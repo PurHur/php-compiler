@@ -16185,6 +16185,26 @@ class Compiler {
                 }
             }
             $argRoot = $this->unwrapOperandChain($arg);
+            $callArg = $callOp->args[$argIndex] ?? null;
+            // file_put_contents($f, 'a', FILE_APPEND | LOCK_EX) — dead temp must use BitwiseOr slot, not prior call return (#18523).
+            if (
+                ($prev instanceof Op\Expr\BinaryOp\BitwiseOr
+                    || $prev instanceof Op\Expr\BinaryOp\BitwiseAnd
+                    || $prev instanceof Op\Expr\BinaryOp\BitwiseXor)
+                && null !== $callArg
+                && $this->callArgIsDeadInlineTemporary($callArg)
+                && !$this->callArgOperandExpectsArrayProducer($callArg)
+            ) {
+                if (null === $block->slotForOperand($prev->result)) {
+                    foreach ($this->compileExpr($prev, $block) as $op) {
+                        $block->addOpCode($op);
+                    }
+                }
+                $slot = $block->slotForOperand($prev->result);
+                if (null !== $slot) {
+                    return $slot;
+                }
+            }
             if (($prev instanceof Op\Expr\BinaryOp || $prev instanceof Op\Expr\InstanceOf_ || $prev instanceof Op\Expr\In_)
                 && null !== $prev->result
                 && (
@@ -19324,6 +19344,22 @@ class Compiler {
             $chainedDimFetch = $this->matchChainedArrayDimFetchInlineCallArgProducer($producers, $argIndex);
             if (null !== $chainedDimFetch) {
                 return $chainedDimFetch;
+            }
+            $last = $producers[$producerCount - 1] ?? null;
+            if ($last instanceof Op\Expr\BinaryOp\BitwiseOr
+                || $last instanceof Op\Expr\BinaryOp\BitwiseAnd
+                || $last instanceof Op\Expr\BinaryOp\BitwiseXor
+            ) {
+                $nonEmbeddedArgIndices = [];
+                foreach ($callArgs as $i => $candidateArg) {
+                    if (null !== $candidateArg && !$this->isEmbeddedCallLiteralArg($candidateArg)) {
+                        $nonEmbeddedArgIndices[] = $i;
+                    }
+                }
+                $trailingNonEmbedded = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
+                if ($argIndex === $trailingNonEmbedded) {
+                    return $last;
+                }
             }
             // str_contains($arr['k'], $fn . '():') — hoisted dim-fetch + concat (#13662, zend_execute.c).
             if (2 === $producerCount) {
@@ -38842,6 +38878,72 @@ class Compiler {
     }
 
     /**
+     * file_put_contents($f, 'a', FILE_APPEND | LOCK_EX) — dead arg temp must use BitwiseOr result, not prior call return (#18523).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function tryResolveInlineBitmaskCallArgSlot(
+        Operand $arg,
+        Block $block,
+        array &$emitOps,
+        ?Op $cfgCallOp = null,
+        int $argIndex = 0
+    ): ?int {
+        if (null === $block->orig || null === $cfgCallOp || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (null === $callArg || !$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        if ($this->callArgOperandExpectsArrayProducer($callArg)) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $last = $producers[\count($producers) - 1] ?? null;
+        if (
+            !$last instanceof Op\Expr\BinaryOp\BitwiseOr
+            && !$last instanceof Op\Expr\BinaryOp\BitwiseAnd
+            && !$last instanceof Op\Expr\BinaryOp\BitwiseXor
+        ) {
+            return null;
+        }
+        $nonEmbeddedArgIndices = [];
+        foreach ($cfgCallOp->args as $i => $candidateArg) {
+            if (null !== $candidateArg && !$this->isEmbeddedCallLiteralArg($candidateArg)) {
+                $nonEmbeddedArgIndices[] = (int) $i;
+            }
+        }
+        if ($argIndex !== ($nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? -1)) {
+            return null;
+        }
+        if (null === $block->slotForOperand($last->result)) {
+            foreach ($this->compileExpr($last, $block) as $op) {
+                $emitOps[] = $op;
+            }
+        }
+
+        return $block->slotForOperand($last->result);
+    }
+
+    /** file_put_contents($f, 'a', FILE_APPEND | LOCK_EX) — skip adjacent FuncCall rewire (#18523). */
+    private function immediatePredecessorIsInlineBitmaskProducer(Op $cfgCallOp, Block $block): bool
+    {
+        if (null === $block->orig) {
+            return false;
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return false;
+        }
+        $immediate = $block->orig->children[$callIndex - 1] ?? null;
+
+        return $immediate instanceof Op\Expr\BinaryOp\BitwiseOr
+            || $immediate instanceof Op\Expr\BinaryOp\BitwiseAnd
+            || $immediate instanceof Op\Expr\BinaryOp\BitwiseXor;
+    }
+
+    /**
      * Lower encapsed ConcatList call args when php-cfg allocates a dead arg temp (#13466).
      *
      * @param list<OpCode> $emitOps
@@ -41250,6 +41352,9 @@ class Compiler {
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->tryResolveUnaryLiteralCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
+                }
+                if (null === $valueSlot) {
+                    $valueSlot = $this->tryResolveInlineBitmaskCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
                 }
                 if (null === $valueSlot && null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
@@ -44128,6 +44233,7 @@ class Compiler {
                 && !$inlineArrayLiteralArgWired
                 && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
                 && !$this->shouldSkipFinalAdjacentNestedFuncCallArgProbe($cfgCallOp, (int) $argIndex, $block)
+                && !$this->immediatePredecessorIsInlineBitmaskProducer($cfgCallOp, $block)
             ) {
                 $nestedCallArgSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
                     $block,
@@ -44896,6 +45002,39 @@ class Compiler {
                 );
                 if (null !== $hoistedScalarArgSlot) {
                     $valueSlot = $hoistedScalarArgSlot;
+                }
+            }
+            if (null !== $cfgCallOp && null !== $block->orig) {
+                $bitmaskArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                $bitmaskSlot = $this->tryResolveInlineBitmaskCallArgSlot(
+                    $bitmaskArgProbe,
+                    $block,
+                    $sends,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null === $bitmaskSlot) {
+                    $bitmaskCallIndex = array_search($cfgCallOp, $block->orig->children, true);
+                    if (\is_int($bitmaskCallIndex) && $bitmaskCallIndex > 0) {
+                        $bitmaskImmediate = $block->orig->children[$bitmaskCallIndex - 1] ?? null;
+                        if (
+                            ($bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseOr
+                                || $bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseAnd
+                                || $bitmaskImmediate instanceof Op\Expr\BinaryOp\BitwiseXor)
+                            && $this->callArgIsDeadInlineTemporary($bitmaskArgProbe)
+                            && !$this->callArgOperandExpectsArrayProducer($bitmaskArgProbe)
+                        ) {
+                            if (null === $block->slotForOperand($bitmaskImmediate->result)) {
+                                foreach ($this->compileExpr($bitmaskImmediate, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                            }
+                            $bitmaskSlot = $block->slotForOperand($bitmaskImmediate->result);
+                        }
+                    }
+                }
+                if (null !== $bitmaskSlot) {
+                    $valueSlot = (string) $bitmaskSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
@@ -48560,6 +48699,86 @@ class Compiler {
     }
 
     /**
+     * file_put_contents($f, 'a', FILE_APPEND | LOCK_EX) — trailing dead-temp arg must use BitwiseOr dest (#18523).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $nestedProducerOps
+     */
+    private function rewireInlineBitmaskTrailingCallArgSendSlots(
+        array &$outerArgSends,
+        array $nestedProducerOps,
+        Block $block,
+        ?Op $cfgCallOp
+    ): void {
+        if (null === $cfgCallOp || null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return;
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex) || $callIndex < 1) {
+            return;
+        }
+        $immediate = $block->orig->children[$callIndex - 1] ?? null;
+        if (
+            !$immediate instanceof Op\Expr\BinaryOp\BitwiseOr
+            && !$immediate instanceof Op\Expr\BinaryOp\BitwiseAnd
+            && !$immediate instanceof Op\Expr\BinaryOp\BitwiseXor
+        ) {
+            return;
+        }
+        $nonEmbeddedArgIndices = [];
+        foreach ($cfgCallOp->args as $i => $candidateArg) {
+            if (null !== $candidateArg && !$this->isEmbeddedCallLiteralArg($candidateArg)) {
+                $nonEmbeddedArgIndices[] = (int) $i;
+            }
+        }
+        $trailingArgIndex = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
+        if (null === $trailingArgIndex) {
+            return;
+        }
+        $trailingArg = $cfgCallOp->args[$trailingArgIndex] ?? null;
+        if (
+            !$this->callArgIsDeadInlineTemporary($trailingArg)
+            || $this->callArgOperandExpectsArrayProducer($trailingArg)
+        ) {
+            return;
+        }
+        $bitmaskSlot = null;
+        foreach (array_merge($nestedProducerOps, $outerArgSends, $block->opCodes) as $op) {
+            if (
+                OpCode::TYPE_BITWISE_OR === $op->type
+                || OpCode::TYPE_BITWISE_AND === $op->type
+                || OpCode::TYPE_BITWISE_XOR === $op->type
+            ) {
+                if (null !== $op->arg1) {
+                    $bitmaskSlot = (string) $op->arg1;
+                    break;
+                }
+            }
+        }
+        if (null === $bitmaskSlot && null !== $immediate->result) {
+            $operandSlot = $block->slotForOperand($immediate->result);
+            if (null !== $operandSlot) {
+                $bitmaskSlot = (string) $operandSlot;
+            }
+        }
+        if (null === $bitmaskSlot) {
+            return;
+        }
+        $argSendOrdinal = 0;
+        foreach ($outerArgSends as $send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            if ($argSendOrdinal === $trailingArgIndex) {
+                $send->arg1 = $bitmaskSlot;
+
+                return;
+            }
+            ++$argSendOrdinal;
+        }
+    }
+
+    /**
      * is_array(file(..., FILE_* | FILE_*)) / count(file(...)) — arg #0 must use adjacent FUNCCALL_EXEC_RETURN,
      * not the hoisted bitmask OR slot (#10474).
      *
@@ -48933,6 +49152,7 @@ class Compiler {
             $calleeName
         );
         $this->rewireIsArrayNestedFileCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
+        $this->rewireInlineBitmaskTrailingCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
         $return = [];
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN === $send->type) {
