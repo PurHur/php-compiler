@@ -384,6 +384,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsXmlrpcFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsXmlrpc());
+    }
+
+    public function testSupportsXmlrpcTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsXmlrpc());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsBrotliFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsBrotli());

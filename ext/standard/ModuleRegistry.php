@@ -83,8 +83,10 @@ final class ModuleRegistry
             && !\PHPCompiler\ext\inotify\InotifyExtensionPolicy::advertisesExtension();
         $withholdXslSurface = 'xsl' === $primary
             && !\PHPCompiler\ext\xsl\XslExtensionPolicy::advertisesExtension();
+        $withholdXmlrpcSurface = 'xmlrpc' === $primary
+            && !\PHPCompiler\ext\xmlrpc\XmlrpcExtensionPolicy::advertisesExtension();
 
-        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface) {
+        if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface && !$withholdXmlrpcSurface) {
             self::register($module->getExtensionName(), $moduleVersion);
         }
         $additional = $module->getAdditionalExtensionNames();
@@ -99,7 +101,7 @@ final class ModuleRegistry
                 continue;
             }
             $fnName = strtolower($func->getName());
-            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface || $withholdInotifySurface || $withholdXslSurface) {
+            if ($withholdOpensslSurface || $withholdSqlite3Surface || $withholdLdapSurface || $withholdInotifySurface || $withholdXslSurface || $withholdXmlrpcSurface) {
                 self::registerBuiltinLookup($fnName);
 
                 continue;

@@ -521,6 +521,11 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'extension_loaded_msgpack')) {
                 continue;
             }
+            if (!CompilerVersion::supportsXmlrpc()
+                && str_contains($name, 'xmlrpc')
+                && !str_contains($name, 'extension_loaded_xmlrpc')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZip()
                 && (str_contains($name, 'zip')
                     || str_contains($name, 'ziparchive'))

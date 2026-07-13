@@ -146,6 +146,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['curl_escape', 'curl_unescape'], true)) {
             return CurlExtensionPolicy::advertisesExtension();
         }
+        if (\in_array($lc, ['xmlrpc_encode', 'xmlrpc_decode'], true)) {
+            return \PHPCompiler\ext\xmlrpc\XmlrpcExtensionPolicy::advertisesExtension();
+        }
         if ('ldap_escape' === $lc) {
             return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins();
         }
@@ -179,6 +182,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('msgpack' === $ext) {
             return \PHPCompiler\ext\msgpack\MsgpackExtensionPolicy::advertisesExtension();
+        }
+        if ('xmlrpc' === $ext) {
+            return \PHPCompiler\ext\xmlrpc\XmlrpcExtensionPolicy::advertisesExtension();
         }
         if ('uri' === $ext) {
             return \PHPCompiler\ext\uri\UriExtensionPolicy::advertisesExtension();
