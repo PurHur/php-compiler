@@ -248,6 +248,182 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_seal() — public-key envelope encryption (php-src ext/openssl/openssl.c; #6523).
+     *
+     * @param list<string> $publicKeyPems
+     *
+     * @return array{length: int, sealed: string, encrypted_keys: list<string>, iv: string}|false
+     */
+    public static function seal(
+        string $data,
+        array $publicKeyPems,
+        string $cipherAlgo,
+        bool $assignIv,
+        ?Frame $frame = null
+    ): array|false {
+        if (!VmOpensslSealNative::available()) {
+            self::userWarning('openssl_seal(): OpenSSL envelope encryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $ivLen = OpensslCipherRegistry::cipherIvLength($cipherAlgo);
+        if (false === $ivLen) {
+            self::userWarning('openssl_seal(): Unknown cipher algorithm', $frame);
+
+            return false;
+        }
+        if ($ivLen > 0 && !$assignIv) {
+            throw new \ValueError('openssl_seal(): Argument #6 ($iv) cannot be null for the chosen cipher algorithm');
+        }
+
+        if ([] === $publicKeyPems) {
+            throw new \ValueError('openssl_seal(): Argument #4 ($public_key) cannot be empty');
+        }
+
+        $result = VmOpensslSealNative::seal($data, $publicKeyPems, $cipherAlgo, $assignIv);
+        if (false === $result) {
+            self::userWarning('openssl_seal(): Seal operation failed', $frame);
+
+            return false;
+        }
+
+        return $result;
+    }
+
+    /**
+     * openssl_open() — decrypt openssl_seal() output (php-src ext/openssl/openssl.c; #6523).
+     */
+    public static function open(
+        string $sealedData,
+        string $encryptedKey,
+        string $privateKeyPem,
+        string $cipherAlgo,
+        ?string $iv,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslSealNative::available()) {
+            self::userWarning('openssl_open(): OpenSSL envelope decryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $ivLen = OpensslCipherRegistry::cipherIvLength($cipherAlgo);
+        if (false === $ivLen) {
+            self::userWarning('openssl_open(): Unknown cipher algorithm', $frame);
+
+            return false;
+        }
+        if ($ivLen > 0) {
+            if (null === $iv) {
+                throw new \ValueError('openssl_open(): Argument #6 ($iv) cannot be null for the chosen cipher algorithm');
+            }
+            if (\strlen($iv) !== $ivLen) {
+                self::userWarning('openssl_open(): IV length is invalid', $frame);
+
+                return false;
+            }
+        }
+
+        $plain = VmOpensslSealNative::open($sealedData, $encryptedKey, $privateKeyPem, $cipherAlgo, $iv);
+        if (false === $plain) {
+            self::userWarning('openssl_open(): Open operation failed', $frame);
+
+            return false;
+        }
+
+        return $plain;
+    }
+
+    /**
+     * @return list<string>|false
+     */
+    public static function coercePublicKeyPemList(
+        Variable $arrayVar,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        ?Frame $frame = null
+    ): array|false {
+        $arrayVar = $arrayVar->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arrayVar->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type array, %s given',
+                $function,
+                $argIndex + 1,
+                $paramName,
+                match ($arrayVar->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_BOOLEAN => 'bool',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_FLOAT => 'float',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_OBJECT => 'object',
+                    default => 'mixed',
+                }
+            ));
+        }
+
+        $ht = $arrayVar->toArray();
+        $pems = [];
+        $index = 0;
+        foreach ($ht->iterateKeyed(true) as [, $valueVar]) {
+            $pem = self::coerceSealPublicKeyPem($valueVar, $function, $index, $frame);
+            if (false === $pem) {
+                self::userWarning(\sprintf(
+                    '%s(): Not a public key (%dth member of pubkeys)',
+                    $function,
+                    $index + 1
+                ), $frame);
+
+                return false;
+            }
+            $pems[] = $pem;
+            ++$index;
+        }
+
+        if ([] === $pems) {
+            throw new \ValueError($function.'(): Argument #'.($argIndex + 1).' ($'.$paramName.') cannot be empty');
+        }
+
+        return $pems;
+    }
+
+    private static function coerceSealPublicKeyPem(
+        Variable $var,
+        string $function,
+        int $memberIndex,
+        ?Frame $frame = null
+    ): string|false {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING === $var->type) {
+            $pem = $var->toString();
+
+            return '' !== $pem ? $pem : false;
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $pem = VmOpensslObjects::keyPem($var->toObject());
+            if ('' === $pem) {
+                return false;
+            }
+            if (!VmOpensslPkeyNative::available()) {
+                return false;
+            }
+            $publicPem = VmOpensslPkeyNative::exportPublicKeyPem($pem);
+            if (false === $publicPem) {
+                self::userWarning(\sprintf(
+                    '%s(): Don\'t know how to get public key from this private key',
+                    $function
+                ), $frame);
+            }
+
+            return $publicPem;
+        }
+
+        return false;
+    }
+
+    /**
      * openssl_pkey_derive() — ECDH/X25519 shared secret (EVP_PKEY_derive; issue #15428).
      *
      * @return string|false

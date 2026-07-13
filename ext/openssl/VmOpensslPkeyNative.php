@@ -86,6 +86,93 @@ final class VmOpensslPkeyNative
         return self::normalizePrivateKeyPem($pem, $passphrase);
     }
 
+    public static function exportPublicKeyPem(string $pem): string|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $pkey = self::readAnyKey($ffi, $pem);
+        if (null === $pkey) {
+            return false;
+        }
+
+        try {
+            return self::writePublicKeyPem($ffi, $pkey);
+        } finally {
+            $ffi->EVP_PKEY_free($pkey);
+        }
+    }
+
+    /**
+     * @param \FFI $ffi
+     *
+     * @return \FFI\CData|null
+     */
+    private static function readAnyKey($ffi, string $pem)
+    {
+        $bio = $ffi->BIO_new_mem_buf($pem, \strlen($pem));
+        if (null === $bio) {
+            return null;
+        }
+
+        try {
+            $pub = $ffi->PEM_read_bio_PUBKEY($bio, null, null, null);
+            if (null !== $pub) {
+                return $pub;
+            }
+        } finally {
+            $ffi->BIO_free($bio);
+        }
+
+        $bio = $ffi->BIO_new_mem_buf($pem, \strlen($pem));
+        if (null === $bio) {
+            return null;
+        }
+
+        try {
+            return $ffi->PEM_read_bio_PrivateKey($bio, null, null, null);
+        } finally {
+            $ffi->BIO_free($bio);
+        }
+    }
+
+    /**
+     * @param \FFI       $ffi
+     * @param \FFI\CData $pkey
+     */
+    private static function writePublicKeyPem($ffi, $pkey): string|false
+    {
+        $tmp = \tempnam(\sys_get_temp_dir(), 'phpc-pubkey-');
+        if (false === $tmp) {
+            return false;
+        }
+
+        $bio = $ffi->BIO_new_file($tmp, 'wb');
+        if (null === $bio) {
+            @\unlink($tmp);
+
+            return false;
+        }
+
+        try {
+            if (1 !== (int) $ffi->PEM_write_bio_PUBKEY($bio, $pkey)) {
+                return false;
+            }
+        } finally {
+            $ffi->BIO_free($bio);
+        }
+
+        $pem = @\file_get_contents($tmp);
+        @\unlink($tmp);
+        if (false === $pem || '' === $pem) {
+            return false;
+        }
+
+        return $pem;
+    }
+
     /**
      * @param \FFI $ffi
      *
@@ -171,6 +258,7 @@ BIO *BIO_new_mem_buf(const void *buf, int len);
 BIO *BIO_new_file(const char *filename, const char *mode);
 void BIO_free(BIO *a);
 EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, void *cb, void *u);
+EVP_PKEY *PEM_read_bio_PUBKEY(BIO *bp, EVP_PKEY **x, void *cb, void *u);
 void EVP_PKEY_free(EVP_PKEY *pkey);
 EVP_PKEY_CTX *EVP_PKEY_CTX_new_id(int id, void *e);
 void EVP_PKEY_CTX_free(EVP_PKEY_CTX *ctx);
@@ -179,6 +267,7 @@ int EVP_PKEY_CTX_set_rsa_keygen_bits(EVP_PKEY_CTX *ctx, int bits);
 int EVP_PKEY_keygen(EVP_PKEY_CTX *ctx, EVP_PKEY **ppkey);
 int PEM_write_bio_PrivateKey(BIO *bp, EVP_PKEY *x, void *enc,
     void *kstr, int klen, void *cb, void *u);
+int PEM_write_bio_PUBKEY(BIO *bp, EVP_PKEY *x);
 CDEF;
 
         foreach (['libcrypto.so.3', 'libcrypto.so'] as $lib) {
