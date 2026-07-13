@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -35,12 +36,7 @@ final class wordwrap extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $text = VmString::coerceTypedStringBuiltinArg(
-            $frame->calledArgs[0],
-            'wordwrap',
-            0,
-            'string'
-        );
+        $text = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'wordwrap', 'string');
         $width = 75;
         if ($argc >= 2) {
             $width = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'wordwrap', 2, 'width');
@@ -104,7 +100,7 @@ final class wordwrap extends Internal
             $cutI8 = $context->builder->zExt($context->helper->loadValue($args[3]), $i8);
         }
 
-        $text = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'wordwrap', 0, 'string');
+        $text = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'wordwrap', 0, 'string');
         StringWordwrap::ensureLinked($context);
 
         return $context->builder->call(

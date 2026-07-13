@@ -1,5 +1,5 @@
 --TEST--
-stdlib addslashes()/stripslashes() coerce scalars (#4553, ext/standard/string.c)
+stdlib addslashes()/stripslashes() coerce scalars (#4553, #18483, ext/standard/string.c)
 --FILE--
 <?php
 try {
@@ -16,6 +16,6 @@ try {
     echo $e::class, ': ', $e->getMessage(), "\n";
 }
 --EXPECT--
-TypeError: addslashes(): Argument #1 ($string) must be of type string, null given
+uncaught
 123
 TypeError: addslashes(): Argument #1 ($string) must be of type string, array given

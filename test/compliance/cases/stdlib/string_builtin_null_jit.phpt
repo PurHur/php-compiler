@@ -1,5 +1,5 @@
 --TEST--
-stdlib typed string builtins — null $string TypeError JIT (#18190, ext/standard/string.c, html.c)
+stdlib typed string builtins — null $string coerces to empty string JIT (#18483, ext/standard/string.c, html.c)
 --JIT--
 --FILE--
 <?php
@@ -17,7 +17,7 @@ foreach ([
     }
 }
 --EXPECT--
-htmlspecialchars: TypeError
-htmlentities: TypeError
-addcslashes: TypeError
-strip_tags: TypeError
+htmlspecialchars: uncaught
+htmlentities: uncaught
+addcslashes: uncaught
+strip_tags: uncaught
