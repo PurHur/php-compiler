@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\ext\posix\VmPosix;
+use PHPCompiler\VM;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ScriptStack;
@@ -849,6 +851,11 @@ final class VmFs
 
     private static function filePutContentsViaOpen(string $path, string $data, int $flags): int|false
     {
+        if (0 !== ($flags & \LOCK_EX)) {
+            self::warnLockExNonRegularFile();
+
+            return false;
+        }
         $mode = (0 !== ($flags & StdlibConstants::FILE_APPEND)) ? 'ab' : 'wb';
         $handle = self::fopen($path, $mode);
         if (false === $handle) {
@@ -861,6 +868,29 @@ final class VmFs
         }
 
         return $written;
+    }
+
+    private static function warnLockExNonRegularFile(): void
+    {
+        $message = 'file_put_contents(): Exclusive locks may only be set for regular files';
+        $vm = VM::running();
+        if (null === $vm) {
+            @\trigger_error($message, \E_WARNING);
+
+            return;
+        }
+        $frame = $vm->builtinHandlerFrame();
+        if (null === $frame) {
+            $frames = $vm->context->runStackFrames();
+            $frame = [] !== $frames ? $frames[0] : null;
+        }
+        $vm->context->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            null,
+            $vm->context,
+            $frame
+        );
     }
 
     public static function fopen(string $path, string $mode, ?\PHPCompiler\VM\Context $ctx = null) {
