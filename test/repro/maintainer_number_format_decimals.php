@@ -1,17 +1,26 @@
 <?php
 
-$out20 = number_format(1.1, 20);
-echo 'decimals20=', $out20, "\n";
+declare(strict_types=1);
 
-$outNeg = number_format(1.5, -1);
-echo 'decimals_neg=', $outNeg, "\n";
-
-$expected20 = '1.10000000000000008882';
-if ($out20 !== $expected20) {
-    fwrite(STDERR, "expected20=$expected20 got=$out20\n");
+// Issue #18525 — number_format() with decimals > 14 must not zero fractional digits.
+$out = number_format(1.1, 20);
+$expected = '1.10000000000000008882';
+if ($out !== $expected) {
+    fwrite(STDERR, "number_format(1.1, 20): expected {$expected}, got {$out}\n");
     exit(1);
 }
-if ('2' !== $outNeg) {
-    fwrite(STDERR, "expected neg decimals=2 got=$outNeg\n");
+
+$out2 = number_format(1234.5678, 20);
+$expected2 = '1,234.56780000000003383320';
+if ($out2 !== $expected2) {
+    fwrite(STDERR, "number_format(1234.5678, 20): expected {$expected2}, got {$out2}\n");
     exit(1);
 }
+
+$neg = number_format(1.5, -1);
+if ('2' !== $neg) {
+    fwrite(STDERR, "number_format(1.5, -1): expected 2, got {$neg}\n");
+    exit(1);
+}
+
+echo "ok\n";

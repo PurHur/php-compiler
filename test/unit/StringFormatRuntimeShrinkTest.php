@@ -62,5 +62,13 @@ final class StringFormatRuntimeShrinkTest extends TestCase
                 StdlibConstants::PHP_ROUND_TOWARD_ZERO
             )
         );
+        $this->assertSame(
+            '1.10000000000000008882',
+            SprintfJitHelper::numberFormat(1.1, 20, '.', ',')
+        );
+        $this->assertSame(
+            VmNumberFormat::format(1.1, 20),
+            SprintfJitHelper::numberFormat(1.1, 20, '.', ',')
+        );
     }
 }

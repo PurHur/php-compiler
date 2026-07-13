@@ -1,5 +1,5 @@
 --TEST--
-stdlib number_format() >14 decimal places matches Zend (ext/standard/number_format.c, #18525)
+stdlib number_format() high $decimals fractional digits (#18525, ext/standard/number_format.c)
 --FILE--
 <?php
 declare(strict_types=1);

@@ -127,50 +127,33 @@ final class VmNumberFormat
 
         $rounded = VmRound::mathRound($number, $roundPlaces, $roundingMode);
 
-        if ($decimals > 0) {
-            return self::formatWithSprintfFraction(
-                $rounded,
-                $decimals,
-                $decimalSeparator,
-                $thousandsSeparator,
-                $negative
-            );
+        // php-src ext/standard/number_format.c — php_conv_floating_point / %F after _php_math_round.
+        // Integer frac extraction breaks past ~14 decimals (IEEE double); reuse dtoa fcvt path (#18525).
+        $signedRounded = $negative ? -$rounded : $rounded;
+        $formatted = VmFloatDtoa::formatSprintfF($signedRounded, $decimals);
+        if ('' !== $formatted && '-' === $formatted[0]) {
+            $formatted = \substr($formatted, 1);
+            $negative = true;
         }
 
-        $intDigits = self::digitsFromInt((int) floor($rounded));
-        $result = self::insertThousands($intDigits, $thousandsSeparator);
-
-        if ($negative) {
-            return '-'.$result;
-        }
-
-        return $result;
-    }
-
-    /**
-     * php-src ext/standard/number_format.c — snprintf / php_conv_floating_point for display precision.
-     *
-     * Integer extraction of the fractional part loses accuracy beyond ~14 decimal digits (IEEE double).
-     */
-    private static function formatWithSprintfFraction(
-        float $rounded,
-        int $decimals,
-        string $decimalSeparator,
-        string $thousandsSeparator,
-        bool $negative
-    ): string {
-        $formatted = \sprintf('%.'.$decimals.'f', $rounded);
         $dotPos = \strpos($formatted, '.');
         if (false === $dotPos) {
-            $intDigits = $formatted;
+            $intDigits = '' === $formatted ? '0' : $formatted;
             $fracDigits = '';
         } else {
-            $intDigits = VmString::byteSlice($formatted, 0, $dotPos);
-            $fracDigits = VmString::byteSlice($formatted, $dotPos + 1);
+            $intDigits = \substr($formatted, 0, $dotPos);
+            if ('' === $intDigits) {
+                $intDigits = '0';
+            }
+            $fracDigits = \substr($formatted, $dotPos + 1);
         }
 
         $result = self::insertThousands($intDigits, $thousandsSeparator);
-        if ('' !== $fracDigits) {
+
+        if ($decimals > 0) {
+            while (VmString::byteLength($fracDigits) < $decimals) {
+                $fracDigits .= '0';
+            }
             $result .= $decimalSeparator.$fracDigits;
         }
 
@@ -179,20 +162,6 @@ final class VmNumberFormat
         }
 
         return $result;
-    }
-
-    private static function digitsFromInt(int $value): string
-    {
-        if (0 === $value) {
-            return '0';
-        }
-        $digits = '';
-        while ($value > 0) {
-            $digits = \chr(48 + ($value % 10)).$digits;
-            $value = (int) ($value / 10);
-        }
-
-        return $digits;
     }
 
     private static function insertThousands(string $digits, string $separator): string

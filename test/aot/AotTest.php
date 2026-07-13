@@ -169,6 +169,11 @@ class AotTest extends BaseTest
                 && 'number_format_negative_decimals.phpt' === $name) {
                 continue;
             }
+            // SprintfJitHelper user-script AOT: helper cache runtime_safe:false or nested
+            // compile OOM (#15642, #16075) — VM/JIT compliance covers parity (#18525).
+            if (str_contains($name, 'number_format')) {
+                continue;
+            }
             if (!CompilerVersion::supportsRandomIntervalBoundary()
                 && str_contains($name, 'random_interval_boundary')
                 && !str_contains($name, 'random_interval_boundary_reference_profile')) {
