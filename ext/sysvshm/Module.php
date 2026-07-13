@@ -22,6 +22,7 @@ class Module extends ModuleAbstract
     public static function registerClasses(Context $ctx): void
     {
         VmSysvShm::registerClass($ctx);
+        VmShmop::registerClass($ctx);
     }
 
     public function getFunctions(): array
@@ -32,6 +33,12 @@ class Module extends ModuleAbstract
             new shm_get_var(),
             new shm_put_var(),
             new shm_remove_var(),
+            new shmop_open(),
+            new shmop_read(),
+            new shmop_write(),
+            new shmop_size(),
+            new shmop_close(),
+            new shmop_delete(),
         ];
     }
 }
