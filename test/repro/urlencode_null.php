@@ -1,4 +1,8 @@
 <?php
-// Issue #18368 — urlencode(null) coerces to '' (ext/standard/url.c).
-echo 'urlencode=' . urlencode(null) . "\n";
-echo 'rawurlencode=' . rawurlencode(null) . "\n";
+// Issue #18733 — urlencode(null) TypeError (ext/standard/url.c).
+try {
+    urlencode(null);
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}

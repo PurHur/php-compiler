@@ -1,5 +1,5 @@
 --TEST--
-AOT urlencode()/rawurlencode() null TypeError (#18733, ext/standard/url.c)
+stdlib urlencode()/rawurlencode() null TypeError (#18733, ext/standard/url.c)
 --FILE--
 <?php
 foreach (['urlencode', 'rawurlencode'] as $fn) {
