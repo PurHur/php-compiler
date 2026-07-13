@@ -7,10 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** shell_exec() — VM via VmShellExecNative libc popen; JIT/AOT via __compiler_shell_exec (#8250). */
@@ -29,7 +27,6 @@ final class shell_exec extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'shell_exec', 'command', 0, $frame);
         $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'shell_exec', 0, 'command');
         VmString::rejectEmptyBuiltinStringArg($command, 'shell_exec', 0, 'command');
         $result = VmShellExecNative::shellExec($command);
@@ -47,8 +44,6 @@ final class shell_exec extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('shell_exec() requires exactly one argument');
         }
-
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'shell_exec', 'command', 1);
 
         $command = JitStringBuiltinArg::lower($context, $args[0], 'shell_exec', 0, 'command');
         JitStringBuiltinArg::rejectEmpty(

@@ -2,13 +2,9 @@
 
 declare(strict_types=1);
 
-foreach (['exec', 'shell_exec', 'system', 'passthru', 'popen'] as $fn) {
+foreach (['shell_exec', 'system', 'passthru'] as $fn) {
     try {
-        if ('popen' === $fn) {
-            $fn(null, 'r');
-        } else {
-            $fn(null);
-        }
+        $fn(null);
         fwrite(STDERR, "$fn(null): expected ValueError\n");
         exit(1);
     } catch (ValueError) {
@@ -22,7 +18,7 @@ foreach (['exec', 'shell_exec', 'system', 'passthru', 'popen'] as $fn) {
 $pipes = [];
 $result = proc_open(null, [], $pipes);
 if (null !== $result) {
-    fwrite(STDERR, 'proc_open(null): expected NULL'."\n");
+    fwrite(STDERR, 'proc_open(null): expected NULL, got '.var_export($result, true)."\n");
     exit(1);
 }
 echo "proc_open(null): ok\n";

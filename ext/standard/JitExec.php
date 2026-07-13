@@ -9,7 +9,6 @@ use PHPCompiler\JIT\Builtin\ObOutputRuntime;
 use PHPCompiler\JIT\Builtin\ProcessRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -74,8 +73,6 @@ final class JitExec
             throw new \LogicException('passthru() accepts one or two arguments in this compiler build');
         }
 
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'passthru', 'command', 1);
-
         return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, false, 'passthru');
     }
 
@@ -85,8 +82,6 @@ final class JitExec
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('system() accepts one or two arguments in this compiler build');
         }
-
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'system', 'command', 1);
 
         return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, true, 'system');
     }

@@ -34,6 +34,13 @@ final class proc_open extends Internal
             return;
         }
 
+        $commandArg = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_NULL === $commandArg->type) {
+            $frame->returnVar->null();
+
+            return;
+        }
+
         $command = self::parseCommand($frame->calledArgs[0], 'proc_open', 1);
         $descriptorSpec = self::parseDescriptorSpec($frame->calledArgs[1], 'proc_open', 2);
         $cwd = null;
