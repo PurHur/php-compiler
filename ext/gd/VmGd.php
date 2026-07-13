@@ -52,9 +52,120 @@ final class VmGd
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
-        GdRegistry::attach($entry, new GdImageState($encoded, $imageType));
+        GdRegistry::attach($entry, GdImageState::fromEncoded($encoded, $imageType));
 
         return $entry;
+    }
+
+    public static function createTruecolorImage(Frame $frame, int $width, int $height): ObjectEntry|false
+    {
+        if ($width <= 0 || $height <= 0) {
+            self::warnInvalidDimensions($frame, 'imagecreatetruecolor');
+
+            return false;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('imagecreatetruecolor() requires VM context');
+        }
+        $class = $ctx->classes[self::CLASS_GDIMAGE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('GdImage is not registered in this compiler build');
+        }
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        GdRegistry::attach($entry, GdImageState::createTruecolor($width, $height));
+
+        return $entry;
+    }
+
+    public static function colorAllocate(ObjectEntry $image, int $red, int $green, int $blue): int|false
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster() || !$state->truecolor) {
+            return false;
+        }
+        if ($red < 0 || $red > 255 || $green < 0 || $green > 255 || $blue < 0 || $blue > 255) {
+            return false;
+        }
+
+        return ($red << 16) | ($green << 8) | $blue;
+    }
+
+    public static function fill(ObjectEntry $image, int $x, int $y, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $width = $state->width;
+        $height = $state->height;
+        if ($x < 0 || $y < 0 || $x >= $width || $y >= $height) {
+            return false;
+        }
+
+        $pixels = $state->pixels;
+        $index = $y * $width + $x;
+        $target = $pixels[$index];
+        if ($target === $color) {
+            return true;
+        }
+
+        $stack = [[$x, $y]];
+        while ([] !== $stack) {
+            [$px, $py] = array_pop($stack);
+            if ($px < 0 || $py < 0 || $px >= $width || $py >= $height) {
+                continue;
+            }
+            $pos = $py * $width + $px;
+            if ($pixels[$pos] !== $target) {
+                continue;
+            }
+            $pixels[$pos] = $color;
+            $stack[] = [$px + 1, $py];
+            $stack[] = [$px - 1, $py];
+            $stack[] = [$px, $py + 1];
+            $stack[] = [$px, $py - 1];
+        }
+        $state->pixels = $pixels;
+
+        return true;
+    }
+
+    public static function destroy(ObjectEntry $image): bool
+    {
+        if (null === GdRegistry::state($image)) {
+            return false;
+        }
+        GdRegistry::forget($image);
+
+        return true;
+    }
+
+    public static function coerceIntArg(Variable $arg, string $function, int $position, string $name): int
+    {
+        $arg = $arg->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type int, %s given',
+                $function,
+                $position,
+                $name,
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type int, %s given',
+                $function,
+                $position,
+                $name,
+                self::typeLabel($arg)
+            ));
+        }
+
+        return $arg->toInt();
     }
 
     public static function requireGdImage(Variable $arg, string $function, int $position): ObjectEntry
@@ -90,7 +201,14 @@ final class VmGd
             throw new \TypeError('imagepng(): Argument #1 ($image) must be of type GdImage');
         }
 
-        return $state->encoded;
+        if ($state->hasEncoded()) {
+            return $state->encoded;
+        }
+        if ($state->hasRaster()) {
+            return VmGdPng::encodeRgb($state->width, $state->height, $state->pixels);
+        }
+
+        throw new \TypeError('imagepng(): Argument #1 ($image) must be of type GdImage');
     }
 
     public static function writePngToOutput(Frame $frame, ObjectEntry $image): bool
@@ -112,6 +230,20 @@ final class VmGd
         }
         $frame->vmContext->errors->triggerError(
             $function.'(): Invalid image format',
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    private static function warnInvalidDimensions(Frame $frame, string $function): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            $function.'(): Invalid image dimensions',
             ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,

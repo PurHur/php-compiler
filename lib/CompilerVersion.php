@@ -972,18 +972,12 @@ final class CompilerVersion
     /**
      * PHP 8.4+ property hooks (`$prop { get; set; }`, default initializer + hook block).
      *
-     * Enabled on the 8.4 development line by default (#15994, #16068). Explicit
-     * `PHP_COMPILER_PROFILE=8.2` (or older) keeps Zend 8.2 reference rejection (#14062, #15800).
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
+     * (#14062, #15800, #18531). Forward profile: `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+.
      * php-src: Zend/zend_language_parser.y / Zend/zend_compile.c property hooks.
      */
     public static function supportsPropertyHooks(): bool
     {
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            // Default 8.4 development line (#15994, #18445); version_compare treats -dev below stable.
-            return version_compare(self::VERSION, '8.4', '>=');
-        }
-
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 

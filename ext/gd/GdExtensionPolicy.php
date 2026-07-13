@@ -21,4 +21,9 @@ final class GdExtensionPolicy
     {
         return self::advertisesExtension();
     }
+
+    public static function advertisesDrawing(): bool
+    {
+        return self::advertisesExtension();
+    }
 }

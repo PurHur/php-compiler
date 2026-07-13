@@ -88,6 +88,9 @@ final class BuiltinByRefParams
             case 'openssl_sign':
             case 'openssl_open':
             case 'openssl_pkey_export':
+            case 'openssl_pkcs12_export':
+                return [1];
+            case 'openssl_pkcs12_read':
                 return [1];
             case 'openssl_seal':
                 return [1, 2, 5];
