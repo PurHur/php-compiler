@@ -9443,6 +9443,16 @@ class JIT {
                     $prevStrict = $this->context->callerStrictTypes;
                     $this->context->callerStrictTypes = $block->strictTypes;
                     $this->emitJitLateStaticCallSiteBinding($callArgs);
+                    if (
+                        $this->context->scope->toCall instanceof JIT\Call\Native
+                        && [] !== $callArgs
+                    ) {
+                        JIT\BackedEnumFromJit::emitCallSiteStrictCheck(
+                            $this->context,
+                            $this->context->scope->toCall,
+                            $callArgs[0]
+                        );
+                    }
                     if ($this->context->scope->toCall instanceof CoreFunc\Internal) {
                         $callArgs = $this->densifyInternalCallArgs($this->context->scope->toCall, $callArgs);
                     }
@@ -9643,6 +9653,16 @@ class JIT {
                     $prevStrict = $this->context->callerStrictTypes;
                     $this->context->callerStrictTypes = $block->strictTypes;
                     $this->emitJitLateStaticCallSiteBinding($callArgs);
+                    if (
+                        $this->context->scope->toCall instanceof JIT\Call\Native
+                        && [] !== $callArgs
+                    ) {
+                        JIT\BackedEnumFromJit::emitCallSiteStrictCheck(
+                            $this->context,
+                            $this->context->scope->toCall,
+                            $callArgs[0]
+                        );
+                    }
                     $savedUnserializeOptionsOperand = $this->context->jitUnserializeOptionsOperand;
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
