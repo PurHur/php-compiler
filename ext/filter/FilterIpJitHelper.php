@@ -13,9 +13,9 @@ namespace PHPCompiler\ext\filter;
  */
 final class FilterIpJitHelper
 {
-    public static function validate(string $s): ?string
+    public static function validate(string $s, int $flags = 0): ?string
     {
-        if (!VmFilter::isValidIpAddress($s)) {
+        if (!VmFilter::isValidIpAddress($s, $flags)) {
             return null;
         }
 
