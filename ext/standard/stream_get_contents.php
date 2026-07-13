@@ -8,6 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitResourceArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -33,9 +35,7 @@ final class stream_get_contents extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        if (!is_resource_::isResource($handleVar)) {
-            throw new \LogicException('stream_get_contents() expects a stream resource');
-        }
+        $handle = VmStreamArg::requireStreamHandle($handleVar, 'stream_get_contents');
         $maxlength = -1;
         $offset = -1;
         if (isset($frame->calledArgs[1])) {
@@ -49,7 +49,7 @@ final class stream_get_contents extends Internal
                 'offset'
             );
         }
-        $data = VmFs::streamGetContents($handleVar->toInt(), $maxlength, $offset);
+        $data = VmFs::streamGetContents($handle, $maxlength, $offset);
         if (false === $data) {
             $frame->returnVar->bool(false);
 
@@ -63,6 +63,12 @@ final class stream_get_contents extends Internal
         $argc = \count($args);
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('stream_get_contents() requires one to three arguments in this compiler build');
+        }
+        JitResourceArg::rejectEnumCaseOperand($context, $args[0], 'stream_get_contents', 0, 'stream');
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            JitResourceArg::emitResourceTypeErrorAndAbort($context, 'stream_get_contents', 0, 'stream', 'null');
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
         $i64 = $context->getTypeFromString('int64');
         $handle = $context->builder->truncOrBitCast(
