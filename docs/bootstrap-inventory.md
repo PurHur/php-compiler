@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4806 |
-| Phase A inventory files (M2 ratio SSOT) | 4806 |
+| PHP files on vm.php path | 4814 |
+| Phase A inventory files (M2 ratio SSOT) | 4814 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12916 |
+| Source constructs flagged (warnings) | 12940 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2922,14 +2922,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/stats/stats_covariance.php` | 0 | 2 |
 | `ext/stats/stats_standard_deviation.php` | 0 | 2 |
 | `ext/stats/stats_variance.php` | 0 | 2 |
-| `ext/sysvshm/Module.php` | 0 | 6 |
+| `ext/sysvshm/Module.php` | 0 | 12 |
+| `ext/sysvshm/ShmopArgs.php` | 0 | 2 |
 | `ext/sysvshm/SysvShmArgs.php` | 0 | 2 |
+| `ext/sysvshm/VmShmop.php` | 0 | 4 |
 | `ext/sysvshm/VmSysvShm.php` | 0 | 4 |
 | `ext/sysvshm/shm_attach.php` | 0 | 2 |
 | `ext/sysvshm/shm_detach.php` | 0 | 2 |
 | `ext/sysvshm/shm_get_var.php` | 0 | 2 |
 | `ext/sysvshm/shm_put_var.php` | 0 | 2 |
 | `ext/sysvshm/shm_remove_var.php` | 0 | 2 |
+| `ext/sysvshm/shmop_close.php` | 0 | 2 |
+| `ext/sysvshm/shmop_delete.php` | 0 | 2 |
+| `ext/sysvshm/shmop_open.php` | 0 | 2 |
+| `ext/sysvshm/shmop_read.php` | 0 | 2 |
+| `ext/sysvshm/shmop_size.php` | 0 | 2 |
+| `ext/sysvshm/shmop_write.php` | 0 | 2 |
 | `ext/tokenizer/BuiltinClasses.php` | 0 | 1 |
 | `ext/tokenizer/JitTokenGetAll.php` | 0 | 2 |
 | `ext/tokenizer/JitTokenName.php` | 0 | 1 |
@@ -23812,18 +23820,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sysvshm/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new shm_attach (line 30)
-- new shm_detach (line 31)
-- new shm_get_var (line 32)
-- new shm_put_var (line 33)
-- new shm_remove_var (line 34)
+- new shm_attach (line 31)
+- new shm_detach (line 32)
+- new shm_get_var (line 33)
+- new shm_put_var (line 34)
+- new shm_remove_var (line 35)
+- new shmop_open (line 36)
+- new shmop_read (line 37)
+- new shmop_write (line 38)
+- new shmop_size (line 39)
+- new shmop_close (line 40)
+- new shmop_delete (line 41)
 - 3 class method(s)
+
+### `ext/sysvshm/ShmopArgs.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 20)
+- 10 class method(s)
 
 ### `ext/sysvshm/SysvShmArgs.php`
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 19)
 - 5 class method(s)
+
+### `ext/sysvshm/VmShmop.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 35)
+- new Variable (line 43)
+- new ObjectEntry (line 44)
+- 12 class method(s)
 
 ### `ext/sysvshm/VmSysvShm.php`
 
@@ -23862,6 +23890,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
 - 2 class method(s)
+
+### `ext/sysvshm/shmop_close.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 2 class method(s)
+
+### `ext/sysvshm/shmop_delete.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 3 class method(s)
+
+### `ext/sysvshm/shmop_open.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 3 class method(s)
+
+### `ext/sysvshm/shmop_read.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 3 class method(s)
+
+### `ext/sysvshm/shmop_size.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 3 class method(s)
+
+### `ext/sysvshm/shmop_write.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 3 class method(s)
 
 ### `ext/tokenizer/BuiltinClasses.php`
 
