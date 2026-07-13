@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_replace_key() via ArrayReplaceKeyJitHelper PHP (#12488).
  *
- * Standalone AOT compiles {@see ArrayReplaceKeyJitHelper} via JitVmHelperLink bridge (#14531); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::arrayReplaceKey()}.
+ * Standalone AOT compiles {@see ArrayReplaceKeyJitHelper} via JitVmHelperLink bridge (#14531); native literal arrays materialize via {@see ArrayBuiltinHelper::nativeListToHashTable()} then route through PHP (#18430).
  * SSOT: {@see \PHPCompiler\VM\HashTable::replaceKeyCopy()}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_replace_key) (PHP 8.4+)
  */
@@ -32,14 +32,13 @@ final class ArrayReplaceKeyRuntime
 
     public static function replaceKey(Context $context, JITVariable $base, JITVariable $replacements): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($base->type)
-            || ArrayBuiltinHelper::isNativeArray($replacements->type)) {
-            return ArrayBuiltinHelper::arrayReplaceKey($context, $base, $replacements);
-        }
-
         self::ensureLinked($context);
-        $baseHt = ArrayBuiltinHelper::loadHashTable($context, $base);
-        $replHt = ArrayBuiltinHelper::loadHashTable($context, $replacements);
+        $baseHt = ArrayBuiltinHelper::isNativeArray($base->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $base)
+            : ArrayBuiltinHelper::loadHashTable($context, $base);
+        $replHt = ArrayBuiltinHelper::isNativeArray($replacements->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $replacements)
+            : ArrayBuiltinHelper::loadHashTable($context, $replacements);
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_REPLACE_KEY),
