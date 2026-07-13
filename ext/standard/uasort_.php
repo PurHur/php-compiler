@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\SortRuntime;
+use PHPCompiler\JIT\Builtin\UsortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -18,7 +18,7 @@ use PHPLLVM\Value;
  * uasort() — sort by values preserving keys (subset of PHP; issue #1211).
  *
  * VM: strcmp and strcasecmp string callbacks; closure comparators (#3086, #3582).
- * JIT/AOT: strcmp on packed list arrays only.
+ * JIT/AOT: compile-time strcmp or closure comparator preserving keys (#5698).
  */
 final class uasort_ extends Internal
 {
@@ -96,8 +96,6 @@ final class uasort_ extends Internal
         if (!UsortCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
         }
-        SortRuntime::sortPacked($context, $args[0]);
-
-        return $context->getTypeFromString('int1')->constInt(1, false);
+        return UsortRuntime::uasortValues($context, $args[0], $args[1]);
     }
 }

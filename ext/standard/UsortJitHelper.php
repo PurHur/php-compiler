@@ -53,6 +53,22 @@ final class UsortJitHelper
         self::reorderFromPairs($ht, $pairs);
     }
 
+    public static function sortValuesWithClosure(HashTable $ht, Variable $closure): void
+    {
+        if ($ht->getNumElements() < 2) {
+            return;
+        }
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            throw new \LogicException(
+                'UsortJitHelper::sortValuesWithClosure() requires an active VM context in this compiler build'
+            );
+        }
+        $pairs = self::collectKeyedPairs($ht);
+        VmClosureCall::sortKeyedPairsByValue($ctx, $pairs, VmClosureCall::resolve($closure));
+        self::reorderFromPairs($ht, $pairs);
+    }
+
     /**
      * @param list<Variable> $values
      */
@@ -72,7 +88,7 @@ final class UsortJitHelper
     private static function collectKeyedPairs(HashTable $ht): array
     {
         $pairs = [];
-        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+        foreach ($ht->exportKeyValuePairs(true) as [$key, $value]) {
             $keyCopy = new Variable();
             $keyCopy->duplicateFrom($key);
             $valCopy = new Variable();
