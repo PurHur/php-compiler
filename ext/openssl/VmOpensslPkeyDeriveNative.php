@@ -19,6 +19,61 @@ final class VmOpensslPkeyDeriveNative
         return null !== self::ffi();
     }
 
+    private const EVP_PKEY_DH = 28;
+
+    /**
+     * openssl_dh_compute_key() — raw peer DH public bytes + local private key (php-src ext/openssl/openssl_backend_v3.c; #6596).
+     */
+    public static function dhComputeKey(string $privateKeyPem, string $pubKeyBytes): string|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $privateKey = self::readPrivateKey($ffi, $privateKeyPem);
+        if (null === $privateKey) {
+            return false;
+        }
+
+        if (self::EVP_PKEY_DH !== (int) $ffi->EVP_PKEY_get_base_id($privateKey)) {
+            $ffi->EVP_PKEY_free($privateKey);
+
+            return false;
+        }
+
+        $peerKey = $ffi->EVP_PKEY_new();
+        if (null === $peerKey) {
+            $ffi->EVP_PKEY_free($privateKey);
+
+            return false;
+        }
+
+        try {
+            if (1 !== (int) $ffi->EVP_PKEY_copy_parameters($peerKey, $privateKey)) {
+                return false;
+            }
+            $pubLen = \strlen($pubKeyBytes);
+            if ($pubLen <= 0) {
+                return false;
+            }
+            $pubBuf = $ffi->new("unsigned char[{$pubLen}]");
+            \FFI::memcpy($pubBuf, $pubKeyBytes, $pubLen);
+            if (1 !== (int) $ffi->EVP_PKEY_set1_encoded_public_key(
+                $peerKey,
+                $pubBuf,
+                $pubLen
+            )) {
+                return false;
+            }
+
+            return self::deriveWithPeer($ffi, $privateKey, $peerKey, 0);
+        } finally {
+            $ffi->EVP_PKEY_free($peerKey);
+            $ffi->EVP_PKEY_free($privateKey);
+        }
+    }
+
     public static function derive(string $publicKeyPem, string $privateKeyPem, int $keyLength = 0): string|false
     {
         $ffi = self::ffi();
@@ -38,11 +93,23 @@ final class VmOpensslPkeyDeriveNative
             return false;
         }
 
-        $ctx = $ffi->EVP_PKEY_CTX_new($privateKey, null);
-        if (null === $ctx) {
+        try {
+            return self::deriveWithPeer($ffi, $privateKey, $publicKey, $keyLength);
+        } finally {
             $ffi->EVP_PKEY_free($publicKey);
             $ffi->EVP_PKEY_free($privateKey);
+        }
+    }
 
+    /**
+     * @param \FFI       $ffi
+     * @param \FFI\CData $privateKey
+     * @param \FFI\CData $peerKey
+     */
+    private static function deriveWithPeer($ffi, $privateKey, $peerKey, int $keyLength): string|false
+    {
+        $ctx = $ffi->EVP_PKEY_CTX_new($privateKey, null);
+        if (null === $ctx) {
             return false;
         }
 
@@ -50,7 +117,7 @@ final class VmOpensslPkeyDeriveNative
             if (1 !== (int) $ffi->EVP_PKEY_derive_init($ctx)) {
                 return false;
             }
-            if (1 !== (int) $ffi->EVP_PKEY_derive_set_peer($ctx, $publicKey)) {
+            if (1 !== (int) $ffi->EVP_PKEY_derive_set_peer($ctx, $peerKey)) {
                 return false;
             }
 
@@ -77,8 +144,6 @@ final class VmOpensslPkeyDeriveNative
             return \FFI::string($buf, (int) $secretLen->cdata);
         } finally {
             $ffi->EVP_PKEY_CTX_free($ctx);
-            $ffi->EVP_PKEY_free($publicKey);
-            $ffi->EVP_PKEY_free($privateKey);
         }
     }
 
@@ -152,6 +217,10 @@ BIO *BIO_new_mem_buf(const void *buf, int len);
 void BIO_free(BIO *a);
 EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, void *cb, void *u);
 EVP_PKEY *PEM_read_bio_PUBKEY(BIO *bp, EVP_PKEY **x, void *cb, void *u);
+EVP_PKEY *EVP_PKEY_new(void);
+int EVP_PKEY_get_base_id(const EVP_PKEY *pkey);
+int EVP_PKEY_copy_parameters(EVP_PKEY *to, const EVP_PKEY *from);
+int EVP_PKEY_set1_encoded_public_key(EVP_PKEY *pkey, const unsigned char *pub, size_t len);
 void EVP_PKEY_free(EVP_PKEY *pkey);
 EVP_PKEY_CTX *EVP_PKEY_CTX_new(EVP_PKEY *pkey, void *e);
 void EVP_PKEY_CTX_free(EVP_PKEY_CTX *ctx);

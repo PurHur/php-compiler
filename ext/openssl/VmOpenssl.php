@@ -613,6 +613,28 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_dh_compute_key() — DH shared secret from raw peer public bytes (php-src ext/openssl/openssl_backend_v3.c; #6596).
+     *
+     * @return string|false
+     */
+    public static function dhComputeKey(
+        string $pubKeyBytes,
+        string $privateKeyPem,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslPkeyDeriveNative::available()) {
+            self::userWarning(
+                'openssl_dh_compute_key(): OpenSSL DH key agreement is unavailable in this compiler build',
+                $frame
+            );
+
+            return false;
+        }
+
+        return VmOpensslPkeyDeriveNative::dhComputeKey($privateKeyPem, $pubKeyBytes);
+    }
+
+    /**
      * openssl_pkey_new() — generate asymmetric key pair (php-src ext/openssl/xp.c; #6295).
      *
      * @return \PHPCompiler\VM\Variable|false OpenSSLAsymmetricKey wrapper

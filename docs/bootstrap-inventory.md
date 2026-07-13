@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4773 |
-| Phase A inventory files (M2 ratio SSOT) | 4773 |
+| PHP files on vm.php path | 4774 |
+| Phase A inventory files (M2 ratio SSOT) | 4774 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 12825 |
+| Source constructs flagged (warnings) | 12828 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -592,7 +592,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 33 |
+| `ext/openssl/Module.php` | 0 | 34 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
@@ -613,6 +613,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_cipher_iv_length.php` | 0 | 2 |
 | `ext/openssl/openssl_cipher_key_length.php` | 0 | 2 |
 | `ext/openssl/openssl_decrypt.php` | 0 | 2 |
+| `ext/openssl/openssl_dh_compute_key.php` | 0 | 2 |
 | `ext/openssl/openssl_digest.php` | 0 | 2 |
 | `ext/openssl/openssl_encrypt.php` | 0 | 2 |
 | `ext/openssl/openssl_error_string.php` | 0 | 2 |
@@ -8605,25 +8606,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_pkey_get_private (line 45)
 - new openssl_pkey_export (line 46)
 - new openssl_pkey_derive (line 47)
-- new openssl_cipher_iv_length (line 48)
-- new openssl_cipher_key_length (line 49)
-- new openssl_digest (line 50)
-- new openssl_pbkdf2 (line 51)
-- new openssl_x509_read (line 52)
-- new openssl_x509_parse (line 53)
-- new openssl_x509_fingerprint (line 54)
-- new openssl_pkcs12_read (line 55)
-- new openssl_pkcs12_export (line 56)
-- new openssl_pkcs12_export_to_file (line 57)
-- new openssl_x509_verify (line 58)
-- new openssl_free_key (line 59)
-- new openssl_spki_new (line 60)
-- new openssl_spki_verify (line 61)
-- new openssl_spki_export (line 62)
-- new openssl_spki_export_challenge (line 63)
-- new openssl_seal (line 64)
-- new openssl_open (line 65)
-- new openssl_error_string (line 66)
+- new openssl_dh_compute_key (line 48)
+- new openssl_cipher_iv_length (line 49)
+- new openssl_cipher_key_length (line 50)
+- new openssl_digest (line 51)
+- new openssl_pbkdf2 (line 52)
+- new openssl_x509_read (line 53)
+- new openssl_x509_parse (line 54)
+- new openssl_x509_fingerprint (line 55)
+- new openssl_pkcs12_read (line 56)
+- new openssl_pkcs12_export (line 57)
+- new openssl_pkcs12_export_to_file (line 58)
+- new openssl_x509_verify (line 59)
+- new openssl_free_key (line 60)
+- new openssl_spki_new (line 61)
+- new openssl_spki_verify (line 62)
+- new openssl_spki_export (line 63)
+- new openssl_spki_export_challenge (line 64)
+- new openssl_seal (line 65)
+- new openssl_open (line 66)
+- new openssl_error_string (line 67)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -8655,11 +8657,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 91)
-- new HashTable (line 1002)
-- new Variable (line 1004)
-- new HashTable (line 1015)
-- new Variable (line 1017)
-- 35 class method(s)
+- new HashTable (line 1024)
+- new Variable (line 1026)
+- new HashTable (line 1037)
+- new Variable (line 1039)
+- 36 class method(s)
 
 ### `ext/openssl/VmOpensslCipherNative.php`
 
@@ -8707,7 +8709,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/VmOpensslPkeyDeriveNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 8 class method(s)
 
 ### `ext/openssl/VmOpensslPkeyNative.php`
 
@@ -8750,6 +8752,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
+- 2 class method(s)
+
+### `ext/openssl/openssl_dh_compute_key.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_digest.php`
