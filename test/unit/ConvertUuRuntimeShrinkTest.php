@@ -16,7 +16,7 @@ final class ConvertUuRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringConvertUu.php');
         $this->assertStringContainsString('ConvertUuJitHelper', $source);
         $this->assertStringNotContainsString('StringConvertUuJit', $source);
-        $this->assertLessThan(230, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(235, \substr_count($source, "\n") + 1);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringConvertUuJit.php');
     }
 

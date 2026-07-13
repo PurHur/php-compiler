@@ -57,6 +57,10 @@ final class StringConvertUu
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $encodeProbe = $context->module->getNamedFunction('__compiler_convert_uuencode');
         $decodeProbe = $context->module->getNamedFunction('__compiler_convert_uudecode');
         if (null !== $encodeProbe && $encodeProbe->countBasicBlocks() > 0
@@ -66,11 +70,16 @@ final class StringConvertUu
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementEncodeBridge($context);
         self::implementDecodeBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementEncodeBridge(Context $context): void
@@ -123,6 +132,9 @@ final class StringConvertUu
             );
 
         $entry = $fn->appendBasicBlock('convert_uu_decode_bridge_entry');
+        $falseBb = $fn->appendBasicBlock('convert_uu_decode_false');
+        $stringBb = $fn->appendBasicBlock('convert_uu_decode_string');
+        $doneBb = $fn->appendBasicBlock('convert_uu_decode_done');
         $context->builder->positionAtEnd($entry);
 
         $out = $fn->getParam(1);
@@ -133,10 +145,6 @@ final class StringConvertUu
             [$fn->getParam(0)]
         );
         $tagI32 = $context->builder->trunc($tag, $i32);
-
-        $falseBb = BasicBlockHelper::append($context, 'convert_uu_decode_false');
-        $stringBb = BasicBlockHelper::append($context, 'convert_uu_decode_string');
-        $doneBb = BasicBlockHelper::append($context, 'convert_uu_decode_done');
 
         $isFalse = $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_FALSE, false));
         $context->builder->branchIf($isFalse, $falseBb, $stringBb);
