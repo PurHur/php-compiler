@@ -37,7 +37,6 @@ final class DomInstanceMethodJit
 
     /** @var array<string, true> */
     private const USER_SCRIPT_GENERIC_DOM_METHODS = [
-        'domdocument::createdocumentfragment' => true,
         'domxpath::registernamespace' => true,
         'domnode::comparedocumentposition' => true,
     ];
@@ -57,6 +56,11 @@ final class DomInstanceMethodJit
         'domdocument::getelementsbytagname' => true,
         'domdocument::appendchild' => true,
         'domnode::appendchild' => true,
+        'domdocumentfragment::appendchild' => true,
+        'domnode::append' => true,
+        'domnode::prepend' => true,
+        'domnode::replacechildren' => true,
+        'domdocument::createdocumentfragment' => true,
         'domxpath::query' => true,
         'domxpath::evaluate' => true,
         'domnodelist::item' => true,
@@ -147,6 +151,31 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domdocumentfragment::appendchild' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeAppendChild();
+
+                return;
+            }
+            if ('domnode::append' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeAppend();
+
+                return;
+            }
+            if ('domnode::prepend' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodePrepend();
+
+                return;
+            }
+            if ('domnode::replacechildren' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeReplaceChildren();
+
+                return;
+            }
+            if ('domdocument::createdocumentfragment' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentCreateDocumentFragment();
+
+                return;
+            }
             if ('domxpath::query' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomXPathQuery();
 
@@ -199,6 +228,11 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::appendchild');
             self::ensureProxy($context, 'domelement::appendchild');
             self::ensureProxy($context, 'domnode::appendchild');
+            self::ensureProxy($context, 'domdocumentfragment::appendchild');
+            self::ensureProxy($context, 'domnode::append');
+            self::ensureProxy($context, 'domnode::prepend');
+            self::ensureProxy($context, 'domnode::replacechildren');
+            self::ensureProxy($context, 'domdocument::createdocumentfragment');
             self::ensureProxy($context, 'domxpath::query');
             self::ensureProxy($context, 'domxpath::evaluate');
             self::ensureProxy($context, 'domnodelist::item');

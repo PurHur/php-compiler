@@ -308,6 +308,78 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureAppendBridge(Context $context, int $arity): void
+    {
+        self::ensureLiveMutationBridge(
+            $context,
+            DomNodeLiveMutationRuntime::appendAbi($arity),
+            'dom_append_user_script_'.$arity,
+            $arity,
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendArgv'.$arity
+        );
+    }
+
+    public static function ensurePrependBridge(Context $context, int $arity): void
+    {
+        self::ensureLiveMutationBridge(
+            $context,
+            DomNodeLiveMutationRuntime::prependAbi($arity),
+            'dom_prepend_user_script_'.$arity,
+            $arity,
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependArgv'.$arity
+        );
+    }
+
+    public static function ensureReplaceChildrenBridge(Context $context, int $arity): void
+    {
+        self::ensureLiveMutationBridge(
+            $context,
+            DomNodeLiveMutationRuntime::replaceChildrenAbi($arity),
+            'dom_replace_children_user_script_'.$arity,
+            $arity,
+            'PHPCompiler\\ext\\dom\\DomNodeLiveMutationJitHelper::replaceChildrenArgv'.$arity
+        );
+    }
+
+    public static function ensureCreateDocumentFragmentBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomNodeLiveMutationRuntime::ABI_CREATE_FRAGMENT,
+            'dom_create_document_fragment_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::createDocumentFragmentArgv',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    private static function ensureLiveMutationBridge(
+        Context $context,
+        string $abi,
+        string $entryBlock,
+        int $arity,
+        string $helperLogical
+    ): void {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $paramTypes = [$objPtr];
+        for ($i = 0; $i < $arity; ++$i) {
+            $paramTypes[] = $valuePtr;
+        }
+        self::ensureContextBridge(
+            $context,
+            $abi,
+            $entryBlock,
+            $paramTypes,
+            $context->context->voidType(),
+            $helperLogical,
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
     /**
      * @param list<\PHPLLVM\Type> $paramTypes
      */

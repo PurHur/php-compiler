@@ -77,6 +77,50 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function append(VmContext $ctx, ObjectEntry $parent, array $extra): Variable
+    {
+        VmDom::appendLiveStandardNodes($ctx, $parent, $extra);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function prepend(VmContext $ctx, ObjectEntry $parent, array $extra): Variable
+    {
+        VmDom::prependLiveStandardNodes($ctx, $parent, $extra);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function replaceChildren(VmContext $ctx, ObjectEntry $parent, array $extra): Variable
+    {
+        VmDom::replaceChildrenLiveStandardNodes($ctx, $parent, $extra);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function createDocumentFragment(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        return VmDom::createDocumentFragment($ctx, $document);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function getAttribute(ObjectEntry $element, array $extra): Variable
     {
         $name = self::stringArg($extra[0] ?? self::missingArg('getAttribute', 0), 'getAttribute', 0);
