@@ -29,7 +29,7 @@ final class ProcessOpenJitHelper
     /** @return int ABI for __compiler_proc_open (handle or -1) */
     public static function procOpenArgv(?string $command, ?HashTable $pipesHt): int
     {
-        if (null === $command || '' === $command || null === $pipesHt) {
+        if (null === $command || null === $pipesHt) {
             return -1;
         }
 

@@ -80,11 +80,7 @@ final class proc_open extends Internal
     {
         $arg = $arg->resolveIndirect();
         if (Variable::TYPE_NULL === $arg->type) {
-            throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($command) must be of type array|string, null given',
-                $functionName,
-                $argNum
-            ));
+            return '';
         }
         if (Variable::TYPE_STRING === $arg->type) {
             return $arg->toString();

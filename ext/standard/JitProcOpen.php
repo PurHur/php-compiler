@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
@@ -21,18 +20,6 @@ final class JitProcOpen
     {
         if (\count($args) < 3) {
             throw new \LogicException('proc_open() requires at least three arguments in this compiler build');
-        }
-
-        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
-            TypeErrorRaise::registerDeclarations($context);
-            TypeErrorRaise::ensureLinked($context);
-            TypeErrorRaise::emitRaise(
-                $context,
-                'proc_open(): Argument #1 ($command) must be of type array|string, null given'
-            );
-            $context->builder->call($context->lookupFunction('abort'));
-
-            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         $commandStr = JitStringArg::lower($context, $args[0], 'proc_open() command');

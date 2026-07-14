@@ -15,14 +15,13 @@ foreach (['shell_exec', 'system', 'passthru'] as $fn) {
 }
 
 $pipes = [];
-try {
-    proc_open(null, [], $pipes);
-    echo "proc_open: uncaught\n";
-} catch (TypeError $e) {
-    echo 'proc_open: TypeError', "\n";
+$result = proc_open(null, [], $pipes);
+echo 'proc_open: '.(is_resource($result) ? 'resource' : (null === $result ? 'NULL' : 'other'))."\n";
+if (is_resource($result)) {
+    proc_close($result);
 }
 --EXPECT--
 shell_exec: ValueError
 system: ValueError
 passthru: ValueError
-proc_open: TypeError
+proc_open: resource
