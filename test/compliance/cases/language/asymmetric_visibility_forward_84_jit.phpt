@@ -1,7 +1,16 @@
 --TEST--
-Language: asymmetric visibility forward 8.4 profile JIT — unparenthesized duplicate modifiers compile fatal (#18805, Zend/zend_compile.c)
+Language: asymmetric visibility forward 8.4 profile JIT — bare combined modifiers (#18820, Zend/zend_compile.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+    die('skip bare combined asymmetric modifiers require PHP 8.4 forward profile');
+}
+?>
 --FILE--
 <?php
 declare(strict_types=1);
@@ -15,5 +24,6 @@ class ProtectedSet {
     public protected(set) string $label = 'hi';
 }
 echo (new ProtectedSet())->label, "\n";
---EXPECT_EXIT--
-255
+--EXPECT--
+1
+hi
