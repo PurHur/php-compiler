@@ -75,6 +75,7 @@ final class NewWithoutParensCompileCheck
      */
     private function walkClassConstNewExpr(array $ops, ?string $sourceCode, bool $atTopLevel): void
     {
+        $requireCtorParens = !CompilerVersion::supportsNewWithoutParensInConstAndStaticInitializers();
         $topLevelNewCount = 0;
         foreach ($ops as $op) {
             if (!$op instanceof Op) {
@@ -84,7 +85,7 @@ final class NewWithoutParensCompileCheck
                 if (!$atTopLevel) {
                     throw new \CompileError(self::MESSAGE);
                 }
-                if (!NewCtorParens::hasCtorParens($op, $sourceCode)) {
+                if ($requireCtorParens && !NewCtorParens::hasCtorParens($op, $sourceCode)) {
                     throw new \CompileError(self::MESSAGE);
                 }
                 ++$topLevelNewCount;
@@ -115,13 +116,14 @@ final class NewWithoutParensCompileCheck
             return;
         }
         if (CompilerVersion::supportsPropertyDefaultObjectExpressions() && !$prop->static) {
+            $requireCtorParens = true;
             if (null !== $prop->defaultBlock && [] !== ($prop->defaultBlock->children ?? [])) {
-                $this->walkPropertyDefaultNewExpr($prop->defaultBlock->children, $this->sourceCode, true);
+                $this->walkPropertyDefaultNewExpr($prop->defaultBlock->children, $this->sourceCode, true, $requireCtorParens);
 
                 return;
             }
             if ($prop->defaultVar instanceof New_) {
-                if (!NewCtorParens::hasCtorParens($prop->defaultVar, $this->sourceCode)) {
+                if ($requireCtorParens && !NewCtorParens::hasCtorParens($prop->defaultVar, $this->sourceCode)) {
                     throw new \CompileError(self::MESSAGE);
                 }
 
@@ -130,7 +132,28 @@ final class NewWithoutParensCompileCheck
             if (!$prop->defaultVar instanceof Op) {
                 return;
             }
-            $this->walkSubBlocksPropertyDefaultNew($prop->defaultVar, $this->sourceCode, true);
+            $this->walkSubBlocksPropertyDefaultNew($prop->defaultVar, $this->sourceCode, true, $requireCtorParens);
+
+            return;
+        }
+        if (CompilerVersion::supportsStaticPropertyDefaultObjectExpressions() && $prop->static) {
+            $requireCtorParens = !CompilerVersion::supportsNewWithoutParensInConstAndStaticInitializers();
+            if (null !== $prop->defaultBlock && [] !== ($prop->defaultBlock->children ?? [])) {
+                $this->walkPropertyDefaultNewExpr($prop->defaultBlock->children, $this->sourceCode, true, $requireCtorParens);
+
+                return;
+            }
+            if ($prop->defaultVar instanceof New_) {
+                if ($requireCtorParens && !NewCtorParens::hasCtorParens($prop->defaultVar, $this->sourceCode)) {
+                    throw new \CompileError(self::MESSAGE);
+                }
+
+                return;
+            }
+            if (!$prop->defaultVar instanceof Op) {
+                return;
+            }
+            $this->walkSubBlocksPropertyDefaultNew($prop->defaultVar, $this->sourceCode, true, $requireCtorParens);
 
             return;
         }
@@ -145,12 +168,16 @@ final class NewWithoutParensCompileCheck
     }
 
     /**
-     * PHP 8.4+ instance property default: single top-level `new Class(...)` (#18040).
+     * PHP 8.4+ property default: single top-level `new Class` / `new Class(...)` (#18040, #18816).
      *
      * @param list<Op> $ops
      */
-    private function walkPropertyDefaultNewExpr(array $ops, ?string $sourceCode, bool $atTopLevel): void
-    {
+    private function walkPropertyDefaultNewExpr(
+        array $ops,
+        ?string $sourceCode,
+        bool $atTopLevel,
+        bool $requireCtorParens = true
+    ): void {
         $topLevelNewCount = 0;
         foreach ($ops as $op) {
             if (!$op instanceof Op) {
@@ -160,7 +187,7 @@ final class NewWithoutParensCompileCheck
                 if (!$atTopLevel) {
                     throw new \CompileError(self::MESSAGE);
                 }
-                if (!NewCtorParens::hasCtorParens($op, $sourceCode)) {
+                if ($requireCtorParens && !NewCtorParens::hasCtorParens($op, $sourceCode)) {
                     throw new \CompileError(self::MESSAGE);
                 }
                 ++$topLevelNewCount;
@@ -169,18 +196,22 @@ final class NewWithoutParensCompileCheck
             if ($atTopLevel && $topLevelNewCount > 0) {
                 throw new \CompileError(self::MESSAGE);
             }
-            $this->walkSubBlocksPropertyDefaultNew($op, $sourceCode, false);
+            $this->walkSubBlocksPropertyDefaultNew($op, $sourceCode, false, $requireCtorParens);
         }
         if ($atTopLevel && $topLevelNewCount > 1) {
             throw new \CompileError(self::MESSAGE);
         }
     }
 
-    private function walkSubBlocksPropertyDefaultNew(Op $op, ?string $sourceCode, bool $atTopLevel): void
-    {
+    private function walkSubBlocksPropertyDefaultNew(
+        Op $op,
+        ?string $sourceCode,
+        bool $atTopLevel,
+        bool $requireCtorParens = true
+    ): void {
         foreach ($op->getSubBlocks() as $sub) {
             if (null !== $sub && property_exists($sub, 'children') && is_array($sub->children)) {
-                $this->walkPropertyDefaultNewExpr($sub->children, $sourceCode, $atTopLevel);
+                $this->walkPropertyDefaultNewExpr($sub->children, $sourceCode, $atTopLevel, $requireCtorParens);
             }
         }
     }

@@ -64,6 +64,18 @@ PHP, 'property_default_new_instance_untyped.php');
 
     public function testStaticPropertyDefaultNewCompileErrors(): void
     {
+        if (CompilerVersion::supportsStaticPropertyDefaultObjectExpressions()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public static $x = new stdClass();
+}
+PHP, 'property_default_new_static.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $runtime = new Runtime();
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage(NewWithoutParensCompileCheck::MESSAGE);
