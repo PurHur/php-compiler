@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** php_uname() — operating system identification (ext/standard/info.c parity, issue #3174). */
@@ -30,11 +30,14 @@ final class php_uname extends Internal
         }
         $mode = 'a';
         if (1 === $argc) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $arg->type) {
-                throw new \LogicException('php_uname() mode must be a string in this compiler build');
-            }
-            $mode = $arg->toString();
+            $mode = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[0],
+                'php_uname',
+                0,
+                'mode',
+                'string',
+                false
+            );
         }
         $frame->returnVar->string(VmInfo::php_uname($mode));
     }
@@ -46,7 +49,16 @@ final class php_uname extends Internal
         }
         $mode = null;
         if (isset($args[0])) {
-            $mode = $this->jitString($context, $args[0], 'php_uname() mode');
+            $mode = JitStringBuiltinArg::lower(
+                $context,
+                $args[0],
+                'php_uname',
+                0,
+                'mode',
+                'string',
+                null,
+                false
+            );
         }
 
         return JitInfo::php_uname($context, $mode);
