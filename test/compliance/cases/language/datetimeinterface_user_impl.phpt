@@ -1,5 +1,5 @@
 --TEST--
-Language: user class implements DateTimeInterface — runtime fatal (#18781, Zend/zend_compile.c)
+Language: user class implements DateTimeInterface — runtime fatal (#13325, #18781, zend_compile.c)
 --FILE--
 <?php
 echo "before\n";

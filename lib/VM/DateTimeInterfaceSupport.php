@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Compiler\SourceLocation;
+use PHPCompiler\Frame;
+
 /**
  * Built-in DateTimeInterface and format constants (ext/date/php_date.c, issue #7141).
  */
@@ -54,5 +57,42 @@ final class DateTimeInterfaceSupport
     public static function rejectsUserImplementationLc(string $ifaceLc): bool
     {
         return self::isDateTimeInterfaceLc($ifaceLc);
+    }
+
+    /**
+     * php-src zend_check_implement_interface — user classes cannot implement DateTimeInterface (#18781).
+     *
+     * @param list<string> $interfaceLcs
+     */
+    public static function assertUserMayImplement(
+        array $interfaceLcs,
+        Frame $frame,
+        ?SourceLocation $sourceLocation = null,
+    ): void {
+        foreach ($interfaceLcs as $ifaceLc) {
+            if (self::rejectsUserImplementationLc($ifaceLc)) {
+                self::throwRuntimeFatal($frame, $sourceLocation);
+            }
+        }
+    }
+
+    /**
+     * @return never
+     */
+    private static function throwRuntimeFatal(Frame $frame, ?SourceLocation $sourceLocation): void
+    {
+        $file = '' !== $frame->scriptPath ? $frame->scriptPath : 'Standard input code';
+        if (null !== $sourceLocation && '' !== $sourceLocation->filename) {
+            $file = $sourceLocation->filename;
+        }
+        $line = null !== $sourceLocation && $sourceLocation->startLine > 0
+            ? $sourceLocation->startLine
+            : FatalSite::lineFromOpcodes($frame);
+        throw new \LogicException(sprintf(
+            'Fatal error: %s in %s on line %d',
+            self::USER_IMPLEMENTATION_FORBIDDEN_MESSAGE,
+            $file,
+            max(1, $line),
+        ));
     }
 }

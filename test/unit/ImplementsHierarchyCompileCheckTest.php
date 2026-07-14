@@ -138,8 +138,8 @@ PHP;
         $runtime->parseAndCompile($code, 'nested.php');
     }
 
-    /** @covers issue #18781 */
-    public function testClassImplementsDateTimeInterfaceFailsAtRuntime(): void
+    /** @covers issue #13325, #18781 */
+    public function testClassImplementsDateTimeInterfaceCompilesThenFatalsAtRuntime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -147,13 +147,14 @@ PHP;
 class UserDateTime implements DateTimeInterface {}
 PHP;
         $block = $runtime->parseAndCompile($code, 'datetimeinterface.php');
+        $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage("Fatal error: DateTimeInterface can't be implemented by user classes");
-        $runtime->run($block);
+        $runtime->run($block, false);
     }
 
-    /** @covers issue #18781 */
-    public function testEnumImplementsDateTimeInterfaceFailsAtRuntime(): void
+    /** @covers issue #13325, #18781 */
+    public function testEnumImplementsDateTimeInterfaceCompilesThenFatalsAtRuntime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -161,9 +162,10 @@ PHP;
 enum E implements DateTimeInterface { case A; }
 PHP;
         $block = $runtime->parseAndCompile($code, 'enum_datetimeinterface.php');
+        $this->assertNotNull($block);
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage("Fatal error: DateTimeInterface can't be implemented by user classes");
-        $runtime->run($block);
+        $runtime->run($block, false);
     }
 
     /** @covers issue #18781 */

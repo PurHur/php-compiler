@@ -31,6 +31,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
+use PHPCompiler\VM\DateTimeInterfaceSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ReferencableCheck;
 use PHPCompiler\VM\TypeCheck;
@@ -2005,15 +2006,7 @@ class Compiler {
         foreach ($ops as $child) {
             switch (get_class($child)) {
                 case Op\Stmt\Class_::class:
-                    $className = $this->staticNameFromOperand($child->name);
-                    $interfaceLcs = $this->interfaceNamesFromOperands($child->implements);
-                    if (
-                        null !== $className
-                        && ImplementsHierarchyRuntimeCheck::requiresSourceOrderRegistration(
-                            ltrim($className, '\\'),
-                            $interfaceLcs
-                        )
-                    ) {
+                    if ($this->defersRuntimeInterfaceImplementationCheck($child)) {
                         break;
                     }
                     $block->addOpCode($this->compileClassLike($child, $block));
@@ -2165,15 +2158,7 @@ class Compiler {
                 case Op\Stmt\Trait_::class:
                     break;
                 case Op\Stmt\Class_::class:
-                    $className = $this->staticNameFromOperand($child->name);
-                    $interfaceLcs = $this->interfaceNamesFromOperands($child->implements);
-                    if (
-                        null !== $className
-                        && ImplementsHierarchyRuntimeCheck::requiresSourceOrderRegistration(
-                            ltrim($className, '\\'),
-                            $interfaceLcs
-                        )
-                    ) {
+                    if ($this->defersRuntimeInterfaceImplementationCheck($child)) {
                         $block->addOpCode($this->compileClassLike($child, $block));
                     }
                     break;
@@ -6217,6 +6202,22 @@ class Compiler {
         }
 
         return $names;
+    }
+
+    /**
+     * Zend defers forbidden user-implement fatals to declaration site (#18781).
+     */
+    protected function defersRuntimeInterfaceImplementationCheck(Op\Stmt\ClassLike $class): bool
+    {
+        $className = $this->staticNameFromOperand($class->name);
+        if (null === $className) {
+            return false;
+        }
+
+        return ImplementsHierarchyRuntimeCheck::requiresSourceOrderRegistration(
+            ltrim($className, '\\'),
+            $this->interfaceNamesFromOperands($class->implements)
+        );
     }
 
     protected function staticNameFromOperand(Operand $op): ?string
