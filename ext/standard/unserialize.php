@@ -104,7 +104,7 @@ final class unserialize extends Internal
     private static function compileTimeUnserialize(Context $context, JITVariable $arg, ?array $options = null): ?Value
     {
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
-            if (VmString::requiresForwardProfileStrictStringNull()) {
+            if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
                 JitStringBuiltinArg::lowerZparamStr($context, $arg, 'unserialize', 0, 'data');
                 $slot = JitValueBox::alloc($context);
 

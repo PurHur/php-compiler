@@ -162,12 +162,6 @@ final class InternalStrictArg
     ): string {
         if (self::isCallerStrict($frame)) {
             self::requireString($frame, $argIndex, $function, $paramName);
-
-            return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
-        }
-        $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
-        if (Variable::TYPE_NULL === $arg->type) {
-            return '';
         }
 
         return VmString::coerceStringBuiltinArg(
