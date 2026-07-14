@@ -32,6 +32,10 @@ final class DnfCheck
         if ('Property' === $kind && null !== $propertyMeta && null !== $propertyMeta->declaredTypeLabel) {
             throw self::propertyTypeError($propertyMeta, $propertyMeta->declaredTypeLabel, $resolved);
         }
+        $ctx = TypeCheck::currentParamErrorContext();
+        if (null !== $ctx && 'Argument' === $kind) {
+            $ctx->throwExpectedType($expected, $value);
+        }
         $given = self::givenTypeLabel($resolved);
         throw new \TypeError("{$kind} must be of type {$expected}, {$given} given");
     }
