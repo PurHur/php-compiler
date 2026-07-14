@@ -95,6 +95,7 @@ final class BuiltinByRefParams
             case 'openssl_seal':
                 return [1, 2, 5];
             case 'stream_context_set_options':
+            case 'stream_context_set_option':
             case 'stream_context_set_params':
                 return [0];
             case 'exec':

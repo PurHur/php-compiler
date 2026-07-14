@@ -78,6 +78,62 @@ final class StreamContextJitHelper
         self::replaceParams($dest, $params);
     }
 
+    /**
+     * Singular stream_context_set_option($ctx, $wrapper, $option, $value) (#3448).
+     */
+    public static function setSingleOption(
+        HashTable $dest,
+        Variable $wrapperKey,
+        Variable $optionKey,
+        Variable $value
+    ): void {
+        if (!self::hasMarker($dest)) {
+            return;
+        }
+        $wrapperName = self::coerceOptionKeyString($wrapperKey->resolveIndirect());
+        $optionName = self::coerceOptionKeyString($optionKey->resolveIndirect());
+        $exportedValue = self::exportValue($value);
+        if (!\is_scalar($exportedValue) && null !== $exportedValue && !\is_array($exportedValue)) {
+            $exportedValue = '';
+        }
+        VmParseStr::mergeInto($dest, [
+            $wrapperName => [$optionName => $exportedValue],
+        ]);
+    }
+
+    public static function getParams(?HashTable $src): ?HashTable
+    {
+        if (null === $src || !self::hasMarker($src)) {
+            return null;
+        }
+        $out = new HashTable();
+        $options = self::getOptions($src);
+        if (null !== $options) {
+            $optionsVar = new Variable();
+            $optionsVar->array($options);
+            $out->add('options', $optionsVar);
+        }
+        $paramsSlot = $src->find(VmStreamContext::PARAMS_MARKER_KEY);
+        if (null !== $paramsSlot) {
+            $paramsHt = $paramsSlot->resolveIndirect()->toArray();
+            foreach ($paramsHt->iterateKeyed(true) as [$keyVar, $valVar]) {
+                $key = $keyVar->resolveIndirect();
+                if (Variable::TYPE_STRING !== $key->type) {
+                    continue;
+                }
+                $name = $key->toString();
+                if ('options' === $name) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($valVar);
+                $out->add($name, $copy);
+            }
+        }
+
+        return $out;
+    }
+
     public static function getDefault(?HashTable $options): HashTable
     {
         $context = self::ensureDefault();
@@ -184,5 +240,26 @@ final class StreamContextJitHelper
             default:
                 return '';
         }
+    }
+
+    private static function coerceOptionKeyString(Variable $resolved): string
+    {
+        if (Variable::TYPE_STRING === $resolved->type) {
+            return $resolved->toString();
+        }
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return (string) $resolved->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type) {
+            return (string) $resolved->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $resolved->type) {
+            return $resolved->toBool() ? '1' : '';
+        }
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return '';
+        }
+
+        return '';
     }
 }

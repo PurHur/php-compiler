@@ -177,6 +177,8 @@ final class SelfHostBuiltinPolicy
         'stream_context_get_default' => 'filesystem',
         'stream_context_set_default' => 'filesystem',
         'stream_context_get_options' => 'filesystem',
+        'stream_context_set_option' => 'filesystem',
+        'stream_context_get_params' => 'filesystem',
         'stream_context_set_options' => 'filesystem',
     ];
 
