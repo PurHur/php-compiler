@@ -9,13 +9,13 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_is_list() JIT routes through ArrayIsListJitHelper PHP not JitArrayIsList LLVM (#13645, #14246). */
+/** array_is_list() AOT uses native packed-table LLVM + ArrayIsListJitHelper SSOT (#6229). */
 final class ArrayIsListRuntimeShrinkTest extends TestCase
 {
-    public function testArrayIsListRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayIsListRuntimeUsesNativeLlvmForPackedTables(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayIsListRuntime.php');
-        $this->assertStringContainsString('ArrayIsListJitHelper', $runtime);
+        $this->assertStringContainsString('ArrayIsListNativeLlvm', $runtime);
         $this->assertStringContainsString('IS_NATIVE_ARRAY', $runtime);
         $this->assertStringNotContainsString('JitArrayIsList::invoke', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);

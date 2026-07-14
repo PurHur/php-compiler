@@ -46,7 +46,7 @@ final class StringHashHmacAlgos
         $context->builder->positionAtEnd($entry);
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $nullHt = $htPtr->constNull();
         $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $nullHt);
@@ -65,7 +65,7 @@ final class StringHashHmacAlgos
             $context->builder->call(
                 $setAt,
                 $ht,
-                $i64->constInt($index, false),
+                $sizeT->constInt($index, false),
                 self::literalString($context, $algo)
             );
         }

@@ -72,23 +72,21 @@ final class ArrayIsListRuntime
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i1 = $context->getTypeFromString('int1');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI_IS_LIST,
-            'array_is_list_bridge_entry',
-            [$htPtr],
-            $i1,
-            self::IS_LIST_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#13645'
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_IS_LIST,
+                $context->context->functionType($i1, false, $htPtr)
+            );
+        $entry = $fn->appendBasicBlock('array_is_list_native_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = ArrayIsListNativeLlvm::isList($context, $fn->getParam(0));
+        $context->builder->returnValue($result);
+        $context->builder->clearInsertionPosition();
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
         }
     }
 
