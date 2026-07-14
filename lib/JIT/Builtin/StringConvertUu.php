@@ -9,13 +9,14 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for __compiler_convert_uu* via ConvertUuJitHelper PHP (#13227).
  *
- * Embed and standalone AOT compile the same PHP bridge; no uuencode LLVM monolith.
+ * Embed/JIT use ConvertUuJitHelper PHP bridge; standalone user-script AOT defers to LLVM (#4567).
  * php-src: ext/standard/uuencode.c
  */
 final class StringConvertUu
@@ -61,16 +62,35 @@ final class StringConvertUu
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
         $encodeProbe = $context->module->getNamedFunction('__compiler_convert_uuencode');
         $decodeProbe = $context->module->getNamedFunction('__compiler_convert_uudecode');
         if (null !== $encodeProbe && $encodeProbe->countBasicBlocks() > 0
             && null !== $decodeProbe && $decodeProbe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+            if (null !== $savedInsert) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
 
             return;
         }
 
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StringConvertUuEncodeLlvm::implement($context);
+            StringConvertUuDecodeLlvm::implement($context);
+            self::registerLinkedRuntime($context);
+            if (null !== $savedInsert) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+
+            return;
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementEncodeBridge($context);
         self::implementDecodeBridge($context);

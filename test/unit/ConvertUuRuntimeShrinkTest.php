@@ -8,15 +8,16 @@ use PHPCompiler\ext\standard\ConvertUuJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** convert_uuencode/uudecode JIT routes through ConvertUuJitHelper PHP not StringConvertUuJit LLVM (#13227). */
+/** convert_uuencode()/convert_uudecode() JIT routes through ConvertUuJitHelper PHP (#13227, #4567). */
 final class ConvertUuRuntimeShrinkTest extends TestCase
 {
-    public function testStringConvertUuIsThinBridge(): void
+    public function testStringConvertUuUsesJitHelperWithStandaloneLlvmDefer(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringConvertUu.php');
         $this->assertStringContainsString('ConvertUuJitHelper', $source);
-        $this->assertStringNotContainsString('StringConvertUuJit', $source);
-        $this->assertLessThan(235, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('StringConvertUuEncodeLlvm', $source);
+        $this->assertStringContainsString('StringConvertUuDecodeLlvm', $source);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitConvertUuBodies.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringConvertUuJit.php');
     }
 
