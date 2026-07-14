@@ -16,7 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Nested {@see SuperglobalRefreshJitHelper} JIT during init segfaults (#13571); the PHP
  * bridge returns VM {@see __object__*} handles that cannot populate native sg_* (#12039).
- * Process environ mirror uses {@see EnvironMirrorUserScriptLlvm} (no nested GetenvJitHelper JIT, #15417).
+ * Process environ mirror routes through {@see EnvironMirrorRuntime} + {@see EnvironMirrorNativeJitHelper} (#18984).
  * Form/cookie parsing routes through {@see ParseStrRuntime} + {@see __compiler_parse_str}
  * ({@see ParseStrJitHelper::parseIntoNative} streaming materializer — #13900).
  * php-src: main/php_variables.c
@@ -42,7 +42,7 @@ final class SuperglobalRefreshUserScriptLlvm
         self::ensureGlobals($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptLinked($context);
-        EnvironMirrorUserScriptLlvm::ensureLinked($context);
+        EnvironMirrorRuntime::ensureLinked($context);
         self::ensureHeaderQueueExternal($context);
     }
 
@@ -426,7 +426,7 @@ final class SuperglobalRefreshUserScriptLlvm
     private static function fillServerFromProcessEnviron(Context $context, LlvmFunction $fn, Value $serverHt): void
     {
         unset($fn);
-        EnvironMirrorUserScriptLlvm::emitFillCall($context, $serverHt);
+        EnvironMirrorRuntime::emitFillCall($context, $serverHt);
     }
 
     private static function setServerKeyFromCstr(Context $context, Value $ht, string $key, Value $valCstrSlot): void
@@ -499,7 +499,7 @@ final class SuperglobalRefreshUserScriptLlvm
         self::ensureGlobals($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptLinked($context);
-        EnvironMirrorUserScriptLlvm::ensureLinked($context);
+        EnvironMirrorRuntime::ensureLinked($context);
         self::ensureHeaderQueueExternal($context);
     }
 
@@ -509,7 +509,7 @@ final class SuperglobalRefreshUserScriptLlvm
         LibcExtern::register($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptNoOpPopulateStub($context);
-        EnvironMirrorUserScriptLlvm::ensureLinked($context);
+        EnvironMirrorRuntime::ensureLinked($context);
         self::ensureGlobals($context);
         self::ensureHeaderQueueExternal($context);
     }

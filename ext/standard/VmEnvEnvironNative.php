@@ -32,10 +32,7 @@ final class VmEnvEnvironNative
      */
     private static function enumerateLinuxProcEnviron(): array
     {
-        if (!\is_readable('/proc/self/environ')) {
-            return [];
-        }
-
+        // is_readable() is false in user-script AOT while fopen succeeds (#18897).
         $raw = VmFsReadNative::read('/proc/self/environ');
         if (false === $raw || '' === $raw) {
             return [];

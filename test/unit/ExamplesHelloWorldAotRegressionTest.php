@@ -28,7 +28,7 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
         $this->assertStringContainsString('StringHtmlspecialcharsDecode::ensureStandaloneBodies', $source);
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
         $userScript = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
-        $this->assertStringContainsString('EnvironMirrorUserScriptLlvm', $userScript);
+        $this->assertStringContainsString('EnvironMirrorRuntime::ensureLinked', $userScript);
         $runtime = (string) file_get_contents(dirname(__DIR__, 2).'/lib/Runtime.php');
         $this->assertStringContainsString('ensureUserScriptRefreshPrerequisites', $runtime);
         $this->assertStringContainsString('PHP_COMPILER_AOT_USER_SCRIPT', $source);
