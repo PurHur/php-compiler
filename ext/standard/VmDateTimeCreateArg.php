@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
@@ -45,7 +46,16 @@ final class VmDateTimeCreateArg
             return '';
         }
         if (InternalStrictArg::isCallerStrict($frame)) {
-            InternalStrictArg::requireString($frame, $userArgIndex, $function, $paramName);
+            $resolved = $var->resolveIndirect();
+            if (Variable::TYPE_STRING !== $resolved->type) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d ($%s) must be of type string, %s given',
+                    $function,
+                    $userArgIndex + 1,
+                    $paramName,
+                    EnumCaseSupport::typeNameForVariable($resolved)
+                ));
+            }
         }
 
         return VmString::coerceStringBuiltinArg(
