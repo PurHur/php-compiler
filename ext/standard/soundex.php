@@ -61,7 +61,7 @@ final class soundex extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'soundex', $paramName)->toString();
         }
 
-        return VmString::coerceStringBuiltinArg(
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[$argIndex],
             'soundex',
             $argIndex,
@@ -77,7 +77,7 @@ final class soundex extends Internal
     ): Value {
         JitInternalStrictArg::requireString($context, $arg, 'soundex', $paramName, $argNumber);
 
-        return JitStringBuiltinArg::lower(
+        return JitStringBuiltinArg::lowerZparamStr(
             $context,
             $arg,
             'soundex',

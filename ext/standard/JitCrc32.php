@@ -26,6 +26,6 @@ final class JitCrc32
     /** Lower crc32() subject with Z_PARAM_STR parity (#4594, #5780, #16115, ext/standard/string.c). */
     public static function lowerStringSubject(Context $context, JITVariable $arg): Value
     {
-        return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'crc32', 0, 'string');
+        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'crc32', 0, 'string');
     }
 }

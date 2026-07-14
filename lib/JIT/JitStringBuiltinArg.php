@@ -63,7 +63,10 @@ final class JitStringBuiltinArg
         return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
     }
 
-    public static function lower(
+    /**
+     * Z_PARAM_STR null coercion — survives 8.4 forward profile (#18821, #18822, ext/standard/string.c).
+     */
+    public static function lowerZparamStr(
         Context $context,
         Variable $arg,
         string $function,
@@ -72,10 +75,35 @@ final class JitStringBuiltinArg
         string $expectedType = 'string',
         ?string $arrayExpectedType = null
     ): Value {
+        return self::lower(
+            $context,
+            $arg,
+            $function,
+            $argIndex,
+            $paramName,
+            $expectedType,
+            $arrayExpectedType,
+            false
+        );
+    }
+
+    public static function lower(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string',
+        ?string $arrayExpectedType = null,
+        bool $rejectNullOnForwardProfile = true
+    ): Value {
         JitNativeString::ensureInsertBlock($context);
         $arrayExpected = $arrayExpectedType ?? $expectedType;
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            if ($context->callerStrictTypes || self::requiresForwardProfileStrictStringNull()) {
+            if (
+                $context->callerStrictTypes
+                || ($rejectNullOnForwardProfile && self::requiresForwardProfileStrictStringNull())
+            ) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
 
                 return self::unreachableStringPtr($context);

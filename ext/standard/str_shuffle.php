@@ -23,7 +23,12 @@ final class str_shuffle extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('str_shuffle() requires exactly one argument');
         }
-        $subject = VmString::stringBuiltinArgForFrame($frame, 0, 'str_shuffle', 0, 'string');
+        $subject = VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'str_shuffle',
+            0,
+            'string'
+        );
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::strShuffle($subject))
@@ -38,7 +43,7 @@ final class str_shuffle extends Internal
 
         return JitStrShuffle::shuffle(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'str_shuffle', 0, 'string')
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'str_shuffle', 0, 'string')
         );
     }
 }

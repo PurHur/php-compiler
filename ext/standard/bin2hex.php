@@ -32,7 +32,12 @@ final class bin2hex extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('bin2hex() requires exactly one argument');
         }
-        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'bin2hex', 0, 'string');
+        $data = VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'bin2hex',
+            0,
+            'string'
+        );
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($data): void {
             $ret->string(VmString::bin2hex($data));
         });
@@ -48,7 +53,7 @@ final class bin2hex extends Internal
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_bin2hex'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'bin2hex', 0, 'string')
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'bin2hex', 0, 'string')
         );
     }
 }
