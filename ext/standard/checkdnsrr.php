@@ -36,7 +36,7 @@ final class checkdnsrr extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException($fn.'() requires one or two arguments in this compiler build');
         }
-        $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $fn, 0, 'hostname');
+        $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $fn, 0, 'hostname', 'string', false);
         VmString::rejectEmptyBuiltinStringArg($hostname, $fn, 0, 'hostname');
         $type = 'MX';
         if ($argc >= 2) {
@@ -60,7 +60,7 @@ final class checkdnsrr extends Internal
             throw new \LogicException($fn.'() requires one or two arguments in this compiler build');
         }
 
-        $hostname = JitStringBuiltinArg::lower($context, $args[0], $fn, 0, 'hostname');
+        $hostname = JitStringBuiltinArg::lower($context, $args[0], $fn, 0, 'hostname', 'string', null, false);
         JitStringBuiltinArg::rejectEmpty(
             $context,
             $args[0],

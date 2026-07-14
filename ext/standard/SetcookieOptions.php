@@ -53,7 +53,7 @@ final class SetcookieOptions
 
                 return self::parseOptionsArray(
                     $function,
-                    VmString::coerceStringBuiltinArg($args[0], $function, 0, 'name'),
+                    VmString::coerceStringBuiltinArg($args[0], $function, 0, 'name', 'string', false),
                     $argc >= 2
                         ? VmString::coerceStringBuiltinArg($args[1], $function, 1, 'value')
                         : '',
@@ -86,7 +86,7 @@ final class SetcookieOptions
     private static function parsePositional(string $function, array $args): array
     {
         $argc = \count($args);
-        $name = VmString::coerceStringBuiltinArg($args[0], $function, 0, 'name');
+        $name = VmString::coerceStringBuiltinArg($args[0], $function, 0, 'name', 'string', false);
         $value = '';
         if ($argc >= 2) {
             $value = VmString::coerceStringBuiltinArg($args[1], $function, 1, 'value');
