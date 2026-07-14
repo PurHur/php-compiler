@@ -16,6 +16,7 @@ final class JitUnserialize
 {
     public static function decodeRuntime(Context $context, JITVariable $payload): Value
     {
+        StringUnserialize::ensureLinked($context);
         $payloadString = JitStringBuiltinArg::lowerZparamStr(
             $context,
             $payload,
@@ -23,7 +24,6 @@ final class JitUnserialize
             0,
             'data'
         );
-        StringUnserialize::ensureLinked($context);
 
         return self::decodeRuntimeString($context, $payloadString);
     }
