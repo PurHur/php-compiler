@@ -402,7 +402,22 @@ trait ClassConstFetchHelperTrait
         if (!$objectType->isTraitClass($funcClassLc)) {
             return $scope;
         }
-        $called = $objectType->jitContext()->scope->calledClassName ?? '';
+        $jitScope = $objectType->jitContext()->scope;
+        $composing = $jitScope->traitComposingClassName ?? '';
+        if ('' !== $composing && !$objectType->isTraitClass(strtolower(ltrim($composing, '\\')))) {
+            return $composing;
+        }
+        if ($jitScope->classId > 0) {
+            $fromId = $objectType->classNameForId($jitScope->classId);
+            if ('' !== $fromId && !$objectType->isTraitClass(strtolower(ltrim($fromId, '\\')))) {
+                return $fromId;
+            }
+        }
+        $scopeName = $jitScope->className ?? '';
+        if ('' !== $scopeName && !$objectType->isTraitClass(strtolower(ltrim($scopeName, '\\')))) {
+            return $scopeName;
+        }
+        $called = $jitScope->calledClassName ?? '';
         if ('' !== $called) {
             $calledLc = strtolower(ltrim($called, '\\'));
             if ($calledLc !== $funcClassLc) {

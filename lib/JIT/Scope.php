@@ -18,6 +18,8 @@ class Scope {
     public string $calledClassName = '';
     /** Call-site class id for standalone `new static()` / `: static` (#4792). */
     public ?int $lateStaticCallClassId = null;
+    /** Using class when lowering a trait method body merged onto a class (#18878). */
+    public string $traitComposingClassName = '';
     public \SplObjectStorage $blockStorage;
     /** LLVM entry BB per CFG block; stable when includes retarget {@see $blockStorage} (#866, #878). */
     public \SplObjectStorage $blockEntryStorage;

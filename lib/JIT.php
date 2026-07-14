@@ -339,6 +339,19 @@ class JIT {
             $this->context->jitImportedGlobalNames = [];
             $llvmFunc = $run[0];
             $cfgBlock = $run[1] ?? null;
+            $traitComposing = $this->resolveTraitComposingClassForQueue($llvmFunc, $cfgBlock);
+            if ('' !== $traitComposing) {
+                $this->context->scope->traitComposingClassName = $traitComposing;
+                $composingLc = strtolower(ltrim($traitComposing, '\\'));
+                if ('' === $this->context->scope->className
+                    || $this->context->type->object->isTraitClass(strtolower(ltrim($this->context->scope->className, '\\')))) {
+                    $this->context->scope->className = $composingLc;
+                }
+                if (0 === $this->context->scope->classId
+                    && $this->context->type->object->hasDeclaredClass($traitComposing)) {
+                    $this->context->scope->classId = $this->context->type->object->lookup($traitComposing);
+                }
+            }
             if ($cfgBlock instanceof Block && null !== $cfgBlock->func) {
                 $this->context->activeFunction = strtolower($cfgBlock->func->getScopedName());
             } else {
@@ -351,6 +364,43 @@ class JIT {
             }
             $this->compileBlockInternal($llvmFunc, $cfgBlock, null, null, 0, false, ...$run[2]);
         }
+    }
+
+    /**
+     * Trait method bodies queue as T::method but register a composing alias C::method (#18878).
+     */
+    private function resolveTraitComposingClassForQueue(PHPLLVM\Value $llvmFunc, ?Block $cfgBlock): string
+    {
+        if (!$cfgBlock instanceof Block || null === $cfgBlock->func?->class) {
+            return '';
+        }
+        $traitLc = strtolower(ltrim($cfgBlock->func->class->value, '\\'));
+        if (!$this->context->type->object->isTraitClass($traitLc)) {
+            return '';
+        }
+        $methodLc = strtolower($cfgBlock->func->name);
+        foreach ($this->context->functions as $name => $candidate) {
+            if ($candidate !== $llvmFunc || !str_contains($name, '::')) {
+                continue;
+            }
+            [$classPart, $methodPart] = explode('::', $name, 2);
+            if (strtolower($methodPart) !== $methodLc) {
+                continue;
+            }
+            $classLc = strtolower(ltrim($classPart, '\\'));
+            if ($classLc === $traitLc || $this->context->type->object->isTraitClass($classLc)) {
+                continue;
+            }
+            if ($this->context->type->object->hasDeclaredClass($classPart)) {
+                return $this->context->type->object->classNameForId(
+                    $this->context->type->object->lookup($classPart)
+                );
+            }
+
+            return $classPart;
+        }
+
+        return '';
     }
 
     /**
@@ -12330,7 +12380,13 @@ class JIT {
                 if ($this->context->scope->blockStorage->contains($methodBlock)) {
                     $this->context->scope->blockStorage->detach($methodBlock);
                 }
-                $this->compileBlock($methodBlock, $classLc.'::'.$methodLc);
+                $savedTraitComposing = $this->context->scope->traitComposingClassName;
+                $this->context->scope->traitComposingClassName = $className;
+                try {
+                    $this->compileBlock($methodBlock, $classLc.'::'.$methodLc);
+                } finally {
+                    $this->context->scope->traitComposingClassName = $savedTraitComposing;
+                }
             }
         }
     }
@@ -15164,9 +15220,24 @@ class JIT {
             $declaringClass = $block->func->class->value;
             $declaringLc = strtolower(ltrim($declaringClass, '\\'));
             if ($this->context->type->object->isTraitClass($declaringLc)) {
-                $called = $this->context->scope->calledClassName;
-                if ('' !== $called && strtolower(ltrim($called, '\\')) !== $declaringLc) {
-                    $declaringClass = $called;
+                $composing = $this->context->scope->traitComposingClassName;
+                if ('' !== $composing && !$this->context->type->object->isTraitClass(strtolower(ltrim($composing, '\\')))) {
+                    $declaringClass = $composing;
+                } elseif ($this->context->scope->classId > 0) {
+                    $fromId = $this->context->type->object->classNameForId($this->context->scope->classId);
+                    if ('' !== $fromId && !$this->context->type->object->isTraitClass(strtolower(ltrim($fromId, '\\')))) {
+                        $declaringClass = $fromId;
+                    }
+                } else {
+                    $scopeName = $this->context->scope->className;
+                    if ('' !== $scopeName && !$this->context->type->object->isTraitClass(strtolower(ltrim($scopeName, '\\')))) {
+                        $declaringClass = $scopeName;
+                    } else {
+                        $called = $this->context->scope->calledClassName;
+                        if ('' !== $called && strtolower(ltrim($called, '\\')) !== $declaringLc) {
+                            $declaringClass = $called;
+                        }
+                    }
                 }
             }
             $parentLc = $this->context->type->object->parentClassLc($declaringClass);
