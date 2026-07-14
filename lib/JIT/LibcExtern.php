@@ -72,6 +72,7 @@ final class LibcExtern
             'remove' => [$i32, false, [$i8p]],
             'rename' => [$i32, false, [$i8p, $i8p]],
             'getenv' => [$i8p, false, [$i8p]],
+            'putenv' => [$i32, false, [$i8p]],
             'realpath' => [$i8p, false, [$i8p, $i8p]],
             'time' => [$i64, false, [$i8p]],
             'printf' => [$i32, true, [$i8p]],
