@@ -1,5 +1,7 @@
 --TEST--
-stdlib urlencode()/rawurlencode() null TypeError JIT (#18733, ext/standard/url.c)
+stdlib urlencode()/rawurlencode() null TypeError on 8.4 forward profile JIT (#18733 #18912, ext/standard/url.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php

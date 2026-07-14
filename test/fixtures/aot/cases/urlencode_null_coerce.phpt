@@ -1,5 +1,7 @@
 --TEST--
-AOT urlencode()/rawurlencode() null TypeError (#18733, ext/standard/url.c)
+AOT urlencode()/rawurlencode() null TypeError on 8.4 forward profile (#18733 #18912, ext/standard/url.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 foreach (['urlencode', 'rawurlencode'] as $fn) {
