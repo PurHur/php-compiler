@@ -668,6 +668,10 @@
         "ext/openssl/openssl_pkey_export.php",
         "ext/openssl/openssl_pkey_get_private.php",
         "ext/openssl/openssl_pkey_new.php",
+        "ext/openssl/openssl_private_decrypt.php",
+        "ext/openssl/openssl_private_encrypt.php",
+        "ext/openssl/openssl_public_decrypt.php",
+        "ext/openssl/openssl_public_encrypt.php",
         "ext/openssl/openssl_seal.php",
         "ext/openssl/openssl_sign.php",
         "ext/openssl/openssl_spki_export.php",
@@ -5086,9 +5090,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4852,
+        "inventory_files": 4856,
         "excluded": 0,
-        "eligible": 4852,
+        "eligible": 4856,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
