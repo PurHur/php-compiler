@@ -57,7 +57,7 @@ PHP;
             return;
         }
 
-        $this->assertSame('', $this->runVm($code));
+        $this->expectVmError($code, 'Undefined constant "__PROPERTY__"');
     }
 
     public function testPropertyMagicConstTopLevelOutsideHookOn84Profile(): void
@@ -156,6 +156,17 @@ PHP;
         $out = ob_get_clean();
 
         return is_string($out) ? $out : '';
+    }
+
+    private function expectVmError(string $code, string $message): void
+    {
+        $runtime = new Runtime(Runtime::MODE_NORMAL);
+        $block = $runtime->parseAndCompile($code, 'magic-constants-test.php');
+        $this->assertNotNull($block);
+
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage($message);
+        $runtime->run($block);
     }
 
     private function expectCompileError(string $code, string $message): void
