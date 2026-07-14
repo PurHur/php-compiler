@@ -20,7 +20,7 @@ final class rawurlencode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('rawurlencode() requires exactly one argument');
         }
-        $subject = VmString::coerceTypedStringBuiltinArg(
+        $subject = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'rawurlencode',
             0,
@@ -38,7 +38,7 @@ final class rawurlencode extends Internal
             throw new \LogicException('rawurlencode() requires exactly one argument');
         }
 
-        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'rawurlencode', 0, 'string');
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'rawurlencode', 0, 'string');
 
         return JitUrlencode::rawurlencode($context, $str);
     }
