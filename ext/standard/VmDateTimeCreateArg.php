@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
@@ -15,17 +14,12 @@ use PHPCompiler\VM\Variable;
 /**
  * date_create()/DateTime::__construct() $datetime — typed string default "now" (ext/date/php_date.c; #18730).
  *
- * PHP 8.2: null deprecated and coerces to "" (now). PHP 8.4+ forward profile: null TypeError.
+ * php-src: null/empty datetime coerces to "" which constructs current time.
  */
 final class VmDateTimeCreateArg
 {
-    public static function requiresStrictDatetimeType(): bool
-    {
-        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
-    }
-
     /**
-     * @throws \TypeError when forward profile rejects null datetime operand
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
     public static function coerceDatetime(
         Frame $frame,
@@ -34,18 +28,25 @@ final class VmDateTimeCreateArg
         int $userArgIndex = 0,
         string $paramName = 'datetime'
     ): string {
-        if (self::requiresStrictDatetimeType()) {
-            InternalStrictArg::rejectNullString($var, $function, $paramName, $userArgIndex, $frame);
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return '';
+        }
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, $userArgIndex, $function, $paramName);
         }
 
-        return VmString::coerceStringBuiltinArg($var, $function, $userArgIndex, $paramName);
+        return VmString::coerceStringBuiltinArg(
+            $var,
+            $function,
+            $userArgIndex,
+            $paramName,
+            'string',
+            false
+        );
     }
 
-    /**
-     * Compile-time null datetime literal — reject on 8.4+ profile, else "" (now).
-     *
-     * @throws \TypeError when forward profile rejects null
-     */
+    /** Compile-time null datetime literal — "" (now). */
     public static function jitNullDatetimeLiteral(
         Context $context,
         JITVariable $arg,
@@ -53,7 +54,7 @@ final class VmDateTimeCreateArg
         int $userArgIndex = 0,
         string $paramName = 'datetime'
     ): string {
-        if (self::requiresStrictDatetimeType()) {
+        if ($context->callerStrictTypes) {
             JitInternalStrictArg::rejectNullString($context, $arg, $function, $paramName, $userArgIndex + 1);
         }
 

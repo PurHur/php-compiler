@@ -24,9 +24,10 @@ final class JitFilestatArg
         JITVariable $arg,
         string $function,
         int $argIndex = 0,
-        string $paramName = 'filename'
+        string $paramName = 'filename',
+        bool $softNullPath = false
     ): Value {
-        return JitStringBuiltinArg::lowerPath($context, $arg, $function, $argIndex, $paramName);
+        return JitStringBuiltinArg::lowerPath($context, $arg, $function, $argIndex, $paramName, 'string', null, $softNullPath);
     }
 
     /** touch() $filename — typed string; reject null (#18245, ext/standard/file.c). */

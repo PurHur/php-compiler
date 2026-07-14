@@ -22,13 +22,14 @@ final class VmFilestatArg
         string $function,
         int $argIndex = 0,
         string $paramName = 'filename',
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        bool $softNullPath = false
     ): string {
         if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::rejectNullString($var, $function, $paramName, $argIndex, $frame);
         }
 
-        return VmString::coercePathBuiltinArg($var, $function, $argIndex, $paramName);
+        return VmString::coercePathBuiltinArg($var, $function, $argIndex, $paramName, $softNullPath);
     }
 
     /**

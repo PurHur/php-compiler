@@ -23,7 +23,7 @@ final class chdir_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('chdir() requires exactly one argument in this compiler build');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'chdir', 0, 'directory', $frame);
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'chdir', 0, 'directory', $frame, true);
         $ok = VmFs::chdir($path);
         if (!$ok) {
             VmFilestatFailure::warnChdirFailed($frame, $path);
@@ -41,7 +41,7 @@ final class chdir_ extends Internal
         }
         return JitChdir::invoke(
             $context,
-            JitFilestatArg::lowerFilename($context, $args[0], 'chdir', 0, 'directory')
+            JitFilestatArg::lowerFilename($context, $args[0], 'chdir', 0, 'directory', true)
         );
     }
 }
