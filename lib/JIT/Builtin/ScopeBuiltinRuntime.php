@@ -5,27 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\Variable;
-use PHPCompiler\VM\ErrorReporter;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for compact() warnings + extract() EXTR_* name resolution (#10184, #14499).
  *
- * Replaces libc snprintf warning formatting in {@see ScopeBuiltinEmitHelper}.
+ * Replaces inline standalone warning LLVM in {@see ScopeBuiltinEmitHelper}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmScope}
  */
 final class ScopeBuiltinRuntime
 {
-    private static int $standaloneBlockSeq = 0;
-
     private const HELPER_PATH = '/ext/standard/ScopeBuiltinJitHelper.php';
 
     private const COMPACT_UNDEF_HELPER = 'PHPCompiler\\ext\\standard\\ScopeBuiltinJitHelper::emitCompactUndefinedVariableWarning';
@@ -47,6 +41,10 @@ final class ScopeBuiltinRuntime
     private const ABI_STORE_VAR_SNAPSHOT = '__scope_store_var_snapshot';
 
     private const ABI_MATCH_NAMED_VAR_INDEX = '__scope_match_named_var_index';
+
+    private const ABI_COMPACT_INVALID_ARG_WARN = '__scope_compact_invalid_arg_warn';
+
+    private const ABI_COMPACT_UNDEF_WARN = '__scope_compact_undef_warn';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -372,159 +370,111 @@ final class ScopeBuiltinRuntime
         int $argNum,
         Value $typeByte
     ): void {
-        StringTriggerError::ensureLinked($context);
+        self::ensureCompactInvalidArgWarnStandaloneLinked($context);
+        $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
-        $tag = 'cia'.(string) ++self::$standaloneBlockSeq;
-        $done = BasicBlockHelper::append($context, 'compact_invalid_done_'.$tag);
-        $afterInt = BasicBlockHelper::append($context, 'compact_invalid_after_int_'.$tag);
-        $afterFloat = BasicBlockHelper::append($context, 'compact_invalid_after_float_'.$tag);
-        $afterBool = BasicBlockHelper::append($context, 'compact_invalid_after_bool_'.$tag);
-        $afterString = BasicBlockHelper::append($context, 'compact_invalid_after_string_'.$tag);
-        $afterArray = BasicBlockHelper::append($context, 'compact_invalid_after_array_'.$tag);
-        $intBlock = BasicBlockHelper::append($context, 'compact_invalid_int_'.$tag);
-        $floatBlock = BasicBlockHelper::append($context, 'compact_invalid_float_'.$tag);
-        $boolBlock = BasicBlockHelper::append($context, 'compact_invalid_bool_'.$tag);
-        $stringBlock = BasicBlockHelper::append($context, 'compact_invalid_string_'.$tag);
-        $arrayBlock = BasicBlockHelper::append($context, 'compact_invalid_array_'.$tag);
-        $unknownBlock = BasicBlockHelper::append($context, 'compact_invalid_unknown_'.$tag);
-
-        $isInt = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
-        );
-        $context->builder->branchIf($isInt, $intBlock, $afterInt);
-
-        $context->builder->positionAtEnd($intBlock);
-        self::emitStandaloneCompactInvalidArgumentWarningMessage($context, $argNum, 'int');
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterInt);
-        $isFloat = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
-        );
-        $context->builder->branchIf($isFloat, $floatBlock, $afterFloat);
-
-        $context->builder->positionAtEnd($floatBlock);
-        self::emitStandaloneCompactInvalidArgumentWarningMessage($context, $argNum, 'float');
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterFloat);
-        $isBool = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
-        );
-        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
-
-        $context->builder->positionAtEnd($boolBlock);
-        self::emitStandaloneCompactInvalidArgumentWarningMessage($context, $argNum, 'bool');
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterBool);
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
-        );
-        $context->builder->branchIf($isString, $stringBlock, $afterString);
-
-        $context->builder->positionAtEnd($stringBlock);
-        self::emitStandaloneCompactInvalidArgumentWarningMessage($context, $argNum, 'string');
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterString);
-        $isArray = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_HASHTABLE, false)
-        );
-        $context->builder->branchIf($isArray, $arrayBlock, $afterArray);
-
-        $context->builder->positionAtEnd($arrayBlock);
-        self::emitStandaloneCompactInvalidArgumentWarningMessage($context, $argNum, 'array');
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterArray);
-        $context->builder->branch($unknownBlock);
-
-        $context->builder->positionAtEnd($unknownBlock);
-        self::emitStandaloneCompactInvalidArgumentWarningMessage($context, $argNum, 'unknown type');
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($done);
-    }
-
-    private static function emitStandaloneCompactInvalidArgumentWarningMessage(
-        Context $context,
-        int $argNum,
-        string $typeName
-    ): void {
-        $message = \PHPCompiler\ext\standard\ScopeBuiltinJitHelper::compactInvalidArgumentMessage($argNum, $typeName);
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i32 = $context->getTypeFromString('int32');
-        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->call(
-            $context->lookupFunction('__compiler_trigger_error'),
-            $msgPtr,
-            $sizeT->constInt(\strlen($message), false),
-            $i32->constInt(ErrorReporter::E_WARNING, false),
-            $emptyFile,
-            $i32->constInt(0, false)
+            $context->lookupFunction(self::ABI_COMPACT_INVALID_ARG_WARN),
+            $i64->constInt($argNum, false),
+            $context->builder->trunc($typeByte, $i8)
         );
     }
 
     private static function emitStandaloneCompactUndefinedWarning(Context $context, string $name): void
     {
-        StringTriggerError::ensureLinked($context);
-        $message = \PHPCompiler\ext\standard\ScopeBuiltinJitHelper::compactUndefinedVariableMessage($name);
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i32 = $context->getTypeFromString('int32');
-        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        self::ensureCompactUndefWarnStandaloneLinked($context);
         $context->builder->call(
-            $context->lookupFunction('__compiler_trigger_error'),
-            $msgPtr,
-            $sizeT->constInt(\strlen($message), false),
-            $i32->constInt(ErrorReporter::E_WARNING, false),
-            $emptyFile,
-            $i32->constInt(0, false)
+            $context->lookupFunction(self::ABI_COMPACT_UNDEF_WARN),
+            $context->constantFromString($name)
         );
     }
 
     private static function emitStandaloneCompactUndefinedWarningFromCstr(Context $context, Value $namePtr): void
     {
+        self::ensureCompactUndefWarnStandaloneLinked($context);
+        $context->builder->call(
+            $context->lookupFunction(self::ABI_COMPACT_UNDEF_WARN),
+            self::cstrToStringPtr($context, $namePtr)
+        );
+    }
+
+    private static function ensureCompactInvalidArgWarnStandaloneLinked(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_COMPACT_INVALID_ARG_WARN);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_COMPACT_INVALID_ARG_WARN, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i32 = $context->getTypeFromString('int32');
-        $buf = $context->builder->alloca($i8, 128, 'compact_undef_msg');
-        $bufPtr = $context->builder->pointerCast($buf, $i8p);
-        $fmtPtr = $context->builder->pointerCast(
-            $context->constantFromString('compact(): Undefined variable $%s'),
-            $i8p
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_COMPACT_INVALID_ARG_WARN,
+            'scope_compact_invalid_arg_warn_entry',
+            [$i64, $i8],
+            $context->getTypeFromString('void'),
+            self::COMPACT_INVALID_ARG_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#18773'
         );
-        $context->builder->call(
-            $context->lookupFunction('snprintf'),
-            $bufPtr,
-            $sizeT->constInt(128, false),
-            $fmtPtr,
-            $namePtr
+        $context->registerFunction(
+            self::ABI_COMPACT_INVALID_ARG_WARN,
+            $context->module->getNamedFunction(self::ABI_COMPACT_INVALID_ARG_WARN)
         );
-        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $bufPtr);
-        $context->builder->call(
-            $context->lookupFunction('__compiler_trigger_error'),
-            $bufPtr,
-            $msgLen,
-            $i32->constInt(ErrorReporter::E_WARNING, false),
-            $context->builder->pointerCast($context->constantFromString(''), $i8p),
-            $i32->constInt(0, false)
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function ensureCompactUndefWarnStandaloneLinked(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_COMPACT_UNDEF_WARN);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_COMPACT_UNDEF_WARN, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_COMPACT_UNDEF_WARN,
+            'scope_compact_undef_warn_entry',
+            [$strPtr],
+            $context->getTypeFromString('void'),
+            self::COMPACT_UNDEF_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#18773'
         );
+        $context->registerFunction(
+            self::ABI_COMPACT_UNDEF_WARN,
+            $context->module->getNamedFunction(self::ABI_COMPACT_UNDEF_WARN)
+        );
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

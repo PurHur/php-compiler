@@ -45,6 +45,20 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ScopeBuiltinJitHelper::matchNamedVariableIndex', $source);
     }
 
+    public function testScopeBuiltinRuntimeStandaloneWarningsUsePhpBridges(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ScopeBuiltinRuntime.php');
+        $this->assertStringContainsString('__scope_compact_invalid_arg_warn', $source);
+        $this->assertStringContainsString('__scope_compact_undef_warn', $source);
+        $this->assertStringContainsString('ensureCompactInvalidArgWarnStandaloneLinked', $source);
+        $this->assertStringContainsString('ensureCompactUndefWarnStandaloneLinked', $source);
+        $this->assertStringNotContainsString("lookupFunction('snprintf')", $source);
+        $this->assertStringNotContainsString('compact_invalid_int_', $source);
+        $this->assertStringNotContainsString('emitStandaloneCompactInvalidArgumentWarningMessage', $source);
+        $loc = substr_count($source, "\n") + 1;
+        $this->assertLessThan(530, $loc, 'ScopeBuiltinRuntime.php LOC');
+    }
+
     public function testScopeBuiltinJitHelperMatchNamedVariableIndex(): void
     {
         $table = "foo\0bar";
