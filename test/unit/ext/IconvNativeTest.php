@@ -89,4 +89,10 @@ final class IconvNativeTest extends TestCase
     {
         $this->assertFalse(VmIconv::iconvStrlen("\xFF", 'UTF-8'));
     }
+
+    public function testIconvNullEncodingResolvesToDefaultCharset(): void
+    {
+        $this->assertSame('hi', VmIconv::iconv('', 'UTF-8', 'hi'));
+        $this->assertSame('hi', VmIconv::iconv('UTF-8', '', 'hi'));
+    }
 }

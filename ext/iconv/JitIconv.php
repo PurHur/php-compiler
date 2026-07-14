@@ -22,23 +22,23 @@ final class JitIconv
             throw new \LogicException('iconv() requires exactly three arguments');
         }
 
-        $fromLit = JitStringBuiltinArg::compileTimeLiteral($args[0]);
-        $toLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
+        $fromLit = self::encodingCompileTimeLiteral($args[0]);
+        $toLit = self::encodingCompileTimeLiteral($args[1]);
         $inputLit = JitStringBuiltinArg::compileTimeLiteral($args[2]);
         if (
             null !== $fromLit
             && null !== $toLit
             && null !== $inputLit
-            && null !== CharsetEngine::parseEncodingSpec($fromLit)
-            && null !== CharsetEngine::parseEncodingSpec($toLit)
+            && null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($fromLit, true))
+            && null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($toLit, false))
         ) {
             return self::foldCompileTime($context, $fromLit, $toLit, $inputLit);
         }
 
         IconvRuntimeLink::ensureLinked($context);
 
-        $from = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'iconv', 0, 'from_encoding');
-        $to = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'iconv', 1, 'to_encoding');
+        $from = JitStringBuiltinArg::lower($context, $args[0], 'iconv', 0, 'from_encoding', 'string', null, false);
+        $to = JitStringBuiltinArg::lower($context, $args[1], 'iconv', 1, 'to_encoding', 'string', null, false);
         $input = JitStringBuiltinArg::lowerRequiredString($context, $args[2], 'iconv', 2, 'string');
 
         $result = $context->builder->call(
@@ -49,6 +49,15 @@ final class JitIconv
         );
 
         return self::materializeStringOrFalse($context, $result);
+    }
+
+    private static function encodingCompileTimeLiteral(JITVariable $arg): ?string
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return '';
+        }
+
+        return JitStringBuiltinArg::compileTimeLiteral($arg);
     }
 
     private static function foldCompileTime(Context $context, string $from, string $to, string $input): Value
