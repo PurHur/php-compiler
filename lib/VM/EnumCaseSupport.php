@@ -788,6 +788,12 @@ final class EnumCaseSupport
 
                 return $out;
             }
+            if ($object->immortalClassConst) {
+                $out = new Variable();
+                $out->copyFrom($src);
+
+                return $out;
+            }
         }
         if ($src->is(Variable::TYPE_ARRAY)) {
             if (self::arrayContainsRuntimeRefs($src)) {

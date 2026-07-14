@@ -157,6 +157,7 @@ final class ClassConstMaterializer
                 }
                 $detached = new ObjectEntry($srcObj->class);
                 $detached->constructed = $srcObj->constructed;
+                $detached->immortalClassConst = true;
                 foreach ($srcObj->propertiesWithNames() as $propName => $propVar) {
                     if (!self::isDetachablePropertySlot($propVar)) {
                         continue;

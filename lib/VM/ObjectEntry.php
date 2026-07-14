@@ -85,6 +85,9 @@ class ObjectEntry {
     /** True for backed/unit enum case singleton objects (#3518). */
     public bool $isEnumCase = false;
 
+    /** True for class-constant object values detached once at definition (#18816, zend_constants.c). */
+    public bool $immortalClassConst = false;
+
     /** Case name as declared (`Active`), not lowercased. */
     public ?string $enumCaseName = null;
 

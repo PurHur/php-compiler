@@ -15,9 +15,11 @@ use PHPCfg\Op\Terminal\Const_ as ConstTerminal;
  * Reject invalid `new` in class **constant**, **static property**, and **instance property** initializers
  * (#6549, #9484, #10095, #10391, #10693).
  *
- * php-src rejects all `new` in class constant expressions and property default expressions with
- * "New expressions are not supported in this context" (zend_compile_const_expr / zend_compile_property).
- * Constructor parameter defaults (including promoted properties) may still use `new` (#3391 RFC).
+ * php-src rejects `new` in class constant expressions and property default expressions on older
+ * profiles with "New expressions are not supported in this context" (zend_compile_const_expr /
+ * zend_compile_property). PHP 8.4+ forward profile allows bare `new Class` in const/static/instance
+ * initializers (#18816, Zend/zend_language_parser.y NewWithoutParens). Constructor parameter defaults
+ * (including promoted properties) may still use `new` (#3391 RFC).
  *
  * @see Zend/zend_compile.c — zend_compile_const_expr(), zend_compile_property()
  */
@@ -84,7 +86,8 @@ final class NewWithoutParensCompileCheck
                 if (!$atTopLevel) {
                     throw new \CompileError(self::MESSAGE);
                 }
-                if (!NewCtorParens::hasCtorParens($op, $sourceCode)) {
+                if (!CompilerVersion::supportsPropertyDefaultObjectExpressions()
+                    && !NewCtorParens::hasCtorParens($op, $sourceCode)) {
                     throw new \CompileError(self::MESSAGE);
                 }
                 ++$topLevelNewCount;
@@ -114,17 +117,13 @@ final class NewWithoutParensCompileCheck
         if (null === $prop->defaultVar && null === $prop->defaultBlock) {
             return;
         }
-        if (CompilerVersion::supportsPropertyDefaultObjectExpressions() && !$prop->static) {
+        if (CompilerVersion::supportsPropertyDefaultObjectExpressions()) {
             if (null !== $prop->defaultBlock && [] !== ($prop->defaultBlock->children ?? [])) {
                 $this->walkPropertyDefaultNewExpr($prop->defaultBlock->children, $this->sourceCode, true);
 
                 return;
             }
             if ($prop->defaultVar instanceof New_) {
-                if (!NewCtorParens::hasCtorParens($prop->defaultVar, $this->sourceCode)) {
-                    throw new \CompileError(self::MESSAGE);
-                }
-
                 return;
             }
             if (!$prop->defaultVar instanceof Op) {
@@ -145,7 +144,7 @@ final class NewWithoutParensCompileCheck
     }
 
     /**
-     * PHP 8.4+ instance property default: single top-level `new Class(...)` (#18040).
+     * PHP 8.4+ instance/static property default: single top-level `new Class` / `new Class(...)` (#18040, #18816).
      *
      * @param list<Op> $ops
      */
@@ -160,7 +159,8 @@ final class NewWithoutParensCompileCheck
                 if (!$atTopLevel) {
                     throw new \CompileError(self::MESSAGE);
                 }
-                if (!NewCtorParens::hasCtorParens($op, $sourceCode)) {
+                if (!CompilerVersion::supportsPropertyDefaultObjectExpressions()
+                    && !NewCtorParens::hasCtorParens($op, $sourceCode)) {
                     throw new \CompileError(self::MESSAGE);
                 }
                 ++$topLevelNewCount;

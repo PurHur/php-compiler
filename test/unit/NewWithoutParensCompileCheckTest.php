@@ -14,6 +14,18 @@ final class NewWithoutParensCompileCheckTest extends TestCase
 {
     public function testClassConstNewWithoutParensCompileErrors(): void
     {
+        if (CompilerVersion::supportsPropertyDefaultObjectExpressions()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    const X = new stdClass;
+}
+PHP, 'class_const_new_without_parens.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -24,6 +36,18 @@ PHP);
 
     public function testStaticPropertyDefaultNewWithoutParensCompileErrors(): void
     {
+        if (CompilerVersion::supportsPropertyDefaultObjectExpressions()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public static $s = new stdClass;
+}
+PHP, 'static_property_new_without_parens.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -34,6 +58,18 @@ PHP);
 
     public function testStaticTypedPropertyDefaultNewCompileErrors(): void
     {
+        if (CompilerVersion::supportsPropertyDefaultObjectExpressions()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public static DateTime $d = new DateTime('2020-01-01');
+}
+PHP, 'static_property_new_with_parens.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -71,7 +107,7 @@ PHP);
             $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
-    public $p = new stdClass();
+    public $p = new stdClass;
 }
 PHP, 'property_default_new_instance_untyped.php');
             $this->assertNotNull($block);
