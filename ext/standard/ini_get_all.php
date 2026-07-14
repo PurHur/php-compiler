@@ -33,10 +33,12 @@ final class ini_get_all extends Internal
         $extension = null;
         $details = true;
         if (\count($frame->calledArgs) >= 1) {
-            $arg0 = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $arg0->type) {
-                $extension = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'ini_get_all', 0, 'extension');
-            }
+            $extension = VmString::coerceTypedNullableStringBuiltinArg(
+                $frame->calledArgs[0],
+                'ini_get_all',
+                0,
+                'extension'
+            );
         }
         if (2 === \count($frame->calledArgs)) {
             $arg1 = $frame->calledArgs[1]->resolveIndirect();
