@@ -16,6 +16,14 @@ final class VmMath
 {
     private const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
 
+    /**
+     * PHP 8.4+ forward profile: Z_PARAM_LONG null is TypeError (ext/standard/math.c; #18850).
+     */
+    public static function requiresForwardProfileStrictNumericNull(): bool
+    {
+        return VmString::requiresForwardProfileStrictStringNull();
+    }
+
     public static function toFloat(Variable $v): float
     {
         if (Variable::TYPE_INTEGER === $v->type) {
@@ -447,6 +455,10 @@ final class VmMath
             case Variable::TYPE_BOOLEAN:
                 return $var->toBool() ? 1 : 0;
             case Variable::TYPE_NULL:
+                if (self::requiresForwardProfileStrictNumericNull()) {
+                    throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+                }
+
                 return 0;
             case Variable::TYPE_STRING:
                 $s = $var->toString();

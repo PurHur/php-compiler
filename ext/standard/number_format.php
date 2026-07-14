@@ -16,8 +16,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -35,9 +33,6 @@ final class number_format extends Internal
             return;
         }
         $numVar = $frame->calledArgs[0]->resolveIndirect();
-        if (InternalStrictArg::isCallerStrict($frame) && Variable::TYPE_NULL === $numVar->type) {
-            throw new \TypeError('number_format(): Argument #1 ($num) must be of type float, null given');
-        }
         $num = VmNumberFormat::coerceFloat($numVar);
         $decimals = isset($frame->calledArgs[1])
             ? VmMath::parseIntBuiltinArg(

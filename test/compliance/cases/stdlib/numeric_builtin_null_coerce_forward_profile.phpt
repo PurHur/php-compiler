@@ -1,0 +1,30 @@
+--TEST--
+stdlib chr/number_format/dechex/decbin/decoct/wordwrap/str_pad — null TypeError on 8.4 forward profile (#18850, ext/standard/string.c, math.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
+--FILE--
+<?php
+foreach ([
+    'chr' => static fn () => chr(null),
+    'wordwrap' => static fn () => wordwrap(null),
+    'number_format' => static fn () => number_format(null),
+    'dechex' => static fn () => dechex(null),
+    'decbin' => static fn () => decbin(null),
+    'decoct' => static fn () => decoct(null),
+    'str_pad' => static fn () => str_pad(null, 5),
+] as $label => $factory) {
+    try {
+        $factory();
+        echo "$label: uncaught\n";
+    } catch (TypeError $e) {
+        echo $label.': '.$e->getMessage()."\n";
+    }
+}
+--EXPECT--
+chr: chr(): Argument #1 ($codepoint) must be of type int, null given
+wordwrap: wordwrap(): Argument #1 ($string) must be of type string, null given
+number_format: number_format(): Argument #1 ($num) must be of type float, null given
+dechex: dechex(): Argument #1 ($num) must be of type int, null given
+decbin: decbin(): Argument #1 ($num) must be of type int, null given
+decoct: decoct(): Argument #1 ($num) must be of type int, null given
+str_pad: str_pad(): Argument #1 ($string) must be of type string, null given

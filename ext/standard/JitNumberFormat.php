@@ -68,7 +68,7 @@ final class JitNumberFormat
 
         $argc = \count($args);
 
-        if ($context->callerStrictTypes) {
+        if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
             self::rejectNullNum($context, $args[0]);
         }
 

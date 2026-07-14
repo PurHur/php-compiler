@@ -62,6 +62,10 @@ final class VmNumberFormat
         }
         switch ($value->type) {
             case Variable::TYPE_NULL:
+                if (VmString::requiresForwardProfileStrictStringNull()) {
+                    throw new \TypeError(self::numTypeError('null'));
+                }
+
                 return 0.0;
             case Variable::TYPE_INTEGER:
                 return (float) $value->toInt();

@@ -21,6 +21,12 @@ final class JitChr
     public static function lowerCodepoint(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_NULL === $arg->type) {
+            if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
+                self::emitIntTypeErrorAndAbort($context, 'null');
+
+                return $context->getTypeFromString('int64')->constInt(0, false);
+            }
+
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {

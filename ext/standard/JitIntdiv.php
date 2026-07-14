@@ -159,6 +159,12 @@ final class JitIntdiv
         bool $warnFloatPrecision = false
     ): Value {
         if (JITVariable::TYPE_NULL === $arg->type) {
+            if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
+                self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $nullable);
+
+                return $context->getTypeFromString('int64')->constInt(0, false);
+            }
+
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
