@@ -120,7 +120,7 @@ final class JitFilestatArg
         );
     }
 
-    /** mkdir() mode — Z_PARAM_LONG zend_strtol base-0 numeric strings (#17819, #18887, ext/standard/filestat.c). */
+    /** mkdir() mode — Z_PARAM_LONG decimal numeric strings (#17819, #18923, ext/standard/filestat.c). */
     public static function lowerFileMode(
         Context $context,
         JITVariable $arg,
@@ -131,7 +131,7 @@ final class JitFilestatArg
         return self::lowerFileModeArg($context, $arg, $function, $argIndex, $paramName);
     }
 
-    /** chmod() mode — Z_PARAM_LONG zend_strtol base-0 numeric strings (#18887, ext/standard/filestat.c). */
+    /** chmod() mode — Z_PARAM_LONG decimal numeric strings (#18923, ext/standard/filestat.c). */
     public static function lowerChmodMode(
         Context $context,
         JITVariable $arg,
@@ -159,7 +159,10 @@ final class JitFilestatArg
             );
         }
         if (JITVariable::TYPE_STRING === $arg->type) {
-            return JitLongArg::lowerZendLong($context, $arg, $function.'() '.$paramName);
+            return JitLongArg::lowerStringValue(
+                $context,
+                $context->helper->loadValue($arg)
+            );
         }
 
         return JitLongArg::lower($context, $arg, $function.'() '.$paramName);

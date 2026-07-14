@@ -205,9 +205,9 @@ final class VmFilestatArg
     }
 
     /**
-     * chmod() mode — Z_PARAM_LONG zend_strtol base-0 numeric strings (#18887, ext/standard/filestat.c).
+     * chmod() mode — Z_PARAM_LONG decimal numeric strings (#18923, ext/standard/filestat.c).
      *
-     * Leading-zero strings parse as octal ('0644' → 420 like int literal 0644).
+     * String modes parse as base-10 ('0644' → 644), unlike int literal 0644 (octal 420).
      *
      * @throws \TypeError
      */
@@ -227,7 +227,7 @@ final class VmFilestatArg
     }
 
     /**
-     * mkdir() mode — Z_PARAM_LONG zend_strtol base-0 numeric strings (#17819, #18887, ext/standard/filestat.c).
+     * mkdir() mode — Z_PARAM_LONG decimal numeric strings (#17819, #18923, ext/standard/filestat.c).
      *
      * @throws \TypeError
      */
@@ -247,7 +247,7 @@ final class VmFilestatArg
     }
 
     /**
-     * File mode coercion — Z_PARAM_LONG zend_strtol base-0 for mkdir() and chmod() (#18887).
+     * File mode coercion — Z_PARAM_LONG base-10 for mkdir() and chmod() (#18923).
      *
      * @throws \TypeError
      */
@@ -307,10 +307,10 @@ final class VmFilestatArg
         ));
     }
 
-    /** php-src Zend/zend_operators.c — zend_strtol(..., 0) for chmod()/mkdir() mode strings. */
+    /** php-src ext/standard/filestat.c — Z_PARAM_LONG decimal parse for chmod()/mkdir() mode strings (#18923). */
     public static function parseFileModeString(string $mode): int
     {
-        return (int) VmMath::baseToZval($mode, VmMath::autodetectBase($mode));
+        return (int) VmMath::baseToZval($mode, 10);
     }
 
     private static function vmTypeName(int $type): string
