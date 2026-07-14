@@ -15885,6 +15885,7 @@ class JIT {
         if (!$this->isIncludePathResolverRealLoweringMethod($declaringClassLc.'::'.$methodLc)) {
             return false;
         }
+        $proxy = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
         if (!$this->context->functionIsRegistered($proxy)) {
             $path = \dirname(__DIR__).'/Web/IncludePathResolver.php';
             if (\is_file($path)) {
@@ -15894,8 +15895,8 @@ class JIT {
                     $this->runQueue();
                 }
             }
+            $proxy = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
         }
-        $proxy = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
         if (!$this->context->functionIsRegistered($proxy)) {
             return false;
         }
