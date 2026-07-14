@@ -9,16 +9,19 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_is_list() AOT uses native packed-table LLVM + ArrayIsListJitHelper SSOT (#6229). */
+/** array_is_list() AOT routes through ArrayIsListJitHelper PHP via JitVmHelperLink (#6229, #13645, #18990). */
 final class ArrayIsListRuntimeShrinkTest extends TestCase
 {
-    public function testArrayIsListRuntimeUsesNativeLlvmForPackedTables(): void
+    public function testArrayIsListRuntimeUsesJitHelperBridgeNotNativeLlvm(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayIsListRuntime.php');
-        $this->assertStringContainsString('ArrayIsListNativeLlvm', $runtime);
+        $this->assertStringContainsString('ArrayIsListJitHelper', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
         $this->assertStringContainsString('IS_NATIVE_ARRAY', $runtime);
+        $this->assertStringNotContainsString('ArrayIsListNativeLlvm', $runtime);
         $this->assertStringNotContainsString('JitArrayIsList::invoke', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ArrayIsListNativeLlvm.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_is_list.php');
         $this->assertStringContainsString('ArrayIsListRuntime::isList', $builtin);

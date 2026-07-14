@@ -9,18 +9,21 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** in_array() AOT uses native packed-table LLVM + InArrayJitHelper SSOT (#6229, #12503). */
+/** in_array() AOT routes through InArrayJitHelper PHP via JitVmHelperLink (#6229, #12503, #18990). */
 final class InArrayRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 6200;
 
-    public function testInArrayRuntimeUsesNativeLlvmForPackedTables(): void
+    public function testInArrayRuntimeUsesJitHelperBridgeNotNativeLlvm(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/InArrayRuntime.php');
-        $this->assertStringContainsString('InArrayNativeLlvm', $runtime);
+        $this->assertStringContainsString('InArrayJitHelper', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
         $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('InArrayNativeLlvm', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::inArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/InArrayNativeLlvm.php');
 
         $inOp = (string) file_get_contents(__DIR__.'/../../lib/JIT/InOperatorHelper.php');
         $this->assertStringContainsString('InArrayRuntime::inArray', $inOp);
