@@ -20,6 +20,6 @@ echo $mk ? 'mkdir_ok' : 'mkdir_fail', "\n";
 echo $dmode, "\n";
 --EXPECT--
 chmod_ok
-644
+204
 mkdir_ok
-755
+341

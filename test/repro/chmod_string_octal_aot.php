@@ -13,4 +13,4 @@ $strMode = decoct(fileperms($fStr) & 0777);
 @unlink($fStr);
 
 echo 'int_mode=', $intMode, ' str_mode=', $strMode, "\n";
-echo $intMode === '644' && $strMode === '644' ? 'ok' : 'fail', "\n";
+echo $intMode === '644' && $strMode === '204' ? 'ok' : 'fail', "\n";

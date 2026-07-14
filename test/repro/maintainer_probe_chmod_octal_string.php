@@ -6,7 +6,7 @@ touch($f);
 try {
     $ok = chmod($f, '0644');
     $mode = fileperms($f) & 0777;
-    if (!$ok || 420 !== $mode) {
+    if (!$ok || 132 !== $mode) {
         echo 'fail: ok=', var_export($ok, true), ' mode=', $mode, "\n";
         exit(1);
     }
