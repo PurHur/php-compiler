@@ -25,13 +25,12 @@ final class JitTimezoneOpen
 
         $literal = JitStringBuiltinArg::compileTimeLiteral($args[0]);
         if (null === $literal && (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)) {
-            $literal = VmDateTimeCreateArg::jitNullDatetimeLiteral(
-                $context,
-                $args[0],
-                'timezone_open',
-                0,
-                'timezone'
-            );
+            if (JitStringBuiltinArg::requiresForwardProfileStrictStringNull()) {
+                throw new \TypeError(
+                    VmString::stringBuiltinTypeError('timezone_open', 0, 'timezone', 'null')
+                );
+            }
+            $literal = '';
         }
         if (null === $literal) {
             throw new \LogicException(
