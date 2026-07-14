@@ -32,6 +32,10 @@ final class StreamContextRuntime
 
     private const SET_PARAMS_HELPER = 'PHPCompiler\\ext\\standard\\StreamContextJitHelper::setParams';
 
+    private const SET_SINGLE_OPTION_HELPER = 'PHPCompiler\\ext\\standard\\StreamContextJitHelper::setSingleOption';
+
+    private const GET_PARAMS_HELPER = 'PHPCompiler\\ext\\standard\\StreamContextJitHelper::getParams';
+
     private const GET_DEFAULT_HELPER = 'PHPCompiler\\ext\\standard\\StreamContextJitHelper::getDefault';
 
     private const SET_DEFAULT_HELPER = 'PHPCompiler\\ext\\standard\\StreamContextJitHelper::setDefault';
@@ -42,6 +46,8 @@ final class StreamContextRuntime
         self::MERGE_HELPER,
         self::GET_OPTIONS_HELPER,
         self::SET_PARAMS_HELPER,
+        self::SET_SINGLE_OPTION_HELPER,
+        self::GET_PARAMS_HELPER,
         self::GET_DEFAULT_HELPER,
         self::SET_DEFAULT_HELPER,
     ];
@@ -52,6 +58,8 @@ final class StreamContextRuntime
         '__phpc_stream_context_merge_options',
         '__phpc_stream_context_get_options',
         '__phpc_stream_context_set_params',
+        '__phpc_stream_context_set_single_option',
+        '__phpc_stream_context_get_params',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -95,6 +103,8 @@ final class StreamContextRuntime
         self::implementMergeBridge($context);
         self::implementGetOptionsBridge($context);
         self::implementSetParamsBridge($context);
+        self::implementSetSingleOptionBridge($context);
+        self::implementGetParamsBridge($context);
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
     }
@@ -183,6 +193,44 @@ final class StreamContextRuntime
                 $ctx->builder->returnVoid();
             },
             returnsVoid: true
+        );
+    }
+
+    private static function implementSetSingleOptionBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $valPtr = $context->getTypeFromString('__value__*');
+        self::implementBridge(
+            $context,
+            '__phpc_stream_context_set_single_option',
+            $context->context->functionType($context->getTypeFromString('void'), false, $htPtr, $valPtr, $valPtr, $valPtr),
+            self::SET_SINGLE_OPTION_HELPER,
+            static function (Context $ctx, LlvmFunction $fn): void {
+                $ctx->builder->call(
+                    self::helperFunction($ctx, self::SET_SINGLE_OPTION_HELPER),
+                    $fn->getParam(0),
+                    $fn->getParam(1),
+                    $fn->getParam(2),
+                    $fn->getParam(3)
+                );
+                $ctx->builder->returnVoid();
+            },
+            returnsVoid: true
+        );
+    }
+
+    private static function implementGetParamsBridge(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        self::implementBridge(
+            $context,
+            '__phpc_stream_context_get_params',
+            $context->context->functionType($htPtr, false, $htPtr),
+            self::GET_PARAMS_HELPER,
+            static fn (Context $ctx, LlvmFunction $fn) => $ctx->builder->call(
+                self::helperFunction($ctx, self::GET_PARAMS_HELPER),
+                $fn->getParam(0)
+            )
         );
     }
 

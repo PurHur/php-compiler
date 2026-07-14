@@ -289,6 +289,100 @@ final class VmStreamContext
     }
 
     /**
+     * stream_context_set_option() — singular or batch wrapper option write (ext/standard/streams.c, #3448).
+     *
+     * Two-arg form merges a full options array; four-arg form sets one wrapper option.
+     */
+    public static function setOption(Variable $context, Variable $arg2, ?Variable $arg3 = null, ?Variable $arg4 = null): bool
+    {
+        $context = self::requireRepresentation($context, 'stream_context_set_option');
+        $resolved2 = $arg2->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $resolved2->type && (null === $arg3 || null === $arg4)) {
+            return self::setOptions($context, $arg2);
+        }
+        if (null === $arg3 || null === $arg4) {
+            throw new \LogicException('stream_context_set_option(): missing wrapper/option/value arguments');
+        }
+
+        $wrapperName = self::coerceOptionKeyString($resolved2, 'stream_context_set_option', 2, 'wrapper');
+        $optionName = self::coerceOptionKeyString($arg3->resolveIndirect(), 'stream_context_set_option', 3, 'option');
+        $exportedValue = VmHttpBuildQuery::export($arg4);
+        if (!\is_scalar($exportedValue) && null !== $exportedValue && !\is_array($exportedValue)) {
+            $exportedValue = '';
+        }
+
+        $context->separateArrayForWrite();
+        VmParseStr::mergeInto($context->toArray(), [
+            $wrapperName => [$optionName => $exportedValue],
+        ]);
+
+        return true;
+    }
+
+    /**
+     * stream_context_get_params() — options bag + params metadata (ext/standard/streams.c, #3448).
+     */
+    public static function getParamsHashTable(Variable $context): HashTable
+    {
+        $context = self::requireRepresentation($context, 'stream_context_get_params');
+        $out = new HashTable();
+        $optionsVar = new Variable();
+        $optionsVar->array(self::getOptionsHashTable($context));
+        $out->add('options', $optionsVar);
+
+        $paramsSlot = $context->toArray()->find(self::PARAMS_MARKER_KEY);
+        if (null !== $paramsSlot) {
+            $paramsHt = $paramsSlot->resolveIndirect()->toArray();
+            foreach ($paramsHt->iterateKeyed(true) as [$key, $value]) {
+                $k = $key->resolveIndirect();
+                if (Variable::TYPE_STRING !== $k->type) {
+                    continue;
+                }
+                $name = $k->toString();
+                if ('options' === $name) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $out->add($name, $copy);
+            }
+        }
+
+        return $out;
+    }
+
+    private static function coerceOptionKeyString(
+        Variable $resolved,
+        string $functionName,
+        int $argNum,
+        string $label
+    ): string {
+        if (Variable::TYPE_STRING === $resolved->type) {
+            return $resolved->toString();
+        }
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return (string) $resolved->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type) {
+            return (string) $resolved->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $resolved->type) {
+            return $resolved->toBool() ? '1' : '';
+        }
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return '';
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type string, %s given',
+            $functionName,
+            $argNum,
+            $label,
+            VmStreamArg::debugTypeName($resolved)
+        ));
+    }
+
+    /**
      * Merge options into an existing stream context (issue #6517).
      */
     public static function setOptions(Variable $context, Variable $options): bool

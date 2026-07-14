@@ -135,4 +135,11 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([1, 2], BuiltinByRefParams::forFunction('stream_socket_server'));
         $this->assertSame([1, 2], BuiltinByRefParams::forFunction('STREAM_SOCKET_SERVER'));
     }
+
+    public function testStreamContextMutatorsFirstArgByRef(): void
+    {
+        foreach (['stream_context_set_options', 'stream_context_set_option', 'stream_context_set_params'] as $fn) {
+            $this->assertSame([0], BuiltinByRefParams::forFunction($fn), $fn);
+        }
+    }
 }
