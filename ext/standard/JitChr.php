@@ -21,6 +21,10 @@ final class JitChr
     public static function lowerCodepoint(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_NULL === $arg->type) {
+            if (VmMath::requiresForwardProfileStrictLongNull()) {
+                self::emitIntTypeErrorAndAbort($context, 'null');
+            }
+
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (($arg->type & JITVariable::IS_NATIVE_ARRAY) || JITVariable::TYPE_HASHTABLE === $arg->type) {
@@ -88,6 +92,9 @@ final class JitChr
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
 
         $context->builder->positionAtEnd($nullBlock);
+        if (VmMath::requiresForwardProfileStrictLongNull()) {
+            self::emitIntTypeErrorAndAbort($context, 'null');
+        }
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($afterNull);

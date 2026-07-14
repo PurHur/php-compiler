@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -15,6 +16,16 @@ use PHPCompiler\VM\Variable;
 final class VmMath
 {
     private const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
+
+    /**
+     * PHP 8.4+ forward profile: Z_PARAM_LONG null is TypeError (ext/standard/math.c; #18850).
+     *
+     * PHP 8.2 reference profile keeps coerce to 0.
+     */
+    public static function requiresForwardProfileStrictLongNull(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
 
     public static function toFloat(Variable $v): float
     {
@@ -447,6 +458,10 @@ final class VmMath
             case Variable::TYPE_BOOLEAN:
                 return $var->toBool() ? 1 : 0;
             case Variable::TYPE_NULL:
+                if (self::requiresForwardProfileStrictLongNull()) {
+                    throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+                }
+
                 return 0;
             case Variable::TYPE_STRING:
                 $s = $var->toString();

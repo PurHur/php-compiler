@@ -68,7 +68,7 @@ final class JitNumberFormat
 
         $argc = \count($args);
 
-        if ($context->callerStrictTypes) {
+        if ($context->callerStrictTypes || version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
             self::rejectNullNum($context, $args[0]);
         }
 

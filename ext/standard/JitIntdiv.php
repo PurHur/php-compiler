@@ -159,6 +159,10 @@ final class JitIntdiv
         bool $warnFloatPrecision = false
     ): Value {
         if (JITVariable::TYPE_NULL === $arg->type) {
+            if (!$nullable && VmMath::requiresForwardProfileStrictLongNull()) {
+                self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $nullable);
+            }
+
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
@@ -251,6 +255,9 @@ final class JitIntdiv
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
 
         $context->builder->positionAtEnd($nullBlock);
+        if (!$nullable && VmMath::requiresForwardProfileStrictLongNull()) {
+            self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $nullable);
+        }
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($afterNull);
