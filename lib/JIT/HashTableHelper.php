@@ -433,6 +433,7 @@ final class HashTableHelper
             $result->value = $slot;
             $result->initialize();
         }
+        self::ensureHashtableInitLvalueSlot($context, $result);
         $ht = self::alloc($context);
         if (Variable::TYPE_VALUE === $result->type) {
             $context->builder->call(
@@ -445,6 +446,28 @@ final class HashTableHelper
             return;
         }
         $context->builder->store($ht, $result->value);
+    }
+
+    /**
+     * Nested array literals may bind INIT_ARRAY temps to a direct __hashtable__* rvalue; initArray
+     * must store through an alloca slot (__hashtable__**), not the pointer itself (#827, bootstrap-aot-link).
+     */
+    private static function ensureHashtableInitLvalueSlot(Context $context, Variable $result): void
+    {
+        if (Variable::TYPE_HASHTABLE !== $result->type) {
+            return;
+        }
+        $slotTy = $context->getStringFromType($result->value->typeOf());
+        if (Variable::KIND_VARIABLE === $result->kind && '__hashtable__**' === $slotTy) {
+            return;
+        }
+        $slot = BasicBlockHelper::entryAlloca(
+            $context,
+            $context->getTypeFromString('__hashtable__*')
+        );
+        $result->kind = Variable::KIND_VARIABLE;
+        $result->value = $slot;
+        $result->initialize();
     }
 
     public static function spreadAddElement(
