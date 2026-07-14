@@ -11,6 +11,9 @@ namespace PHPCompiler\ext\dom;
  */
 final class VmDomValidationNative
 {
+    private const LIBXML_DTDLOAD = 2;
+    private const LIBXML_DTDVALID = 4;
+
     /** @var \FFI|null */
     private static $ffi = null;
 
@@ -87,6 +90,50 @@ final class VmDomValidationNative
             $ffi->xmlFreeDoc($doc);
 
             return 0 === $rc;
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($prev);
+        }
+    }
+
+    /**
+     * @return array{valid: bool, errors: list<string>}
+     */
+    public static function validateDtdDocument(string $docXml): array
+    {
+        self::$lastErrors = [];
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return ['valid' => false, 'errors' => []];
+        }
+
+        $prev = libxml_use_internal_errors(true);
+        libxml_clear_errors();
+        try {
+            $doc = $ffi->xmlReadMemory($docXml, \strlen($docXml), '', null, self::LIBXML_DTDLOAD | self::LIBXML_DTDVALID);
+            if (null === $doc) {
+                self::captureLibxmlErrors();
+
+                return ['valid' => false, 'errors' => self::consumeLastErrors()];
+            }
+
+            $validCtxt = $ffi->xmlNewValidCtxt();
+            if (null === $validCtxt) {
+                self::captureLibxmlErrors();
+                $ffi->xmlFreeDoc($doc);
+
+                return ['valid' => false, 'errors' => self::consumeLastErrors()];
+            }
+
+            $rc = (int) $ffi->xmlValidateDocument($validCtxt, $doc);
+            if (1 !== $rc) {
+                self::captureLibxmlErrors();
+            }
+
+            $ffi->xmlFreeValidCtxt($validCtxt);
+            $ffi->xmlFreeDoc($doc);
+
+            return ['valid' => 1 === $rc, 'errors' => self::consumeLastErrors()];
         } finally {
             libxml_clear_errors();
             libxml_use_internal_errors($prev);
@@ -182,6 +229,7 @@ final class VmDomValidationNative
 
         $cdef = <<<'CDEF'
 typedef struct _xmlDoc xmlDoc;
+typedef struct _xmlValidCtxt xmlValidCtxt;
 typedef struct _xmlSchema xmlSchema;
 typedef struct _xmlSchemaParserCtxt xmlSchemaParserCtxt;
 typedef struct _xmlSchemaValidCtxt xmlSchemaValidCtxt;
@@ -191,6 +239,10 @@ typedef struct _xmlRelaxNGValidCtxt xmlRelaxNGValidCtxt;
 
 xmlDoc* xmlReadMemory(const char* buffer, int size, const char* URL, const char* encoding, int options);
 void xmlFreeDoc(xmlDoc* cur);
+
+xmlValidCtxt* xmlNewValidCtxt(void);
+void xmlFreeValidCtxt(xmlValidCtxt* cur);
+int xmlValidateDocument(xmlValidCtxt* ctxt, xmlDoc* doc);
 
 xmlSchemaParserCtxt* xmlSchemaNewParserCtxt(const char* URL);
 xmlSchema* xmlSchemaParse(xmlSchemaParserCtxt* ctxt);

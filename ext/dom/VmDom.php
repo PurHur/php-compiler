@@ -593,6 +593,8 @@ final class VmDom
         $document->methods['relaxngvalidatesource'] = new DocumentRelaxNGValidateSource();
         $document->methodVisibility['relaxngvalidatesource'] = $pub;
         $document->methodNames['relaxngvalidatesource'] = 'relaxNGValidateSource';
+        $document->methods['validate'] = new DocumentValidate();
+        $document->methodVisibility['validate'] = $pub;
         $ctx->classes[self::CLASS_DOCUMENT] = $document;
 
         $element = new ClassEntry('DOMElement');
@@ -2161,6 +2163,7 @@ final class VmDom
         self::reindexDocumentIds($document, $root);
         $state->documentUri = self::defaultDocumentUri();
         $state->loadedViaXml = true;
+        $state->sourceXml = $trimmed;
 
         return true;
     }
@@ -6743,6 +6746,71 @@ final class VmDom
         unset($ctx, $options, $frame);
 
         return false;
+    }
+
+    /** DOMDocument::validate() — in-document DTD validation via libxml2 FFI (php-src ext/dom/document.c; #18833). */
+    public static function validate(Context $ctx, ObjectEntry $document, ?Frame $frame = null): bool
+    {
+        self::ensureDocument($document);
+        unset($ctx);
+        if (!VmDomValidationNative::available()) {
+            self::triggerDomWarning($frame, 'DOMDocument::validate(): not implemented in this compiler build');
+
+            return false;
+        }
+
+        $state = DomRegistry::state($document);
+        $docXml = $state->sourceXml;
+        if (null === $docXml || '' === $docXml) {
+            if (null === self::parseDoctypeNameFromDocument($document)) {
+                self::triggerDomWarning($frame, 'DOMDocument::validate(): no DTD found!');
+
+                return false;
+            }
+            $docXml = self::serializeXmlForValidation($document);
+        }
+
+        $result = VmDomValidationNative::validateDtdDocument($docXml);
+        foreach ($result['errors'] as $error) {
+            self::triggerDomWarning($frame, 'DOMDocument::validate(): '.$error);
+        }
+
+        return $result['valid'];
+    }
+
+    private static function parseDoctypeNameFromDocument(ObjectEntry $document): ?string
+    {
+        $state = DomRegistry::state($document);
+        if (null !== $state->doctypeName && '' !== $state->doctypeName) {
+            return $state->doctypeName;
+        }
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && self::isDocumentType($child)) {
+                return DomRegistry::state($child)->nodeName;
+            }
+        }
+
+        return null;
+    }
+
+    private static function serializeXmlForValidation(ObjectEntry $document): string
+    {
+        $state = DomRegistry::state($document);
+        $lines = [self::serializeXmlDeclaration($state)];
+        if (null !== $state->doctypeName) {
+            $lines[] = self::serializeDoctype(
+                $state->doctypeName,
+                $state->doctypePublicId ?? '',
+                $state->doctypeSystemId ?? ''
+            );
+        }
+        $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $rootVar->type) {
+            $lines[] = self::serializeNode($rootVar->toObject(), 0, false, false);
+        }
+
+        return implode("\n", $lines);
     }
 
     /** DOMDocument::schemaValidate() — XSD file validation via libxml2 FFI (php-src ext/dom/document.c; #14370, #18806). */
