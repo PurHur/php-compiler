@@ -12,6 +12,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** chunk_split() — insert a separator every N bytes (subset of PHP). */
@@ -28,24 +29,14 @@ final class chunk_split extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('chunk_split() requires one to three arguments in this compiler build');
         }
-        $string = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'chunk_split',
-            0,
-            'string'
-        );
+        $string = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'chunk_split', 'string');
         $length = 76;
         if ($argc >= 2) {
             $length = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'chunk_split', 2, 'length');
         }
         $separator = "\r\n";
         if (3 === $argc) {
-            $separator = VmString::coerceStringBuiltinArg(
-                $frame->calledArgs[2],
-                'chunk_split',
-                2,
-                'separator'
-            );
+            $separator = InternalStrictArg::resolveCoercibleStringArg($frame, 2, 'chunk_split', 'separator');
         }
         $result = VmString::chunkSplit($string, $length, $separator);
         if (null === $frame->returnVar) {
@@ -74,7 +65,7 @@ final class chunk_split extends Internal
             JitChunkSplit::emitRuntimeLengthGuard($context, $chunkLen);
         }
         if ($argc >= 3) {
-            $separator = JitStringBuiltinArg::lower($context, $args[2], 'chunk_split', 2, 'separator');
+            $separator = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'chunk_split', 2, 'separator');
         } else {
             $separator = $context->builder->load($context->constantStringFromString("\r\n"));
         }

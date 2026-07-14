@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -33,7 +34,7 @@ final class str_word_count extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('str_word_count() accepts one to three arguments in this compiler build');
         }
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'str_word_count', 0, 'string');
+        $string = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'str_word_count', 'string');
         $format = 0;
         if ($argc >= 2) {
             $formatArg = $frame->calledArgs[1]->resolveIndirect();
@@ -44,7 +45,7 @@ final class str_word_count extends Internal
         }
         $chars = '';
         if (3 === $argc) {
-            $chars = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'str_word_count', 2, 'chars');
+            $chars = InternalStrictArg::resolveCoercibleStringArg($frame, 2, 'str_word_count', 'chars');
         }
         if (null === $frame->returnVar) {
             return;
@@ -107,7 +108,7 @@ final class str_word_count extends Internal
 
         $str = null !== $literal
             ? $context->builder->load($context->constantStringFromString($literal))
-            : JitStringBuiltinArg::lower($context, $args[0], 'str_word_count', 0, 'string');
+            : JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'str_word_count', 0, 'string');
 
         $formatVal = 1 === $argc
             ? $context->getTypeFromString('int64')->constInt(0, false)
@@ -125,7 +126,7 @@ final class str_word_count extends Internal
         $charsArg = null !== $charsCt
             ? $context->builder->load($context->constantStringFromString($charsCt))
             : (3 === $argc
-                ? JitStringBuiltinArg::lower($context, $args[2], 'str_word_count', 2, 'chars')
+                ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'str_word_count', 2, 'chars')
                 : $context->builder->load($context->constantStringFromString('')));
 
         return $context->builder->call(

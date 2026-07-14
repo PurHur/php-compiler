@@ -37,7 +37,7 @@ final class JitTimezoneNameFromAbbr
         $gmtoffset = -1;
         $isdst = -1;
         if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
-            if (VmString::requiresForwardProfileStrictStringNull()) {
+            if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
                 JitInternalStrictArg::rejectNullString(
                     $context,
                     $args[0],
@@ -46,6 +46,7 @@ final class JitTimezoneNameFromAbbr
                     1
                 );
             }
+
             return self::writeResult($context, VmDateTimeNative::timezoneNameFromAbbr('', $gmtoffset, $isdst));
         }
 

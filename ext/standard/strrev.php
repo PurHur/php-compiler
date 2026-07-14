@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Builtin\StringStrrev;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -39,12 +40,7 @@ final class strrev extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $subject = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'strrev',
-            0,
-            'string'
-        );
+        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'strrev', 'string');
         $frame->returnVar->string(VmString::strrev($subject));
     }
 
@@ -58,7 +54,7 @@ final class strrev extends Internal
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_strrev'),
-            JitStringBuiltinArg::lower($context, $args[0], 'strrev', 0, 'string')
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strrev', 0, 'string')
         );
     }
 }
