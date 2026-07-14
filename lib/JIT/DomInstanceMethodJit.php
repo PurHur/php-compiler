@@ -44,6 +44,7 @@ final class DomInstanceMethodJit
     /** @var array<string, true> */
     private const USER_SCRIPT_DIRECT_METHODS = [
         'domdocument::createelement' => true,
+        'domdocument::load' => true,
         'domdocument::loadhtml' => true,
         'domdocument::loadhtmlfile' => true,
         'domdocument::getelementbyid' => true,
@@ -75,6 +76,11 @@ final class DomInstanceMethodJit
         if (self::shouldDeferToVmClassMethodLowering()) {
             if ('domdocument::createelement' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentCreateElement();
+
+                return;
+            }
+            if ('domdocument::load' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentLoad();
 
                 return;
             }
@@ -162,6 +168,7 @@ final class DomInstanceMethodJit
             VmActiveContextInitLlvm::requestThinStandaloneInit($context);
             self::ensureDomElementPropertyLayout($context);
             self::ensureProxy($context, 'domdocument::createelement');
+            self::ensureProxy($context, 'domdocument::load');
             self::ensureProxy($context, 'domdocument::loadhtml');
             self::ensureProxy($context, 'domdocument::loadhtmlfile');
             self::ensureProxy($context, 'domdocument::getelementbyid');

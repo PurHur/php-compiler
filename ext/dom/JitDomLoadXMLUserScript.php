@@ -20,6 +20,11 @@ final class JitDomLoadXMLUserScript
         return self::$lastCompileTimeXml;
     }
 
+    public static function rememberCompileTimeXml(string $xml): void
+    {
+        self::$lastCompileTimeXml = $xml;
+    }
+
     public static function shouldUse(Context $context): bool
     {
         return JitDomLoadHTMLUserScript::shouldUse($context);
