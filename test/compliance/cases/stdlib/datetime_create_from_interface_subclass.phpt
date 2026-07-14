@@ -1,5 +1,5 @@
 --TEST--
-stdlib DateTime::createFromInterface() DateTime subclass operand (#16204, ext/date/php_date.c)
+stdlib DateTime::createFromInterface() DateTime subclass operand (#18921, ext/date/php_date.c)
 --FILE--
 <?php
 class MyDate extends DateTime
