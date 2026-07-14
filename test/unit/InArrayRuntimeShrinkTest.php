@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** in_array() JIT routes all operands through InArrayJitHelper PHP not ArrayBuiltinHelper LLVM (#12503, #14360, #18153). */
+/** in_array() AOT uses native packed-table LLVM + InArrayJitHelper SSOT (#6229, #12503). */
 final class InArrayRuntimeShrinkTest extends TestCase
 {
     private const ARRAY_BUILTIN_HELPER_MAX_LINES = 6200;
 
-    public function testInArrayRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testInArrayRuntimeUsesNativeLlvmForPackedTables(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/InArrayRuntime.php');
-        $this->assertStringContainsString('InArrayJitHelper', $runtime);
+        $this->assertStringContainsString('InArrayNativeLlvm', $runtime);
         $this->assertStringContainsString('nativeListToHashTable', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::inArray', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);

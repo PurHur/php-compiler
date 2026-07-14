@@ -79,23 +79,26 @@ final class InArrayRuntime
         $valuePtr = $context->getTypeFromString('__value__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i1 = $context->getTypeFromString('int1');
-        JitVmHelperLink::ensureBridge(
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_CONTAINS,
+                $context->context->functionType($i1, false, $valuePtr, $htPtr, $i1)
+            );
+        $entry = $fn->appendBasicBlock('in_array_native_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = InArrayNativeLlvm::contains(
             $context,
-            self::ABI_CONTAINS,
-            'in_array_bridge_entry',
-            [$valuePtr, $htPtr, $i1],
-            $i1,
-            self::CONTAINS_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#12503'
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2)
         );
+        $context->builder->returnValue($result);
+        $context->builder->clearInsertionPosition();
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
         }
     }
 
