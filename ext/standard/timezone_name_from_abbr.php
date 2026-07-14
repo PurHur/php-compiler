@@ -32,7 +32,12 @@ final class timezone_name_from_abbr extends Internal
                 \sprintf('timezone_name_from_abbr() expects between 1 and 3 arguments, %d given', $argc)
             );
         }
-        $abbr = $frame->calledArgs[0]->resolveIndirect()->toString();
+        $abbr = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'timezone_name_from_abbr',
+            0,
+            'abbr'
+        );
         $gmtoffset = -1;
         if ($argc >= 2) {
             $gmtoffset = (int) $frame->calledArgs[1]->resolveIndirect()->toInt();
