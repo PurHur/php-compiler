@@ -267,6 +267,14 @@ final class DomInstanceMethodJit
         $object->defineProperty($classId, 'tagName', Variable::TYPE_STRING);
         $object->defineProperty($classId, 'attributes', Variable::TYPE_VALUE);
         $object->defineProperty($classId, 'textContent', Variable::TYPE_STRING);
+        foreach (['DOMNode', 'DOMElement', 'DOMDocument'] as $nodeClass) {
+            $nodeId = $object->lookup($nodeClass);
+            foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+                if (!$object->hasProperty($nodeId, $prop)) {
+                    $object->defineProperty($nodeId, $prop, Variable::TYPE_VALUE);
+                }
+            }
+        }
         $docId = $object->lookup('DOMDocument');
         if (!$object->hasProperty($docId, VmDom::PROP_ELEMENT_ID_MAP)) {
             $object->defineProperty($docId, VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_VALUE);

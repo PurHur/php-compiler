@@ -24,6 +24,9 @@ final class ObjectInstancePropertyLlvm
         int $classId
     ): Variable {
         $classLc = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
+        if (\PHPCompiler\ext\dom\JitDomNodeChildProperty::isDomNodeChildProperty($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomNodeChildProperty::fetch($object, $obj, $name);
+        }
         if (\PHPCompiler\ext\dom\JitDomElementTextContent::isDomElementTextContent($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomElementTextContent::fetch($object, $obj);
         }
