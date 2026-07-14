@@ -38,6 +38,9 @@ final class VmDateTimeCreateArg
                     $paramName
                 ));
             }
+            if (!VmString::requiresForwardProfileStrictStringNull()) {
+                VmNullStringParamDeprecation::emit($frame, $function, $userArgIndex, $paramName);
+            }
 
             return '';
         }
@@ -65,6 +68,14 @@ final class VmDateTimeCreateArg
     ): string {
         if ($context->callerStrictTypes) {
             JitInternalStrictArg::rejectNullString($context, $arg, $function, $paramName, $userArgIndex + 1);
+        }
+        if (!JitStringBuiltinArg::requiresForwardProfileStrictStringNull()) {
+            JitStringBuiltinArg::emitNullStringParamDeprecation(
+                $context,
+                $function,
+                $userArgIndex,
+                $paramName
+            );
         }
 
         return '';
