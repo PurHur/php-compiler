@@ -42,6 +42,10 @@ final class DebugBacktraceBuiltinTest extends BaseTest
             __DIR__.'/../compliance/cases/stdlib/debug_print_backtrace.phpt',
             'debug_print_backtrace.phpt'
         );
+        yield 'debug_backtrace_method_frame.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/standard/debug_backtrace_frame_shape/method_frame.phpt',
+            'debug_backtrace_method_frame.phpt'
+        );
     }
 
     public function testVmDebugBacktraceInline(): void

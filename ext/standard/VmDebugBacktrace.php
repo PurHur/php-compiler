@@ -255,7 +255,7 @@ final class VmDebugBacktrace
         bool $provideObject,
         bool $includeHandlerMetadata,
     ): ?Variable {
-        $function = self::frameFunction($frame);
+        $function = self::frameFunctionName($frame);
         $file = self::frameFile($frame);
         if ('' === $function && '' === $file) {
             return null;
@@ -273,6 +273,17 @@ final class VmDebugBacktrace
             $lineVar = new Variable(Variable::TYPE_INTEGER);
             $lineVar->int(self::frameLine($frame));
             $ht->add('line', $lineVar);
+        }
+
+        $className = self::frameClass($frame);
+        if ('' !== $className) {
+            $classVar = new Variable(Variable::TYPE_STRING);
+            $classVar->string($className);
+            $ht->add('class', $classVar);
+
+            $typeVar = new Variable(Variable::TYPE_STRING);
+            $typeVar->string(self::frameCallType($frame));
+            $ht->add('type', $typeVar);
         }
 
         $fnVar = new Variable(Variable::TYPE_STRING);
@@ -345,28 +356,6 @@ final class VmDebugBacktrace
         }
 
         return null;
-    }
-
-    private static function frameFunction(Frame $frame): string
-    {
-        if ($frame->hasHandler()) {
-            return $frame->handler->getName();
-        }
-        if (null === $frame->block || null === $frame->block->func) {
-            return '';
-        }
-        $func = $frame->block->func;
-        $name = $func->name;
-        if ('' === $name && null === $func->class) {
-            return '{closure}';
-        }
-        if (null !== $func->class) {
-            $class = $func->class->value ?? $func->class->name ?? '';
-
-            return '' !== $class ? $class.'::'.$name : $name;
-        }
-
-        return $name;
     }
 
     private static function handlerClassName(Frame $frame): string
