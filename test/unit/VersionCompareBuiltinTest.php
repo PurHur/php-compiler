@@ -58,4 +58,23 @@ final class VersionCompareBuiltinTest extends TestCase
         $this->assertContains('standard', $names);
         $this->assertContains('types', $names);
     }
+
+    public function testGetLoadedExtensionsNullCoercesToFalse(): void
+    {
+        $runtime = new Runtime();
+        $fn = new get_loaded_extensions();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $nullArg = new VMVariable();
+        $nullArg->null();
+        $frame->calledArgs = [$nullArg];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $ht = $frame->returnVar->resolveIndirect()->toArray();
+        $names = [];
+        foreach ($ht->iterate() as $value) {
+            $names[] = $value->toString();
+        }
+        $this->assertContains('standard', $names);
+        $this->assertNotEmpty($names);
+    }
 }

@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** get_loaded_extensions() — registered extension list (ext/standard/info.c parity, #3204). */
@@ -31,13 +30,12 @@ final class get_loaded_extensions extends Internal
         }
         $zendExtensions = false;
         if (1 === $argc) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $arg->type) {
-                throw new \LogicException(
-                    'get_loaded_extensions() zend_extensions must be boolean in this compiler build'
-                );
-            }
-            $zendExtensions = $arg->toBool();
+            $zendExtensions = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[0],
+                'get_loaded_extensions',
+                1,
+                'zend_extensions'
+            );
         }
         $frame->returnVar->array(VmInfo::get_loaded_extensions($zendExtensions));
     }
@@ -49,7 +47,11 @@ final class get_loaded_extensions extends Internal
         }
         $zendExtensions = $context->constantFromBool(false);
         if (isset($args[0])) {
-            $zendExtensions = JitBoolArg::lower($context, $args[0], 'get_loaded_extensions() zend_extensions');
+            $zendExtensions = JitBoolArg::lowerCoerce(
+                $context,
+                $args[0],
+                'get_loaded_extensions(): Argument #1 ($zend_extensions)'
+            );
         }
 
         return JitInfo::get_loaded_extensions($context, $zendExtensions);
