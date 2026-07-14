@@ -12,12 +12,15 @@ namespace PHPCompiler\ext\standard;
  */
 final class StrftimeJitHelper
 {
-    public static function strftimeArgv(string $format, int $timestamp, int $gmt): string
+    public static function strftimeArgv(string $format, int $timestamp, int $gmt): ?string
     {
-        if (0 !== $gmt) {
-            return VmDate::gmstrftime($format, $timestamp);
+        $result = 0 !== $gmt
+            ? VmDate::gmstrftime($format, $timestamp)
+            : VmDate::strftime($format, $timestamp);
+        if (false === $result) {
+            return null;
         }
 
-        return VmDate::strftime($format, $timestamp);
+        return $result;
     }
 }

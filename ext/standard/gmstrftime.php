@@ -32,7 +32,12 @@ final class gmstrftime extends Internal
         if (2 === $argc) {
             $timestamp = VmDate::coerceNullableTimestampArgForFrame($frame, 1, 'gmstrftime', 2, 'timestamp');
         }
-        $frame->returnVar->string(VmDate::gmstrftime($format, $timestamp));
+        $result = VmDate::gmstrftime($format, $timestamp);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->string($result);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
