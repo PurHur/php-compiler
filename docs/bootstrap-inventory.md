@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4867 |
-| Phase A inventory files (M2 ratio SSOT) | 4867 |
+| PHP files on vm.php path | 4876 |
+| Phase A inventory files (M2 ratio SSOT) | 4876 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13058 |
+| Source constructs flagged (warnings) | 13077 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -360,7 +360,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/filter/VmFilter.php` | 0 | 25 |
 | `ext/filter/filter_has_var.php` | 0 | 3 |
 | `ext/filter/filter_id.php` | 0 | 1 |
-| `ext/filter/filter_input.php` | 0 | 7 |
+| `ext/filter/filter_input.php` | 0 | 6 |
 | `ext/filter/filter_input_array.php` | 0 | 1 |
 | `ext/filter/filter_list.php` | 0 | 1 |
 | `ext/filter/filter_var.php` | 0 | 1 |
@@ -920,9 +920,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/VmSplObserver.php` | 0 | 3 |
 | `ext/spl/VmSplRegistry.php` | 0 | 4 |
 | `ext/spl/spl_classes.php` | 0 | 2 |
-| `ext/sqlite3/BuiltinClasses.php` | 0 | 2 |
+| `ext/sqlite3/BuiltinClasses.php` | 0 | 1 |
 | `ext/sqlite3/Module.php` | 0 | 1 |
+| `ext/sqlite3/SQLite3Close.php` | 0 | 1 |
+| `ext/sqlite3/SQLite3Construct.php` | 0 | 2 |
+| `ext/sqlite3/SQLite3Exec.php` | 0 | 2 |
+| `ext/sqlite3/SQLite3QuerySingle.php` | 0 | 2 |
+| `ext/sqlite3/Sqlite3ClassMethod.php` | 0 | 1 |
 | `ext/sqlite3/Sqlite3ExtensionPolicy.php` | 0 | 1 |
+| `ext/sqlite3/VmSQLite3.php` | 0 | 9 |
+| `ext/sqlite3/VmSqlite3Native.php` | 0 | 4 |
 | `ext/standard/AbsJitHelper.php` | 0 | 1 |
 | `ext/standard/AcosJitHelper.php` | 0 | 1 |
 | `ext/standard/AcoshJitHelper.php` | 0 | 1 |
@@ -7056,15 +7063,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/filter/JitFilter.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 775)
-- new JITVariable (line 812)
-- new JITVariable (line 847)
-- new JITVariable (line 1243)
-- new JITVariable (line 1418)
-- new JITVariable (line 1461)
-- new JITVariable (line 1462)
-- new JITVariable (line 1463)
+- new JITVariable (line 778)
+- new JITVariable (line 815)
+- new JITVariable (line 850)
+- new JITVariable (line 1246)
+- new JITVariable (line 1421)
 - new JITVariable (line 1464)
+- new JITVariable (line 1465)
+- new JITVariable (line 1466)
+- new JITVariable (line 1467)
 - 39 class method(s)
 
 ### `ext/filter/JitFilterId.php`
@@ -7094,31 +7101,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/filter/VmFilter.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 265)
-- new Variable (line 571)
-- new Variable (line 579)
-- new Variable (line 593)
-- new Variable (line 599)
-- new Variable (line 607)
+- new Variable (line 266)
 - new Variable (line 613)
-- new Variable (line 624)
-- new Variable (line 630)
-- new Variable (line 645)
-- new Variable (line 665)
-- new Variable (line 678)
-- new Variable (line 690)
-- new Variable (line 776)
-- new Variable (line 792)
-- new Variable (line 872)
-- new Variable (line 910)
-- new Variable (line 931)
-- new Variable (line 1018)
-- new Variable (line 1201)
-- new Variable (line 1463)
-- new HashTable (line 1517)
-- new HashTable (line 1532)
-- new Variable (line 1571)
-- 72 class method(s)
+- new Variable (line 621)
+- new Variable (line 635)
+- new Variable (line 641)
+- new Variable (line 649)
+- new Variable (line 655)
+- new Variable (line 666)
+- new Variable (line 672)
+- new Variable (line 687)
+- new Variable (line 707)
+- new Variable (line 720)
+- new Variable (line 732)
+- new Variable (line 818)
+- new Variable (line 834)
+- new Variable (line 914)
+- new Variable (line 952)
+- new Variable (line 973)
+- new Variable (line 1060)
+- new Variable (line 1243)
+- new Variable (line 1505)
+- new HashTable (line 1559)
+- new HashTable (line 1574)
+- new Variable (line 1613)
+- 73 class method(s)
 
 ### `ext/filter/filter_has_var.php`
 
@@ -7135,12 +7142,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/filter/filter_input.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 42)
-- new Variable (line 69)
-- new JITVariable (line 102)
-- new JITVariable (line 111)
-- new array_key_exists (line 228)
-- new JITVariable (line 250)
+- new Variable (line 66)
+- new JITVariable (line 97)
+- new JITVariable (line 106)
+- new array_key_exists (line 223)
+- new JITVariable (line 245)
 - 3 class method(s)
 
 ### `ext/filter/filter_input_array.php`
@@ -11245,18 +11251,66 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sqlite3/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 32)
 - 2 class method(s)
 
 ### `ext/sqlite3/Module.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/sqlite3/SQLite3Close.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/sqlite3/SQLite3Construct.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 1 class method(s)
+
+### `ext/sqlite3/SQLite3Exec.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/sqlite3/SQLite3QuerySingle.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/sqlite3/Sqlite3ClassMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/sqlite3/Sqlite3ExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/sqlite3/VmSQLite3.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 30)
+- new Variable (line 33)
+- new SQLite3Construct (line 40)
+- new SQLite3Close (line 45)
+- new SQLite3Exec (line 46)
+- new SQLite3QuerySingle (line 47)
+- new Sqlite3State (line 64)
+- new Variable (line 186)
+- 11 class method(s)
+
+### `ext/sqlite3/VmSqlite3Native.php`
+
+**Warnings** (review for bootstrap subset):
+- new SQLite3Exception (line 50)
+- new SQLite3Exception (line 77)
+- new SQLite3Exception (line 92)
+- 11 class method(s)
 
 ### `ext/standard/AbsJitHelper.php`
 
@@ -12677,7 +12731,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 259)
 - new ArgumentCountError (line 288)
 - new ArgumentCountError (line 291)
-- 14 class method(s)
+- 15 class method(s)
 
 ### `ext/standard/JitDateCreate.php`
 
@@ -21267,8 +21321,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/gmstrftime.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 22)
+- new ArgumentCountError (line 25)
 - 3 class method(s)
 
 ### `ext/standard/gzclose.php`
@@ -23529,8 +23583,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/strftime.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 22)
+- new ArgumentCountError (line 25)
 - 3 class method(s)
 
 ### `ext/standard/string_ltrim.php`
