@@ -22,5 +22,9 @@ final class GmpModuleTest extends BaseTest
             __DIR__.'/../compliance/cases/gmp/add_cmp.phpt',
             'gmp_add_cmp.phpt'
         );
+        yield 'gmp_init_null.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/gmp/gmp_init_null.phpt',
+            'gmp_init_null.phpt'
+        );
     }
 }
