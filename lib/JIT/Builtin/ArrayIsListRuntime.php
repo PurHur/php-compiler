@@ -58,7 +58,7 @@ final class ArrayIsListRuntime
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_IS_LIST);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, 'array_is_list_bridge_entry')) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -72,21 +72,23 @@ final class ArrayIsListRuntime
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i1 = $context->getTypeFromString('int1');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI_IS_LIST,
-                $context->context->functionType($i1, false, $htPtr)
-            );
-        $entry = $fn->appendBasicBlock('array_is_list_native_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = ArrayIsListNativeLlvm::isList($context, $fn->getParam(0));
-        $context->builder->returnValue($result);
-        $context->builder->clearInsertionPosition();
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_IS_LIST,
+            'array_is_list_bridge_entry',
+            [$htPtr],
+            $i1,
+            self::IS_LIST_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#18990'
+        );
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
     }
 

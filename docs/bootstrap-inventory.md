@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4882 |
-| Phase A inventory files (M2 ratio SSOT) | 4882 |
+| PHP files on vm.php path | 4880 |
+| Phase A inventory files (M2 ratio SSOT) | 4880 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13087 |
+| Source constructs flagged (warnings) | 13084 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3305,7 +3305,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ArrayIntersectAssocRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayIntersectKeyRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayIntersectRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/ArrayIsListNativeLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayIsListRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayKeyExistsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayKeysRuntime.php` | 0 | 1 |
@@ -3451,7 +3450,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Iconv.php` | 0 | 1 |
 | `lib/JIT/Builtin/IconvRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ImageTypeToMimeType.php` | 0 | 1 |
-| `lib/JIT/Builtin/InArrayNativeLlvm.php` | 0 | 2 |
 | `lib/JIT/Builtin/InArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IncludePathRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/InetRuntime.php` | 0 | 3 |
@@ -23862,9 +23860,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/time_sleep_until.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- new ArgumentCountError (line 61)
-- 5 class method(s)
+- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 65)
+- 3 class method(s)
 
 ### `ext/standard/timezone_abbreviations_list.php`
 
@@ -26977,11 +26975,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 14 class method(s)
 - 1 closure(s)
 
-### `lib/JIT/Builtin/ArrayIsListNativeLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
 ### `lib/JIT/Builtin/ArrayIsListRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -27825,12 +27818,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
-
-### `lib/JIT/Builtin/InArrayNativeLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- new Variable (line 41)
-- 1 class method(s)
 
 ### `lib/JIT/Builtin/InArrayRuntime.php`
 
@@ -29156,7 +29143,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringBin2hex.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringBitwiseNot.php`
 
@@ -31677,7 +31664,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitBoolArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 12 class method(s)
 
 ### `lib/JIT/JitClockGettimeArg.php`
 
