@@ -25,11 +25,21 @@ final class DomNodeLiveMutationRuntime
 
     public const ABI_CREATE_FRAGMENT = '__phpc_dom_create_document_fragment';
 
+    public const ABI_CREATE_FRAGMENT_OBJECT = '__phpc_dom_create_document_fragment_object';
+
     private const HELPER_CREATE_FRAGMENT = 'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::createDocumentFragmentArgv';
+
+    private const HELPER_CREATE_FRAGMENT_OBJECT = 'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::createDocumentFragmentObjectArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::HELPER_CREATE_FRAGMENT,
+        self::HELPER_CREATE_FRAGMENT_OBJECT,
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendObjectArgv1',
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendObjectArgv2',
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendObjectArgv3',
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependObjectArgv1',
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependObjectArgv2',
         'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendArgv1',
         'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendArgv2',
         'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendArgv3',
@@ -54,10 +64,16 @@ final class DomNodeLiveMutationRuntime
 
     public static function invokeCreateDocumentFragment(Context $context, Variable $receiver): Value
     {
-        self::ensureCreateFragmentBridge($context);
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            DomDocumentMethodUserScriptLlvm::ensureCreateDocumentFragmentObjectBridge($context);
+            $abi = self::ABI_CREATE_FRAGMENT_OBJECT;
+        } else {
+            self::ensureCreateFragmentBridge($context);
+            $abi = self::ABI_CREATE_FRAGMENT;
+        }
         $parentObj = self::receiverObject($context, $receiver);
         $result = $context->builder->call(
-            $context->lookupFunction(self::ABI_CREATE_FRAGMENT),
+            $context->lookupFunction($abi),
             $parentObj
         );
         $slot = JitValueBox::alloc($context);
@@ -69,6 +85,16 @@ final class DomNodeLiveMutationRuntime
         );
 
         return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    public static function appendObjectAbi(int $extraArgCount): string
+    {
+        return '__phpc_dom_node_append_object_'.$extraArgCount;
+    }
+
+    public static function prependObjectAbi(int $extraArgCount): string
+    {
+        return '__phpc_dom_node_prepend_object_'.$extraArgCount;
     }
 
     public static function appendAbi(int $extraArgCount): string
@@ -99,6 +125,31 @@ final class DomNodeLiveMutationRuntime
         if ($extraArgCount < 1 || $extraArgCount > self::MAX_EXTRA_ARGS) {
             throw new \LogicException('DomNodeLiveMutationRuntime unsupported arity');
         }
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            $useObjectBridge = self::canUseObjectMutationBridge($extraArgs);
+            $orderedArgs = 'prepend' === $kind ? array_reverse($extraArgs) : $extraArgs;
+            foreach ($orderedArgs as $arg) {
+                if ($useObjectBridge) {
+                    self::ensureObjectMutationBridge($context, $kind, 1);
+                    $abi = self::objectAbiFor($kind, 1);
+                    $context->builder->call(
+                        $context->lookupFunction($abi),
+                        self::receiverObject($context, $receiver),
+                        self::mutationArgObject($context, $arg)
+                    );
+                    continue;
+                }
+                self::ensureMutationBridge($context, $kind, 1);
+                $abi = self::abiFor($kind, 1);
+                $context->builder->call(
+                    $context->lookupFunction($abi),
+                    self::receiverObject($context, $receiver),
+                    JitValueBox::valuePtrFromVariable($context, $arg)
+                );
+            }
+
+            return self::nullValuePtr($context);
+        }
         self::ensureMutationBridge($context, $kind, $extraArgCount);
         $abi = self::abiFor($kind, $extraArgCount);
         $llvmArgs = [self::receiverObject($context, $receiver)];
@@ -108,6 +159,54 @@ final class DomNodeLiveMutationRuntime
         $context->builder->call($context->lookupFunction($abi), ...$llvmArgs);
 
         return self::nullValuePtr($context);
+    }
+
+    /** @param list<Variable> $extraArgs */
+    private static function canUseObjectMutationBridge(array $extraArgs): bool
+    {
+        if ([] === $extraArgs) {
+            return false;
+        }
+        foreach ($extraArgs as $arg) {
+            if (!\in_array($arg->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function ensureObjectMutationBridge(Context $context, string $kind, int $extraArgCount): void
+    {
+        match ($kind) {
+            'append' => DomDocumentMethodUserScriptLlvm::ensureAppendObjectBridge($context, $extraArgCount),
+            'prepend' => DomDocumentMethodUserScriptLlvm::ensurePrependObjectBridge($context, $extraArgCount),
+            default => throw new \LogicException('DOM object live-mutation bridge unsupported for '.$kind),
+        };
+    }
+
+    private static function mutationArgObject(Context $context, Variable $arg): Value
+    {
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+        }
+
+        throw new \LogicException('DOM object live-mutation arg must be object or value box');
+    }
+
+    private static function objectAbiFor(string $kind, int $extraArgCount): string
+    {
+        return match ($kind) {
+            'append' => self::appendObjectAbi($extraArgCount),
+            'prepend' => self::prependObjectAbi($extraArgCount),
+            default => throw new \LogicException('Unknown DOM object live-mutation kind'),
+        };
     }
 
     private static function ensureMutationBridge(Context $context, string $kind, int $extraArgCount): void

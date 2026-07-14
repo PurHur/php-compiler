@@ -319,6 +319,17 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureAppendObjectBridge(Context $context, int $arity): void
+    {
+        self::ensureObjectLiveMutationBridge(
+            $context,
+            DomNodeLiveMutationRuntime::appendObjectAbi($arity),
+            'dom_append_object_user_script_'.$arity,
+            $arity,
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendObjectArgv'.$arity
+        );
+    }
+
     public static function ensurePrependBridge(Context $context, int $arity): void
     {
         self::ensureLiveMutationBridge(
@@ -327,6 +338,17 @@ final class DomDocumentMethodUserScriptLlvm
             'dom_prepend_user_script_'.$arity,
             $arity,
             'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependArgv'.$arity
+        );
+    }
+
+    public static function ensurePrependObjectBridge(Context $context, int $arity): void
+    {
+        self::ensureObjectLiveMutationBridge(
+            $context,
+            DomNodeLiveMutationRuntime::prependObjectAbi($arity),
+            'dom_prepend_object_user_script_'.$arity,
+            $arity,
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependObjectArgv'.$arity
         );
     }
 
@@ -356,6 +378,44 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureCreateDocumentFragmentObjectBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeLiveMutationRuntime::ABI_CREATE_FRAGMENT_OBJECT,
+            'dom_create_document_fragment_object_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::createDocumentFragmentObjectArgv',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    private static function ensureObjectLiveMutationBridge(
+        Context $context,
+        string $abi,
+        string $entryBlock,
+        int $arity,
+        string $helperLogical
+    ): void {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $paramTypes = [$objPtr];
+        for ($i = 0; $i < $arity; ++$i) {
+            $paramTypes[] = $objPtr;
+        }
+        self::ensureBridge(
+            $context,
+            $abi,
+            $entryBlock,
+            $paramTypes,
+            $context->context->voidType(),
+            $helperLogical,
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
     private static function ensureLiveMutationBridge(
         Context $context,
         string $abi,
@@ -369,7 +429,7 @@ final class DomDocumentMethodUserScriptLlvm
         for ($i = 0; $i < $arity; ++$i) {
             $paramTypes[] = $valuePtr;
         }
-        self::ensureContextBridge(
+        self::ensureBridge(
             $context,
             $abi,
             $entryBlock,
@@ -662,6 +722,8 @@ final class DomDocumentMethodUserScriptLlvm
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);
         NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'toobject');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
         DomInstanceMethodRuntime::ensureActiveContextProxy($context);
     }
 

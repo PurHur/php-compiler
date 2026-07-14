@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-// Compile-only (#18951): DOMNode::append/prepend user-script bridges link; execute tier blocked on helper runtime.
+// Compile-only (#18951): multi-arg / string-mix append still blocked on detached-sibling AOT execute.
 $doc = new DOMDocument();
 $root = $doc->createElement('root');
 $doc->appendChild($root);
