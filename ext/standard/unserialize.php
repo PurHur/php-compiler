@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
@@ -98,6 +99,10 @@ final class unserialize extends Internal
     private static function compileTimeUnserialize(Context $context, JITVariable $arg, ?array $options = null): ?Value
     {
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
+                JitInternalStrictArg::rejectNullString($context, $arg, 'unserialize', 'data', 1);
+            }
+
             return $context->helper->loadValue(
                 new JITVariable(
                     $context,
