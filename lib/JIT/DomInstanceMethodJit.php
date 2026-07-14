@@ -37,6 +37,7 @@ final class DomInstanceMethodJit
 
     /** @var array<string, true> */
     private const USER_SCRIPT_GENERIC_DOM_METHODS = [
+        'domdocument::createdocumentfragment' => true,
         'domxpath::registernamespace' => true,
         'domnode::comparedocumentposition' => true,
     ];
@@ -53,6 +54,7 @@ final class DomInstanceMethodJit
         'domdocument::savehtml' => true,
         'domdocument::savehtmlfile' => true,
         'domdocument::getelementsbytagname' => true,
+        'domdocument::appendchild' => true,
         'domnode::appendchild' => true,
         'domxpath::query' => true,
         'domxpath::evaluate' => true,
@@ -124,6 +126,16 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domdocument::appendchild' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentAppendChild();
+
+                return;
+            }
+            if ('domelement::appendchild' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeAppendChild();
+
+                return;
+            }
             if ('domnode::appendchild' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomNodeAppendChild();
 
@@ -177,6 +189,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::savehtml');
             self::ensureProxy($context, 'domdocument::savehtmlfile');
             self::ensureProxy($context, 'domdocument::getelementsbytagname');
+            self::ensureProxy($context, 'domdocument::appendchild');
+            self::ensureProxy($context, 'domelement::appendchild');
             self::ensureProxy($context, 'domnode::appendchild');
             self::ensureProxy($context, 'domxpath::query');
             self::ensureProxy($context, 'domxpath::evaluate');

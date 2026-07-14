@@ -922,6 +922,62 @@ final class VmDom
         return DomRegistry::state($fragment);
     }
 
+    /**
+     * User-script AOT: LLVM-materialized DOM objects may lack DomRegistry state (#18927).
+     */
+    public static function ensureDomTreeNodeRegistered(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?ObjectEntry $ownerDocument = null
+    ): void {
+        if (DomRegistry::has($entry)) {
+            return;
+        }
+
+        $classLc = strtolower($entry->class->name);
+        if (self::CLASS_DOCUMENT === $classLc) {
+            self::ensureDocument($entry);
+
+            return;
+        }
+        if (self::CLASS_DOCUMENT_FRAGMENT === $classLc) {
+            self::ensureDocumentFragment($entry);
+
+            return;
+        }
+        if (self::CLASS_ELEMENT !== $classLc) {
+            throw new \LogicException('DOM object has no registered node state in this compiler build');
+        }
+
+        $name = self::PROP_NODE_NAME;
+        $nodeName = 'unknown';
+        if ($entry->hasProperty($name)) {
+            $nameVar = $entry->getProperty($name)->resolveIndirect();
+            if (Variable::TYPE_STRING === $nameVar->type) {
+                $nodeName = $nameVar->toString();
+            }
+        }
+        if ($entry->hasProperty(self::PROP_TAG_NAME)) {
+            $entry->getProperty(self::PROP_TAG_NAME)->string($nodeName);
+        }
+        self::initElementPropertySlots($entry);
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_ELEMENT_NODE;
+        $state->nodeName = $nodeName;
+        $state->localName = $nodeName;
+        if (null !== $ownerDocument) {
+            self::ensureDomTreeNodeRegistered($ctx, $ownerDocument);
+            $state->documentId = $ownerDocument->id;
+        }
+        DomRegistry::attach($entry, $state);
+        if (CompilerVersion::supportsDomTokenList()) {
+            self::syncElementClassList($ctx, $entry);
+        }
+        self::ensureChildNodesList($ctx, $entry);
+        self::ensureElementAttributesMap($ctx, $entry);
+    }
+
     public static function createElement(
         Context $ctx,
         string $name,

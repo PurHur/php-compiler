@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
-/** DOMNode::appendChild() — user-script AOT (#18478). */
+/** DOMNode::appendChild() — user-script AOT (#18478, #18927). */
 final class DomNodeAppendChild implements Call
 {
     public function call(Context $context, Variable ...$args): Value
