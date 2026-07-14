@@ -320,6 +320,9 @@ class JIT {
             $this->context->coalesceAssignTargets = new \SplObjectStorage();
             $this->context->coalesceMergeSlotOperands = [];
             $this->context->ternaryEchoPhiByAliasSlot = [];
+            $this->context->ternaryEchoLiteralConditionSlot = null;
+            $this->context->ternaryEchoLiteralIf = null;
+            $this->context->ternaryEchoLiteralElse = null;
             $this->context->listUnpackSkipAssignPath = false;
             $this->context->listUnpackMergeLlvmBlocks = new \SplObjectStorage();
             $this->context->listUnpackMergeNullInitTargets = [];
@@ -410,7 +413,7 @@ class JIT {
     }
 
     /** Both ?: arms jump to a merge block whose first ECHO uses the phi alias temp (#3790, #18052). */
-    private function jumpIfTargetsEchoMerge(?Block $ifBlock, ?Block $elseBlock): bool
+    private function jumpIfTargetsEchoMerge(?Block $ifBlock, ?Block $elseBlock, ?Block $jumpIfBlock = null, int $jumpIfIndex = -1): bool
     {
         $ifMerge = $this->branchJumpMergeBlock($ifBlock);
         $elseMerge = $this->branchJumpMergeBlock($elseBlock);
@@ -423,11 +426,79 @@ class JIT {
         if (null !== $this->ternaryReturnPhiOperand($ifMerge)) {
             return false;
         }
-        if (!$this->ternaryEchoMergeNeedsStackPhi($ifMerge, $ifBlock, $elseBlock)) {
+        if (
+            !$this->ternaryEchoMergeNeedsStackPhi($ifMerge, $ifBlock, $elseBlock)
+            && !$this->ternaryEchoMergeNeedsLiteralArmRedirect($jumpIfBlock, $jumpIfIndex, $ifMerge, $ifBlock, $elseBlock)
+        ) {
             return false;
         }
 
         return null !== $this->ternaryEchoPhiOperand($ifMerge, $ifBlock, $elseBlock);
+    }
+
+    /**
+     * Literal ?: echo arms after object-producing calls need merge-block operand redirect (#18784).
+     *
+     * Pure literal ternaries without preceding calls keep the default assign path; enabling echo
+     * merge there mis-lowers and can crash AOT init (#18052).
+     */
+    private function ternaryEchoMergeNeedsLiteralArmRedirect(
+        ?Block $jumpIfBlock,
+        int $jumpIfIndex,
+        Block $mergeBlock,
+        ?Block $ifBlock,
+        ?Block $elseBlock
+    ): bool {
+        if (null === $jumpIfBlock || $jumpIfIndex < 0 || !$this->ternaryEchoMergeHasLiteralArmsOnly($mergeBlock, $ifBlock, $elseBlock)) {
+            return false;
+        }
+
+        return $this->ternaryEchoMergeFollowsObjectProducerCall($jumpIfBlock, $jumpIfIndex);
+    }
+
+    /** @return bool true when every ?: arm assigns a literal into the merge ECHO slot */
+    private function ternaryEchoMergeHasLiteralArmsOnly(Block $mergeBlock, ?Block $ifBlock, ?Block $elseBlock): bool
+    {
+        $echoSlot = $this->mergeEchoSlot($mergeBlock);
+        if (null === $echoSlot) {
+            return false;
+        }
+        $literalArmCount = 0;
+        foreach ([$ifBlock, $elseBlock] as $branch) {
+            if (null === $branch) {
+                continue;
+            }
+            foreach ($branch->opCodes as $branchOp) {
+                if (OpCode::TYPE_ASSIGN !== $branchOp->type || (int) $branchOp->arg2 !== $echoSlot) {
+                    continue;
+                }
+                $rhsSlot = null !== $branchOp->arg3 ? (int) $branchOp->arg3 : (int) $branchOp->arg2;
+                $rhs = $branch->getOperand($rhsSlot);
+                if (!$rhs instanceof Operand\Literal) {
+                    return false;
+                }
+                ++$literalArmCount;
+            }
+        }
+
+        return $literalArmCount > 0;
+    }
+
+    /** True when a call/method result may pollute the ?: echo slot before the JUMPIF (#18784). */
+    private function ternaryEchoMergeFollowsObjectProducerCall(Block $jumpIfBlock, int $jumpIfIndex): bool
+    {
+        for ($i = 0; $i < $jumpIfIndex; ++$i) {
+            $prior = $jumpIfBlock->opCodes[$i];
+            if (
+                OpCode::TYPE_METHODCALL_INIT === $prior->type
+                || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $prior->type
+                || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $prior->type
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** Literal ?: echo arms keep operand redirect; non-literal arms need stack-slot phi (#18052). */
@@ -454,6 +525,66 @@ class JIT {
         }
 
         return false;
+    }
+
+    /** Literal assigned into the merge ECHO slot on a ?: arm (#18784). */
+    private function ternaryEchoBranchLiteralString(?Block $branch, Block $mergeBlock): ?string
+    {
+        $echoSlot = $this->mergeEchoSlot($mergeBlock);
+        if (null === $echoSlot || null === $branch) {
+            return null;
+        }
+        foreach ($branch->opCodes as $branchOp) {
+            if (OpCode::TYPE_ASSIGN !== $branchOp->type || (int) $branchOp->arg2 !== $echoSlot) {
+                continue;
+            }
+            $rhsSlot = null !== $branchOp->arg3 ? (int) $branchOp->arg3 : (int) $branchOp->arg2;
+            $rhs = $branch->getOperand($rhsSlot);
+            if ($rhs instanceof Operand\Literal && is_string($rhs->value)) {
+                return $rhs->value;
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
+     * Echo compile-time ?: arm literals from the saved condition (#18784).
+     *
+     * Avoids merge-block ValueEcho reading a polluted alias temp in standalone AOT.
+     */
+    private function emitTernaryLiteralEchoMerge(
+        \PHPLLVM\Value $condition,
+        string $ifLiteral,
+        string $elseLiteral,
+        \PHPLLVM\BasicBlock $continueBlock
+    ): \PHPLLVM\BasicBlock {
+        static $seq = 0;
+        $tag = '18784_'.(string) ++$seq;
+        $ifBlock = JIT\BasicBlockHelper::append($this->context, 'ternary_echo_lit_if_'.$tag);
+        $elseBlock = JIT\BasicBlockHelper::append($this->context, 'ternary_echo_lit_else_'.$tag);
+        $doneBlock = JIT\BasicBlockHelper::append($this->context, 'ternary_echo_lit_done_'.$tag);
+        $builder = $this->context->builder;
+        $builder->positionAtEnd($continueBlock);
+        $builder->branchIf($condition, $ifBlock, $elseBlock);
+        $builder->positionAtEnd($ifBlock);
+        JIT\ValueEchoHelper::echoLiteral($this->context, $ifLiteral);
+        $builder->branch($doneBlock);
+        $builder->positionAtEnd($elseBlock);
+        JIT\ValueEchoHelper::echoLiteral($this->context, $elseLiteral);
+        $builder->branch($doneBlock);
+        $builder->positionAtEnd($doneBlock);
+
+        return $doneBlock;
+    }
+
+    private function clearTernaryEchoLiteralMergeState(): void
+    {
+        $this->context->ternaryEchoLiteralConditionSlot = null;
+        $this->context->ternaryEchoLiteralIf = null;
+        $this->context->ternaryEchoLiteralElse = null;
     }
 
     private function mergeEchoSlot(Block $mergeBlock): ?int
@@ -7198,6 +7329,16 @@ class JIT {
                     }
                     $forceAssign = $forceCoalesce
                         || $this->assignOperandsUsedByLiteralInclude($block, $op);
+                    $ternaryEchoPhiDest = null;
+                    if (
+                        $forceCoalesce
+                        && null !== $coalesceTarget
+                        && $coalesceTarget === $destOp
+                        && null !== $aliasOp
+                        && $op->arg1 !== $op->arg2
+                    ) {
+                        $ternaryEchoPhiDest = $destOp;
+                    }
                     $aliasName = null !== $aliasOp ? JIT\OperandName::resolve($aliasOp) : null;
                     $needsNamedStorageAssign = null !== $aliasOp
                         && $op->arg1 !== $op->arg2
@@ -7230,6 +7371,32 @@ class JIT {
                             $this->recordTernaryEchoPhiByAliasSlot($block, $op, $destOp, $aliasOp, $rhsSlot);
                             break;
                         }
+                    }
+                    if (null !== $ternaryEchoPhiDest) {
+                        $this->assignOperand($ternaryEchoPhiDest, $value, true);
+                        if ($this->context->hasVariableOp($ternaryEchoPhiDest)) {
+                            $phiVar = $this->context->getVariableFromOp($ternaryEchoPhiDest);
+                            if (
+                                Variable::TYPE_VALUE === $phiVar->type
+                                && Variable::KIND_VARIABLE === $phiVar->kind
+                            ) {
+                                $phiPtr = JIT\JitValueBox::pointer($this->context, $phiVar->value);
+                                JIT\JitValueBox::assignToPointer(
+                                    $this->context,
+                                    $phiPtr,
+                                    $value
+                                );
+                                JIT\JitValueBox::publishAfterWrite($this->context, $phiPtr);
+                                $this->foldCompileTimeStringFromAssign(
+                                    $block,
+                                    $rhsSlot,
+                                    $phiVar,
+                                    $value
+                                );
+                            }
+                        }
+                        $this->recordTernaryEchoPhiByAliasSlot($block, $op, $destOp, $aliasOp, $rhsSlot);
+                        break;
                     }
                     if ($needsNamedStorageAssign) {
                         if (!$this->context->hasVariableOp($aliasOp)) {
@@ -8391,6 +8558,19 @@ class JIT {
                         JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                     }
                     JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
+                    if (null !== $this->context->ternaryEchoLiteralConditionSlot) {
+                        $cond = $this->context->builder->load($this->context->ternaryEchoLiteralConditionSlot);
+                        $ifLiteral = $this->context->ternaryEchoLiteralIf ?? '';
+                        $elseLiteral = $this->context->ternaryEchoLiteralElse ?? '';
+                        $basicBlock = $this->emitTernaryLiteralEchoMerge(
+                            $cond,
+                            $ifLiteral,
+                            $elseLiteral,
+                            $basicBlock
+                        );
+                        $this->clearTernaryEchoLiteralMergeState();
+                        break;
+                    }
                     $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
                     $echoOp = $block->getOperand($argOffset);
                     $echoSlot = $block->slotForOperand($echoOp);
@@ -8408,7 +8588,22 @@ class JIT {
                         }
                     }
                     if (null !== $echoSlot && isset($this->context->ternaryEchoPhiByAliasSlot[$echoSlot])) {
-                        $echoOp = $this->context->ternaryEchoPhiByAliasSlot[$echoSlot];
+                        $phiOp = $this->context->ternaryEchoPhiByAliasSlot[$echoSlot];
+                        if ($this->context->hasVariableOp($phiOp)) {
+                            $arg = $this->materializeCoalesceMergeSlotArgSend($block, $phiOp);
+                            if (Variable::TYPE_VALUE === $arg->type) {
+                                JIT\ValueEchoHelper::echo(
+                                    $this->context,
+                                    JIT\JitValueBox::pointer($this->context, $arg->value)
+                                );
+                                break;
+                            }
+                            if (Variable::TYPE_STRING === $arg->type) {
+                                JIT\ValueEchoHelper::echoStringVariable($this->context, $arg);
+                                break;
+                            }
+                        }
+                        $echoOp = $phiOp;
                     }
                     $arg = $this->context->getVariableFromOpInScopes($echoOp);
                     if (Variable::KIND_VARIABLE === $arg->kind) {
@@ -8879,7 +9074,7 @@ class JIT {
                         && $this->jumpIfTargetsReturnMerge($op->block1, $op->block2);
                     $isTernaryEchoMerge = 0 === $this->context->inlineIncludeDepth
                         && !$isTernaryReturnMerge
-                        && $this->jumpIfTargetsEchoMerge($op->block1, $op->block2);
+                        && $this->jumpIfTargetsEchoMerge($op->block1, $op->block2, $block, $i);
                     if ($isTernaryReturnMerge) {
                         $mergeBlock = $this->branchJumpMergeBlock($op->block1);
                         assert(null !== $mergeBlock);
@@ -8900,9 +9095,10 @@ class JIT {
                         $ternaryMergeEcho = $this->ternaryEchoPhiOperand($mergeBlock, $op->block1, $op->block2);
                         if (null !== $ternaryMergeEcho) {
                             $this->context->coalesceAssignTargets[$ternaryMergeEcho] = true;
+                            $needsStackPhi = $this->ternaryEchoMergeNeedsStackPhi($mergeBlock, $op->block1, $op->block2);
                             $this->ensureCoalesceMergeStackSlot($ternaryMergeEcho);
                             $echoSlot = $this->mergeEchoSlot($mergeBlock);
-                            if (null !== $echoSlot) {
+                            if (null !== $echoSlot && $needsStackPhi) {
                                 $this->context->coalesceMergeSlotOperands[$echoSlot] = $ternaryMergeEcho;
                             }
                         }
@@ -8912,6 +9108,24 @@ class JIT {
                             $this->context->getVariableFromOp($this->operandAt($block, $op->arg1, 'branch condition'))
                         )
                     );
+                    if ($isTernaryEchoMerge) {
+                        $mergeBlock = $this->branchJumpMergeBlock($op->block1);
+                        assert(null !== $mergeBlock);
+                        if ($this->ternaryEchoMergeNeedsLiteralArmRedirect($block, $i, $mergeBlock, $op->block1, $op->block2)) {
+                            $ifLiteral = $this->ternaryEchoBranchLiteralString($op->block1, $mergeBlock);
+                            $elseLiteral = $this->ternaryEchoBranchLiteralString($op->block2, $mergeBlock);
+                            if (null !== $ifLiteral && null !== $elseLiteral) {
+                                $condSlot = JIT\BasicBlockHelper::entryAlloca(
+                                    $this->context,
+                                    $this->context->getTypeFromString('int1')
+                                );
+                                $this->context->builder->store($condition, $condSlot);
+                                $this->context->ternaryEchoLiteralConditionSlot = $condSlot;
+                                $this->context->ternaryEchoLiteralIf = $ifLiteral;
+                                $this->context->ternaryEchoLiteralElse = $elseLiteral;
+                            }
+                        }
+                    }
                     // If-branch JUMP may compile a shared merge RETURN_VOID before the else/elseif arm
                     // runs; do not let inlineIncludeExitBlock leak across arms (#784, #846, #764).
                     $savedIncludeExit = null;
@@ -9015,6 +9229,7 @@ class JIT {
                     if (null !== $ternaryMergeEcho) {
                         unset($this->context->coalesceAssignTargets[$ternaryMergeEcho]);
                     }
+                    $this->clearTernaryEchoLiteralMergeState();
                     $this->context->ternarySharedReturnOperand = $savedTernarySharedReturn;
                     $this->context->ternarySharedReturnSlot = $savedTernarySharedReturnSlot;
 

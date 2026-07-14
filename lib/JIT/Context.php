@@ -213,6 +213,15 @@ class Context {
      */
     public array $ternaryEchoPhiByAliasSlot = [];
 
+    /** Entry alloca holding ?: condition for literal-arm merge ECHO (#18784). */
+    public ?\PHPLLVM\Value $ternaryEchoLiteralConditionSlot = null;
+
+    /** True-arm literal for {@see $ternaryEchoLiteralConditionSlot} redirect (#18784). */
+    public ?string $ternaryEchoLiteralIf = null;
+
+    /** False-arm literal for {@see $ternaryEchoLiteralConditionSlot} redirect (#18784). */
+    public ?string $ternaryEchoLiteralElse = null;
+
     /** Guarded list destruct: assign-path dim fetches compile as unreachable stubs (#4308). */
     public bool $listUnpackSkipAssignPath = false;
 
