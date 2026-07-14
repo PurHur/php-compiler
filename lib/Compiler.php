@@ -12262,6 +12262,103 @@ class Compiler {
         return null;
     }
 
+    /**
+     * Hoisted PropertyFetch before MethodCall/FuncCall when scalar preludes sit between (#18860).
+     *
+     * importNode($doc->documentElement->firstChild, true) — ConstFetch between chain and call.
+     *
+     * @return Op\Expr\PropertyFetch|Op\Expr\NullsafePropertyFetch|null
+     */
+    private function propertyFetchPreludeMatchingCallArg(
+        Block $block,
+        Op $cfgCallOp,
+        int $callIndex,
+        int $argIndex,
+        Operand $arg
+    ): Op\Expr\PropertyFetch|Op\Expr\NullsafePropertyFetch|null {
+        if (null === $block->orig || $callIndex < 1 || !property_exists($cfgCallOp, 'args')) {
+            return null;
+        }
+        $callArgs = $cfgCallOp->args;
+        if (!\is_array($callArgs) || !$this->callArgIsDeadInlineTemporary($arg)) {
+            return null;
+        }
+        $nonLiteralArgCount = 0;
+        foreach ($callArgs as $callArg) {
+            if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
+                ++$nonLiteralArgCount;
+            }
+        }
+        $trailingScalarPreludeCount = 0;
+        $scalarProbeIndex = $callIndex - 1;
+        while ($scalarProbeIndex >= 0) {
+            $scalarProbe = $block->orig->children[$scalarProbeIndex] ?? null;
+            if ($scalarProbe instanceof Op\Expr\ConstFetch || $scalarProbe instanceof Op\Expr\ClassConstFetch) {
+                ++$trailingScalarPreludeCount;
+                --$scalarProbeIndex;
+                continue;
+            }
+            break;
+        }
+        $propertyArgCount = max(0, $nonLiteralArgCount - $trailingScalarPreludeCount);
+        $fetches = [];
+        $probeIndex = $callIndex - 1;
+        while ($probeIndex >= 0) {
+            $probe = $block->orig->children[$probeIndex] ?? null;
+            if ($probe instanceof Op\Expr\ConstFetch || $probe instanceof Op\Expr\ClassConstFetch) {
+                --$probeIndex;
+                continue;
+            }
+            if (
+                $probe instanceof Op\Expr\PropertyFetch
+                || $probe instanceof Op\Expr\NullsafePropertyFetch
+            ) {
+                $fetches[] = $probe;
+                --$probeIndex;
+                continue;
+            }
+            break;
+        }
+        if ([] === $fetches) {
+            return null;
+        }
+        if (\count($fetches) > $propertyArgCount) {
+            if (0 !== $argIndex) {
+                return null;
+            }
+
+            return $fetches[0];
+        }
+        $ordinal = \count($fetches) - 1 - $argIndex;
+        if ($ordinal < 0 || $ordinal >= \count($fetches)) {
+            return null;
+        }
+
+        return $fetches[$ordinal];
+    }
+
+    /**
+     * @return ?string scope slot for a hoisted PropertyFetch call arg (#18860)
+     */
+    private function propertyFetchPreludeResultSlot(
+        Block $block,
+        Op\Expr\PropertyFetch|Op\Expr\NullsafePropertyFetch $prelude,
+        Op $cfgCallOp
+    ): ?string {
+        if (null === $block->slotForOperand($prelude->result)) {
+            foreach ($this->compileExpr($prelude, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+
+        return $this->slotForInlineCallArgProducerResult(
+            $block,
+            $prelude,
+            $cfgCallOp,
+            null !== $block->orig ? $block->orig->children : null
+        ) ?? $block->slotForOperand($prelude->result);
+    }
+
     private function compileStaticPropertyFetchRead(
         Op\Expr\StaticPropertyFetch $fetch,
         Block $block,
@@ -40045,7 +40142,13 @@ class Compiler {
             ) {
                 $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
                 if (\is_int($callIndex) && $callIndex > 0) {
-                    $prelude = $block->orig->children[$callIndex - 1] ?? null;
+                    $prelude = $this->propertyFetchPreludeMatchingCallArg(
+                        $block,
+                        $cfgCallOp,
+                        $callIndex,
+                        (int) $argIndex,
+                        $arg
+                    ) ?? ($block->orig->children[$callIndex - 1] ?? null);
                     if (
                         $prelude instanceof Op\Expr\PropertyFetch
                         || $prelude instanceof Op\Expr\NullsafePropertyFetch
@@ -40056,9 +40159,22 @@ class Compiler {
                             && null !== $cfgCallOp->var
                             && null !== $prelude->result
                             && $this->operandsReferToSameVariable($cfgCallOp->var, $prelude->result);
+                        $callArgOperand = $this->cfgCallArgOperand($cfgCallOp, (int) $argIndex, $arg);
                         $preludeFetchFeedsCallArg = null !== $prelude->result
-                            && ($callArgOperand = $this->cfgCallArgOperand($cfgCallOp, (int) $argIndex, $arg)) instanceof Operand
-                            && $this->operandsReferToSameVariable($callArgOperand, $prelude->result);
+                            && $callArgOperand instanceof Operand
+                            && (
+                                $this->operandsReferToSameVariable($callArgOperand, $prelude->result)
+                                || (
+                                    $this->callArgIsDeadInlineTemporary($arg)
+                                    && $prelude === $this->propertyFetchPreludeMatchingCallArg(
+                                        $block,
+                                        $cfgCallOp,
+                                        $callIndex,
+                                        (int) $argIndex,
+                                        $arg
+                                    )
+                                )
+                            );
                         if (!$propertyFetchIsMethodReceiver && $preludeFetchFeedsCallArg) {
                             if (null === $this->lastPropertyFetchResultSlotBeforePendingCall($block)) {
                                 foreach ($this->compileExpr($prelude, $block) as $op) {
@@ -40068,7 +40184,8 @@ class Compiler {
                             if ($prelude instanceof Op\Expr\PropertyFetch) {
                                 $this->syncPropertyFetchResultToFollowingFuncCallArg($prelude, $block);
                             }
-                            $propertyFetchArgSlot = $this->lastPropertyFetchResultSlotBeforePendingCall($block);
+                            $propertyFetchArgSlot = $this->propertyFetchPreludeResultSlot($block, $prelude, $cfgCallOp)
+                                ?? $this->lastPropertyFetchResultSlotBeforePendingCall($block);
                             if (null !== $propertyFetchArgSlot) {
                                 $sends[] = new OpCode(
                                     OpCode::TYPE_ARG_SEND,
