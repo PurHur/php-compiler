@@ -120,7 +120,7 @@ final class JitFilestatArg
         );
     }
 
-    /** mkdir() mode — Z_PARAM_LONG decimal numeric strings (#17819, ext/standard/filestat.c). */
+    /** mkdir() mode — Z_PARAM_LONG zend_strtol base-0 numeric strings (#17819, #18887, ext/standard/filestat.c). */
     public static function lowerFileMode(
         Context $context,
         JITVariable $arg,
@@ -128,13 +128,21 @@ final class JitFilestatArg
         int $argIndex,
         string $paramName
     ): Value {
-        self::guardFileModeString($context, $arg, $function, $argIndex, $paramName);
-
-        return JitLongArg::lower($context, $arg, $function.'() '.$paramName);
+        return self::lowerFileModeArg($context, $arg, $function, $argIndex, $paramName);
     }
 
-    /** chmod() mode — Z_PARAM_LONG decimal numeric strings (#18487, ext/standard/filestat.c). */
+    /** chmod() mode — Z_PARAM_LONG zend_strtol base-0 numeric strings (#18887, ext/standard/filestat.c). */
     public static function lowerChmodMode(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        return self::lowerFileModeArg($context, $arg, $function, $argIndex, $paramName);
+    }
+
+    private static function lowerFileModeArg(
         Context $context,
         JITVariable $arg,
         string $function,
@@ -146,7 +154,7 @@ final class JitFilestatArg
             $i64 = $context->getTypeFromString('int64');
 
             return $i64->constInt(
-                (int) VmMath::baseToZval($arg->compileTimeString, 10),
+                VmFilestatArg::parseFileModeString($arg->compileTimeString),
                 false
             );
         }

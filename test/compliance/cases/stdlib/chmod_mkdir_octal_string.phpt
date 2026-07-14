@@ -1,5 +1,5 @@
 --TEST--
-stdlib chmod()/mkdir() decimal numeric-string permissions (#17819, #17860, ext/standard/filestat.c)
+stdlib chmod()/mkdir() octal numeric-string permissions (#18887, ext/standard/filestat.c)
 --FILE--
 <?php
 
@@ -15,7 +15,7 @@ $mkdirMode = is_dir($d) ? decoct(fileperms($d) & 0777) : '0';
 @rmdir($d);
 
 echo 'chmod=', $chmodMode, ' mkdir=', $mkdirMode, "\n";
-echo 420 === $chmodMode && '341' === $mkdirMode ? 'ok' : 'fail', "\n";
+echo 420 === $chmodMode && '755' === $mkdirMode ? 'ok' : 'fail', "\n";
 --EXPECT--
-chmod=420 mkdir=341
+chmod=420 mkdir=755
 ok
