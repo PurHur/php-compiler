@@ -18,7 +18,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * hand-lowering mirrors {@see ParseStrEngine} for runtime libc getenv strings.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
-final class ParseStrUserScriptDelimitedJit
+final class ParseStrRuntimeUserScriptCstr
 {
     private const MAX_KEY_PARTS = 16;
 

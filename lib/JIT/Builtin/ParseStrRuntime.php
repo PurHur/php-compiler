@@ -240,12 +240,60 @@ final class ParseStrRuntime
 
     private static function implementUserScriptParseBridge(Context $context, LlvmFunction $fn): void
     {
-        self::implementParseBridge($context, $fn, self::USER_SCRIPT_PARSE_INTO_NATIVE);
+        self::implementUserScriptCstrDelimitedBridge($context, $fn, '&', false);
     }
 
     private static function implementUserScriptCookieBridge(Context $context, LlvmFunction $fn): void
     {
-        self::implementCookieBridge($context, $fn, self::USER_SCRIPT_PARSE_COOKIE_INTO_NATIVE);
+        self::implementUserScriptCstrDelimitedBridge($context, $fn, ';', true);
+    }
+
+    /**
+     * User-script AOT: __string__* → native cstr → LLVM delimited parser (#18855).
+     *
+     * Nested {@see ParseStrNativeJitHelper} does not populate sg_* from refresh/populate LLVM;
+     * {@see ParseStrRuntimeUserScriptCstr} mirrors {@see ParseStrEngine} on raw cstr until #18872.
+     */
+    private static function implementUserScriptCstrDelimitedBridge(
+        Context $context,
+        LlvmFunction $fn,
+        string $delimiter,
+        bool $cookiePairDecode
+    ): void {
+        $entry = $fn->appendBasicBlock('parse_str_bridge_entry_v8');
+        $early = $fn->appendBasicBlock('parse_str_bridge_early_v8');
+        $work = $fn->appendBasicBlock('parse_str_bridge_work_v8');
+        $context->builder->positionAtEnd($entry);
+
+        $dest = $fn->getParam(0);
+        $encoded = $fn->getParam(1);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $nullDest = $context->builder->icmp(Builder::INT_EQ, $dest, $htPtr->constNull());
+        $context->builder->branchIf($nullDest, $early, $work);
+
+        $context->builder->positionAtEnd($early);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($work);
+        ParseStrRuntimeUserScriptCstr::ensureSubhelpers($context);
+        $cstr = self::encodedStringToCstr($context, $encoded);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->call(
+            $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
+            $dest,
+            $cstr,
+            $i8->constInt(ord($delimiter), false),
+            $i32->constInt($cookiePairDecode ? 1 : 0, false)
+        );
+        $context->builder->returnVoid();
+    }
+
+    private static function encodedStringToCstr(Context $context, \PHPLLVM\Value $encoded): \PHPLLVM\Value
+    {
+        $map = $context->structFieldMap['__string__'];
+
+        return $context->builder->structGep($encoded, $map['value']);
     }
 
     private static function implementCookieBridge(Context $context, LlvmFunction $fn, string $helperLogical): void
@@ -289,7 +337,8 @@ final class ParseStrRuntime
             foreach ($fn->getBasicBlocks() as $block) {
                 $name = $block->getName();
                 if (
-                    (str_contains($name, '_work') || str_contains($name, '_bridge_work'))
+                    (str_contains($name, '_work_v8') || str_contains($name, '_bridge_work_v8')
+                        || str_contains($name, '_work') || str_contains($name, '_bridge_work'))
                     && null !== $block->getTerminator()
                 ) {
                     return true;
