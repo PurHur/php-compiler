@@ -1005,10 +1005,27 @@ final class CompilerVersion
     /**
      * PHP 8.4+ instance property default `new Class(...)` initializers (#18040, Zend/zend_compile.c).
      *
-     * Static property defaults and class constants keep php-src rejection rules on every profile.
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2.
      */
     public static function supportsPropertyDefaultObjectExpressions(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ static property default `new Class` / `new Class(...)` initializers (#18816, Zend/zend_compile.c).
+     */
+    public static function supportsStaticPropertyDefaultObjectExpressions(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ bare `new Class` (without trailing `()`) in class constants and static property initializers (#18816).
+     *
+     * php-src: Zend/zend_compile.c — zend_compile_const_expr / NewWithoutParens.
+     */
+    public static function supportsNewWithoutParensInConstAndStaticInitializers(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
