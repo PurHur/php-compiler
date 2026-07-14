@@ -3860,7 +3860,6 @@
         "lib/JIT/Builtin/StringStripTags.php",
         "lib/JIT/Builtin/StringStripcslashesRuntime.php",
         "lib/JIT/Builtin/StringStripslashes.php",
-        "lib/JIT/Builtin/StringStripslashesLlvm.php",
         "lib/JIT/Builtin/StringStrnatcasecmp.php",
         "lib/JIT/Builtin/StringStrnatcmp.php",
         "lib/JIT/Builtin/StringStrncasecmp.php",
@@ -5080,9 +5079,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4846,
+        "inventory_files": 4845,
         "excluded": 0,
-        "eligible": 4846,
+        "eligible": 4845,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

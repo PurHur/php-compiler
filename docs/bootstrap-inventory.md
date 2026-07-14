@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4846 |
-| Phase A inventory files (M2 ratio SSOT) | 4846 |
+| PHP files on vm.php path | 4845 |
+| Phase A inventory files (M2 ratio SSOT) | 4845 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13016 |
+| Source constructs flagged (warnings) | 13013 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3802,8 +3802,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrftime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStripTags.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStripcslashesRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringStripslashes.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringStripslashesLlvm.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringStripslashes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrnatcasecmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrnatcmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrncasecmp.php` | 0 | 1 |
@@ -29811,14 +29810,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStripslashes.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 136)
-- 7 class method(s)
-- 1 closure(s)
-
-### `lib/JIT/Builtin/StringStripslashesLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringStrnatcasecmp.php`
 
