@@ -1,8 +1,4 @@
 <?php
-// #18933 — http_response_code(null) TypeError (ext/standard/head.c).
-try {
-    http_response_code(null);
-    echo "uncaught\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
+// #18958 — http_response_code(null) returns false when unset, not TypeError (ext/standard/head.c).
+$result = http_response_code(null);
+echo 'result=' . var_export($result, true) . "\n";
