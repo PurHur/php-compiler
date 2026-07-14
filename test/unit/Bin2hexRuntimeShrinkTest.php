@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\Bin2hexJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** bin2hex() JIT routes through Bin2hexJitHelper PHP for embed + user-script AOT (#14603, #18884). */
+/** bin2hex() JIT routes through Bin2hexJitHelper PHP; standalone defer uses inline LLVM (#14603, #18884, #3357). */
 final class Bin2hexRuntimeShrinkTest extends TestCase
 {
     public function testStringBin2hexUsesJitHelperNotLlvmMonolith(): void
@@ -16,7 +16,8 @@ final class Bin2hexRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringBin2hex.php');
         $this->assertStringContainsString('Bin2hexJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('bin2hex_inline_entry', $source);
         $this->assertStringNotContainsString('StringBin2hexLlvm', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringBin2hexLlvm.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitBin2hex.php');
