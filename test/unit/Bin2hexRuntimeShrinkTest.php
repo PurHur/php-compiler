@@ -24,8 +24,8 @@ final class Bin2hexRuntimeShrinkTest extends TestCase
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/bin2hex.php');
         $this->assertStringContainsString('StringBin2hex::ensureLinked', $builtin);
         $this->assertStringContainsString('__compiler_bin2hex', $builtin);
-        $this->assertStringContainsString('coerceTypedStringBuiltinArg', $builtin);
-        $this->assertStringContainsString('lowerTypedString', $builtin);
+        $this->assertStringContainsString('stringBuiltinArgForFrame', $builtin);
+        $this->assertStringContainsString('lowerStrictOrCoercible', $builtin);
         $this->assertStringNotContainsString('JitBin2hex', $builtin);
     }
 

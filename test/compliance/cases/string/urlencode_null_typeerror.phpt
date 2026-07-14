@@ -1,15 +1,11 @@
 --TEST--
-stdlib urlencode()/rawurlencode() null TypeError (#18733, ext/standard/url.c)
+stdlib urlencode()/rawurlencode() null coerce on default profile (#18912, re-#18733, ext/standard/url.c)
 --FILE--
 <?php
 foreach (['urlencode', 'rawurlencode'] as $fn) {
-    try {
-        $fn(null);
-        echo "$fn: uncaught\n";
-    } catch (TypeError $e) {
-        echo $fn.': '.$e->getMessage()."\n";
-    }
+    echo $fn.': '.var_export($fn(null), true)."\n";
 }
+?>
 --EXPECT--
-urlencode: urlencode(): Argument #1 ($string) must be of type string, null given
-rawurlencode: rawurlencode(): Argument #1 ($string) must be of type string, null given
+urlencode: ''
+rawurlencode: ''

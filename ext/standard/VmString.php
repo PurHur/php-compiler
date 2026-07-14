@@ -57,9 +57,18 @@ final class VmString
      * PHP 8.4+ forward profile: Z_PARAM_STR null is TypeError (ext/standard/string.c; #18778, #18797).
      *
      * PHP 8.2 reference profile keeps deprecation + coerce to "".
+     * 8.4.0-dev without {@code PHP_COMPILER_PROFILE} matches Zend 8.2 (#18912, #18914).
      */
     public static function requiresForwardProfileStrictStringNull(): bool
     {
+        if (version_compare(CompilerVersion::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
         return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
     }
 

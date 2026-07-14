@@ -103,7 +103,7 @@ final class VmPreg
     ): Variable {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            if (InternalStrictArg::isCallerStrict($frame)) {
+            if (InternalStrictArg::isCallerStrict($frame) || VmString::requiresForwardProfileStrictStringNull()) {
                 throw new \TypeError(
                     self::stringOrArraySubjectTypeError($function, $argIndex, $paramName, 'null')
                 );
