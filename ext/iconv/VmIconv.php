@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\iconv;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -16,10 +17,24 @@ use PHPCompiler\VM\Variable;
  */
 final class VmIconv
 {
-    public static function coerceEncodingArg(Variable $var, string $function, int $argIndex, string $param): string
-    {
+    public static function coerceEncodingArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $param,
+        ?Frame $frame = null
+    ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d ($%s) must be of type string, null given',
+                    $function,
+                    $argIndex + 1,
+                    $param
+                ));
+            }
+
             return '';
         }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
@@ -122,14 +137,15 @@ final class VmIconv
         Variable $var,
         string $function,
         int $argIndex,
-        string $param = 'encoding'
+        string $param = 'encoding',
+        ?Frame $frame = null
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
             return 'UTF-8';
         }
 
-        return self::coerceEncodingArg($var, $function, $argIndex, $param);
+        return self::coerceEncodingArg($var, $function, $argIndex, $param, $frame);
     }
 
     public static function iconvStrlen(string $input, string $encoding, ?Frame $frame = null): int|false

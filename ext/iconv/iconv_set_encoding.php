@@ -35,8 +35,8 @@ final class iconv_set_encoding extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $type = VmIconv::coerceEncodingArg($frame->calledArgs[0], 'iconv_set_encoding', 0, 'type');
-        $charset = VmIconv::coerceEncodingArg($frame->calledArgs[1], 'iconv_set_encoding', 1, 'charset');
+        $type = VmIconv::coerceEncodingArg($frame->calledArgs[0], 'iconv_set_encoding', 0, 'type', $frame);
+        $charset = VmIconv::coerceEncodingArg($frame->calledArgs[1], 'iconv_set_encoding', 1, 'charset', $frame);
         if (\strlen($charset) >= IconvConstants::ENCODING_NAME_MAX_LEN) {
             if (null !== $frame->vmContext) {
                 $frame->vmContext->errors->triggerError(

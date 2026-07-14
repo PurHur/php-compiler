@@ -34,8 +34,8 @@ final class iconv extends Internal
                 $argc
             ));
         }
-        $from = VmIconv::coerceEncodingArg($frame->calledArgs[0], 'iconv', 0, 'from_encoding');
-        $to = VmIconv::coerceEncodingArg($frame->calledArgs[1], 'iconv', 1, 'to_encoding');
+        $from = VmIconv::coerceEncodingArg($frame->calledArgs[0], 'iconv', 0, 'from_encoding', $frame);
+        $to = VmIconv::coerceEncodingArg($frame->calledArgs[1], 'iconv', 1, 'to_encoding', $frame);
         InternalStrictArg::rejectNullString($frame->calledArgs[2], 'iconv', 'string', 2, $frame);
         $input = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'iconv', 2, 'string');
         if (null === $frame->returnVar) {
