@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\iconv;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
@@ -26,7 +27,13 @@ final class VmIconv
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+            if (
+                null !== $frame
+                && (
+                    InternalStrictArg::isCallerStrict($frame)
+                    || VmString::requiresForwardProfileStrictStringNull()
+                )
+            ) {
                 throw new \TypeError(sprintf(
                     '%s(): Argument #%d ($%s) must be of type string, null given',
                     $function,
