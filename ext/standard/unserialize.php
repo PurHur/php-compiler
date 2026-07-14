@@ -6,10 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
-use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
@@ -105,10 +105,15 @@ final class unserialize extends Internal
     {
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
             if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
-                JitStringBuiltinArg::lowerZparamStr($context, $arg, 'unserialize', 0, 'data');
-                $slot = JitValueBox::alloc($context);
+                $message = 'unserialize(): Argument #1 ($data) must be of type string, null given';
+                if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+                    TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message);
+                } else {
+                    TypeErrorRaise::emitRaise($context, $message);
+                    $context->builder->call($context->lookupFunction('abort'));
+                }
 
-                return JitValueBox::pointer($context, $slot);
+                return JitJsonDecode::materializeScalar($context, false);
             }
 
             return $context->helper->loadValue(
