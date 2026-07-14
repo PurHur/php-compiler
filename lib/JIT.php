@@ -15885,17 +15885,10 @@ class JIT {
         if (!$this->isIncludePathResolverRealLoweringMethod($declaringClassLc.'::'.$methodLc)) {
             return false;
         }
+        JIT\Builtin\StringIncludePathResolver::ensureLinked($this->context);
         $proxy = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
         if (!$this->context->functionIsRegistered($proxy)) {
-            $path = __DIR__.'/Web/IncludePathResolver.php';
-            if (\is_file($path)) {
-                $script = $this->context->runtime->parseAndCompile((string) \file_get_contents($path), $path);
-                if (null !== $script) {
-                    $this->compile($script);
-                    $this->runQueue();
-                }
-            }
-            $proxy = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
+            $this->context->functionProxies[$proxy] = new JIT\Call\IncludePathResolverResolve();
         }
         if (!$this->context->functionIsRegistered($proxy)) {
             return false;
