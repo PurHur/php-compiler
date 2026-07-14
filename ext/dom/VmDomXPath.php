@@ -365,7 +365,26 @@ final class VmDomXPath
             return false;
         }
         if (preg_match('~^boolean\((.+)\)$~i', $expression, $matches)) {
-            $value = self::evaluateScalar($xpath, trim($matches[1]), $contextNode);
+            $inner = trim($matches[1]);
+            if (preg_match('~^count\((.+)\)$~i', $inner)) {
+                return 0.0 !== self::evaluateNumber($xpath, $inner, $contextNode);
+            }
+            if (preg_match('~^string\((.+)\)$~i', $inner)) {
+                return '' !== self::evaluateString($xpath, $inner, $contextNode);
+            }
+            if (preg_match('~^number\((.+)\)$~i', $inner)) {
+                $number = self::evaluateNumber($xpath, $inner, $contextNode);
+
+                return 0.0 !== $number && !is_nan($number);
+            }
+            try {
+                $nodeIds = self::evaluateNodeSet($xpath, $inner, $contextNode, false);
+
+                return [] !== $nodeIds;
+            } catch (\DOMException) {
+                // Fall through to string-value coercion for unsupported inner shapes.
+            }
+            $value = self::evaluateScalar($xpath, $inner, $contextNode);
 
             return self::booleanize($value);
         }

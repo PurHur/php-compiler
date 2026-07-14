@@ -34,7 +34,11 @@ final class JitDomXPathEvaluateUserScript
 
         $expression = trim($exprLit);
         if (preg_match('~^boolean\((.+)\)$~i', $expression, $boolWrap)) {
-            $count = self::countForXPath($xml, trim($boolWrap[1]));
+            $inner = trim($boolWrap[1]);
+            if (preg_match('~^count\((.+)\)$~i', $inner, $countWrap)) {
+                $inner = trim($countWrap[1]);
+            }
+            $count = self::countForXPath($xml, $inner);
             if (null === $count) {
                 return null;
             }
