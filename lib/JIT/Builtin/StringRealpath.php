@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -41,7 +42,17 @@ final class StringRealpath
 
     public static function invoke(Context $context, \PHPLLVM\Value $path): \PHPLLVM\Value
     {
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
         self::ensureLinked($context);
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'realpath_invoke_cont');
+        }
 
         return $context->builder->call($context->lookupFunction(self::ABI), $path);
     }

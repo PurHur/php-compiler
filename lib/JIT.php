@@ -7483,7 +7483,7 @@ class JIT {
                         $this->maybeBindNamedVariable($aliasOp);
                         $this->recordTernaryEchoPhiByAliasSlot($block, $op, $destOp, $aliasOp, $rhsSlot);
                     }
-                    if ($op->arg1 === $op->arg2) {
+                    if ($op->arg1 === $op->arg2 && null !== $destOp) {
                         $this->maybeBindNamedVariable($destOp);
                     }
                     foreach ([$aliasOp, $destOp] as $destOperand) {
@@ -15887,7 +15887,7 @@ class JIT {
         }
         $proxy = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
         if (!$this->context->functionIsRegistered($proxy)) {
-            $path = \dirname(__DIR__).'/Web/IncludePathResolver.php';
+            $path = __DIR__.'/Web/IncludePathResolver.php';
             if (\is_file($path)) {
                 $script = $this->context->runtime->parseAndCompile((string) \file_get_contents($path), $path);
                 if (null !== $script) {
