@@ -15,8 +15,9 @@ foreach (['shell_exec', 'system', 'passthru'] as $fn) {
 
 $pipes = [];
 $result = proc_open(null, [], $pipes);
-if (null !== $result) {
-    fwrite(STDERR, 'proc_open(null): expected NULL, got '.var_export($result, true)."\n");
+if (!is_resource($result)) {
+    fwrite(STDERR, 'proc_open(null): expected resource, got '.var_export($result, true)."\n");
     exit(1);
 }
+proc_close($result);
 echo "proc_open(null): ok\n";

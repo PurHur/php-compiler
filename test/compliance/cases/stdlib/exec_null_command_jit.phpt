@@ -16,9 +16,12 @@ foreach (['shell_exec', 'system', 'passthru'] as $fn) {
 
 $pipes = [];
 $result = proc_open(null, [], $pipes);
-echo 'proc_open: '.(null === $result ? 'NULL' : 'other')."\n";
+echo 'proc_open: '.(is_resource($result) ? 'resource' : (null === $result ? 'NULL' : 'other'))."\n";
+if (is_resource($result)) {
+    proc_close($result);
+}
 --EXPECT--
 shell_exec: ValueError
 system: ValueError
 passthru: ValueError
-proc_open: NULL
+proc_open: resource

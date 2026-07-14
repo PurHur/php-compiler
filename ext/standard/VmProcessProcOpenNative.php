@@ -203,10 +203,6 @@ final class VmProcessProcOpenNative
         ?string $cwd = null,
         ?array $env = null,
     ): array|false {
-        if ('' === $command) {
-            return false;
-        }
-
         $ffi = self::ffi();
         if (null === $ffi) {
             return false;
