@@ -13,7 +13,10 @@ declare(strict_types=1);
  */
 function bootstrap_spine_native_link_deferred(): array
 {
-    return [];
+    return [
+        // User-script parse_str cstr bridge — linked via ParseStrRuntime, not spine smoke (#18855).
+        'lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php',
+    ];
 }
 
 /** Inventory paths covered by spine shims without a 1:1 literal require_once (issue #2543, #2868). */
