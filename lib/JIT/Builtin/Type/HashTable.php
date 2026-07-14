@@ -1903,6 +1903,7 @@ class HashTable extends Type
         $htSlot = $this->context->builder->pointerCast($ptrField, $htPtr->pointerType(0));
         $this->context->builder->store($hashtable, $htSlot);
         $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
     }
 
     private function lookupStringKeyValue(
