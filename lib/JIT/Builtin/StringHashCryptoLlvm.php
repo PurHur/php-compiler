@@ -548,7 +548,7 @@ final class StringHashCryptoLlvm
 
         $context->builder->positionAtEnd($afterCopyT);
         $inputPos = $context->builder->select($tLenNonZero, $tLen, $i64->constInt(0, false));
-        $infoDest = $context->builder->inBoundsGEP($inputBuf, $inputPos);
+        $infoDest = $context->builder->gep($inputBuf, $inputPos);
         $context->intrinsic->memcpy(
             $infoDest,
             $context->builder->pointerCast($infoPtr, $i8p),
@@ -556,7 +556,7 @@ final class StringHashCryptoLlvm
             false
         );
         $counterPos = $context->builder->add($inputPos, $infoLenI64);
-        $counterPtr = $context->builder->inBoundsGEP($inputBuf, $counterPos);
+        $counterPtr = $context->builder->gep($inputBuf, $counterPos);
         $context->builder->store(
             $context->builder->truncOrBitCast($blockNum, $i8),
             $counterPtr
@@ -598,7 +598,7 @@ final class StringHashCryptoLlvm
             $remaining
         );
         $context->intrinsic->memcpy(
-            $context->builder->inBoundsGEP($okmOut, $okmPos),
+            $context->builder->gep($okmOut, $okmPos),
             $context->builder->pointerCast($tBuf, $i8p),
             $context->builder->truncOrBitCast($copyLen, $sizeT),
             false
@@ -609,11 +609,17 @@ final class StringHashCryptoLlvm
 
         $context->builder->positionAtEnd($loopDone);
         $context->builder->call($context->lookupFunction('free'), $inputBuf);
-        $rawResult = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $okmLenPhi,
-            $context->builder->pointerCast($okmOut, $charPtr)
+        $strMap = $context->structFieldMap['__string__'];
+        $rawResult = $context->builder->call($context->lookupFunction('__string__alloc'), $okmLenPhi);
+        $context->builder->store($okmLenPhi, $context->builder->structGep($rawResult, $strMap['length']));
+        $destPtr = $context->builder->structGep($rawResult, $strMap['value']);
+        $context->intrinsic->memcpy(
+            $destPtr,
+            $context->builder->pointerCast($okmOut, $i8p),
+            $context->builder->truncOrBitCast($okmLenPhi, $sizeT),
+            false
         );
+        $context->builder->call($context->lookupFunction('free'), $okmBuf);
         $context->builder->returnValue($rawResult);
     }
 
@@ -698,12 +704,19 @@ final class StringHashCryptoLlvm
 
         $context->builder->positionAtEnd($rawBb);
         $mdLenI64 = $context->builder->zExt($mdLen, $i64);
-        $rawResult = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $mdLenI64,
-            $context->builder->pointerCast($mdBuf, $charPtr)
+        $rawStr = $context->builder->call($context->lookupFunction('__string__alloc'), $mdLenI64);
+        $strMap = $context->structFieldMap['__string__'];
+        $context->builder->store($mdLenI64, $context->builder->structGep($rawStr, $strMap['length']));
+        $destPtr = $context->builder->structGep($rawStr, $strMap['value']);
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8p = $context->getTypeFromString('int8*');
+        $context->intrinsic->memcpy(
+            $destPtr,
+            $context->builder->pointerCast($mdBuf, $i8p),
+            $context->builder->truncOrBitCast($mdLenI64, $sizeT),
+            false
         );
-        $context->builder->returnValue($rawResult);
+        $context->builder->returnValue($rawStr);
 
         $context->builder->positionAtEnd($hexBb);
         $mdLenI64 = $context->builder->zExt($mdLen, $i64);
