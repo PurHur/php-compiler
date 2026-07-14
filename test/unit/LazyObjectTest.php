@@ -108,6 +108,46 @@ PHP;
         $this->assertSame("true\nfalse\nfalse\n", ob_get_clean());
     }
 
+    /** @covers issue #18818 — property-read materialization flips introspection probes */
+    public function testClassHasLazyObjectInitializerAfterPropertyRead(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc { public string $id = ''; }
+$ref = new ReflectionClass(Svc::class);
+$lazy = $ref->newLazyGhost(function (Svc $o) { $o->id = 'x'; });
+echo class_has_lazy_object_initializer($lazy) ? 'true' : 'false';
+echo "\n";
+$lazy->id;
+echo class_has_lazy_object_initializer($lazy) ? 'true' : 'false';
+echo "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'class_has_lazy_object_initializer_read.php'));
+        $this->assertSame("true\nfalse\n", ob_get_clean());
+    }
+
+    /** @covers issue #18818 — property-read materialization flips introspection probes */
+    public function testIsUninitializedLazyObjectAfterPropertyRead(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc { public string $id = ''; }
+$ref = new ReflectionClass(Svc::class);
+$lazy = $ref->newLazyGhost(function (Svc $o) { $o->id = 'x'; });
+echo $ref->isUninitializedLazyObject($lazy) ? 'true' : 'false';
+echo "\n";
+$lazy->id;
+echo $ref->isUninitializedLazyObject($lazy) ? 'true' : 'false';
+echo "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'is_uninitialized_lazy_object_read.php'));
+        $this->assertSame("true\nfalse\n", ob_get_clean());
+    }
+
     /** @covers issue #6097 */
     public function testClassHasLazyObjectUninitializer(): void
     {

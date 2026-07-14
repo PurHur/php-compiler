@@ -8,3 +8,7 @@ var_export($ref->isUninitializedLazyObject($lazy));
 echo "\n";
 var_export($ref->isUninitializedLazyObject(new Svc()));
 echo "\n";
+$lazy2 = $ref->newLazyGhost(function (Svc $o) { $o->id = 'y'; });
+$lazy2->id;
+var_export($ref->isUninitializedLazyObject($lazy2));
+echo "\n";
