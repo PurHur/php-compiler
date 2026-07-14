@@ -60,24 +60,26 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('phpc_native_ht_set_string_key', $native);
         $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeOpsJit.php');
 
-        // User-script refresh routes via ParseStrNativeJitHelper PHP bridge (#14217).
+        // User-script refresh: init-safe delimited LLVM on libc C strings (#18832, #18841).
         $userScript = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
         $this->assertStringContainsString('ParseStrRuntime::ensureUserScriptLinked', $userScript);
-        $this->assertStringContainsString('__compiler_parse_str', $userScript);
+        $this->assertStringContainsString('ParseStrUserScriptDelimitedJit::ensureSubhelpers', $userScript);
+        $this->assertStringContainsString('__phpc_parse_str_parse_delimited_pairs', $userScript);
         $parseStrRuntime = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
         $this->assertStringContainsString('USER_SCRIPT_PARSE_INTO_NATIVE', $parseStrRuntime);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $parseStrRuntime);
-        $this->assertStringNotContainsString('ParseStrUserScriptDelimitedJit', $parseStrRuntime);
-        $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php');
+        $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php');
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeLlvm.php');
         $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/MultipartRuntime.php');
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
         $this->assertFileExists($this->repoRoot.'/lib/Web/MultipartNativeJitHelper.php');
     }
 
-    public function testParseStrUserScriptDelimitedJitDeleted(): void
+    public function testParseStrUserScriptDelimitedJitPresentForRefresh(): void
     {
-        $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php');
+        $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php');
+        $this->assertStringContainsString('__phpc_parse_str_parse_delimited_pairs', $source);
+        $this->assertStringContainsString('ensureSubhelpers', $source);
     }
 
     public function testParseStrRuntimeRoutesUserScriptThroughNativeJitHelper(): void
@@ -86,8 +88,9 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('implementUserScriptParseBridge', $source);
         $this->assertStringContainsString('USER_SCRIPT_PARSE_INTO_NATIVE', $source);
         $this->assertStringContainsString('USER_SCRIPT_PARSE_COOKIE_INTO_NATIVE', $source);
-        $this->assertStringNotContainsString('ParseStrUserScriptDelimitedJit', $source);
         $this->assertStringNotContainsString('emitUserScriptDelimitedParse', $source);
+        $delimited = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php');
+        $this->assertStringContainsString('emitParseDelimitedPairs', $delimited);
     }
 
     public function testSpineBundleIncludesParseStrPhpJitPath(): void
