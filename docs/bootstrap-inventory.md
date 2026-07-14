@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4844 |
-| Phase A inventory files (M2 ratio SSOT) | 4844 |
+| PHP files on vm.php path | 4845 |
+| Phase A inventory files (M2 ratio SSOT) | 4845 |
 | Phase A ratio-deferred paths | 0 |
-| Source constructs flagged (blockers) | 1 |
-| Source constructs flagged (warnings) | 13010 |
+| Source constructs flagged (blockers) | 0 |
+| Source constructs flagged (warnings) | 13014 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2073,7 +2073,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamTransports.php` | 0 | 1 |
 | `ext/standard/VmStreamWrapperMetadata.php` | 0 | 7 |
 | `ext/standard/VmStreamWrapperRegistry.php` | 0 | 1 |
-| `ext/standard/VmString.php` | 1 | 0 |
+| `ext/standard/VmString.php` | 0 | 3 |
 | `ext/standard/VmStripWhitespace.php` | 0 | 1 |
 | `ext/standard/VmSys.php` | 0 | 3 |
 | `ext/standard/VmSysGetTempDirNative.php` | 0 | 1 |
@@ -3520,6 +3520,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ParamSensitiveLowering.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrNativeOpsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrRuntime.php` | 0 | 7 |
+| `lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrl.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlComponentJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlRuntime.php` | 0 | 3 |
@@ -6848,9 +6849,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 126)
 - new DOMException (line 169)
 - new DOMException (line 289)
-- new DOMException (line 373)
-- new DOMException (line 393)
-- new DOMException (line 402)
+- new DOMException (line 392)
+- new DOMException (line 412)
+- new DOMException (line 421)
 - 22 class method(s)
 - 1 closure(s)
 
@@ -13422,7 +13423,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitIniGetAll.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 11 class method(s)
 
 ### `ext/standard/JitIniIntrospection.php`
 
@@ -18923,8 +18924,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 ### `ext/standard/VmString.php`
 
-**Blockers** (likely prevent AOT bootstrap compile):
-- parse error: Syntax error, unexpected T_SL on line 334
+**Warnings** (review for bootstrap subset):
+- new Error (line 1632)
+- new Error (line 1643)
+- 214 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -23811,8 +23814,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/unserialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 102)
-- new JITVariable (line 120)
+- new JITVariable (line 115)
+- new JITVariable (line 133)
 - 6 class method(s)
 
 ### `ext/standard/urldecode.php`
@@ -28160,6 +28163,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 15 class method(s)
 - 4 closure(s)
 
+### `lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php`
+
+**Warnings** (review for bootstrap subset):
+- 25 class method(s)
+
 ### `lib/JIT/Builtin/ParseUrl.php`
 
 **Warnings** (review for bootstrap subset):
@@ -31545,7 +31553,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 361)
+- new Variable (line 360)
 - 26 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
