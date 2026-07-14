@@ -19,6 +19,7 @@ use PHPCompiler\JIT\ReadonlyBridge;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
+use PHPCompiler\VM\TraitSelfClassScope;
 use PHPCfg\Operand;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -65,7 +66,8 @@ trait ClassConstFetchHelperTrait
     ): Value {
         $literal = JitStringArg::compileTimeLiteral($classVar);
         if (null !== $literal) {
-            $resolved = self::resolveJitClassNameString($objectType, $block, $literal);
+            $resolved = self::resolveJitSelfClassPseudoConstDisplayName($objectType, $block, $literal)
+                ?? self::resolveJitClassNameString($objectType, $block, $literal);
             $objectType->lookup($resolved);
 
             return $objectType->jitContext()->builder->load(
@@ -75,7 +77,7 @@ trait ClassConstFetchHelperTrait
 
         $context = $objectType->jitContext();
         $nameStr = JitStringArg::lowerDominating($context, $classVar, '::class class operand');
-        $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
+        $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr, true);
 
         return self::emitClassPseudoConstFromResolvedName($objectType, $resolvedStr);
     }
@@ -189,7 +191,13 @@ trait ClassConstFetchHelperTrait
         $literal = JitStringArg::compileTimeLiteral($nameVar);
         if (null !== $literal) {
             if ('class' === strtolower($literal)) {
-                return self::classPseudoConst($objectType, $classId, self::displayClassName($objectType, $classId, $classOp));
+                $display = self::resolveJitSelfClassPseudoConstDisplayName(
+                    $objectType,
+                    $block,
+                    $classOp instanceof Operand\Literal && \is_string($classOp->value) ? $classOp->value : null
+                ) ?? self::displayClassName($objectType, $classId, $classOp);
+
+                return self::classPseudoConst($objectType, $classId, $display);
             }
             if (null !== $block && null !== $jit) {
                 ClassConstVisibilityJitGuard::emitBeforeFetch($objectType, $jit, $block, $classId, $literal);
@@ -307,6 +315,45 @@ trait ClassConstFetchHelperTrait
         return self::classNameStringFromId($objectType, $classId);
     }
 
+    /**
+     * self::class in trait methods — composing class when invoked via user (#18879).
+     */
+    private static function resolveJitSelfClassPseudoConstDisplayName(
+        Object_ $objectType,
+        Block $block,
+        ?string $classNameHint = null
+    ): ?string {
+        $lc = null !== $classNameHint ? strtolower(ltrim($classNameHint, '\\')) : null;
+        if (null !== $lc && 'self' !== $lc) {
+            return null;
+        }
+        $funcClassLc = null;
+        $funcIsTrait = false;
+        if (null !== $block->func?->class) {
+            $funcClassLc = $block->func->class->value;
+            $funcIsTrait = $objectType->isTraitClass(strtolower(ltrim($funcClassLc, '\\')));
+        }
+        if (!$funcIsTrait) {
+            return null;
+        }
+        $scopeName = $objectType->jitContext()->scope->className ?? '';
+        if ('' !== $scopeName && !$objectType->isTraitClass(strtolower(ltrim($scopeName, '\\')))) {
+            return $scopeName;
+        }
+        $scope = self::jitScopeClassName($objectType, $block);
+        if (null === $scope || '' === $scope) {
+            return null;
+        }
+        $called = $objectType->jitContext()->scope->calledClassName ?? '';
+
+        return TraitSelfClassScope::resolveSelfClassName(
+            $funcClassLc,
+            true,
+            '' !== $called ? $called : null,
+            $scope
+        );
+    }
+
     private static function resolveJitClassNameString(Object_ $objectType, Block $block, string $className): string
     {
         $lc = strtolower($className);
@@ -380,7 +427,8 @@ trait ClassConstFetchHelperTrait
     private static function emitScopeResolveClassNameString(
         Object_ $objectType,
         Block $block,
-        Value $nameStr
+        Value $nameStr,
+        bool $forClassPseudoConst = false
     ): Value {
         $context = $objectType->jitContext();
         $scopeClass = self::jitScopeClassName($objectType, $block);
@@ -391,9 +439,12 @@ trait ClassConstFetchHelperTrait
         $i32 = $context->getTypeFromString('int32');
         $result = $nameStr;
 
+        $selfResolved = $forClassPseudoConst
+            ? (self::resolveJitSelfClassPseudoConstDisplayName($objectType, $block, 'self') ?? $scopeClass)
+            : $scopeClass;
         foreach (
             [
-                ['self', $scopeClass],
+                ['self', $selfResolved],
                 ['static', self::jitLateStaticClassName($objectType, $block) ?? $scopeClass],
             ] as [$keyword, $resolvedName]
         ) {

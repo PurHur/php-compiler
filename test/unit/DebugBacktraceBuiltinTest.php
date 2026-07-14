@@ -34,6 +34,10 @@ final class DebugBacktraceBuiltinTest extends BaseTest
             __DIR__.'/../compliance/cases/stdlib/debug_backtrace_line_call_site.phpt',
             'debug_backtrace_line_call_site.phpt'
         );
+        yield 'debug_backtrace_method_frame_shape.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/standard/debug_backtrace_method_frame_shape.phpt',
+            'debug_backtrace_method_frame_shape.phpt'
+        );
         yield 'get_debug_backtrace_alias.phpt' => self::parsePHPT(
             __DIR__.'/../compliance/cases/stdlib/get_debug_backtrace_alias.phpt',
             'get_debug_backtrace_alias.phpt'
@@ -41,10 +45,6 @@ final class DebugBacktraceBuiltinTest extends BaseTest
         yield 'debug_print_backtrace.phpt' => self::parsePHPT(
             __DIR__.'/../compliance/cases/stdlib/debug_print_backtrace.phpt',
             'debug_print_backtrace.phpt'
-        );
-        yield 'debug_backtrace_method_frame.phpt' => self::parsePHPT(
-            __DIR__.'/../compliance/cases/standard/debug_backtrace_frame_shape/method_frame.phpt',
-            'debug_backtrace_method_frame.phpt'
         );
     }
 

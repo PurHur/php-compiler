@@ -1,5 +1,7 @@
+--TEST--
+Stdlib: debug_backtrace() method frames expose class/type/function keys (#18881, basic_functions.c)
+--FILE--
 <?php
-
 declare(strict_types=1);
 
 class C
@@ -14,3 +16,7 @@ $frame = (new C())->f();
 echo isset($frame['class']) ? $frame['class'] : 'NO_CLASS', "\n";
 echo isset($frame['type']) ? $frame['type'] : 'NO_TYPE', "\n";
 echo $frame['function'], "\n";
+--EXPECT--
+C
+->
+f

@@ -275,21 +275,6 @@ final class VmDebugBacktrace
             $ht->add('line', $lineVar);
         }
 
-        $className = self::frameClass($frame);
-        if ('' !== $className) {
-            $classVar = new Variable(Variable::TYPE_STRING);
-            $classVar->string($className);
-            $ht->add('class', $classVar);
-
-            $typeVar = new Variable(Variable::TYPE_STRING);
-            $typeVar->string(self::frameCallType($frame));
-            $ht->add('type', $typeVar);
-        }
-
-        $fnVar = new Variable(Variable::TYPE_STRING);
-        $fnVar->string($function);
-        $ht->add('function', $fnVar);
-
         if ($includeHandlerMetadata && $frame->hasHandler()) {
             $className = self::handlerClassName($frame);
             if ('' !== $className) {
@@ -301,7 +286,22 @@ final class VmDebugBacktrace
                 $typeVar->string('::');
                 $ht->add('type', $typeVar);
             }
+        } else {
+            $className = self::frameClass($frame);
+            if ('' !== $className) {
+                $classVar = new Variable(Variable::TYPE_STRING);
+                $classVar->string($className);
+                $ht->add('class', $classVar);
+
+                $typeVar = new Variable(Variable::TYPE_STRING);
+                $typeVar->string(self::frameCallType($frame));
+                $ht->add('type', $typeVar);
+            }
         }
+
+        $fnVar = new Variable(Variable::TYPE_STRING);
+        $fnVar->string($function);
+        $ht->add('function', $fnVar);
 
         if ($provideObject) {
             $object = self::frameObject($frame);

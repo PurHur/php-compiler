@@ -36,8 +36,7 @@ final class timezone_open extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('timezone_open() requires VM context in this compiler build');
         }
-        $timezone = VmDateTimeCreateArg::coerceDatetime(
-            $frame,
+        $timezone = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'timezone_open',
             0,

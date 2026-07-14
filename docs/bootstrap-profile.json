@@ -1159,7 +1159,6 @@
         "ext/standard/JitAttributeExists.php",
         "ext/standard/JitBase64Decode.php",
         "ext/standard/JitBase64Encode.php",
-        "ext/standard/JitBin2hex.php",
         "ext/standard/JitBuiltinWarning.php",
         "ext/standard/JitCallUserFunc.php",
         "ext/standard/JitChdir.php",
@@ -3579,7 +3578,7 @@
         "lib/JIT/Builtin/ParamSensitiveLowering.php",
         "lib/JIT/Builtin/ParseStrNativeOpsJit.php",
         "lib/JIT/Builtin/ParseStrRuntime.php",
-        "lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php",
+        "lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php",
         "lib/JIT/Builtin/ParseUrl.php",
         "lib/JIT/Builtin/ParseUrlComponentJit.php",
         "lib/JIT/Builtin/ParseUrlRuntime.php",
@@ -3713,7 +3712,6 @@
         "lib/JIT/Builtin/StringBase64Encode.php",
         "lib/JIT/Builtin/StringBase64EncodeLlvm.php",
         "lib/JIT/Builtin/StringBin2hex.php",
-        "lib/JIT/Builtin/StringBin2hexLlvm.php",
         "lib/JIT/Builtin/StringBitwiseNot.php",
         "lib/JIT/Builtin/StringBrotli.php",
         "lib/JIT/Builtin/StringBz2.php",
@@ -5082,9 +5080,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4848,
+        "inventory_files": 4846,
         "excluded": 0,
-        "eligible": 4848,
+        "eligible": 4846,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
