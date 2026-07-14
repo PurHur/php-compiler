@@ -34,7 +34,7 @@ final class define_ extends Internal
         if (count($frame->calledArgs) < 2) {
             throw new \LogicException('define() requires at least two arguments');
         }
-        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'define', 0, 'constant_name');
+        $name = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'define', 0, 'constant_name');
         self::rejectClassConstantName($name);
         $value = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->vmContext) {
@@ -62,7 +62,7 @@ final class define_ extends Internal
             throw new \LogicException('define() requires at least two arguments');
         }
         if (JITVariable::TYPE_VALUE === $args[0]->type || JITVariable::TYPE_OBJECT === $args[0]->type) {
-            JitStringBuiltinArg::lower($context, $args[0], 'define', 0, 'constant_name');
+            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'define', 0, 'constant_name');
         }
         if (\count($args) >= 3
             && (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type || null === $args[2]->value->value)) {

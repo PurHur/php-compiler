@@ -13,11 +13,15 @@ foreach (['shell_exec', 'system', 'passthru'] as $fn) {
     }
 }
 $pipes = [];
-var_export(proc_open(null, [], $pipes));
-echo "\n";
+try {
+    proc_open(null, [], $pipes);
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
 ?>
 --EXPECT--
 shell_exec(): Argument #1 ($command) cannot be empty
 system(): Argument #1 ($command) cannot be empty
 passthru(): Argument #1 ($command) cannot be empty
-NULL
+proc_open(): Argument #1 ($command) must be of type array|string, null given

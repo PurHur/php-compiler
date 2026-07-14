@@ -79,7 +79,7 @@ final class similar_text extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'similar_text', $paramName)->toString();
         }
 
-        return VmString::coerceStringBuiltinArg(
+        return VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[$argIndex],
             'similar_text',
             $argIndex,
@@ -95,7 +95,7 @@ final class similar_text extends Internal
     ): Value {
         JitInternalStrictArg::requireString($context, $arg, 'similar_text', $paramName, $argNumber);
 
-        return JitStringBuiltinArg::lower(
+        return JitStringBuiltinArg::lowerTypedString(
             $context,
             $arg,
             'similar_text',

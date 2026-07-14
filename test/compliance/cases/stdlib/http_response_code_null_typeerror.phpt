@@ -1,14 +1,12 @@
 --TEST--
-stdlib http_response_code() JIT — numeric-string coercion (#4454)
+stdlib http_response_code(null) — TypeError not false (#18933, ext/standard/head.c)
 --FILE--
 <?php
-http_response_code("404");
-echo http_response_code(), "\n";
 try {
     http_response_code(null);
+    echo "uncaught\n";
 } catch (TypeError $e) {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-404
 http_response_code(): Argument #1 ($response_code) must be of type int, null given

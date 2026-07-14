@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
@@ -23,11 +24,15 @@ final class JitProcOpen
         }
 
         if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
-            $slot = JitValueBox::alloc($context);
-            $ptr = JitValueBox::pointer($context, $slot);
-            $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitRaise(
+                $context,
+                'proc_open(): Argument #1 ($command) must be of type array|string, null given'
+            );
+            $context->builder->call($context->lookupFunction('abort'));
 
-            return $ptr;
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         $commandStr = JitStringArg::lower($context, $args[0], 'proc_open() command');

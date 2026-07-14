@@ -11,6 +11,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin\HttpResponseCode as Hrc;
 use PHPCompiler\JIT\Builtin\HttpResponseCodeJit;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -80,14 +81,8 @@ final class JitHttpResponseCode
             return $ptr;
         }
 
-        if (JITVariable::TYPE_NULL === $arg->type) {
-            $context->builder->call(
-                $context->lookupFunction('__phpc_http_response_code_apply'),
-                $i8->constInt(Hrc::APPLY_GET, false),
-                $i64->constInt(0, false),
-                $nullBoxed,
-                $ptr
-            );
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            JitInternalStrictArg::rejectNullInt($context, $arg, 'http_response_code', 'response_code', 1);
 
             return $ptr;
         }
