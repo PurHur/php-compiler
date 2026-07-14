@@ -121,7 +121,7 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringParseStr.php', $spine);
         $this->assertStringContainsString('ParseStrNativeOpsJit.php', $spine);
         $this->assertStringNotContainsString('ParseStrUserScriptDelimitedJit.php', $spine);
-        $this->assertStringNotContainsString('ParseStrRuntimeUserScriptCstr.php', $spine);
+        $this->assertStringContainsString('ParseStrRuntimeUserScriptCstr.php', $spine);
         $this->assertStringNotContainsString('ParseStrNativeLlvm.php', $spine);
         $this->assertStringContainsString('phpc_native_ht_alloc.php', $spine);
         $this->assertStringNotContainsString('StringParseStrJit.php', $spine);

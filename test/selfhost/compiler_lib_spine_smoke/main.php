@@ -3601,6 +3601,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ParamSensitiveLookupRuntime.php'
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParamSensitiveLowering.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrNativeOpsJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrl.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrlComponentJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrlRuntime.php';
@@ -4791,6 +4792,7 @@ require_once __DIR__.'/../../../lib/VM/StringOffsetJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/StringableSupport.php';
 require_once __DIR__.'/../../../lib/VM/TickQueue.php';
 require_once __DIR__.'/../../../lib/VM/TraitCompositionConflictMessage.php';
+require_once __DIR__.'/../../../lib/VM/TraitSelfClassScope.php';
 require_once __DIR__.'/../../../lib/VM/TraversableSupport.php';
 require_once __DIR__.'/../../../lib/VM/TryCatchJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/TypeCheck.php';
