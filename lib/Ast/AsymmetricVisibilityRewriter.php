@@ -523,11 +523,9 @@ final class AsymmetricVisibilityRewriter
         if (self::lineViolatesDuplicateSetModifierRules($line)) {
             return true;
         }
-        // php-src 8.4+: unparenthesized `public private(set)` is valid when asymmetric visibility is enabled (#16858, #17114).
-        if (CompilerVersion::supportsAsymmetricVisibility()) {
-            return false;
-        }
 
+        // php-src 8.4: unparenthesized `public private(set)` / `public protected(set)` are duplicate
+        // access modifiers — use `public (private(set))` instead (#18805, Zend/zend_compile.c).
         return self::lineHasExplicitReadPlusSetModifier($line);
     }
 

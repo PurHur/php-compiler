@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -32,12 +33,7 @@ final class timezone_name_from_abbr extends Internal
                 \sprintf('timezone_name_from_abbr() expects between 1 and 3 arguments, %d given', $argc)
             );
         }
-        $abbr = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'timezone_name_from_abbr',
-            0,
-            'abbr'
-        );
+        $abbr = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'timezone_name_from_abbr', 'abbr');
         $gmtoffset = -1;
         if ($argc >= 2) {
             $gmtoffset = (int) $frame->calledArgs[1]->resolveIndirect()->toInt();

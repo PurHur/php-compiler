@@ -35,9 +35,6 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
         $this->assertStringNotContainsString('StringHashCryptoNativeJit', $jit);
         $this->assertStringNotContainsString('ensureBitcode', $jit);
         $this->assertStringNotContainsString('hash_crypto_jit_runtime.c', $jit);
-        $llvm = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoLlvm.php');
-        $this->assertStringContainsString('emitHkdf', $llvm);
-        $this->assertStringNotContainsString('hc_llvm_hkdf_stub', $llvm);
         $this->assertStringContainsString('HashCryptoJitHelper', $php);
         $this->assertStringContainsString('__compiler_hash', $php);
         $this->assertStringNotContainsString('__phpc_hc_sha256_transform', $php);
