@@ -128,13 +128,7 @@ final class JitExec
             self::writeStatusRef($context, $statusArg, self::readStatus($context, $capture));
         }
         if ($returnLastLine) {
-            $lastLineBlock = BasicBlockHelper::append($context, 'proc_last_line');
-            $lastLineDone = BasicBlockHelper::append($context, 'proc_last_line_done');
-            $context->builder->branch($lastLineBlock);
-            $context->builder->positionAtEnd($lastLineBlock);
             $last = self::lastLine($context, $lines);
-            $context->builder->branch($lastLineDone);
-            $context->builder->positionAtEnd($lastLineDone);
             $context->builder->call(
                 $context->lookupFunction('__value__writeString'),
                 $ptr,

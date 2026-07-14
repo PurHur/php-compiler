@@ -11419,6 +11419,33 @@ class JIT {
             }
             $llvmResult = $this->materializeCallResultReachable($llvmResult);
             JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'call_assign_cont');
+            $llvmTy = $this->context->getStringFromType($llvmResult->typeOf());
+            if (
+                $this->context->hasVariableOp($result)
+                && ('__value__*' === $llvmTy || '__value__' === $llvmTy)
+                && $this->context->scope->toCall instanceof CoreFunc\Internal
+            ) {
+                $prior = $this->context->getVariableFromOp($result);
+                if (Variable::TYPE_VALUE !== $prior->type) {
+                    $ptr = '__value__*' === $llvmTy
+                        ? JIT\JitValueBox::normalizeValuePtr($this->context, $llvmResult)
+                        : JIT\JitValueBox::pointer($this->context, $llvmResult);
+                    $prior->free();
+                    $slot = JIT\JitValueBox::alloc($this->context);
+                    JIT\JitValueBox::copyFromPointer($this->context, $slot, $ptr);
+                    $this->context->setVariableOp(
+                        $result,
+                        new Variable(
+                            $this->context,
+                            Variable::TYPE_VALUE,
+                            Variable::KIND_VARIABLE,
+                            $slot
+                        )
+                    );
+
+                    return;
+                }
+            }
             $this->assignOperandValue($result, $llvmResult, true);
             if ($this->context->scope->toCall instanceof JIT\Call\DomDocumentGetElementById) {
                 JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'dom_gei_post_assign');
@@ -13935,13 +13962,21 @@ class JIT {
         $destTy = $this->context->getStringFromType($dest->value->typeOf());
         if (Variable::TYPE_NATIVE_BOOL === $dest->type) {
             if ('__value__' === $valueTy || '__value__*' === $valueTy) {
-                $source = new Variable(
-                    $this->context,
-                    Variable::TYPE_VALUE,
-                    Variable::KIND_VALUE,
-                    $value
+                $valuePtr = '__value__*' === $valueTy
+                    ? JIT\JitValueBox::normalizeValuePtr($this->context, $value)
+                    : JIT\JitValueBox::pointer($this->context, $value);
+                $dest->free();
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer($this->context, $slot, $valuePtr);
+                $this->context->setVariableOp(
+                    $result,
+                    new Variable(
+                        $this->context,
+                        Variable::TYPE_VALUE,
+                        Variable::KIND_VARIABLE,
+                        $slot
+                    )
                 );
-                $this->assignOperand($result, $source);
 
                 return;
             }
@@ -13964,13 +13999,21 @@ class JIT {
         }
         if (Variable::TYPE_NATIVE_LONG === $dest->type || Variable::TYPE_NATIVE_DOUBLE === $dest->type) {
             if ('__value__' === $valueTy || '__value__*' === $valueTy) {
-                $source = new Variable(
-                    $this->context,
-                    Variable::TYPE_VALUE,
-                    Variable::KIND_VALUE,
-                    $value
+                $valuePtr = '__value__*' === $valueTy
+                    ? JIT\JitValueBox::normalizeValuePtr($this->context, $value)
+                    : JIT\JitValueBox::pointer($this->context, $value);
+                $dest->free();
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::copyFromPointer($this->context, $slot, $valuePtr);
+                $this->context->setVariableOp(
+                    $result,
+                    new Variable(
+                        $this->context,
+                        Variable::TYPE_VALUE,
+                        Variable::KIND_VARIABLE,
+                        $slot
+                    )
                 );
-                $this->assignOperand($result, $source);
 
                 return;
             }
