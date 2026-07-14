@@ -38,7 +38,12 @@ final class strftime extends Internal
         if (2 === $argc) {
             $timestamp = VmDate::coerceNullableTimestampArgForFrame($frame, 1, 'strftime', 2, 'timestamp');
         }
-        $frame->returnVar->string(VmDate::strftime($format, $timestamp));
+        $result = VmDate::strftime($format, $timestamp);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->string($result);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -7,18 +7,20 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\HtmlspecialcharsDecodeJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** htmlspecialchars_decode() JIT routes through HtmlspecialcharsDecodeJitHelper PHP not inline LLVM (#14820). */
+/** htmlspecialchars_decode() JIT routes through HtmlspecialcharsDecodeJitHelper PHP for embed + user-script AOT (#14820, #18954). */
 final class HtmlspecialcharsDecodeRuntimeShrinkTest extends TestCase
 {
-    public function testStringHtmlspecialcharsDecodeUsesJitHelperNotInlineLlvm(): void
+    public function testStringHtmlspecialcharsDecodeUsesJitHelperNotLlvmMonolith(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsDecode.php');
         $this->assertStringContainsString('HtmlspecialcharsDecodeJitHelper', $source);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertStringContainsString('StringHtmlspecialcharsDecodeLlvm', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('StringHtmlspecialcharsDecodeLlvm', $source);
         $this->assertStringNotContainsString('countLoop', $source);
         $this->assertStringNotContainsString('writeLoop', $source);
         $this->assertStringNotContainsString('quoteBothFlag', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsDecodeLlvm.php');
     }
 
     public function testHtmlspecialcharsDecodeJitHelperMirrorsVmStringSemantics(): void
@@ -33,11 +35,12 @@ final class HtmlspecialcharsDecodeRuntimeShrinkTest extends TestCase
         $this->assertSame($expected, HtmlspecialcharsDecodeJitHelper::htmlspecialcharsDecodeArgv($input, $flags));
     }
 
-    public function testSpineBundleIncludesHtmlspecialcharsDecodeJitHelper(): void
+    public function testSpineBundleOmitsDeletedHtmlspecialcharsDecodeLlvm(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('HtmlspecialcharsDecodeJitHelper.php', $spine);
         $this->assertStringContainsString('StringHtmlspecialcharsDecode.php', $spine);
+        $this->assertStringNotContainsString('StringHtmlspecialcharsDecodeLlvm.php', $spine);
     }
 
     public function testJitHtmlspecialcharsDecodeEnsuresLazyBridgeLink(): void

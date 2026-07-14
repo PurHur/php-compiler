@@ -271,12 +271,12 @@ final class VmDate
     /**
      * strftime() / gmstrftime() — locale time via libc strftime (ext/standard/datetime.c, #3692).
      */
-    public static function strftime(string $format, ?int $timestamp = null): string
+    public static function strftime(string $format, ?int $timestamp = null): string|false
     {
         return self::libcStrftime($format, $timestamp ?? self::time(), false);
     }
 
-    public static function gmstrftime(string $format, ?int $timestamp = null): string
+    public static function gmstrftime(string $format, ?int $timestamp = null): string|false
     {
         return self::libcStrftime($format, $timestamp ?? self::time(), true);
     }
@@ -1257,7 +1257,7 @@ final class VmDate
         return VmDatePure::readTimeval();
     }
 
-    private static function libcStrftime(string $format, int $timestamp, bool $gmt): string
+    private static function libcStrftime(string $format, int $timestamp, bool $gmt): string|false
     {
         return VmDatePure::strftime($format, $timestamp, $gmt);
     }

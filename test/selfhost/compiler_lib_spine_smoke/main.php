@@ -3806,7 +3806,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringHrtime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHrtimeRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialchars.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialcharsDecode.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialcharsDecodeLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialcharsUserScriptLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHttpBuildQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringIdate.php';
