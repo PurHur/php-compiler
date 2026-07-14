@@ -68,10 +68,6 @@ final class strtok extends Internal
             '?string',
             '?string'
         );
-        if (JITVariable::TYPE_NULL === $args[0]->type) {
-            return JitStrtok::tokenize($context, null, $tok);
-        }
-
         return JitStrtok::tokenize(
             $context,
             JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'string', 'string', 'string'),
