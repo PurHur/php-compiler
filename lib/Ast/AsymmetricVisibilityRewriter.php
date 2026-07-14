@@ -524,9 +524,13 @@ final class AsymmetricVisibilityRewriter
             return true;
         }
 
-        // php-src 8.4: unparenthesized `public private(set)` / `public protected(set)` are duplicate
-        // access modifiers — use `public (private(set))` instead (#18805, Zend/zend_compile.c).
-        return self::lineHasExplicitReadPlusSetModifier($line);
+        // Reference profile: explicit read + bare set is a duplicate-modifier fatal (#12576, #13960).
+        // PHP 8.4 forward profile accepts `public private(set)` and rewrites to marker form (#18820).
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            return self::lineHasExplicitReadPlusSetModifier($line);
+        }
+
+        return false;
     }
 
     /**
