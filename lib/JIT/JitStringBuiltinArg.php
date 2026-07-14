@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmNullStringParamDeprecation;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\VM\ErrorReporter;
@@ -20,6 +22,12 @@ use PHPLLVM\Value;
  */
 final class JitStringBuiltinArg
 {
+    /** PHP 8.4+ forward profile: Z_PARAM_STR null is TypeError (#18778, #18798). */
+    public static function requiresForwardProfileStrictStringNull(): bool
+    {
+        return VmString::requiresForwardProfileStrictStringNull();
+    }
+
     /**
      * Z_PARAM_STR with caller strict_types parity (#12276, #12274).
      */
@@ -67,7 +75,7 @@ final class JitStringBuiltinArg
         JitNativeString::ensureInsertBlock($context);
         $arrayExpected = $arrayExpectedType ?? $expectedType;
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            if ($context->callerStrictTypes) {
+            if ($context->callerStrictTypes || self::requiresForwardProfileStrictStringNull()) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
 
                 return self::unreachableStringPtr($context);
@@ -139,7 +147,7 @@ final class JitStringBuiltinArg
     ): Value {
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             JitNativeString::ensureInsertBlock($context);
-            if ($context->callerStrictTypes) {
+            if ($context->callerStrictTypes || self::requiresForwardProfileStrictStringNull()) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
 
                 return self::unreachableStringPtr($context);

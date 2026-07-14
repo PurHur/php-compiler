@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM;
@@ -52,6 +53,16 @@ final class VmNullStringParamDeprecation
 
 final class VmString
 {
+    /**
+     * PHP 8.4+ forward profile: Z_PARAM_STR null is TypeError (ext/standard/string.c; #18778, #18797).
+     *
+     * PHP 8.2 reference profile keeps deprecation + coerce to "".
+     */
+    public static function requiresForwardProfileStrictStringNull(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
 
     /** php-src php_trim_int(): trim left side. */
@@ -111,6 +122,11 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            if (self::requiresForwardProfileStrictStringNull()) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null', $expectedType)
+                );
+            }
             VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
 
             return '';
@@ -155,6 +171,9 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            if (self::requiresForwardProfileStrictStringNull()) {
+                throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+            }
             VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
 
             return '';
