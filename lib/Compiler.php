@@ -53,6 +53,7 @@ use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\PseudoClassTypeHintCompileCheck;
 use PHPCompiler\Compiler\FunctionStaticAnonymousClassCompileCheck;
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
+use PHPCompiler\Compiler\DateTimeInterfaceUserImplCompileCheck;
 use PHPCompiler\Compiler\NonEnumBuiltinInterfaceCompileCheck;
 use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
 use PHPCompiler\Compiler\AsymmetricVisibilityCompileCheck;
@@ -536,6 +537,7 @@ class Compiler {
         }
 
         NonEnumBuiltinInterfaceCompileCheck::validate($script);
+        DateTimeInterfaceUserImplCompileCheck::validate($script);
         InterfaceImplementationCheck::validate($script, $this->propertyHookRegistry);
         TraitCollisionCheck::validate($script, $this->propertyHookRegistry);
         FinalClassExtensionCheck::validate($script);

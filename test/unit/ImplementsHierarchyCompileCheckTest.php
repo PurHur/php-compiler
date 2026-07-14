@@ -138,8 +138,8 @@ PHP;
         $runtime->parseAndCompile($code, 'nested.php');
     }
 
-    /** @covers issue #13325 */
-    public function testClassImplementsDateTimeInterfaceFailsAtCompileTime(): void
+    /** @covers issue #18781 */
+    public function testClassImplementsDateTimeInterfaceFailsWithCompileFatal(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -151,8 +151,8 @@ PHP;
         $runtime->parseAndCompile($code, 'datetimeinterface.php');
     }
 
-    /** @covers issue #13325 */
-    public function testEnumImplementsDateTimeInterfaceFailsAtCompileTime(): void
+    /** @covers issue #18781 */
+    public function testEnumImplementsDateTimeInterfaceFailsWithCompileFatal(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
