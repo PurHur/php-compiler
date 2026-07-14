@@ -7,17 +7,17 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * User-script standalone AOT: mirror process environ into sg_SERVER without nested JIT (#15417).
+ * Init-safe environ mirror for user-script AOT superglobal refresh (#15417, #18984).
  *
- * Replaces {@see StringGetenvAll} during {@see SuperglobalRefreshUserScriptLlvm} init — nested
- * GetenvJitHelper compile after htmlspecialchars/ParseStrRuntime segfaults (#13571, #14209).
- * php-src: sapi/cli/php_cli.c — copy environ into $_SERVER on CLI startup.
+ * Nested {@see EnvironMirrorNativeJitHelper} (fopen/file_get_contents) segfaults at
+ * {@code main_after_init}; this libc environ walk mirrors {@see EnvironMirrorNativeJitHelper}
+ * for the refresh gate only — same pattern as {@see StringFileGetContentsLibc} (#15309).
+ * php-src: sapi/cli/php_cli.c — copy environ into $_SERVER on CLI startup
  */
-final class EnvironMirrorUserScriptLlvm
+final class EnvironMirrorRuntimeUserScriptCstr
 {
     private const ABI = '__superglobals__mirror_process_environ';
 
@@ -38,11 +38,6 @@ final class EnvironMirrorUserScriptLlvm
         self::restoreInsertBlock($context, $restore);
         $context->registerFunction(self::ABI, $fn);
         $context->builder->clearInsertionPosition();
-    }
-
-    public static function emitFillCall(Context $context, Value $serverHt): void
-    {
-        $context->builder->call($context->lookupFunction(self::ABI), $serverHt);
     }
 
     private static function declareMirror(Context $context): LlvmFunction
@@ -102,7 +97,7 @@ final class EnvironMirrorUserScriptLlvm
         $context->builder->store($i64->constInt(0, false), $idxSlot);
         $environGlobal = $context->module->getNamedGlobal('environ');
         if (null === $environGlobal) {
-            throw new \LogicException('environ global missing for user-script AOT mirror (#15417)');
+            throw new \LogicException('environ global missing for user-script AOT mirror (#18984)');
         }
         $environPtr = $context->builder->load($environGlobal);
         $environNull = $context->builder->icmp(Builder::INT_EQ, $environPtr, $i8pp->constNull());

@@ -1077,6 +1077,7 @@
         "ext/standard/EmbedObJitHelper.php",
         "ext/standard/EnumExistsJitHelper.php",
         "ext/standard/EnvLocalJitHelper.php",
+        "ext/standard/EnvironMirrorNativeJitHelper.php",
         "ext/standard/ErrorHandlerJitHelper.php",
         "ext/standard/ErrorLastJitHelper.php",
         "ext/standard/ErrorLogJitHelper.php",
@@ -3454,7 +3455,8 @@
         "lib/JIT/Builtin/EmbedObOutput.php",
         "lib/JIT/Builtin/EnumCasesRuntime.php",
         "lib/JIT/Builtin/EnvLocalRuntime.php",
-        "lib/JIT/Builtin/EnvironMirrorUserScriptLlvm.php",
+        "lib/JIT/Builtin/EnvironMirrorRuntime.php",
+        "lib/JIT/Builtin/EnvironMirrorRuntimeUserScriptCstr.php",
         "lib/JIT/Builtin/ErrorHandler.php",
         "lib/JIT/Builtin/ErrorHandlerJitRuntime.php",
         "lib/JIT/Builtin/ErrorHandlerOutput.php",
@@ -5114,9 +5116,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4880,
+        "inventory_files": 4882,
         "excluded": 0,
-        "eligible": 4880,
+        "eligible": 4882,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

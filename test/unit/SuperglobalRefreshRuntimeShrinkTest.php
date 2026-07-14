@@ -37,7 +37,8 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
         $this->assertStringContainsString('ParseStrRuntime::ensureUserScriptLinked', $source);
         $this->assertStringContainsString('MultipartRuntime::ensureUserScriptLinked', $source);
-        $this->assertStringContainsString('EnvironMirrorUserScriptLlvm', $source);
+        $this->assertStringContainsString('EnvironMirrorRuntime::ensureLinked', $source);
+        $this->assertStringContainsString('EnvironMirrorRuntime::emitFillCall', $source);
         $this->assertStringContainsString('ensurePrerequisites', $source);
         $this->assertStringContainsString('__compiler_parse_str', $source);
         $this->assertStringContainsString('__compiler_parse_cookie_header', $source);
