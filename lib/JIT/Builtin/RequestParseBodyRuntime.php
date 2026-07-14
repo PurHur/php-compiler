@@ -12,7 +12,8 @@ use PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MultipartRuntime;
 use PHPCompiler\JIT\Builtin\ParseStrRuntime;
-use PHPCompiler\JIT\Builtin\StringGetenv;
+use PHPCompiler\JIT\Builtin\RequestParseBodyUserScriptLlvm;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -52,6 +53,10 @@ final class RequestParseBodyRuntime
 
     public static function ensureLinked(Context $context): void
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
+
         self::implement($context);
     }
 
