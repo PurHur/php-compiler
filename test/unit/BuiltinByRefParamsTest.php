@@ -62,6 +62,14 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([1], BuiltinByRefParams::forFunction('OPENSSL_SIGN'));
     }
 
+    public function testOpensslPublicEncryptPrivateDecryptOutputArguments(): void
+    {
+        foreach (['openssl_public_encrypt', 'openssl_private_decrypt', 'openssl_private_encrypt', 'openssl_public_decrypt'] as $fn) {
+            $this->assertSame([1], BuiltinByRefParams::forFunction($fn), $fn);
+        }
+        $this->assertSame([1], BuiltinByRefParams::forFunction('OPENSSL_PUBLIC_ENCRYPT'));
+    }
+
     public function testOpensslSealOpenByRefIndices(): void
     {
         $this->assertSame([1, 2, 5], BuiltinByRefParams::forFunction('openssl_seal'));

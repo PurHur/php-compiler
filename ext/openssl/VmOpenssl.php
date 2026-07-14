@@ -190,6 +190,106 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_public_encrypt() — EVP_PKEY_encrypt (php-src ext/openssl/xp.c; #6666).
+     *
+     * @return string|false ciphertext bytes
+     */
+    public static function publicEncrypt(
+        string $data,
+        string $publicKeyPem,
+        int $padding,
+        ?Frame $frame = null,
+    ): string|false {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_public_encrypt(): OpenSSL asymmetric encryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $encrypted = VmOpensslPkeyNative::encrypt($data, $publicKeyPem, $padding);
+        if (false === $encrypted) {
+            self::userWarning('openssl_public_encrypt(): Encryption failed', $frame);
+        }
+
+        return $encrypted;
+    }
+
+    /**
+     * openssl_private_decrypt() — EVP_PKEY_decrypt (php-src ext/openssl/xp.c; #6666).
+     *
+     * @return string|false plaintext bytes
+     */
+    public static function privateDecrypt(
+        string $data,
+        string $privateKeyPem,
+        int $padding,
+        ?Frame $frame = null,
+    ): string|false {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_private_decrypt(): OpenSSL asymmetric decryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $decrypted = VmOpensslPkeyNative::decrypt($data, $privateKeyPem, $padding);
+        if (false === $decrypted) {
+            self::userWarning('openssl_private_decrypt(): Decryption failed', $frame);
+        }
+
+        return $decrypted;
+    }
+
+    /**
+     * openssl_private_encrypt() — EVP_PKEY_sign (php-src ext/openssl/xp.c; #6666).
+     *
+     * @return string|false ciphertext bytes
+     */
+    public static function privateEncrypt(
+        string $data,
+        string $privateKeyPem,
+        int $padding,
+        ?Frame $frame = null,
+    ): string|false {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_private_encrypt(): OpenSSL asymmetric encryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $encrypted = VmOpensslPkeyNative::privateEncrypt($data, $privateKeyPem, $padding);
+        if (false === $encrypted) {
+            self::userWarning('openssl_private_encrypt(): Encryption failed', $frame);
+        }
+
+        return $encrypted;
+    }
+
+    /**
+     * openssl_public_decrypt() — EVP_PKEY_verify_recover (php-src ext/openssl/xp.c; #6666).
+     *
+     * @return string|false plaintext bytes
+     */
+    public static function publicDecrypt(
+        string $data,
+        string $publicKeyPem,
+        int $padding,
+        ?Frame $frame = null,
+    ): string|false {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_public_decrypt(): OpenSSL asymmetric decryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $decrypted = VmOpensslPkeyNative::publicDecrypt($data, $publicKeyPem, $padding);
+        if (false === $decrypted) {
+            self::userWarning('openssl_public_decrypt(): Decryption failed', $frame);
+        }
+
+        return $decrypted;
+    }
+
+    /**
      * openssl_spki_new() — create Netscape SPKAC (php-src ext/openssl/openssl.c; #8690).
      *
      * @return string|false SPKAC=… encoded certificate request
@@ -827,6 +927,34 @@ final class VmOpenssl
                 Variable::TYPE_FLOAT => 'float',
                 Variable::TYPE_ARRAY => 'array',
                 Variable::TYPE_OBJECT => 'object',
+                default => 'mixed',
+            }
+        ));
+    }
+
+    public static function coercePaddingArg(Variable $var, string $function, int $argIndex, string $paramName): int
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return $var->toInt();
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            return (int) $var->toString();
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            return OpensslConstants::OPENSSL_PKCS1_PADDING;
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type int, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            match ($var->type) {
+                Variable::TYPE_BOOLEAN => 'bool',
+                Variable::TYPE_FLOAT => 'float',
+                Variable::TYPE_ARRAY => 'array',
+                Variable::TYPE_OBJECT => $var->toObject()->class->name,
                 default => 'mixed',
             }
         ));

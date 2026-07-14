@@ -11,6 +11,9 @@ final class OpensslConstants
 {
     public const OPENSSL_RAW_DATA = 1;
     public const OPENSSL_ZERO_PADDING = 2;
+    public const OPENSSL_PKCS1_PADDING = 1;
+    public const OPENSSL_NO_PADDING = 3;
+    public const OPENSSL_PKCS1_OAEP_PADDING = 4;
 
     /** php-src ext/openssl/openssl.c — digest/signature algorithm ids. */
     public const OPENSSL_ALGO_SHA1 = 1;
@@ -37,6 +40,9 @@ final class OpensslConstants
         return [
             'OPENSSL_RAW_DATA' => self::OPENSSL_RAW_DATA,
             'OPENSSL_ZERO_PADDING' => self::OPENSSL_ZERO_PADDING,
+            'OPENSSL_PKCS1_PADDING' => self::OPENSSL_PKCS1_PADDING,
+            'OPENSSL_NO_PADDING' => self::OPENSSL_NO_PADDING,
+            'OPENSSL_PKCS1_OAEP_PADDING' => self::OPENSSL_PKCS1_OAEP_PADDING,
         ] + self::algorithmConstants();
     }
 
