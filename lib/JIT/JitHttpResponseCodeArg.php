@@ -23,6 +23,9 @@ final class JitHttpResponseCodeArg
             return $context->getTypeFromString('int64')->constInt($compileTime, false);
         }
 
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
         if (Variable::TYPE_VALUE === $arg->type) {
             return self::lowerBoxed($context, $arg, $fn);
         }

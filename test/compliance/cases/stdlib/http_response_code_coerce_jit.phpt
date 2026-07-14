@@ -4,11 +4,8 @@ stdlib http_response_code() JIT — numeric-string coercion (#4454)
 <?php
 http_response_code("404");
 echo http_response_code(), "\n";
-try {
-    http_response_code(null);
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
+var_export(http_response_code(null));
+echo "\n";
 --EXPECT--
 404
-http_response_code(): Argument #1 ($response_code) must be of type int, null given
+404

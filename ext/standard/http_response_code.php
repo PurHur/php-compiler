@@ -9,7 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitHttpResponseCodeArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -33,12 +33,9 @@ final class http_response_code extends Internal
             if (0 === $argc) {
                 return;
             }
-            InternalStrictArg::rejectNullInt(
-                $frame->calledArgs[0],
-                'http_response_code',
-                'response_code',
-                0
-            );
+            if (Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type) {
+                return;
+            }
             $code = VmHttpResponse::resolveCodeArg($frame->calledArgs[0], 'http_response_code');
             if (0 !== $code) {
                 VmHttpResponse::writeHttpResponseCode($code);
@@ -55,12 +52,15 @@ final class http_response_code extends Internal
 
             return;
         }
-        InternalStrictArg::rejectNullInt(
-            $frame->calledArgs[0],
-            'http_response_code',
-            'response_code',
-            0
-        );
+        if (Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type) {
+            VmHttpResponse::assignReadResult(
+                $frame->returnVar,
+                VmHttpResponse::readHttpResponseCode($ctx),
+                $ctx
+            );
+
+            return;
+        }
         $code = VmHttpResponse::resolveCodeArg($frame->calledArgs[0], 'http_response_code');
         // php-src head.c: response_code 0 is falsy — getter only, no status change (#9306).
         if (0 === $code) {
