@@ -81,12 +81,6 @@ final class idate extends Internal
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::requireString($frame, 0, 'idate', 'format');
-
-            return $frame->calledArgs[0]->resolveIndirect()->toString();
-        }
-        $arg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_NULL === $arg->type) {
-            return '';
         }
 
         return VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'idate', 0, 'format');
