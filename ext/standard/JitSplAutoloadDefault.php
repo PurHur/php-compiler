@@ -94,7 +94,7 @@ final class JitSplAutoloadDefault
 
         $arg = $args[$index];
         if (JITVariable::TYPE_NULL === $arg->type) {
-            return [$i1->constInt(1, false), $strPtr->constNull()];
+            return [$i1->constInt(0, false), $strPtr->constNull()];
         }
 
         return [
