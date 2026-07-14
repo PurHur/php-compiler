@@ -1994,12 +1994,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomNodeContainsTrueOn84DevDefaultProfile(): void
+    public function testSupportsDomNodeContainsFalseOn84DevDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsDomNodeContains());
+            $this->assertFalse(CompilerVersion::supportsDomNodeContains());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -2027,12 +2027,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomNodeCompareDocumentPositionTrueOn84DevDefaultProfile(): void
+    public function testSupportsDomNodeCompareDocumentPositionFalseOn84DevDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsDomNodeCompareDocumentPosition());
+            $this->assertFalse(CompilerVersion::supportsDomNodeCompareDocumentPosition());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -2072,7 +2072,7 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersDomNodeCompareDocumentPositionOnDefaultProfile(): void
+    public function testVmWithholdsDomNodeCompareDocumentPositionOnDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
@@ -2080,7 +2080,7 @@ final class CompilerVersionGateTest extends TestCase
             $runtime = new Runtime();
             $node = $runtime->vmContext->classes['domnode'] ?? null;
             $this->assertNotNull($node);
-            $this->assertTrue(isset($node->methods['comparedocumentposition']));
+            $this->assertFalse(isset($node->methods['comparedocumentposition']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -2393,12 +2393,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsDomElementToggleAttributeTrueOn84DevDefaultProfile(): void
+    public function testSupportsDomElementToggleAttributeFalseOn84DevDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertTrue(CompilerVersion::supportsDomElementToggleAttribute());
+            $this->assertFalse(CompilerVersion::supportsDomElementToggleAttribute());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
