@@ -93,6 +93,7 @@ final class request_parse_body extends Internal
         $postHt = HashTableHelper::alloc($context);
         $filesHt = HashTableHelper::alloc($context);
         if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            RequestParseBodyUserScriptLlvm::ensureLinked($context);
             $context->builder->call(
                 $context->lookupFunction(RequestParseBodyUserScriptLlvm::BRIDGE_NAME),
                 $postHt,

@@ -86,6 +86,8 @@ final class StringGetenv
     public static function ensurePutenvLinked(Context $context): void
     {
         if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureJitHelperCompiled($context);
+
             return;
         }
         self::ensureJitHelperCompiled($context);
