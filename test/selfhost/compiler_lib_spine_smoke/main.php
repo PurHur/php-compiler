@@ -4914,4 +4914,21 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/dom/DomCreateElementJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/DomCreateElementNSJitHelper.php';
+require_once __DIR__.'/../../../ext/dom/JitDomAppendChildUserScript.php';
+require_once __DIR__.'/../../../ext/dom/JitDomCreateElementNS.php';
+require_once __DIR__.'/../../../ext/phar/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/phar/Module.php';
+require_once __DIR__.'/../../../ext/phar/PharExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/phar/VmPhar.php';
+require_once __DIR__.'/../../../ext/standard/IncludePathResolverJitHelper.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DomCreateElementNSRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DomCreateElementRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringIncludePathResolver.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentAppendChild.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateElementNS.php';
+require_once __DIR__.'/../../../lib/JIT/Call/HashTableUnshiftPrepend.php';
+require_once __DIR__.'/../../../lib/JIT/Call/IncludePathResolverResolve.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/PharRunning.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
