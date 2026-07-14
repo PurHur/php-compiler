@@ -23862,9 +23862,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/time_sleep_until.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- new ArgumentCountError (line 61)
-- 5 class method(s)
+- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 65)
+- 3 class method(s)
 
 ### `ext/standard/timezone_abbreviations_list.php`
 
@@ -29156,7 +29156,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringBin2hex.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringBitwiseNot.php`
 
@@ -31677,7 +31677,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitBoolArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 12 class method(s)
 
 ### `lib/JIT/JitClockGettimeArg.php`
 
