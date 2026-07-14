@@ -15,10 +15,14 @@ foreach (['shell_exec', 'system', 'passthru'] as $fn) {
 }
 
 $pipes = [];
-$result = proc_open(null, [], $pipes);
-echo 'proc_open: '.(null === $result ? 'NULL' : 'other')."\n";
+try {
+    proc_open(null, [], $pipes);
+    echo "proc_open: uncaught\n";
+} catch (TypeError $e) {
+    echo 'proc_open: TypeError', "\n";
+}
 --EXPECT--
 shell_exec: ValueError
 system: ValueError
 passthru: ValueError
-proc_open: NULL
+proc_open: TypeError

@@ -4,8 +4,11 @@ stdlib http_response_code() — numeric-string coercion + TypeError (#4454, ext/
 <?php
 http_response_code("404");
 echo http_response_code(), "\n";
-http_response_code(null);
-echo http_response_code() === 404 ? "ok\n" : "fail\n";
+try {
+    http_response_code(null);
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
 try {
     http_response_code([]);
 } catch (TypeError $e) {
@@ -13,5 +16,5 @@ try {
 }
 --EXPECT--
 404
-ok
+http_response_code(): Argument #1 ($response_code) must be of type int, null given
 http_response_code(): Argument #1 ($response_code) must be of type int, array given
