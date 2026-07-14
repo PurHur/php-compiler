@@ -9,9 +9,8 @@ use PHPCompiler\CompilerVersion;
 /**
  * ext/sqlite3 advertisement — php-src ext/sqlite3/php_sqlite3.c (#7269, #17106, #17194).
  *
- * Reference profile withholds extension_loaded('sqlite3') and SQLite3Exception to match Zend
- * Docker without HAVE_SQLITE3. Forward profile ({@see CompilerVersion::supportsSqlite3()})
- * restores the #7269 exception hierarchy before the SQLite3 query API ships (#3434).
+ * Pure-PHP SQLite3 ({@see VmSQLite3}) via libsqlite3 FFI — withheld on reference profile until
+ * {@see CompilerVersion::supportsSqlite3()}. Exception hierarchy on forward profile since #7269.
  */
 final class Sqlite3ExtensionPolicy
 {
