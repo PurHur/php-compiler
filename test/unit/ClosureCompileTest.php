@@ -64,6 +64,23 @@ PHP;
         $this->assertSame("9\n", ob_get_clean());
     }
 
+    /** Regression: Closure::bind($closure, new C(), null) must bind $this like bindTo (#18880). */
+    public function testVmStaticClosureBindNullScope(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class C { public int $x = 5; }
+$c = function (): int { return $this->x; };
+echo Closure::bind($c, new C(), null)(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("5\n", ob_get_clean());
+    }
+
     /** Regression: bindTo(null, ClassName::class) on static closure — scope not misbound as $newThis (#15899). */
     public function testVmStaticClosureBindToNullClassScope(): void
     {
