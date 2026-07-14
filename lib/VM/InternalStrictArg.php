@@ -158,7 +158,8 @@ final class InternalStrictArg
         Frame $frame,
         int $argIndex,
         string $function,
-        string $paramName
+        string $paramName,
+        bool $rejectNullOnForwardProfile = true
     ): string {
         if (self::isCallerStrict($frame)) {
             self::requireString($frame, $argIndex, $function, $paramName);
@@ -168,7 +169,9 @@ final class InternalStrictArg
             $frame->calledArgs[$argIndex],
             $function,
             $argIndex,
-            $paramName
+            $paramName,
+            'string',
+            $rejectNullOnForwardProfile
         );
     }
 

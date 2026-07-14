@@ -28,7 +28,7 @@ final class shell_exec extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'shell_exec', 'command');
+        $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'shell_exec', 'command', false);
         VmString::rejectEmptyBuiltinStringArg($command, 'shell_exec', 0, 'command');
         $result = VmShellExecNative::shellExec($command);
         if (false === $result) {
@@ -46,7 +46,7 @@ final class shell_exec extends Internal
             throw new \LogicException('shell_exec() requires exactly one argument');
         }
 
-        $command = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'shell_exec', 0, 'command');
+        $command = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'shell_exec', 0, 'command', 'string', null, false);
         JitStringBuiltinArg::rejectEmpty(
             $context,
             $args[0],

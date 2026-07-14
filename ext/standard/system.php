@@ -29,7 +29,7 @@ final class system extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('system() accepts one or two arguments in this compiler build');
         }
-        $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'system', 'command');
+        $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'system', 'command', false);
         VmString::rejectEmptyBuiltinStringArg($command, 'system', 0, 'command');
         $result = VmExecNative::run($command);
         if (false !== $result) {

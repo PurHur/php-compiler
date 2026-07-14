@@ -1,0 +1,37 @@
+--TEST--
+stdlib exec family null command — ValueError not TypeError on 8.4 forward profile (#18922, ext/standard/exec.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
+--FILE--
+<?php
+foreach (['shell_exec', 'system', 'passthru', 'exec'] as $fn) {
+    try {
+        $fn(null);
+        echo "$fn: NO_ERROR\n";
+    } catch (ValueError $e) {
+        echo $e->getMessage(), "\n";
+    } catch (TypeError $e) {
+        echo "TypeError: ", $e->getMessage(), "\n";
+    }
+}
+try {
+    scandir(null);
+    echo "scandir: NO_ERROR\n";
+} catch (ValueError $e) {
+    echo $e->getMessage(), "\n";
+} catch (TypeError $e) {
+    echo "TypeError: ", $e->getMessage(), "\n";
+}
+$r = popen(null, 'r');
+echo 'popen: ', is_resource($r) ? 'resource' : 'other', "\n";
+if (is_resource($r)) {
+    pclose($r);
+}
+?>
+--EXPECT--
+shell_exec(): Argument #1 ($command) cannot be empty
+system(): Argument #1 ($command) cannot be empty
+passthru(): Argument #1 ($command) cannot be empty
+exec(): Argument #1 ($command) cannot be empty
+scandir(): Argument #1 ($directory) cannot be empty
+popen: resource

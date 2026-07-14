@@ -25,7 +25,7 @@ final class JitExec
             throw new \LogicException('exec() accepts one to three arguments in this compiler build');
         }
 
-        $cmd = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'exec', 0, 'command');
+        $cmd = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'exec', 0, 'command', 'string', null, false);
         self::rejectEmptyCommand($context, $args[0], $cmd, 'exec');
         $capture = self::capture($context, $cmd);
         $failed = $context->builder->icmp(
@@ -93,7 +93,7 @@ final class JitExec
         bool $returnLastLine,
         string $function
     ): Value {
-        $cmd = JitStringBuiltinArg::lowerStrictOrCoercible($context, $commandArg, $function, 0, 'command');
+        $cmd = JitStringBuiltinArg::lowerStrictOrCoercible($context, $commandArg, $function, 0, 'command', 'string', null, false);
         self::rejectEmptyCommand($context, $commandArg, $cmd, $function);
         $capture = self::capture($context, $cmd);
         $failed = $context->builder->icmp(

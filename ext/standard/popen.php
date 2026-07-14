@@ -32,7 +32,7 @@ final class popen extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'popen', 'command');
+        $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'popen', 'command', false);
         $mode = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             'popen',
@@ -56,7 +56,7 @@ final class popen extends Internal
 
         return JitPopen::invoke(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'popen', 0, 'command'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'popen', 0, 'command', 'string', null, false),
             JitStringBuiltinArg::lower($context, $args[1], 'popen', 1, 'mode')
         );
     }
