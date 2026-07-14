@@ -138,30 +138,34 @@ PHP;
         $runtime->parseAndCompile($code, 'nested.php');
     }
 
-    /** @covers issue #13325 */
-    public function testClassImplementsDateTimeInterfaceFailsAtCompileTime(): void
+    /** @covers issue #13325, #18781 */
+    public function testClassImplementsDateTimeInterfaceCompilesThenFatalsAtRuntime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 class UserDateTime implements DateTimeInterface {}
 PHP;
-        $this->expectException(\CompileError::class);
+        $block = $runtime->parseAndCompile($code, 'datetimeinterface.php');
+        $this->assertNotNull($block);
+        $this->expectException(\LogicException::class);
         $this->expectExceptionMessage("DateTimeInterface can't be implemented by user classes");
-        $runtime->parseAndCompile($code, 'datetimeinterface.php');
+        $runtime->run($block, false);
     }
 
-    /** @covers issue #13325 */
-    public function testEnumImplementsDateTimeInterfaceFailsAtCompileTime(): void
+    /** @covers issue #13325, #18781 */
+    public function testEnumImplementsDateTimeInterfaceCompilesThenFatalsAtRuntime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 enum E implements DateTimeInterface { case A; }
 PHP;
-        $this->expectException(\CompileError::class);
+        $block = $runtime->parseAndCompile($code, 'enum_datetimeinterface.php');
+        $this->assertNotNull($block);
+        $this->expectException(\LogicException::class);
         $this->expectExceptionMessage("DateTimeInterface can't be implemented by user classes");
-        $runtime->parseAndCompile($code, 'enum_datetimeinterface.php');
+        $runtime->run($block, false);
     }
 
     /** @covers issue #13327 */

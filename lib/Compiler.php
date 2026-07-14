@@ -31,6 +31,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
+use PHPCompiler\VM\DateTimeInterfaceSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ReferencableCheck;
 use PHPCompiler\VM\TypeCheck;
@@ -2004,6 +2005,9 @@ class Compiler {
         foreach ($ops as $child) {
             switch (get_class($child)) {
                 case Op\Stmt\Class_::class:
+                    if ($this->defersRuntimeInterfaceImplementationCheck($child)) {
+                        break;
+                    }
                     $block->addOpCode($this->compileClassLike($child, $block));
                     break;
                 case Op\Stmt\Interface_::class:
@@ -2148,10 +2152,14 @@ class Compiler {
             $this->debugWriteLastPhase('Compiler::compileOps op', $block, $child);
             switch (get_class($child)) {
                 case Op\Stmt\Function_::class:
-                case Op\Stmt\Class_::class:
                 case Op\Terminal\Const_::class:
                 case Op\Stmt\Interface_::class:
                 case Op\Stmt\Trait_::class:
+                    break;
+                case Op\Stmt\Class_::class:
+                    if ($this->defersRuntimeInterfaceImplementationCheck($child)) {
+                        $block->addOpCode($this->compileClassLike($child, $block));
+                    }
                     break;
                 case Op\Stmt\Enum_::class:
                     $block->addOpCode($this->compileEnum($child, $block));
@@ -6193,6 +6201,20 @@ class Compiler {
         }
 
         return $names;
+    }
+
+    /**
+     * Zend defers DateTimeInterface user-implement fatals to declaration site (#18781).
+     */
+    protected function defersRuntimeInterfaceImplementationCheck(Op\Stmt\ClassLike $class): bool
+    {
+        foreach ($this->interfaceNamesFromOperands($class->implements) as $ifaceLc) {
+            if (DateTimeInterfaceSupport::rejectsUserImplementationLc($ifaceLc)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     protected function staticNameFromOperand(Operand $op): ?string
