@@ -195,7 +195,7 @@ PHP);
             $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
-    public private(set) string $x = 'hi';
+    public (private(set)) string $x = 'hi';
     public (private(set)) int $n = 1;
 }
 PHP, 'asymmetric_visibility_literal_default.php');
@@ -222,7 +222,7 @@ PHP, 'asymmetric_visibility_literal_default.php');
             $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
-    public private(set) stdClass $obj = new stdClass();
+    public (private(set)) stdClass $obj = new stdClass();
 }
 PHP, 'asymmetric_visibility_property_default_new.php');
             $this->assertNotNull($block);
