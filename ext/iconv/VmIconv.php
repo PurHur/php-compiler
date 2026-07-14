@@ -19,6 +19,9 @@ final class VmIconv
     public static function coerceEncodingArg(Variable $var, string $function, int $argIndex, string $param): string
     {
         $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return '';
+        }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(sprintf(
                 '%s(): Argument #%d ($%s) must be of type string, %s given',
@@ -41,8 +44,24 @@ final class VmIconv
         return $var->toString();
     }
 
+    /**
+     * php-src ext/iconv/iconv.c — empty/null encoding uses input/output ini defaults.
+     */
+    public static function resolveIconvEncoding(string $encoding, bool $isFrom): string
+    {
+        if ('' !== $encoding) {
+            return $encoding;
+        }
+
+        return $isFrom
+            ? IconvEncodingState::getInputEncoding()
+            : IconvEncodingState::getOutputEncoding();
+    }
+
     public static function iconv(string $fromEncoding, string $toEncoding, string $input, ?Frame $frame = null): string|false
     {
+        $fromEncoding = self::resolveIconvEncoding($fromEncoding, true);
+        $toEncoding = self::resolveIconvEncoding($toEncoding, false);
         if (null === CharsetEngine::parseEncodingSpec($fromEncoding)) {
             self::triggerUnsupportedEncodingWarning($frame, $fromEncoding, $toEncoding);
 
