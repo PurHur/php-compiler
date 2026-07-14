@@ -28,11 +28,23 @@ final class JitDomSaveXML
 
         DomSaveXMLRuntime::ensureLinked($context);
 
+        $bridgeArgs = [self::loadObjectArg($context, $args[0])];
+        if (\count($args) >= 2) {
+            $bridgeArgs[] = JitValueBox::valuePtrFromVariable($context, $args[1]);
+        } else {
+            $nullSlot = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $nullSlot)
+            );
+            $bridgeArgs[] = JitValueBox::normalizeValuePtr($context, $nullSlot);
+        }
+
         return self::boxStringResult(
             $context,
             $context->builder->call(
                 $context->lookupFunction(DomSaveXMLRuntime::ABI_NAME),
-                self::loadObjectArg($context, $args[0])
+                ...$bridgeArgs
             )
         );
     }

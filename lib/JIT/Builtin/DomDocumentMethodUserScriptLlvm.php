@@ -213,16 +213,52 @@ final class DomDocumentMethodUserScriptLlvm
 
     public static function ensureSaveXMLBridge(Context $context): void
     {
-        self::ensureBridge(
+        self::ensureContextBridge(
             $context,
             DomSaveXMLRuntime::ABI_NAME,
             'dom_save_xml_user_script',
             [
                 $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__value__*'),
             ],
             $context->getTypeFromString('__string__*'),
             'PHPCompiler\\ext\\dom\\DomSaveXMLJitHelper::saveXMLArgv',
             '/ext/dom/DomSaveXMLJitHelper.php'
+        );
+    }
+
+    public static function ensureCreateElementBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomCreateElementRuntime::ABI_NAME,
+            'dom_create_element_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::createElementArgv',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensureCreateElementNSBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomCreateElementNSRuntime::ABI_NAME,
+            'dom_create_element_ns_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomCreateElementNSJitHelper::createElementNSArgv',
+            '/ext/dom/DomCreateElementNSJitHelper.php'
         );
     }
 

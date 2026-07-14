@@ -4,18 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
-/** JIT/AOT link for DOMDocument::saveHTML() via DomSaveHTMLJitHelper (#18268). */
-final class DomSaveHTMLRuntime
+/** JIT/AOT link for DOMDocument::createElement($name, $value) via DomCreateElementJitHelper (#18938). */
+final class DomCreateElementRuntime
 {
-    public const ABI_NAME = '__phpc_dom_save_html';
+    public const ABI_NAME = '__phpc_dom_create_element';
 
-    private const HELPER_PATH = '/ext/dom/DomSaveHTMLJitHelper.php';
+    private const HELPER_PATH = '/ext/dom/DomCreateElementJitHelper.php';
 
-    private const HELPER = 'PHPCompiler\\ext\\dom\\DomSaveHTMLJitHelper::saveHTMLArgv';
+    private const HELPER = 'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::createElementArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -25,7 +24,7 @@ final class DomSaveHTMLRuntime
     public static function ensureLinked(Context $context): void
     {
         if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureSaveHTMLBridge($context);
+            DomDocumentMethodUserScriptLlvm::ensureCreateElementBridge($context);
 
             return;
         }
@@ -35,13 +34,13 @@ final class DomSaveHTMLRuntime
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_NAME,
-            'dom_save_html_bridge',
-            [$objPtr],
-            $strPtr,
+            'dom_create_element_bridge',
+            [$objPtr, $strPtr, $strPtr],
+            $objPtr,
             self::HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#18268'
+            '#18938'
         );
     }
 }

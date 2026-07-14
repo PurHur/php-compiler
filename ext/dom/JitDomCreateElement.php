@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\JIT\Builtin\DomCreateElementRuntime;
+use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -31,12 +33,56 @@ final class JitDomCreateElement
             throw new \LogicException('DOMDocument::createElement() expects receiver and name');
         }
 
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context) && \count($args) >= 3) {
+            return self::invokeViaHelper($context, ...$args);
+        }
+
         $nameLit = self::compileTimeStringArg($args[1]);
         if (null !== $nameLit) {
             return self::materializeElementFromLiteral($context, $nameLit);
         }
 
         return self::materializeElementFromRuntimeName($context, $args[1]);
+    }
+
+    private static function invokeViaHelper(Context $context, JITVariable ...$args): Value
+    {
+        DomCreateElementRuntime::ensureLinked($context);
+
+        $document = self::loadObjectArg($context, $args[0]);
+        $name = self::loadStringArg($context, $args[1]);
+        $value = self::loadStringArg($context, $args[2]);
+        $element = $context->builder->call(
+            $context->lookupFunction(DomCreateElementRuntime::ABI_NAME),
+            $document,
+            $name,
+            $value
+        );
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $ptr,
+            $element
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    private static function loadObjectArg(Context $context, JITVariable $arg): Value
+    {
+        if (JITVariable::TYPE_OBJECT === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+        }
+
+        throw new \LogicException('DOMDocument::createElement() receiver must be an object');
     }
 
     private static function compileTimeStringArg(JITVariable $arg): ?string
