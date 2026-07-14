@@ -954,7 +954,16 @@
         "ext/spl/spl_classes.php",
         "ext/sqlite3/BuiltinClasses.php",
         "ext/sqlite3/Module.php",
+        "ext/sqlite3/SQLite3Close.php",
+        "ext/sqlite3/SQLite3Construct.php",
+        "ext/sqlite3/SQLite3Exec.php",
+        "ext/sqlite3/SQLite3QuerySingle.php",
+        "ext/sqlite3/Sqlite3ClassMethod.php",
+        "ext/sqlite3/Sqlite3Constants.php",
         "ext/sqlite3/Sqlite3ExtensionPolicy.php",
+        "ext/sqlite3/Sqlite3State.php",
+        "ext/sqlite3/VmSQLite3.php",
+        "ext/sqlite3/VmSqlite3Native.php",
         "ext/sqlite3/bootstrap_sqlite3exception.php",
         "ext/standard/AbsJitHelper.php",
         "ext/standard/AcosJitHelper.php",
@@ -5102,9 +5111,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4868,
+        "inventory_files": 4877,
         "excluded": 0,
-        "eligible": 4868,
+        "eligible": 4877,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

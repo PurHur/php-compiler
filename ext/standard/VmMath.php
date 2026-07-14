@@ -238,6 +238,9 @@ final class VmMath
             return $var->toBool() ? 1 : 0;
         }
         if (Variable::TYPE_NULL === $var->type) {
+            if (self::requiresForwardProfileStrictLongNull()) {
+                throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+            }
             if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
                 throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'null'));
             }

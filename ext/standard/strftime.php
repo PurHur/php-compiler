@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** strftime() — locale time formatting via libc strftime (ext/standard/datetime.c, #3692). */
@@ -28,11 +29,21 @@ final class strftime extends Internal
             return;
         }
         $format = self::vmFormatArg($frame);
+        if (false === $format) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $timestamp = null;
         if (2 === $argc) {
             $timestamp = VmDate::coerceNullableTimestampArgForFrame($frame, 1, 'strftime', 2, 'timestamp');
         }
-        $frame->returnVar->string(VmDate::strftime($format, $timestamp));
+        $result = VmDate::strftime($format, $timestamp);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->string($result);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -40,10 +51,15 @@ final class strftime extends Internal
         return JitDate::formatStrftime($context, false, ...$args);
     }
 
-    private static function vmFormatArg(Frame $frame): string
+    /** @return string|false */
+    private static function vmFormatArg(Frame $frame): string|false
     {
         if (null !== $frame->parent && $frame->parent->block->strictTypes) {
             return InternalStrictArg::requireString($frame, 0, 'strftime', 'format')->toString();
+        }
+        $arg = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_NULL === $arg->type) {
+            return false;
         }
 
         return VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strftime', 0, 'format');

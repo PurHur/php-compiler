@@ -128,7 +128,11 @@ final class substr_replace extends Internal
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
-        if (Variable::TYPE_STRING === $var->type || Variable::TYPE_ARRAY === $var->type) {
+        if (
+            Variable::TYPE_STRING === $var->type
+            || Variable::TYPE_ARRAY === $var->type
+            || Variable::TYPE_NULL === $var->type
+        ) {
             return $var;
         }
 
@@ -157,7 +161,7 @@ final class substr_replace extends Internal
      */
     private static function resolveScalarReplace(Variable $replaceArg, Variable $replaceVar): string
     {
-        if (Variable::TYPE_STRING === $replaceVar->type) {
+        if (Variable::TYPE_STRING === $replaceVar->type || Variable::TYPE_NULL === $replaceVar->type) {
             return VmString::coerceStringBuiltinArg($replaceArg, 'substr_replace', 1, 'replace');
         }
 

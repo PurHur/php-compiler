@@ -171,19 +171,22 @@ final class VmDatePure
         return $parsed;
     }
 
-    public static function strftime(string $format, int $timestamp, bool $gmt): string
+    public static function strftime(string $format, int $timestamp, bool $gmt): string|false
     {
+        if ('' === $format) {
+            return false;
+        }
         if (!\function_exists('strftime')) {
             return '';
         }
         if ($gmt && \function_exists('gmstrftime')) {
             $text = @\gmstrftime($format, $timestamp);
 
-            return \is_string($text) ? $text : '';
+            return \is_string($text) ? $text : false;
         }
         $text = @\strftime($format, $timestamp);
 
-        return \is_string($text) ? $text : '';
+        return \is_string($text) ? $text : false;
     }
 
     /** Push default timezone for host date/mktime wrappers in VmDateTimeNative::withTimezone (#13857). */

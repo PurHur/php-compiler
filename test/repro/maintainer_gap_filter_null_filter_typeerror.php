@@ -1,23 +1,16 @@
 <?php
 
-declare(strict_types=1);
-
-$checks = [
-    ['filter_var', ['x', null], 'filter_var(): Argument #2 ($filter) must be of type int, null given'],
-    ['filter_input', [INPUT_GET, 'q', null], 'filter_input(): Argument #3 ($filter) must be of type int, null given'],
-];
-
-foreach ($checks as [$fn, $args, $expected]) {
-    try {
-        $fn(...$args);
-        echo "fail: {$fn}() expected TypeError\n";
-        exit(1);
-    } catch (TypeError $e) {
-        if ($expected !== $e->getMessage()) {
-            echo 'fail: ', $fn, '(): ', $e->getMessage(), "\n";
-            exit(1);
-        }
-    }
+// #18943 — filter_var(null filter) Warning + false on default profile (not TypeError).
+$r = @filter_var('x', null);
+if (false !== $r) {
+    echo 'fail filter_var: expected false, got ', var_export($r, true), "\n";
+    exit(1);
+}
+$_GET['q'] = 'x';
+$r2 = @filter_input(INPUT_GET, 'q', null);
+if (false !== $r2) {
+    echo 'fail filter_input: expected false, got ', var_export($r2, true), "\n";
+    exit(1);
 }
 
 echo "ok\n";

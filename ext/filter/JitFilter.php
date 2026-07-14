@@ -29,6 +29,9 @@ final class JitFilter
 
     public static function loadFilterId(Context $context, JITVariable $filter): Value
     {
+        if (JITVariable::TYPE_NULL === $filter->type) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
         if (JITVariable::TYPE_NATIVE_LONG === $filter->type) {
             return $context->helper->loadValue($filter);
         }

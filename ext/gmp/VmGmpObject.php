@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\gmp;
 
 use PHPCfg\Func as CfgFunc;
-use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\ext\standard\VmStreamArg;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
@@ -57,7 +57,7 @@ final class VmGmpObject
                 $function,
                 $index + 1,
                 $label,
-                VmString::debugTypeName($resolved)
+                VmStreamArg::debugTypeName($resolved)
             ));
         }
         $object = $resolved->toObject();
