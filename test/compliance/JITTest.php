@@ -793,7 +793,12 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'property_magic_const'))
                 && !str_contains($name, 'reference_profile')
                 && !str_contains($name, 'profile_gate')
-                && !str_contains($name, 'forward_profile')) {
+                && !str_contains($name, 'forward_profile')
+                && !str_contains($name, 'property_magic_outside_hook_compile_error')) {
+                continue;
+            }
+            if (CompilerVersion::supportsPropertyHooks()
+                && str_contains($name, 'property_magic_outside_hook_runtime_error')) {
                 continue;
             }
             if (!CompilerVersion::supportsPropertyHooks()
