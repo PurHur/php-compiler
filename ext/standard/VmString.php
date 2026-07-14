@@ -307,6 +307,9 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            if (self::requiresForwardProfileStrictStringNull()) {
+                throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+            }
             VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
 
             return '';
