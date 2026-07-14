@@ -219,6 +219,9 @@ final class BuiltinIntrospectionPolicy
         if ('xsl' === $ext) {
             return \PHPCompiler\ext\xsl\XslExtensionPolicy::advertisesExtension();
         }
+        if ('phar' === $ext) {
+            return \PHPCompiler\ext\phar\PharExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }
