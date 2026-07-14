@@ -1,5 +1,5 @@
 --TEST--
-stdlib date_create(null) / DateTime(null) — null datetime coerces on 8.4 profile (#18903, ext/date/php_date.c)
+stdlib date_create(null) / DateTime(null) — null datetime coerces to now on 8.4 profile (#18903, ext/date/php_date.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -11,7 +11,7 @@ foreach ([
     ['DateTimeImmutable', static fn () => new DateTimeImmutable(null)],
 ] as [$label, $factory]) {
     $result = $factory();
-    echo $label.': '.(false === $result ? 'false' : get_class($result))."\n";
+    echo $label.': '.($result instanceof DateTime || $result instanceof DateTimeImmutable ? "ok\n" : "bad\n");
 }
 
 foreach (['date_create' => static fn () => date_create(''), 'DateTime' => static fn () => new DateTime('')] as $label => $factory) {
@@ -19,9 +19,9 @@ foreach (['date_create' => static fn () => date_create(''), 'DateTime' => static
     echo $label."(''): ", $result instanceof DateTime ? "ok\n" : "bad\n";
 }
 --EXPECT--
-date_create: DateTime
-date_create_immutable: DateTimeImmutable
-DateTime: DateTime
-DateTimeImmutable: DateTimeImmutable
+date_create: ok
+date_create_immutable: ok
+DateTime: ok
+DateTimeImmutable: ok
 date_create(''): ok
 DateTime(''): ok

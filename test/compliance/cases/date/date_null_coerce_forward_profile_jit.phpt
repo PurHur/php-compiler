@@ -1,5 +1,5 @@
 --TEST--
-date/gmdate/date_create null coerce on 8.4 forward profile JIT (#18902 #18903, ext/date/php_date.c)
+date/gmdate/date_create null coercion on 8.4 forward profile JIT (#18902 #18903, ext/date/php_date.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--

@@ -16,7 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_hash_algos via HashAlgosJitHelper PHP (#14909).
  *
- * User-script standalone AOT uses inline registry LLVM (same as {@see StringHashHmacAlgos})
+ * User-script standalone AOT uses inline registry LLVM (same defer pattern as {@see StringHashHmacAlgos})
  * because nested HashAlgosJitHelper emits invalid __hashtable__ bridge types (#3357).
  * SSOT: {@see \PHPCompiler\ext\standard\VmHash::algos()}
  * php-src: ext/hash/hash.c — php_hash_algos()
