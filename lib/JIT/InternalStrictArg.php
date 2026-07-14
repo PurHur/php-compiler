@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -301,7 +302,8 @@ final class InternalStrictArg
     }
 
     /**
-     * Reject null for array|string internal parameters when caller uses strict_types (#11015).
+     * Reject null for array|string internal parameters when caller uses strict_types (#11015)
+     * or 8.4 forward profile requires Z_PARAM_STR_OR_ARR null TypeError (#18914).
      */
     public static function rejectNullStringOrArray(
         Context $context,
@@ -310,7 +312,7 @@ final class InternalStrictArg
         string $paramName,
         int $argNumber
     ): void {
-        if (!$context->callerStrictTypes) {
+        if (!$context->callerStrictTypes && !VmString::requiresForwardProfileStrictStringNull()) {
             return;
         }
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {

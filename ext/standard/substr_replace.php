@@ -28,7 +28,8 @@ final class substr_replace extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $stringVar = VmPreg::requireStringOrArraySubject(
+        $stringVar = VmPreg::resolveStringOrArraySubject(
+            $frame,
             $frame->calledArgs[0],
             'substr_replace',
             0,
@@ -101,7 +102,7 @@ final class substr_replace extends Internal
         }
 
         JitPregSubject::requireStringOrArray($context, $args[0], 'substr_replace', 0, 'string');
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+        if (!JitPregSubject::isStringOrCoercibleNullSubject($args[0])) {
             throw new \LogicException('substr_replace() array string operand is not supported in this compiler build');
         }
 
