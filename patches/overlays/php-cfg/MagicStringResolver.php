@@ -158,7 +158,8 @@ class MagicStringResolver extends NodeVisitorAbstract
                         throw new \CompileError(self::PROPERTY_MAGIC_OUTSIDE_HOOK);
                     }
 
-                    return new Node\Scalar\String_('', $node->getAttributes());
+                    // Default profile: leave ConstFetch — runtime Undefined constant (Zend 8.2+, #18900).
+                    return null;
                 }
 
                 return new Node\Scalar\String_(end($this->propertyStack), $node->getAttributes());

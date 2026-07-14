@@ -1,5 +1,5 @@
 <?php
-// Issue #18815 — __PROPERTY__ outside property hook must compile-fatal on 8.4 profile.
+// Issue #18900 — __PROPERTY__ outside property hook must not evaluate to empty string (default profile).
 
 class C {
     public function m(): void {

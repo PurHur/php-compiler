@@ -57,7 +57,17 @@ PHP;
             return;
         }
 
-        $this->assertSame('', $this->runVm($code));
+        $runtime = new Runtime(Runtime::MODE_NORMAL);
+        $block = $runtime->parseAndCompile($code, 'magic-constants-test.php');
+        $this->assertNotNull($block);
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Undefined constant "__PROPERTY__"');
+        ob_start();
+        try {
+            $runtime->run($block);
+        } finally {
+            ob_end_clean();
+        }
     }
 
     public function testPropertyMagicConstTopLevelOutsideHookOn84Profile(): void

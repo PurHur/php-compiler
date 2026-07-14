@@ -2,13 +2,7 @@
 Language: __PROPERTY__ outside property hook must compile-error (#18815, Zend/zend_compile.c)
 --SKIPIF--
 <?php
-if (!class_exists('PHPCompiler\\CompilerVersion')) {
-    require __DIR__ . '/../../../../vendor/autoload.php';
-}
-putenv('PHP_COMPILER_PROFILE=8.4');
-if (!PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
-    die('skip requires PHP_COMPILER_PROFILE=8.4 property hooks gate');
-}
+die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI');
 ?>
 --ENV--
 PHP_COMPILER_PROFILE=8.4
