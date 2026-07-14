@@ -325,11 +325,12 @@ final class VmString
         Variable $var,
         string $function,
         int $argIndex = 0,
-        string $paramName = 'path'
+        string $paramName = 'path',
+        bool $softNullPath = false
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            if (self::requiresForwardProfileStrictStringNull()) {
+            if (!$softNullPath && self::requiresForwardProfileStrictStringNull()) {
                 throw new \TypeError(
                     self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null')
                 );

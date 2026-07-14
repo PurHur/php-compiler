@@ -24,7 +24,7 @@ final class rmdir_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('rmdir() requires exactly one argument in this compiler build');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'rmdir', 0, 'directory', $frame);
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'rmdir', 0, 'directory', $frame, true);
         $ok = VmFs::rmdir($path);
         if (!$ok) {
             if (VmStatPath::isDir($path) && VmFs::isDirNonempty($path)) {
@@ -43,7 +43,7 @@ final class rmdir_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('rmdir() requires exactly one argument in this compiler build');
         }
-        $path = JitFilestatArg::lowerFilename($context, $args[0], 'rmdir', 0, 'directory');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'rmdir', 0, 'directory', true);
 
         return JitRmdir::invoke($context, $path);
     }

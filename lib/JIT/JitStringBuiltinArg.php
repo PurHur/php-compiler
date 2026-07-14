@@ -170,11 +170,15 @@ final class JitStringBuiltinArg
         int $argIndex,
         string $paramName,
         string $expectedType = 'string',
-        ?string $arrayExpectedType = null
+        ?string $arrayExpectedType = null,
+        bool $softNullPath = false
     ): Value {
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             JitNativeString::ensureInsertBlock($context);
-            if ($context->callerStrictTypes || self::requiresForwardProfileStrictStringNull()) {
+            if (
+                !$softNullPath
+                && ($context->callerStrictTypes || self::requiresForwardProfileStrictStringNull())
+            ) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
 
                 return self::unreachableStringPtr($context);
