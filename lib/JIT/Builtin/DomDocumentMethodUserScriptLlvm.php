@@ -109,6 +109,36 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureFirstChildBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_FIRST_CHILD,
+            'dom_first_child_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            DomNodeChildPropertyRuntime::HELPER_FIRST,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
+        );
+    }
+
+    public static function ensureLastChildBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_LAST_CHILD,
+            'dom_last_child_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            DomNodeChildPropertyRuntime::HELPER_LAST,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
+        );
+    }
+
     public static function ensureXPathQueryBridge(Context $context): void
     {
         self::ensureContextBridge(

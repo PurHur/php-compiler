@@ -274,13 +274,13 @@ final class DomInstanceMethodJit
                     $object->defineProperty($nodeId, $prop, Variable::TYPE_VALUE);
                 }
             }
+            if (!$object->hasProperty($nodeId, VmDom::PROP_REGISTRY_ID)) {
+                $object->defineProperty($nodeId, VmDom::PROP_REGISTRY_ID, Variable::TYPE_VALUE);
+            }
         }
         $docId = $object->lookup('DOMDocument');
         if (!$object->hasProperty($docId, VmDom::PROP_ELEMENT_ID_MAP)) {
             $object->defineProperty($docId, VmDom::PROP_ELEMENT_ID_MAP, Variable::TYPE_VALUE);
-        }
-        if (!$object->hasProperty($docId, VmDom::PROP_REGISTRY_ID)) {
-            $object->defineProperty($docId, VmDom::PROP_REGISTRY_ID, Variable::TYPE_VALUE);
         }
     }
 }

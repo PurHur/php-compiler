@@ -5447,6 +5447,9 @@ final class VmDom
         if (!$entry->hasProperty(self::PROP_CHILD_NODES)) {
             $entry->allocateProperty(self::PROP_CHILD_NODES)->null();
         }
+        if (!$entry->hasProperty(self::PROP_REGISTRY_ID)) {
+            $entry->allocateProperty(self::PROP_REGISTRY_ID)->int(0);
+        }
     }
 
     private static function initElementPropertySlots(ObjectEntry $entry): void

@@ -11,20 +11,36 @@ final class DomNodeChildPropertyJitHelper
 {
     public static function firstChildArgv(ObjectEntry $node): ?ObjectEntry
     {
-        return self::childArgv($node, true);
+        return null;
     }
 
     public static function lastChildArgv(ObjectEntry $node): ?ObjectEntry
     {
-        return self::childArgv($node, false);
+        return null;
+    }
+
+    public static function firstChildByIdArgv(int $nodeId): ?ObjectEntry
+    {
+        $node = DomRegistry::entry($nodeId);
+
+        return null === $node ? null : self::childArgv($node, true);
+    }
+
+    public static function lastChildByIdArgv(int $nodeId): ?ObjectEntry
+    {
+        $node = DomRegistry::entry($nodeId);
+
+        return null === $node ? null : self::childArgv($node, false);
     }
 
     private static function childArgv(ObjectEntry $node, bool $first): ?ObjectEntry
     {
+        $node = DomRegistry::entry($node->id) ?? $node;
         if (!DomRegistry::has($node)) {
             return null;
         }
-        $childIds = DomRegistry::state($node)->childIds;
+        $state = DomRegistry::state($node);
+        $childIds = $state->childIds;
         if ([] === $childIds) {
             return null;
         }

@@ -17,11 +17,19 @@ final class DomNodeChildPropertyRuntime
 
     public const ABI_LAST_CHILD = '__phpc_dom_node_last_child';
 
+    public const ABI_FIRST_CHILD_BY_ID = '__phpc_dom_node_first_child_by_id';
+
+    public const ABI_LAST_CHILD_BY_ID = '__phpc_dom_node_last_child_by_id';
+
     private const HELPER_PATH = '/ext/dom/DomNodeChildPropertyJitHelper.php';
 
-    private const HELPER_FIRST = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::firstChildArgv';
+    public const HELPER_FIRST = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::firstChildArgv';
 
-    private const HELPER_LAST = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::lastChildArgv';
+    public const HELPER_LAST = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::lastChildArgv';
+
+    public const HELPER_FIRST_BY_ID = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::firstChildByIdArgv';
+
+    public const HELPER_LAST_BY_ID = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::lastChildByIdArgv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [

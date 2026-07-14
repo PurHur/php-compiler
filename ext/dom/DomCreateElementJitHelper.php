@@ -22,7 +22,9 @@ final class DomCreateElementJitHelper
 
     public static function appendObjectArgv1(ObjectEntry $parent, ObjectEntry $child): void
     {
-        VmDom::appendChild(VmDomJitFrame::vmContext(), $parent, $child);
+        $ctx = VmDomJitFrame::vmContext();
+        $parentFresh = DomRegistry::entry($parent->id) ?? $parent;
+        VmDom::appendChild($ctx, $parentFresh, $child);
     }
 
     public static function appendObjectArgv2(ObjectEntry $parent, ObjectEntry $a1, ObjectEntry $a2): void
@@ -43,7 +45,9 @@ final class DomCreateElementJitHelper
 
     public static function prependObjectArgv1(ObjectEntry $parent, ObjectEntry $child): void
     {
-        VmDom::prependLiveStandardChild(VmDomJitFrame::vmContext(), $parent, $child);
+        $ctx = VmDomJitFrame::vmContext();
+        $parentFresh = DomRegistry::entry($parent->id) ?? $parent;
+        VmDom::prependLiveStandardChild($ctx, $parentFresh, $child);
     }
 
     public static function prependObjectArgv2(ObjectEntry $parent, ObjectEntry $a1, ObjectEntry $a2): void
