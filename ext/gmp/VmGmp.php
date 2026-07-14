@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\gmp;
 
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
-use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\ext\standard\VmStreamArg;
 
 /**
  * GMP integer semantics in PHP (php-src ext/gmp/gmp.c; issue #3341).
@@ -74,6 +74,9 @@ final class VmGmp
                 return self::objectToSignedDecimal($object);
             }
         }
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return '0';
+        }
         if (Variable::TYPE_INTEGER === $resolved->type) {
             return (string) $resolved->toInt();
         }
@@ -83,7 +86,7 @@ final class VmGmp
                 $function,
                 $index + 1,
                 $label,
-                VmString::debugTypeName($resolved)
+                VmStreamArg::debugTypeName($resolved)
             ));
         }
 
