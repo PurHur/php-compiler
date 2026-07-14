@@ -323,6 +323,7 @@
         "ext/dom/VmDomLiving.php",
         "ext/dom/VmDomSimpleXmlBridge.php",
         "ext/dom/VmDomTokenList.php",
+        "ext/dom/VmDomValidationNative.php",
         "ext/dom/VmDomXPath.php",
         "ext/dom/XPathConstruct.php",
         "ext/dom/XPathEvaluate.php",
@@ -5079,9 +5080,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4845,
+        "inventory_files": 4846,
         "excluded": 0,
-        "eligible": 4845,
+        "eligible": 4846,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -6745,7 +6745,7 @@ final class VmDom
         return false;
     }
 
-    /** DOMDocument::schemaValidate() — XSD validation stub (php-src ext/dom/document.c; #14370). */
+    /** DOMDocument::schemaValidate() — XSD file validation via libxml2 FFI (php-src ext/dom/document.c; #14370, #18806). */
     public static function schemaValidate(
         Context $ctx,
         ObjectEntry $document,
@@ -6769,12 +6769,28 @@ final class VmDom
 
             return false;
         }
-        self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): not implemented in this compiler build');
+        if (!VmDomValidationNative::available()) {
+            self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): not implemented in this compiler build');
 
-        return false;
+            return false;
+        }
+
+        $docXml = self::saveXML($document);
+        $ok = VmDomValidationNative::validateSchemaDocument($docXml, $filename);
+        if (!$ok) {
+            $errors = VmDomValidationNative::consumeLastErrors();
+            foreach ($errors as $error) {
+                self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): '.$error);
+            }
+            if ([] === $errors) {
+                self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): Invalid Schema');
+            }
+        }
+
+        return $ok;
     }
 
-    /** DOMDocument::relaxNGValidate() — RelaxNG validation stub (php-src ext/dom/document.c; #14370). */
+    /** DOMDocument::relaxNGValidate() — RelaxNG file validation via libxml2 FFI (php-src ext/dom/document.c; #14370, #18806). */
     public static function relaxNGValidate(
         Context $ctx,
         ObjectEntry $document,
@@ -6797,9 +6813,25 @@ final class VmDom
 
             return false;
         }
-        self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): not implemented in this compiler build');
+        if (!VmDomValidationNative::available()) {
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): not implemented in this compiler build');
 
-        return false;
+            return false;
+        }
+
+        $docXml = self::saveXML($document);
+        $ok = VmDomValidationNative::validateRelaxNGDocument($docXml, $filename);
+        if (!$ok) {
+            $errors = VmDomValidationNative::consumeLastErrors();
+            foreach ($errors as $error) {
+                self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): '.$error);
+            }
+            if ([] === $errors) {
+                self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): Invalid RelaxNG');
+            }
+        }
+
+        return $ok;
     }
 
     /** DOMDocument::schemaValidateSource() — in-memory XSD validation stub (php-src ext/dom/document.c; #18748). */
