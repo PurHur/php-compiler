@@ -51,8 +51,7 @@ final class date extends Internal
             'date',
             0,
             'format',
-            'string',
-            false
+            'string'
         );
     }
 }

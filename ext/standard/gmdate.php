@@ -50,8 +50,7 @@ final class gmdate extends Internal
             'gmdate',
             0,
             'format',
-            'string',
-            false
+            'string'
         );
     }
 }

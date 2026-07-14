@@ -1,18 +1,25 @@
 --TEST--
-date/gmdate/date_create null coercion on 8.4 forward profile JIT (#18868 #18867, ext/date/php_date.c)
+date/gmdate/date_create null TypeError on 8.4 forward profile JIT (#18889, ext/date/php_date.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
-echo 'date(null)=[' . date(null) . "]\n";
-echo 'gmdate(null)=[' . gmdate(null) . "]\n";
-$dt = date_create(null);
-echo 'date_create(null)=' . (false === $dt ? 'false' : get_class($dt)) . "\n";
-$dti = date_create_immutable(null);
-echo 'date_create_immutable(null)=' . (false === $dti ? 'false' : get_class($dti)) . "\n";
+foreach ([
+    ['date', static fn () => date(null)],
+    ['gmdate', static fn () => gmdate(null)],
+    ['date_create', static fn () => date_create(null)],
+    ['date_create_immutable', static fn () => date_create_immutable(null)],
+] as [$label, $factory]) {
+    try {
+        $factory();
+        echo "$label: uncaught\n";
+    } catch (TypeError $e) {
+        echo $label.': TypeError'."\n";
+    }
+}
 --EXPECT--
-date(null)=[]
-gmdate(null)=[]
-date_create(null)=DateTime
-date_create_immutable(null)=DateTimeImmutable
+date: TypeError
+gmdate: TypeError
+date_create: TypeError
+date_create_immutable: TypeError

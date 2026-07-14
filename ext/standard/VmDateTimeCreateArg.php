@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
@@ -29,9 +30,6 @@ final class VmDateTimeCreateArg
         string $paramName = 'datetime'
     ): string {
         $var = $var->resolveIndirect();
-        if (Variable::TYPE_NULL === $var->type) {
-            return '';
-        }
         if (InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::requireString($frame, $userArgIndex, $function, $paramName);
         }
@@ -41,8 +39,7 @@ final class VmDateTimeCreateArg
             $function,
             $userArgIndex,
             $paramName,
-            'string',
-            false
+            'string'
         );
     }
 
@@ -54,7 +51,7 @@ final class VmDateTimeCreateArg
         int $userArgIndex = 0,
         string $paramName = 'datetime'
     ): string {
-        if ($context->callerStrictTypes) {
+        if ($context->callerStrictTypes || JitStringBuiltinArg::requiresForwardProfileStrictStringNull()) {
             JitInternalStrictArg::rejectNullString($context, $arg, $function, $paramName, $userArgIndex + 1);
         }
 
