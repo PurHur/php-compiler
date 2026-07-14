@@ -50,8 +50,16 @@ final class JitIniGetAll
      */
     private static function invokeWithRuntimeExtension(Context $context, array $args): Value
     {
-        if (self::isInvalidExtensionScalar($args[0])) {
+        if (self::isInvalidExtensionScalar($context, $args[0])) {
             return self::emitExtensionScalarTypeError($context, $args[0]);
+        }
+
+        if (!$context->callerStrictTypes && self::isNativeScalarExtensionArg($args[0])) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return $ptr;
         }
 
         $literal = JITVariable::TYPE_STRING === $args[0]->type
@@ -78,14 +86,23 @@ final class JitIniGetAll
     private static function invokeRuntimeExtensionSelect(Context $context, array $args): Value
     {
         $argc = \count($args);
-        $extStr = JitStringBuiltinArg::lowerRequiredString(
-            $context,
-            $args[0],
-            'ini_get_all',
-            0,
-            'extension',
-            '?string'
-        );
+        $extStr = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerRequiredString(
+                $context,
+                $args[0],
+                'ini_get_all',
+                0,
+                'extension',
+                '?string'
+            )
+            : JitStringBuiltinArg::lower(
+                $context,
+                $args[0],
+                'ini_get_all',
+                0,
+                'extension',
+                '?string'
+            );
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
 
@@ -239,7 +256,16 @@ final class JitIniGetAll
         return JITVariable::TYPE_VALUE === $arg->type && ($arg->isNullConstant ?? false);
     }
 
-    private static function isInvalidExtensionScalar(JITVariable $arg): bool
+    private static function isInvalidExtensionScalar(Context $context, JITVariable $arg): bool
+    {
+        if (!$context->callerStrictTypes) {
+            return false;
+        }
+
+        return self::isNativeScalarExtensionArg($arg);
+    }
+
+    private static function isNativeScalarExtensionArg(JITVariable $arg): bool
     {
         return JITVariable::TYPE_NATIVE_BOOL === $arg->type
             || JITVariable::TYPE_NATIVE_LONG === $arg->type

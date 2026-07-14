@@ -33,8 +33,9 @@ final class ini_get_all extends Internal
         $extension = null;
         $details = true;
         if (\count($frame->calledArgs) >= 1) {
-            $extension = VmString::coerceTypedNullableStringBuiltinArg(
-                $frame->calledArgs[0],
+            $extension = VmString::typedNullableStringBuiltinArgForFrame(
+                $frame,
+                0,
                 'ini_get_all',
                 0,
                 'extension'

@@ -504,6 +504,35 @@ final class VmString
         );
     }
 
+    /**
+     * Z_PARAM_STR_OR_NULL with caller strict_types parity (#18870, ext/standard/ini.c).
+     *
+     * @throws \TypeError when caller strict_types rejects non-string operands
+     */
+    public static function typedNullableStringBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): ?string {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return self::coerceTypedNullableStringBuiltinArg(
+                $frame->calledArgs[$argIndex],
+                $function,
+                $userArgIndex,
+                $paramName
+            );
+        }
+
+        return self::coerceNullableStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $userArgIndex,
+            $paramName
+        );
+    }
+
     private static function builtinScalarTypeName(Variable $var): string
     {
         return match ($var->type) {
