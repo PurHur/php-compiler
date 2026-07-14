@@ -176,6 +176,9 @@ final class DomNodeState
     /** True after DOMDocument::loadXML() — saveHTML expands empty elements (re-#18618, ext/dom/php_dom.c). */
     public bool $loadedViaXml = false;
 
+    /** Original XML passed to loadXML() for libxml DTD validation (#18833). */
+    public ?string $sourceXml = null;
+
     /**
      * Per-document custom node class map: base builtin lc => extended class lc (php-src dom_set_doc_classmap; #15334).
      *
