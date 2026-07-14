@@ -49,8 +49,8 @@ final class SuperglobalsBracketRuntimeStandaloneTest extends TestCase
             ] as $name
         ) {
             $legacy = $ctx->module->getNamedFunction($name);
-            $this->assertNotNull($legacy, $name.' LLVM must be linked for user-script refresh (#18832)');
-            $this->assertGreaterThan(0, $legacy->countBasicBlocks(), $name.' must have LLVM body (#18832)');
+            $this->assertNotNull($legacy, $name.' LLVM linked via ParseStrRuntimeUserScriptCstr (#18855)');
+            $this->assertGreaterThan(0, $legacy->countBasicBlocks(), $name.' must have LLVM body');
         }
     }
 

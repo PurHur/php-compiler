@@ -40,7 +40,6 @@ final class SuperglobalRefreshUserScriptLlvm
     {
         LibcExtern::register($context);
         self::ensureGlobals($context);
-        ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptLinked($context);
         EnvironMirrorUserScriptLlvm::ensureLinked($context);
@@ -329,31 +328,15 @@ final class SuperglobalRefreshUserScriptLlvm
 
     private static function parseFormEncodedFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
     {
-        ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
-        $cstr = $context->builder->load($cstrSlot);
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $context->builder->call(
-            $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
-            $ht,
-            $cstr,
-            $i8->constInt(ord('&'), false),
-            $i32->constInt(0, false)
-        );
+        self::parseFormEncoded($context, $ht, self::cstrToPhpcString($context, $cstrSlot));
     }
 
     private static function parseCookieFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
     {
-        ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
-        $cstr = $context->builder->load($cstrSlot);
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
         $context->builder->call(
-            $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
+            $context->lookupFunction('__compiler_parse_cookie_header'),
             $ht,
-            $cstr,
-            $i8->constInt(ord(';'), false),
-            $i32->constInt(1, false)
+            self::cstrToPhpcString($context, $cstrSlot)
         );
     }
 
@@ -514,7 +497,6 @@ final class SuperglobalRefreshUserScriptLlvm
     {
         LibcExtern::register($context);
         self::ensureGlobals($context);
-        ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptLinked($context);
         EnvironMirrorUserScriptLlvm::ensureLinked($context);
