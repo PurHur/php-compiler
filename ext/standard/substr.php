@@ -14,9 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -47,7 +47,7 @@ final class substr extends Internal
                 $argc
             ));
         }
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'substr', 0, 'string');
+        $string = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'substr', 0, 'string');
         $offset = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -101,6 +101,15 @@ final class substr extends Internal
         $warnOnClip = $supportsTruncate && !$truncate;
 
         $strLit = $args[0]->compileTimeString ?? null;
+        if (null === $strLit
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+        ) {
+            if ($context->callerStrictTypes || JitStringBuiltinArg::requiresForwardProfileStrictStringNull()) {
+                $strLit = null;
+            } else {
+                $strLit = '';
+            }
+        }
         if (null !== $strLit) {
             $offsetLit = self::compileTimeSignedLong($context, $args[1]);
             if (null !== $offsetLit) {
@@ -123,7 +132,18 @@ final class substr extends Internal
             }
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'substr', 0, 'string');
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresForwardProfileStrictStringNull())
+        ) {
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'substr', 0, 'string');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'substr_null_typeerror_done');
+
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'substr', 0, 'string');
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'substr_str_cont');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(
