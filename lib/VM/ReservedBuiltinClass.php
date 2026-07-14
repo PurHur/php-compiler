@@ -22,7 +22,7 @@ final class ReservedBuiltinClass
         'xmlparser' => 'Cannot directly construct XMLParser, use xml_parser_create() instead',
     ];
 
-    /** @var array<string, string> lc => display name — compile-time implements guard (#13327, #15445) */
+    /** @var array<string, string> lc => display name — runtime implements guard (#13327, #15445, #18781) */
     private const COMPILE_TIME_NON_INTERFACES = [
         'closure' => 'Closure',
         'generator' => 'Generator',

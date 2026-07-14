@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\Compiler;
 
 use PHPCompiler\VM\EnumSupport;
-use PHPCompiler\VM\ReservedBuiltinClass;
 use PHPCompiler\VM\TraversableSupport;
 use PHPCfg\AbstractVisitor;
 use PHPCfg\Block;
@@ -175,13 +174,6 @@ final class ImplementsHierarchyCompileCheck
                 if (null !== $enumIface) {
                     throw new \CompileError($enumIface);
                 }
-                $reservedImpl = ReservedBuiltinClass::compileTimeImplementsForbiddenMessage(
-                    $class['display'],
-                    $targetLc
-                );
-                if (null !== $reservedImpl) {
-                    throw new \CompileError($reservedImpl);
-                }
                 if (isset($this->nonInterfaces[$targetLc])) {
                     throw new \CompileError(sprintf(
                         '%s cannot implement %s - it is not an interface',
@@ -209,13 +201,6 @@ final class ImplementsHierarchyCompileCheck
                 ));
             }
             foreach ($enum['implements'] as $targetLc) {
-                $reservedImpl = ReservedBuiltinClass::compileTimeImplementsForbiddenMessage(
-                    $enum['display'],
-                    $targetLc
-                );
-                if (null !== $reservedImpl) {
-                    throw new \CompileError($reservedImpl);
-                }
                 if (isset($this->nonInterfaces[$targetLc])) {
                     throw new \CompileError(sprintf(
                         '%s cannot implement %s - it is not an interface',

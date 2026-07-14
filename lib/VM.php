@@ -6152,8 +6152,10 @@ restart:
                     $classEntry->attributeNames = $op->attributeNames;
                     $classEntry->attributeEntries = $op->attributeEntries;
                     $classEntry->classDeprecated = $op->deprecatedMetadata;
-                    VM\DateTimeInterfaceSupport::assertUserMayImplement(
+                    VM\ImplementsHierarchyRuntimeCheck::assertAllowed(
+                        $name,
                         $op->classImplements,
+                        $this->context,
                         $frame,
                         $op->sourceLocation
                     );
@@ -6207,8 +6209,10 @@ restart:
                     $classEntry->attributeEntries = $op->attributeEntries;
                     $classEntry->classDeprecated = $op->deprecatedMetadata;
                     $classEntry->sourceLocation = $op->sourceLocation;
-                    VM\DateTimeInterfaceSupport::assertUserMayImplement(
+                    VM\ImplementsHierarchyRuntimeCheck::assertAllowed(
+                        $name,
                         $op->classImplements,
+                        $this->context,
                         $frame,
                         $op->sourceLocation
                     );

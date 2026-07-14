@@ -69,6 +69,7 @@ use PHPCompiler\Compiler\FinalClassConstCheck;
 use PHPCompiler\Compiler\TraitClassConstConflictCheck;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\ImplementsHierarchyCompileCheck;
+use PHPCompiler\VM\ImplementsHierarchyRuntimeCheck;
 use PHPCompiler\Compiler\FinalMethodOverrideCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\ParameterMetadata;
@@ -6204,17 +6205,19 @@ class Compiler {
     }
 
     /**
-     * Zend defers DateTimeInterface user-implement fatals to declaration site (#18781).
+     * Zend defers forbidden user-implement fatals to declaration site (#18781).
      */
     protected function defersRuntimeInterfaceImplementationCheck(Op\Stmt\ClassLike $class): bool
     {
-        foreach ($this->interfaceNamesFromOperands($class->implements) as $ifaceLc) {
-            if (DateTimeInterfaceSupport::rejectsUserImplementationLc($ifaceLc)) {
-                return true;
-            }
+        $className = $this->staticNameFromOperand($class->name);
+        if (null === $className) {
+            return false;
         }
 
-        return false;
+        return ImplementsHierarchyRuntimeCheck::requiresSourceOrderRegistration(
+            ltrim($className, '\\'),
+            $this->interfaceNamesFromOperands($class->implements)
+        );
     }
 
     protected function staticNameFromOperand(Operand $op): ?string
