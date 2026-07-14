@@ -52,13 +52,44 @@ final class JitVmHelperLink
         $path = self::resolveHelperPath($relativeHelperPath);
         $basename = \basename($path);
         NestedVmActiveContextLlvm::ensureMethod($context);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
-            if (null === $block) {
-                throw new \LogicException($basename.' parseAndCompile failed ('.$compileLabel.')');
+        $deferUserScript = UserScriptAotDeferNestedJit::shouldDefer($context);
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel, $deferUserScript): void {
+            $prevUser = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+            $prevSelf = getenv('PHP_COMPILER_SELFHOST_AOT');
+            if ($deferUserScript && \function_exists('putenv')) {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+                putenv('PHP_COMPILER_SELFHOST_AOT=0');
+                $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
+                $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
             }
-            $jit = new \PHPCompiler\JIT($context);
-            $jit->compile($block);
+            try {
+                $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
+                if (null === $block) {
+                    throw new \LogicException($basename.' parseAndCompile failed ('.$compileLabel.')');
+                }
+                $jit = new \PHPCompiler\JIT($context);
+                $jit->compile($block);
+            } finally {
+                if ($deferUserScript && \function_exists('putenv')) {
+                    if (false === $prevUser || '' === (string) $prevUser) {
+                        putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+                        unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+                    } else {
+                        putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUser);
+                        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUser;
+                        $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUser;
+                    }
+                    if (false === $prevSelf || '' === (string) $prevSelf) {
+                        putenv('PHP_COMPILER_SELFHOST_AOT=');
+                        unset($_ENV['PHP_COMPILER_SELFHOST_AOT'], $_SERVER['PHP_COMPILER_SELFHOST_AOT']);
+                    } else {
+                        putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelf);
+                        $_ENV['PHP_COMPILER_SELFHOST_AOT'] = $prevSelf;
+                        $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = $prevSelf;
+                    }
+                }
+            }
         });
         foreach ($compiledHelpers as $logical) {
             $lc = \strtolower($logical);
