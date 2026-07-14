@@ -4,19 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_convert_uu* via ConvertUuJitHelper PHP (#13227).
+ * JIT/AOT link for __compiler_convert_uu* via ConvertUuJitHelper PHP (#13227, #18827).
  *
- * Embed/JIT use ConvertUuJitHelper PHP bridge; standalone user-script AOT defers to LLVM (#4567).
+ * User-script AOT uses HelperRuntimeCache prelinked units (#15889) instead of LLVM defer.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/uuencode.c
  */
 final class StringConvertUu
@@ -28,6 +28,8 @@ final class StringConvertUu
     private const DECODE_TAG = 'PHPCompiler\\ext\\standard\\ConvertUuJitHelper::decodeTag';
 
     private const LAST_STRING = 'PHPCompiler\\ext\\standard\\ConvertUuJitHelper::lastString';
+
+    private const ENCODE_BRIDGE_ENTRY = 'convert_uu_encode_bridge_entry';
 
     private const TAG_FALSE = 0;
 
@@ -62,73 +64,33 @@ final class StringConvertUu
             return;
         }
 
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-
         $encodeProbe = $context->module->getNamedFunction('__compiler_convert_uuencode');
         $decodeProbe = $context->module->getNamedFunction('__compiler_convert_uudecode');
         if (null !== $encodeProbe && $encodeProbe->countBasicBlocks() > 0
             && null !== $decodeProbe && $decodeProbe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
-            if (null !== $savedInsert) {
-                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-            } else {
-                $context->builder->clearInsertionPosition();
-            }
+            self::restoreInsertBlock($context, BasicBlockHelper::tryGetInsertBlock($context));
 
             return;
         }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            StringConvertUuEncodeLlvm::implement($context);
-            StringConvertUuDecodeLlvm::implement($context);
-            self::registerLinkedRuntime($context);
-            if (null !== $savedInsert) {
-                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-            } else {
-                $context->builder->clearInsertionPosition();
-            }
-
-            return;
-        }
-
-        self::ensureJitHelperCompiled($context);
-        self::implementEncodeBridge($context);
-        self::implementDecodeBridge($context);
-        self::registerLinkedRuntime($context);
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function implementEncodeBridge(Context $context): void
-    {
-        $abiName = '__compiler_convert_uuencode';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('convert_uu_encode_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $raw = JitNestedHelperCoerce::callHelper(
+        JitVmHelperLink::ensureBridge(
             $context,
-            self::helperFunction($context, self::ENCODE_HELPER),
-            [$fn->getParam(0)]
+            '__compiler_convert_uuencode',
+            self::ENCODE_BRIDGE_ENTRY,
+            [$strPtr],
+            $strPtr,
+            self::ENCODE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#18827'
         );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
-        );
-        $context->registerFunction($abiName, $fn);
+        self::implementDecodeBridge($context);
+        self::registerLinkedRuntime($context);
+        self::restoreInsertBlock($context, $savedInsert);
     }
 
     private static function implementDecodeBridge(Context $context): void
@@ -140,6 +102,8 @@ final class StringConvertUu
 
             return;
         }
+
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#18827');
 
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
@@ -197,44 +161,7 @@ final class StringConvertUu
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after ConvertUuJitHelper compile (#13227)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ConvertUuJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ConvertUuJitHelper.php parseAndCompile failed (#13227)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#13227)');
-            }
-        }
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#18827');
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -242,9 +169,18 @@ final class StringConvertUu
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringConvertUu bridge (#13227)');
+                throw new \LogicException($name.' missing after StringConvertUu bridge (#18827)');
             }
             $context->registerFunction($name, $fn);
+        }
+    }
+
+    private static function restoreInsertBlock(Context $context, ?\PHPLLVM\BasicBlock $savedInsert): void
+    {
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
     }
 }
