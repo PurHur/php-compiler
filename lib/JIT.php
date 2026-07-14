@@ -2002,6 +2002,7 @@ class JIT {
                     || $this->isSourceBundlerRealLoweringMethod($emitLc)
                     || $this->isConstStringFolderRealLoweringMethod($emitLc)
                     || $this->isSuperglobalsRealLoweringMethod($emitLc)
+                    || $this->isIncludePathResolverRealLoweringMethod($emitLc)
                     || $this->isM3EmitTuRuntimeCompileDriverSpineLoweringName($emitLc)
                     || $this->isM3CompileDriverBlockPhpLoweringName($emitLc)
                 )
@@ -7266,7 +7267,7 @@ class JIT {
                         break;
                     }
                     $coalesceTarget = null;
-                    if ($this->context->coalesceAssignTargets->contains($destOp)) {
+                    if (null !== $destOp && $this->context->coalesceAssignTargets->contains($destOp)) {
                         $coalesceTarget = $destOp;
                     } elseif (null !== $aliasOp && $this->context->coalesceAssignTargets->contains($aliasOp)) {
                         $coalesceTarget = $aliasOp;
@@ -7359,6 +7360,7 @@ class JIT {
                             $prior = $i > 0 ? $block->opCodes[$i - 1] : null;
                             if (
                                 null !== $prior
+                                && null !== $destOp
                                 && $this->context->coalesceAssignTargets->contains($destOp)
                                 && null !== $this->ternaryEchoPhiPropertyFetchDest($block, $i - 1)
                             ) {
@@ -7408,9 +7410,11 @@ class JIT {
                         if (null !== $aliasOp) {
                             $this->assignOperand($aliasOp, $value, $forceAssign);
                         }
-                        $destUsed = [] !== $destOp->usages;
-                        if ($destUsed || $forceAssign) {
-                            $this->assignOperand($destOp, $value, $destUsed || $forceAssign);
+                        if (null !== $destOp) {
+                            $destUsed = [] !== $destOp->usages;
+                            if ($destUsed || $forceAssign) {
+                                $this->assignOperand($destOp, $value, $destUsed || $forceAssign);
+                            }
                         }
                     }
                     $srcOp = $block->getOperand($rhsSlot);
@@ -15800,6 +15804,35 @@ class JIT {
         return true;
     }
 
+    /**
+     * IncludePathResolver::resolve may compile after the caller static call is lowered (#816, bootstrap-aot-link).
+     */
+    private function tryResolveIncludePathResolverStaticCall(string $className, string $methodName): bool
+    {
+        $declaringClassLc = strtolower(ltrim($className, '\\'));
+        $methodLc = strtolower($methodName);
+        if (!$this->isIncludePathResolverRealLoweringMethod($declaringClassLc.'::'.$methodLc)) {
+            return false;
+        }
+        if (!$this->context->functionIsRegistered($proxy)) {
+            $path = \dirname(__DIR__).'/Web/IncludePathResolver.php';
+            if (\is_file($path)) {
+                $script = $this->context->runtime->parseAndCompile((string) \file_get_contents($path), $path);
+                if (null !== $script) {
+                    $this->compile($script);
+                    $this->runQueue();
+                }
+            }
+        }
+        $proxy = $this->resolveJitStaticMethodProxyName($declaringClassLc, $methodLc);
+        if (!$this->context->functionIsRegistered($proxy)) {
+            return false;
+        }
+        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxy);
+
+        return true;
+    }
+
     private function resolveJitStaticMethodProxyName(string $classLc, string $methodLc): string
     {
         $methodLc = strtolower($methodLc);
@@ -15970,6 +16003,11 @@ class JIT {
                 return;
             }
             if ($this->tryResolveProgressStaticCall($className, $nameOp->value)) {
+                $this->context->scope->args = [];
+
+                return;
+            }
+            if ($this->tryResolveIncludePathResolverStaticCall($className, $nameOp->value)) {
                 $this->context->scope->args = [];
 
                 return;
