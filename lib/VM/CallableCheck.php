@@ -52,6 +52,11 @@ final class CallableCheck
             return;
         }
 
+        $ctx = TypeCheck::currentParamErrorContext();
+        if (null !== $ctx && 'Argument' === $kind) {
+            $ctx->throwExpectedType(self::TYPE_LABEL, $value);
+        }
+
         throw new \TypeError(sprintf(
             '%s must be of type %s, %s given',
             $kind,

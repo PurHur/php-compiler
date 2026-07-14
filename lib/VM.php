@@ -5932,17 +5932,29 @@ restart:
                                         }
                                     }
                                 }
-                                TypeCheck::verifyVariadicElements(
-                                    $trailing,
-                                    $strict,
-                                    $frame->block->paramVariadicElementTypeConstraints[$variadicSlot] ?? null,
-                                    $frame->block->paramVariadicElementGenericArrayTypeSpecs[$variadicSlot] ?? null,
-                                    $frame->block->paramVariadicElementIntersectionConstraints[$variadicSlot] ?? null,
-                                    $frame->block->paramVariadicElementDnfConstraints[$variadicSlot] ?? null,
-                                    $this->context,
-                                    isset($frame->block->paramIterableSlots[$variadicSlot]),
-                                    isset($frame->block->paramNeverSlots[$variadicSlot]),
-                                    $frame->block->paramVariadicElementIntersectionDisplayLabels[$variadicSlot] ?? null
+                                $vmContext = $this->context;
+                                TypeCheck::withParamErrorContext(
+                                    \PHPCompiler\VM\UserParamErrorContext::forRecvFrame($frame, $variadicParamIdx, true),
+                                    static function () use (
+                                        $trailing,
+                                        $strict,
+                                        $frame,
+                                        $variadicSlot,
+                                        $vmContext
+                                    ): void {
+                                        TypeCheck::verifyVariadicElements(
+                                            $trailing,
+                                            $strict,
+                                            $frame->block->paramVariadicElementTypeConstraints[$variadicSlot] ?? null,
+                                            $frame->block->paramVariadicElementGenericArrayTypeSpecs[$variadicSlot] ?? null,
+                                            $frame->block->paramVariadicElementIntersectionConstraints[$variadicSlot] ?? null,
+                                            $frame->block->paramVariadicElementDnfConstraints[$variadicSlot] ?? null,
+                                            $vmContext,
+                                            isset($frame->block->paramIterableSlots[$variadicSlot]),
+                                            isset($frame->block->paramNeverSlots[$variadicSlot]),
+                                            $frame->block->paramVariadicElementIntersectionDisplayLabels[$variadicSlot] ?? null
+                                        );
+                                    }
                                 );
                             }
                             if (null !== $namedVariadicPack || null !== $untypedNamedPassthrough) {
@@ -6019,37 +6031,44 @@ restart:
                         ? $frame->parent->block->strictTypes
                         : $frame->block->strictTypes;
                     $arraySpec = $frame->block->paramGenericArrayTypeSpecs[$op->arg1] ?? null;
+                    $paramIdx = (int) $op->arg2;
+                    $vmContext = $this->context;
                     try {
-                        if (
-                            !TypeCheck::skipParameterTypeCheckForImplicitNullable(
-                                $frame->block,
-                                (int) $op->arg1,
-                                $arg1
-                            )
-                        ) {
-                            if (isset($frame->block->paramNeverSlots[$op->arg1])) {
-                                TypeCheck::assertNeverParameter($arg1);
-                            } elseif (isset($frame->block->paramIterableSlots[$op->arg1])) {
-                                IterableCheck::assertParameter($arg1, $this->context);
-                            } elseif (isset($frame->block->paramCallableSlots[$op->arg1])) {
-                                CallableCheck::assertParameter($arg1, $this->context, $frame);
-                            } elseif (isset($frame->block->paramDnfConstraints[$op->arg1])) {
-                                DnfCheck::assertMatches(
-                                    $arg1,
-                                    $frame->block->paramDnfConstraints[$op->arg1],
-                                    $this->context
-                                );
-                            } elseif (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
-                                TypeCheck::assertParamIntersection(
-                                    $arg1,
-                                    $frame->block->paramIntersectionConstraints[$op->arg1],
-                                    $this->context,
-                                    $frame->block->paramIntersectionDisplayLabels[$op->arg1] ?? null
-                                );
-                            } else {
-                                TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                        TypeCheck::withParamErrorContext(
+                            \PHPCompiler\VM\UserParamErrorContext::forRecvFrame($frame, $paramIdx),
+                            function () use ($frame, $op, $arg1, $strict, $arraySpec, $vmContext): void {
+                                if (
+                                    !TypeCheck::skipParameterTypeCheckForImplicitNullable(
+                                        $frame->block,
+                                        (int) $op->arg1,
+                                        $arg1
+                                    )
+                                ) {
+                                    if (isset($frame->block->paramNeverSlots[$op->arg1])) {
+                                        TypeCheck::assertNeverParameter($arg1);
+                                    } elseif (isset($frame->block->paramIterableSlots[$op->arg1])) {
+                                        IterableCheck::assertParameter($arg1, $vmContext);
+                                    } elseif (isset($frame->block->paramCallableSlots[$op->arg1])) {
+                                        CallableCheck::assertParameter($arg1, $vmContext, $frame);
+                                    } elseif (isset($frame->block->paramDnfConstraints[$op->arg1])) {
+                                        DnfCheck::assertMatches(
+                                            $arg1,
+                                            $frame->block->paramDnfConstraints[$op->arg1],
+                                            $vmContext
+                                        );
+                                    } elseif (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
+                                        TypeCheck::assertParamIntersection(
+                                            $arg1,
+                                            $frame->block->paramIntersectionConstraints[$op->arg1],
+                                            $vmContext,
+                                            $frame->block->paramIntersectionDisplayLabels[$op->arg1] ?? null
+                                        );
+                                    } else {
+                                        TypeCheck::coerceParameter($arg1, $strict, $arraySpec);
+                                    }
+                                }
                             }
-                        }
+                        );
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {

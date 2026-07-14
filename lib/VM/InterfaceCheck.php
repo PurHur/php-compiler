@@ -26,19 +26,34 @@ final class InterfaceCheck
         $target = $value->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $target->type) {
             $given = self::valueTypeName($target);
+            self::throwKindTypeError($kind, $expected, $given, $value);
 
-            throw new \TypeError("{$kind} must be of type {$expected}, {$given} given");
+            return;
         }
         $entry = $target->toObject()->class;
         foreach ($interfaceLcs as $memberLc) {
             if (!self::entrySatisfiesIntersectionMember($entry, $memberLc, $context)) {
                 $given = $entry->name;
 
-                throw new \TypeError(
-                    "{$kind} must be of type {$expected}, {$given} given"
-                );
+                self::throwKindTypeError($kind, $expected, $given, $value);
             }
         }
+    }
+
+    private static function throwKindTypeError(
+        string $kind,
+        string $expected,
+        string $given,
+        Variable $value
+    ): void {
+        if ('Argument' === $kind) {
+            $ctx = TypeCheck::currentParamErrorContext();
+            if (null !== $ctx) {
+                $ctx->throwExpectedType($expected, $value);
+            }
+        }
+
+        throw new \TypeError("{$kind} must be of type {$expected}, {$given} given");
     }
 
     /**
