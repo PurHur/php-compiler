@@ -4325,11 +4325,26 @@ class Object_ extends Type {
                 PseudoClassScope::fatalInGlobalScope('parent');
             }
             $declaringClass = $this->context->scope->className;
-            $declaringLc = strtolower(ltrim($declaringClass, '\\'));
-            if ($this->isTraitClass($declaringLc)) {
-                $called = $this->context->scope->calledClassName;
-                if ('' !== $called && strtolower(ltrim($called, '\\')) !== $declaringLc) {
-                    $declaringClass = $called;
+            if (null !== $block?->func?->class) {
+                $funcClassLc = strtolower(ltrim($block->func->class->value, '\\'));
+                if ($this->isTraitClass($funcClassLc)) {
+                    $composing = $this->context->scope->traitComposingClassName;
+                    if ('' !== $composing && !$this->isTraitClass(strtolower(ltrim($composing, '\\')))) {
+                        $declaringClass = $composing;
+                    } elseif ($this->context->scope->classId > 0) {
+                        $fromId = $this->classNameForId($this->context->scope->classId);
+                        if ('' !== $fromId && !$this->isTraitClass(strtolower(ltrim($fromId, '\\')))) {
+                            $declaringClass = $fromId;
+                        }
+                    } else {
+                        $scopeLc = strtolower(ltrim($declaringClass, '\\'));
+                        if ($this->isTraitClass($scopeLc)) {
+                            $called = $this->context->scope->calledClassName;
+                            if ('' !== $called && strtolower(ltrim($called, '\\')) !== $funcClassLc) {
+                                $declaringClass = $called;
+                            }
+                        }
+                    }
                 }
             }
             $parentLc = $this->parentClassLc($declaringClass);
