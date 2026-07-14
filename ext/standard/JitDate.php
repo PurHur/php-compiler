@@ -291,8 +291,13 @@ final class JitDate
             throw new \ArgumentCountError("{$function}() expects at most 2 arguments, {$argc} given");
         }
         VmEngineBuiltinDeprecation::emitJitFunction($context, $function);
+        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+            JitInternalStrictArg::requireString($context, $args[0], $function, 'format', 1);
+
+            return self::boxStrftimeFailure($context);
+        }
         JitInternalStrictArg::requireString($context, $args[0], $function, 'format', 1);
-        $format = JitStringArg::lower($context, $args[0], "{$function}() argument #1 (format)");
+        $format = JitStringBuiltinArg::lower($context, $args[0], $function, 0, 'format', 'string', null, false);
         $i64 = $context->getTypeFromString('int64');
         $timestamp = $argc >= 2
             ? JitDateTimestampArg::lowerNullable(
@@ -312,6 +317,14 @@ final class JitDate
             $timestamp,
             $gmtI8
         );
+    }
+
+    private static function boxStrftimeFailure(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int1')->constInt(0, false));
+
+        return JitValueBox::pointer($context, $slot);
     }
 
 }
