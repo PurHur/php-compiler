@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ParseStrRuntime;
+use PHPCompiler\JIT\Builtin\SuperglobalRefreshUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\StringParseStr;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -31,7 +32,7 @@ final class SuperglobalsBracketRuntimeStandaloneTest extends TestCase
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        ParseStrRuntime::ensureUserScriptLinked($ctx);
+        SuperglobalRefreshUserScriptLlvm::ensurePrerequisites($ctx);
 
         foreach (['__compiler_parse_str', '__compiler_parse_cookie_header'] as $name) {
             $bridge = $ctx->module->getNamedFunction($name);
@@ -48,7 +49,8 @@ final class SuperglobalsBracketRuntimeStandaloneTest extends TestCase
             ] as $name
         ) {
             $legacy = $ctx->module->getNamedFunction($name);
-            $this->assertNull($legacy, $name.' hand-LLVM must stay deleted — ParseStrNativeJitHelper PHP (#18643)');
+            $this->assertNotNull($legacy, $name.' LLVM must be linked for user-script refresh (#18832)');
+            $this->assertGreaterThan(0, $legacy->countBasicBlocks(), $name.' must have LLVM body (#18832)');
         }
     }
 

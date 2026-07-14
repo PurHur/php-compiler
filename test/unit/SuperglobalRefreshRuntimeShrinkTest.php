@@ -45,6 +45,6 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringGetenvAll::ensureLinked', $source);
         $this->assertStringNotContainsString('GetenvJitHelper::fillAllEnvironmentHashtable', $source);
         $this->assertStringNotContainsString('ParseStrNativeLlvm::ensureSubhelpers', $source);
-        $this->assertStringNotContainsString('ParseStrUserScriptDelimitedJit::ensureSubhelpers', $source);
+        $this->assertStringContainsString('ParseStrUserScriptDelimitedJit::ensureSubhelpers', $source);
     }
 }

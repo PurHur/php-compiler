@@ -40,6 +40,7 @@ final class SuperglobalRefreshUserScriptLlvm
     {
         LibcExtern::register($context);
         self::ensureGlobals($context);
+        ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptLinked($context);
         EnvironMirrorUserScriptLlvm::ensureLinked($context);
@@ -122,10 +123,9 @@ final class SuperglobalRefreshUserScriptLlvm
         $context->builder->branch($workBb);
         $context->builder->positionAtEnd($workBb);
 
-        $queryStr = self::cstrToPhpcString($context, $queryCstr);
         $getHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $context->builder->store($getHt, self::sgGlobalPtr($context, 'sg_GET'));
-        self::parseFormEncoded($context, $getHt, $queryStr);
+        self::parseFormEncodedFromCstrSlot($context, $getHt, $queryCstr);
 
         $postHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $filesHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
@@ -148,7 +148,7 @@ final class SuperglobalRefreshUserScriptLlvm
         $reqAfterQsBb = $fn->appendBasicBlock('sg_user_refresh_req_after_qs');
         $context->builder->branchIf($queryNonEmpty, $reqQsBb, $reqAfterQsBb);
         $context->builder->positionAtEnd($reqQsBb);
-        self::parseFormEncoded($context, $requestHt, $queryStr);
+        self::parseFormEncodedFromCstrSlot($context, $requestHt, $queryCstr);
         $context->builder->branch($reqAfterQsBb);
         $context->builder->positionAtEnd($reqAfterQsBb);
         $reqPostBb = $fn->appendBasicBlock('sg_user_refresh_req_post');
@@ -329,7 +329,32 @@ final class SuperglobalRefreshUserScriptLlvm
 
     private static function parseFormEncodedFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
     {
-        self::parseFormEncoded($context, $ht, self::cstrToPhpcString($context, $cstrSlot));
+        ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
+        $cstr = $context->builder->load($cstrSlot);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->call(
+            $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
+            $ht,
+            $cstr,
+            $i8->constInt(ord('&'), false),
+            $i32->constInt(0, false)
+        );
+    }
+
+    private static function parseCookieFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
+    {
+        ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
+        $cstr = $context->builder->load($cstrSlot);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->call(
+            $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
+            $ht,
+            $cstr,
+            $i8->constInt(ord(';'), false),
+            $i32->constInt(1, false)
+        );
     }
 
     private static function populatePostBodyFromCstrSlot(
@@ -379,15 +404,6 @@ final class SuperglobalRefreshUserScriptLlvm
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
-    }
-
-    private static function parseCookieFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
-    {
-        $context->builder->call(
-            $context->lookupFunction('__compiler_parse_cookie_header'),
-            $ht,
-            self::cstrToPhpcString($context, $cstrSlot)
-        );
     }
 
     private static function cstrToPhpcString(Context $context, Value $cstrSlot): Value
@@ -498,6 +514,7 @@ final class SuperglobalRefreshUserScriptLlvm
     {
         LibcExtern::register($context);
         self::ensureGlobals($context);
+        ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptLinked($context);
         EnvironMirrorUserScriptLlvm::ensureLinked($context);
