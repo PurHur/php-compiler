@@ -3797,7 +3797,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrftime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStripTags.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStripcslashesRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStripslashes.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringStripslashesLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrnatcasecmp.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrnatcmp.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrncasecmp.php';
