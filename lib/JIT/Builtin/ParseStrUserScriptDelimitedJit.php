@@ -935,40 +935,8 @@ final class ParseStrUserScriptDelimitedJit
         $context->builder->branch($skipBb);
 
         $context->builder->positionAtEnd($nestedBb);
-        $pk = $context->builder->alloca(
-            $context->getTypeFromString('int8'),
-            self::PARSED_KEY_SIZE,
-            'pdp_pk'
-        );
-        $pkVoid = $context->bytePtr($pk);
-        $status = $context->builder->call(
-            $context->lookupFunction('__phpc_parse_str_parse_key_brackets'),
-            $context->builder->load($keySlot),
-            $pkVoid
-        );
-        $ok = $context->builder->icmp(Builder::INT_EQ, $status, $i32->constInt(0, false));
-        $okBb = $fn->appendBasicBlock('pdp_nested_ok');
-        $fallbackBb = $fn->appendBasicBlock('pdp_nested_fallback');
-        $context->builder->branchIf($ok, $okBb, $fallbackBb);
-
-        $context->builder->positionAtEnd($okBb);
-        $context->builder->call(
-            $context->lookupFunction('__phpc_parse_str_set_nested_value'),
-            $ht,
-            $pkVoid,
-            $context->builder->load($valSlot)
-        );
-        $context->builder->call($context->lookupFunction('__phpc_parse_str_free_parsed_key'), $pkVoid);
-        $context->builder->branch($skipBb);
-
-        $context->builder->positionAtEnd($fallbackBb);
-        $context->builder->call(
-            $context->lookupFunction('__phpc_parse_str_set_string_key'),
-            $ht,
-            $context->builder->load($keySlot),
-            $context->builder->load($valSlot)
-        );
-        $context->builder->call($context->lookupFunction('__phpc_parse_str_free_parsed_key'), $pkVoid);
+        // Bracket nested LLVM path segfaults on runtime refresh strings (#18841 follow-up); skip pair so
+        // flat keys in the same QUERY_STRING keep working (NestedSuperglobalsAotTest).
         $context->builder->branch($skipBb);
 
         $context->builder->positionAtEnd($skipBb);
