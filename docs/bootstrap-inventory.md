@@ -13915,8 +13915,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitPack.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
-- 2 class method(s)
+- new ArgumentCountError (line 23)
+- 3 class method(s)
 
 ### `ext/standard/JitPackNumericGuard.php`
 
@@ -15987,7 +15987,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PackEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 16 class method(s)
+- 17 class method(s)
 
 ### `ext/standard/PackEngineEncode.php`
 
@@ -19122,8 +19122,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1673)
-- new Error (line 1684)
+- new Error (line 1677)
+- new Error (line 1688)
 - 215 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
