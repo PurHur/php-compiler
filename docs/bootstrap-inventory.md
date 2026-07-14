@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4850 |
-| Phase A inventory files (M2 ratio SSOT) | 4850 |
+| PHP files on vm.php path | 4847 |
+| Phase A inventory files (M2 ratio SSOT) | 4847 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13025 |
+| Source constructs flagged (warnings) | 13020 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1125,7 +1125,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitAssert.php` | 0 | 2 |
 | `ext/standard/JitAssertOptions.php` | 0 | 2 |
 | `ext/standard/JitAttributeExists.php` | 0 | 1 |
-| `ext/standard/JitBase64Decode.php` | 0 | 1 |
 | `ext/standard/JitBuiltinWarning.php` | 0 | 1 |
 | `ext/standard/JitCallUserFunc.php` | 0 | 7 |
 | `ext/standard/JitChdir.php` | 0 | 1 |
@@ -3318,7 +3317,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/AttributeRegistryLookupRuntime.php` | 0 | 4 |
 | `lib/JIT/Builtin/AttributeRegistryLowering.php` | 0 | 1 |
 | `lib/JIT/Builtin/BackedEnumFromRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/Base64JitLink.php` | 0 | 3 |
 | `lib/JIT/Builtin/Bcmath.php` | 0 | 1 |
 | `lib/JIT/Builtin/BcmathJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/Bz2Runtime.php` | 0 | 1 |
@@ -3654,7 +3652,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamSyncJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringAddslashes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBase64Decode.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringBase64DecodeLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBase64Encode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBin2hex.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 3 |
@@ -12384,11 +12381,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
-
-### `ext/standard/JitBase64Decode.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
 
 ### `ext/standard/JitBuiltinWarning.php`
 
@@ -27001,13 +26993,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 16 class method(s)
 
-### `lib/JIT/Builtin/Base64JitLink.php`
-
-**Warnings** (review for bootstrap subset):
-- new JIT (line 69)
-- 4 class method(s)
-- 1 closure(s)
-
 ### `lib/JIT/Builtin/Bcmath.php`
 
 **Warnings** (review for bootstrap subset):
@@ -28952,12 +28937,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringBase64Decode.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
-
-### `lib/JIT/Builtin/StringBase64DecodeLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringBase64Encode.php`
 
