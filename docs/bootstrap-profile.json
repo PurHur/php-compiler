@@ -2100,6 +2100,8 @@
         "ext/standard/VmStreamSocketPairNative.php",
         "ext/standard/VmStreamSocketPairPure.php",
         "ext/standard/VmStreamSocketPure.php",
+        "ext/standard/VmStreamSocketShutdown.php",
+        "ext/standard/VmStreamSocketShutdownPure.php",
         "ext/standard/VmStreamSupports.php",
         "ext/standard/VmStreamSync.php",
         "ext/standard/VmStreamTransports.php",
@@ -2872,6 +2874,7 @@
         "ext/standard/stream_socket_get_name.php",
         "ext/standard/stream_socket_pair.php",
         "ext/standard/stream_socket_server.php",
+        "ext/standard/stream_socket_shutdown.php",
         "ext/standard/stream_supports.php",
         "ext/standard/stream_supports_lock.php",
         "ext/standard/stream_wrapper_register.php",
@@ -5059,9 +5062,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4825,
+        "inventory_files": 4828,
         "excluded": 0,
-        "eligible": 4825,
+        "eligible": 4828,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
