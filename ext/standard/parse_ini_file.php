@@ -33,7 +33,7 @@ final class parse_ini_file extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $filename = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'parse_ini_file', 'filename');
+        $filename = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'parse_ini_file', 'filename', false);
         VmString::rejectEmptyBuiltinStringArg($filename, 'parse_ini_file', 0, 'filename');
         $processSections = false;
         $scannerMode = ParseIniEngine::SCANNER_NORMAL;
