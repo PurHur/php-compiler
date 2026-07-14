@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** gmstrftime() — UTC locale time formatting via libc strftime (ext/standard/datetime.c, #3692). */
@@ -28,6 +29,11 @@ final class gmstrftime extends Internal
             return;
         }
         $format = self::vmFormatArg($frame);
+        if (false === $format) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $timestamp = null;
         if (2 === $argc) {
             $timestamp = VmDate::coerceNullableTimestampArgForFrame($frame, 1, 'gmstrftime', 2, 'timestamp');
@@ -40,10 +46,15 @@ final class gmstrftime extends Internal
         return JitDate::formatStrftime($context, true, ...$args);
     }
 
-    private static function vmFormatArg(Frame $frame): string
+    /** @return string|false */
+    private static function vmFormatArg(Frame $frame): string|false
     {
         if (null !== $frame->parent && $frame->parent->block->strictTypes) {
             return InternalStrictArg::requireString($frame, 0, 'gmstrftime', 'format')->toString();
+        }
+        $arg = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_NULL === $arg->type) {
+            return false;
         }
 
         return VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gmstrftime', 0, 'format');
