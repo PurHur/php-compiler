@@ -21,6 +21,9 @@ class MagicStringResolver extends NodeVisitorAbstract
 
     private const PROPERTY_SET_HOOK_PREFIX = '__phpc_property_set_';
 
+    /** Zend/zend_compile.c — __PROPERTY__ (T_PROPERTY_C) requires active property hook (#18815, re-#5978). */
+    private const PROPERTY_MAGIC_OUTSIDE_HOOK = 'Cannot use __PROPERTY__ outside of a property hook';
+
     protected $classStack = [];
 
     protected $parentStack = [];
@@ -135,9 +138,15 @@ class MagicStringResolver extends NodeVisitorAbstract
             $this->inStaticCallClassName = true;
         } elseif ($node instanceof Node\Expr\ConstFetch) {
             if ('__property__' === strtolower($node->name->toString())) {
-                $name = $this->propertyStack !== [] ? end($this->propertyStack) : '';
+                if ($this->propertyStack === []) {
+                    if ($this->propertyHooksProfileEnabled()) {
+                        throw new \CompileError(self::PROPERTY_MAGIC_OUTSIDE_HOOK);
+                    }
 
-                return new Node\Scalar\String_($name, $node->getAttributes());
+                    return new Node\Scalar\String_('', $node->getAttributes());
+                }
+
+                return new Node\Scalar\String_(end($this->propertyStack), $node->getAttributes());
             }
         } elseif ($node instanceof Node\Name) {
             if ($node->getAttribute(self::PRESERVE_LEXICAL_TYPE)) {
@@ -256,6 +265,27 @@ class MagicStringResolver extends NodeVisitorAbstract
         }
 
         return null;
+    }
+
+    /**
+     * Forward 8.4 profile gate — mirrors PHPCompiler\CompilerVersion::supportsPropertyHooks() without coupling namespaces.
+     */
+    private function propertyHooksProfileEnabled(): bool
+    {
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+        $raw = trim($raw);
+        if (preg_match('/^\d+\.\d+$/', $raw)) {
+            $version = $raw.'.0';
+        } elseif (preg_match('/^\d+\.\d+\.\d+/', $raw, $m)) {
+            $version = $m[0];
+        } else {
+            return false;
+        }
+
+        return version_compare($version, '8.4.0', '>=');
     }
 
     private function stripClass($class)

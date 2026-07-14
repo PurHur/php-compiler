@@ -51,7 +51,25 @@ class P {
 }
 echo (new P)->m();
 PHP;
+        if (CompilerVersion::supportsPropertyHooks()) {
+            $this->expectCompileError($code, 'Cannot use __PROPERTY__ outside of a property hook');
+
+            return;
+        }
+
         $this->assertSame('', $this->runVm($code));
+    }
+
+    public function testPropertyMagicConstTopLevelOutsideHookOn84Profile(): void
+    {
+        if (!CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('requires PHP_COMPILER_PROFILE=8.4 property hooks gate');
+        }
+
+        $this->expectCompileError(
+            "<?php\necho __PROPERTY__, \"\\n\";",
+            'Cannot use __PROPERTY__ outside of a property hook'
+        );
     }
 
     public function testFunctionMagicConstInClassConst(): void
@@ -138,5 +156,23 @@ PHP;
         $out = ob_get_clean();
 
         return is_string($out) ? $out : '';
+    }
+
+    private function expectCompileError(string $code, string $message): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime(Runtime::MODE_NORMAL);
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage($message);
+            $runtime->parseAndCompile($code, 'magic-constants-test.php');
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
     }
 }
