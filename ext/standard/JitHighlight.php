@@ -32,7 +32,13 @@ final class JitHighlight
             return self::materializeHtml($context, HighlightEngine::render($codeLit), $returnLit ?? false);
         }
 
-        $codeStr = JitStringBuiltinArg::lower($context, $args[0], 'highlight_string', 0, 'string');
+        $codeStr = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[0],
+            'highlight_string',
+            0,
+            'string'
+        );
         $htmlStr = self::renderCodeString($context, $codeStr);
 
         return self::emitResult($context, $htmlStr, $args, $argc, 'highlight_string');
