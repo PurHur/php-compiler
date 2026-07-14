@@ -13314,7 +13314,21 @@ restart:
             return $boundScope;
         }
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
-            return strtolower($frame->block->func->class->value);
+            $funcClassValue = $frame->block->func->class->value;
+            $funcClassLc = strtolower($funcClassValue);
+            if ('parent' === $scopeKeyword) {
+                $funcIsTrait = ($this->context->classes[$funcClassLc] ?? null)?->isTrait ?? false;
+                if ($funcIsTrait) {
+                    return VM\TraitSelfClassScope::resolveComposingClassLc(
+                        $funcClassValue,
+                        true,
+                        $frame->calledClass,
+                        $funcClassLc
+                    );
+                }
+            }
+
+            return $funcClassLc;
         }
         // Bound closure scope (Closure::bind/bindTo $newScope) — #3673.
         if (null !== $frame->calledClass && '' !== $frame->calledClass) {

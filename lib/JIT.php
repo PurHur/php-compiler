@@ -15157,7 +15157,15 @@ class JIT {
             if (null === $block->func || null === $block->func->class) {
                 PseudoClassScope::fatalInGlobalScope('parent');
             }
-            $parentLc = $this->context->type->object->parentClassLc($block->func->class->value);
+            $declaringClass = $block->func->class->value;
+            $declaringLc = strtolower(ltrim($declaringClass, '\\'));
+            if ($this->context->type->object->isTraitClass($declaringLc)) {
+                $called = $this->context->scope->calledClassName;
+                if ('' !== $called && strtolower(ltrim($called, '\\')) !== $declaringLc) {
+                    $declaringClass = $called;
+                }
+            }
+            $parentLc = $this->context->type->object->parentClassLc($declaringClass);
             if (null === $parentLc) {
                 throw new \LogicException('parent:: used when class has no parent');
             }

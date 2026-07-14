@@ -327,7 +327,7 @@ trait ClassConstFetchHelperTrait
             return $scope;
         }
         if ('parent' === $lc) {
-            $scope = self::jitScopeClassName($objectType, $block);
+            $scope = self::jitComposingScopeClassName($objectType, $block);
             if (null === $scope) {
                 PseudoClassScope::fatalInGlobalScope('parent');
             }
@@ -340,6 +340,30 @@ trait ClassConstFetchHelperTrait
         }
 
         return $className;
+    }
+
+    /**
+     * Trait methods — parent:: scope is the composing class, not the trait (#18878).
+     */
+    private static function jitComposingScopeClassName(Object_ $objectType, Block $block): ?string
+    {
+        $scope = self::jitScopeClassName($objectType, $block);
+        if (null === $scope || null === $block->func?->class) {
+            return $scope;
+        }
+        $funcClassLc = strtolower(ltrim($block->func->class->value, '\\'));
+        if (!$objectType->isTraitClass($funcClassLc)) {
+            return $scope;
+        }
+        $called = $objectType->jitContext()->scope->calledClassName ?? '';
+        if ('' !== $called) {
+            $calledLc = strtolower(ltrim($called, '\\'));
+            if ($calledLc !== $funcClassLc) {
+                return $called;
+            }
+        }
+
+        return $scope;
     }
 
     private static function jitScopeClassName(Object_ $objectType, Block $block): ?string
@@ -383,7 +407,7 @@ trait ClassConstFetchHelperTrait
         Value $nameStr
     ): Value {
         $context = $objectType->jitContext();
-        $scopeClass = self::jitScopeClassName($objectType, $block);
+        $scopeClass = self::jitComposingScopeClassName($objectType, $block);
         if (null === $scopeClass) {
             return $nameStr;
         }

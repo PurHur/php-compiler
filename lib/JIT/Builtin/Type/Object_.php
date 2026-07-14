@@ -4324,7 +4324,15 @@ class Object_ extends Type {
             if ('' === $this->context->scope->className) {
                 PseudoClassScope::fatalInGlobalScope('parent');
             }
-            $parentLc = $this->parentClassLc($this->context->scope->className);
+            $declaringClass = $this->context->scope->className;
+            $declaringLc = strtolower(ltrim($declaringClass, '\\'));
+            if ($this->isTraitClass($declaringLc)) {
+                $called = $this->context->scope->calledClassName;
+                if ('' !== $called && strtolower(ltrim($called, '\\')) !== $declaringLc) {
+                    $declaringClass = $called;
+                }
+            }
+            $parentLc = $this->parentClassLc($declaringClass);
             if (null === $parentLc) {
                 throw new \LogicException('parent:: used when class has no parent');
             }

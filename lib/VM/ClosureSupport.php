@@ -9,6 +9,7 @@ use PHPCompiler\Func;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\PseudoClassScope;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\TraitSelfClassScope;
 
 /**
  * Closure::fromCallable / bind / bindTo helpers (issue #3266, #3673, Zend zend_closures.c).
@@ -630,7 +631,17 @@ final class ClosureSupport
             if (null === $frame->block->func || null === $frame->block->func->class) {
                 PseudoClassScope::fatalInGlobalScope('parent');
             }
-            $declaring = strtolower($frame->block->func->class->value);
+            $funcClassValue = $frame->block->func->class->value;
+            $declaring = strtolower($funcClassValue);
+            $funcIsTrait = ($ctx->classes[$declaring] ?? null)?->isTrait ?? false;
+            if ($funcIsTrait) {
+                $declaring = TraitSelfClassScope::resolveComposingClassLc(
+                    $funcClassValue,
+                    true,
+                    $frame->calledClass,
+                    $declaring
+                );
+            }
             if (!isset($ctx->classes[$declaring])) {
                 PseudoClassScope::fatalInGlobalScope('parent');
             }
