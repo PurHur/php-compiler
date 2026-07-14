@@ -17139,6 +17139,58 @@ class Compiler {
     }
 
     /**
+     * Closure::bind($closure, new C(), null) — hoisted null prelude must not wire to arg #1 ($newThis) (#18880, #15900).
+     */
+    private function slotForStaticClosureBindNewThisArg(
+        Block $block,
+        Op\Expr\StaticCall $callOp,
+        int $argIndex
+    ): ?string {
+        if (1 !== $argIndex || null === $block->orig) {
+            return null;
+        }
+        $className = $this->staticNameFromOperand($callOp->class);
+        $method = $this->staticNameFromOperand($callOp->name);
+        if (null === $className || null === $method) {
+            return null;
+        }
+        if ('closure' !== strtolower(ltrim($className, '\\'))) {
+            return null;
+        }
+        if ('bind' !== strtolower($method)) {
+            return null;
+        }
+        $callArg = $callOp->args[1] ?? null;
+        if (!$this->callArgUsesHoistedEnumPreludeSlot($callArg)) {
+            return null;
+        }
+        $callIndex = $this->cfgCallOpIndex($block, $callOp);
+        if (!\is_int($callIndex) || $callIndex < 2) {
+            return null;
+        }
+        $newExpr = null;
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\New_) {
+                $newExpr = $child;
+            }
+            break;
+        }
+        if (!$newExpr instanceof Op\Expr\New_) {
+            return null;
+        }
+        $slot = $block->slotForOperand($newExpr->result);
+        if (null !== $slot) {
+            return (string) $slot;
+        }
+
+        return $this->slotForInlineNewProducer($block, $newExpr);
+    }
+
+    /**
      * Closure::bind(inline closure, …) — hoisted Enum::class prelude must not wire to arg #0 (#3673, #16722).
      */
     private function slotForStaticClosureBindInlineClosureArg(
@@ -40355,6 +40407,20 @@ class Compiler {
                     $sends[] = new OpCode(
                         OpCode::TYPE_ARG_SEND,
                         $staticBindClosureSlot,
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
+                $staticBindNewThisSlot = $this->slotForStaticClosureBindNewThisArg(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $staticBindNewThisSlot) {
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        $staticBindNewThisSlot,
                         $nameSlot,
                         $unpackFlag
                     );
