@@ -244,6 +244,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_childnodes_empty.phpt',
             'dom_childnodes_empty.phpt'
         );
+        yield 'dom_import_node_chained_deep.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_import_node_chained_deep.phpt',
+            'dom_import_node_chained_deep.phpt'
+        );
     }
 
     public function setUp(): void
