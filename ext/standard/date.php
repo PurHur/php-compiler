@@ -50,7 +50,9 @@ final class date extends Internal
             $frame->calledArgs[0],
             'date',
             0,
-            'format'
+            'format',
+            'string',
+            false
         );
     }
 }

@@ -108,7 +108,9 @@ final class JitStringBuiltinArg
                 return self::unreachableStringPtr($context);
             }
 
-            self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName);
+            if (!self::requiresForwardProfileStrictStringNull()) {
+                self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName);
+            }
 
             return $context->builder->load($context->constantStringFromString(''));
         }
@@ -192,13 +194,18 @@ final class JitStringBuiltinArg
         return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
     }
 
-    private static function emitNullStringParamDeprecation(
+    public static function emitNullStringParamDeprecation(
         Context $context,
         string $function,
         int $argIndex,
         string $paramName
     ): void {
-        $message = VmNullStringParamDeprecation::message($function, $argIndex, $paramName);
+        $message = \sprintf(
+            '%s(): Passing null to parameter #%d ($%s) of type string is deprecated',
+            $function,
+            $argIndex + 1,
+            $paramName
+        );
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');

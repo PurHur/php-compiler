@@ -31,13 +31,16 @@ final class VmDateTimeCreateArg
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            if (VmString::requiresForwardProfileStrictStringNull() || InternalStrictArg::isCallerStrict($frame)) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
                 throw new \TypeError(\sprintf(
                     '%s(): Argument #%d ($%s) must be of type string, null given',
                     $function,
                     $userArgIndex + 1,
                     $paramName
                 ));
+            }
+            if (!VmString::requiresForwardProfileStrictStringNull()) {
+                VmNullStringParamDeprecation::emit($frame, $function, $userArgIndex, $paramName);
             }
 
             return '';
@@ -64,8 +67,16 @@ final class VmDateTimeCreateArg
         int $userArgIndex = 0,
         string $paramName = 'datetime'
     ): string {
-        if ($context->callerStrictTypes || JitStringBuiltinArg::requiresForwardProfileStrictStringNull()) {
+        if ($context->callerStrictTypes) {
             JitInternalStrictArg::rejectNullString($context, $arg, $function, $paramName, $userArgIndex + 1);
+        }
+        if (!JitStringBuiltinArg::requiresForwardProfileStrictStringNull()) {
+            JitStringBuiltinArg::emitNullStringParamDeprecation(
+                $context,
+                $function,
+                $userArgIndex,
+                $paramName
+            );
         }
 
         return '';

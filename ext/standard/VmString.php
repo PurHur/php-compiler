@@ -149,7 +149,9 @@ final class VmString
                     self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null', $expectedType)
                 );
             }
-            VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+            if (!self::requiresForwardProfileStrictStringNull()) {
+                VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+            }
 
             return '';
         }

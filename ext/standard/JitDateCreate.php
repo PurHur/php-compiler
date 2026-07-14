@@ -10,6 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\NativeDateInvalidTimeZoneException;
+use PHPLLVM\Value;
 
 /** LLVM lowering for date_create() / date_create_immutable() (#4124, ext/date/php_date.c). */
 final class JitDateCreate
@@ -40,6 +41,9 @@ final class JitDateCreate
                     );
                 }
             }
+        }
+        if ('' === $timeLit) {
+            $timeLit = 'now';
         }
         $tzLit = $argc >= 2 ? self::compileTimeTimezoneName($context, $args[1], $function) : null;
         if (null !== $timeLit && (2 !== $argc || null !== $tzLit)) {
