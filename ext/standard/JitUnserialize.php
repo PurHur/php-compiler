@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\StringUnserialize;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -17,12 +16,16 @@ final class JitUnserialize
 {
     public static function decodeRuntime(Context $context, JITVariable $payload): Value
     {
+        $payloadString = JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $payload,
+            'unserialize',
+            0,
+            'data'
+        );
         StringUnserialize::ensureLinked($context);
 
-        return self::decodeRuntimeString(
-            $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $payload, 'unserialize', 0, 'data')
-        );
+        return self::decodeRuntimeString($context, $payloadString);
     }
 
     /**

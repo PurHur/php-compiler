@@ -7,11 +7,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -34,7 +34,12 @@ final class unserialize extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $payload = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'unserialize', 'data');
+        $payload = VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'unserialize',
+            0,
+            'data'
+        );
         $options = null;
         if ($argc > 1) {
             $optionsVar = $frame->calledArgs[1]->resolveIndirect();
@@ -100,7 +105,10 @@ final class unserialize extends Internal
     {
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
             if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
-                JitInternalStrictArg::rejectNullString($context, $arg, 'unserialize', 'data', 1);
+                JitStringBuiltinArg::lowerZparamStr($context, $arg, 'unserialize', 0, 'data');
+                $slot = JitValueBox::alloc($context);
+
+                return JitValueBox::pointer($context, $slot);
             }
 
             return $context->helper->loadValue(
