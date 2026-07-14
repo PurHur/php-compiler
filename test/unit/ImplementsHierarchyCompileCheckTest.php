@@ -138,45 +138,48 @@ PHP;
         $runtime->parseAndCompile($code, 'nested.php');
     }
 
-    /** @covers issue #13325 */
-    public function testClassImplementsDateTimeInterfaceFailsAtCompileTime(): void
+    /** @covers issue #18781 */
+    public function testClassImplementsDateTimeInterfaceFailsAtRuntime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 class UserDateTime implements DateTimeInterface {}
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage("DateTimeInterface can't be implemented by user classes");
-        $runtime->parseAndCompile($code, 'datetimeinterface.php');
+        $block = $runtime->parseAndCompile($code, 'datetimeinterface.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage("Fatal error: DateTimeInterface can't be implemented by user classes");
+        $runtime->run($block);
     }
 
-    /** @covers issue #13325 */
-    public function testEnumImplementsDateTimeInterfaceFailsAtCompileTime(): void
+    /** @covers issue #18781 */
+    public function testEnumImplementsDateTimeInterfaceFailsAtRuntime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 enum E implements DateTimeInterface { case A; }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage("DateTimeInterface can't be implemented by user classes");
-        $runtime->parseAndCompile($code, 'enum_datetimeinterface.php');
+        $block = $runtime->parseAndCompile($code, 'enum_datetimeinterface.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage("Fatal error: DateTimeInterface can't be implemented by user classes");
+        $runtime->run($block);
     }
 
-    /** @covers issue #13327 */
-    public function testClassImplementsInternalIteratorFailsAtCompileTime(): void
+    /** @covers issue #18781 */
+    public function testClassImplementsInternalIteratorFailsAtRuntime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 class UserInternalIterator implements InternalIterator {}
 PHP;
-        $this->expectException(\CompileError::class);
+        $block = $runtime->parseAndCompile($code, 'internaliterator.php');
+        $this->expectException(\LogicException::class);
         $this->expectExceptionMessage(
-            'UserInternalIterator cannot implement InternalIterator - it is not an interface'
+            'Fatal error: UserInternalIterator cannot implement InternalIterator - it is not an interface'
         );
-        $runtime->parseAndCompile($code, 'internaliterator.php');
+        $runtime->run($block);
     }
 
     /** @covers issue #13326 */
@@ -231,8 +234,8 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
-    /** @covers issue #15445 */
-    public function testClassImplementsClosureFailsAtCompileTime(): void
+    /** @covers issue #18781 */
+    public function testClassImplementsClosureFailsAtRuntime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -241,26 +244,28 @@ class C implements Closure {
     public function __invoke(): void {}
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('C cannot implement Closure - it is not an interface');
-        $runtime->parseAndCompile($code, 'implements_closure.php');
+        $block = $runtime->parseAndCompile($code, 'implements_closure.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Fatal error: C cannot implement Closure - it is not an interface');
+        $runtime->run($block);
     }
 
-    /** @covers issue #15445 */
-    public function testClassImplementsGeneratorFailsAtCompileTime(): void
+    /** @covers issue #18781 */
+    public function testClassImplementsGeneratorFailsAtRuntime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
 class G implements Generator {}
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('G cannot implement Generator - it is not an interface');
-        $runtime->parseAndCompile($code, 'implements_generator.php');
+        $block = $runtime->parseAndCompile($code, 'implements_generator.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Fatal error: G cannot implement Generator - it is not an interface');
+        $runtime->run($block);
     }
 
-    /** @covers issue #15445 */
-    public function testClassImplementsStdClassFailsAtCompileTime(): void
+    /** @covers issue #18781 */
+    public function testClassImplementsStdClassFailsAtRuntime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -269,9 +274,10 @@ class S implements stdClass {
     public int $x = 1;
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage('S cannot implement stdClass - it is not an interface');
-        $runtime->parseAndCompile($code, 'implements_stdclass.php');
+        $block = $runtime->parseAndCompile($code, 'implements_stdclass.php');
+        $this->expectException(\LogicException::class);
+        $this->expectExceptionMessage('Fatal error: S cannot implement stdClass - it is not an interface');
+        $runtime->run($block);
     }
 
     /** @covers issue #15447 */

@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
-use PHPCompiler\VM\DateTimeInterfaceSupport;
 use PHPCompiler\VM\EnumSupport;
-use PHPCompiler\VM\ReservedBuiltinClass;
 use PHPCompiler\VM\TraversableSupport;
 use PHPCfg\AbstractVisitor;
 use PHPCfg\Block;
@@ -169,22 +167,12 @@ final class ImplementsHierarchyCompileCheck
                 ));
             }
             foreach ($class['implements'] as $targetLc) {
-                if (DateTimeInterfaceSupport::rejectsUserImplementationLc($targetLc)) {
-                    throw new \CompileError(DateTimeInterfaceSupport::USER_IMPLEMENTATION_FORBIDDEN_MESSAGE);
-                }
                 $enumIface = EnumSupport::nonEnumImplementationForbiddenMessage(
                     $class['display'],
                     $targetLc
                 );
                 if (null !== $enumIface) {
                     throw new \CompileError($enumIface);
-                }
-                $reservedImpl = ReservedBuiltinClass::compileTimeImplementsForbiddenMessage(
-                    $class['display'],
-                    $targetLc
-                );
-                if (null !== $reservedImpl) {
-                    throw new \CompileError($reservedImpl);
                 }
                 if (isset($this->nonInterfaces[$targetLc])) {
                     throw new \CompileError(sprintf(
@@ -213,16 +201,6 @@ final class ImplementsHierarchyCompileCheck
                 ));
             }
             foreach ($enum['implements'] as $targetLc) {
-                if (DateTimeInterfaceSupport::rejectsUserImplementationLc($targetLc)) {
-                    throw new \CompileError(DateTimeInterfaceSupport::USER_IMPLEMENTATION_FORBIDDEN_MESSAGE);
-                }
-                $reservedImpl = ReservedBuiltinClass::compileTimeImplementsForbiddenMessage(
-                    $enum['display'],
-                    $targetLc
-                );
-                if (null !== $reservedImpl) {
-                    throw new \CompileError($reservedImpl);
-                }
                 if (isset($this->nonInterfaces[$targetLc])) {
                     throw new \CompileError(sprintf(
                         '%s cannot implement %s - it is not an interface',

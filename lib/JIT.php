@@ -9831,6 +9831,15 @@ class JIT {
                 case OpCode::TYPE_DECLARE_ENUM:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
+                    if ([] !== $op->classImplements) {
+                        JIT\ImplementsHierarchyJitGuard::emitBeforeDeclare(
+                            $this->context,
+                            $nameOp->value,
+                            $op->classImplements,
+                            $block->scriptPath(),
+                            $op->sourceLocation
+                        );
+                    }
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareEnum($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);
@@ -9863,6 +9872,15 @@ class JIT {
                 case OpCode::TYPE_DECLARE_CLASS:
                     $nameOp = $block->getOperand($op->arg1);
                     assert($nameOp instanceof Operand\Literal);
+                    if ([] !== $op->classImplements) {
+                        JIT\ImplementsHierarchyJitGuard::emitBeforeDeclare(
+                            $this->context,
+                            $nameOp->value,
+                            $op->classImplements,
+                            $block->scriptPath(),
+                            $op->sourceLocation
+                        );
+                    }
                     $this->context->pushScope();
                     $this->context->scope->classId = $this->context->type->object->declareClass($nameOp);
                     $this->context->scope->className = strtolower($nameOp->value);

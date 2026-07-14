@@ -6152,6 +6152,13 @@ restart:
                     $classEntry->attributeNames = $op->attributeNames;
                     $classEntry->attributeEntries = $op->attributeEntries;
                     $classEntry->classDeprecated = $op->deprecatedMetadata;
+                    VM\ImplementsHierarchyRuntimeCheck::assertAllowed(
+                        $name,
+                        $op->classImplements,
+                        $this->context,
+                        $frame,
+                        $op->sourceLocation
+                    );
                     self::defineClass($classEntry, $op->block1, $frame);
                     $this->inheritFromInterfaces($classEntry);
                     VM\EnumSupport::ensureBuiltinCasesMethod($classEntry);
@@ -6202,6 +6209,13 @@ restart:
                     $classEntry->attributeEntries = $op->attributeEntries;
                     $classEntry->classDeprecated = $op->deprecatedMetadata;
                     $classEntry->sourceLocation = $op->sourceLocation;
+                    VM\ImplementsHierarchyRuntimeCheck::assertAllowed(
+                        $name,
+                        $op->classImplements,
+                        $this->context,
+                        $frame,
+                        $op->sourceLocation
+                    );
                     self::defineClass($classEntry, $op->block1, $frame);
                     if (!$parentPending && null !== $classEntry->parentLc) {
                         $this->inheritFromParent($classEntry);

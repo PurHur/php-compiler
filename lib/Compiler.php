@@ -68,6 +68,7 @@ use PHPCompiler\Compiler\FinalClassConstCheck;
 use PHPCompiler\Compiler\TraitClassConstConflictCheck;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
 use PHPCompiler\Compiler\ImplementsHierarchyCompileCheck;
+use PHPCompiler\VM\ImplementsHierarchyRuntimeCheck;
 use PHPCompiler\Compiler\FinalMethodOverrideCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\ParameterMetadata;
@@ -2004,6 +2005,17 @@ class Compiler {
         foreach ($ops as $child) {
             switch (get_class($child)) {
                 case Op\Stmt\Class_::class:
+                    $className = $this->staticNameFromOperand($child->name);
+                    $interfaceLcs = $this->interfaceNamesFromOperands($child->implements);
+                    if (
+                        null !== $className
+                        && ImplementsHierarchyRuntimeCheck::requiresSourceOrderRegistration(
+                            ltrim($className, '\\'),
+                            $interfaceLcs
+                        )
+                    ) {
+                        break;
+                    }
                     $block->addOpCode($this->compileClassLike($child, $block));
                     break;
                 case Op\Stmt\Interface_::class:
@@ -2148,10 +2160,22 @@ class Compiler {
             $this->debugWriteLastPhase('Compiler::compileOps op', $block, $child);
             switch (get_class($child)) {
                 case Op\Stmt\Function_::class:
-                case Op\Stmt\Class_::class:
                 case Op\Terminal\Const_::class:
                 case Op\Stmt\Interface_::class:
                 case Op\Stmt\Trait_::class:
+                    break;
+                case Op\Stmt\Class_::class:
+                    $className = $this->staticNameFromOperand($child->name);
+                    $interfaceLcs = $this->interfaceNamesFromOperands($child->implements);
+                    if (
+                        null !== $className
+                        && ImplementsHierarchyRuntimeCheck::requiresSourceOrderRegistration(
+                            ltrim($className, '\\'),
+                            $interfaceLcs
+                        )
+                    ) {
+                        $block->addOpCode($this->compileClassLike($child, $block));
+                    }
                     break;
                 case Op\Stmt\Enum_::class:
                     $block->addOpCode($this->compileEnum($child, $block));
