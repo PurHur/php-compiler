@@ -38,7 +38,8 @@ final class JitStringBuiltinArg
         int $argIndex,
         string $paramName,
         string $expectedType = 'string',
-        ?string $arrayExpectedType = null
+        ?string $arrayExpectedType = null,
+        bool $rejectNullOnForwardProfile = true
     ): Value {
         if ($context->callerStrictTypes) {
             if (Variable::TYPE_VALUE === $arg->type || Variable::TYPE_OBJECT === $arg->type) {
@@ -60,7 +61,16 @@ final class JitStringBuiltinArg
             return JitStringArg::lower($context, $arg, "{$function}() argument #" . ($argIndex + 1));
         }
 
-        return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
+        return self::lower(
+            $context,
+            $arg,
+            $function,
+            $argIndex,
+            $paramName,
+            $expectedType,
+            $arrayExpectedType,
+            $rejectNullOnForwardProfile
+        );
     }
 
     /**

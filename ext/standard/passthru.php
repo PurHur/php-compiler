@@ -29,7 +29,7 @@ final class passthru extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('passthru() accepts one or two arguments in this compiler build');
         }
-        $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'passthru', 'command');
+        $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'passthru', 'command', false);
         VmString::rejectEmptyBuiltinStringArg($command, 'passthru', 0, 'command');
         $result = VmExecNative::run($command);
         if (false !== $result) {

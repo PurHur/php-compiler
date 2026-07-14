@@ -24,7 +24,7 @@ final class scandir extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('scandir() requires one or two arguments in this compiler build');
         }
-        $path = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'scandir', 'directory');
+        $path = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'scandir', 'directory', false);
         VmString::rejectEmptyBuiltinStringArg($path, 'scandir', 0, 'directory');
         $sortingOrder = \SCANDIR_SORT_ASCENDING;
         if (2 === $argc) {
@@ -81,11 +81,11 @@ final class scandir extends Internal
      */
     private static function vmDirectoryArg(Variable $var): string
     {
-        return VmString::coerceStringBuiltinArg($var, 'scandir', 0, 'directory');
+        return VmString::coerceStringBuiltinArg($var, 'scandir', 0, 'directory', 'string', false);
     }
 
     private static function jitDirectoryArg(Context $context, JITVariable $arg): Value
     {
-        return JitStringBuiltinArg::lower($context, $arg, 'scandir', 0, 'directory');
+        return JitStringBuiltinArg::lower($context, $arg, 'scandir', 0, 'directory', 'string', null, false);
     }
 }
