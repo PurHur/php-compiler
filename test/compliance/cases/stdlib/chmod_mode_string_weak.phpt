@@ -22,4 +22,4 @@ echo $dmode, "\n";
 chmod_ok
 644
 mkdir_ok
-341
+755
