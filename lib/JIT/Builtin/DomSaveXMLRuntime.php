@@ -25,16 +25,19 @@ final class DomSaveXMLRuntime
     public static function ensureLinked(Context $context): void
     {
         if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            DomDocumentMethodUserScriptLlvm::ensureSaveXMLBridge($context);
+
             return;
         }
 
         $objPtr = $context->getTypeFromString('__object__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
         $strPtr = $context->getTypeFromString('__string__*');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_NAME,
             'dom_save_xml_bridge',
-            [$objPtr],
+            [$objPtr, $valuePtr],
             $strPtr,
             self::HELPER,
             self::HELPER_PATH,
