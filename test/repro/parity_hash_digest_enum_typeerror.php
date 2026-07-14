@@ -10,6 +10,8 @@ foreach ([
     ['md5', fn () => md5(E::A)],
     ['sha1', fn () => sha1(E::A)],
     ['crc32', fn () => crc32(E::A)],
+    ['bin2hex', fn () => bin2hex(E::A)],
+    ['base64_encode', fn () => base64_encode(E::A)],
 ] as [$name, $call]) {
     try {
         $call();
