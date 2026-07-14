@@ -9,13 +9,14 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for __compiler_convert_uu* via ConvertUuJitHelper PHP (#13227).
  *
- * Embed and standalone AOT compile the same PHP bridge; no uuencode LLVM monolith.
+ * Embed/JIT use ConvertUuJitHelper PHP bridge; standalone user-script AOT defers to LLVM (#4567).
  * php-src: ext/standard/uuencode.c
  */
 final class StringConvertUu
@@ -57,11 +58,35 @@ final class StringConvertUu
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
         $encodeProbe = $context->module->getNamedFunction('__compiler_convert_uuencode');
         $decodeProbe = $context->module->getNamedFunction('__compiler_convert_uudecode');
         if (null !== $encodeProbe && $encodeProbe->countBasicBlocks() > 0
             && null !== $decodeProbe && $decodeProbe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+            if (null !== $savedInsert) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
+
+            return;
+        }
+
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StringConvertUuEncodeLlvm::implement($context);
+            StringConvertUuDecodeLlvm::implement($context);
+            self::registerLinkedRuntime($context);
+            if (null !== $savedInsert) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
 
             return;
         }
@@ -70,7 +95,11 @@ final class StringConvertUu
         self::implementEncodeBridge($context);
         self::implementDecodeBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementEncodeBridge(Context $context): void
@@ -123,6 +152,9 @@ final class StringConvertUu
             );
 
         $entry = $fn->appendBasicBlock('convert_uu_decode_bridge_entry');
+        $falseBb = $fn->appendBasicBlock('convert_uu_decode_false');
+        $stringBb = $fn->appendBasicBlock('convert_uu_decode_string');
+        $doneBb = $fn->appendBasicBlock('convert_uu_decode_done');
         $context->builder->positionAtEnd($entry);
 
         $out = $fn->getParam(1);
@@ -133,10 +165,6 @@ final class StringConvertUu
             [$fn->getParam(0)]
         );
         $tagI32 = $context->builder->trunc($tag, $i32);
-
-        $falseBb = BasicBlockHelper::append($context, 'convert_uu_decode_false');
-        $stringBb = BasicBlockHelper::append($context, 'convert_uu_decode_string');
-        $doneBb = BasicBlockHelper::append($context, 'convert_uu_decode_done');
 
         $isFalse = $context->builder->icmp(Builder::INT_EQ, $tagI32, $i32->constInt(self::TAG_FALSE, false));
         $context->builder->branchIf($isFalse, $falseBb, $stringBb);
