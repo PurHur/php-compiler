@@ -33,7 +33,12 @@ final class nl2br extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('nl2br() requires one or two arguments');
         }
-        $subject = VmString::stringBuiltinArgForFrame($frame, 0, 'nl2br', 0, 'string');
+        $subject = VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'nl2br',
+            0,
+            'string'
+        );
         $useXhtml = true;
         if (2 === $argc) {
             $useXhtml = self::resolveUseXhtmlBool($frame, 1);
@@ -64,7 +69,7 @@ final class nl2br extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'nl2br', 0, 'string');
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'nl2br', 0, 'string');
         $i8 = $context->getTypeFromString('int8');
         $useXhtmlI8 = $i8->constInt(1, false);
         if (2 === $argc) {

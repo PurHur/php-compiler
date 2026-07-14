@@ -113,16 +113,39 @@ final class VmString
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
-    public static function coerceStringBuiltinArg(
+    /**
+     * Z_PARAM_STR null coercion — survives 8.4 forward profile (#18821, #18822, ext/standard/string.c).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceZparamStrBuiltinArg(
         Variable $var,
         string $function,
         int $argIndex = 0,
         string $paramName = 'string',
         string $expectedType = 'string'
     ): string {
+        return self::coerceStringBuiltinArg(
+            $var,
+            $function,
+            $argIndex,
+            $paramName,
+            $expectedType,
+            false
+        );
+    }
+
+    public static function coerceStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string',
+        string $expectedType = 'string',
+        bool $rejectNullOnForwardProfile = true
+    ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            if (self::requiresForwardProfileStrictStringNull()) {
+            if ($rejectNullOnForwardProfile && self::requiresForwardProfileStrictStringNull()) {
                 throw new \TypeError(
                     self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null', $expectedType)
                 );
@@ -307,6 +330,11 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            if (self::requiresForwardProfileStrictStringNull()) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null')
+                );
+            }
             VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
 
             return '';

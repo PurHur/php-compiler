@@ -29,7 +29,12 @@ final class hebrev extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('hebrev() accepts one or two arguments in this compiler build');
         }
-        $string = VmString::stringBuiltinArgForFrame($frame, 0, 'hebrev', 0, 'string');
+        $string = VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'hebrev',
+            0,
+            'string'
+        );
         $maxCharsPerLine = 0;
         if ($argc >= 2) {
             $maxVar = $frame->calledArgs[1]->resolveIndirect();

@@ -57,7 +57,7 @@ final class crc32 extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'crc32', 'string')->toString();
         }
 
-        return VmString::coerceStringBuiltinArg(
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[$argIndex],
             'crc32',
             $argIndex,
