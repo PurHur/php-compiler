@@ -84,7 +84,7 @@ final class metaphone extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'metaphone', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[$argIndex],
             'metaphone',
             $argIndex,
@@ -100,7 +100,7 @@ final class metaphone extends Internal
     ): Value {
         JitInternalStrictArg::requireString($context, $arg, 'metaphone', $paramName, $argNumber);
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTypedString(
             $context,
             $arg,
             'metaphone',

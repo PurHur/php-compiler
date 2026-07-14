@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -22,7 +23,7 @@ final class HashTableReadLlvm
         $tag = 'rb'.(string) self::nextSeq();
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
-        $entryPtr = HashTableHelper::listEntryPointer($context, $ht, $index);
+        $entryPtr = self::listEntryPointer($context, $ht, $index);
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($entryPtr, $valueMap['type'])
@@ -750,6 +751,64 @@ final class HashTableReadLlvm
         $result->addIncoming($ht, $ready);
 
         return $result;
+    }
+
+    /**
+     * Load a native {@see __hashtable__*} from a boxed or direct array variable (#107, #18942 v8).
+     */
+    public static function loadHashtablePointer(Context $context, Variable $array): Value
+    {
+        if (Variable::TYPE_STRING === $array->type) {
+            ErrorRaise::registerDeclarations($context);
+            ErrorRaise::ensureLinked($context);
+            ErrorRaise::emitRaise(
+                $context,
+                \PHPCompiler\VM\TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE
+            );
+
+            return $context->getTypeFromString('__hashtable__*')->constNull();
+        }
+        if (null !== $array->objectPropertySlot) {
+            if (Variable::TYPE_HASHTABLE === ($array->objectPropertyType ?? null)) {
+                return $context->builder->pointerCast(
+                    $context->builder->load($array->objectPropertySlot),
+                    $context->getTypeFromString('__hashtable__*')
+                );
+            }
+
+            return self::ensureHashtablePointer($context, $array);
+        }
+        if (Variable::TYPE_HASHTABLE === $array->type) {
+            return $context->helper->loadValue($array);
+        }
+        if (Variable::TYPE_VALUE === $array->type || $array->valueBoxHashtable) {
+            return self::ensureHashtablePointer($context, $array);
+        }
+
+        throw new \LogicException(
+            'Array offset access requires hashtable or boxed array, got '
+            .Variable::getStringType($array->type)
+        );
+    }
+
+    public static function listEntryPointer(Context $context, Value $ht, Value $index): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $values = $context->builder->load(
+            $context->builder->structGep($ht, $map['values'])
+        );
+
+        return $context->builder->inBoundsGep($values, $index);
+    }
+
+    public static function readStringAt(Context $context, Value $ht, Value $index): Value
+    {
+        $entry = self::listEntryPointer($context, $ht, $index);
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $entry
+        );
     }
 
 }

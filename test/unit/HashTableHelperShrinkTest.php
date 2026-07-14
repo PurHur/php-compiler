@@ -6,10 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** HashTableHelper v1–v7 slices route DefineRuntime + splits read/write/spread/ensure LLVM (#10031, #17809, #17824, #17865). */
+/** HashTableHelper v1–v8 slices route DefineRuntime + splits read/write/spread/ensure/init LLVM (#10031, #18942). */
 final class HashTableHelperShrinkTest extends TestCase
 {
-    private const HELPER_MAX_LINES = 720;
+    private const HELPER_MAX_LINES = 550;
 
     public function testHashTableHelperDelegatesWriteLlvm(): void
     {
@@ -107,7 +107,7 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertLessThanOrEqual(
             self::HELPER_MAX_LINES,
             $lines,
-            'HashTableHelper.php should shrink as LLVM moves to Read/WriteLlvm (#10031 v4, #17809 v5, #17824 v6, #17865 v7)'
+            'HashTableHelper.php should shrink as LLVM moves to Read/WriteLlvm (#10031 v4–v8, #18942)'
         );
     }
 
@@ -169,5 +169,29 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertStringContainsString('public static function setValueBoxKey', $write);
         $this->assertStringContainsString('public static function setAtObjectKey', $write);
         $this->assertStringContainsString('public static function setAtKeyCoercingNumericString', $write);
+    }
+
+    public function testHashTableHelperDelegatesInitAndMaterializeLlvmV8(): void
+    {
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableHelper.php');
+        $this->assertStringContainsString('HashTableWriteLlvm::initArray', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::variableFromVmHashTable', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::packVariables', $helper);
+        $this->assertStringContainsString('HashTableWriteLlvm::objectPointerAsStringKey', $helper);
+        $this->assertStringContainsString('HashTableReadLlvm::loadHashtablePointer', $helper);
+        $this->assertStringContainsString('HashTableReadLlvm::listEntryPointer', $helper);
+        $this->assertStringContainsString('HashTableReadLlvm::readStringAt', $helper);
+        $this->assertStringNotContainsString('function ensureHashtableInitLvalueSlot', $helper);
+        $this->assertStringNotContainsString('ht_ensure_box_init', $helper);
+        $this->assertStringNotContainsString('spl_key_buf', $helper);
+
+        $write = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableWriteLlvm.php');
+        $this->assertStringContainsString('public static function initArray', $write);
+        $this->assertStringContainsString('public static function variableFromVmHashTable', $write);
+        $this->assertStringContainsString('public static function packVariables', $write);
+
+        $read = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableReadLlvm.php');
+        $this->assertStringContainsString('public static function loadHashtablePointer', $read);
+        $this->assertStringContainsString('public static function listEntryPointer', $read);
     }
 }

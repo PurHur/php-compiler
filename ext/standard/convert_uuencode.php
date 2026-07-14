@@ -27,7 +27,7 @@ final class convert_uuencode extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'convert_uuencode', 0, 'string');
+        $data = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'convert_uuencode', 0, 'string');
         $frame->returnVar->string(VmString::convert_uuencode($data));
     }
 
@@ -39,7 +39,7 @@ final class convert_uuencode extends Internal
 
         return JitConvertUuencode::encode(
             $context,
-            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'convert_uuencode', 0, 'string')
+            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'convert_uuencode', 0, 'string')
         );
     }
 }

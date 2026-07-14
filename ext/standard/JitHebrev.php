@@ -28,7 +28,7 @@ final class JitHebrev
             return self::materializeString($context, VmHebrev::convert($strLit, $maxLit));
         }
 
-        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'hebrev', 0, 'string');
+        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'hebrev', 0, 'string');
         $i64 = $context->getTypeFromString('int64');
         $max = $argc >= 2
             ? JitStrictIntArg::lower($context, $args[1], 'hebrev', 2, 'max_chars_per_line')

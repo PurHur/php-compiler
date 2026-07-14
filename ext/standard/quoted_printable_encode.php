@@ -24,7 +24,7 @@ final class quoted_printable_encode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('quoted_printable_encode() requires exactly one argument in this compiler build');
         }
-        $data = VmString::coerceZparamStrBuiltinArg(
+        $data = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'quoted_printable_encode',
             0,
@@ -43,7 +43,7 @@ final class quoted_printable_encode extends Internal
         }
         return JitQuotedPrintableEncode::encode(
             $context,
-            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'quoted_printable_encode', 0, 'string'),
+            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'quoted_printable_encode', 0, 'string'),
             $args[0]
         );
     }
