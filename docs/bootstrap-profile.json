@@ -370,8 +370,13 @@
         "ext/filter/filter_var.php",
         "ext/filter/filter_var_array.php",
         "ext/ftp/BuiltinClasses.php",
+        "ext/ftp/FtpExtensionPolicy.php",
         "ext/ftp/Module.php",
+        "ext/ftp/VmFtpArg.php",
         "ext/ftp/VmFtpConnection.php",
+        "ext/ftp/VmFtpCore.php",
+        "ext/ftp/ftp_close.php",
+        "ext/ftp/ftp_connect.php",
         "ext/gd/BuiltinClasses.php",
         "ext/gd/GdExtensionPolicy.php",
         "ext/gd/GdFunction.php",
@@ -3807,7 +3812,6 @@
         "lib/JIT/Builtin/StringHrtimeRuntime.php",
         "lib/JIT/Builtin/StringHtmlspecialchars.php",
         "lib/JIT/Builtin/StringHtmlspecialcharsDecode.php",
-        "lib/JIT/Builtin/StringHtmlspecialcharsDecodeLlvm.php",
         "lib/JIT/Builtin/StringHtmlspecialcharsUserScriptLlvm.php",
         "lib/JIT/Builtin/StringHttpBuildQuery.php",
         "lib/JIT/Builtin/StringIdate.php",
@@ -5111,9 +5115,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4877,
+        "inventory_files": 4881,
         "excluded": 0,
-        "eligible": 4877,
+        "eligible": 4881,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

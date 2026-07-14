@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4876 |
-| Phase A inventory files (M2 ratio SSOT) | 4876 |
+| PHP files on vm.php path | 4881 |
+| Phase A inventory files (M2 ratio SSOT) | 4881 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13077 |
+| Source constructs flagged (warnings) | 13088 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -366,8 +366,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/filter/filter_var.php` | 0 | 1 |
 | `ext/filter/filter_var_array.php` | 0 | 1 |
 | `ext/ftp/BuiltinClasses.php` | 0 | 1 |
-| `ext/ftp/Module.php` | 0 | 1 |
+| `ext/ftp/FtpExtensionPolicy.php` | 0 | 1 |
+| `ext/ftp/Module.php` | 0 | 3 |
+| `ext/ftp/VmFtpArg.php` | 0 | 1 |
 | `ext/ftp/VmFtpConnection.php` | 0 | 2 |
+| `ext/ftp/VmFtpCore.php` | 0 | 3 |
+| `ext/ftp/ftp_close.php` | 0 | 2 |
+| `ext/ftp/ftp_connect.php` | 0 | 2 |
 | `ext/gd/BuiltinClasses.php` | 0 | 2 |
 | `ext/gd/GdExtensionPolicy.php` | 0 | 1 |
 | `ext/gd/GdFunction.php` | 0 | 3 |
@@ -7174,16 +7179,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/ftp/FtpExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/ftp/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- new ftp_connect (line 52)
+- new ftp_close (line 53)
+- 4 class method(s)
+
+### `ext/ftp/VmFtpArg.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/ftp/VmFtpConnection.php`
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 25)
 - 1 class method(s)
+
+### `ext/ftp/VmFtpCore.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 46)
+- new ObjectEntry (line 47)
+- 11 class method(s)
+
+### `ext/ftp/ftp_close.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/ftp/ftp_connect.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
 
 ### `ext/gd/BuiltinClasses.php`
 
@@ -23756,8 +23792,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/substr_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 226)
-- new Variable (line 270)
+- new HashTable (line 230)
+- new Variable (line 274)
 - 10 class method(s)
 
 ### `ext/standard/symlink_.php`
