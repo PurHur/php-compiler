@@ -2409,10 +2409,11 @@ final class CompilerVersion
     }
 
     /**
-     * Forward DOM APIs gated like compareDocumentPosition (#18504, #18608).
+     * Forward DOM APIs gated like str_increment() (#18614) and compareDocumentPosition (#18504).
      *
-     * Default `8.4.0-dev` line enables PHP 8.3+/8.4+ DOM methods (`version_compare` treats
-     * `-dev` below stable). Pin `PHP_COMPILER_PROFILE=8.2` to withhold like Zend 8.2.
+     * Unset `PHP_COMPILER_PROFILE` on `8.4.0-dev` withholds PHP 8.3+/8.4+ DOM methods so
+     * `method_exists` matches Zend 8.2 while `phpversion()` reports 8.2.31. Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
      */
     private static function supportsDomApiSince(string $since): bool
     {
@@ -2422,11 +2423,7 @@ final class CompilerVersion
 
         $raw = getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
-            if (preg_match('/^(\d+\.\d+)/', $since, $m)) {
-                return version_compare(self::VERSION, $m[1], '>=');
-            }
-
-            return version_compare(self::VERSION, $since, '>=');
+            return false;
         }
 
         return version_compare(self::languageProfileVersion(), $since, '>=');
