@@ -31,7 +31,8 @@ final class disk_free_space extends Internal
         if ($argc >= 1) {
             $resolved = $frame->calledArgs[0]->resolveIndirect();
             if (Variable::TYPE_NULL === $resolved->type) {
-                if (InternalStrictArg::isCallerStrict($frame)) {
+                if (InternalStrictArg::isCallerStrict($frame)
+                    || VmString::requiresForwardProfileStrictStringNull()) {
                     throw new \TypeError(
                         $fn.'(): Argument #1 ($directory) must be of type string, null given'
                     );

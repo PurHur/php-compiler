@@ -29,7 +29,7 @@ final class JitDiskPath
             return self::nullDirectoryFailureBoxed($context, $function);
         }
         if (JITVariable::TYPE_NULL === $arg->type) {
-            if ($context->callerStrictTypes) {
+            if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
                 self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'null'));
             }
 
@@ -96,7 +96,7 @@ final class JitDiskPath
         $context->builder->branchIf($isNull, $nullBlock, $arrayBlock);
 
         $context->builder->positionAtEnd($nullBlock);
-        if ($context->callerStrictTypes) {
+        if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
             self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'null'));
         }
         $nullResult = self::nullDirectoryFailureBoxed($context, $function);

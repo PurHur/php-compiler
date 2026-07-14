@@ -61,7 +61,8 @@ final class PackEngine
                 case 'a':
                 case 'A':
                 case 'Z':
-                    $str = self::argString($args[$currentArg++], $frame);
+                    $valueIdx = $currentArg;
+                    $str = self::argString($args[$currentArg++], $frame, $valueIdx);
                     $argCp = 'Z' !== $code ? $arg : ($arg > 0 ? $arg - 1 : 0);
                     $pad = 'A' === $code ? ' ' : "\0";
                     $chunk = \str_pad(\substr($str, 0, $argCp), $arg, $pad);
@@ -70,7 +71,8 @@ final class PackEngine
                     break;
                 case 'h':
                 case 'H':
-                    $str = self::argString($args[$currentArg++], $frame);
+                    $valueIdx = $currentArg;
+                    $str = self::argString($args[$currentArg++], $frame, $valueIdx);
                     $packed = self::packHex($str, $arg, 'H' === $code);
                     $output = self::writeAt($output, $outputPos, $packed);
                     $outputPos += \strlen($packed);
@@ -310,7 +312,7 @@ final class PackEngine
                         throw new \ValueError(\sprintf('Type %s: not enough arguments', $code));
                     }
                     if ($arg < 0) {
-                        $str = self::argString($args[$currentArg] ?? '', $frame);
+                        $str = self::argString($args[$currentArg] ?? '', $frame, $currentArg);
                         $arg = \strlen($str);
                         if ('Z' === $code) {
                             ++$arg;
@@ -571,10 +573,11 @@ final class PackEngine
         return self::argDouble($args[$idx], $frame, $idx);
     }
 
-    private static function argString(mixed $value, ?Frame $frame = null): string
+    private static function argString(mixed $value, ?Frame $frame = null, int $valueArgIndex = 0): string
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
+            self::rejectNullForwardProfileValue($resolved, $valueArgIndex);
             EnumCaseSupport::packRejectStringOperand($resolved);
             if (Variable::TYPE_STRING === $resolved->type) {
                 return $resolved->toString();
@@ -614,6 +617,7 @@ final class PackEngine
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
+            self::rejectNullForwardProfileValue($resolved, $valueArgIndex);
             $enumLong = EnumCaseSupport::packCoerceToLong($resolved, $frame?->vmContext, $frame);
             if (null !== $enumLong) {
                 return $enumLong;
@@ -656,6 +660,7 @@ final class PackEngine
     {
         if ($value instanceof Variable) {
             $resolved = $value->resolveIndirect();
+            self::rejectNullForwardProfileValue($resolved, $valueArgIndex);
             $enumDouble = EnumCaseSupport::packCoerceToDouble($resolved, $frame?->vmContext, $frame);
             if (null !== $enumDouble) {
                 return $enumDouble;
@@ -689,6 +694,17 @@ final class PackEngine
         }
 
         return 0.0;
+    }
+
+    /** php-src ext/standard/pack.c — Z_PARAM_STR null TypeError on 8.4 forward profile (#18992). */
+    private static function rejectNullForwardProfileValue(Variable $resolved, int $valueArgIndex): void
+    {
+        if (Variable::TYPE_NULL === $resolved->type && VmString::requiresForwardProfileStrictStringNull()) {
+            throw new \TypeError(\sprintf(
+                'pack(): Argument #%d ($values) must be of type string, null given',
+                $valueArgIndex + 2
+            ));
+        }
     }
 
 }
