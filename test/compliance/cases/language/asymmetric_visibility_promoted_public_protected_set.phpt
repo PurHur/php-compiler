@@ -1,21 +1,12 @@
 --TEST--
-Language: promoted public protected(set) unparenthesized — parses and reads (#16161, Zend/zend_compile.c)
---SKIPIF--
-<?php
-if (!class_exists('PHPCompiler\\CompilerVersion')) {
-    require __DIR__ . '/../../../../vendor/autoload.php';
-}
-if (!PHPCompiler\CompilerVersion::supportsAsymmetricVisibility()) {
-    die('skip requires PHP_COMPILER_PROFILE=8.4 asymmetric visibility gate');
-}
-?>
+Language: promoted public protected(set) unparenthesized — compile fatal (#18805, Zend/zend_compile.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-class D {
+class C {
     public function __construct(public protected(set) string $n = 'ok') {}
 }
-echo (new D())->n, "\n";
---EXPECT--
-ok
+echo (new C())->n, "\n";
+--EXPECT_EXIT--
+255
