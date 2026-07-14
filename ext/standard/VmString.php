@@ -114,7 +114,7 @@ final class VmString
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
     /**
-     * Z_PARAM_STR null coercion — survives 8.4 forward profile (#18821, #18822, ext/standard/string.c).
+     * Z_PARAM_STR — null TypeError on 8.4 forward profile (#18837, #18838, ext/standard/string.c).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
@@ -130,8 +130,7 @@ final class VmString
             $function,
             $argIndex,
             $paramName,
-            $expectedType,
-            false
+            $expectedType
         );
     }
 

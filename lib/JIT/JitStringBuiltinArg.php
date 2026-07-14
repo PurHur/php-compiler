@@ -64,7 +64,7 @@ final class JitStringBuiltinArg
     }
 
     /**
-     * Z_PARAM_STR null coercion — survives 8.4 forward profile (#18821, #18822, ext/standard/string.c).
+     * Z_PARAM_STR — null TypeError on 8.4 forward profile (#18837, #18838, ext/standard/string.c).
      */
     public static function lowerZparamStr(
         Context $context,
@@ -82,8 +82,7 @@ final class JitStringBuiltinArg
             $argIndex,
             $paramName,
             $expectedType,
-            $arrayExpectedType,
-            false
+            $arrayExpectedType
         );
     }
 
