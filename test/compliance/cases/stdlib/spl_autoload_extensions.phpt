@@ -7,9 +7,10 @@ declare(strict_types=1);
 echo spl_autoload_extensions(), "\n";
 spl_autoload_extensions('.test,.phpt');
 echo spl_autoload_extensions(), "\n";
-spl_autoload_extensions(null);
+echo spl_autoload_extensions(null), "\n";
 echo spl_autoload_extensions(), "\n";
 --EXPECT--
 .inc,.php
 .test,.phpt
-.inc,.php
+.test,.phpt
+.test,.phpt

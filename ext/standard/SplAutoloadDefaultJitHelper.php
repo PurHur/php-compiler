@@ -27,7 +27,7 @@ final class SplAutoloadDefaultJitHelper
 
     public static function extensionsArgv(bool $hasArg, ?string $fileExts): string
     {
-        if ($hasArg) {
+        if ($hasArg && null !== $fileExts) {
             VmSplAutoload::setFileExtensions($fileExts);
         }
 
