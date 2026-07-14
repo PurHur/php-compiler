@@ -44,6 +44,7 @@ function collectCapabilities(string $root): array
         'uuid' => new PHPCompiler\ext\uuid\Module(),
         'uploadprogress' => new PHPCompiler\ext\uploadprogress\Module(),
         'sysvshm' => new PHPCompiler\ext\sysvshm\Module(),
+        'sysvsem' => new PHPCompiler\ext\sysvsem\Module(),
     ];
 
     $capabilities = [];
