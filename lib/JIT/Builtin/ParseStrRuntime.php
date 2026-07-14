@@ -186,6 +186,9 @@ final class ParseStrRuntime
         }
 
         $fn = null !== $probe && $probe->countBasicBlocks() > 0 ? $probe : self::declareFunction($context, $name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0 && !self::bridgeBodyComplete($probe)) {
+            self::clearFunctionBody($fn);
+        }
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
@@ -222,12 +225,16 @@ final class ParseStrRuntime
         $context->builder->positionAtEnd($work);
         $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#13827');
         $destI64 = JitNestedHelperCoerce::ptrToI64($context, $dest);
+        $i64 = $context->getTypeFromString('int64');
+        $destSlot = $context->builder->alloca($i64, 1);
+        $context->builder->store($destI64, $destSlot);
+        $destArg = $context->builder->load($destSlot);
         $encodedArg = JitNestedHelperCoerce::coerceArgForHelper(
             $context,
             $encoded,
             $helperFn->getParam(1)->typeOf()
         );
-        $context->builder->call($helperFn, $destI64, $encodedArg);
+        JitNestedHelperCoerce::callHelper($context, $helperFn, [$destArg, $encodedArg]);
         $context->builder->returnVoid();
     }
 
@@ -260,12 +267,16 @@ final class ParseStrRuntime
         $context->builder->positionAtEnd($work);
         $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#13827');
         $destI64 = JitNestedHelperCoerce::ptrToI64($context, $dest);
+        $i64 = $context->getTypeFromString('int64');
+        $destSlot = $context->builder->alloca($i64, 1);
+        $context->builder->store($destI64, $destSlot);
+        $destArg = $context->builder->load($destSlot);
         $headerArg = JitNestedHelperCoerce::coerceArgForHelper(
             $context,
             $header,
             $helperFn->getParam(1)->typeOf()
         );
-        $context->builder->call($helperFn, $destI64, $headerArg);
+        JitNestedHelperCoerce::callHelper($context, $helperFn, [$destArg, $headerArg]);
         $context->builder->returnVoid();
     }
 
@@ -288,6 +299,13 @@ final class ParseStrRuntime
         }
 
         return false;
+    }
+
+    private static function clearFunctionBody(LlvmFunction $fn): void
+    {
+        foreach (array_reverse($fn->getBasicBlocks()) as $block) {
+            $block->delete();
+        }
     }
 
     private static function registerLinkedRuntime(Context $context): void

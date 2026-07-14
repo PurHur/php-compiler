@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /**
  * parse_str dispatch — embed + standalone AOT via ParseStrRuntime PHP (#9295, #13360, #13429).
@@ -27,6 +28,12 @@ final class StringParseStr
 
     public static function implement(Context $context): void
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            ParseStrRuntime::ensureUserScriptLinked($context);
+
+            return;
+        }
+
         $fn = $context->module->getNamedFunction(self::RUNTIME_FUNCTION);
         if (null !== $fn && $fn->countBasicBlocks() > 0) {
             $context->registerFunction(self::RUNTIME_FUNCTION, $fn);
