@@ -258,7 +258,7 @@ final class JitDate
         if ($argc > 2) {
             throw new \ArgumentCountError("{$function}() expects at most 2 arguments, {$argc} given");
         }
-        $format = JitStringBuiltinArg::lower($context, $args[0], $function, 0, 'format', 'string', null, false);
+        $format = JitStringBuiltinArg::lower($context, $args[0], $function, 0, 'format', 'string');
         $i64 = $context->getTypeFromString('int64');
         $timestamp = $argc >= 2
             ? JitDateTimestampArg::lowerNullable(

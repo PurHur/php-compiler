@@ -49,9 +49,7 @@ final class gmdate extends Internal
             $frame->calledArgs[0],
             'gmdate',
             0,
-            'format',
-            'string',
-            false
+            'format'
         );
     }
 }

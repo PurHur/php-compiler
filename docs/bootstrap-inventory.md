@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4848 |
-| Phase A inventory files (M2 ratio SSOT) | 4848 |
+| PHP files on vm.php path | 4846 |
+| Phase A inventory files (M2 ratio SSOT) | 4846 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13020 |
+| Source constructs flagged (warnings) | 13016 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1124,7 +1124,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitAttributeExists.php` | 0 | 1 |
 | `ext/standard/JitBase64Decode.php` | 0 | 1 |
 | `ext/standard/JitBase64Encode.php` | 0 | 1 |
-| `ext/standard/JitBin2hex.php` | 0 | 1 |
 | `ext/standard/JitBuiltinWarning.php` | 0 | 1 |
 | `ext/standard/JitCallUserFunc.php` | 0 | 7 |
 | `ext/standard/JitChdir.php` | 0 | 1 |
@@ -3522,7 +3521,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ParamSensitiveLowering.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrNativeOpsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrRuntime.php` | 0 | 7 |
-| `lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrl.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlComponentJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlRuntime.php` | 0 | 3 |
@@ -3655,8 +3654,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringBase64DecodeLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBase64Encode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBase64EncodeLlvm.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringBin2hex.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringBin2hexLlvm.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringBin2hex.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringBrotli.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringBz2.php` | 0 | 1 |
@@ -12378,11 +12376,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
-### `ext/standard/JitBin2hex.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
 ### `ext/standard/JitBuiltinWarning.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15837,7 +15830,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ParseStrNativeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/ParseUrlJitHelper.php`
 
@@ -28170,15 +28163,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ParseStrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 338)
-- new phpc_native_ht_set_string_key (line 339)
-- new phpc_native_ht_set_string_key_ht (line 340)
-- new phpc_native_ht_set_string_at (line 341)
-- new phpc_native_ht_set_hashtable_at (line 342)
-- 16 class method(s)
+- new phpc_native_ht_alloc (line 387)
+- new phpc_native_ht_set_string_key (line 388)
+- new phpc_native_ht_set_string_key_ht (line 389)
+- new phpc_native_ht_set_string_at (line 390)
+- new phpc_native_ht_set_hashtable_at (line 391)
+- 18 class method(s)
 - 4 closure(s)
 
-### `lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php`
+### `lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php`
 
 **Warnings** (review for bootstrap subset):
 - 25 class method(s)
@@ -28956,14 +28949,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringBin2hex.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 125)
-- 7 class method(s)
-- 1 closure(s)
-
-### `lib/JIT/Builtin/StringBin2hexLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringBitwiseNot.php`
 

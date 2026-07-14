@@ -34,9 +34,9 @@ final class JitDebugBacktrace
 
         $block = $context->jitEnclosingBlock;
         if ($block instanceof Block && null !== $block->func) {
-            $function = $block->func->getScopedName();
-            if ('' === $function) {
-                $function = $block->func->name ?? '';
+            $function = $block->func->name ?? '';
+            if ('' === $function && null === $block->func->class) {
+                $function = '{closure}';
             }
             if ('' !== $function) {
                 self::appendUserFrame(
@@ -66,7 +66,14 @@ final class JitDebugBacktrace
         ?JITVariable $optionsArg
     ): void {
         $frame = HashTableHelper::alloc($context);
-        self::appendStringFrameToAssoc($context, $frame, $file, $function);
+        self::appendStringFrameToAssoc(
+            $context,
+            $frame,
+            $file,
+            $function,
+            self::frameClassName($block),
+            self::frameCallType($block)
+        );
 
         if ([] !== $block->paramNames) {
             $ignoreArgs = SensitiveParamHelper::ignoreArgsBit($context, $optionsArg);
@@ -166,7 +173,9 @@ final class JitDebugBacktrace
         Context $context,
         Value $frameHt,
         string $file,
-        string $function
+        string $function,
+        string $class = '',
+        string $callType = ''
     ): void {
         $fileJit = new JITVariable(
             $context,
@@ -195,15 +204,62 @@ final class JitDebugBacktrace
         HashTableHelper::setAtStringKey(
             $context,
             $frameHt,
-            $context->builder->load($context->constantStringFromString('function')),
-            $fnJit
-        );
-        HashTableHelper::setAtStringKey(
-            $context,
-            $frameHt,
             $context->builder->load($context->constantStringFromString('line')),
             $lineJit
         );
+        if ('' !== $class) {
+            $classJit = new JITVariable(
+                $context,
+                JITVariable::TYPE_STRING,
+                JITVariable::KIND_VALUE,
+                $context->builder->load($context->constantStringFromString($class))
+            );
+            HashTableHelper::setAtStringKey(
+                $context,
+                $frameHt,
+                $context->builder->load($context->constantStringFromString('class')),
+                $classJit
+            );
+            $typeJit = new JITVariable(
+                $context,
+                JITVariable::TYPE_STRING,
+                JITVariable::KIND_VALUE,
+                $context->builder->load($context->constantStringFromString('' !== $callType ? $callType : '->'))
+            );
+            HashTableHelper::setAtStringKey(
+                $context,
+                $frameHt,
+                $context->builder->load($context->constantStringFromString('type')),
+                $typeJit
+            );
+        }
+        HashTableHelper::setAtStringKey(
+            $context,
+            $frameHt,
+            $context->builder->load($context->constantStringFromString('function')),
+            $fnJit
+        );
+    }
+
+    private static function frameClassName(Block $block): string
+    {
+        if (null === $block->func || null === $block->func->class) {
+            return '';
+        }
+
+        return $block->func->class->value ?? $block->func->class->name ?? '';
+    }
+
+    private static function frameCallType(Block $block): string
+    {
+        if (null === $block->func || null === $block->func->class) {
+            return '';
+        }
+        if (($block->func->flags ?? 0) & Func::FLAG_STATIC) {
+            return '::';
+        }
+
+        return '->';
     }
 
     private static function wrapHashTable(Context $context, Value $ht): Value

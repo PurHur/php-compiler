@@ -8487,8 +8487,25 @@ restart:
         $lcClass = strtolower($className);
         if ('self' === $lcClass) {
             $declaring = $this->declaringClassLc($frame, 'self');
+            $fallback = $this->context->classes[$declaring]->name;
+            $funcClassLc = null;
+            $funcIsTrait = false;
+            if (null !== $frame->block->func && null !== $frame->block->func->class) {
+                $funcClassLc = $frame->block->func->class->value;
+                $funcLc = strtolower(ltrim($funcClassLc, '\\'));
+                $funcIsTrait = ($this->context->classes[$funcLc] ?? null)?->isTrait ?? false;
+            }
+            $calledLc = null !== $frame->calledClass && '' !== $frame->calledClass
+                ? $frame->calledClass
+                : null;
 
-            return $this->context->classes[$declaring]->name;
+            return VM\TraitSelfClassScope::resolveSelfClassName(
+                $funcClassLc,
+                $funcIsTrait,
+                $calledLc,
+                $fallback,
+                fn (string $lc): string => $this->context->classes[$lc]->name
+            );
         }
         if ('static' === $lcClass) {
             $lateLc = $this->lateStaticClassLc($frame);
