@@ -59,12 +59,49 @@ final class DomCreateElementJitHelper
         self::prependObjectArgv1($parent, $a1);
     }
 
+    public static function appendStringArgv1(ObjectEntry $parent, string $text): void
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        $owner = VmDom::ownerDocumentEntry($canonical);
+        if (null === $owner && VmDom::isDocument($canonical)) {
+            $owner = $canonical;
+        }
+        $child = VmDom::createTextNode($ctx, $text, $owner);
+        VmDom::appendLiveStandardChild($ctx, $canonical, $child);
+        VmDom::syncSubtree($ctx, $canonical);
+        if ($canonical !== $parent) {
+            VmDom::mirrorNodeLinkProperties($parent, $canonical);
+        }
+    }
+
+    public static function prependStringArgv1(ObjectEntry $parent, string $text): void
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        $owner = VmDom::ownerDocumentEntry($canonical);
+        if (null === $owner && VmDom::isDocument($canonical)) {
+            $owner = $canonical;
+        }
+        $child = VmDom::createTextNode($ctx, $text, $owner);
+        VmDom::prependLiveStandardChild($ctx, $canonical, $child);
+        VmDom::syncSubtree($ctx, $canonical);
+        if ($canonical !== $parent) {
+            VmDom::mirrorNodeLinkProperties($parent, $canonical);
+        }
+    }
+
     public static function appendArgv1(ObjectEntry $parent, Variable $a1): void
     {
         $ctx = VmDomJitFrame::vmContext();
         $a1 = $a1->resolveIndirect();
         if (Variable::TYPE_OBJECT === $a1->type) {
             self::appendObjectArgv1($parent, $a1->toObject());
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $a1->type) {
+            self::appendStringArgv1($parent, $a1->toString($ctx));
 
             return;
         }
@@ -97,6 +134,12 @@ final class DomCreateElementJitHelper
     public static function prependArgv1(ObjectEntry $parent, Variable $a1): void
     {
         $ctx = VmDomJitFrame::vmContext();
+        $a1 = $a1->resolveIndirect();
+        if (Variable::TYPE_STRING === $a1->type) {
+            self::prependStringArgv1($parent, $a1->toString($ctx));
+
+            return;
+        }
         $canonical = DomRegistry::entry($parent->id) ?? $parent;
         VmDom::prependLiveStandardNodes($ctx, $canonical, [$a1]);
         if ($canonical !== $parent) {

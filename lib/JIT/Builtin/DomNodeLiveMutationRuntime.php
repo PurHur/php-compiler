@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\dom\VmDom;
+use PHPCompiler\ext\dom\JitDomCreateTextNode;
+use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
@@ -28,6 +31,10 @@ final class DomNodeLiveMutationRuntime
 
     public const ABI_CREATE_FRAGMENT_OBJECT = '__phpc_dom_create_document_fragment_object';
 
+    public const ABI_APPEND_STRING = '__phpc_dom_node_append_string';
+
+    public const ABI_PREPEND_STRING = '__phpc_dom_node_prepend_string';
+
     private const HELPER_CREATE_FRAGMENT = 'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::createDocumentFragmentArgv';
 
     private const HELPER_CREATE_FRAGMENT_OBJECT = 'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::createDocumentFragmentObjectArgv';
@@ -44,8 +51,10 @@ final class DomNodeLiveMutationRuntime
         'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendArgv1',
         'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendArgv2',
         'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendArgv3',
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendStringArgv1',
         'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependArgv1',
         'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependArgv2',
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependStringArgv1',
     ];
 
     public static function invokeAppend(Context $context, int $extraArgCount, Variable $receiver, Variable ...$extraArgs): Value
@@ -108,6 +117,16 @@ final class DomNodeLiveMutationRuntime
         return '__phpc_dom_node_prepend_'.$extraArgCount;
     }
 
+    public static function appendStringAbi(): string
+    {
+        return self::ABI_APPEND_STRING;
+    }
+
+    public static function prependStringAbi(): string
+    {
+        return self::ABI_PREPEND_STRING;
+    }
+
     public static function replaceChildrenAbi(int $extraArgCount): string
     {
         return '__phpc_dom_node_replace_children_'.$extraArgCount;
@@ -134,16 +153,26 @@ final class DomNodeLiveMutationRuntime
             $lastChildObj = null;
             foreach ($orderedArgs as $arg) {
                 $appended = self::invokeUserScriptMutationArg($context, $kind, $receiver, $arg);
-                if ($arg === $firstArg) {
-                    $firstChildObj = $appended;
-                }
-                if ($arg === $lastArg) {
-                    $lastChildObj = $appended;
+                if (Variable::TYPE_STRING === $arg->type) {
+                    if ($arg === $firstArg) {
+                        $firstChildObj = JitDomCreateTextNode::materialize($context);
+                    }
+                    if ($arg === $lastArg) {
+                        $lastChildObj = JitDomCreateTextNode::materialize($context);
+                    }
+                } else {
+                    if ($arg === $firstArg) {
+                        $firstChildObj = $appended;
+                    }
+                    if ($arg === $lastArg) {
+                        $lastChildObj = $appended;
+                    }
                 }
             }
             if (null !== $firstChildObj && null !== $lastChildObj) {
                 self::syncChildLinkSlots($context, $receiver, $firstChildObj, $lastChildObj);
             }
+            self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
 
             return self::nullValuePtr($context);
         }
@@ -165,15 +194,16 @@ final class DomNodeLiveMutationRuntime
         Variable $arg
     ): Value {
         if (Variable::TYPE_STRING === $arg->type) {
-            self::ensureMutationBridge($context, $kind, 1);
-            $abi = self::abiFor($kind, 1);
+            self::ensureStringMutationBridge($context, $kind);
+            $abi = self::stringAbiFor($kind);
+            $receiverObj = self::receiverObject($context, $receiver);
             $context->builder->call(
                 $context->lookupFunction($abi),
-                self::receiverObject($context, $receiver),
-                JitValueBox::valuePtrFromVariable($context, $arg)
+                $receiverObj,
+                JitStringArg::lower($context, $arg, 'DOMNode::'.$kind.'() string argument')
             );
 
-            return self::receiverObject($context, $receiver);
+            return $receiverObj;
         }
         if (\in_array($arg->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)) {
             self::ensureObjectMutationBridge($context, $kind, 1);
@@ -242,6 +272,63 @@ final class DomNodeLiveMutationRuntime
             $lastJit,
             Variable::TYPE_VALUE
         );
+    }
+
+    /** @param list<Variable> $extraArgs */
+    private static function syncTextContentSlotFromLiteralArgs(
+        Context $context,
+        Variable $receiver,
+        array $extraArgs
+    ): void {
+        $parts = [];
+        foreach ($extraArgs as $arg) {
+            if (Variable::TYPE_STRING !== $arg->type) {
+                continue;
+            }
+            $lit = $arg->compileTimeString ?? null;
+            if (null === $lit) {
+                return;
+            }
+            $parts[] = $lit;
+        }
+        if ([] === $parts) {
+            return;
+        }
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup('DOMElement');
+        if (!$objectType->hasProperty($classId, 'textContent')) {
+            $objectType->defineProperty($classId, 'textContent', Variable::TYPE_STRING);
+        }
+        $receiverObj = self::receiverObject($context, $receiver);
+        $textStr = $context->builder->load($context->constantStringFromString(implode('', $parts)));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $textStr
+        );
+        $propVar = new Variable($context, Variable::TYPE_STRING, Variable::KIND_VALUE, $owned);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($receiverObj, 'DOMElement', 'textContent'),
+            $propVar,
+            Variable::TYPE_STRING
+        );
+    }
+
+    private static function ensureStringMutationBridge(Context $context, string $kind): void
+    {
+        match ($kind) {
+            'append' => DomDocumentMethodUserScriptLlvm::ensureAppendStringBridge($context),
+            'prepend' => DomDocumentMethodUserScriptLlvm::ensurePrependStringBridge($context),
+            default => throw new \LogicException('DOM string live-mutation bridge unsupported for '.$kind),
+        };
+    }
+
+    private static function stringAbiFor(string $kind): string
+    {
+        return match ($kind) {
+            'append' => self::appendStringAbi(),
+            'prepend' => self::prependStringAbi(),
+            default => throw new \LogicException('Unknown DOM string live-mutation kind'),
+        };
     }
 
     private static function ensureObjectMutationBridge(Context $context, string $kind, int $extraArgCount): void

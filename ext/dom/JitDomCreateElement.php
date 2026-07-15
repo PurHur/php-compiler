@@ -27,6 +27,8 @@ final class JitDomCreateElement
 
     private const PROP_ATTRIBUTES = 'attributes';
 
+    private const PROP_TEXT_CONTENT = 'textContent';
+
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 2) {
@@ -35,6 +37,18 @@ final class JitDomCreateElement
 
         if (DomDocumentMethodUserScriptLlvm::shouldUse($context) && \count($args) >= 3) {
             return self::invokeViaHelper($context, ...$args);
+        }
+
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            $nameLit = self::compileTimeStringArg($args[1]);
+            if (null !== $nameLit) {
+                $obj = self::materializeElementFromLiteral($context, $nameLit);
+                self::initTextContentSlot($context, $obj, null);
+
+                return $obj;
+            }
+
+            return self::materializeElementFromRuntimeName($context, $args[1]);
         }
 
         $nameLit = self::compileTimeStringArg($args[1]);
@@ -58,6 +72,7 @@ final class JitDomCreateElement
             $name,
             $value
         );
+        self::initTextContentSlot($context, $element, $args[2] ?? null);
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
@@ -68,6 +83,30 @@ final class JitDomCreateElement
         );
 
         return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    private static function initTextContentSlot(Context $context, Value $element, ?JITVariable $valueArg): void
+    {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_ELEMENT);
+        if (!$objectType->hasProperty($classId, self::PROP_TEXT_CONTENT)) {
+            $objectType->defineProperty($classId, self::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
+        }
+        $lit = '';
+        if (null !== $valueArg) {
+            $lit = $valueArg->compileTimeString ?? JitStringBuiltinArg::compileTimeLiteral($valueArg) ?? '';
+        }
+        $textStr = $context->builder->load($context->constantStringFromString($lit));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $textStr
+        );
+        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($element, self::CLASS_ELEMENT, self::PROP_TEXT_CONTENT),
+            $propVar,
+            JITVariable::TYPE_STRING
+        );
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value

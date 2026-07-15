@@ -382,6 +382,38 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureAppendStringBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeLiveMutationRuntime::appendStringAbi(),
+            'dom_append_string_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendStringArgv1',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensurePrependStringBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeLiveMutationRuntime::prependStringAbi(),
+            'dom_prepend_string_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependStringArgv1',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
     public static function ensureReplaceChildrenBridge(Context $context, int $arity): void
     {
         self::ensureLiveMutationBridge(
@@ -755,6 +787,18 @@ final class DomDocumentMethodUserScriptLlvm
         NestedVmVariableMethodLlvm::ensureMethod($context, 'toobject');
         NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
         DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+    }
+
+    /**
+     * @param list<string> $compiledHelpers
+     */
+    public static function compileMainModuleHelpers(
+        Context $context,
+        string $relativePath,
+        array $compiledHelpers
+    ): void {
+        self::ensureNestedHelperProxies($context);
+        self::ensureMainModuleHelperCompiled($context, $relativePath, $compiledHelpers);
     }
 
     /**
