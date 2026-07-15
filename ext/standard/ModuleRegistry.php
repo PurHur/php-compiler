@@ -77,6 +77,8 @@ final class ModuleRegistry
             && !\PHPCompiler\ext\openssl\OpensslExtensionPolicy::advertisesExtension();
         $withholdSqlite3Surface = 'sqlite3' === $primary
             && !\PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtension();
+        $registerSqlite3ExtensionLoaded = 'sqlite3' === $primary
+            && \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtensionLoaded();
         $withholdLdapSurface = 'ldap' === $primary
             && !\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesExtension();
         $withholdInotifySurface = 'inotify' === $primary
@@ -89,6 +91,8 @@ final class ModuleRegistry
             && !\PHPCompiler\ext\wddx\WddxExtensionPolicy::advertisesExtension();
 
         if (!$withholdOpensslSurface && !$withholdSqlite3Surface && !$withholdLdapSurface && !$withholdInotifySurface && !$withholdXslSurface && !$withholdXmlrpcSurface && !$withholdWddxSurface) {
+            self::register($module->getExtensionName(), $moduleVersion);
+        } elseif ($registerSqlite3ExtensionLoaded) {
             self::register($module->getExtensionName(), $moduleVersion);
         }
         $additional = $module->getAdditionalExtensionNames();
