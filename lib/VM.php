@@ -14995,6 +14995,35 @@ restart:
         return $this->initMethodCall($frame, $receiver, $methodName);
     }
 
+    /**
+     * Declare a user class for JIT/AOT class-constant materialization (#19046, Zend/zend_compile.c).
+     *
+     * Registers methods (including __construct) without re-running full defineClass(), which would
+     * recursively materialize other class constants and hit incomplete VM opcode paths.
+     */
+    public function ensureClassDeclaredForConstMaterialization(string $name, Block $bodyBlock): void
+    {
+        $lcname = strtolower(ltrim($name, '\\'));
+        if (isset($this->context->classes[$lcname])) {
+            return;
+        }
+        $frame = $bodyBlock->getFrame($this->context);
+        $entry = new ClassEntry(ltrim($name, '\\'));
+        \PHPCompiler\ext\standard\VmReflection::markCompilerBootstrapClassInternal($entry);
+        foreach ($bodyBlock->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_METHOD !== $op->type || null === $op->block1) {
+                continue;
+            }
+            $methodName = strtolower($frame->scope[$op->arg1]->toString());
+            $method = new Func\PHP($entry->name.'::'.$methodName, $op->block1);
+            $entry->methods[$methodName] = $method;
+            if ('__construct' === $methodName) {
+                $entry->constructor = $method;
+            }
+        }
+        $this->context->classes[$lcname] = $entry;
+    }
+
     protected function defineClass(ClassEntry $entry, Block $block, ?Frame $warningFrame = null): void {
         $frame = $block->getFrame($this->context);
         $frame->vmContext = $this->context;
@@ -15915,6 +15944,11 @@ restart:
         }
 
         return null;
+    }
+
+    public function materializeClassConstInitFragment(Block $fragmentBlock, int $resultSlot): Variable
+    {
+        return $this->executePropertyDefaultInitBlock($fragmentBlock, $resultSlot);
     }
 
     private function executePropertyDefaultInitBlock(Block $initBlock, int $resultSlot): Variable
