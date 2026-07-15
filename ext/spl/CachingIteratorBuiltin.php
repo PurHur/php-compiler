@@ -302,7 +302,7 @@ final class CachingIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             CachingIteratorBuiltin::CLASS_LC,
             'CachingIterator::__construct()'
