@@ -1,8 +1,7 @@
 --TEST--
-AOT: gzcompress(null) TypeError on default profile (#19004, ext/zlib/zlib.c)
+AOT: gzcompress(null) coerces to empty payload on default profile (#19023, ext/zlib/zlib.c)
 --FILE--
 <?php
-gzcompress(null);
+echo strlen(gzcompress(null)), "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+8

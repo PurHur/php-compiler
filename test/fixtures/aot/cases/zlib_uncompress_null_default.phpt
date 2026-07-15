@@ -1,8 +1,8 @@
 --TEST--
-AOT: gzuncompress(null) TypeError on default profile (#19004, ext/zlib/zlib.c)
+AOT: gzuncompress(null) warns and returns false on default profile (#19023, ext/zlib/zlib.c)
 --FILE--
 <?php
-gzuncompress(null);
+var_export(@gzuncompress(null));
+echo "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+false

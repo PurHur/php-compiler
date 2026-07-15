@@ -1,8 +1,8 @@
 --TEST--
-AOT: gzinflate(null) TypeError on default profile (#19004, ext/zlib/zlib.c)
+AOT: gzinflate(null) warns and returns false on default profile (#19023, ext/zlib/zlib.c)
 --FILE--
 <?php
-gzinflate(null);
+var_export(@gzinflate(null));
+echo "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+false
