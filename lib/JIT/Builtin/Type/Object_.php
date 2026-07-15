@@ -1512,6 +1512,7 @@ class Object_ extends Type {
         $this->setInterfaceExtends('SessionIdInterface', ['SessionHandlerInterface']);
         $this->markInterfaceClass('SessionUpdateTimestampHandlerInterface');
         $this->setInterfaceExtends('SessionUpdateTimestampHandlerInterface', ['SessionHandlerInterface']);
+        $this->setClassInterfaces('SessionHandler', ['SessionHandlerInterface', 'SessionIdInterface']);
         $this->markInterfaceClass('Random\\Engine');
         $this->markInterfaceClass('Random\\CryptoSafeEngine');
         $this->setInterfaceExtends('Random\\CryptoSafeEngine', ['Random\\Engine']);
