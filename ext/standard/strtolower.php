@@ -31,12 +31,7 @@ final class strtolower extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('strtolower() requires exactly one argument');
         }
-        $subject = InternalStrictArg::resolveCoercibleStringArg(
-            $frame,
-            0,
-            'strtolower',
-            'string'
-        );
+        $subject = self::vmStringArg($frame, 0, 'string');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::asciiLower($subject))
@@ -51,10 +46,50 @@ final class strtolower extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('strtolower() requires exactly one argument');
         }
-        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strtolower', 0, 'string');
+        $str = self::jitStringArg($context, $args[0], 0, 'string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         lcfirst::transformAllAscii($context, $copy, ord('A'), ord('Z'), 32);
 
         return $copy;
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strtolower', $paramName)->toString();
+        }
+
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19276, string.c).
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'strtolower',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'strtolower',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'strtolower',
+            $argIndex,
+            $paramName
+        );
     }
 }

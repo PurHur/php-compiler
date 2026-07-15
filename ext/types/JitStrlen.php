@@ -9,13 +9,13 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -27,7 +27,11 @@ final class JitStrlen
     public static function lowerLength(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            if ($context->callerStrictTypes) {
+            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19276, string.c).
+            if (
+                $context->callerStrictTypes
+                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+            ) {
                 self::emitTypeErrorAndAbort($context, 'null');
 
                 return $context->getTypeFromString('int64')->constInt(0, false);
@@ -161,7 +165,11 @@ final class JitStrlen
         $mergeBlock = null;
         $nullEnd = null;
         $nullLen = null;
-        if ($context->callerStrictTypes) {
+        if (
+            $context->callerStrictTypes
+            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+        ) {
+            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19276, string.c).
             $context->builder->branchIf($isNull, $nullErrBlock, $okBlock);
             $context->builder->positionAtEnd($nullErrBlock);
             self::emitTypeErrorAndAbort($context, 'null');
@@ -265,16 +273,9 @@ final class JitStrlen
 
     public static function emitTypeErrorAndAbort(Context $context, string $given): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        $message = self::typeErrorMessage($given);
-        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
-            TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message);
-
-            return;
-        }
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        // ExceptionBridge matches Z_PARAM_STR builtins (strpos/…) — TypeErrorRaise+abort
+        // SIGABRTs on user-script AOT without a PHP fatal (#19276).
+        ExceptionBridge::emitTypeErrorAndAbort($context, self::typeErrorMessage($given));
     }
 
     private static function unreachableStringPtr(Context $context): Value

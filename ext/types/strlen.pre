@@ -29,7 +29,8 @@ class strlen extends Internal {
         if (null !== $frame->parent && InternalStrictArg::isCallerStrict($frame)) {
             $string = VmString::requireStringBuiltinArg($var, 'strlen', 0, 'string');
         } else {
-            $string = VmString::coerceStringBuiltinArg($var, 'strlen', 0, 'string');
+            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19276, string.c).
+            $string = VmString::coerceZparamStrBuiltinArg($var, 'strlen', 0, 'string');
         }
         if (!is_null($frame->returnVar)) {
             $frame->returnVar->int(VmString::byteLength($string));
