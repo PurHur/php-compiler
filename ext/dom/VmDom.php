@@ -1063,6 +1063,30 @@ final class VmDom
         return $var;
     }
 
+    /**
+     * DOMDocument::createAttributeNS() — requires a document element (php-src ext/dom/document.c; #19200).
+     *
+     * @return Variable DOMAttr or false when the document has no root element
+     */
+    public static function documentCreateAttributeNS(
+        Context $ctx,
+        ObjectEntry $document,
+        ?string $namespace,
+        string $qualifiedName,
+        ?Frame $frame = null
+    ): Variable {
+        $root = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_NULL === $root->type) {
+            self::triggerDomWarning($frame, 'DOMDocument::createAttributeNS(): Document Missing Root Element');
+            $false = new Variable(Variable::TYPE_BOOLEAN);
+            $false->bool(false);
+
+            return $false;
+        }
+
+        return self::createAttributeNS($ctx, $namespace, $qualifiedName, $document);
+    }
+
     public static function createAttributeNS(
         Context $ctx,
         ?string $namespace,
