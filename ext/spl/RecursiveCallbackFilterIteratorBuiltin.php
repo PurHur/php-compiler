@@ -74,9 +74,21 @@ final class RecursiveCallbackFilterIteratorBuiltin
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
-    public static function init(ObjectEntry $object, Variable $inner, Variable $callback, Context $ctx): void
-    {
-        [$callbackCopy, $callbackClosure] = SplIteratorSupport::pinCallback($callback);
+    public static function init(
+        ObjectEntry $object,
+        Variable $inner,
+        Variable $callback,
+        Context $ctx,
+        ?ClosureState $callbackClosure = null
+    ): void {
+        // Prefer an already-pinned ClosureState (getChildren share). Re-resolving from the
+        // callback Variable can miss ephemeral Closures whose ObjectEntry.closureState was
+        // cleared by GC while the iterator still holds the ClosureState (#6692).
+        if (null === $callbackClosure) {
+            [$callbackCopy, $callbackClosure] = SplIteratorSupport::pinCallback($callback);
+        } else {
+            $callbackCopy = self::copyVar($callback);
+        }
         self::$store[$object->id] = [
             'inner' => self::copyVar($inner),
             'callback' => $callbackCopy,
@@ -130,7 +142,8 @@ final class RecursiveCallbackFilterIteratorBuiltin
     public static function createFromInnerAndCallback(
         Context $ctx,
         Variable $inner,
-        Variable $callback
+        Variable $callback,
+        ?ClosureState $callbackClosure = null
     ): Variable {
         $class = $ctx->classes[self::CLASS_LC] ?? null;
         if (null === $class) {
@@ -138,7 +151,7 @@ final class RecursiveCallbackFilterIteratorBuiltin
         }
         $object = new ObjectEntry($class);
         $object->constructed = true;
-        self::init($object, $inner, $callback, $ctx);
+        self::init($object, $inner, $callback, $ctx, $callbackClosure);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($object);
 
@@ -445,12 +458,14 @@ final class RecursiveCallbackFilterIteratorGetChildren extends VmClassMethod
         $state = RecursiveCallbackFilterIteratorBuiltin::state($object);
         $inner = $state['inner'];
         $childInner = $vm->invokeForeachInstanceMethod($frame, $inner, 'getChildren');
+        // Share the same callback (+ pinned ClosureState) as php-src get_children (#6692).
         SplIteratorSupport::copyReturnFrom(
             $frame,
             RecursiveCallbackFilterIteratorBuiltin::createFromInnerAndCallback(
                 $state['ctx'],
                 $childInner,
-                $state['callback']
+                $state['callback'],
+                $state['callbackClosure']
             )
         );
     }
