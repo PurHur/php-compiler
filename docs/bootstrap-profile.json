@@ -1178,7 +1178,6 @@
         "ext/standard/IsNanJitHelper.php",
         "ext/standard/JitAddcslashes.php",
         "ext/standard/JitArrayChunk.php",
-        "ext/standard/JitArrayCountRecursive.php",
         "ext/standard/JitArrayElem.php",
         "ext/standard/JitArrayFill.php",
         "ext/standard/JitArrayIsList.php",
@@ -5113,9 +5112,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4879,
+        "inventory_files": 4878,
         "excluded": 0,
-        "eligible": 4879,
+        "eligible": 4878,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
