@@ -7,18 +7,9 @@ namespace PHPCompiler\ext\xmlrpc;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
-/**
- * xmlrpc_encode() JIT/AOT helper (#19048).
- *
- * SSOT mirrors {@see VmXmlrpc::encode()}.
- */
-final class XmlrpcEncodeJitHelper
+/** xmlrpc_encode() table JIT/AOT helper (#19048). */
+final class XmlrpcEncodeTableJitHelper
 {
-    public static function encodeValue(Variable $value): string
-    {
-        return self::wrapParam(self::encodePayload($value->resolveIndirect()));
-    }
-
     public static function encodeListHashTable(HashTable $table): string
     {
         return self::wrapParam(self::encodeListInner($table));

@@ -6,9 +6,11 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableNestedExportLlvm;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -20,17 +22,29 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class StringXmlrpc
 {
-    private const ENCODE_HELPER_PATH = '/ext/xmlrpc/XmlrpcEncodeJitHelper.php';
+    private const ENCODE_SCALAR_HELPER_PATH = '/ext/xmlrpc/XmlrpcEncodeScalarJitHelper.php';
+
+    private const ENCODE_TABLE_HELPER_PATH = '/ext/xmlrpc/XmlrpcEncodeTableJitHelper.php';
 
     private const DECODE_HELPER_PATH = '/ext/xmlrpc/XmlrpcDecodeJitHelper.php';
 
-    private const ENCODE_VALUE_HELPER = 'PHPCompiler\\ext\\xmlrpc\\XmlrpcEncodeJitHelper::encodeValue';
+    private const ENCODE_VALUE_HELPER = 'PHPCompiler\\ext\\xmlrpc\\XmlrpcEncodeScalarJitHelper::encodeValue';
+
+    private const ENCODE_LIST_HELPER = 'PHPCompiler\\ext\\xmlrpc\\XmlrpcEncodeTableJitHelper::encodeListHashTable';
+
+    private const ENCODE_STRUCT_HELPER = 'PHPCompiler\\ext\\xmlrpc\\XmlrpcEncodeTableJitHelper::encodeStructHashTable';
 
     private const DECODE_TO_JSON_HELPER = 'PHPCompiler\\ext\\xmlrpc\\XmlrpcDecodeJitHelper::decodeToJson';
 
     /** @var list<string> */
-    private const ENCODE_COMPILED_HELPERS = [
+    private const ENCODE_SCALAR_COMPILED_HELPERS = [
         self::ENCODE_VALUE_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const ENCODE_TABLE_COMPILED_HELPERS = [
+        self::ENCODE_LIST_HELPER,
+        self::ENCODE_STRUCT_HELPER,
     ];
 
     /** @var list<string> */
@@ -47,15 +61,11 @@ final class StringXmlrpc
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::ensureEncodeLinked($context);
+        self::ensureDecodeLinked($context);
     }
 
-    public static function ensureStandaloneBodies(Context $context): void
-    {
-        self::implement($context);
-    }
-
-    public static function implement(Context $context): void
+    public static function ensureEncodeLinked(Context $context): void
     {
         if (NestedJitCompileScope::isActive()) {
             return;
@@ -63,20 +73,67 @@ final class StringXmlrpc
 
         $probe = $context->module->getNamedFunction('__compiler_xmlrpc_encode_value');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
+            $context->registerFunction('__compiler_xmlrpc_encode_value', $probe);
+            $arrayFn = $context->module->getNamedFunction('__compiler_xmlrpc_encode_array');
+            if (null !== $arrayFn && $arrayFn->countBasicBlocks() > 0) {
+                $context->registerFunction('__compiler_xmlrpc_encode_array', $arrayFn);
+            }
 
             return;
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::emitEncodeValueBridge($context);
-        self::emitEncodeArrayBridge($context);
-        self::emitDecodeBridgeStub($context);
-        self::registerLinkedRuntime($context);
+        $encodeValueFn = $context->module->getNamedFunction('__compiler_xmlrpc_encode_value');
+        if (null !== $encodeValueFn) {
+            $context->registerFunction('__compiler_xmlrpc_encode_value', $encodeValueFn);
+        }
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
+        }
+    }
+
+    public static function ensureDecodeLinked(Context $context): void
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction('__compiler_xmlrpc_decode');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction('__compiler_xmlrpc_decode', $probe);
+
+            return;
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        StringJsonDecode::ensureLinked($context);
+        self::emitDecodeBridge($context);
+        $decodeFn = $context->module->getNamedFunction('__compiler_xmlrpc_decode');
+        if (null !== $decodeFn) {
+            $context->registerFunction('__compiler_xmlrpc_decode', $decodeFn);
+        }
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::ensureLinked($context);
+    }
+
+    public static function ensureArrayLinked(Context $context): void
+    {
+        self::ensureEncodeLinked($context);
+        self::emitEncodeArrayBridge($context);
+        $arrayFn = $context->module->getNamedFunction('__compiler_xmlrpc_encode_array');
+        if (null !== $arrayFn) {
+            $context->registerFunction('__compiler_xmlrpc_encode_array', $arrayFn);
         }
     }
 
@@ -94,8 +151,8 @@ final class StringXmlrpc
             [$valuePtr],
             $strPtr,
             self::ENCODE_VALUE_HELPER,
-            self::ENCODE_HELPER_PATH,
-            self::ENCODE_COMPILED_HELPERS,
+            self::ENCODE_SCALAR_HELPER_PATH,
+            self::ENCODE_SCALAR_COMPILED_HELPERS,
             '#19048'
         );
     }
@@ -110,55 +167,60 @@ final class StringXmlrpc
             return;
         }
 
+        self::ensureEncodeTableHelpersCompiled($context);
+
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
         $ft = $context->context->functionType($strPtr, false, $htPtr);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('xmlrpc_encode_array_bridge_entry');
+        $listBlock = $fn->appendBasicBlock('xmlrpc_encode_array_list');
+        $structBlock = $fn->appendBasicBlock('xmlrpc_encode_array_struct');
+        $doneBlock = $fn->appendBasicBlock('xmlrpc_encode_array_done');
         $context->builder->positionAtEnd($entry);
-        $valueSlot = JitValueBox::alloc($context);
-        $valueOut = JitValueBox::pointer($context, $valueSlot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeHashtable'),
-            $valueOut,
-            $fn->getParam(0)
-        );
-        $result = $context->builder->call(
-            self::lookupEncodeHelper($context),
-            $valueOut
-        );
-        $context->builder->returnValue($result);
+
+        $ht = $fn->getParam(0);
+        $isList = self::packedListHeuristic($context, $ht);
+        $context->builder->branchIf($isList, $listBlock, $structBlock);
+
+        $htObj = $context->builder->bitcast($ht, $context->getTypeFromString('__object__*'));
+        $listFn = JitVmHelperLink::lookupCompiled($context, self::ENCODE_LIST_HELPER, '#19048');
+        $structFn = JitVmHelperLink::lookupCompiled($context, self::ENCODE_STRUCT_HELPER, '#19048');
+
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $strPtr);
+
+        $context->builder->positionAtEnd($listBlock);
+        $listResult = $context->builder->call($listFn, $htObj);
+        $context->builder->store($listResult, $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($structBlock);
+        $structResult = $context->builder->call($structFn, $htObj);
+        $context->builder->store($structResult, $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $context->builder->returnValue($context->builder->load($resultSlot));
         $context->registerFunction($abiName, $fn);
     }
 
-    private static function emitDecodeBridgeStub(Context $context): void
+    private static function packedListHeuristic(Context $context, \PHPLLVM\Value $ht): \PHPLLVM\Value
     {
-        $abiName = '__compiler_xmlrpc_decode';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodePtrTy = $context->getTypeFromString('__strkey_node__*');
+        $numElements = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
+        $strKeys = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+        $zero = $context->getTypeFromString('size_t')->constInt(0, false);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $numElements, $zero);
+        $noStrKeys = $context->builder->icmp(Builder::INT_EQ, $strKeys, $nodePtrTy->constNull());
+        $dense = $context->builder->icmp(Builder::INT_EQ, $numElements, $nextFree);
 
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-        $i1 = $context->getTypeFromString('int1');
-        $ft = $context->context->functionType($voidTy, false, $strPtr, $valuePtr);
-        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('xmlrpc_decode_stub_entry');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $fn->getParam(1),
-            $i1->constInt(0, false)
+        return $context->builder->or(
+            $empty,
+            $context->builder->and($noStrKeys, $dense)
         );
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
     }
 
     private static function emitDecodeBridge(Context $context): void
@@ -215,12 +277,29 @@ final class StringXmlrpc
     {
         JitVmHelperLink::ensureCompiled(
             $context,
-            self::ENCODE_HELPER_PATH,
-            self::ENCODE_COMPILED_HELPERS,
+            self::ENCODE_SCALAR_HELPER_PATH,
+            self::ENCODE_SCALAR_COMPILED_HELPERS,
             '#19048'
         );
 
         return JitVmHelperLink::lookupCompiled($context, self::ENCODE_VALUE_HELPER, '#19048');
+    }
+
+    private static function ensureEncodeTableHelpersCompiled(Context $context): void
+    {
+        HashTableNestedExportLlvm::ensureLinked($context);
+        foreach (['getnumelements', 'exportkeyvaluepairs', 'ispackedlist'] as $method) {
+            NestedVmHashTableMethodLlvm::ensureMethod($context, $method);
+        }
+        foreach (['resolveindirect', 'toint', 'tostring', 'tobool', 'tofloat'] as $method) {
+            NestedVmVariableMethodLlvm::ensureMethod($context, $method);
+        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::ENCODE_TABLE_HELPER_PATH,
+            self::ENCODE_TABLE_COMPILED_HELPERS,
+            '#19048'
+        );
     }
 
     private static function lookupDecodeHelper(Context $context): LlvmFunction
@@ -238,11 +317,18 @@ final class StringXmlrpc
     private static function registerLinkedRuntime(Context $context): void
     {
         foreach (self::ABI_FUNCTIONS as $name) {
+            if ('__compiler_xmlrpc_encode_array' === $name) {
+                continue;
+            }
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
                 throw new \LogicException($name.' missing after StringXmlrpc bridge (#19048)');
             }
             $context->registerFunction($name, $fn);
+        }
+        $arrayFn = $context->module->getNamedFunction('__compiler_xmlrpc_encode_array');
+        if (null !== $arrayFn && $arrayFn->countBasicBlocks() > 0) {
+            $context->registerFunction('__compiler_xmlrpc_encode_array', $arrayFn);
         }
     }
 }

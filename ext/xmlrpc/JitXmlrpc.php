@@ -17,9 +17,8 @@ final class JitXmlrpc
 {
     public static function encode(Context $context, JITVariable $arg): Value
     {
-        StringXmlrpc::ensureLinked($context);
-
         if (JITVariable::TYPE_HASHTABLE === $arg->type || ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            StringXmlrpc::ensureArrayLinked($context);
             $ht = JITVariable::TYPE_HASHTABLE === $arg->type
                 ? $context->helper->loadValue($arg)
                 : ArrayBuiltinHelper::loadHashTable($context, $arg);
@@ -29,6 +28,8 @@ final class JitXmlrpc
                 $ht
             );
         }
+
+        StringXmlrpc::ensureEncodeLinked($context);
         if (JITVariable::TYPE_VALUE === $arg->type) {
             return $context->builder->call(
                 $context->lookupFunction('__compiler_xmlrpc_encode_value'),
@@ -48,7 +49,7 @@ final class JitXmlrpc
 
     public static function decode(Context $context, JITVariable $xmlArg): Value
     {
-        StringXmlrpc::ensureLinked($context);
+        StringXmlrpc::ensureDecodeLinked($context);
 
         $xmlString = JitStringBuiltinArg::lowerCoercible($context, $xmlArg, 'xmlrpc_decode', 0, 'xml');
         $slot = JitValueBox::alloc($context);
