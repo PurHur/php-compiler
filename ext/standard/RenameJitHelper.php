@@ -14,7 +14,17 @@ final class RenameJitHelper
 {
     public static function invokeArgv(string $from, string $to): bool
     {
-        $ok = VmFs::rename($from, $to);
+        if (str_contains($from, "\0") || str_contains($to, "\0")) {
+            $ok = false;
+        } elseif (null !== VmFsPhpWrapper::renameWarningMessage($from, $to)) {
+            $ok = false;
+        } else {
+            $ok = \phpc_rename_kernel($from, $to);
+        }
+        if ($ok) {
+            VmStatCache::invalidatePath($from);
+            VmStatCache::invalidatePath($to);
+        }
         if (!$ok) {
             $wrapperMessage = VmFsPhpWrapper::renameWarningMessage($from, $to);
             TriggerErrorJitHelper::warning(
