@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\JitHashFile;
 use PHPCompiler\ext\standard\JitStreamPath;
 use PHPCompiler\ext\standard\JitStringBuiltinArg;
 use PHPCompiler\ext\standard\VmHashFile;
+use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
@@ -35,7 +36,7 @@ final class hash_hmac_file extends Internal
             return;
         }
         $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash_hmac_file', 0, 'algo');
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash_hmac_file', 1, 'filename');
+        $path = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 1, 'hash_hmac_file', 'filename');
         $key = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'hash_hmac_file', 2, 'key');
         $raw = false;
         if (4 === $argc) {
