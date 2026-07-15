@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** Environ mirror routes through EnvironMirrorRuntime + PHP helper (#18984). */
+/** Environ mirror routes through EnvironMirrorRuntime + PHP helper (#18984, #19157). */
 final class EnvironMirrorRuntimeShrinkTest extends TestCase
 {
     public function testEnvironMirrorUserScriptLlvmDeleted(): void
@@ -20,6 +20,8 @@ final class EnvironMirrorRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('MIRROR_HELPER', $runtime);
         $this->assertStringContainsString('implementEmbedBridge', $runtime);
         $this->assertStringContainsString('__superglobals__mirror_process_environ', $runtime);
+        $this->assertStringNotContainsString('EnvironMirrorRuntimeUserScriptCstr', $runtime);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
     }
 
     public function testSuperglobalRefreshUserScriptRoutesEnvironMirrorRuntime(): void
@@ -33,26 +35,22 @@ final class EnvironMirrorRuntimeShrinkTest extends TestCase
     public function testEnvironMirrorNativeJitHelperUsesVmEnvEnvironNative(): void
     {
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/EnvironMirrorNativeJitHelper.php');
-        $this->assertStringContainsString('VmEnvEnvironNative::enumerate', $helper);
-        $this->assertStringContainsString('phpc_native_ht_set_string_key', $helper);
+        $this->assertStringContainsString('VmEnvEnvironNative::mirrorIntoNativeHashtable', $helper);
         $this->assertStringContainsString('Superglobals::applyProcessEnvironMirror', $helper);
+
+        $vmEnviron = (string) file_get_contents(__DIR__.'/../../ext/standard/VmEnvEnvironNative.php');
+        $this->assertStringContainsString('phpc_native_environ_mirror_into_ht', $vmEnviron);
     }
 
-    public function testUserScriptRefreshUsesInitSafeCstrGate(): void
+    public function testUserScriptCstrDeleted(): void
     {
-        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/EnvironMirrorRuntime.php');
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $runtime);
-        $this->assertStringContainsString('EnvironMirrorRuntimeUserScriptCstr::ensureLinked', $runtime);
-
-        $cstr = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/EnvironMirrorRuntimeUserScriptCstr.php');
-        $this->assertStringContainsString('__hashtable__setStringKeyString', $cstr);
-        $this->assertStringContainsString('EnvironMirrorNativeJitHelper', $cstr);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/EnvironMirrorRuntimeUserScriptCstr.php');
     }
 
     public function testEnvironMirrorRuntimeCentralizesUserScriptLlvm(): void
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/EnvironMirrorUserScriptLlvm.php');
         $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/EnvironMirrorRuntime.php');
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/EnvironMirrorRuntimeUserScriptCstr.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/EnvironLibcWalkJit.php');
     }
 }
