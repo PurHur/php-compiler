@@ -246,7 +246,6 @@ final class VmSockets
             return;
         }
         self::$lastError = 0;
-        self::$socketErrors = [];
     }
 
     public static function strerror(int $errno): string

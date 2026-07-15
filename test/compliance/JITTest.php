@@ -954,6 +954,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'socket_create_connect_rw')) {
                 continue;
             }
+            // socket_strerror/last_error/clear_error — VM first (#6227).
+            if (str_contains($name, 'socket_strerror')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when encapsed ?? interpolation enabled (#14063).
             if (CompilerVersion::supportsEncapsedCoalesce()
                 && str_contains($name, 'encapsed_coalesce_parse_error')) {
