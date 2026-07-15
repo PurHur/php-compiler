@@ -3363,7 +3363,6 @@
         "lib/JIT/Builtin/ArrayIntersectAssocRuntime.php",
         "lib/JIT/Builtin/ArrayIntersectKeyRuntime.php",
         "lib/JIT/Builtin/ArrayIntersectRuntime.php",
-        "lib/JIT/Builtin/ArrayIsListNativeLlvm.php",
         "lib/JIT/Builtin/ArrayIsListRuntime.php",
         "lib/JIT/Builtin/ArrayKeyExistsRuntime.php",
         "lib/JIT/Builtin/ArrayKeysRuntime.php",
@@ -3510,7 +3509,6 @@
         "lib/JIT/Builtin/Iconv.php",
         "lib/JIT/Builtin/IconvRuntime.php",
         "lib/JIT/Builtin/ImageTypeToMimeType.php",
-        "lib/JIT/Builtin/InArrayNativeLlvm.php",
         "lib/JIT/Builtin/InArrayRuntime.php",
         "lib/JIT/Builtin/IncludePathRuntime.php",
         "lib/JIT/Builtin/InetRuntime.php",
@@ -3629,7 +3627,6 @@
         "lib/JIT/Builtin/PregMatchRuntime.php",
         "lib/JIT/Builtin/PregMatchUserScriptLlvm.php",
         "lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php",
-        "lib/JIT/Builtin/ProcessExecCaptureLlvm.php",
         "lib/JIT/Builtin/ProcessIdentityJit.php",
         "lib/JIT/Builtin/ProcessOpen.php",
         "lib/JIT/Builtin/ProcessOpenEmbedBridge.php",
@@ -5116,9 +5113,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4882,
+        "inventory_files": 4879,
         "excluded": 0,
-        "eligible": 4882,
+        "eligible": 4879,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
