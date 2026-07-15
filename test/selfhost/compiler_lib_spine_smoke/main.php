@@ -4962,4 +4962,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/IncludePathResolverResolve.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/PharRunning.php';
 require_once __DIR__.'/../../../ext/gd/GdConstants.php';
 require_once __DIR__.'/../../../lib/VM/CloneSupport.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialcharsUserScriptLlvm.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

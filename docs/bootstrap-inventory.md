@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4901 |
-| Phase A inventory files (M2 ratio SSOT) | 4901 |
+| PHP files on vm.php path | 4902 |
+| Phase A inventory files (M2 ratio SSOT) | 4902 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13139 |
+| Source constructs flagged (warnings) | 13142 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3756,7 +3756,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHashAlgos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCryptoJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringHashCryptoPhp.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringHashCryptoLlvm.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringHashCryptoPhp.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHashEquals.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHashHmacAlgos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHex2bin.php` | 0 | 3 |
@@ -29250,7 +29251,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringBin2hex.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringBitwiseNot.php`
 
@@ -29609,10 +29610,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `lib/JIT/Builtin/StringHashCryptoLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 17 class method(s)
+
 ### `lib/JIT/Builtin/StringHashCryptoPhp.php`
 
 **Warnings** (review for bootstrap subset):
+- new JIT (line 225)
 - 9 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringHashEquals.php`
 
@@ -30582,9 +30590,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/TypeErrorRaise.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 563)
+- new ArgumentCountError (line 566)
 - 26 class method(s)
-- 2 closure(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/UndefinedGlobalVariableRuntime.php`
 

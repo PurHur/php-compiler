@@ -3816,6 +3816,7 @@
         "lib/JIT/Builtin/StringHashAlgos.php",
         "lib/JIT/Builtin/StringHashCrypto.php",
         "lib/JIT/Builtin/StringHashCryptoJit.php",
+        "lib/JIT/Builtin/StringHashCryptoLlvm.php",
         "lib/JIT/Builtin/StringHashCryptoPhp.php",
         "lib/JIT/Builtin/StringHashEquals.php",
         "lib/JIT/Builtin/StringHashHmacAlgos.php",
@@ -5135,9 +5136,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4901,
+        "inventory_files": 4902,
         "excluded": 0,
-        "eligible": 4901,
+        "eligible": 4902,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
