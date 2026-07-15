@@ -949,6 +949,16 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'clone_with_forward_profile')) {
                 continue;
             }
+            // 8.4-target reject gate; skipped when try/catch/else enabled (#15817, #19128).
+            if (CompilerVersion::supportsTryCatchElse()
+                && str_contains($name, 'try_catch_else_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsTryCatchElse()
+                && str_contains($name, 'try_catch_else')
+                && !str_contains($name, 'try_catch_else_reference_profile')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when pipe operator enabled (#12424, #18007).
             if (CompilerVersion::supportsPipeOperator()
                 && str_contains($name, 'pipe_operator_reference_profile')) {
