@@ -6,7 +6,7 @@ socket_atmark() — registered on VM (issue #6544)
 <?php
 declare(strict_types=1);
 echo (int) function_exists('socket_atmark'), "\n";
-if (!function_exists('stream_socket_pair') || !function_exists('socket_import_stream')) {
+if (!function_exists('stream_socket_pair') || !function_exists('socket_import_stream') || !function_exists('socket_send')) {
     echo "deps_skip\n";
     exit(0);
 }
