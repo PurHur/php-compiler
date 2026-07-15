@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4895 |
-| Phase A inventory files (M2 ratio SSOT) | 4895 |
+| PHP files on vm.php path | 4894 |
+| Phase A inventory files (M2 ratio SSOT) | 4894 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13127 |
+| Source constructs flagged (warnings) | 13128 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -573,7 +573,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/Module.php` | 0 | 50 |
 | `ext/mbstring/Utf8CaseMap.php` | 0 | 1 |
 | `ext/mbstring/VmMbConvertVariables.php` | 0 | 3 |
-| `ext/mbstring/VmMbstring.php` | 0 | 7 |
+| `ext/mbstring/VmMbstring.php` | 0 | 9 |
 | `ext/mbstring/mb_check_encoding.php` | 0 | 2 |
 | `ext/mbstring/mb_chr.php` | 0 | 3 |
 | `ext/mbstring/mb_convert_case.php` | 0 | 3 |
@@ -3584,7 +3584,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ProcessOpenJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessOpenRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/ProcessShellExecLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProgressNoteRuntime.php` | 0 | 4 |
 | `lib/JIT/Builtin/Rand.php` | 0 | 2 |
 | `lib/JIT/Builtin/RangeIntRuntime.php` | 0 | 1 |
@@ -8562,12 +8561,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/VmMbstring.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1334)
-- new ArgumentCountError (line 1342)
-- new ArgumentCountError (line 2523)
-- new MailBuiltin (line 2737)
-- new Variable (line 2742)
-- 133 class method(s)
+- new HashTable (line 378)
+- new Variable (line 381)
+- new ArgumentCountError (line 1366)
+- new ArgumentCountError (line 1374)
+- new ArgumentCountError (line 2555)
+- new MailBuiltin (line 2769)
+- new Variable (line 2774)
+- 134 class method(s)
 - 1 closure(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
@@ -8595,7 +8596,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 34)
 - 2 class method(s)
-- 1 closure(s)
+- 2 closure(s)
 
 ### `ext/mbstring/mb_convert_kana.php`
 
@@ -18248,8 +18249,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmNumberFormat.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new ArgumentCountError (line 42)
+- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 44)
 - 5 class method(s)
 
 ### `ext/standard/VmOb.php`
@@ -28605,14 +28606,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ProcessRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 435)
+- new JIT (line 429)
 - 17 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/ProcessShellExecLibc.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
 
 ### `lib/JIT/Builtin/ProgressNoteRuntime.php`
 
