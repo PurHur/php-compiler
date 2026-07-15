@@ -4,18 +4,9 @@ AOT request_parse_body multipart parsing (PHP 8.4 profile, #16927)
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-$boundary = '----phpc-boundary';
-putenv('CONTENT_TYPE=multipart/form-data; boundary=' . $boundary);
-$body =
-    '--' . $boundary . "\r\n" .
-    "Content-Disposition: form-data; name=\"a\"\r\n\r\n" .
-    "hi\r\n" .
-    '--' . $boundary . "\r\n" .
-    "Content-Disposition: form-data; name=\"up\"; filename=\"t.txt\"\r\n" .
-    "Content-Type: text/plain\r\n\r\n" .
-    "payload\r\n" .
-    '--' . $boundary . "--\r\n";
-putenv('REQUEST_BODY=' . $body);
+// Literal putenv — Nested JIT putenv+concat setenv still drops REQUEST_BODY (#5965).
+putenv('CONTENT_TYPE=multipart/form-data; boundary=----phpc-boundary');
+putenv("REQUEST_BODY=------phpc-boundary\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\nhi\r\n------phpc-boundary\r\nContent-Disposition: form-data; name=\"up\"; filename=\"t.txt\"\r\nContent-Type: text/plain\r\n\r\npayload\r\n------phpc-boundary--\r\n");
 [$post, $files] = request_parse_body();
 echo $post['a'], "\n";
 echo $files['up']['name'], "\n";
@@ -31,4 +22,3 @@ text/plain
 0
 7
 payload
-

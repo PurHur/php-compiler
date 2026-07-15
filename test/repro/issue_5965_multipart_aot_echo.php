@@ -1,17 +1,7 @@
 <?php
-// Minimal AOT multipart request_parse_body repro (#5965) — no var_export.
-$boundary = '----phpc-boundary';
-putenv('CONTENT_TYPE=multipart/form-data; boundary=' . $boundary);
-$body =
-    '--' . $boundary . "\r\n" .
-    "Content-Disposition: form-data; name=\"a\"\r\n\r\n" .
-    "hi\r\n" .
-    '--' . $boundary . "\r\n" .
-    "Content-Disposition: form-data; name=\"up\"; filename=\"t.txt\"\r\n" .
-    "Content-Type: text/plain\r\n\r\n" .
-    "payload\r\n" .
-    '--' . $boundary . "--\r\n";
-putenv('REQUEST_BODY=' . $body);
+// Minimal AOT multipart request_parse_body (#5965) — literal putenv (concat setenv still fragile).
+putenv('CONTENT_TYPE=multipart/form-data; boundary=----phpc-boundary');
+putenv("REQUEST_BODY=------phpc-boundary\r\nContent-Disposition: form-data; name=\"a\"\r\n\r\nhi\r\n------phpc-boundary\r\nContent-Disposition: form-data; name=\"up\"; filename=\"t.txt\"\r\nContent-Type: text/plain\r\n\r\npayload\r\n------phpc-boundary--\r\n");
 $pair = request_parse_body();
 echo $pair[0]['a'], "\n";
 echo $pair[1]['up']['name'], "\n";
