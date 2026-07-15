@@ -2,52 +2,33 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Thin libc fopen/fwrite bridge for user-script standalone AOT (#16734).
+ * LLVM lowering for user-script AOT file_put_contents — thin libc fopen/fwrite (#19294).
  *
- * Nested FilePutContentsJitHelper does not run in minimal standalone init.
+ * Nested {@see FilePutContentsJitHelper} does not run under minimal standalone init
+ * (#16075); this kernel mirrors pre-#15310 LLVM from ext/ not lib/JIT/Builtin/.
  * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_stream_ex
  */
-final class StringFilePutContentsLibc
+final class JitFilePutContentsKernel
 {
-    private const ABI = '__compiler_file_put_contents';
-
     private const FILE_APPEND = 8;
 
-    public static function implement(Context $context): void
+    /** Emit libc write path; builder must be positioned at the bridge entry block. */
+    public static function emitBody(Context $context, LlvmFunction $fn): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI, $probe);
-
-            return;
-        }
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $fn = null !== $probe
-            ? $probe
-            : $context->lookupFunction(self::ABI);
-        $entry = $fn->appendBasicBlock('fpc_libc_entry');
-        $context->builder->positionAtEnd($entry);
-
         $path = $fn->getParam(0);
         $data = $fn->getParam(1);
         $flags = $fn->getParam(2);
         $strMap = $context->structFieldMap['__string__'];
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
         $oneI64 = $i64->constInt(1, false);
@@ -82,8 +63,8 @@ final class StringFilePutContentsLibc
         $context->builder->call($context->lookupFunction('__mm__free'), $pathBuf);
 
         $openFail = $context->builder->icmp(Builder::INT_EQ, $stream, $nullPtr);
-        $failBlock = $fn->appendBasicBlock('fpc_libc_open_fail');
-        $okBlock = $fn->appendBasicBlock('fpc_libc_open_ok');
+        $failBlock = $fn->appendBasicBlock('fpc_kernel_open_fail');
+        $okBlock = $fn->appendBasicBlock('fpc_kernel_open_ok');
         $context->builder->branchIf($openFail, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
@@ -94,8 +75,8 @@ final class StringFilePutContentsLibc
             $context->builder->structGep($data, $strMap['length'])
         );
         $zeroLen = $context->builder->icmp(Builder::INT_EQ, $dataLen, $i64->constInt(0, false));
-        $emptyBlock = $fn->appendBasicBlock('fpc_libc_empty_data');
-        $writeBlock = $fn->appendBasicBlock('fpc_libc_write_data');
+        $emptyBlock = $fn->appendBasicBlock('fpc_kernel_empty_data');
+        $writeBlock = $fn->appendBasicBlock('fpc_kernel_write_data');
         $context->builder->branchIf($zeroLen, $emptyBlock, $writeBlock);
 
         $context->builder->positionAtEnd($emptyBlock);
@@ -118,8 +99,8 @@ final class StringFilePutContentsLibc
         $context->builder->call($context->lookupFunction('fclose'), $stream);
 
         $writeFail = $context->builder->icmp(Builder::INT_NE, $nWritten, $dataSizeT);
-        $writeFailBlock = BasicBlockHelper::append($context, 'fpc_libc_write_fail');
-        $writeOkBlock = BasicBlockHelper::append($context, 'fpc_libc_write_ok');
+        $writeFailBlock = BasicBlockHelper::append($context, 'fpc_kernel_write_fail');
+        $writeOkBlock = BasicBlockHelper::append($context, 'fpc_kernel_write_ok');
         $context->builder->branchIf($writeFail, $writeFailBlock, $writeOkBlock);
 
         $context->builder->positionAtEnd($writeFailBlock);
@@ -127,13 +108,6 @@ final class StringFilePutContentsLibc
 
         $context->builder->positionAtEnd($writeOkBlock);
         $context->builder->returnValue($context->builder->truncOrBitCast($nWritten, $i64));
-
-        $context->registerFunction(self::ABI, $fn);
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 
     private static function modeCString(Context $context, string $mode): \PHPLLVM\Value
