@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -22,12 +21,7 @@ final class strtr extends Internal
     {
         $argc = \count($frame->calledArgs);
         if (2 === $argc) {
-            $string = VmString::coerceStringBuiltinArg(
-                $frame->calledArgs[0],
-                'strtr',
-                0,
-                'string'
-            );
+            $string = self::vmStringArg($frame, 0, 'string');
             $pairs = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_ARRAY !== $pairs->type) {
                 throw self::twoArgSecondTypeError($frame, $pairs);
@@ -43,12 +37,7 @@ final class strtr extends Internal
             return;
         }
         if (3 === $argc) {
-            $string = VmString::coerceStringBuiltinArg(
-                $frame->calledArgs[0],
-                'strtr',
-                0,
-                'string'
-            );
+            $string = self::vmStringArg($frame, 0, 'string');
             $from = VmString::coerceStringBuiltinArg(
                 $frame->calledArgs[1],
                 'strtr',
@@ -71,18 +60,13 @@ final class strtr extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $subjectEarly = self::lowerStrtrSubjectEarly($context, $args[0]);
-        if (null !== $subjectEarly) {
-            return $subjectEarly;
-        }
-
         if (\count($args) >= 2 && self::isReplacePairsArg($args[1])) {
             return JitStrtr::translateArray($context, $args[0], $args[1]);
         }
         if (3 === \count($args)) {
             return JitStrtr::translate(
                 $context,
-                JitStringBuiltinArg::lower($context, $args[0], 'strtr', 0, 'string'),
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strtr', 0, 'string'),
                 JitStringBuiltinArg::lower($context, $args[1], 'strtr', 1, 'from'),
                 JitStringBuiltinArg::lower($context, $args[2], 'strtr', 2, 'to'),
                 $args[0],
@@ -117,29 +101,18 @@ final class strtr extends Internal
         return new \TypeError('strtr(): Argument #2 ($from) must be of type array, string given');
     }
 
-    /**
-     * Compile-time / literal null subject — avoid StringStrtr::ensureLinked on sealed blocks (#18981).
-     */
-    private static function lowerStrtrSubjectEarly(Context $context, JITVariable $subject): ?Value
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        if (!self::isNullStrtrSubject($subject)) {
-            return null;
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strtr', $paramName)->toString();
         }
-        if ($context->callerStrictTypes || JitStringBuiltinArg::requiresForwardProfileStrictStringNull()) {
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $subject, 'strtr', 0, 'string');
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'strtr_null_typeerror_done');
 
-            return $context->builder->load($context->constantStringFromString(''));
-        }
-        JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'strtr', 0, 'string');
-
-        return $context->builder->load($context->constantStringFromString(''));
-    }
-
-    private static function isNullStrtrSubject(JITVariable $subject): bool
-    {
-        return JITVariable::TYPE_NULL === $subject->type
-            || ($subject->isNullConstant ?? false);
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'strtr',
+            $argIndex,
+            $paramName
+        );
     }
 
     private static function isReplacePairsArg(JITVariable $arg): bool
