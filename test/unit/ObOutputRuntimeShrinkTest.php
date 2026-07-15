@@ -38,11 +38,12 @@ final class ObOutputRuntimeShrinkTest extends TestCase
             $bridge
         );
         $execCaptureRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureRuntime.php');
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $execCaptureRuntime);
-        $this->assertStringContainsString('ObOutputExecCaptureLlvm::ensureLinked', $execCaptureRuntime);
-        $execCaptureLlvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
-        $this->assertStringContainsString('implementGetContents', $execCaptureLlvm);
-        $this->assertStringContainsString('ensureReadApiLinked', $execCaptureLlvm);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $execCaptureRuntime);
+        $this->assertStringContainsString('ObOutputExecCaptureJitHelper', $execCaptureRuntime);
+        $this->assertStringContainsString('implementGetContents', $execCaptureRuntime);
+        $this->assertStringContainsString('ensureReadApiLinked', $execCaptureRuntime);
+        $this->assertStringNotContainsString('ObOutputExecCaptureLlvm', $execCaptureRuntime);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
 
         $userScript = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputUserScriptLlvm.php');
         $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $userScript);
@@ -76,5 +77,17 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertSame(1, ObOutputJitHelper::endFlush());
         $this->assertSame(1, ObOutputJitHelper::getLevel());
         $this->assertSame('x', ObOutputJitHelper::getContents());
+    }
+
+    public function testObOutputExecCaptureJitHelperReadApi(): void
+    {
+        \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper::reset();
+        \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper::start();
+        \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper::appendString('ab');
+        $this->assertSame(1, \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper::getLevel());
+        $this->assertSame('ab', \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper::getContents());
+        $this->assertSame(2, \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper::getLength());
+        $this->assertSame(1, \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper::endClean());
+        $this->assertSame(0, \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper::getLevel());
     }
 }

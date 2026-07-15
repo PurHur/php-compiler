@@ -3605,7 +3605,6 @@
         "lib/JIT/Builtin/ObGzhandlerJitRuntime.php",
         "lib/JIT/Builtin/ObOutput.php",
         "lib/JIT/Builtin/ObOutputEchoJitEmit.php",
-        "lib/JIT/Builtin/ObOutputExecCaptureLlvm.php",
         "lib/JIT/Builtin/ObOutputExecCaptureRuntime.php",
         "lib/JIT/Builtin/ObOutputJitBridge.php",
         "lib/JIT/Builtin/ObOutputRuntime.php",
@@ -5133,9 +5132,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4899,
+        "inventory_files": 4898,
         "excluded": 0,
-        "eligible": 4899,
+        "eligible": 4898,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

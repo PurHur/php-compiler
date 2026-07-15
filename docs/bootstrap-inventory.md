@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4899 |
-| Phase A inventory files (M2 ratio SSOT) | 4899 |
+| PHP files on vm.php path | 4898 |
+| Phase A inventory files (M2 ratio SSOT) | 4898 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13136 |
+| Source constructs flagged (warnings) | 13133 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3545,8 +3545,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ObGzhandlerJitRuntime.php` | 0 | 4 |
 | `lib/JIT/Builtin/ObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObOutputEchoJitEmit.php` | 0 | 1 |
-| `lib/JIT/Builtin/ObOutputExecCaptureLlvm.php` | 0 | 2 |
-| `lib/JIT/Builtin/ObOutputExecCaptureRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/ObOutputExecCaptureRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ObOutputJitBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/ObOutputRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObOutputUserScriptLlvm.php` | 0 | 1 |
@@ -16058,7 +16057,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ObOutputExecCaptureJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/ObOutputJitHelper.php`
 
@@ -28385,18 +28384,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
 
-### `lib/JIT/Builtin/ObOutputExecCaptureLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 21 class method(s)
-- 7 closure(s)
-
 ### `lib/JIT/Builtin/ObOutputExecCaptureRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 83)
-- 10 class method(s)
-- 4 closure(s)
+- 19 class method(s)
+- 7 closure(s)
 
 ### `lib/JIT/Builtin/ObOutputJitBridge.php`
 
