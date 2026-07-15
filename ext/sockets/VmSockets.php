@@ -138,6 +138,35 @@ final class VmSockets
         return $object;
     }
 
+    /**
+     * php-src: PHP_FUNCTION(socket_create_pair) — socketpair(2) as two Socket objects (#6563).
+     *
+     * @return array{0: ObjectEntry, 1: ObjectEntry}|false
+     */
+    public static function createPair(
+        int $domain,
+        int $type,
+        int $protocol,
+        \PHPCompiler\VM\Context $ctx
+    ): array|false {
+        if (!SocketsLibcThinAbi::available()) {
+            return false;
+        }
+        $fds = SocketsLibcThinAbi::socketpair($domain, $type, $protocol);
+        if (false === $fds) {
+            self::recordError(null, SocketsLibcThinAbi::readErrno());
+
+            return false;
+        }
+
+        $a = VmSocket::wrapOwnedFd($fds[0], $ctx);
+        $b = VmSocket::wrapOwnedFd($fds[1], $ctx);
+        self::$socketErrors[$a->id] = 0;
+        self::$socketErrors[$b->id] = 0;
+
+        return [$a, $b];
+    }
+
     public static function connect(ObjectEntry $object, string $addr, int $port, Frame $frame): bool
     {
         $fd = VmSocket::fdForObject($object);

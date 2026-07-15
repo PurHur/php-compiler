@@ -58,6 +58,8 @@ final class BuiltinByRefParams
                 return [2];
             case 'stream_socket_server':
                 return [1, 2];
+            case 'socket_create_pair':
+                return [3];
             case 'fsockopen':
             case 'pfsockopen':
                 return [2, 3];
