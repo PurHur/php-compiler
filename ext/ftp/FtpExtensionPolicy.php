@@ -10,7 +10,7 @@ use PHPCompiler\ext\standard\VmStreamSocketNative;
 /**
  * ext/ftp advertisement — php-src ext/ftp/php_ftp.c (#3353, #7270).
  *
- * {@code function_exists('ftp_connect')} is true once connect handlers register;
+ * {@code function_exists('ftp_connect'|'ftp_fget'|…)} once handlers register (#3353, #6762);
  * {@code extension_loaded('ftp')} stays false until the module advertises as loaded.
  */
 final class FtpExtensionPolicy
