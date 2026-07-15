@@ -355,9 +355,11 @@ final class VmMath
     }
 
     /**
-     * Z_PARAM_LONG coercion where null always becomes 0 (ext/random/random.c random_bytes; #19054).
+     * Z_PARAM_LONG coercion where null becomes 0 when the caller is not strict_types
+     * (ext/random/random.c random_bytes without strict_types; #19054).
      *
-     * Unlike {@see parseIntBuiltinArg}, does not apply 8.4 forward-profile strict null TypeError.
+     * Prefer {@see parseZParamLongBuiltinArgForFrame} so `declare(strict_types=1)` matches
+     * Zend TypeError (#19230, same as sleep #19079).
      */
     public static function parseZParamLongBuiltinArg(
         Variable $var,

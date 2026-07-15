@@ -19262,9 +19262,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1670)
-- new Error (line 1681)
-- 215 class method(s)
+- new Error (line 1694)
+- new Error (line 1705)
+- 216 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -22388,7 +22388,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/openssl_random_pseudo_bytes.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/ord.php`
 
@@ -22848,7 +22848,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/random_bytes.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/random_int.php`
 
@@ -24156,8 +24156,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/unserialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 120)
-- new JITVariable (line 138)
+- new JITVariable (line 119)
+- new JITVariable (line 137)
 - 6 class method(s)
 
 ### `ext/standard/urldecode.php`
@@ -32014,8 +32014,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 380)
-- 26 class method(s)
+- new Variable (line 390)
+- 27 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
 
