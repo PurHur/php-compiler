@@ -43,6 +43,14 @@ final class DomUserScriptAttributeCacheLlvm
         return self::$lastCreateLocalName;
     }
 
+    /** Compile-time cache presence check for getAttribute dispatch (#19281). */
+    public static function hasLiteralKey(string $namespace, string $localName): bool
+    {
+        $key = $namespace."\0".$localName;
+
+        return isset(self::$slotByKey[$key]);
+    }
+
     public static function storeLiteral(
         Context $context,
         string $namespace,
