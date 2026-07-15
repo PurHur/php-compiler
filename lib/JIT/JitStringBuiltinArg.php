@@ -22,7 +22,7 @@ use PHPLLVM\Value;
  */
 final class JitStringBuiltinArg
 {
-    /** PHP 8.4+ forward profile: Z_PARAM_STR null is TypeError (#18778, #18798). */
+    /** Z_PARAM_STR null coerces outside caller strict_types (#19161). */
     public static function requiresForwardProfileStrictStringNull(): bool
     {
         return VmString::requiresForwardProfileStrictStringNull();

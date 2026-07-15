@@ -27,7 +27,7 @@ final class ord extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'ord', 1);
-        $s = VmString::stringBuiltinArgForFrame($frame, 0, 'ord', 1, 'character');
+        $s = VmString::stringBuiltinArgForFrame($frame, 0, 'ord', 0, 'character');
         if (null === $frame->returnVar) {
             return;
         }

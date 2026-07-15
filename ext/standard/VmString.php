@@ -54,22 +54,14 @@ final class VmNullStringParamDeprecation
 final class VmString
 {
     /**
-     * PHP 8.4+ forward profile: Z_PARAM_STR null is TypeError (ext/standard/string.c; #18778, #18797).
+     * Z_PARAM_STR null coercion — php-src coerces to "" outside caller strict_types (#19161).
      *
-     * PHP 8.2 reference profile keeps deprecation + coerce to "".
-     * 8.4.0-dev without {@code PHP_COMPILER_PROFILE} matches Zend 8.2 (#18912, #18914).
+     * Forward profile 8.4 does not add a profile-wide null TypeError; only {@see InternalStrictArg}
+     * at strict call sites rejects null before coercion (ext/standard/string.c).
      */
     public static function requiresForwardProfileStrictStringNull(): bool
     {
-        if (version_compare(CompilerVersion::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";

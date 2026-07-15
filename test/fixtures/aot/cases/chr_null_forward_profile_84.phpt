@@ -1,10 +1,10 @@
 --TEST--
-AOT: chr(null) — TypeError on 8.4 forward profile (#18850, ext/standard/string.c)
+AOT: chr(null) — coerces to NUL on 8.4 forward profile (#19161, ext/standard/string.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-chr(null);
+echo bin2hex(chr(null)), "\n";
+?>
 --EXPECT--
---EXPECT_EXIT--
-134
+00

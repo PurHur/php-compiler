@@ -18,13 +18,11 @@ final class VmMath
     private const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
 
     /**
-     * PHP 8.4+ forward profile: Z_PARAM_LONG null is TypeError (ext/standard/math.c; #18850).
-     *
-     * PHP 8.2 reference profile keeps coerce to 0.
+     * Z_PARAM_LONG null coercion — php-src coerces to 0 outside caller strict_types (#19161, chr/ord).
      */
     public static function requiresForwardProfileStrictLongNull(): bool
     {
-        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+        return false;
     }
 
     public static function toFloat(Variable $v): float
