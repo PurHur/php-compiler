@@ -39,6 +39,16 @@ final class strrchr extends Internal
             throw new \LogicException('strrchr() requires exactly two arguments in this compiler build');
         }
 
+        // Early TypeError — skip StringStrrchr ensureLinked on null haystack (#19242).
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strrchr', 0, 'haystack');
+
+            return JitStrtok::deadFalseResult($context);
+        }
+
         return JitStrrchr::find(
             $context,
             JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strrchr', 0, 'haystack'),
