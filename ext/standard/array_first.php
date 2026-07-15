@@ -27,9 +27,12 @@ final class array_first extends Internal
             return;
         }
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_first');
-        VmArray::requireNonEmptyFindArray($ht, 'array_first');
         $value = VmArray::valueFirst($ht);
-        $frame->returnVar->copyFrom($value);
+        if (null === $value) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->copyFrom($value);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

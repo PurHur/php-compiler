@@ -27,9 +27,12 @@ final class array_last extends Internal
             return;
         }
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_last');
-        VmArray::requireNonEmptyFindArray($ht, 'array_last');
         $value = VmArray::valueLast($ht);
-        $frame->returnVar->copyFrom($value);
+        if (null === $value) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->copyFrom($value);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
