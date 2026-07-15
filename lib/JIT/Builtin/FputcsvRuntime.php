@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
@@ -35,10 +34,6 @@ final class FputcsvRuntime
         Value $enclosure,
         Value $escape,
     ): Value {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            throw new \LogicException('fputcsv() scalar field JIT requires linked CsvJitHelper (#12447)');
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -52,10 +47,6 @@ final class FputcsvRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_FORMAT);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinked($context);
@@ -80,6 +71,11 @@ final class FputcsvRuntime
         );
         self::registerLinked($context);
         self::restoreInsertBlock($context, $savedBlock);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::ensureLinked($context);
     }
 
     private static function registerLinked(Context $context): void

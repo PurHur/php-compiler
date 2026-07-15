@@ -43,9 +43,7 @@ final class fputcsv extends Internal
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $fieldsVar = $frame->calledArgs[1]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'fputcsv');
-        if (Variable::TYPE_ARRAY !== $fieldsVar->type) {
-            throw new \LogicException('fputcsv() fields must be an array in this compiler build');
-        }
+        $fieldsHt = VmArray::requireArrayParam($fieldsVar, 'fputcsv', 2, 'fields');
         $separator = ',';
         $enclosure = '"';
         $escape = '\\';
@@ -59,7 +57,7 @@ final class fputcsv extends Internal
             $escape = VmReflection::stringArg($frame->calledArgs[4], 'fputcsv() escape', 4);
         }
         VmCsvArg::validateFputcsvOptions($separator, $enclosure, $escape);
-        $fields = VmFputcsv::coerceFieldList($fieldsVar->toArray()->iterate(true));
+        $fields = VmFputcsv::coerceFieldList($fieldsHt->iterate(true));
         $written = VmFs::fputcsv(
             $handle,
             $fields,
@@ -89,7 +87,12 @@ final class fputcsv extends Internal
         if (null !== $compileTimeFailure) {
             return $compileTimeFailure;
         }
+        $compileTimeFailure = $this->emitCompileTimeNullFieldsFailure($context, $args[1]);
+        if (null !== $compileTimeFailure) {
+            return $compileTimeFailure;
+        }
         JitCsvArg::validateFputcsvCall($context, ...$args);
+        JitArrayElem::requireArrayParam($context, $args[1], 'fputcsv', 2, 'fields');
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $handle = $context->builder->truncOrBitCast(
@@ -167,5 +170,26 @@ final class fputcsv extends Internal
         }
 
         return null;
+    }
+
+    private function emitCompileTimeNullFieldsFailure(Context $context, JITVariable $fieldsArg): ?Value
+    {
+        if (JITVariable::TYPE_NULL !== $fieldsArg->type && !($fieldsArg->isNullConstant ?? false)) {
+            return null;
+        }
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $errBlock = BasicBlockHelper::append($context, 'fputcsv_null_fields_err');
+        $afterBlock = BasicBlockHelper::append($context, 'fputcsv_null_fields_after');
+        $context->builder->branch($errBlock);
+        $context->builder->positionAtEnd($errBlock);
+        TypeErrorRaise::emitRaise(
+            $context,
+            'fputcsv(): Argument #2 ($fields) must be of type array, null given'
+        );
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($afterBlock);
+
+        return $context->getTypeFromString('int64')->constInt(0, false);
     }
 }
