@@ -134,7 +134,7 @@ final class JitDomCreateElement
         return $arg->compileTimeString;
     }
 
-    private static function materializeElementFromLiteral(Context $context, string $nameLit): Value
+    public static function materializeElementFromLiteral(Context $context, string $nameLit): Value
     {
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_ELEMENT);
