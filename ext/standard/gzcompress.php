@@ -26,7 +26,7 @@ final class gzcompress extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('gzcompress() expects one to three arguments in this compiler build');
         }
-        $data = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'gzcompress', 0, 'data');
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzcompress', 0, 'data');
         $level = -1;
         $encoding = \ZLIB_ENCODING_DEFLATE;
         if ($argc >= 2) {
@@ -67,7 +67,7 @@ final class gzcompress extends Internal
 
         return JitZlib::compress(
             $context,
-            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'gzcompress', 0, 'data'),
+            JitStringBuiltinArg::lower($context, $args[0], 'gzcompress', 0, 'data'),
             $level,
             $encoding
         );

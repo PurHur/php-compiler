@@ -1,17 +1,13 @@
 --TEST--
-zlib gzcompress/gzuncompress/gzinflate(null) — TypeError on default profile JIT (#19004, ext/zlib/zlib.c)
+zlib gzcompress/gzuncompress/gzinflate(null) — coerce to empty string on default profile JIT (#19023, ext/zlib/zlib.c)
 --FILE--
 <?php
-foreach (['gzcompress', 'gzuncompress', 'gzinflate'] as $fn) {
-    try {
-        $fn(null);
-        echo $fn, ": uncaught\n";
-    } catch (TypeError $e) {
-        echo $e->getMessage(), "\n";
-    }
-}
+$c = gzcompress(null);
+echo strlen($c), "\n";
+echo var_export(@gzuncompress(null), true), "\n";
+echo var_export(@gzinflate(null), true), "\n";
 ?>
 --EXPECT--
-gzcompress(): Argument #1 ($data) must be of type string, null given
-gzuncompress(): Argument #1 ($data) must be of type string, null given
-gzinflate(): Argument #1 ($data) must be of type string, null given
+8
+false
+false

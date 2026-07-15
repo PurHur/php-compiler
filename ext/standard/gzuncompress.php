@@ -26,7 +26,7 @@ final class gzuncompress extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('gzuncompress() expects one or two arguments in this compiler build');
         }
-        $data = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'gzuncompress', 0, 'data');
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzuncompress', 0, 'data');
         $maxLength = 0;
         if (2 === $argc) {
             $maxLength = VmZlibArg::requireInt($frame->calledArgs[1], 'gzuncompress', 2, 'max_length');
@@ -58,7 +58,7 @@ final class gzuncompress extends Internal
 
         return JitZlib::uncompress(
             $context,
-            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'gzuncompress', 0, 'data'),
+            JitStringBuiltinArg::lower($context, $args[0], 'gzuncompress', 0, 'data'),
             $maxLength
         );
     }

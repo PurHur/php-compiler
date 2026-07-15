@@ -101,6 +101,10 @@ final class VmZlibCore
 
     public static function gzinflate(string $data, int $maxLength = 0): string|false
     {
+        if ('' === $data) {
+            return false;
+        }
+
         return self::rawInflate($data, $maxLength);
     }
 
