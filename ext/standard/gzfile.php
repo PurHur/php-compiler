@@ -31,7 +31,7 @@ final class gzfile extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzfile', 0, 'filename');
+        $filename = VmZlibArg::resolveFilenameString($frame, 'gzfile');
         $useIncludePath = 0;
         if (2 === $argc) {
             $useIncludePath = VmMath::parseIntBuiltinArg(
@@ -70,7 +70,7 @@ final class gzfile extends Internal
 
         return JitGzfile::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'gzfile', 0, 'filename'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'gzfile', 0, 'filename'),
             $useIncludePath
         );
     }

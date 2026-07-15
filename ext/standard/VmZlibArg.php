@@ -4,12 +4,26 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /** Shared VM argument parsing for ext/zlib builtins (php-src ext/zlib/zlib.c, issue #4497). */
 final class VmZlibArg
 {
+    /** Z_PARAM_STR $data with declare(strict_types=1) caller edge (#19119). */
+    public static function resolveDataString(Frame $frame, string $function, int $argIndex = 0): string
+    {
+        return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, $function, 'data');
+    }
+
+    /** Z_PARAM_STR $filename with declare(strict_types=1) caller edge (#19119). */
+    public static function resolveFilenameString(Frame $frame, string $function, int $argIndex = 0): string
+    {
+        return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, $function, 'filename');
+    }
+
     public static function requireInt(
         Variable $var,
         string $function,

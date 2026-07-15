@@ -26,7 +26,7 @@ final class zlib_encode extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('zlib_encode() expects two or three arguments in this compiler build');
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'zlib_encode', 0, 'data');
+        $data = VmZlibArg::resolveDataString($frame, 'zlib_encode');
         $encoding = VmZlibArg::requireInt($frame->calledArgs[1], 'zlib_encode', 2, 'encoding');
         self::assertValidEncoding($encoding);
         $level = -1;
@@ -61,7 +61,7 @@ final class zlib_encode extends Internal
 
         return JitZlib::zlibEncode(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'zlib_encode', 0, 'data'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'zlib_encode', 0, 'data'),
             JitStrictIntArg::lower($context, $args[1], 'zlib_encode', 2, 'encoding'),
             $level
         );
