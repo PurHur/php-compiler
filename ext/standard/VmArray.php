@@ -773,7 +773,7 @@ final class VmArray
     }
 
     /**
-     * array_find() / array_find_key() — empty haystack ValueError (php-src array.c, #12519).
+     * array_first() / array_last() — empty haystack ValueError (php-src array.c).
      *
      * @throws \ValueError
      */
