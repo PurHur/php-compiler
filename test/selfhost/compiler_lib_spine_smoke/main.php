@@ -4057,6 +4057,8 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentSaveHTML.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentSaveHTMLFile.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentSaveXML.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementGetAttribute.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetAttribute.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomElementGetAttributeNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementGetAttributeNodeNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetAttributeNodeNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomInstanceMethod.php';

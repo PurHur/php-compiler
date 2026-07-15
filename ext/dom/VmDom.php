@@ -6505,13 +6505,29 @@ final class VmDom
         }
         $state = DomRegistry::state($node);
         if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
-            $state->textContent = $value;
-            if ($node->hasProperty(self::PROP_VALUE)) {
-                $node->getProperty(self::PROP_VALUE)->string($value);
+            // Live Attr handle (php-src dom_attr_value_write / ext/dom/attr.c; #19281).
+            self::syncAttributeNodeValue($node, $value);
+            $ownerElementId = $state->ownerElementId;
+            if (null === $ownerElementId) {
+                return;
             }
-            if ($node->hasProperty(self::PROP_NODE_VALUE)) {
-                $node->getProperty(self::PROP_NODE_VALUE)->string($value);
+            $owner = DomRegistry::entry($ownerElementId);
+            if (null === $owner || !self::isElement($owner)) {
+                return;
             }
+            $ownerState = DomRegistry::state($owner);
+            $name = $state->nodeName;
+            $ownerState->attributes[$name] = $value;
+            if (self::isXmlnsAttributeName($name)) {
+                $ownerState->namespaceDeclarations = self::extractNamespaceDeclarations($ownerState->attributes);
+            }
+            if (null !== $ownerState->idAttributeName && $name === $ownerState->idAttributeName) {
+                self::syncElementIdRegistration($owner);
+            }
+            if (CompilerVersion::supportsDomTokenList() && 'class' === $name) {
+                VmDomTokenList::invalidateForElement($owner);
+            }
+            self::syncElementAttributes($ctx, $owner);
 
             return;
         }
