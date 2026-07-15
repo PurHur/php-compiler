@@ -6583,6 +6583,22 @@ restart:
                                     goto restart;
                                 }
                                 $this->tagReadonlyPropertyDimWriteContainer($result, $propertyObject, $name);
+                                // PROPERTY_FETCH_WRITE + []= must read-modify-write via hooks (#19171).
+                                $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
+                                if (null !== $hookValue) {
+                                    $catchFrame = $this->deliverHookedPropertyDimWriteContainer(
+                                        $result,
+                                        $hookValue,
+                                        $propertyObject,
+                                        $name,
+                                        $frame
+                                    );
+                                    if (null !== $catchFrame) {
+                                        $frame = $catchFrame;
+                                        goto restart;
+                                    }
+                                    break;
+                                }
                             }
                             $catchFrame = $this->enforceDomDocumentReadOnlyPropertyWrite($propertyObject, $name, $frame);
                             if (null !== $catchFrame) {
