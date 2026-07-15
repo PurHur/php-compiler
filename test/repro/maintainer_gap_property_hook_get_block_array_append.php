@@ -4,7 +4,7 @@ class C {
         get {
             return $this->items ?? [];
         }
-        set (array $value) {
+        set {
             $this->items = $value;
         }
     }

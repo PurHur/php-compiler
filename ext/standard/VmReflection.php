@@ -699,9 +699,17 @@ final class VmReflection
     }
 
     /**
-     * method_exists() operand dispatch — php-src ext/standard/class.c (#4360).
+     * method_exists() on a class name — inherited public/protected methods; parent-private excluded (#4360, #19178).
+     */
+    public static function methodExistsOnClassWithInheritance(Context $ctx, ClassEntry $entry, string $method): bool
+    {
+        return self::classHasMethodForReflection($entry, $ctx, $method, 0);
+    }
+
+    /**
+     * method_exists() operand dispatch — php-src ext/standard/class.c (#4360, #19178).
      *
-     * Class-name strings see only methods on that class table (private parent methods excluded).
+     * Class-name strings walk inheritance (parent-private methods excluded).
      * Object operands walk inheritance (private parent methods included).
      */
     public static function methodExists(Context $ctx, Variable $objectOrClass, string $method): bool
@@ -713,7 +721,7 @@ final class VmReflection
                 return false;
             }
 
-            return self::methodExistsOnClass($class, $method);
+            return self::methodExistsOnClassWithInheritance($ctx, $class, $method);
         }
         if (Variable::TYPE_OBJECT === $objectOrClass->type) {
             $object = $objectOrClass->toObject();

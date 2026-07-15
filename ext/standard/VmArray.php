@@ -773,18 +773,6 @@ final class VmArray
     }
 
     /**
-     * array_first() / array_last() — empty haystack ValueError (php-src array.c).
-     *
-     * @throws \ValueError
-     */
-    public static function requireNonEmptyFindArray(HashTable $ht, string $fn): void
-    {
-        if (0 === $ht->getNumElements()) {
-            throw new \ValueError(\sprintf('%s(): Argument #1 ($array) must not be empty', $fn));
-        }
-    }
-
-    /**
      * Variadic array builtins whose Zend messages omit ($param) — e.g. array_merge().
      *
      * @throws \TypeError when {@param $value} is not an array

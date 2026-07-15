@@ -17,20 +17,26 @@ final class ArrayElemJitHelper
 {
     public static function firstArgv(HashTable $ht): Variable
     {
-        VmArray::requireNonEmptyFindArray($ht, 'array_first');
         $value = VmArray::valueFirst($ht);
         $out = new Variable();
-        $out->copyFrom($value);
+        if (null === $value) {
+            $out->null();
+        } else {
+            $out->copyFrom($value);
+        }
 
         return $out;
     }
 
     public static function lastArgv(HashTable $ht): Variable
     {
-        VmArray::requireNonEmptyFindArray($ht, 'array_last');
         $value = VmArray::valueLast($ht);
         $out = new Variable();
-        $out->copyFrom($value);
+        if (null === $value) {
+            $out->null();
+        } else {
+            $out->copyFrom($value);
+        }
 
         return $out;
     }
