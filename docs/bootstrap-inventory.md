@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4966 |
-| Phase A inventory files (M2 ratio SSOT) | 4966 |
+| PHP files on vm.php path | 4967 |
+| Phase A inventory files (M2 ratio SSOT) | 4967 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13315 |
+| Source constructs flagged (warnings) | 13318 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -204,6 +204,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomStandaloneAotInitJitHelper.php` | 0 | 1 |
 | `ext/dom/DomSyncElementIdMapJitHelper.php` | 0 | 1 |
 | `ext/dom/DomTokenListPropertySupport.php` | 0 | 2 |
+| `ext/dom/DomUserScriptAttributeCacheLlvm.php` | 0 | 1 |
 | `ext/dom/DomUserScriptElementCacheLlvm.php` | 0 | 1 |
 | `ext/dom/DomUserScriptLiveTagListLlvm.php` | 0 | 1 |
 | `ext/dom/DomXPathEvaluateJitHelper.php` | 0 | 1 |
@@ -244,7 +245,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ImplementationHasFeature.php` | 0 | 1 |
 | `ext/dom/JitDomAppendChild.php` | 0 | 1 |
 | `ext/dom/JitDomAppendChildUserScript.php` | 0 | 2 |
-| `ext/dom/JitDomAttributeNodeNS.php` | 0 | 1 |
+| `ext/dom/JitDomAttributeNodeNS.php` | 0 | 3 |
 | `ext/dom/JitDomCreateElement.php` | 0 | 5 |
 | `ext/dom/JitDomCreateElementNS.php` | 0 | 1 |
 | `ext/dom/JitDomCreateTextNode.php` | 0 | 2 |
@@ -5956,7 +5957,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomParseSimpleXmlJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 5 class method(s)
 
 ### `ext/dom/DomRegistry.php`
 
@@ -5993,6 +5994,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 28)
 - 3 class method(s)
+
+### `ext/dom/DomUserScriptAttributeCacheLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/dom/DomUserScriptElementCacheLlvm.php`
 
@@ -6204,7 +6210,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomAttributeNodeNS.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- new JITVariable (line 320)
+- new JITVariable (line 335)
+- 19 class method(s)
 
 ### `ext/dom/JitDomCreateElement.php`
 
