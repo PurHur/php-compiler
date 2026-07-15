@@ -1111,6 +1111,7 @@ require_once __DIR__.'/../../../ext/standard/AttributeRegistryArgsJitHelper.php'
 require_once __DIR__.'/../../../ext/standard/AttributeRegistryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/Base64JitHelper.php';
 require_once __DIR__.'/../../../ext/standard/Bin2hexJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/JitBin2hexKernel.php';
 require_once __DIR__.'/../../../ext/standard/BuiltinAttributes.php';
 require_once __DIR__.'/../../../ext/standard/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/standard/BuiltinEnums.php';

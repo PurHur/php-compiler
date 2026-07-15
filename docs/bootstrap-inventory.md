@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4997 |
-| Phase A inventory files (M2 ratio SSOT) | 4997 |
+| PHP files on vm.php path | 4998 |
+| Phase A inventory files (M2 ratio SSOT) | 4998 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13453 |
+| Source constructs flagged (warnings) | 13454 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1219,6 +1219,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitAssert.php` | 0 | 2 |
 | `ext/standard/JitAssertOptions.php` | 0 | 2 |
 | `ext/standard/JitAttributeExists.php` | 0 | 1 |
+| `ext/standard/JitBin2hexKernel.php` | 0 | 1 |
 | `ext/standard/JitBuiltinWarning.php` | 0 | 1 |
 | `ext/standard/JitCallUserFunc.php` | 0 | 7 |
 | `ext/standard/JitChdir.php` | 0 | 1 |
@@ -13232,6 +13233,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/JitAttributeExists.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitBin2hexKernel.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
