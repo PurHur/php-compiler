@@ -50,13 +50,10 @@ final class JitDomXPathQueryUserScript
         $tag = $matches[1];
         if (!isset($matches[2])) {
             self::$lastCacheKey = null;
-            DomUserScriptLiveTagListLlvm::initCount(
-                $context,
-                $tag,
-                DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag)
-            );
+            $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+            DomUserScriptLiveTagListLlvm::initCount($context, $tag, $count);
 
-            return self::boxNodeList($context);
+            return self::boxNodeList($context, $count);
         }
         $matched = DomParseSimpleXmlJitHelper::matchDescendantAttributeArgv(
             $xml,
@@ -68,7 +65,7 @@ final class JitDomXPathQueryUserScript
             self::$lastCacheKey = null;
             DomUserScriptLiveTagListLlvm::initCount($context, $tag, 0);
 
-            return self::boxNodeList($context);
+            return self::boxNodeList($context, 0);
         }
         [$count, $text] = $matched;
         self::$lastCacheKey = strtolower($tag.'@'.$matches[2].'='.$matches[3]);
@@ -80,15 +77,29 @@ final class JitDomXPathQueryUserScript
         $nullDoc = $context->getTypeFromString('__object__*')->constNull();
         DomUserScriptElementCacheLlvm::store($context, $nullDoc, $cacheKey, $element);
 
-        return self::boxNodeList($context);
+        return self::boxNodeList($context, $count);
     }
 
-    private static function boxNodeList(Context $context): Value
+    private static function boxNodeList(Context $context, int $length): Value
     {
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_NODELIST);
         $list = $objectType->allocate($classId);
         $objectType->markObjectConstructed($list);
+        if (!$objectType->hasProperty($classId, 'length')) {
+            $objectType->defineProperty($classId, 'length', JITVariable::TYPE_NATIVE_LONG);
+        }
+        $lengthVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt($length, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($list, self::CLASS_NODELIST, 'length'),
+            $lengthVar,
+            JITVariable::TYPE_NATIVE_LONG
+        );
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(

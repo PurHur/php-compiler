@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\Builtin\DomLoadXMLRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -24,6 +25,11 @@ final class JitDomLoadXML
             if (null !== $us) {
                 return $us;
             }
+        }
+
+        $xmlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null !== $xmlLit && '' !== trim($xmlLit)) {
+            JitDomLoadXMLUserScript::rememberCompileTimeXml($xmlLit);
         }
 
         DomLoadXMLRuntime::ensureLinked($context);
