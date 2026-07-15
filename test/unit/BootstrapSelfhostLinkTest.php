@@ -142,6 +142,9 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('export BOOTSTRAP_NO_ZEND_FALLBACK=1', $spineLink);
         $this->assertStringContainsString('inventory argv driver unavailable (no Zend — #8716)', $spineLink);
         $this->assertStringContainsString('BOOTSTRAP_NO_ZEND_FALLBACK:-0}" != "1"', $spineLink);
+        $this->assertStringContainsString('bootstrap_try_sidecar_emit_fallback', $spineLink);
+        $this->assertStringContainsString('native parse spine null — recovered via gen-0 sidecar', $spineLink);
+        $this->assertStringContainsString('#19095', $spineLink);
 
         $coldBoot = self::$root.'/script/bootstrap-selfhost-cold-boot-probe.sh';
         $this->assertFileExists($coldBoot);

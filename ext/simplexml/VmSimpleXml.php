@@ -36,6 +36,7 @@ final class VmSimpleXml
         if (isset($ctx->classes['arrayaccess'])) {
             $entry->interfaces[] = 'arrayaccess';
         }
+        SimpleXmlElementIterator::registerInterfaces($entry, $ctx);
 
         $entry->methods['__get'] = new SimpleXmlElementGet();
         $entry->methodVisibility['__get'] = $pub;
@@ -74,6 +75,7 @@ final class VmSimpleXml
         $entry->methods['registerxpathnamespace'] = new SimpleXmlElementRegisterXPathNamespace();
         $entry->methodVisibility['registerxpathnamespace'] = $pub;
         $entry->methodNames['registerxpathnamespace'] = 'registerXPathNamespace';
+        SimpleXmlElementIterator::registerMethods($entry, $pub);
 
         $ctx->classes[self::CLASS_LC] = $entry;
         $ctx->classes[self::CLASS_LC]->isInternal = true;

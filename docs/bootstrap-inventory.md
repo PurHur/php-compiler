@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4893 |
-| Phase A inventory files (M2 ratio SSOT) | 4893 |
+| PHP files on vm.php path | 4894 |
+| Phase A inventory files (M2 ratio SSOT) | 4894 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13126 |
+| Source constructs flagged (warnings) | 13127 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -787,6 +787,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/SimpleXmlElementGetDocNamespaces.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementGetName.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementGetNamespaces.php` | 0 | 1 |
+| `ext/simplexml/SimpleXmlElementIterator.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementOffsetExists.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementOffsetGet.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementRegisterXPathNamespace.php` | 0 | 1 |
@@ -6847,34 +6848,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 3905)
 - new DOMException (line 3946)
 - new DOMException (line 3971)
-- new DOMException (line 4639)
-- new Variable (line 4667)
-- new DOMException (line 4897)
-- new DOMException (line 4980)
-- new DOMException (line 5022)
-- new ObjectEntry (line 5107)
-- new DomNodeState (line 5111)
-- new Variable (line 5118)
-- new ObjectEntry (line 5318)
-- new DomNodeState (line 5322)
-- new Variable (line 5329)
-- new ObjectEntry (line 5349)
-- new DomNodeState (line 5352)
-- new Variable (line 5360)
-- new Variable (line 5508)
-- new DOMException (line 5592)
-- new DOMException (line 5599)
-- new DOMException (line 5606)
-- new DOMException (line 5610)
+- new DOMException (line 4642)
+- new Variable (line 4670)
+- new DOMException (line 4900)
+- new DOMException (line 4983)
+- new DOMException (line 5025)
+- new ObjectEntry (line 5110)
+- new DomNodeState (line 5114)
+- new Variable (line 5121)
+- new ObjectEntry (line 5321)
+- new DomNodeState (line 5325)
+- new Variable (line 5332)
+- new ObjectEntry (line 5352)
+- new DomNodeState (line 5355)
+- new Variable (line 5363)
+- new Variable (line 5511)
+- new DOMException (line 5595)
+- new DOMException (line 5602)
+- new DOMException (line 5609)
 - new DOMException (line 5613)
-- new DOMException (line 5622)
-- new Variable (line 6425)
-- new Variable (line 6438)
-- new DOMException (line 6520)
-- new DOMException (line 6531)
-- new DOMException (line 6597)
-- new DOMException (line 6605)
-- new DOMException (line 6614)
+- new DOMException (line 5616)
+- new DOMException (line 5625)
+- new Variable (line 6428)
+- new Variable (line 6441)
+- new DOMException (line 6523)
+- new DOMException (line 6534)
+- new DOMException (line 6600)
+- new DOMException (line 6608)
+- new DOMException (line 6617)
 - 317 class method(s)
 - 2 closure(s)
 
@@ -10105,6 +10106,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/simplexml/SimpleXmlElementIterator.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
+
 ### `ext/simplexml/SimpleXmlElementOffsetExists.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10156,40 +10162,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 32)
-- new SimpleXmlElementGet (line 40)
-- new SimpleXmlElementToString (line 42)
-- new SimpleXmlElementOffsetGet (line 45)
-- new SimpleXmlElementOffsetExists (line 48)
-- new SimpleXmlElementCount (line 51)
-- new SimpleXmlElementGetName (line 53)
-- new SimpleXmlElementChildren (line 56)
-- new SimpleXmlElementAsXml (line 58)
-- new SimpleXmlElementAddChild (line 61)
-- new SimpleXmlElementXpath (line 64)
-- new SimpleXmlElementAttributes (line 66)
-- new SimpleXmlElementGetDocNamespaces (line 68)
-- new SimpleXmlElementGetNamespaces (line 71)
-- new SimpleXmlElementRegisterXPathNamespace (line 74)
-- new Variable (line 161)
-- new Variable (line 166)
-- new Variable (line 173)
-- new Variable (line 179)
-- new Variable (line 188)
-- new SimpleXmlNodeState (line 277)
-- new SimpleXmlNodeState (line 283)
-- new SimpleXmlNodeState (line 329)
-- new HashTable (line 342)
-- new Variable (line 354)
-- new Variable (line 364)
-- new ObjectEntry (line 409)
-- new ObjectEntry (line 451)
-- new ObjectEntry (line 462)
-- new SimpleXmlNodeState (line 466)
-- new ObjectEntry (line 482)
-- new HashTable (line 602)
-- new Variable (line 604)
-- new SimpleXmlNodeState (line 663)
-- new SimpleXmlNodeState (line 672)
+- new SimpleXmlElementGet (line 41)
+- new SimpleXmlElementToString (line 43)
+- new SimpleXmlElementOffsetGet (line 46)
+- new SimpleXmlElementOffsetExists (line 49)
+- new SimpleXmlElementCount (line 52)
+- new SimpleXmlElementGetName (line 54)
+- new SimpleXmlElementChildren (line 57)
+- new SimpleXmlElementAsXml (line 59)
+- new SimpleXmlElementAddChild (line 62)
+- new SimpleXmlElementXpath (line 65)
+- new SimpleXmlElementAttributes (line 67)
+- new SimpleXmlElementGetDocNamespaces (line 69)
+- new SimpleXmlElementGetNamespaces (line 72)
+- new SimpleXmlElementRegisterXPathNamespace (line 75)
+- new Variable (line 163)
+- new Variable (line 168)
+- new Variable (line 175)
+- new Variable (line 181)
+- new Variable (line 190)
+- new SimpleXmlNodeState (line 279)
+- new SimpleXmlNodeState (line 285)
+- new SimpleXmlNodeState (line 331)
+- new HashTable (line 344)
+- new Variable (line 356)
+- new Variable (line 366)
+- new ObjectEntry (line 411)
+- new ObjectEntry (line 453)
+- new ObjectEntry (line 464)
+- new SimpleXmlNodeState (line 468)
+- new ObjectEntry (line 484)
+- new HashTable (line 604)
+- new Variable (line 606)
+- new SimpleXmlNodeState (line 665)
+- new SimpleXmlNodeState (line 674)
 - 39 class method(s)
 
 ### `ext/simplexml/VmSimpleXmlIterator.php`

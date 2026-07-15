@@ -158,11 +158,12 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
     _spine_driver_env+=(PHP_COMPILER_VENDOR_PRELINK="${PHP_COMPILER_VENDOR_PRELINK}")
   fi
   set +e
-  env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+  driver_out="$(env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
     "${_spine_driver_env[@]}" \
-    "${SPINE_COMPILE_DRIVER}" -o "${OUT}" "${ENTRY}" 2>&1
+    "${SPINE_COMPILE_DRIVER}" -o "${OUT}" "${ENTRY}" 2>&1)"
   driver_code=$?
   set -e
+  printf '%s\n' "${driver_out}"
   if [[ "${driver_code}" -eq 139 ]]; then
     bootstrap_spine_emit_crash_diag "${SPINE_COMPILE_DRIVER}" -o "${OUT}" "${ENTRY}"
   fi
@@ -176,6 +177,13 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
     if [[ -f "${PHP_COMPILER_JIT_ENTRY_FILE}" ]]; then
       echo "bootstrap-selfhost-lib-spine-smoke-link: last entry: $(cat "${PHP_COMPILER_JIT_ENTRY_FILE}" 2>/dev/null || true)" >&2
     fi
+    if grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile' <<< "${driver_out}" \
+      && bootstrap_try_sidecar_emit_fallback "${OUT}" "${ENTRY}" "${driver_code}"; then
+      echo "bootstrap-selfhost-lib-spine-smoke-link: native parse spine null — recovered via gen-0 sidecar (#1492, #19095)" >&2
+    elif [[ "${driver_code}" -eq 139 ]] \
+      && bootstrap_try_sidecar_emit_fallback "${OUT}" "${ENTRY}" "${driver_code}"; then
+      echo "bootstrap-selfhost-lib-spine-smoke-link: native driver segfault — recovered via gen-0 sidecar (#1492, #19095)" >&2
+    else
     echo "bootstrap-selfhost-lib-spine-smoke-link: inventory argv driver failed; retrying honest Zend then native resolver (#8559)" >&2
     if bootstrap_compiler_lib_honest_zend_compile "${OUT}" "${ENTRY}" full 2>&1; then
       :
@@ -210,6 +218,7 @@ if [[ "${BOOTSTRAP_LIB_SPINE_SMOKE_USE_COMPILE_INVOKE:-0}" != "1" ]]; then
         echo "bootstrap-selfhost-lib-spine-smoke-link: compile failed (progress gate; see stderr above)" >&2
         exit 1
       fi
+    fi
     fi
   fi
 fi

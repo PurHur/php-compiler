@@ -245,14 +245,46 @@ final class SplFileObjectStorage
             return false;
         }
         $readLen = $length ?? ($state['maxLineLen'] > 0 ? $state['maxLineLen'] : null);
-        $line = VmFs::fgets($state['handle'], $readLen);
-        if (false === $line) {
-            return false;
-        }
-        $state['currentLine'] = $line;
-        $state['lineNum'] += $lineAdd;
+        do {
+            if (VmFs::feof($state['handle'])) {
+                return false;
+            }
+            $line = VmFs::fgets($state['handle'], $readLen);
+            if (false === $line) {
+                return false;
+            }
+            $line = self::applyDropNewLine($line, $state['flags']);
+            if (self::shouldSkipEmptyLine($state['flags'], $line)) {
+                continue;
+            }
+            $state['currentLine'] = $line;
+            $state['lineNum'] += $lineAdd;
 
-        return true;
+            return true;
+        } while (true);
+    }
+
+    private static function applyDropNewLine(string $line, int $flags): string
+    {
+        if (0 === ($flags & SplFileObjectBuiltin::DROP_NEW_LINE)) {
+            return $line;
+        }
+        if ('' === $line) {
+            return $line;
+        }
+        if (str_ends_with($line, "\r\n")) {
+            return substr($line, 0, -2);
+        }
+        if (str_ends_with($line, "\n") || str_ends_with($line, "\r")) {
+            return substr($line, 0, -1);
+        }
+
+        return $line;
+    }
+
+    private static function shouldSkipEmptyLine(int $flags, string $line): bool
+    {
+        return 0 !== ($flags & SplFileObjectBuiltin::SKIP_EMPTY) && '' === $line;
     }
 
     /** @param array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int, separator: string, enclosure: string, escape: string} $state */

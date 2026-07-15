@@ -6788,7 +6788,15 @@ restart:
                         break;
                     }
                     if (Variable::TYPE_OBJECT !== $src->type) {
-                        throw new \LogicException('clone requires an object');
+                        $catchFrame = $this->dispatchVmError(
+                            VM\CloneSupport::NON_OBJECT_ERROR_MESSAGE,
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     }
                     $srcObject = $src->toObject();
                     $catchFrame = $this->enforceCloneVisibility($srcObject, $frame);

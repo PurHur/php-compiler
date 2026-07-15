@@ -2344,10 +2344,10 @@ final class CompilerVersion
     }
 
     /**
-     * ext/sqlite3 exception surface — withheld on reference profile (#17106, #17194).
+     * ext/sqlite3 SQLite3 class + query API — forward profile only (#3434).
      *
-     * Forward profile ({@code PHP_COMPILER_PROFILE=8.4}) advertises extension_loaded('sqlite3')
-     * and SQLite3Exception for catch/class_exists parity before the SQLite3 API lands (#3434).
+     * {@code extension_loaded('sqlite3')} and {@code SQLite3Exception} are advertised whenever
+     * the in-tree module loads ({@see Sqlite3ExtensionPolicy::advertisesExtensionLoaded()}, #19047).
      */
     public static function supportsSqlite3(): bool
     {

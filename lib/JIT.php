@@ -8158,27 +8158,7 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_CLONE:
-                    $srcVar = $this->context->getVariableFromOp($block->getOperand($op->arg2));
-                    if (Variable::TYPE_OBJECT === $srcVar->type) {
-                        $srcObj = $this->context->helper->loadValue($srcVar);
-                    } elseif (Variable::TYPE_VALUE === $srcVar->type) {
-                        $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $srcVar);
-                        $srcObj = $this->context->builder->call(
-                            $this->context->lookupFunction('__value__readObject'),
-                            $valuePtr
-                        );
-                    } else {
-                        throw new \LogicException('clone requires an object');
-                    }
-                    $cloned = $this->context->type->object->cloneObject($srcObj);
-                    $this->context->type->object->invokeCloneMagicIfPresent($block, $cloned);
-                    $objVar = new JIT\Variable(
-                        $this->context,
-                        Variable::TYPE_OBJECT,
-                        Variable::KIND_VALUE,
-                        $cloned
-                    );
-                    $this->assignOperand($block->getOperand($op->arg1), $objVar);
+                    JIT\CloneOperandHelper::compile($this, $this->context, $block, $op);
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
