@@ -1660,6 +1660,7 @@ require_once __DIR__.'/../../../ext/standard/JitZendScalarCast.php';
 require_once __DIR__.'/../../../ext/standard/JitZlib.php';
 require_once __DIR__.'/../../../ext/standard/JsonDecodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JsonEncodeJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/JsonStringOperandArg.php';
 require_once __DIR__.'/../../../ext/standard/KeySortJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/LcgJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/LdexpJitHelper.php';

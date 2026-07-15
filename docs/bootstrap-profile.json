@@ -1646,6 +1646,7 @@
         "ext/standard/JitZlib.php",
         "ext/standard/JsonDecodeJitHelper.php",
         "ext/standard/JsonEncodeJitHelper.php",
+        "ext/standard/JsonStringOperandArg.php",
         "ext/standard/KeySortJitHelper.php",
         "ext/standard/LcgJitHelper.php",
         "ext/standard/LdexpJitHelper.php",
@@ -5149,9 +5150,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4915,
+        "inventory_files": 4916,
         "excluded": 0,
-        "eligible": 4915,
+        "eligible": 4916,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
