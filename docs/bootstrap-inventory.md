@@ -1510,6 +1510,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitRandomIntArg.php` | 0 | 1 |
 | `ext/standard/JitReaddir.php` | 0 | 1 |
 | `ext/standard/JitReadfile.php` | 0 | 1 |
+| `ext/standard/JitReadfileKernel.php` | 0 | 1 |
 | `ext/standard/JitReadgzfile.php` | 0 | 1 |
 | `ext/standard/JitReadline.php` | 0 | 1 |
 | `ext/standard/JitReadlink.php` | 0 | 1 |
@@ -3873,7 +3874,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringQuotemeta.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringReadfile.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringReadfileLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringReadlink.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRealpath.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRename.php` | 0 | 1 |
@@ -14700,6 +14700,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/JitReadfile.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitReadfileKernel.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -30461,13 +30466,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringReadfile.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 112)
-- 5 class method(s)
-
-### `lib/JIT/Builtin/StringReadfileLibc.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new JIT (line 160)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/StringReadlink.php`
 
