@@ -20,14 +20,12 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_parse_str via ParseStrJitHelper PHP (#9295, #14217).
  *
- * Embed compiles {@see ParseStrJitHelper}; user-script AOT compiles {@see ParseStrNativeJitHelper} (#15417).
+ * Embed compiles {@see ParseStrJitHelper}; user-script AOT uses {@see ParseStrRuntimeUserScriptCstr} (#18855).
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
 final class ParseStrRuntime
 {
     private const HELPER_PATH = '/ext/standard/ParseStrJitHelper.php';
-
-    private const USER_SCRIPT_HELPER_PATH = '/ext/standard/ParseStrNativeJitHelper.php';
 
     private const PARSE_INTO_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseInto';
 
@@ -36,16 +34,6 @@ final class ParseStrRuntime
     private const PARSE_COOKIE_INTO_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseCookieHeaderInto';
 
     private const PARSE_COOKIE_INTO_NATIVE_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseCookieHeaderIntoNative';
-
-    private const USER_SCRIPT_PARSE_INTO_NATIVE = 'PHPCompiler\\ext\\standard\\ParseStrNativeJitHelper::parseIntoNative';
-
-    private const USER_SCRIPT_PARSE_COOKIE_INTO_NATIVE = 'PHPCompiler\\ext\\standard\\ParseStrNativeJitHelper::parseCookieHeaderIntoNative';
-
-    /** @var list<string> */
-    private const USER_SCRIPT_COMPILED_HELPERS = [
-        self::USER_SCRIPT_PARSE_INTO_NATIVE,
-        self::USER_SCRIPT_PARSE_COOKIE_INTO_NATIVE,
-    ];
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -81,16 +69,14 @@ final class ParseStrRuntime
         }
 
         self::ensureNativeHtInternalProxies($context);
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::USER_SCRIPT_HELPER_PATH,
-            self::USER_SCRIPT_COMPILED_HELPERS,
-            '#15417'
-        );
-        self::implementIfMissing($context, '__compiler_parse_str', static function (Context $context, LlvmFunction $fn): void {
+        // Emit cstr delimited bridges before any nested helper compile — nested
+        // ParseStrNativeJitHelper lowering clears PHP_COMPILER_AOT_USER_SCRIPT and
+        // installs the embed ParseStrJitHelper bridge, which bridgeBodyComplete()
+        // would otherwise treat as complete (#18832 regression post-#18872).
+        self::implementUserScriptIfMissing($context, '__compiler_parse_str', static function (Context $context, LlvmFunction $fn): void {
             self::implementUserScriptParseBridge($context, $fn);
         });
-        self::implementIfMissing($context, '__compiler_parse_cookie_header', static function (Context $context, LlvmFunction $fn): void {
+        self::implementUserScriptIfMissing($context, '__compiler_parse_cookie_header', static function (Context $context, LlvmFunction $fn): void {
             self::implementUserScriptCookieBridge($context, $fn);
         });
         self::registerLinkedRuntime($context);
@@ -178,15 +164,40 @@ final class ParseStrRuntime
      */
     private static function implementIfMissing(Context $context, string $name, callable $emit): void
     {
+        self::implementBridgeIfMissing($context, $name, $emit, false);
+    }
+
+    /**
+     * @param callable(Context, LlvmFunction): void $emit
+     */
+    private static function implementUserScriptIfMissing(Context $context, string $name, callable $emit): void
+    {
+        self::implementBridgeIfMissing($context, $name, $emit, true);
+    }
+
+    /**
+     * @param callable(Context, LlvmFunction): void $emit
+     */
+    private static function implementBridgeIfMissing(
+        Context $context,
+        string $name,
+        callable $emit,
+        bool $requireUserScriptBridge
+    ): void {
         $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && self::bridgeBodyComplete($probe)) {
+        $complete = static function (LlvmFunction $fn) use ($requireUserScriptBridge): bool {
+            return $requireUserScriptBridge
+                ? self::userScriptBridgeBodyComplete($fn)
+                : self::bridgeBodyComplete($fn);
+        };
+        if (null !== $probe && $complete($probe)) {
             $context->registerFunction($name, $probe);
 
             return;
         }
 
         $fn = null !== $probe && $probe->countBasicBlocks() > 0 ? $probe : self::declareFunction($context, $name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0 && !self::bridgeBodyComplete($probe)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0 && !$complete($probe)) {
             self::clearFunctionBody($fn);
         }
         $emit($context, $fn);
@@ -339,6 +350,28 @@ final class ParseStrRuntime
                 if (
                     (str_contains($name, '_work_v8') || str_contains($name, '_bridge_work_v8')
                         || str_contains($name, '_work') || str_contains($name, '_bridge_work'))
+                    && null !== $block->getTerminator()
+                ) {
+                    return true;
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        return false;
+    }
+
+    /** User-script refresh requires the cstr delimited v8 bridge, not the embed ParseStrJitHelper bridge (#18832). */
+    private static function userScriptBridgeBodyComplete(LlvmFunction $fn): bool
+    {
+        if (0 === $fn->countBasicBlocks()) {
+            return false;
+        }
+        try {
+            foreach ($fn->getBasicBlocks() as $block) {
+                $name = $block->getName();
+                if (
+                    (str_contains($name, '_work_v8') || str_contains($name, '_bridge_work_v8'))
                     && null !== $block->getTerminator()
                 ) {
                     return true;

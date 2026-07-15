@@ -110,7 +110,8 @@ final class ParseStrRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
         $this->assertStringContainsString('clearFunctionBody', $source);
-        $this->assertStringContainsString('!self::bridgeBodyComplete($probe)', $source);
+        $this->assertStringContainsString('userScriptBridgeBodyComplete', $source);
+        $this->assertStringContainsString('implementUserScriptIfMissing', $source);
     }
 
     public function testSpineBundleIncludesParseStrPhpJitPath(): void
@@ -161,9 +162,13 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('$early = $fn->appendBasicBlock', $source);
         $this->assertStringNotContainsString('BasicBlockHelper::append($context, \'parse_str_bridge', $source);
         $this->assertStringNotContainsString('emitUserScriptDelimitedParse', $source);
-        $this->assertStringContainsString('USER_SCRIPT_PARSE_INTO_NATIVE', $source);
+        $this->assertStringContainsString('ParseStrRuntimeUserScriptCstr::ensureSubhelpers', $source);
         $this->assertStringContainsString('JitNestedHelperCoerce::coerceArgForHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString(
+            'USER_SCRIPT_HELPER_PATH',
+            $source,
+            'user-script refresh must not nested-compile ParseStrNativeJitHelper before v8 bridge (#18832)'
+        );
     }
 
     /** Issue #14150 — parse_str() root keys map `.` and `+` to `_` (php_register_variable). */

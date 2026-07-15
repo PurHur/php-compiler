@@ -50,6 +50,8 @@ final class SuperglobalRefreshUserScriptLlvm
     public static function emitRefresh(Context $context): void
     {
         if ($context->isThinStandaloneAotMain()) {
+            // Re-link parse_str/cookie bridges after user-script lowering — nested helper
+            // compile can replace the v8 bridge with the embed ParseStrJitHelper body (#18832).
             self::ensureEmitRefreshPrerequisites($context);
         }
 
