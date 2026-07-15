@@ -690,7 +690,7 @@ final class Variable {
                             $this->context, 
                             $type,
                             self::KIND_VALUE,
-                            $this->context->builder->zEdt($this->value, $this->context->getTypeFromString('long long'))
+                            $this->context->builder->zExt($this->value, $this->context->getTypeFromString('long long'))
                         );
                     case self::TYPE_VALUE:
                         return new self(

@@ -1278,6 +1278,31 @@ class Type extends Builtin {
             $this->context->context->functionType($i64, false, $strPtr, $i64)
         );
         $this->context->registerFunction('__compiler_json_validate', $fnJsonValidate);
+        $fntypeXmlrpcEncodeValue = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $valuePtr
+        );
+        $fnXmlrpcEncodeValue = $this->context->module->addFunction(
+            '__compiler_xmlrpc_encode_value',
+            $fntypeXmlrpcEncodeValue
+        );
+        $this->context->registerFunction('__compiler_xmlrpc_encode_value', $fnXmlrpcEncodeValue);
+        $fntypeXmlrpcEncodeArray = $this->context->context->functionType(
+            $this->context->getTypeFromString('__string__*'),
+            false,
+            $this->context->getTypeFromString('__hashtable__*')
+        );
+        $fnXmlrpcEncodeArray = $this->context->module->addFunction(
+            '__compiler_xmlrpc_encode_array',
+            $fntypeXmlrpcEncodeArray
+        );
+        $this->context->registerFunction('__compiler_xmlrpc_encode_array', $fnXmlrpcEncodeArray);
+        $fnXmlrpcDecode = $this->context->module->addFunction(
+            '__compiler_xmlrpc_decode',
+            $this->context->context->functionType($void, false, $strPtr, $valuePtr)
+        );
+        $this->context->registerFunction('__compiler_xmlrpc_decode', $fnXmlrpcDecode);
         $fntypeSerializeHashtable = $this->context->context->functionType(
             $this->context->getTypeFromString('__string__*'),
             false,
