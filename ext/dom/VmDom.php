@@ -207,7 +207,11 @@ final class VmDom
         $node->methodVisibility['insertbefore'] = $pub;
         $node->methods['removechild'] = new NodeRemoveChild();
         $node->methodVisibility['removechild'] = $pub;
+        $node->methods['appendchild'] = new NodeAppendChild();
+        $node->methodVisibility['appendchild'] = $pub;
+        $node->methodNames['appendchild'] = 'appendChild';
         $node->methods['issamenode'] = new NodeIsSameNode();
+        $node->methodVisibility['issamenode'] = $pub;
         $node->methodVisibility['issamenode'] = $pub;
         if (CompilerVersion::supportsDomNodeIsEqualNode()) {
             $node->methods['isequalnode'] = new NodeIsEqualNode();

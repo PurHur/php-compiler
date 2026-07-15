@@ -682,7 +682,7 @@ final class VmReflection
         };
     }
 
-    public static function methodExistsOnClass(ClassEntry $class, string $method): bool
+    public static function methodExistsOnClass(ClassEntry $class, string $method, ?Context $ctx = null): bool
     {
         $methodLc = strtolower($method);
         if ($class->isEnum) {
@@ -695,7 +695,37 @@ final class VmReflection
             }
         }
 
-        return isset($class->methods[$methodLc]) || isset($class->abstractMethods[$methodLc]);
+        if (null === $ctx) {
+            return isset($class->methods[$methodLc]) || isset($class->abstractMethods[$methodLc]);
+        }
+
+        $scopeLc = strtolower(ltrim($class->name, '\\'));
+        $current = $class;
+        $visited = [];
+        while (true) {
+            $walkLc = strtolower(ltrim($current->name, '\\'));
+            if (isset($visited[$walkLc])) {
+                return false;
+            }
+            $visited[$walkLc] = true;
+            if (isset($current->abstractMethods[$methodLc])) {
+                return true;
+            }
+            if (isset($current->methods[$methodLc])) {
+                $vis = $current->methodVisibility[$methodLc] ?? CfgFunc::FLAG_PUBLIC;
+                if (($vis & CfgFunc::FLAG_PRIVATE) !== 0) {
+                    $declaringLc = $current->methodDeclaringClassLc[$methodLc] ?? $walkLc;
+
+                    return $scopeLc === $declaringLc;
+                }
+
+                return true;
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return false;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
     }
 
     /**
@@ -713,7 +743,7 @@ final class VmReflection
                 return false;
             }
 
-            return self::methodExistsOnClass($class, $method);
+            return self::methodExistsOnClass($class, $method, $ctx);
         }
         if (Variable::TYPE_OBJECT === $objectOrClass->type) {
             $object = $objectOrClass->toObject();
@@ -752,7 +782,7 @@ final class VmReflection
         if (null === $entry) {
             return false;
         }
-        if (self::methodExistsOnClass($entry, $method)) {
+        if (self::methodExistsOnClass($entry, $method, $ctx)) {
             return true;
         }
         $classLc = strtolower(ltrim($className, '\\'));

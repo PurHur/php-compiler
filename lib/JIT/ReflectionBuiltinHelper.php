@@ -134,7 +134,8 @@ final class ReflectionBuiltinHelper
         } elseif (null !== $context->runtime->vmContext && isset($context->runtime->vmContext->classes[$lc])) {
             $exists = \PHPCompiler\ext\standard\VmReflection::methodExistsOnClass(
                 $context->runtime->vmContext->classes[$lc],
-                $method
+                $method,
+                $context->runtime->vmContext
             );
         }
         $i1 = $context->getTypeFromString('int1');

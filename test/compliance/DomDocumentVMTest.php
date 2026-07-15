@@ -101,6 +101,10 @@ final class DomDocumentVMTest extends BaseTest
                 __DIR__.'/cases/stdlib/dom_node_contains.phpt',
                 'dom_node_contains.phpt'
             );
+            yield 'dom_method_exists_inherited.phpt' => self::parsePHPT(
+                __DIR__.'/cases/dom/dom_method_exists_inherited.phpt',
+                'dom_method_exists_inherited.phpt'
+            );
         } else {
             yield 'php84_dom_node_contains_phantom.phpt' => self::parsePHPT(
                 __DIR__.'/cases/stdlib/php84_dom_node_contains_phantom.phpt',
