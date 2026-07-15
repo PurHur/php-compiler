@@ -1,5 +1,7 @@
 --TEST--
 ext/ftp FTP\Connection class registered on PHP 8.4 profile (#7270, ext/ftp/ftp.stub.php)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
