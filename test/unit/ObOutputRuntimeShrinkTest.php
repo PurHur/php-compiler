@@ -38,12 +38,11 @@ final class ObOutputRuntimeShrinkTest extends TestCase
             $bridge
         );
         $execCaptureRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureRuntime.php');
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $execCaptureRuntime);
-        $this->assertStringContainsString('ObOutputExecCaptureJitHelper', $execCaptureRuntime);
-        $this->assertStringContainsString('implementGetContents', $execCaptureRuntime);
-        $this->assertStringContainsString('ensureReadApiLinked', $execCaptureRuntime);
-        $this->assertStringNotContainsString('ObOutputExecCaptureLlvm', $execCaptureRuntime);
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $execCaptureRuntime);
+        $this->assertStringContainsString('ObOutputExecCaptureLlvm::ensureLinked', $execCaptureRuntime);
+        $execCaptureLlvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
+        $this->assertStringContainsString('implementGetContents', $execCaptureLlvm);
+        $this->assertStringContainsString('ensureReadApiLinked', $execCaptureLlvm);
 
         $userScript = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputUserScriptLlvm.php');
         $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $userScript);
