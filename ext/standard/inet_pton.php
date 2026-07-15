@@ -9,6 +9,8 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -25,6 +27,22 @@ final class inet_pton extends Internal
     {
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('inet_pton() requires exactly one argument in this compiler build');
+        }
+        $resolved = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            if (InternalStrictArg::isCallerStrict($frame)
+                || VmString::requiresForwardProfileStrictStringNull()) {
+                throw new \TypeError(
+                    'inet_pton(): Argument #1 ($address) must be of type string, null given'
+                );
+            }
+            if (null === $frame->returnVar) {
+                return;
+            }
+            // php-src basic_functions.c — null address returns false (#19053).
+            $frame->returnVar->bool(false);
+
+            return;
         }
         $address = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'inet_pton', 0, 'address');
         if (null === $frame->returnVar) {
@@ -47,7 +65,7 @@ final class inet_pton extends Internal
 
         return JitInet::inetPton(
             $context,
-            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'inet_pton', 0, 'address')
+            JitStringBuiltinArg::lower($context, $args[0], 'inet_pton', 0, 'address')
         );
     }
 }
