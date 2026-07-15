@@ -43,6 +43,7 @@ final class implode extends Internal
             throw new \LogicException($this->getName().'() requires one or two arguments in this compiler build');
         }
         if (1 === $argc) {
+            self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
             $glue = '';
             $ht = VmArray::requireArrayParam(
                 $frame->calledArgs[0],
@@ -94,6 +95,7 @@ final class implode extends Internal
             throw new \LogicException($this->getName().'() requires one or two arguments in this compiler build');
         }
         if (1 === $argc) {
+            self::rejectNullSeparatorJit($context, $args[0], $this->getName());
             $i64 = $context->getTypeFromString('int64');
             $glue = $context->builder->call(
                 $context->lookupFunction('__string__alloc'),

@@ -112,13 +112,13 @@ final class ReflectionSetup
             $context,
             $obj,
             'ReflectionMethod',
-            ReflectionSupport::PROP_CLASS_NAME
+            ReflectionSupport::PROP_REFLECTION_METHOD_CLASS
         );
         [$methodCstr, $methodLen] = self::stringPropertyAsCstr(
             $context,
             $obj,
             'ReflectionMethod',
-            ReflectionSupport::PROP_METHOD_NAME
+            ReflectionSupport::PROP_REFLECTION_METHOD_FUNC
         );
 
         return [$classCstr, $classLen, $methodCstr, $methodLen];

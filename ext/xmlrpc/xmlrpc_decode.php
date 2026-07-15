@@ -7,6 +7,9 @@ namespace PHPCompiler\ext\xmlrpc;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
 
 /** xmlrpc_decode() — XML-RPC value deserialization (php-src ext/xmlrpc/xmlrpc.c; #6579). */
 final class xmlrpc_decode extends XmlrpcFunction
@@ -14,6 +17,24 @@ final class xmlrpc_decode extends XmlrpcFunction
     public function __construct()
     {
         parent::__construct('xmlrpc_decode');
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \LogicException('xmlrpc_decode() requires at least one argument');
+        }
+        if ($argc > 2) {
+            throw new \LogicException('xmlrpc_decode() accepts at most two arguments');
+        }
+
+        $falseLiteral = JitXmlrpcCompileTime::tryDecodeFalseLiteral($context, $args[0]);
+        if (null !== $falseLiteral) {
+            return $falseLiteral;
+        }
+
+        return JitXmlrpc::decode($context, $args[0]);
     }
 
     public function execute(Frame $frame): void

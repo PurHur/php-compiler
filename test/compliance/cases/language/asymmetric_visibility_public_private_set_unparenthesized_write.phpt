@@ -1,5 +1,16 @@
 --TEST--
-Language: public private(set) unparenthesized — read OK, write Error (#16858, Zend/zend_execute.c)
+Language: public private(set) unparenthesized — compile fatal on reference profile (#18805, Zend/zend_compile.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (PHPCompiler\CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+    die('skip bare public private(set) accepted on PHP 8.4 forward profile (#18820)');
+}
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class B {
@@ -7,11 +18,5 @@ class B {
 }
 $b = new B();
 echo $b->label, "\n";
-try {
-    $b->label = 'no';
-} catch (Error $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
---EXPECT--
-hi
-Error: Cannot modify public private(set) property B::$label from global scope
+--EXPECT_EXIT--
+255

@@ -5,16 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
-use PHPLLVM\Builder;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for unlink() via UnlinkJitHelper PHP (#15471).
+ * JIT/AOT link for unlink() via UnlinkJitHelper PHP (#15471, #19186).
  *
- * Replaces libc unlink(2) LLVM in ext/standard/JitUnlink.php.
+ * User-script AOT and embed route through helper-runtime + {@see UnlinkJitHelper} (#19157 pattern).
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::unlink()}.
  * php-src: ext/standard/filestat.c — php_unlink
  */
@@ -30,6 +28,8 @@ final class StringUnlink
     private const COMPILED_HELPERS = [
         self::INVOKE_HELPER,
     ];
+
+    private const BRIDGE_ENTRY = 'unlink_bridge_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -50,78 +50,22 @@ final class StringUnlink
 
     private static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI, $probe);
-
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            self::implementLibcBridge($context, $probe);
-
-            return;
-        }
-
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#15471');
-
         $strPtr = $context->getTypeFromString('__string__*');
-        $i32 = $context->getTypeFromString('int32');
         $i1 = $context->getTypeFromString('int1');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($i1, false, $strPtr)
-            );
-
-        $entry = $fn->appendBasicBlock('unlink_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_HELPER, '#15471');
-        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$fn->getParam(0)]);
-        $bool = JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $i1);
-        $context->builder->returnValue($bool);
-
-        $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementLibcBridge(Context $context, ?\PHPLLVM\Value\Function_ $probe): void
-    {
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i32 = $context->getTypeFromString('int32');
-        $i1 = $context->getTypeFromString('int1');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($i1, false, $strPtr)
-            );
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $entry = $fn->appendBasicBlock('unlink_libc_entry');
-        $context->builder->positionAtEnd($entry);
-        $map = $context->structFieldMap['__string__'];
-        $pathPtr = $context->builder->structGep($fn->getParam(0), $map['value']);
-        $ret = $context->builder->call(
-            $context->lookupFunction('unlink'),
-            $pathPtr
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI,
+            self::BRIDGE_ENTRY,
+            [$strPtr],
+            $i1,
+            self::INVOKE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#19186'
         );
-        $zero = $i32->constInt(0, false);
-        $ok = $context->builder->icmp(Builder::INT_EQ, $ret, $zero);
-        $context->builder->returnValue($ok);
-        $context->registerFunction(self::ABI, $fn);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 }

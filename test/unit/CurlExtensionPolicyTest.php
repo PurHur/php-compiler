@@ -17,9 +17,12 @@ final class CurlExtensionPolicyTest extends TestCase
         self::assertTrue(CurlExtensionPolicy::advertisesBuiltins());
         self::assertFalse(CurlExtensionPolicy::advertisesExtension());
         self::assertFalse(CurlExtensionPolicy::advertisesHandleClasses());
+        self::assertTrue(CurlExtensionPolicy::advertisesShareHandles());
+        self::assertFalse(CurlExtensionPolicy::advertisesEasyHandleStubs());
+        self::assertFalse(CurlExtensionPolicy::advertisesIntrospectionFunctions());
     }
 
-    public function testCurlHandleClassesWithheldUntilExtensionAdvertised(): void
+    public function testCurlShareHandleClassAdvertisedWithShareBuiltins(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -34,7 +37,19 @@ var_export(class_exists('CURLStringFile', false));
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'curl_handle_classes.php'));
-        self::assertSame("false\nfalse\nfalse\ntrue", ob_get_clean());
+        self::assertSame("false\nfalse\ntrue\ntrue", ob_get_clean());
+    }
+
+    public function testCurlHandleClassesWithheldUntilExtensionAdvertised(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+var_export(class_exists('CurlMultiHandle', false));
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'curl_multi_handle.php'));
+        self::assertSame('false', ob_get_clean());
     }
 
     public function testCurlVersionCore(): void
@@ -50,8 +65,8 @@ PHP;
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep'] as $fn) {
-            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+        foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep', 'curl_file_create'] as $fn) {
+            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_escape', 'curl_unescape'] as $fn) {
             self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);

@@ -32,8 +32,7 @@ final class exec extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('exec() accepts one to three arguments in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'exec', 'command', 0, $frame);
-        $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'exec', 0, 'command');
+        $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'exec', 'command', false);
         VmString::rejectEmptyBuiltinStringArg($command, 'exec', 0, 'command');
         $result = VmExecNative::run($command);
         if (false !== $result && $argc >= 2) {

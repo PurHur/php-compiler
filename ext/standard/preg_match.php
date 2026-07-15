@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -21,8 +22,8 @@ final class preg_match extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('preg_match() requires 2 to 5 arguments in this compiler build');
         }
-        $pattern = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'preg_match', 0, 'pattern');
-        $subject = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'preg_match', 1, 'subject');
+        $pattern = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'preg_match', 'pattern');
+        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 1, 'preg_match', 'subject');
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_match', $pattern);
 
         $flags = 0;

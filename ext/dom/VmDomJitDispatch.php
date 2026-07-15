@@ -77,6 +77,50 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function append(VmContext $ctx, ObjectEntry $parent, array $extra): Variable
+    {
+        VmDom::appendLiveStandardNodes($ctx, $parent, $extra);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function prepend(VmContext $ctx, ObjectEntry $parent, array $extra): Variable
+    {
+        VmDom::prependLiveStandardNodes($ctx, $parent, $extra);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function replaceChildren(VmContext $ctx, ObjectEntry $parent, array $extra): Variable
+    {
+        VmDom::replaceChildrenLiveStandardNodes($ctx, $parent, $extra);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function createDocumentFragment(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        return VmDom::createDocumentFragment($ctx, $document);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function getAttribute(ObjectEntry $element, array $extra): Variable
     {
         $name = self::stringArg($extra[0] ?? self::missingArg('getAttribute', 0), 'getAttribute', 0);
@@ -140,6 +184,47 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function dispatchItem(VmContext $ctx, ObjectEntry $receiver, array $extra): Variable
+    {
+        return match (strtolower($receiver->class->name)) {
+            'domtokenlist' => self::tokenListItem($receiver, $extra),
+            'domnodelist' => self::nodeListItem($ctx, $receiver, $extra),
+            default => throw new \Error('Call to undefined method '.$receiver->class->name.'::item()'),
+        };
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function nodeListItem(VmContext $ctx, ObjectEntry $nodeList, array $extra): Variable
+    {
+        $indexVar = ($extra[0] ?? self::missingArg('item', 0))->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $indexVar->type && Variable::TYPE_FLOAT !== $indexVar->type) {
+            throw new \TypeError(sprintf(
+                'DOMNodeList::item(): Argument #1 ($index) must be of type int, %s given',
+                VmDom::typeLabel($indexVar)
+            ));
+        }
+        $index = $indexVar->toInt();
+        $result = new Variable();
+        if ($index < 0) {
+            $result->null();
+
+            return $result;
+        }
+        $node = VmDom::nodeListItem($nodeList, $index);
+        if (null === $node) {
+            $result->null();
+        } else {
+            $result->object($node);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function tokenListItem(ObjectEntry $tokenList, array $extra): Variable
     {
         $indexVar = ($extra[0] ?? self::missingArg('item', 0))->resolveIndirect();
@@ -172,6 +257,68 @@ final class VmDomJitDispatch
     }
 
     /**
+     * @param list<Variable> $extra
+     */
+    public static function xpathQuery(VmContext $ctx, ObjectEntry $xpath, array $extra): Variable
+    {
+        $expression = self::stringArg($extra[0] ?? self::missingArg('query', 0), 'query', 0);
+        $contextNode = self::optionalDomNodeArg($extra[1] ?? null, 'query', 1);
+        $registerNodeNS = self::optionalBoolArg($extra[2] ?? null, 'query', 2);
+
+        return VmDomXPath::query($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function xpathEvaluate(VmContext $ctx, ObjectEntry $xpath, array $extra): Variable
+    {
+        $expression = self::stringArg($extra[0] ?? self::missingArg('evaluate', 0), 'evaluate', 0);
+        $contextNode = self::optionalDomNodeArg($extra[1] ?? null, 'evaluate', 1);
+        $registerNodeNS = self::optionalBoolArg($extra[2] ?? null, 'evaluate', 2);
+
+        return VmDomXPath::evaluate($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function xpathRegisterNamespace(ObjectEntry $xpath, array $extra): Variable
+    {
+        $prefix = self::stringArg($extra[0] ?? self::missingArg('registerNamespace', 0), 'registerNamespace', 0);
+        $namespaceUri = self::stringArg($extra[1] ?? self::missingArg('registerNamespace', 1), 'registerNamespace', 1);
+        $result = new Variable();
+        $result->bool(VmDomXPath::registerNamespace($xpath, $prefix, $namespaceUri));
+
+        return $result;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function compareDocumentPosition(ObjectEntry $node, array $extra): Variable
+    {
+        $otherVar = ($extra[0] ?? self::missingArg('compareDocumentPosition', 0))->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $otherVar->type) {
+            throw new \TypeError(
+                'DOMNode::compareDocumentPosition(): Argument #1 ($other) must be of type DOMNode, '
+                .VmDom::typeLabel($otherVar).' given'
+            );
+        }
+        $other = VariableObject::entry($otherVar);
+        if (!VmDom::isDomNode($other)) {
+            throw new \TypeError(
+                'DOMNode::compareDocumentPosition(): Argument #1 ($other) must be of type DOMNode, '
+                .VmDom::typeLabel($otherVar).' given'
+            );
+        }
+        $var = new Variable();
+        $var->int(VmDom::compareDocumentPosition($node, $other));
+
+        return $var;
+    }
+
+    /**
      * @return list<Variable>
      */
     public static function unpackArgs(Variable $argsTable): array
@@ -201,5 +348,53 @@ final class VmDomJitDispatch
     private static function missingArg(string $method, int $index): Variable
     {
         throw new \ArgumentCountError($method.'() expects argument #'.($index + 1));
+    }
+
+    private static function optionalDomNodeArg(?Variable $var, string $label, int $index): ?ObjectEntry
+    {
+        if (null === $var) {
+            return null;
+        }
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(sprintf(
+                'DOMXPath::%s(): Argument #%d ($context) must be of type ?DOMNode, %s given',
+                $label,
+                $index + 1,
+                VmDom::typeLabel($var)
+            ));
+        }
+        $object = VariableObject::entry($var);
+        if (!VmDom::isDomNode($object)) {
+            throw new \TypeError(sprintf(
+                'DOMXPath::%s(): Argument #%d ($context) must be of type ?DOMNode, %s given',
+                $label,
+                $index + 1,
+                $object->class->name
+            ));
+        }
+
+        return $object;
+    }
+
+    private static function optionalBoolArg(?Variable $var, string $label, int $index): bool
+    {
+        if (null === $var) {
+            return false;
+        }
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_BOOL !== $var->type) {
+            throw new \TypeError(sprintf(
+                'DOMXPath::%s(): Argument #%d ($registerNodeNS) must be of type bool, %s given',
+                $label,
+                $index + 1,
+                VmDom::typeLabel($var)
+            ));
+        }
+
+        return $var->bool;
     }
 }

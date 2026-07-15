@@ -8,10 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -29,7 +27,7 @@ final class filter_var extends Internal
             return;
         }
         $value = $frame->calledArgs[0]->resolveIndirect();
-        $filter = InternalStrictArg::requireBuiltinTypedInt($frame, 1, 'filter_var', 'filter');
+        $filterId = VmFilter::parseFilterIdArg($frame, 1, 'filter_var', 'filter', 2);
         $options = null;
         if (3 === $argc) {
             $options = $frame->calledArgs[2]->resolveIndirect();
@@ -40,7 +38,6 @@ final class filter_var extends Internal
                 throw new \LogicException('filter_var() options must be an integer flag bitmask or array');
             }
         }
-        $filterId = $filter->toInt();
         if (!VmFilter::isSupportedFilter($filterId)) {
             self::triggerUnknownFilterWarning($frame, $filterId);
         }
@@ -66,7 +63,6 @@ final class filter_var extends Internal
         if (\count($args) < 2 || \count($args) > 3) {
             throw new \LogicException('filter_var() requires two or three arguments in this compiler build');
         }
-        JitInternalStrictArg::requireBuiltinTypedInt($context, $args[1], 'filter_var', 'filter', 2);
         $optionsArg = \count($args) > 2 ? $args[2] : null;
         if (null !== $optionsArg
             && JITVariable::TYPE_NULL !== $optionsArg->type
@@ -126,6 +122,7 @@ final class filter_var extends Internal
             $filterVal,
             $i64->constInt(VmFilter::FILTER_VALIDATE_MAC, false)
         );
+        $flags = JitFilter::loadFilterFlags($context, $optionsArg);
 
         $intBlock = BasicBlockHelper::append($context, 'filter_var_int');
         $otherBlock = BasicBlockHelper::append($context, 'filter_var_other');
@@ -149,7 +146,6 @@ final class filter_var extends Internal
         $context->builder->branchIf($isInt, $intBlock, $otherBlock);
 
         $context->builder->positionAtEnd($intBlock);
-        $flags = JitFilter::loadFilterFlags($context, $optionsArg);
         $intResult = JitFilter::validateInt($context, $value, $flags);
         if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
             $intResult = JitFilter::applyNullOnFailure($context, $intResult, $nullOnFailure);
@@ -220,7 +216,7 @@ final class filter_var extends Internal
         $context->builder->branchIf($isSanitize, $sanitizeBlock, $failBlock);
 
         $context->builder->positionAtEnd($ipBlock);
-        $ipResult = JitFilter::validateIp($context, $value);
+        $ipResult = JitFilter::validateIp($context, $value, $flags);
         if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
             $ipResult = JitFilter::applyNullOnFailure($context, $ipResult, $nullOnFailure);
         }
@@ -236,7 +232,6 @@ final class filter_var extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($sanitizeBlock);
-        $flags = JitFilter::loadFilterFlags($context, $optionsArg);
         $sanitizeResult = JitFilter::sanitize($context, $value, $filterVal, $flags);
         $sanitizeTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);

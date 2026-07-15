@@ -33,6 +33,8 @@ class ClassEntry {
     public bool $usesLazyGhostTrait = false;
     /** True for `abstract class` declarations (#3385). */
     public bool $isAbstract = false;
+    /** True for `final class` declarations and final internal classes (#18297). */
+    public bool $isFinal = false;
     /** @var array<string, true> lowercase method names declared abstract on this class */
     public array $abstractMethods = [];
     /** @var array<string, string> trait FQCN => FQCN from direct `use Trait;` (#3119) */

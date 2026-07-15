@@ -45,6 +45,20 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ScopeBuiltinJitHelper::matchNamedVariableIndex', $source);
     }
 
+    public function testScopeBuiltinRuntimeStandaloneWarningsUsePhpBridges(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ScopeBuiltinRuntime.php');
+        $this->assertStringContainsString('__scope_compact_invalid_arg_warn', $source);
+        $this->assertStringContainsString('__scope_compact_undef_warn', $source);
+        $this->assertStringContainsString('ensureCompactInvalidArgWarnStandaloneLinked', $source);
+        $this->assertStringContainsString('ensureCompactUndefWarnStandaloneLinked', $source);
+        $this->assertStringNotContainsString("lookupFunction('snprintf')", $source);
+        $this->assertStringNotContainsString('compact_invalid_int_', $source);
+        $this->assertStringNotContainsString('emitStandaloneCompactInvalidArgumentWarningMessage', $source);
+        $loc = substr_count($source, "\n") + 1;
+        $this->assertLessThan(530, $loc, 'ScopeBuiltinRuntime.php LOC');
+    }
+
     public function testScopeBuiltinJitHelperMatchNamedVariableIndex(): void
     {
         $table = "foo\0bar";
@@ -92,8 +106,22 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ScopeBuiltinEmitHelper.php');
         $loc = substr_count($source, "\n") + 1;
-        $this->assertLessThan(835, $loc, 'ScopeBuiltinEmitHelper.php LOC');
-        $this->assertStringContainsString('branchOnNamedVariableIndex', $source);
+        $this->assertLessThan(550, $loc, 'ScopeBuiltinEmitHelper.php LOC');
+        $this->assertStringContainsString('HashTableReadLlvm::forEachStringKeyNode', $source);
+        $this->assertStringContainsString('HashTableReadLlvm::forEachIndexedStringAt', $source);
+        $this->assertStringContainsString('ScopeBuiltinDefinedLlvm::getDefinedVars', $source);
+        $this->assertStringContainsString('ScopeBuiltinIndexLlvm::branchOnNamedVariableIndex', $source);
+        $this->assertStringNotContainsString('scope_import_str_head', $source);
+        $this->assertStringNotContainsString('compact_names_str_head', $source);
         $this->assertStringNotContainsString("lookupFunction('strcmp')", $source);
+    }
+
+    public function testScopeBuiltinJitHelperDefinedVarsSnapshot(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/ScopeBuiltinJitHelper.php');
+        $this->assertStringContainsString('buildDefinedVarsSnapshot', $source);
+        $this->assertStringContainsString('buildDeclaredVariablesSnapshot', $source);
+        $this->assertStringContainsString('foreachNonEmptyStringKey', $source);
+        $this->assertStringContainsString('addIndex', $source);
     }
 }

@@ -16,11 +16,9 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringTrimMask;
 use PHPCompiler\JIT\Builtin\StringTrimModeJit;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -40,8 +38,7 @@ final class string_rtrim extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException($fn.'() requires one to three arguments');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], $fn, 'string', 0, $frame);
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $fn, 0, 'string');
+        $string = VmString::stringBuiltinArgForFrame($frame, 0, $fn, 0, 'string');
         [$mask, $mode] = VmString::resolveTrimMaskAndMode(
             \array_slice($frame->calledArgs, 1),
             $fn,
@@ -64,7 +61,6 @@ final class string_rtrim extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException($fn.'() requires one to three arguments');
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], $fn, 'string', 1);
         $literal = $args[0]->compileTimeString ?? null;
         $optional = \array_slice($args, 1);
         $optCount = \count($optional);
@@ -108,7 +104,7 @@ final class string_rtrim extends Internal
                 $mode = $modeLiteral;
             }
         }
-        $str = JitStringBuiltinArg::lower($context, $args[0], $fn, 0, 'string');
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], $fn, 0, 'string');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $len = $context->builder->load(

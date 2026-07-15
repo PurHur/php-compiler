@@ -38,6 +38,12 @@ final class IntlExtensionPolicy
         return ModuleRegistry::extensionLoaded('intl');
     }
 
+    /** normalizer_* + Normalizer — partial ext/intl surface (#5153). */
+    public static function advertisesNormalizer(): bool
+    {
+        return true;
+    }
+
     /** grapheme_strlen/substr/strpos/extract/str_split — require loaded ext/intl (#17694, php-src ext/intl/php_intl.c). */
     public static function advertisesGraphemeCore(): bool
     {

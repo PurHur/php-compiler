@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\DeployRoot;
@@ -40,15 +41,13 @@ final class phpc_deploy_path extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('phpc_deploy_path() requires exactly two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type || JITVariable::TYPE_STRING !== $args[1]->type) {
-            throw new \LogicException('phpc_deploy_path() requires two strings in this compiler build');
-        }
+        $this->jitString($context, $args[0], 'phpc_deploy_path() argument #1');
+        $this->jitString($context, $args[1], 'phpc_deploy_path() argument #2');
 
-        $this->jitString($context, $args[0], 'phpcdeploypath() argument #1');
         return JitDeployPath::invoke(
             $context,
-            $context->helper->loadValue($args[0]),
-            $context->helper->loadValue($args[1])
+            JitStringArg::lower($context, $args[0], 'phpc_deploy_path() argument #1'),
+            JitStringArg::lower($context, $args[1], 'phpc_deploy_path() argument #2')
         );
     }
 }

@@ -24,6 +24,19 @@ final class AttributeNamesDuplicateTest extends TestCase
         $this->addToAssertionCount(1);
     }
 
+    public function testAllowsRepeatableUserAttributeDuplicates(): void
+    {
+        $registry = new \PHPCompiler\Compiler\AttributeClassRegistry();
+        $entries = [
+            new \PHPCompiler\Compiler\AttributeEntry('A'),
+            new \PHPCompiler\Compiler\AttributeEntry('A'),
+        ];
+        $result = AttributeNames::validateDuplicates($entries, $registry);
+        $this->assertCount(2, $result);
+        $this->assertTrue($result[0]->isRepeated);
+        $this->assertTrue($result[1]->isRepeated);
+    }
+
     public function testRejectsAllowDynamicPropertiesOnParameter(): void
     {
         $this->expectException(\CompileError::class);

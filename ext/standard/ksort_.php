@@ -16,7 +16,7 @@ use PHPLLVM\Value;
  * ksort() — sort by key preserving values (subset of PHP; issue #2271, #4118).
  *
  * VM: homogeneous string or integer keys; list-shaped int keys sort by key (#10836).
- * JIT/AOT: packed list no-op for ascending keys; string-key hashtable via __hashtable__sortStringKeys.
+ * JIT/AOT: all operands via KeySortJitHelper PHP bridge (#12770, #18381).
  */
 final class ksort_ extends Internal
 {

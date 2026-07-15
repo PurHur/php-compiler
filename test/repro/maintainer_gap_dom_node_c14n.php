@@ -34,3 +34,14 @@ if ($expected !== $fileBody) {
 }
 
 echo 'ok bytes='.strlen($c14n)."\n";
+
+$doc2 = new DOMDocument();
+$doc2->loadXML('<root><!--hi--><child>text</child></root>');
+$expected2 = '<root><!--hi--><child>text</child></root>';
+$c14n2 = $doc2->documentElement->C14N(false, true);
+if (!is_string($c14n2) || $expected2 !== $c14n2) {
+    fwrite(STDERR, "fail: C14N with comments mismatch\nexpected: {$expected2}\ngot: ".var_export($c14n2, true)."\n");
+    exit(1);
+}
+
+echo "ok-with-comments\n";

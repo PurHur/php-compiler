@@ -14,6 +14,18 @@ final class NewWithoutParensCompileCheckTest extends TestCase
 {
     public function testClassConstNewWithoutParensCompileErrors(): void
     {
+        if (CompilerVersion::supportsNewWithoutParensInConstAndStaticInitializers()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    const X = new stdClass;
+}
+PHP, 'class_const_new_without_parens.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -24,6 +36,18 @@ PHP);
 
     public function testStaticPropertyDefaultNewWithoutParensCompileErrors(): void
     {
+        if (CompilerVersion::supportsStaticPropertyDefaultObjectExpressions()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public static $s = new stdClass;
+}
+PHP, 'static_property_default_new_without_parens.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -34,6 +58,18 @@ PHP);
 
     public function testStaticTypedPropertyDefaultNewCompileErrors(): void
     {
+        if (CompilerVersion::supportsStaticPropertyDefaultObjectExpressions()) {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    public static DateTime $d = new DateTime('2020-01-01');
+}
+PHP, 'static_property_default_new_with_parens.php');
+            $this->assertNotNull($block);
+
+            return;
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -195,7 +231,7 @@ PHP);
             $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
-    public private(set) string $x = 'hi';
+    public (private(set)) string $x = 'hi';
     public (private(set)) int $n = 1;
 }
 PHP, 'asymmetric_visibility_literal_default.php');
@@ -222,7 +258,7 @@ PHP, 'asymmetric_visibility_literal_default.php');
             $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
-    public private(set) stdClass $obj = new stdClass();
+    public (private(set)) stdClass $obj = new stdClass();
 }
 PHP, 'asymmetric_visibility_property_default_new.php');
             $this->assertNotNull($block);

@@ -67,6 +67,7 @@ class Module extends ModuleAbstract
             new mb_decode_numericentity(),
             new mb_encode_mimeheader(),
             new mb_decode_mimeheader(),
+            new mb_send_mail(),
             new mb_http_output(),
             new mb_internal_encoding(),
             new mb_language(),
@@ -77,6 +78,11 @@ class Module extends ModuleAbstract
             new mb_encoding_aliases(),
             new mb_convert_kana(),
             new mb_split(),
+            new mb_ereg(),
+            new mb_eregi(),
+            new mb_ereg_replace(),
+            new mb_regex_encoding(),
+            new mb_regex_set_options(),
         ];
     }
 }

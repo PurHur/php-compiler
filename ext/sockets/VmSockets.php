@@ -104,6 +104,26 @@ final class VmSockets
         }
     }
 
+    /** php-src: ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_socket_shutdown) via shutdown(2). */
+    public static function isShutdownSupported(): bool
+    {
+        return null !== self::ffi();
+    }
+
+    public static function shutdownForFd(int $fd, int $how): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            return 0 === (int) $ffi->shutdown($fd, $how);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     private const F_GETFL = 3;
     private const F_SETFL = 4;
     private const O_NONBLOCK = 2048;
@@ -161,7 +181,8 @@ final class VmSockets
                 self::$ffi = \FFI::cdef(
                     'int sockatmark(int sockfd);
                     int getsockname(int sockfd, void *addr, unsigned int *addrlen);
-                    int fcntl(int fd, int cmd, ...);',
+                    int fcntl(int fd, int cmd, ...);
+                    int shutdown(int sockfd, int how);',
                     $lib
                 );
 

@@ -60,4 +60,44 @@ final class ObOutputExecCaptureJitHelper
 
         return self::$buffers[self::$depth];
     }
+
+    public static function getLevel(): int
+    {
+        return self::$depth;
+    }
+
+    /** @return int 1 when an active buffer exists */
+    public static function hasActiveBuffer(): int
+    {
+        return self::$depth > 0 ? 1 : 0;
+    }
+
+    public static function getContents(): ?string
+    {
+        if (self::$depth <= 0) {
+            return null;
+        }
+
+        return self::$buffers[self::$depth - 1];
+    }
+
+    public static function getLength(): int
+    {
+        if (self::$depth <= 0) {
+            return -1;
+        }
+
+        return \strlen(self::$buffers[self::$depth - 1]);
+    }
+
+    public static function endClean(): int
+    {
+        if (self::$depth <= 0) {
+            return 0;
+        }
+        --self::$depth;
+        self::$buffers[self::$depth] = '';
+
+        return 1;
+    }
 }

@@ -31,7 +31,8 @@ final class disk_total_space extends Internal
         if ($argc >= 1) {
             $resolved = $frame->calledArgs[0]->resolveIndirect();
             if (Variable::TYPE_NULL === $resolved->type) {
-                if (InternalStrictArg::isCallerStrict($frame)) {
+                if (InternalStrictArg::isCallerStrict($frame)
+                    || VmString::requiresForwardProfileStrictStringNull()) {
                     throw new \TypeError(
                         $fn.'(): Argument #1 ($directory) must be of type string, null given'
                     );
@@ -51,7 +52,10 @@ final class disk_total_space extends Internal
             return;
         }
         if (false === $result) {
-            VmFilestatFailure::warnNoSuchFile($frame, $fn);
+            // php-src filestat.c — empty directory returns false without warning (#18387).
+            if ('' !== $path) {
+                VmFilestatFailure::warnNoSuchFile($frame, $fn);
+            }
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->float($result);

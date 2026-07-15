@@ -21,7 +21,11 @@ final class BuiltinParamNames
             'datetimeimmutable::createfromformat' => ['format', 'datetime', 'timezone'],
             'datetime::__construct',
             'datetimeimmutable::__construct' => ['datetime', 'timezone'],
+            'datetime::format' => ['format'],
+            'datetimeimmutable::format' => ['format'],
             'datetimezone::__construct' => ['timezone'],
+            'arrayobject::__construct' => ['array', 'flags', 'iterator_class'],
+            'splfileobject::seek' => ['line'],
             default => null,
         };
     }
@@ -248,7 +252,7 @@ final class BuiltinParamNames
             case 'openssl_cipher_key_length':
                 return ['cipher_algo'];
             case 'hash':
-                return ['algo', 'data', 'binary'];
+                return ['algo', 'data', 'binary', 'options'];
             case 'hash_hmac':
                 return ['algo', 'data', 'key', 'binary'];
             case 'hash_pbkdf2':
@@ -454,12 +458,76 @@ final class BuiltinParamNames
      */
     public static function paramCountForInternalFunction(string $name): ?int
     {
-        $names = self::forFunction($name);
+        $names = self::paramNamesForInternalFunction($name);
         if (null !== $names) {
             return \count($names);
         }
 
-        return BuiltinInternalArgInfo::paramCountForFunction($name);
+        return null;
+    }
+
+    /**
+     * Parameter names for internal functions (explicit table first, InternalArgInfo fallback; #18337).
+     *
+     * @return list<string>|null
+     */
+    public static function paramNamesForInternalFunction(string $name): ?array
+    {
+        $explicit = self::forFunction($name);
+        if (null !== $explicit) {
+            return $explicit;
+        }
+        $count = BuiltinInternalArgInfo::paramCountForFunction($name);
+        if (null === $count) {
+            return null;
+        }
+        $names = [];
+        for ($i = 0; $i < $count; $i++) {
+            $info = BuiltinInternalArgInfo::paramInfoForFunction($name, $i);
+            if (null === $info) {
+                return null;
+            }
+            $names[] = $info['name'];
+        }
+
+        return $names;
+    }
+
+    public static function paramCountForInternalMethod(string $class, string $method): ?int
+    {
+        return BuiltinInternalArgInfo::paramCountForClassMethod($class, $method);
+    }
+
+    public static function requiredParamCountForInternalFunction(string $name): ?int
+    {
+        $names = self::forFunction($name);
+        if (null !== $names) {
+            return self::requiredParamCountFromNames(array_keys($names));
+        }
+
+        return BuiltinInternalArgInfo::requiredParamCountForFunction($name);
+    }
+
+    public static function requiredParamCountForInternalMethod(string $class, string $method): ?int
+    {
+        return BuiltinInternalArgInfo::requiredParamCountForClassMethod($class, $method);
+    }
+
+    /**
+     * @param list<int|string> $names
+     */
+    private static function requiredParamCountFromNames(array $names): int
+    {
+        $required = 0;
+        foreach ($names as $name) {
+            $label = (string) $name;
+            if (str_ends_with($label, '=') || str_starts_with($label, '...')) {
+                break;
+            }
+            ++$required;
+        }
+
+        return $required;
     }
 
     /**

@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -24,10 +25,10 @@ final class highlight_string extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('highlight_string() expects 1 or 2 arguments in this compiler build');
         }
-        $code = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            $this->getName(),
+        $code = InternalStrictArg::resolveCoercibleStringArg(
+            $frame,
             0,
+            $this->getName(),
             'string'
         );
         $return = false;

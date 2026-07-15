@@ -1,5 +1,7 @@
 --TEST--
-stdlib touch() — null $filename TypeError JIT (#18245, ext/standard/file.c)
+stdlib touch() — null $filename TypeError JIT (#18245, #18817, ext/standard/file.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php

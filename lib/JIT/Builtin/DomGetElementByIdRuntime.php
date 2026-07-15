@@ -26,6 +26,8 @@ final class DomGetElementByIdRuntime
     public static function ensureLinked(Context $context): void
     {
         if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            DomDocumentMethodUserScriptLlvm::ensureGetElementByIdBridge($context);
+
             return;
         }
 

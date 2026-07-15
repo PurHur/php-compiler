@@ -156,22 +156,25 @@ final class VmImage
     }
 
     /**
-     * php-src php_getimagesize_from_any() — E_NOTICE only for data: URIs, not regular files (#16434).
+     * php-src php_getimagesize_from_any() — E_NOTICE for data:/php:// wrappers, not regular files (#16434, #18405).
      */
     public static function shouldEmitImageReadNoticeForPath(string $filename): bool
     {
-        return VmDataUri::isDataUri($filename);
+        return VmDataUri::isDataUri($filename)
+            || VmFsPhpWrapper::isPhpWrapperPath($filename);
     }
 
     /**
-     * php-src getimagesizefromstring() — E_NOTICE on any parse/read failure (#12930, #17961).
+     * php-src php_getimagetype() — E_NOTICE only when fewer than 12 bytes were read (#12930, #18572).
      *
-     * Unlike getimagesize() on regular files (#16434), getimagesizefromstring() always emits
-     * "Error reading from {data}!" when decode fails (ext/standard/image.c).
+     * After signature probes, {@see php_getimagetype} emits "Error reading from …!" only when
+     * `twelve_bytes_read` is false (ext/standard/image.c). Longer payloads that fail all format
+     * checks return IMAGE_FILETYPE_UNKNOWN silently — unlike getimagesize() on regular files
+     * where only data:/php:// paths gate notices (#16434).
      */
     public static function shouldEmitImageReadNoticeForBytes(string $data): bool
     {
-        return true;
+        return \strlen($data) < 12;
     }
 
     /**
@@ -198,6 +201,9 @@ final class VmImage
     {
         if (VmDataUri::isDataUri($filename)) {
             return false !== VmDataUri::decode($filename);
+        }
+        if (VmFsPhpWrapper::isPhpWrapperPath($filename)) {
+            return false !== VmFs::fileGetContents($filename);
         }
 
         return is_file($filename) && is_readable($filename);

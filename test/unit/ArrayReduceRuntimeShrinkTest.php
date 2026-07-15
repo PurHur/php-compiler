@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_reduce() JIT routes string-builtin/closure through ArrayReduceJitHelper PHP not ArrayBuiltinHelper LLVM (#12646, #14979). */
+/** array_reduce() JIT routes string-builtin/closure through ArrayReduceJitHelper PHP not ArrayBuiltinHelper LLVM (#12646, #14979, #18328). */
 final class ArrayReduceRuntimeShrinkTest extends TestCase
 {
     public function testArrayReduceRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
@@ -29,8 +29,9 @@ final class ArrayReduceRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ArrayBuiltinHelper::buildReduceArray', $builtin);
 
         $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
-        $this->assertStringContainsString('ArrayReduceRuntime::reduce', $arrayBuiltin);
-        $this->assertStringNotContainsString('buildReduceFromHashTableWithClosure', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildReduceArray', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildReduceFromHashTable', $arrayBuiltin);
+        $this->assertStringNotContainsString('buildReduceArrayWithClosure', $arrayBuiltin);
     }
 
     public function testArrayReduceJitHelperHonorsInitialOnEmpty(): void

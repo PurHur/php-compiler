@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM;
@@ -52,6 +53,28 @@ final class VmNullStringParamDeprecation
 
 final class VmString
 {
+    /**
+     * Z_PARAM_STR null coercion — php-src coerces to "" outside caller strict_types (#19161).
+     *
+     * Forward profile 8.4 does not add a profile-wide null TypeError; only {@see InternalStrictArg}
+     * at strict call sites rejects null before coercion (ext/standard/string.c).
+     */
+    public static function requiresForwardProfileStrictStringNull(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222).
+     *
+     * Distinct from {@see requiresForwardProfileStrictStringNull}: chr/trim/crc32 coerce null to "" on 8.4;
+     * unserialize/substr use this stricter guard (php-src ext/standard/string.c, var_unserializer.c).
+     */
+    public static function requiresZparamStrStrictNullOnForwardProfile(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
 
     /** php-src php_trim_int(): trim left side. */
@@ -102,7 +125,12 @@ final class VmString
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
-    public static function coerceStringBuiltinArg(
+    /**
+     * Z_PARAM_STR — null TypeError on 8.4 forward profile (#18837, #18838, ext/standard/string.c).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceZparamStrBuiltinArg(
         Variable $var,
         string $function,
         int $argIndex = 0,
@@ -111,7 +139,44 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            if (self::requiresZparamStrStrictNullOnForwardProfile()) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null', $expectedType)
+                );
+            }
             VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+
+            return '';
+        }
+
+        return self::coerceStringBuiltinArg(
+            $var,
+            $function,
+            $argIndex,
+            $paramName,
+            $expectedType,
+            false
+        );
+    }
+
+    public static function coerceStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string',
+        string $expectedType = 'string',
+        bool $rejectNullOnForwardProfile = true
+    ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            if ($rejectNullOnForwardProfile && self::requiresForwardProfileStrictStringNull()) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null', $expectedType)
+                );
+            }
+            if (!self::requiresForwardProfileStrictStringNull()) {
+                VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+            }
 
             return '';
         }
@@ -155,6 +220,9 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            if (self::requiresForwardProfileStrictStringNull()) {
+                throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+            }
             VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
 
             return '';
@@ -222,7 +290,8 @@ final class VmString
         int $argIndex,
         string $function,
         int $userArgIndex,
-        string $paramName
+        string $paramName,
+        bool $rejectNullOnForwardProfile = true
     ): string {
         if (InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::requireString($frame, $argIndex, $function, $paramName);
@@ -234,7 +303,9 @@ final class VmString
             $frame->calledArgs[$argIndex],
             $function,
             $userArgIndex,
-            $paramName
+            $paramName,
+            'string',
+            $rejectNullOnForwardProfile
         );
     }
 
@@ -284,10 +355,16 @@ final class VmString
         Variable $var,
         string $function,
         int $argIndex = 0,
-        string $paramName = 'path'
+        string $paramName = 'path',
+        bool $softNullPath = false
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            // Z_PARAM_PATH: null→"" then empty-path ValueError; caller strict_types rejects null upstream (#19146).
+            if (!self::requiresForwardProfileStrictStringNull()) {
+                VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+            }
+
             return '';
         }
         $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
@@ -455,6 +532,35 @@ final class VmString
         );
     }
 
+    /**
+     * Z_PARAM_STR_OR_NULL with caller strict_types parity (#18870, ext/standard/ini.c).
+     *
+     * @throws \TypeError when caller strict_types rejects non-string operands
+     */
+    public static function typedNullableStringBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): ?string {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return self::coerceTypedNullableStringBuiltinArg(
+                $frame->calledArgs[$argIndex],
+                $function,
+                $userArgIndex,
+                $paramName
+            );
+        }
+
+        return self::coerceNullableStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $userArgIndex,
+            $paramName
+        );
+    }
+
     private static function builtinScalarTypeName(Variable $var): string
     {
         return match ($var->type) {
@@ -475,6 +581,10 @@ final class VmString
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            if (self::requiresForwardProfileStrictStringNull()) {
+                throw new \TypeError(self::stringBuiltinTypeError('strtok', 0, 'string', 'null'));
+            }
+
             return null;
         }
         if (Variable::TYPE_ARRAY === $var->type) {
@@ -1203,14 +1313,10 @@ final class VmString
         }
         $lenA = self::byteLength($a);
         $lenB = self::byteLength($b);
-        $compare = $length;
-        if ($compare > $lenA) {
-            $compare = $lenA;
-        }
-        if ($compare > $lenB) {
-            $compare = $lenB;
-        }
-        for ($i = 0; $i < $compare; ++$i) {
+        for ($i = 0; $i < $length; ++$i) {
+            if ($i >= $lenA || $i >= $lenB) {
+                return $lenA <=> $lenB;
+            }
             $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
             $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
             if ($ordA !== $ordB) {
@@ -1323,11 +1429,6 @@ final class VmString
     {
         $len1 = self::byteLength($string1);
         $len2 = self::byteLength($string2);
-        if ($len1 > 255 || $len2 > 255) {
-            throw new \ValueError(
-                'similar_text(): Argument #1 ($string1) or #2 ($string2) must be less than 256 characters'
-            );
-        }
         if (0 === $len1 && 0 === $len2) {
             if (null !== $percent) {
                 $percent = 0.0;
@@ -1456,27 +1557,7 @@ final class VmString
 
     private static function strncmpCase(string $a, string $b, int $length): int
     {
-        if ($length <= 0) {
-            return 0;
-        }
-        $lenA = self::byteLength($a);
-        $lenB = self::byteLength($b);
-        $compare = $length;
-        if ($compare > $lenA) {
-            $compare = $lenA;
-        }
-        if ($compare > $lenB) {
-            $compare = $lenB;
-        }
-        for ($i = 0; $i < $compare; ++$i) {
-            $ordA = self::byteOrd(self::asciiLowerByte($a[$i]));
-            $ordB = self::byteOrd(self::asciiLowerByte($b[$i]));
-            if ($ordA !== $ordB) {
-                return $ordA - $ordB;
-            }
-        }
-
-        return 0;
+        return self::strncasecmp($a, $b, $length);
     }
 
     /**

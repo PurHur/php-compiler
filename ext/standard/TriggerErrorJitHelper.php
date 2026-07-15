@@ -16,7 +16,13 @@ final class TriggerErrorJitHelper
 {
     public static function stderrPrintCliError(int $level, string $message, string $file, int $line): void
     {
-        ErrorReporter::writeCliStderrLine($level, $message, '' !== $file ? $file : null, $line);
+        ErrorReporter::writeCliErrorOutput(
+            $level,
+            $message,
+            '' !== $file ? $file : null,
+            $line,
+            ErrorSilenceJitHelper::getDisplayErrors()
+        );
     }
 
     public static function undefinedArrayKey(string $key): void

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\simplexml;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
@@ -35,6 +36,7 @@ final class VmSimpleXml
         if (isset($ctx->classes['arrayaccess'])) {
             $entry->interfaces[] = 'arrayaccess';
         }
+        SimpleXmlElementIterator::registerInterfaces($entry, $ctx);
 
         $entry->methods['__get'] = new SimpleXmlElementGet();
         $entry->methodVisibility['__get'] = $pub;
@@ -73,6 +75,7 @@ final class VmSimpleXml
         $entry->methods['registerxpathnamespace'] = new SimpleXmlElementRegisterXPathNamespace();
         $entry->methodVisibility['registerxpathnamespace'] = $pub;
         $entry->methodNames['registerxpathnamespace'] = 'registerXPathNamespace';
+        SimpleXmlElementIterator::registerMethods($entry, $pub);
 
         $ctx->classes[self::CLASS_LC] = $entry;
         $ctx->classes[self::CLASS_LC]->isInternal = true;
@@ -108,7 +111,12 @@ final class VmSimpleXml
 
     public static function loadFile(Context $ctx, string $filename, ?Frame $frame = null): ?ObjectEntry
     {
-        $contents = @file_get_contents($filename);
+        if ('' === $filename) {
+            self::warn($ctx, 'simplexml_load_file(): failed to load external entity ""', $frame);
+
+            return null;
+        }
+        $contents = VmFsReadNative::read($filename);
         if (false === $contents) {
             self::warn($ctx, 'simplexml_load_file(): Failed to open stream: No such file or directory', $frame);
 
@@ -767,7 +775,13 @@ final class VmSimpleXml
     private static function warn(Context $ctx, string $message, ?Frame $frame): void
     {
         if (null !== $frame && null !== $frame->vmContext) {
-            $frame->vmContext->errors->triggerError($message, ErrorReporter::E_WARNING, $frame);
+            $frame->vmContext->errors->triggerError(
+                $message,
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
         }
     }
 }

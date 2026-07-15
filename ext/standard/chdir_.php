@@ -7,9 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** chdir() — VM via VmChdirNative (libc); JIT/AOT via JitChdir (#8180). */
@@ -25,8 +23,7 @@ final class chdir_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('chdir() requires exactly one argument in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'chdir', 'directory', 0, $frame);
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'chdir', 0, 'directory');
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'chdir', 0, 'directory', $frame, true);
         $ok = VmFs::chdir($path);
         if (!$ok) {
             VmFilestatFailure::warnChdirFailed($frame, $path);
@@ -44,7 +41,7 @@ final class chdir_ extends Internal
         }
         return JitChdir::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'chdir', 0, 'directory')
+            JitFilestatArg::lowerFilename($context, $args[0], 'chdir', 0, 'directory', true)
         );
     }
 }

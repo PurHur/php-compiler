@@ -1,5 +1,7 @@
 --TEST--
 stdlib nl2br/trim family JIT — null operand coerces when caller non-strict (#11322)
+--SKIPIF--
+<?php die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI'); ?>
 --FILE--
 <?php
 foreach (['nl2br', 'trim', 'ucfirst'] as $fn) {

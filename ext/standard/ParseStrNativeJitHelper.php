@@ -27,48 +27,67 @@ final class ParseStrNativeJitHelper
             return;
         }
 
-        $pairs = explode($delimiter, $encoded);
-        $pairCount = \count($pairs);
-        for ($index = 0; $index < $pairCount; ++$index) {
-            $pair = $pairs[$index];
-            if ('' === $pair) {
-                continue;
-            }
-
-            if ($cookiePairDecode) {
-                $pair = ParseStrEngine::trimCookieSegment($pair);
-                if ('' === $pair) {
-                    continue;
-                }
-                $pair = ParseStrEngine::urlDecodeComponent($pair);
-            }
-
-            $eq = strpos($pair, '=');
-            if (false === $eq) {
-                $key = $cookiePairDecode ? $pair : ParseStrEngine::urlDecodeComponent($pair);
-                $value = '';
-            } else {
-                $key = $cookiePairDecode
-                    ? substr($pair, 0, $eq)
-                    : ParseStrEngine::urlDecodeComponent(substr($pair, 0, $eq));
-                $valueStart = $eq + 1;
-                $value = $cookiePairDecode
-                    ? substr($pair, $valueStart)
-                    : ParseStrEngine::urlDecodeComponent(substr($pair, $valueStart));
-            }
-
-            if ('' === $key) {
-                continue;
-            }
-
-            if (!str_contains($key, '[')) {
-                phpc_native_ht_set_string_key($destPtr, $key, $value);
-
-                continue;
-            }
-
-            self::mergeIntoNative($destPtr, ParseStrEngine::parse($key.'='.$value));
+        $delimLen = \strlen($delimiter);
+        if (0 === $delimLen) {
+            return;
         }
+
+        $offset = 0;
+        $encodedLen = \strlen($encoded);
+        while ($offset <= $encodedLen) {
+            $next = strpos($encoded, $delimiter, $offset);
+            if (false === $next) {
+                $pair = substr($encoded, $offset);
+                if ('' !== $pair) {
+                    self::parsePairIntoNative($destPtr, $pair, $cookiePairDecode);
+                }
+
+                break;
+            }
+
+            $pair = substr($encoded, $offset, $next - $offset);
+            if ('' !== $pair) {
+                self::parsePairIntoNative($destPtr, $pair, $cookiePairDecode);
+            }
+            $offset = $next + $delimLen;
+        }
+    }
+
+    private static function parsePairIntoNative(int $destPtr, string $pair, bool $cookiePairDecode): void
+    {
+        if ($cookiePairDecode) {
+            $pair = ParseStrEngine::trimCookieSegment($pair);
+            if ('' === $pair) {
+                return;
+            }
+            $pair = ParseStrEngine::urlDecodeComponent($pair);
+        }
+
+        $eq = strpos($pair, '=');
+        if (false === $eq) {
+            $key = $cookiePairDecode ? $pair : ParseStrEngine::urlDecodeComponent($pair);
+            $value = '';
+        } else {
+            $key = $cookiePairDecode
+                ? substr($pair, 0, $eq)
+                : ParseStrEngine::urlDecodeComponent(substr($pair, 0, $eq));
+            $valueStart = $eq + 1;
+            $value = $cookiePairDecode
+                ? substr($pair, $valueStart)
+                : ParseStrEngine::urlDecodeComponent(substr($pair, $valueStart));
+        }
+
+        if ('' === $key) {
+            return;
+        }
+
+        if (!str_contains($key, '[')) {
+            phpc_native_ht_set_string_key($destPtr, $key, $value);
+
+            return;
+        }
+
+        self::mergeIntoNative($destPtr, ParseStrEngine::parse($key.'='.$value));
     }
 
     /**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\PackJitRuntime;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -26,6 +27,9 @@ final class JitPack
         }
         $fmt = JitStringBuiltinArg::lower($context, $args[0], 'pack', 0, 'format');
         $numArgs = $argc - 1;
+        for ($i = 1; $i < $argc; ++$i) {
+            self::rejectNullValueArg($context, $args[$i], $i + 1);
+        }
         if (0 === $numArgs) {
             $nullArgv = $context->builder->pointerCast(
                 $context->getTypeFromString('int64')->constInt(0, false),
@@ -126,5 +130,25 @@ final class JitPack
                     'pack() argument must be a scalar value in this compiler build'
                 );
         }
+    }
+
+    private static function rejectNullValueArg(Context $context, JITVariable $arg, int $argNumber): void
+    {
+        if (JITVariable::TYPE_NULL !== $arg->type) {
+            return;
+        }
+        if (!$context->callerStrictTypes && !VmString::requiresForwardProfileStrictStringNull()) {
+            return;
+        }
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise(
+            $context,
+            \sprintf(
+                'pack(): Argument #%d ($values) must be of type string, null given',
+                $argNumber
+            )
+        );
+        $context->builder->call($context->lookupFunction('abort'));
     }
 }

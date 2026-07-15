@@ -88,7 +88,7 @@ final class JitIteratorToArray
 
     private static function resolveGenerator(Context $context, Variable $iterator): ?Variable
     {
-        if (GeneratorHelper::isGeneratorVariable($iterator)) {
+        if (GeneratorHelper::hydrateGeneratorMetadata($context, $iterator)) {
             return $iterator;
         }
 
@@ -144,9 +144,8 @@ final class JitIteratorToArray
         Variable $gen,
         bool $preserveKeys
     ): Value {
-        if (null === $gen->generatorStatePtr || null === $gen->generatorResumeName) {
-            throw new \LogicException('iterator_to_array() requires a JIT Generator in this compiler build');
-        }
+        GeneratorHelper::loadStateFromGeneratorObject($context, $gen);
+        GeneratorHelper::compileAssertGeneratorIterableForRewind($context, $gen);
         GeneratorHelper::compileIterReset($context, $gen);
         $out = new Variable(
             $context,
@@ -161,10 +160,7 @@ final class JitIteratorToArray
         $map = $context->structFieldMap['__generator_state__'];
         $i1 = $context->getTypeFromString('int1');
         $i64 = $context->getTypeFromString('int64');
-        $resumeFn = $context->functions[strtolower($gen->generatorResumeName)] ?? null;
-        if (!$resumeFn instanceof Value\Function_) {
-            throw new \LogicException('Generator resume function missing for iterator_to_array: '.$gen->generatorResumeName);
-        }
+        $resumeFn = GeneratorHelper::resolveResumeFunction($context, $gen);
         $fn = $context->builder->getInsertBlock()->getParent();
         $head = $fn->appendBasicBlock('ita_gen_head');
         $body = $fn->appendBasicBlock('ita_gen_body');

@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -23,11 +24,11 @@ final class stripcslashes extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('stripcslashes() requires exactly one argument in this compiler build');
         }
-        $subject = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'stripcslashes',
+        $subject = InternalStrictArg::resolveCoercibleStringArg(
+            $frame,
             0,
-            'str'
+            'stripcslashes',
+            'string'
         );
         BuiltinExecute::writeReturn(
             $frame,
@@ -47,11 +48,11 @@ final class stripcslashes extends Internal
             );
         }
 
-        StringCslashes::ensureLinked($context);
+        StringCslashes::ensureStripcslashes($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_stripcslashes'),
-            JitStringBuiltinArg::lower($context, $args[0], 'stripcslashes', 0, 'str')
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'stripcslashes', 0, 'string')
         );
     }
 }

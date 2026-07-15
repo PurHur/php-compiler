@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\ext\standard\VmNullStringParamDeprecation;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\JIT\Builtin\Type\Object_ as JitObjectType;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -18,6 +22,18 @@ use PHPLLVM\Value;
  */
 final class JitStringBuiltinArg
 {
+    /** Z_PARAM_STR null coerces outside caller strict_types (#19161). */
+    public static function requiresForwardProfileStrictStringNull(): bool
+    {
+        return VmString::requiresForwardProfileStrictStringNull();
+    }
+
+    /** Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222). */
+    public static function requiresZparamStrStrictNullOnForwardProfile(): bool
+    {
+        return VmString::requiresZparamStrStrictNullOnForwardProfile();
+    }
+
     /**
      * Z_PARAM_STR with caller strict_types parity (#12276, #12274).
      */
@@ -28,7 +44,8 @@ final class JitStringBuiltinArg
         int $argIndex,
         string $paramName,
         string $expectedType = 'string',
-        ?string $arrayExpectedType = null
+        ?string $arrayExpectedType = null,
+        bool $rejectNullOnForwardProfile = true
     ): Value {
         if ($context->callerStrictTypes) {
             if (Variable::TYPE_VALUE === $arg->type || Variable::TYPE_OBJECT === $arg->type) {
@@ -50,7 +67,41 @@ final class JitStringBuiltinArg
             return JitStringArg::lower($context, $arg, "{$function}() argument #" . ($argIndex + 1));
         }
 
-        return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
+        return self::lower(
+            $context,
+            $arg,
+            $function,
+            $argIndex,
+            $paramName,
+            $expectedType,
+            $arrayExpectedType,
+            $rejectNullOnForwardProfile
+        );
+    }
+
+    /**
+     * Z_PARAM_STR — null TypeError on 8.4 forward profile (#18837, #18838, ext/standard/string.c).
+     */
+    public static function lowerZparamStr(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string',
+        ?string $arrayExpectedType = null
+    ): Value {
+        return self::lower(
+            $context,
+            $arg,
+            $function,
+            $argIndex,
+            $paramName,
+            $expectedType,
+            $arrayExpectedType,
+            false,
+            true
+        );
     }
 
     public static function lower(
@@ -60,15 +111,25 @@ final class JitStringBuiltinArg
         int $argIndex,
         string $paramName,
         string $expectedType = 'string',
-        ?string $arrayExpectedType = null
+        ?string $arrayExpectedType = null,
+        bool $rejectNullOnForwardProfile = true,
+        bool $zparamStrNullGuard = false
     ): Value {
         JitNativeString::ensureInsertBlock($context);
         $arrayExpected = $arrayExpectedType ?? $expectedType;
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            if ($context->callerStrictTypes) {
+            if (
+                $context->callerStrictTypes
+                || ($zparamStrNullGuard && self::requiresZparamStrStrictNullOnForwardProfile())
+                || ($rejectNullOnForwardProfile && self::requiresForwardProfileStrictStringNull())
+            ) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
 
                 return self::unreachableStringPtr($context);
+            }
+
+            if (!self::requiresForwardProfileStrictStringNull()) {
+                self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName);
             }
 
             return $context->builder->load($context->constantStringFromString(''));
@@ -131,20 +192,53 @@ final class JitStringBuiltinArg
         int $argIndex,
         string $paramName,
         string $expectedType = 'string',
-        ?string $arrayExpectedType = null
+        ?string $arrayExpectedType = null,
+        bool $softNullPath = false
     ): Value {
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             JitNativeString::ensureInsertBlock($context);
-            if ($context->callerStrictTypes) {
+            if (!$softNullPath && $context->callerStrictTypes) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
 
                 return self::unreachableStringPtr($context);
+            }
+
+            if (!$softNullPath && !self::requiresForwardProfileStrictStringNull()) {
+                self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName);
             }
 
             return $context->builder->load($context->constantStringFromString(''));
         }
 
         return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
+    }
+
+    public static function emitNullStringParamDeprecation(
+        Context $context,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        $message = \sprintf(
+            '%s(): Passing null to parameter #%d ($%s) of type string is deprecated',
+            $function,
+            $argIndex + 1,
+            $paramName
+        );
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_DEPRECATED, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
     }
 
     /**
@@ -791,16 +885,10 @@ final class JitStringBuiltinArg
         string $given,
         string $expectedType = 'string'
     ): void {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        $message = self::typeErrorMessage($function, $argIndex, $paramName, $given, $expectedType);
-        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
-            TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message);
-
-            return;
-        }
-        TypeErrorRaise::emitRaise($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            self::typeErrorMessage($function, $argIndex, $paramName, $given, $expectedType)
+        );
     }
 
     private static function unreachableStringPtr(Context $context): Value

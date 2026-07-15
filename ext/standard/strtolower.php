@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -30,10 +31,10 @@ final class strtolower extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('strtolower() requires exactly one argument');
         }
-        $subject = VmString::coerceTypedStringBuiltinArg(
-            $frame->calledArgs[0],
-            'strtolower',
+        $subject = InternalStrictArg::resolveCoercibleStringArg(
+            $frame,
             0,
+            'strtolower',
             'string'
         );
         BuiltinExecute::writeReturn(
@@ -50,7 +51,7 @@ final class strtolower extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('strtolower() requires exactly one argument');
         }
-        $str = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'strtolower', 0, 'string');
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strtolower', 0, 'string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         lcfirst::transformAllAscii($context, $copy, ord('A'), ord('Z'), 32);
 

@@ -24,10 +24,30 @@ final class ObjectInstancePropertyLlvm
         int $classId
     ): Variable {
         $classLc = strtolower(str_replace('/', '\\', ltrim($class, '\\')));
+        if (\PHPCompiler\ext\dom\JitDomNodeChildProperty::isDomNodeChildProperty($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomNodeChildProperty::fetch($object, $obj, $name);
+        }
         if (\PHPCompiler\ext\dom\JitDomElementTextContent::isDomElementTextContent($classLc, strtolower($name))) {
             return \PHPCompiler\ext\dom\JitDomElementTextContent::fetch($object, $obj);
         }
+        if (\PHPCompiler\ext\dom\JitDomNodeListLength::isDomNodeListLength($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomNodeListLength::fetch($object, $obj);
+        }
+        if (\PHPCompiler\ext\dom\JitDomDocumentElement::isDomDocumentElement($classLc, strtolower($name))) {
+            return \PHPCompiler\ext\dom\JitDomDocumentElement::fetch($object, $obj);
+        }
 
+        return self::propertyFetchDeclaredSlot($object, $obj, $class, $name, $classId);
+    }
+
+    /** Slot read without ext/dom live-bridge re-dispatch (#18951). */
+    public static function propertyFetchDeclaredSlot(
+        Object_ $object,
+        Value $obj,
+        string $class,
+        string $name,
+        int $classId
+    ): Variable {
         $context = $object->jitContext();
         $className = $object->classNameForId($classId);
         $nameId = $object->propNameIdFor($name);

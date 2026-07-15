@@ -23,6 +23,9 @@ final class VmStreamFilterChain
 
     public const WRITE = 2;
 
+    /** php-src STREAM_FILTER_ALL — omitted $read_write attaches to both chains (0). */
+    public const ALL = 0;
+
     /** @var array<string, true> */
     private const BUILTIN_FILTERS = [
         'zlib.deflate' => true,
@@ -121,6 +124,20 @@ final class VmStreamFilterChain
         return true;
     }
 
+    /** php-src apply_filter_to_stream() when read_write omitted (ext/standard/streamsfuncs.c). */
+    public static function inferReadWriteFromMode(string $mode): int
+    {
+        $readWrite = 0;
+        if (false !== \strpbrk($mode, 'r+')) {
+            $readWrite |= self::READ;
+        }
+        if (false !== \strpbrk($mode, 'wa+')) {
+            $readWrite |= self::WRITE;
+        }
+
+        return $readWrite;
+    }
+
     public static function clearStream(int $streamHandle): void
     {
         unset(self::$readChains[$streamHandle], self::$writeChains[$streamHandle], self::$streamContexts[$streamHandle]);
@@ -150,7 +167,7 @@ final class VmStreamFilterChain
     }
 
     /**
-     * @return int|false
+     * @return int|false filter resource id (write-chain filter when both chains attach)
      */
     private static function attach(
         int $streamHandle,
@@ -168,6 +185,13 @@ final class VmStreamFilterChain
 
             return false;
         }
+        if (0 === ($readWrite & (self::READ | self::WRITE))) {
+            $mode = VmFs::handleMode($streamHandle) ?? 'r';
+            $readWrite = self::inferReadWriteFromMode($mode);
+            if (0 === $readWrite) {
+                return false;
+            }
+        }
         $isUser = VmStreamFilters::isUserFilterName($filterName);
         if ($isUser) {
             if (null === $frame?->vmContext) {
@@ -184,10 +208,29 @@ final class VmStreamFilterChain
             }
             self::$streamContexts[$streamHandle] = $frame->vmContext;
         }
-        if (0 === ($readWrite & (self::READ | self::WRITE))) {
-            $readWrite = self::READ;
+
+        /** @var int|false */
+        $returnFilterId = false;
+        if (0 !== ($readWrite & self::READ)) {
+            $readFilterId = self::installFilter($streamHandle, $filterName, self::READ, $prepend, $isUser);
+            if (0 === ($readWrite & self::WRITE)) {
+                $returnFilterId = $readFilterId;
+            }
+        }
+        if (0 !== ($readWrite & self::WRITE)) {
+            $returnFilterId = self::installFilter($streamHandle, $filterName, self::WRITE, $prepend, $isUser);
         }
 
+        return $returnFilterId;
+    }
+
+    private static function installFilter(
+        int $streamHandle,
+        string $filterName,
+        int $direction,
+        bool $prepend,
+        bool $isUser
+    ): int {
         $filterId = self::$nextFilterId++;
         self::$filters[$filterId] = [
             'stream' => $streamHandle,
@@ -197,8 +240,7 @@ final class VmStreamFilterChain
             'instance' => null,
             'oncreate' => false,
         ];
-
-        if (0 !== ($readWrite & self::READ)) {
+        if (self::READ === $direction) {
             if ($prepend) {
                 self::$readChains[$streamHandle] ??= [];
                 array_unshift(self::$readChains[$streamHandle], $filterId);
@@ -206,8 +248,7 @@ final class VmStreamFilterChain
                 self::$readChains[$streamHandle] ??= [];
                 self::$readChains[$streamHandle][] = $filterId;
             }
-        }
-        if (0 !== ($readWrite & self::WRITE)) {
+        } else {
             if ($prepend) {
                 self::$writeChains[$streamHandle] ??= [];
                 array_unshift(self::$writeChains[$streamHandle], $filterId);

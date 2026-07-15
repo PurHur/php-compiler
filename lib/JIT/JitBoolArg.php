@@ -29,6 +29,65 @@ final class JitBoolArg
         );
     }
 
+    /** Z_PARAM_BOOL coercion — null → false (php-src ext/standard/info.c get_loaded_extensions; #18971). */
+    public static function lowerCoerceZParamBool(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): Value {
+        if ($context->callerStrictTypes) {
+            InternalStrictArg::requireBool($context, $arg, $function, $paramName, $argNumber);
+        }
+
+        return self::lowerCoerce(
+            $context,
+            $arg,
+            sprintf('%s(): Argument #%d ($%s)', $function, $argNumber, $paramName)
+        );
+    }
+
+    public static function lowerCoerce(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
+    {
+        $literal = JitStringArg::compileTimeLiteral($arg);
+        if (null !== $literal) {
+            return $context->constantFromBool(self::coerceStringLiteral($literal, $contextLabel));
+        }
+
+        if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (Variable::TYPE_NATIVE_LONG === $arg->type) {
+            $zero = $context->getTypeFromString('int64')->constInt(0, false);
+
+            return $context->builder->icmp(
+                Builder::INT_NE,
+                $context->helper->loadValue($arg),
+                $zero
+            );
+        }
+        if (Variable::TYPE_STRING === $arg->type) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'string');
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            return self::lowerBoxedCoerce($context, $arg, $contextLabel, true);
+        }
+        if (Variable::TYPE_NULL === $arg->type) {
+            return $context->constantFromBool(false);
+        }
+        if (Variable::TYPE_HASHTABLE === $arg->type || ($arg->type & Variable::IS_NATIVE_ARRAY)) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'array');
+        }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'object');
+        }
+
+        self::emitTypeErrorAndAbort($context, $contextLabel, 'mixed');
+
+        return $context->constantFromBool(false);
+    }
+
     public static function lower(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
     {
         $literal = JitStringArg::compileTimeLiteral($arg);
@@ -159,6 +218,15 @@ final class JitBoolArg
 
     private static function lowerBoxed(Context $context, Variable $arg, string $contextLabel): Value
     {
+        return self::lowerBoxedCoerce($context, $arg, $contextLabel, false);
+    }
+
+    private static function lowerBoxedCoerce(
+        Context $context,
+        Variable $arg,
+        string $contextLabel,
+        bool $coerceNull
+    ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
@@ -169,14 +237,36 @@ final class JitBoolArg
         $i8 = $context->getTypeFromString('int8');
         $i1 = $context->getTypeFromString('int1');
 
-        foreach (
-            [
+        if ($coerceNull) {
+            $nullBlock = BasicBlockHelper::append($context, 'jit_bool_vbox_coerce_null');
+            $afterNull = BasicBlockHelper::append($context, 'jit_bool_vbox_after_coerce_null');
+            $isNull = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_NULL, false)
+            );
+            $context->builder->branchIf($isNull, $nullBlock, $afterNull);
+            $context->builder->positionAtEnd($nullBlock);
+
+            return $context->constantFromBool(false);
+        }
+
+        $rejectTypes = [
+            [VmVariable::TYPE_ARRAY, 'array'],
+            [VmVariable::TYPE_OBJECT, 'object'],
+            [VmVariable::TYPE_NULL, 'null'],
+            [VmVariable::TYPE_STRING, 'string'],
+        ];
+        if ($coerceNull) {
+            $context->builder->positionAtEnd($afterNull);
+            $rejectTypes = [
                 [VmVariable::TYPE_ARRAY, 'array'],
                 [VmVariable::TYPE_OBJECT, 'object'],
-                [VmVariable::TYPE_NULL, 'null'],
                 [VmVariable::TYPE_STRING, 'string'],
-            ] as [$vmType, $label]
-        ) {
+            ];
+        }
+
+        foreach ($rejectTypes as [$vmType, $label]) {
             $check = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt($vmType, false));
             $ok = BasicBlockHelper::append($context, 'jit_bool_vbox_ok_'.$label);
             $bad = BasicBlockHelper::append($context, 'jit_bool_vbox_bad_'.$label);

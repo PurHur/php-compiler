@@ -9,7 +9,7 @@ use PHPUnit\Framework\TestCase;
 /** usort()/uksort() JIT routes through UsortJitHelper + Sort/KeySort runtimes not ArrayBuiltinHelper LLVM (#15518, #17795). */
 final class UsortRuntimeShrinkTest extends TestCase
 {
-    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 13720;
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 1920;
 
     public function testUsortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
@@ -17,6 +17,8 @@ final class UsortRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('UsortJitHelper', $runtime);
         $this->assertStringContainsString('SortRuntime::sortPacked', $runtime);
         $this->assertStringContainsString('KeySortRuntime::ksortByKey', $runtime);
+        $this->assertStringContainsString('__hashtable__sortStringKeyValues', $runtime);
+        $this->assertStringContainsString('sortValuesWithClosure', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::sortPackedWithClosure', $runtime);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::sortStringKeysWithClosure', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
@@ -24,6 +26,7 @@ final class UsortRuntimeShrinkTest extends TestCase
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/UsortJitHelper.php');
         $this->assertStringContainsString('sortPackedWithClosure', $helper);
         $this->assertStringContainsString('sortKeysWithClosure', $helper);
+        $this->assertStringContainsString('sortValuesWithClosure', $helper);
         $this->assertStringContainsString('VmClosureCall', $helper);
 
         $usort = (string) file_get_contents(__DIR__.'/../../ext/standard/usort_.php');
@@ -32,7 +35,8 @@ final class UsortRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ArrayBuiltinHelper::sortPackedWithClosure', $usort);
 
         $uasort = (string) file_get_contents(__DIR__.'/../../ext/standard/uasort_.php');
-        $this->assertStringContainsString('SortRuntime::sortPacked', $uasort);
+        $this->assertStringContainsString('UsortRuntime::uasortValues', $uasort);
+        $this->assertStringNotContainsString('SortRuntime::sortPacked', $uasort);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::sortPacked', $uasort);
 
         $uksort = (string) file_get_contents(__DIR__.'/../../ext/standard/uksort_.php');

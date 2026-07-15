@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -24,8 +23,8 @@ final class strspn extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('strspn() requires two to four arguments in this compiler build');
         }
-        $str = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'strspn', 0, 'string');
-        $mask = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'strspn', 1, 'characters');
+        $str = VmString::stringBuiltinArgForFrame($frame, 0, 'strspn', 0, 'string');
+        $mask = VmString::stringBuiltinArgForFrame($frame, 1, 'strspn', 1, 'characters');
         $offset = 0;
         if ($argc >= 3) {
             $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'strspn', 3, 'offset');
@@ -48,9 +47,6 @@ final class strspn extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('strspn() requires two to four arguments in this compiler build');
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'strspn', 'string', 1);
-        JitInternalStrictArg::rejectNullString($context, $args[1], 'strspn', 'characters', 2);
-
         return SpnJitLowering::extended($context, $args, true, 'strspn');
     }
 }

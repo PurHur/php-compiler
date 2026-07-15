@@ -6,11 +6,12 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -33,14 +34,7 @@ final class unserialize extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        InternalStrictArg::rejectNullString(
-            $frame->calledArgs[0],
-            'unserialize',
-            'data',
-            0,
-            $frame
-        );
-        $payload = VmString::coerceStringBuiltinArg(
+        $payload = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'unserialize',
             0,
@@ -110,6 +104,17 @@ final class unserialize extends Internal
     private static function compileTimeUnserialize(Context $context, JITVariable $arg, ?array $options = null): ?Value
     {
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes || VmString::requiresZparamStrStrictNullOnForwardProfile()) {
+                $message = 'unserialize(): Argument #1 ($data) must be of type string, null given';
+                if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+                    TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message);
+
+                    return JitJsonDecode::materializeScalar($context, false);
+                }
+
+                return null;
+            }
+
             return $context->helper->loadValue(
                 new JITVariable(
                     $context,

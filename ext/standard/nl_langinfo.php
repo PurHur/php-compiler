@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -55,36 +54,6 @@ final class nl_langinfo extends Internal
 
     private static function parseItemArg(Variable $var): int
     {
-        $var = $var->resolveIndirect();
-        if (Variable::TYPE_INTEGER === $var->type) {
-            return $var->toInt();
-        }
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            throw new \TypeError(self::itemTypeError(EnumCaseSupport::typeNameForVariable($var)));
-        }
-
-        throw new \TypeError(self::itemTypeError(self::vmTypeName($var->type)));
-    }
-
-    private static function itemTypeError(string $given): string
-    {
-        return \sprintf(
-            'nl_langinfo(): Argument #1 ($item) must be of type int, %s given',
-            $given
-        );
-    }
-
-    private static function vmTypeName(int $type): string
-    {
-        return match ($type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
+        return VmMath::parseZParamLongBuiltinArg($var, 'nl_langinfo', 1, 'item');
     }
 }

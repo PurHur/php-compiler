@@ -10,15 +10,23 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** count(COUNT_RECURSIVE) JIT routes through ArrayCountRecursiveJitHelper PHP not JitArrayCountRecursive LLVM (#13274, #14487). */
+/** count(COUNT_RECURSIVE) JIT routes all operands through ArrayCountRecursiveJitHelper PHP (#13274, #14487, #19013). */
 final class ArrayCountRecursiveRuntimeShrinkTest extends TestCase
 {
     public function testArrayCountRecursiveRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayCountRecursiveRuntime.php');
         $this->assertStringContainsString('ArrayCountRecursiveJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::countRecursive', $runtime);
+        $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::countRecursive', $runtime);
+        $this->assertStringNotContainsString('JitArrayCountRecursive', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitArrayCountRecursive.php');
+
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function countRecursive(', $arrayBuiltin);
+        $this->assertStringNotContainsString('JitArrayCountRecursive', $arrayBuiltin);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_count.php');
         $this->assertStringContainsString('ArrayCountRecursiveRuntime::countRecursive', $builtin);

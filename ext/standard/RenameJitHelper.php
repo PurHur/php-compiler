@@ -16,8 +16,11 @@ final class RenameJitHelper
     {
         $ok = VmFs::rename($from, $to);
         if (!$ok) {
+            $wrapperMessage = VmFsPhpWrapper::renameWarningMessage($from, $to);
             TriggerErrorJitHelper::warning(
-                \sprintf('rename(%s,%s): No such file or directory', $from, $to)
+                null !== $wrapperMessage
+                    ? $wrapperMessage
+                    : 'rename('.$from.','.$to.'): No such file or directory'
             );
         }
 

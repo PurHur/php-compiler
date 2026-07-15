@@ -133,6 +133,9 @@ final class BuiltinIntrospectionPolicy
         ], true)) {
             return IntlExtensionPolicy::advertisesBuiltins();
         }
+        if (\in_array($lc, ['normalizer_normalize', 'normalizer_is_normalized'], true)) {
+            return IntlExtensionPolicy::advertisesNormalizer();
+        }
         if (\in_array($lc, [
             'locale_get_primary_language',
             'locale_get_region',
@@ -145,6 +148,21 @@ final class BuiltinIntrospectionPolicy
         }
         if (\in_array($lc, ['curl_escape', 'curl_unescape'], true)) {
             return CurlExtensionPolicy::advertisesExtension();
+        }
+        if (\in_array($lc, [
+            'curl_version',
+            'curl_strerror',
+            'curl_multi_strerror',
+            'curl_upkeep',
+            'curl_file_create',
+        ], true)) {
+            return CurlExtensionPolicy::advertisesIntrospectionFunctions();
+        }
+        if (\in_array($lc, ['xmlrpc_encode', 'xmlrpc_decode'], true)) {
+            return \PHPCompiler\ext\xmlrpc\XmlrpcExtensionPolicy::advertisesExtension();
+        }
+        if (\in_array($lc, ['wddx_serialize_value', 'wddx_serialize_vars', 'wddx_deserialize'], true)) {
+            return \PHPCompiler\ext\wddx\WddxExtensionPolicy::advertisesExtension();
         }
         if ('ldap_escape' === $lc) {
             return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins();
@@ -172,13 +190,19 @@ final class BuiltinIntrospectionPolicy
             return \PHPCompiler\ext\openssl\OpensslExtensionPolicy::advertisesExtension();
         }
         if ('sqlite3' === $ext) {
-            return \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtension();
+            return \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtensionLoaded();
         }
         if ('brotli' === $ext) {
             return \PHPCompiler\ext\brotli\BrotliExtensionPolicy::advertisesExtension();
         }
         if ('msgpack' === $ext) {
             return \PHPCompiler\ext\msgpack\MsgpackExtensionPolicy::advertisesExtension();
+        }
+        if ('xmlrpc' === $ext) {
+            return \PHPCompiler\ext\xmlrpc\XmlrpcExtensionPolicy::advertisesExtension();
+        }
+        if ('wddx' === $ext) {
+            return \PHPCompiler\ext\wddx\WddxExtensionPolicy::advertisesExtension();
         }
         if ('uri' === $ext) {
             return \PHPCompiler\ext\uri\UriExtensionPolicy::advertisesExtension();
@@ -194,6 +218,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('xsl' === $ext) {
             return \PHPCompiler\ext\xsl\XslExtensionPolicy::advertisesExtension();
+        }
+        if ('phar' === $ext) {
+            return \PHPCompiler\ext\phar\PharExtensionPolicy::advertisesExtension();
         }
 
         return true;

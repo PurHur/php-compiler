@@ -75,6 +75,9 @@ class Context {
     /** Operand for json_encode() value arg during FUNCCALL lowering (#14040). */
     public ?Operand $jitJsonEncodeValueOperand = null;
 
+    /** Operand for compile-time xmlrpc_encode() array/scalar literals (#19048). */
+    public ?Operand $jitXmlrpcEncodeValueOperand = null;
+
     /** Operand for call_user_func_array() $args during FUNCCALL lowering (#10359). */
     public ?Operand $jitCallUserFuncArrayParamsOperand = null;
 
@@ -212,6 +215,15 @@ class Context {
      * @var array<int, Operand>
      */
     public array $ternaryEchoPhiByAliasSlot = [];
+
+    /** Entry alloca holding ?: condition for literal-arm merge ECHO (#18784). */
+    public ?\PHPLLVM\Value $ternaryEchoLiteralConditionSlot = null;
+
+    /** True-arm literal for {@see $ternaryEchoLiteralConditionSlot} redirect (#18784). */
+    public ?string $ternaryEchoLiteralIf = null;
+
+    /** False-arm literal for {@see $ternaryEchoLiteralConditionSlot} redirect (#18784). */
+    public ?string $ternaryEchoLiteralElse = null;
 
     /** Guarded list destruct: assign-path dim fetches compile as unreachable stubs (#4308). */
     public bool $listUnpackSkipAssignPath = false;
@@ -858,6 +870,8 @@ class Context {
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
+        $this->functionProxies['reflectionclass::isfinal'] = new Call\ReflectionClassIsFinal();
+        $this->functionProxies['reflectionclass::isiterateable'] = new Call\ReflectionClassIsIterateable();
         if (CompilerVersion::supportsLazyObjectFactories()) {
             $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
             $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
@@ -992,6 +1006,7 @@ class Context {
         Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
         $this->ensureMinimalUserStandaloneBodies();
+        Builtin\EnvLocalRuntime::ensureBootstrapAotStubLinked($this);
         Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
         Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
     }
@@ -2153,6 +2168,9 @@ class Context {
             } elseif ($op instanceof Operand\BoundVariable
                 && Operand\BoundVariable::SCOPE_OBJECT === $op->scope) {
                 $thisVar = $this->findThisVariable();
+                if (null === $thisVar) {
+                    $thisVar = $this->seedImplicitThisFromActiveLlvmFunction();
+                }
                 if (null !== $thisVar) {
                     $this->scope->variables[$op] = $thisVar;
 
@@ -2236,7 +2254,38 @@ class Context {
             return $this->implicitThisArgument;
         }
 
-        return null;
+        return $this->seedImplicitThisFromActiveLlvmFunction();
+    }
+
+    /**
+     * Queued nested instance methods may omit argVars; LLVM param 0 is $this (#16075).
+     */
+    public function seedImplicitThisFromActiveLlvmFunction(): ?Variable
+    {
+        if (null !== $this->implicitThisArgument) {
+            return $this->implicitThisArgument;
+        }
+        $active = strtolower($this->activeFunction ?? '');
+        if ('' === $active || !str_contains($active, '::')) {
+            return null;
+        }
+        $llvmFn = $this->functions[$active] ?? null;
+        if (null === $llvmFn || $llvmFn->countParams() < 1) {
+            return null;
+        }
+        $thisParam = $llvmFn->getParam(0);
+        $thisTy = $this->getStringFromType($thisParam->typeOf());
+        if ('__object__*' !== $thisTy) {
+            return null;
+        }
+        $this->implicitThisArgument = new Variable(
+            $this,
+            Variable::TYPE_OBJECT,
+            Variable::KIND_VALUE,
+            $thisParam
+        );
+
+        return $this->implicitThisArgument;
     }
 
     public function hasVariableOpInScopes(Operand $op): bool

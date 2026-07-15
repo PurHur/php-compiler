@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\openssl;
 
+use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\standard\VmHash;
 use PHPCompiler\ext\standard\VmHashNative;
 use PHPCompiler\Frame;
@@ -189,6 +190,106 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_public_encrypt() — EVP_PKEY_encrypt (php-src ext/openssl/xp.c; #6666).
+     *
+     * @return string|false ciphertext bytes
+     */
+    public static function publicEncrypt(
+        string $data,
+        string $publicKeyPem,
+        int $padding,
+        ?Frame $frame = null,
+    ): string|false {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_public_encrypt(): OpenSSL asymmetric encryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $encrypted = VmOpensslPkeyNative::encrypt($data, $publicKeyPem, $padding);
+        if (false === $encrypted) {
+            self::userWarning('openssl_public_encrypt(): Encryption failed', $frame);
+        }
+
+        return $encrypted;
+    }
+
+    /**
+     * openssl_private_decrypt() — EVP_PKEY_decrypt (php-src ext/openssl/xp.c; #6666).
+     *
+     * @return string|false plaintext bytes
+     */
+    public static function privateDecrypt(
+        string $data,
+        string $privateKeyPem,
+        int $padding,
+        ?Frame $frame = null,
+    ): string|false {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_private_decrypt(): OpenSSL asymmetric decryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $decrypted = VmOpensslPkeyNative::decrypt($data, $privateKeyPem, $padding);
+        if (false === $decrypted) {
+            self::userWarning('openssl_private_decrypt(): Decryption failed', $frame);
+        }
+
+        return $decrypted;
+    }
+
+    /**
+     * openssl_private_encrypt() — EVP_PKEY_sign (php-src ext/openssl/xp.c; #6666).
+     *
+     * @return string|false ciphertext bytes
+     */
+    public static function privateEncrypt(
+        string $data,
+        string $privateKeyPem,
+        int $padding,
+        ?Frame $frame = null,
+    ): string|false {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_private_encrypt(): OpenSSL asymmetric encryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $encrypted = VmOpensslPkeyNative::privateEncrypt($data, $privateKeyPem, $padding);
+        if (false === $encrypted) {
+            self::userWarning('openssl_private_encrypt(): Encryption failed', $frame);
+        }
+
+        return $encrypted;
+    }
+
+    /**
+     * openssl_public_decrypt() — EVP_PKEY_verify_recover (php-src ext/openssl/xp.c; #6666).
+     *
+     * @return string|false plaintext bytes
+     */
+    public static function publicDecrypt(
+        string $data,
+        string $publicKeyPem,
+        int $padding,
+        ?Frame $frame = null,
+    ): string|false {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_public_decrypt(): OpenSSL asymmetric decryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $decrypted = VmOpensslPkeyNative::publicDecrypt($data, $publicKeyPem, $padding);
+        if (false === $decrypted) {
+            self::userWarning('openssl_public_decrypt(): Decryption failed', $frame);
+        }
+
+        return $decrypted;
+    }
+
+    /**
      * openssl_spki_new() — create Netscape SPKAC (php-src ext/openssl/openssl.c; #8690).
      *
      * @return string|false SPKAC=… encoded certificate request
@@ -248,6 +349,348 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_spki_export() — PEM public key from Netscape SPKAC (php-src ext/openssl/openssl.c; #6423).
+     */
+    public static function spkiExport(string $spkac, ?Frame $frame = null): string|false
+    {
+        if (!VmOpensslSpkiNative::available()) {
+            self::userWarning('openssl_spki_export(): OpenSSL SPKI is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $cleaned = VmOpensslSpkiNative::spkiCleanup($spkac);
+        if ('' === $cleaned) {
+            self::userWarning('openssl_spki_export(): Invalid SPKAC', $frame);
+
+            return false;
+        }
+
+        $pem = VmOpensslSpkiNative::spkiExport($spkac);
+        if (false === $pem) {
+            if (!VmOpensslSpkiNative::spkiDecodeable($spkac)) {
+                self::userWarning('openssl_spki_export(): Unable to decode supplied SPKAC', $frame);
+            } else {
+                self::userWarning('openssl_spki_export(): Unable to acquire signed public key', $frame);
+            }
+        }
+
+        return $pem;
+    }
+
+    /**
+     * openssl_spki_export_challenge() — challenge string from Netscape SPKAC (php-src ext/openssl/openssl.c; #6423).
+     */
+    public static function spkiExportChallenge(string $spkac, ?Frame $frame = null): string|false
+    {
+        if (!VmOpensslSpkiNative::available()) {
+            self::userWarning('openssl_spki_export_challenge(): OpenSSL SPKI is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $cleaned = VmOpensslSpkiNative::spkiCleanup($spkac);
+        if ('' === $cleaned) {
+            self::userWarning('openssl_spki_export_challenge(): Invalid SPKAC', $frame);
+
+            return false;
+        }
+
+        $challenge = VmOpensslSpkiNative::spkiExportChallenge($spkac);
+        if (false === $challenge) {
+            self::userWarning('openssl_spki_export_challenge(): Unable to decode SPKAC', $frame);
+        }
+
+        return $challenge;
+    }
+
+    /**
+     * openssl_seal() — public-key envelope encryption (php-src ext/openssl/openssl.c; #6523).
+     *
+     * @param list<string> $publicKeyPems
+     *
+     * @return array{length: int, sealed: string, encrypted_keys: list<string>, iv: string}|false
+     */
+    public static function seal(
+        string $data,
+        array $publicKeyPems,
+        string $cipherAlgo,
+        bool $assignIv,
+        ?Frame $frame = null
+    ): array|false {
+        if (!VmOpensslSealNative::available()) {
+            self::userWarning('openssl_seal(): OpenSSL envelope encryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $ivLen = OpensslCipherRegistry::cipherIvLength($cipherAlgo);
+        if (false === $ivLen) {
+            self::userWarning('openssl_seal(): Unknown cipher algorithm', $frame);
+
+            return false;
+        }
+        if ($ivLen > 0 && !$assignIv) {
+            throw new \ValueError('openssl_seal(): Argument #6 ($iv) cannot be null for the chosen cipher algorithm');
+        }
+
+        if ([] === $publicKeyPems) {
+            throw new \ValueError('openssl_seal(): Argument #4 ($public_key) cannot be empty');
+        }
+
+        $result = VmOpensslSealNative::seal($data, $publicKeyPems, $cipherAlgo, $assignIv);
+        if (false === $result) {
+            self::userWarning('openssl_seal(): Seal operation failed', $frame);
+
+            return false;
+        }
+
+        return $result;
+    }
+
+    /**
+     * openssl_open() — decrypt openssl_seal() output (php-src ext/openssl/openssl.c; #6523).
+     */
+    public static function open(
+        string $sealedData,
+        string $encryptedKey,
+        string $privateKeyPem,
+        string $cipherAlgo,
+        ?string $iv,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslSealNative::available()) {
+            self::userWarning('openssl_open(): OpenSSL envelope decryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $ivLen = OpensslCipherRegistry::cipherIvLength($cipherAlgo);
+        if (false === $ivLen) {
+            self::userWarning('openssl_open(): Unknown cipher algorithm', $frame);
+
+            return false;
+        }
+        if ($ivLen > 0) {
+            if (null === $iv) {
+                throw new \ValueError('openssl_open(): Argument #6 ($iv) cannot be null for the chosen cipher algorithm');
+            }
+            if (\strlen($iv) !== $ivLen) {
+                self::userWarning('openssl_open(): IV length is invalid', $frame);
+
+                return false;
+            }
+        }
+
+        $plain = VmOpensslSealNative::open($sealedData, $encryptedKey, $privateKeyPem, $cipherAlgo, $iv);
+        if (false === $plain) {
+            self::userWarning('openssl_open(): Open operation failed', $frame);
+
+            return false;
+        }
+
+        return $plain;
+    }
+
+    /**
+     * openssl_encrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594).
+     *
+     * @return string|false ciphertext bytes (caller applies base64 unless OPENSSL_RAW_DATA)
+     */
+    public static function encrypt(
+        string $data,
+        string $cipherAlgo,
+        string $passphrase,
+        int $options,
+        string $iv,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslCipherNative::available()) {
+            self::userWarning('openssl_encrypt(): OpenSSL cipher encryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $cipher = strtolower($cipherAlgo);
+        if (false === OpensslCipherRegistry::cipherIvLength($cipher)) {
+            self::userWarning('openssl_encrypt(): Unknown cipher algorithm', $frame);
+
+            return false;
+        }
+
+        $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
+        if (false !== $ivLen && $ivLen > 0 && \strlen($iv) !== $ivLen) {
+            self::userWarning(\sprintf(
+                'openssl_encrypt(): IV passed is only %d bytes long, cipher expects an IV of precisely %d bytes, padding with \\0',
+                \strlen($iv),
+                $ivLen
+            ), $frame);
+
+            return false;
+        }
+
+        $keyLen = OpensslCipherRegistry::cipherKeyLength($cipher);
+        if (false === $keyLen || \strlen($passphrase) !== $keyLen) {
+            self::userWarning('openssl_encrypt(): Invalid key length', $frame);
+
+            return false;
+        }
+
+        $zeroPadding = 0 !== ($options & OpensslConstants::OPENSSL_ZERO_PADDING);
+        $encrypted = VmOpensslCipherNative::encrypt($data, $cipher, $passphrase, $iv, $zeroPadding);
+        if (false === $encrypted) {
+            self::userWarning('openssl_encrypt(): Encryption failed', $frame);
+
+            return false;
+        }
+
+        return $encrypted;
+    }
+
+    /**
+     * openssl_decrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594).
+     *
+     * @return string|false plaintext bytes (caller decodes base64 unless OPENSSL_RAW_DATA)
+     */
+    public static function decrypt(
+        string $data,
+        string $cipherAlgo,
+        string $passphrase,
+        int $options,
+        string $iv,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslCipherNative::available()) {
+            self::userWarning('openssl_decrypt(): OpenSSL cipher decryption is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $cipher = strtolower($cipherAlgo);
+        if (false === OpensslCipherRegistry::cipherIvLength($cipher)) {
+            self::userWarning('openssl_decrypt(): Unknown cipher algorithm', $frame);
+
+            return false;
+        }
+
+        $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
+        if (false !== $ivLen && $ivLen > 0 && \strlen($iv) !== $ivLen) {
+            self::userWarning(\sprintf(
+                'openssl_decrypt(): IV passed is only %d bytes long, cipher expects an IV of precisely %d bytes, padding with \\0',
+                \strlen($iv),
+                $ivLen
+            ), $frame);
+
+            return false;
+        }
+
+        $keyLen = OpensslCipherRegistry::cipherKeyLength($cipher);
+        if (false === $keyLen || \strlen($passphrase) !== $keyLen) {
+            self::userWarning('openssl_decrypt(): Invalid key length', $frame);
+
+            return false;
+        }
+
+        $zeroPadding = 0 !== ($options & OpensslConstants::OPENSSL_ZERO_PADDING);
+        $plain = VmOpensslCipherNative::decrypt($data, $cipher, $passphrase, $iv, $zeroPadding);
+        if (false === $plain) {
+            self::userWarning('openssl_decrypt(): Decryption failed', $frame);
+
+            return false;
+        }
+
+        return $plain;
+    }
+
+    /**
+     * @return list<string>|false
+     */
+    public static function coercePublicKeyPemList(
+        Variable $arrayVar,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        ?Frame $frame = null
+    ): array|false {
+        $arrayVar = $arrayVar->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arrayVar->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type array, %s given',
+                $function,
+                $argIndex + 1,
+                $paramName,
+                match ($arrayVar->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_BOOLEAN => 'bool',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_FLOAT => 'float',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_OBJECT => 'object',
+                    default => 'mixed',
+                }
+            ));
+        }
+
+        $ht = $arrayVar->toArray();
+        $pems = [];
+        $index = 0;
+        foreach ($ht->iterateKeyed(true) as [, $valueVar]) {
+            $pem = self::coerceSealPublicKeyPem($valueVar, $function, $index, $frame);
+            if (false === $pem) {
+                self::userWarning(\sprintf(
+                    '%s(): Not a public key (%dth member of pubkeys)',
+                    $function,
+                    $index + 1
+                ), $frame);
+
+                return false;
+            }
+            $pems[] = $pem;
+            ++$index;
+        }
+
+        if ([] === $pems) {
+            throw new \ValueError($function.'(): Argument #'.($argIndex + 1).' ($'.$paramName.') cannot be empty');
+        }
+
+        return $pems;
+    }
+
+    private static function coerceSealPublicKeyPem(
+        Variable $var,
+        string $function,
+        int $memberIndex,
+        ?Frame $frame = null
+    ): string|false {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING === $var->type) {
+            $pem = $var->toString();
+
+            return '' !== $pem ? $pem : false;
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $pem = VmOpensslObjects::keyPem($var->toObject());
+            if ('' === $pem) {
+                return false;
+            }
+            if (!VmOpensslPkeyNative::available()) {
+                return false;
+            }
+            $publicPem = VmOpensslPkeyNative::exportPublicKeyPem($pem);
+            if (false === $publicPem) {
+                self::userWarning(\sprintf(
+                    '%s(): Don\'t know how to get public key from this private key',
+                    $function
+                ), $frame);
+            }
+
+            return $publicPem;
+        }
+
+        return false;
+    }
+
+    /**
      * openssl_pkey_derive() — ECDH/X25519 shared secret (EVP_PKEY_derive; issue #15428).
      *
      * @return string|false
@@ -268,6 +711,28 @@ final class VmOpenssl
         }
 
         return VmOpensslPkeyDeriveNative::derive($publicKeyPem, $privateKeyPem, $keyLength);
+    }
+
+    /**
+     * openssl_dh_compute_key() — DH shared secret from raw peer public bytes (php-src ext/openssl/openssl_backend_v3.c; #6596).
+     *
+     * @return string|false
+     */
+    public static function dhComputeKey(
+        string $pubKeyBytes,
+        string $privateKeyPem,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslPkeyDeriveNative::available()) {
+            self::userWarning(
+                'openssl_dh_compute_key(): OpenSSL DH key agreement is unavailable in this compiler build',
+                $frame
+            );
+
+            return false;
+        }
+
+        return VmOpensslPkeyDeriveNative::dhComputeKey($privateKeyPem, $pubKeyBytes);
     }
 
     /**
@@ -354,7 +819,7 @@ final class VmOpenssl
 
         $material = $arg->toString();
         if ('' !== $material && @\is_file($material)) {
-            $contents = @\file_get_contents($material);
+            $contents = VmFsReadNative::read($material);
             if (false === $contents) {
                 self::userWarning('openssl_pkey_get_private(): Unable to read key file', $frame);
 
@@ -467,6 +932,34 @@ final class VmOpenssl
         ));
     }
 
+    public static function coercePaddingArg(Variable $var, string $function, int $argIndex, string $paramName): int
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return $var->toInt();
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            return (int) $var->toString();
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            return OpensslConstants::OPENSSL_PKCS1_PADDING;
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type int, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            match ($var->type) {
+                Variable::TYPE_BOOLEAN => 'bool',
+                Variable::TYPE_FLOAT => 'float',
+                Variable::TYPE_ARRAY => 'array',
+                Variable::TYPE_OBJECT => $var->toObject()->class->name,
+                default => 'mixed',
+            }
+        ));
+    }
+
     /**
      * @return string|false EVP digest name
      */
@@ -522,6 +1015,133 @@ final class VmOpenssl
                 Variable::TYPE_STRING => 'string',
                 Variable::TYPE_ARRAY => 'array',
                 Variable::TYPE_OBJECT => 'object',
+                default => 'mixed',
+            }
+        ));
+    }
+
+    /**
+     * openssl_pkcs12_read() — parse PKCS#12 blob (php-src ext/openssl/pkcs12.c; #6420).
+     *
+     * @return array{cert: string, pkey: string}|false
+     */
+    public static function pkcs12Read(string $pkcs12, string $passphrase, ?Frame $frame = null): array|false
+    {
+        if (!VmOpensslPkcs12Native::available()) {
+            self::userWarning('openssl_pkcs12_read(): OpenSSL PKCS#12 is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $parsed = VmOpensslPkcs12Native::parsePkcs12($pkcs12, $passphrase);
+        if (false === $parsed) {
+            return false;
+        }
+
+        return $parsed;
+    }
+
+    /**
+     * openssl_pkcs12_export() — create PKCS#12 blob (php-src ext/openssl/pkcs12.c; #6420).
+     *
+     * @param list<string> $extraCertPems
+     */
+    public static function pkcs12Export(
+        Variable $certArg,
+        Variable $keyArg,
+        string $passphrase,
+        ?Variable $optionsVar,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslPkcs12Native::available()) {
+            self::userWarning('openssl_pkcs12_export(): OpenSSL PKCS#12 is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $certPem = self::coerceCertificatePem($certArg, 'openssl_pkcs12_export', 0, 'certificate');
+        $keyPem = self::coercePkeyPem($keyArg, 'openssl_pkcs12_export', 2, 'private_key');
+
+        $friendlyName = '';
+        $extraCerts = [];
+        if (null !== $optionsVar) {
+            $optionsVar = $optionsVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $optionsVar->type) {
+                foreach ($optionsVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                    if (Variable::TYPE_STRING !== $keyVar->type) {
+                        continue;
+                    }
+                    $key = $keyVar->toString();
+                    $valueVar = $valueVar->resolveIndirect();
+                    if ('friendly_name' === $key && Variable::TYPE_STRING === $valueVar->type) {
+                        $friendlyName = $valueVar->toString();
+                    }
+                    if ('extracerts' === $key && Variable::TYPE_ARRAY === $valueVar->type) {
+                        foreach ($valueVar->toArray()->iterateKeyed(true) as [, $certVar]) {
+                            $extraPem = self::coerceCertificatePem(
+                                $certVar,
+                                'openssl_pkcs12_export',
+                                4,
+                                'options'
+                            );
+                            $extraCerts[] = $extraPem;
+                        }
+                    }
+                }
+            }
+        }
+
+        $blob = VmOpensslPkcs12Native::createPkcs12(
+            $certPem,
+            $keyPem,
+            $passphrase,
+            $friendlyName,
+            $extraCerts
+        );
+        if (false === $blob) {
+            return false;
+        }
+
+        return $blob;
+    }
+
+    public static function coerceCertificatePem(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            if (VmOpensslObjects::isCertificate($var)) {
+                $pem = VmOpensslObjects::certificatePem($var->toObject());
+                if ('' !== $pem) {
+                    return $pem;
+                }
+            }
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type OpenSSLCertificate|string, %s given',
+                $function,
+                $argIndex + 1,
+                $paramName,
+                $var->toObject()->class->name
+            ));
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type OpenSSLCertificate|string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            match ($var->type) {
+                Variable::TYPE_NULL => 'null',
+                Variable::TYPE_BOOLEAN => 'bool',
+                Variable::TYPE_INTEGER => 'int',
+                Variable::TYPE_FLOAT => 'float',
+                Variable::TYPE_ARRAY => 'array',
                 default => 'mixed',
             }
         ));

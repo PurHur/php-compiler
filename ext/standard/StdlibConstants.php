@@ -267,22 +267,22 @@ final class StdlibConstants
     public const LOG_LOCAL6 = 176;
     public const LOG_LOCAL7 = 184;
 
-    /** dns_get_record() type bitmasks (ext/standard/dns.c). */
+    /** dns_get_record() type bitmasks (ext/standard/dns.c; php 8.2+ values). */
     public const DNS_A = 1;
     public const DNS_NS = 2;
-    public const DNS_CNAME = 4;
-    public const DNS_SOA = 8;
-    public const DNS_PTR = 16;
-    public const DNS_HINFO = 32;
-    public const DNS_MX = 64;
-    public const DNS_TXT = 128;
-    public const DNS_AAAA = 256;
-    public const DNS_SRV = 512;
-    public const DNS_NAPTR = 1024;
-    public const DNS_A6 = 2048;
-    public const DNS_ALL = 4095;
-    public const DNS_ANY = 4096;
+    public const DNS_CNAME = 16;
+    public const DNS_SOA = 32;
+    public const DNS_PTR = 2048;
+    public const DNS_HINFO = 4096;
     public const DNS_CAA = 8192;
+    public const DNS_MX = 16384;
+    public const DNS_TXT = 32768;
+    public const DNS_SRV = 33554432;
+    public const DNS_NAPTR = 67108864;
+    public const DNS_AAAA = 134217728;
+    public const DNS_A6 = 16777216;
+    public const DNS_ANY = 268435456;
+    public const DNS_ALL = 251721779;
 
     /** stream_socket_enable_crypto() client/server method flags (ext/standard/streams.c). */
     public const STREAM_CRYPTO_METHOD_TLS_SERVER = 120;

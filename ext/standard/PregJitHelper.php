@@ -40,12 +40,58 @@ final class PregJitHelper
     /** @return int match count, or -1 on PCRE error */
     public static function matchArgv(string $pattern, string $subject): int
     {
+        $trivial = self::matchArgvTrivialUnanchored($pattern, $subject);
+        if (null !== $trivial) {
+            return $trivial;
+        }
+
         $rc = VmPregNative::pregMatch($pattern, $subject);
         if (false === $rc) {
             return -1;
         }
 
         return (int) $rc;
+    }
+
+    /**
+     * AOT fast path for delimiter literals without regex metacharacters (#16075).
+     *
+     * @return int|null 0/1, or null to defer to VmPregNative
+     */
+    public static function matchArgvTrivialUnanchored(string $pattern, string $subject): ?int
+    {
+        $plen = \strlen($pattern);
+        if ($plen < 3 || '/' !== $pattern[0]) {
+            return null;
+        }
+        $close = \strrpos($pattern, '/');
+        if (false === $close || $close < 2 || $close !== $plen - 1) {
+            return null;
+        }
+        $body = \substr($pattern, 1, $close - 1);
+        $bodyLen = \strlen($body);
+        for ($i = 0; $i < $bodyLen; ++$i) {
+            $c = $body[$i];
+            if ('\\' === $c || '[' === $c || '(' === $c || ')' === $c || '|' === $c
+                || '*' === $c || '+' === $c || '?' === $c || '{' === $c || '}' === $c
+                || '^' === $c || '$' === $c || '.' === $c) {
+                return null;
+            }
+        }
+        if (0 === $bodyLen) {
+            return 1;
+        }
+        $subLen = \strlen($subject);
+        if ($subLen < $bodyLen) {
+            return 0;
+        }
+        for ($i = 0; $i <= $subLen - $bodyLen; ++$i) {
+            if (\strncmp(\substr($subject, $i), $body, $bodyLen) === 0) {
+                return 1;
+            }
+        }
+
+        return 0;
     }
 
     /** @return int match count, or -1 on PCRE error */

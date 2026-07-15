@@ -17,14 +17,13 @@ final class ParamTypeError
         Variable $argument,
         string $scriptPath,
         int $callSiteLine,
-        ?string $literalBoolType = null
+        ?string $literalBoolType = null,
+        bool $omitParamName = false
     ): \TypeError {
-        $value = $argument->resolveIndirect();
         $message = sprintf(
-            '%s(): Argument #%d ($%s) must be of type %s, %s given',
+            '%s(): %s must be of type %s, %s given',
             $function,
-            $paramIndex + 1,
-            $paramName,
+            self::argumentLabel($paramIndex, $paramName, $omitParamName),
             TypeCheck::typeNameForConstraint($expectedConstraint, $literalBoolType),
             EnumCaseSupport::typeNameForVariable($argument)
         );
@@ -42,13 +41,13 @@ final class ParamTypeError
         string $expectedType,
         Variable $argument,
         string $scriptPath,
-        int $callSiteLine
+        int $callSiteLine,
+        bool $omitParamName = false
     ): \TypeError {
         $message = sprintf(
-            '%s(): Argument #%d ($%s) must be of type %s, %s given',
+            '%s(): %s must be of type %s, %s given',
             $function,
-            $paramIndex + 1,
-            $paramName,
+            self::argumentLabel($paramIndex, $paramName, $omitParamName),
             $expectedType,
             self::givenTypeName($argument)
         );
@@ -57,6 +56,15 @@ final class ParamTypeError
         }
 
         return new \TypeError($message);
+    }
+
+    private static function argumentLabel(int $paramIndex, string $paramName, bool $omitParamName): string
+    {
+        if ($omitParamName) {
+            return sprintf('Argument #%d', $paramIndex + 1);
+        }
+
+        return sprintf('Argument #%d ($%s)', $paramIndex + 1, $paramName);
     }
 
     private static function givenTypeName(Variable $argument): string

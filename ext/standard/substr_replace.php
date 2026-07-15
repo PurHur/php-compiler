@@ -28,7 +28,8 @@ final class substr_replace extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $stringVar = VmPreg::requireStringOrArraySubject(
+        $stringVar = VmPreg::resolveStringOrArraySubject(
+            $frame,
             $frame->calledArgs[0],
             'substr_replace',
             0,
@@ -101,7 +102,7 @@ final class substr_replace extends Internal
         }
 
         JitPregSubject::requireStringOrArray($context, $args[0], 'substr_replace', 0, 'string');
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
+        if (!JitPregSubject::isStringOrCoercibleNullSubject($args[0])) {
             throw new \LogicException('substr_replace() array string operand is not supported in this compiler build');
         }
 
@@ -127,7 +128,11 @@ final class substr_replace extends Internal
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
-        if (Variable::TYPE_STRING === $var->type || Variable::TYPE_ARRAY === $var->type) {
+        if (
+            Variable::TYPE_STRING === $var->type
+            || Variable::TYPE_ARRAY === $var->type
+            || Variable::TYPE_NULL === $var->type
+        ) {
             return $var;
         }
 
@@ -156,7 +161,7 @@ final class substr_replace extends Internal
      */
     private static function resolveScalarReplace(Variable $replaceArg, Variable $replaceVar): string
     {
-        if (Variable::TYPE_STRING === $replaceVar->type) {
+        if (Variable::TYPE_STRING === $replaceVar->type || Variable::TYPE_NULL === $replaceVar->type) {
             return VmString::coerceStringBuiltinArg($replaceArg, 'substr_replace', 1, 'replace');
         }
 

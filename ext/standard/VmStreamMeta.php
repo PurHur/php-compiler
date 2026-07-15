@@ -18,12 +18,14 @@ final class VmStreamMeta
     public static function buildMetaArray(string $uri, $fp = null, ?bool $eofOverride = null, ?string $mode = null, ?bool $blocked = null): array
     {
         $isPhp = \str_starts_with($uri, 'php://');
+        $isData = VmDataUri::isDataUri($uri);
         $isPhpMemory = \str_starts_with($uri, 'php://memory')
             || \str_starts_with($uri, 'php://temp')
             || \str_starts_with($uri, 'php://fd/');
 
         $socketType = self::streamTypeForUri($uri);
         $phpNativeStreamType = self::phpNativeStreamType($uri);
+        $stdioInheritedType = self::stdioInheritedStreamType($uri, $fp);
         $eof = null !== $eofOverride ? $eofOverride : \feof($fp);
         $reportedMode = null !== $mode ? $mode : self::defaultReportedMode($uri, $isPhpMemory);
 
@@ -39,13 +41,25 @@ final class VmStreamMeta
             ];
         }
 
+        // php-src ext/standard/php_stream_rfc2397.c — data:// wrapper metadata (#18580).
+        if ($isData) {
+            return [
+                'wrapper_type' => 'RFC2397',
+                'stream_type' => 'RFC2397',
+                'mode' => $reportedMode,
+                'unread_bytes' => 0,
+                'seekable' => self::supportsSeekable($uri),
+                'uri' => $uri,
+            ];
+        }
+
         // php-src ext/standard/streams.c — array_add_next insertion order (#17428).
         return [
             'timed_out' => false,
             'blocked' => $blocked ?? true,
             'eof' => $eof,
-            'wrapper_type' => $isPhp ? 'PHP' : 'plainfile',
-            'stream_type' => $socketType ?? $phpNativeStreamType ?? ($isPhp ? 'STDIO' : 'STDIO'),
+            'wrapper_type' => self::wrapperTypeForUri($uri),
+            'stream_type' => $socketType ?? $stdioInheritedType ?? $phpNativeStreamType ?? ($isPhp ? 'STDIO' : 'STDIO'),
             'mode' => $reportedMode,
             'unread_bytes' => 0,
             'seekable' => self::supportsSeekable($uri),
@@ -73,6 +87,21 @@ final class VmStreamMeta
         return \str_starts_with($uri, 'php://memory')
             || \str_starts_with($uri, 'php://temp')
             || \str_starts_with($uri, 'php://fd/');
+    }
+
+    /**
+     * php-src ext/standard/streams.c — wrapper_type in stream_get_meta_data (#18580, #18581).
+     */
+    public static function wrapperTypeForUri(string $uri): string
+    {
+        if (\str_starts_with($uri, 'php://')) {
+            return 'PHP';
+        }
+        if (\str_starts_with($uri, 'data://')) {
+            return 'RFC2397';
+        }
+
+        return 'plainfile';
     }
 
     private static function defaultReportedMode(string $uri, bool $isPhpMemory): string
@@ -219,6 +248,39 @@ final class VmStreamMeta
     public static function isSocketTransport(string $uri): bool
     {
         return null !== self::streamTypeForUri($uri);
+    }
+
+    /**
+     * php://stdin|stdout|stderr may wrap an inherited socket fd — mirror host stream_type (#19129).
+     *
+     * php-src: main/streams/php_stream_stdio.c — php_stream_stdio_cast / is_socket probe
+     *
+     * @param resource|null $fp host stream adopted by {@see VmFsStdioPure::openDupFd()}
+     */
+    public static function stdioInheritedStreamType(string $uri, $fp): ?string
+    {
+        if (!VmFsStdio::isStdioUri($uri) || !\is_resource($fp)) {
+            return null;
+        }
+        $meta = @\stream_get_meta_data($fp);
+        if (!\is_array($meta)) {
+            return null;
+        }
+        $type = $meta['stream_type'] ?? null;
+        if (!\is_string($type) || '' === $type || 'STDIO' === $type) {
+            return null;
+        }
+
+        return self::normalizeHostStreamType($type);
+    }
+
+    /** Map host wrapper labels to php-src stream_type strings consumed by socket_import_stream. */
+    private static function normalizeHostStreamType(string $type): string
+    {
+        return match ($type) {
+            'generic_socket' => 'unix_socket',
+            default => $type,
+        };
     }
 
     /**

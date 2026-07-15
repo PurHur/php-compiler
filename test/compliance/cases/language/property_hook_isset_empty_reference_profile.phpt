@@ -5,10 +5,13 @@ Language: property hook block rejected on reference profile (#12574, Zend/zend_c
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
+putenv('PHP_COMPILER_PROFILE=8.2');
 if (PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
-    die('skip property hooks enabled on PHP 8.4.0+ target');
+    die('skip PHP_COMPILER_PROFILE=8.2 unexpectedly enables property hooks');
 }
 ?>
+--ENV--
+PHP_COMPILER_PROFILE=8.2
 --FILE--
 <?php
 class C {

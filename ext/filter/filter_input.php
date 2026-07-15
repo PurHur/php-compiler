@@ -10,12 +10,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitFilterInputTypeArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -37,10 +35,9 @@ final class filter_input extends Internal
             'variable_name'
         );
         if ($argc >= 3) {
-            $filter = InternalStrictArg::requireBuiltinTypedInt($frame, 2, 'filter_input', 'filter');
+            $filterId = VmFilter::parseFilterIdArg($frame, 2, 'filter_input', 'filter', 3);
         } else {
-            $filter = new Variable();
-            $filter->int(VmFilter::FILTER_DEFAULT);
+            $filterId = VmFilter::FILTER_DEFAULT;
         }
         $options = null;
         if (4 === $argc) {
@@ -81,7 +78,6 @@ final class filter_input extends Internal
             return;
         }
         $value = $stored->resolveIndirect();
-        $filterId = $filter->toInt();
         if (!VmFilter::isSupportedFilter($filterId)) {
             filter_var::triggerUnknownFilterWarning($frame, $filterId);
         }
@@ -94,7 +90,6 @@ final class filter_input extends Internal
             throw new \LogicException('filter_input() requires two to four arguments in this compiler build');
         }
         if (\count($args) >= 3) {
-            JitInternalStrictArg::requireBuiltinTypedInt($context, $args[2], 'filter_input', 'filter', 3);
             $filterArg = $args[2];
         } else {
             $i64 = $context->getTypeFromString('int64');

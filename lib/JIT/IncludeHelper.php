@@ -290,6 +290,18 @@ final class IncludeHelper
         OpCode $op,
         ?Operand $resultOperand
     ): void {
+        $context = $jit->context;
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        \PHPCompiler\JIT\Builtin\StringDeployPath::ensureStandaloneBodies($context);
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'deploy_include_cont');
+        }
         $spec = $callerBlock->deployIncludePaths[$op->arg3];
         $path = $spec['compile'];
         if (null === $path) {

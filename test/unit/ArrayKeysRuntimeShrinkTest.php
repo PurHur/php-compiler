@@ -9,17 +9,29 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_keys() JIT routes through ArrayKeysJitHelper PHP not ArrayBuiltinHelper LLVM (#12340, #14387). */
+/** array_keys() JIT routes all operands through ArrayKeysJitHelper PHP not ArrayBuiltinHelper LLVM (#12340, #14387, #18287). */
 final class ArrayKeysRuntimeShrinkTest extends TestCase
 {
     public function testArrayKeysRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayKeysRuntime.php');
         $this->assertStringContainsString('ArrayKeysJitHelper', $runtime);
-        $this->assertStringContainsString('isNativeArray', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::buildKeysArrayFromVariable', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::buildKeysArrayFiltered', $runtime);
+        $this->assertStringContainsString('ArrayBuiltinHelper::loadHashTable', $runtime);
+        $this->assertStringNotContainsString('buildKeysArrayFromVariable', $runtime);
+        $this->assertStringNotContainsString('buildKeysArrayFiltered', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $keysCopy = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/HashTableKeysCopy.php');
+        $this->assertStringContainsString('ArrayKeysRuntime::keys', $keysCopy);
+        $this->assertStringNotContainsString('buildKeysArrayFromVariable', $keysCopy);
+
+        $keysMatching = (string) file_get_contents(__DIR__.'/../../lib/JIT/Call/HashTableKeysMatchingCopy.php');
+        $this->assertStringContainsString('ArrayKeysRuntime::keysFiltered', $keysMatching);
+        $this->assertStringNotContainsString('buildKeysArrayFiltered', $keysMatching);
+
+        $arrayBuiltin = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function buildKeysArrayFromVariable', $arrayBuiltin);
+        $this->assertStringNotContainsString('function buildKeysArrayFiltered', $arrayBuiltin);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_keys.php');
         $this->assertStringContainsString('ArrayKeysRuntime::keys', $builtin);

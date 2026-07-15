@@ -1,0 +1,27 @@
+--TEST--
+stdlib shell_exec/system/passthru/proc_open null command — ValueError/NULL not TypeError (#18676, ext/standard/exec.c, proc_open.c)
+--FILE--
+<?php
+foreach (['shell_exec', 'system', 'passthru'] as $fn) {
+    try {
+        $fn(null);
+        echo "$fn: NO_ERROR\n";
+    } catch (ValueError $e) {
+        echo $e->getMessage(), "\n";
+    } catch (TypeError $e) {
+        echo "TypeError: ", $e->getMessage(), "\n";
+    }
+}
+$pipes = [];
+try {
+    proc_open(null, [], $pipes);
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
+?>
+--EXPECT--
+shell_exec(): Argument #1 ($command) cannot be empty
+system(): Argument #1 ($command) cannot be empty
+passthru(): Argument #1 ($command) cannot be empty
+proc_open(): Argument #1 ($command) must be of type array|string, null given

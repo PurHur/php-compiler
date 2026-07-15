@@ -141,8 +141,13 @@ use PHPCompiler\VM\Builtin\ReflectionClassImplementsInterface;
 use PHPCompiler\VM\Builtin\ReflectionClassIsAbstract;
 use PHPCompiler\VM\Builtin\ReflectionClassIsAnonymous;
 use PHPCompiler\VM\Builtin\ReflectionClassIsEnum;
+use PHPCompiler\VM\Builtin\ReflectionClassIsFinal;
+use PHPCompiler\VM\Builtin\ReflectionClassGetModifiers;
+use PHPCompiler\VM\Builtin\ReflectionClassIsInterface;
+use PHPCompiler\VM\Builtin\ReflectionClassIsTrait;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInstance;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInstantiable;
+use PHPCompiler\VM\Builtin\ReflectionClassIsIterateable;
 use PHPCompiler\VM\Builtin\ReflectionClassIsReadOnly;
 use PHPCompiler\VM\Builtin\ReflectionClassIsSubclassOf;
 use PHPCompiler\VM\Builtin\ReflectionClassIsInternal;
@@ -181,7 +186,11 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsBacked;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionExtensionConstruct;
+use PHPCompiler\VM\Builtin\ReflectionExtensionGetClasses;
+use PHPCompiler\VM\Builtin\ReflectionExtensionGetConstants;
+use PHPCompiler\VM\Builtin\ReflectionExtensionGetFunctions;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetName;
+use PHPCompiler\VM\Builtin\ReflectionExtensionGetVersion;
 use PHPCompiler\VM\Builtin\ReflectionFiberConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFiber;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFile;
@@ -209,6 +218,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetNamedArguments;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetNumberOfParameters;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetNumberOfRequiredParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetStaticVariables;
@@ -230,6 +240,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureUsedVariables;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetClosureThis;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetName;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetNumberOfParameters;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetNumberOfRequiredParameters;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetPrototype;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasPrototype;
@@ -563,6 +574,14 @@ final class BuiltinClasses
         $rext->methodVisibility['__construct'] = $pub;
         $rext->methods['getname'] = new ReflectionExtensionGetName();
         $rext->methodVisibility['getname'] = $pub;
+        $rext->methods['getversion'] = new ReflectionExtensionGetVersion();
+        $rext->methodVisibility['getversion'] = $pub;
+        $rext->methods['getfunctions'] = new ReflectionExtensionGetFunctions();
+        $rext->methodVisibility['getfunctions'] = $pub;
+        $rext->methods['getclasses'] = new ReflectionExtensionGetClasses();
+        $rext->methodVisibility['getclasses'] = $pub;
+        $rext->methods['getconstants'] = new ReflectionExtensionGetConstants();
+        $rext->methodVisibility['getconstants'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_EXTENSION] = $rext;
 
         $rparam = new ClassEntry('ReflectionParameter');
@@ -615,9 +634,14 @@ final class BuiltinClasses
         $rparam->methodVisibility['ispromoted'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] = $rparam;
 
+        $rfa = new ClassEntry('ReflectionFunctionAbstract');
+        $rfa->isAbstract = true;
+        $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION_ABSTRACT] = $rfa;
+
         $rm = new ClassEntry('ReflectionMethod');
-        $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
-        $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_METHOD_NAME, null, $strProto);
+        $rm->parentLc = ReflectionSupport::REFLECTION_FUNCTION_ABSTRACT;
+        $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_REFLECTION_METHOD_CLASS, null, $strProto);
+        $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_REFLECTION_METHOD_FUNC, null, $strProto);
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
         $rm->constructor = new ReflectionMethodConstruct();
         $rm->methods['__construct'] = $rm->constructor;
@@ -630,6 +654,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getstaticvariables'] = $pub;
         $rm->methods['getnumberofparameters'] = new ReflectionMethodGetNumberOfParameters();
         $rm->methodVisibility['getnumberofparameters'] = $pub;
+        $rm->methods['getnumberofrequiredparameters'] = new ReflectionMethodGetNumberOfRequiredParameters();
+        $rm->methodVisibility['getnumberofrequiredparameters'] = $pub;
         $rm->methods['getname'] = new ReflectionMethodGetName();
         $rm->methodVisibility['getname'] = $pub;
         $rm->methods['getdeclaringclass'] = new ReflectionMethodGetDeclaringClass();
@@ -780,6 +806,16 @@ final class BuiltinClasses
         $rc->methodVisibility['newinstancewithoutconstructor'] = $pub;
         $rc->methods['isabstract'] = new ReflectionClassIsAbstract();
         $rc->methodVisibility['isabstract'] = $pub;
+        $rc->methods['isfinal'] = new ReflectionClassIsFinal();
+        $rc->methodVisibility['isfinal'] = $pub;
+        $rc->methods['isinterface'] = new ReflectionClassIsInterface();
+        $rc->methodVisibility['isinterface'] = $pub;
+        $rc->methods['istrait'] = new ReflectionClassIsTrait();
+        $rc->methodVisibility['istrait'] = $pub;
+        $rc->methods['getmodifiers'] = new ReflectionClassGetModifiers();
+        $rc->methodVisibility['getmodifiers'] = $pub;
+        $rc->methods['isiterateable'] = new ReflectionClassIsIterateable();
+        $rc->methodVisibility['isiterateable'] = $pub;
         $rc->methods['getconstant'] = new ReflectionClassGetConstant();
         $rc->methodVisibility['getconstant'] = $pub;
         $rc->methods['hasconstant'] = new ReflectionClassHasConstant();
@@ -947,6 +983,7 @@ final class BuiltinClasses
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 
         $rf = new ClassEntry('ReflectionFunction');
+        $rf->parentLc = ReflectionSupport::REFLECTION_FUNCTION_ABSTRACT;
         $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
         $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
         $rf->constructor = new ReflectionFunctionConstruct();
@@ -957,6 +994,7 @@ final class BuiltinClasses
                 'getname' => new ReflectionFunctionGetName(),
                 'getparameters' => new ReflectionFunctionGetParameters(),
                 'getnumberofparameters' => new ReflectionFunctionGetNumberOfParameters(),
+                'getnumberofrequiredparameters' => new ReflectionFunctionGetNumberOfRequiredParameters(),
                 'getreturntype' => new ReflectionFunctionGetReturnType(),
                 'hasreturntype' => new ReflectionFunctionHasReturnType(),
                 'isanonymous' => new ReflectionFunctionIsAnonymous(),
@@ -1119,8 +1157,10 @@ final class BuiltinClasses
         $reuc->methodVisibility['getname'] = $pub;
         $reuc->methods['getvalue'] = new ReflectionEnumUnitCaseGetValue();
         $reuc->methodVisibility['getvalue'] = $pub;
-        $reuc->methods['isbacked'] = new ReflectionEnumUnitCaseIsBacked();
-        $reuc->methodVisibility['isbacked'] = $pub;
+        if (CompilerVersion::supportsReflectionEnumCaseIsBacked()) {
+            $reuc->methods['isbacked'] = new ReflectionEnumUnitCaseIsBacked();
+            $reuc->methodVisibility['isbacked'] = $pub;
+        }
         if (CompilerVersion::supportsReflectionEnumUnitCaseIsDeprecated()) {
             $reuc->methods['isdeprecated'] = new ReflectionEnumUnitCaseIsDeprecated();
             $reuc->methodVisibility['isdeprecated'] = $pub;
@@ -1136,8 +1176,10 @@ final class BuiltinClasses
         $rebc->methodVisibility['__construct'] = $pub;
         $rebc->methods['getbackingvalue'] = new ReflectionEnumBackedCaseGetBackingValue();
         $rebc->methodVisibility['getbackingvalue'] = $pub;
-        $rebc->methods['isbacked'] = new ReflectionEnumBackedCaseIsBacked();
-        $rebc->methodVisibility['isbacked'] = $pub;
+        if (CompilerVersion::supportsReflectionEnumCaseIsBacked()) {
+            $rebc->methods['isbacked'] = new ReflectionEnumBackedCaseIsBacked();
+            $rebc->methodVisibility['isbacked'] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_ENUM_BACKED_CASE] = $rebc;
 
         $reflectionType = new ClassEntry('ReflectionType');

@@ -9,7 +9,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 final class VmNumberFormat
@@ -51,7 +53,7 @@ final class VmNumberFormat
      *
      * @throws \TypeError when the value is not int, float, or a numeric string
      */
-    public static function coerceFloat(Variable $value): float
+    public static function coerceFloat(Variable $value, ?Frame $frame = null): float
     {
         $value = $value->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($value)) {
@@ -62,6 +64,13 @@ final class VmNumberFormat
         }
         switch ($value->type) {
             case Variable::TYPE_NULL:
+                if (VmMath::requiresForwardProfileStrictLongNull()) {
+                    throw new \TypeError(self::numTypeError('null'));
+                }
+                if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                    throw new \TypeError(self::numTypeError('null'));
+                }
+
                 return 0.0;
             case Variable::TYPE_INTEGER:
                 return (float) $value->toInt();
@@ -127,26 +136,33 @@ final class VmNumberFormat
 
         $rounded = VmRound::mathRound($number, $roundPlaces, $roundingMode);
 
-        $pow = 1;
-        for ($i = 0; $i < $decimals; ++$i) {
-            $pow *= 10;
+        // php-src ext/standard/number_format.c — php_conv_floating_point / %F after _php_math_round.
+        // Integer frac extraction breaks past ~14 decimals (IEEE double); reuse dtoa fcvt path (#18525).
+        $signedRounded = $negative ? -$rounded : $rounded;
+        $formatted = VmFloatDtoa::formatSprintfF($signedRounded, $decimals);
+        if ('' !== $formatted && '-' === $formatted[0]) {
+            $formatted = \substr($formatted, 1);
+            $negative = true;
         }
 
-        $intPart = (int) floor($rounded);
-        $fracPart = 0;
-        if ($decimals > 0) {
-            $fracPart = (int) round(($rounded - (float) $intPart) * $pow);
-            if ($fracPart >= $pow) {
-                ++$intPart;
-                $fracPart = 0;
+        $dotPos = \strpos($formatted, '.');
+        if (false === $dotPos) {
+            $intDigits = '' === $formatted ? '0' : $formatted;
+            $fracDigits = '';
+        } else {
+            $intDigits = \substr($formatted, 0, $dotPos);
+            if ('' === $intDigits) {
+                $intDigits = '0';
             }
+            $fracDigits = \substr($formatted, $dotPos + 1);
         }
 
-        $intDigits = self::digitsFromInt($intPart);
         $result = self::insertThousands($intDigits, $thousandsSeparator);
 
         if ($decimals > 0) {
-            $fracDigits = self::padLeft(self::digitsFromInt($fracPart), $decimals, '0');
+            while (VmString::byteLength($fracDigits) < $decimals) {
+                $fracDigits .= '0';
+            }
             $result .= $decimalSeparator.$fracDigits;
         }
 
@@ -155,29 +171,6 @@ final class VmNumberFormat
         }
 
         return $result;
-    }
-
-    private static function digitsFromInt(int $value): string
-    {
-        if (0 === $value) {
-            return '0';
-        }
-        $digits = '';
-        while ($value > 0) {
-            $digits = \chr(48 + ($value % 10)).$digits;
-            $value = (int) ($value / 10);
-        }
-
-        return $digits;
-    }
-
-    private static function padLeft(string $digits, int $length, string $pad): string
-    {
-        while (VmString::byteLength($digits) < $length) {
-            $digits = $pad.$digits;
-        }
-
-        return $digits;
     }
 
     private static function insertThousands(string $digits, string $separator): string

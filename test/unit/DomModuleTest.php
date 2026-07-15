@@ -120,6 +120,23 @@ PHP;
         self::assertSame("NULL\n1.0\n0\nNULL\nISO-8859-1\n1\n1\n", ob_get_clean());
     }
 
+    public function test_dom_xpath_quote_escapes_literals(): void
+    {
+        if (!CompilerVersion::supportsDomXPathQuote()) {
+            self::markTestSkipped('DOMXPath::quote() withheld on 8.2 reference profile (#18650)');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo DOMXPath::quote("'quoted' name"), "\n";
+echo DOMXPath::quote("'different' \"quote\" styles"), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_xpath_quote.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("\"'quoted' name\"\nconcat(\"'different' \",'".'"quote" styles'."')\n", ob_get_clean());
+    }
+
     public function test_dom_node_contains_descendant_check(): void
     {
         if (!CompilerVersion::supportsDomNodeContains()) {
@@ -328,7 +345,7 @@ PHP;
     public function test_dom_node_compare_document_position(): void
     {
         if (!CompilerVersion::supportsDomNodeCompareDocumentPosition()) {
-            self::markTestSkipped('DOMNode::compareDocumentPosition() withheld on 8.2 reference profile (#18092)');
+            self::markTestSkipped('DOMNode::compareDocumentPosition() withheld when PHP_COMPILER_PROFILE=8.2 (#18092)');
         }
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -338,8 +355,6 @@ $doc->loadXML('<root><parent><child/></parent><sibling/></root>');
 $parent = $doc->getElementsByTagName('parent')->item(0);
 $child = $doc->getElementsByTagName('child')->item(0);
 $sibling = $doc->getElementsByTagName('sibling')->item(0);
-$contains = DOMNode::DOCUMENT_POSITION_CONTAINS | DOMNode::DOCUMENT_POSITION_PRECEDING;
-$contained = DOMNode::DOCUMENT_POSITION_CONTAINED_BY | DOMNode::DOCUMENT_POSITION_FOLLOWING;
 echo $parent->compareDocumentPosition($child), "\n";
 echo $child->compareDocumentPosition($parent), "\n";
 echo $parent->compareDocumentPosition($sibling), "\n";
@@ -378,6 +393,9 @@ PHP;
         $code = <<<'PHP'
 <?php
 $doc = new DOMDocument();
+$attr = @$doc->createAttributeNS('http://example.com', 'ex:foo');
+echo var_export($attr, true), "\n";
+$doc->loadXML('<root/>');
 $attr = $doc->createAttributeNS('http://example.com', 'ex:foo');
 echo get_class($attr), "\n";
 echo $attr->localName, "\n";
@@ -387,7 +405,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'dom_create_attribute_ns.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("DOMAttr\nfoo\nx\n", ob_get_clean());
+        self::assertSame("false\nDOMAttr\nfoo\nx\n", ob_get_clean());
     }
 
     public function test_dom_create_entity_reference(): void

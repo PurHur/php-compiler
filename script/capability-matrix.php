@@ -23,12 +23,14 @@ function collectCapabilities(string $root): array
     $modules = [
         'types' => new PHPCompiler\ext\types\Module(),
         'bcmath' => new PHPCompiler\ext\bcmath\Module(),
+        'gmp' => new PHPCompiler\ext\gmp\Module(),
         'bz2' => new PHPCompiler\ext\bz2\Module(),
         'stats' => new PHPCompiler\ext\stats\Module(),
         'opcache' => new PHPCompiler\ext\opcache\Module(),
         'ctype' => new PHPCompiler\ext\ctype\Module(),
         'tokenizer' => new PHPCompiler\ext\tokenizer\Module(),
         'filter' => new PHPCompiler\ext\filter\Module(),
+        'fileinfo' => new PHPCompiler\ext\fileinfo\Module(),
         'iconv' => new PHPCompiler\ext\iconv\Module(),
         'session' => new PHPCompiler\ext\session\Module(),
         'mbstring' => new PHPCompiler\ext\mbstring\Module(),
@@ -42,6 +44,8 @@ function collectCapabilities(string $root): array
         'inotify' => new PHPCompiler\ext\inotify\Module(),
         'uuid' => new PHPCompiler\ext\uuid\Module(),
         'uploadprogress' => new PHPCompiler\ext\uploadprogress\Module(),
+        'sysvshm' => new PHPCompiler\ext\sysvshm\Module(),
+        'sysvsem' => new PHPCompiler\ext\sysvsem\Module(),
     ];
 
     $capabilities = [];
@@ -105,6 +109,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('mime_content_type' === $fn->getName() && preg_match('/MimeContentTypeRuntime/i', $source)) {
         $notes[] = 'file MIME sniff (VM host fileinfo + AOT byte sniff) (#6196)';
     }
+    if (str_starts_with($fn->getName(), 'finfo_') && preg_match('/VmFinfo|VmMime/i', $source)) {
+        $notes[] = 'ext/fileinfo VM sniff via VmMime (JIT deferred) (#3366)';
+    }
     if ('openssl_cipher_key_length' === $fn->getName()
         && preg_match('/JitOpensslCipherKeyLength/i', $source)) {
         $notes[] = 'cipher key length table (VM OpensslCipherRegistry + JIT/AOT literals) (#6522)';
@@ -159,7 +166,7 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     if ('array_walk' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: string builtins JIT/AOT; VM closure + optional userdata (#3627)';
     }
-    if ('array_reduce' === $fn->getName() && str_contains($source, 'buildReduceArrayWithClosure')) {
+    if ('array_reduce' === $fn->getName() && str_contains($source, 'ArrayReduceRuntime::reduce')) {
         $notes[] = 'callbacks: string user functions + closure/arrow JIT/AOT (#3531); php-src-strict invalid callback TypeError (#6679)';
     } elseif ('array_reduce' === $fn->getName() && str_contains($source, 'VmClosureCall::isClosure')) {
         $notes[] = 'callbacks: string user functions + VM closures; php-src-strict invalid callback TypeError (#6679)';

@@ -25,7 +25,7 @@ final class ReflectionFunctionGetParameters extends VmClassMethod
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
         $funcName = ReflectionSupport::functionNameFromReflection($receiver);
         if (ReflectionSupport::isReflectionInternalFunction($receiver)) {
-            $paramNames = BuiltinParamNames::forFunction($funcName) ?? [];
+            $paramNames = BuiltinParamNames::paramNamesForInternalFunction($funcName) ?? [];
         } else {
             $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $receiver);
             $paramNames = $func->block->paramNames;

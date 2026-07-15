@@ -186,14 +186,20 @@ final class CycleCollector
                 continue;
             }
             if (!self::referencesCandidateArrayPeer($table, $candidates, $arrayCandidates)) {
-                // Unreachable compiler literal temp — reclaim registry slot (#15139).
-                HashTableRegistry::release($table);
+                // Unreachable compiler literal temp — reclaim only when no live zval refs (#15139, #18612).
+                if (0 === $table->getGcRefcount()) {
+                    HashTableRegistry::release($table);
+                    ++$collected;
+                }
 
                 continue;
             }
             if (!self::arrayCandidateInArrayCycle($arrayId, $arrayCandidates)) {
-                // Nested literal tree (array→array) without a cycle — not Zend GC (#15139).
-                HashTableRegistry::release($table);
+                // Nested literal tree (array→array) without a cycle — skip live arrays (#15139, #18612).
+                if (0 === $table->getGcRefcount()) {
+                    HashTableRegistry::release($table);
+                    ++$collected;
+                }
 
                 continue;
             }

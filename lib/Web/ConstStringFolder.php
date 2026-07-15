@@ -153,9 +153,65 @@ final class ConstStringFolder
             if (null !== $concat) {
                 return self::foldConcat($concat, $sourceFile, $cfg);
             }
+            if ($operand instanceof Operand\Temporary) {
+                $unique = self::findUniqueFoldableConcat($cfg, $sourceFile);
+                if (null !== $unique) {
+                    return $unique;
+                }
+            }
         }
 
         return null;
+    }
+
+    /** When CFG temps diverge from concat results, a sole foldable concat is unambiguous (#816). */
+    private static function findUniqueFoldableConcat(CfgBlock $block, string $sourceFile): ?string
+    {
+        $found = null;
+        $count = 0;
+        $visited = [];
+        self::walkFoldableConcats($block, $sourceFile, $block, $found, $count, $visited);
+
+        return 1 === $count ? $found : null;
+    }
+
+    /**
+     * @param array<int, true> $visited
+     */
+    private static function walkFoldableConcats(
+        CfgBlock $block,
+        string $sourceFile,
+        CfgBlock $cfg,
+        ?string &$found,
+        int &$count,
+        array &$visited
+    ): void {
+        $blockId = spl_object_id($block);
+        if (isset($visited[$blockId])) {
+            return;
+        }
+        $visited[$blockId] = true;
+        foreach ($block->children as $child) {
+            if ($child instanceof Op\Expr\BinaryOp\Concat) {
+                $deployCall = self::findFuncCallForOperand($cfg, $child->left);
+                if (null !== $deployCall) {
+                    $name = self::literalStringValue($deployCall->name) ?? self::fold($deployCall->name, $sourceFile);
+                    if ('phpc_deploy_path' === $name) {
+                        continue;
+                    }
+                }
+                $folded = self::foldConcat($child, $sourceFile, $cfg);
+                if (null !== $folded && '' !== $folded) {
+                    ++$count;
+                    $found = $folded;
+                }
+            }
+            foreach ($child->getSubBlocks() as $sub) {
+                if ($sub instanceof CfgBlock) {
+                    self::walkFoldableConcats($sub, $sourceFile, $cfg, $found, $count, $visited);
+                }
+            }
+        }
     }
 
     private static function findFuncCallForOperand(CfgBlock $cfg, Operand $operand): ?Op\Expr\FuncCall
@@ -205,10 +261,15 @@ final class ConstStringFolder
             return null;
         }
         $call = null;
-        if ($left instanceof Operand\Temporary && $left->original instanceof Op\Expr\FuncCall) {
-            $call = $left->original;
-        } elseif ($left instanceof Op\Expr\FuncCall) {
-            $call = $left;
+        if (null !== $cfg) {
+            $call = self::findFuncCallForOperand($cfg, $left);
+        }
+        if (null === $call) {
+            if ($left instanceof Operand\Temporary && $left->original instanceof Op\Expr\FuncCall) {
+                $call = $left->original;
+            } elseif ($left instanceof Op\Expr\FuncCall) {
+                $call = $left;
+            }
         }
         if (null === $call) {
             return null;

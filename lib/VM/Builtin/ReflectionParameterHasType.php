@@ -20,11 +20,10 @@ final class ReflectionParameterHasType extends VmClassMethod
     {
         $ctx = VmReflection::requireContext($frame);
         $receiver = ReflectionSupport::requireReflectionParameter($frame, $frame->calledArgs[0]);
-        $block = ReflectionSupport::resolveParameterBlock($ctx, $receiver);
-        $index = ReflectionSupport::parameterIndexForReflection($receiver);
-        $slot = ReflectionSupport::parameterScopeSlot($block, $index);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(null !== $slot && isset($block->paramDeclaredTypes[$slot]));
+            $frame->returnVar->bool(
+                null !== ReflectionSupport::declaredParamTypeForReflection($ctx, $receiver)
+            );
         }
     }
 }

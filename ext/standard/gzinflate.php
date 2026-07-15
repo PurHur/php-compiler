@@ -26,7 +26,7 @@ final class gzinflate extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('gzinflate() expects one or two arguments in this compiler build');
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzinflate', 0, 'data');
+        $data = VmZlibArg::resolveDataString($frame, 'gzinflate');
         $maxLength = 0;
         if (2 === $argc) {
             $maxLength = VmZlibArg::requireInt($frame->calledArgs[1], 'gzinflate', 2, 'max_length');
@@ -58,7 +58,7 @@ final class gzinflate extends Internal
 
         return JitZlib::inflate(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'gzinflate', 0, 'data'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'gzinflate', 0, 'data'),
             $maxLength
         );
     }

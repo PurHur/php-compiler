@@ -39,7 +39,7 @@ final class JitSetcookieOptions
             throw new \LogicException($function.'() options form requires exactly three arguments');
         }
 
-        $namePtr = JitStringBuiltinArg::lower($context, $args[0], $function, 0, 'name');
+        $namePtr = JitStringBuiltinArg::lower($context, $args[0], $function, 0, 'name', 'string', null, false);
         JitStringBuiltinArg::rejectEmpty(
             $context,
             $args[0],

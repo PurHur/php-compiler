@@ -111,6 +111,7 @@ final class GeneratorState
     public static function register(Context $ctx): void
     {
         $entry = new ClassEntry('Generator');
+        $entry->isFinal = true;
         $entry->interfaces = ['iterator'];
         $pub = CfgFunc::FLAG_PUBLIC;
         $entry->methods['getreturn'] = new GeneratorGetReturn();

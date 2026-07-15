@@ -25,6 +25,15 @@ final class VmEnvEnvironNative
         return [];
     }
 
+    /** Init-safe native hashtable mirror for JIT/AOT superglobal refresh (#19157). */
+    public static function mirrorIntoNativeHashtable(int $destPtr): void
+    {
+        if ($destPtr <= 0) {
+            return;
+        }
+        phpc_native_environ_mirror_into_ht($destPtr);
+    }
+
     /**
      * Linux bootstrap: /proc/self/environ via VmFsReadNative (#5079, #8426).
      *
@@ -32,10 +41,7 @@ final class VmEnvEnvironNative
      */
     private static function enumerateLinuxProcEnviron(): array
     {
-        if (!\is_readable('/proc/self/environ')) {
-            return [];
-        }
-
+        // is_readable() is false in user-script AOT while fopen succeeds (#18897).
         $raw = VmFsReadNative::read('/proc/self/environ');
         if (false === $raw || '' === $raw) {
             return [];

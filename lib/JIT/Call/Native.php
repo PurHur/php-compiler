@@ -463,6 +463,13 @@ class Native implements Call {
             return;
         }
         $extra = array_slice($args, $idx);
+        if (
+            1 === \count($extra)
+            && Variable::TYPE_HASHTABLE === $extra[0]->type
+            && !empty($extra[0]->variadicElementChecksDone)
+        ) {
+            return;
+        }
         $strict = $context->callerStrictTypes;
         foreach ($extra as $arg) {
             if (

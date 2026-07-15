@@ -7,8 +7,8 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -16,6 +16,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT process helpers via ProcessJitHelper PHP (#9337, #12950).
  *
  * JIT embed and AOT standalone compile thin LLVM bridges; SSOT {@see \PHPCompiler\ext\standard\ProcessJitHelper}.
+ * User-script exec capture via {@see ProcessExecCaptureNativeJitHelper} + {@see JitVmHelperLink} (#19006).
+ * Deferred shell_exec via {@see JitVmHelperLink} + {@see ProcessJitHelper} (#19086).
  * php-src: ext/standard/exec.c — shell_exec, escapeshellarg, escapeshellcmd
  */
 final class ProcessRuntime
@@ -70,17 +72,10 @@ final class ProcessRuntime
         } catch (\Throwable) {
         }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            ProcessShellExecLibc::implement($context);
-            self::ensureShellHelperCompiled($context);
-            self::implementStringBridge($context, '__compiler_escapeshellarg', self::ESCAPESHELLARG);
-            self::implementStringBridge($context, '__compiler_escapeshellcmd', self::ESCAPESHELLCMD);
-        } else {
-            self::ensureShellHelperCompiled($context);
-            self::implementNullableStringBridge($context, '__compiler_shell_exec', self::SHELL_EXEC);
-            self::implementStringBridge($context, '__compiler_escapeshellarg', self::ESCAPESHELLARG);
-            self::implementStringBridge($context, '__compiler_escapeshellcmd', self::ESCAPESHELLCMD);
-        }
+        self::ensureShellHelperCompiled($context);
+        self::implementNullableStringBridge($context, '__compiler_shell_exec', self::SHELL_EXEC);
+        self::implementStringBridge($context, '__compiler_escapeshellarg', self::ESCAPESHELLARG);
+        self::implementStringBridge($context, '__compiler_escapeshellcmd', self::ESCAPESHELLCMD);
         self::registerShellRuntime($context);
 
         if (null !== $savedBlock) {
@@ -204,12 +199,8 @@ final class ProcessRuntime
         }
 
         self::ensureNativeHtInternalProxies($context);
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            ProcessExecCaptureLlvm::implementBridge($context);
-        } else {
-            self::ensureExecCaptureHelperCompiled($context);
-            self::implementExecCaptureNativeBridge($context);
-        }
+        self::ensureExecCaptureHelperCompiled($context);
+        self::implementExecCaptureNativeBridge($context);
         $fn = $context->module->getNamedFunction('__compiler_process_exec_capture');
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
             throw new \LogicException('__compiler_process_exec_capture missing after ProcessRuntime bridge (#9337)');
@@ -311,24 +302,21 @@ final class ProcessRuntime
 
     private static function ensureShellHelperCompiled(Context $context): void
     {
-        if (self::helpersPresent($context, self::SHELL_COMPILED_HELPERS)) {
-            return;
-        }
-
-        self::compileHelperFile($context, self::HELPER_PATH, 'ProcessJitHelper.php', self::SHELL_COMPILED_HELPERS);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::SHELL_COMPILED_HELPERS,
+            '#19086'
+        );
     }
 
     private static function ensureExecCaptureHelperCompiled(Context $context): void
     {
-        if (self::helpersPresent($context, [self::PROCESS_EXEC_CAPTURE])) {
-            return;
-        }
-
-        self::compileHelperFile(
+        JitVmHelperLink::ensureCompiled(
             $context,
             self::EXEC_CAPTURE_HELPER_PATH,
-            'ProcessExecCaptureNativeJitHelper.php',
-            [self::PROCESS_EXEC_CAPTURE]
+            [self::PROCESS_EXEC_CAPTURE],
+            '#19006'
         );
     }
 

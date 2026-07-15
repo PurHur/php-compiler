@@ -66,6 +66,12 @@ final class StringCslashes
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         $strPtr = $context->getTypeFromString('__string__*');
         $params = \array_fill(0, $paramCount, $strPtr);
         $ft = $context->context->functionType($strPtr, false, ...$params);
@@ -87,7 +93,12 @@ final class StringCslashes
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

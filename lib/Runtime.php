@@ -232,10 +232,12 @@ class Runtime {
         $this->load(new ext\simplexml\Module);
         $this->load(new ext\xml\Module);
         $this->load(new ext\xmlrpc\Module);
+        $this->load(new ext\wddx\Module);
         $this->load(new ext\xmlreader\Module);
         $this->load(new ext\xmlwriter\Module);
         $this->load(new ext\gd\Module);
         $this->load(new ext\exif\Module);
+        $this->load(new ext\fileinfo\Module);
         $this->load(new ext\iconv\Module);
         $this->load(new ext\gettext\Module);
         $this->load(new ext\mbstring\Module);
@@ -244,6 +246,7 @@ class Runtime {
         $this->load(new ext\ldap\Module);
         $this->load(new ext\session\Module);
         $this->load(new ext\bcmath\Module);
+        $this->load(new ext\gmp\Module);
         $this->load(new ext\stats\Module);
         $this->load(new ext\opcache\Module);
         $this->load(new ext\openssl\Module);
@@ -265,9 +268,12 @@ class Runtime {
         $this->load(new ext\brotli\Module);
         $this->load(new ext\sodium\Module);
         $this->load(new ext\sqlite3\Module);
+        $this->load(new ext\phar\Module);
         $this->load(new ext\uri\Module);
         $this->load(new ext\uuid\Module);
         $this->load(new ext\uploadprogress\Module);
+        $this->load(new ext\sysvshm\Module);
+        $this->load(new ext\sysvsem\Module);
         $this->load(new ext\standard\Module);
     }
 
@@ -903,19 +909,7 @@ class Runtime {
 
     public function standalone(?Block $block, string $outfile, ?string $sourceCode = null, ?string $sourceFilename = null) {
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_begin');
-        $prevUserScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-        $needsPregPrelink = \is_string($sourceCode)
-            && preg_match('/\bpreg_(?:match(?:_all)?|replace(?:_callback(?:_array)?)?|split|grep|filter|quote|last_error)/i', $sourceCode);
-        $deferUserScriptAotInit = $needsPregPrelink
-            && ('1' === $prevUserScriptAot || 'true' === strtolower((string) $prevUserScriptAot));
-        if ($deferUserScriptAotInit && \function_exists('putenv')) {
-            // User-script Context init + nested preg JIT OOMs (#16075); link preg on a non-user init first.
-            JIT\VmActiveContextInitLlvm::resetPendingState();
-            putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
-            unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
-            $this->jitContext = null;
-            $this->jit = null;
-        }
+        $needsPregPrelink = Block::containsPregPrelinkBuiltinCalls($block);
         $context = $this->loadJitContext();
         if (null !== $sourceFilename && '' !== $sourceFilename) {
             $context->setAotSourceFilename($sourceFilename);
@@ -926,14 +920,8 @@ class Runtime {
             throw new \LogicException('yield in the main script is not supported in AOT yet (issue #3115).');
         }
         if ($needsPregPrelink) {
+            // User-script AOT uses PregMatchUserScriptLlvm stubs — no nested-JIT prelink pass (#16075).
             \PHPCompiler\JIT\Builtin\StringPregMatch::ensureLinked($context);
-        }
-        if ($deferUserScriptAotInit && \function_exists('putenv')) {
-            putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUserScriptAot);
-            $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-            $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUserScriptAot;
-            $context->retrofitUserScriptStandaloneAfterPregPrelink();
-            JIT\VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         }
         $context->setMain($this->loadJit()->compile($block));
         \PHPCompiler\JIT\Progress::noteFunction('runtime_standalone_compile_done');

@@ -214,10 +214,12 @@ final class StreamCapsRuntime
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($i32, false, $i64)
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $i64)
+            );
 
         $entry = $fn->appendBasicBlock('stream_caps_bridge_entry');
         $context->builder->positionAtEnd($entry);
@@ -247,10 +249,12 @@ final class StreamCapsRuntime
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($i32, false, $i64, $i64)
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $i64, $i64)
+            );
 
         $entry = $fn->appendBasicBlock('stream_supports_bridge_entry');
         $context->builder->positionAtEnd($entry);

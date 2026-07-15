@@ -4,33 +4,38 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_bin2hex via Bin2hexJitHelper PHP (#14603).
+ * JIT/AOT link for bin2hex() via Bin2hexJitHelper PHP (#14603, #18884).
  *
- * Replaces inline ~105-line LLVM loop in ext/standard/JitBin2hex.php.
+ * User-script standalone AOT: inline LLVM hex loop (#3357) — nested Bin2hexJitHelper
+ * segfaults after minimal standalone init (same class as hash crypto defer).
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(bin2hex)
  */
 final class StringBin2hex
 {
+    private const ABI = '__compiler_bin2hex';
+
     private const HELPER_PATH = '/ext/standard/Bin2hexJitHelper.php';
 
     private const BIN2HEX_HELPER = 'PHPCompiler\\ext\\standard\\Bin2hexJitHelper::bin2hexArgv';
 
+    private const BRIDGE_ENTRY = 'bin2hex_bridge_entry';
+
+    private const INLINE_ENTRY = 'bin2hex_inline_entry';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::BIN2HEX_HELPER,
-    ];
-
-    /** @var list<string> */
-    private const ABI_FUNCTIONS = [
-        '__compiler_bin2hex',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -45,101 +50,114 @@ final class StringBin2hex
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI);
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI, $probe);
+
+            return;
+        }
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, self::INLINE_ENTRY)) {
+            $context->registerFunction(self::ABI, $probe);
+
+            return;
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            StringBin2hexLlvm::implement($context);
-
-            return;
+            self::implementInlineLlvm($context, $probe);
+        } else {
+            self::implementBridge($context);
         }
-
-        $probe = $context->module->getNamedFunction('__compiler_bin2hex');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
-
-        self::ensureJitHelperCompiled($context);
-        self::implementBridge($context);
-        self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function implementBridge(Context $context): void
     {
-        $abiName = '__compiler_bin2hex';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
         $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr);
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI,
+            self::BRIDGE_ENTRY,
+            [$strPtr],
+            $strPtr,
+            self::BIN2HEX_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#18884'
+        );
+    }
+
+    private static function implementInlineLlvm(Context $context, ?LlvmFunction $probe): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction($abiName, $ft);
+            : $context->module->addFunction(
+                self::ABI,
+                $context->context->functionType($strPtr, false, $strPtr)
+            );
 
-        $entry = $fn->appendBasicBlock('bin2hex_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::INLINE_ENTRY);
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::BIN2HEX_HELPER),
-            $fn->getParam(0)
+
+        $input = $fn->getParam(0);
+        $map = $context->structFieldMap['__string__'];
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+
+        $len = $context->builder->load($context->builder->structGep($input, $map['length']));
+        $lenI64 = $context->builder->zExt($len, $i64);
+        $hexLen = $context->builder->mul($lenI64, $i64->constInt(2, false));
+        $hexStr = $context->builder->call($context->lookupFunction('__string__alloc'), $hexLen);
+        $context->builder->store($hexLen, $context->builder->structGep($hexStr, $map['length']));
+        $srcPtr = $context->builder->structGep($input, $map['value']);
+        $destPtr = $context->builder->structGep($hexStr, $map['value']);
+        $hexTable = $context->builder->pointerCast(
+            $context->constantFromString('0123456789abcdef'),
+            $charPtr
         );
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
-    }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after Bin2hexJitHelper compile (#14603)');
-        }
+        $idxSlot = $context->builder->alloca($i64, 1, 'b2h_idx');
+        $context->builder->store($i64->constInt(0, false), $idxSlot);
+        $loopHead = $fn->appendBasicBlock('b2h_inline_head');
+        $loopBody = $fn->appendBasicBlock('b2h_inline_body');
+        $loopDone = $fn->appendBasicBlock('b2h_inline_done');
+        $context->builder->branch($loopHead);
 
-        return $fn;
-    }
+        $context->builder->positionAtEnd($loopHead);
+        $idx = $context->builder->load($idxSlot);
+        $stop = $context->builder->icmp(Builder::INT_SGE, $idx, $lenI64);
+        $context->builder->branchIf($stop, $loopDone, $loopBody);
 
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
+        $context->builder->positionAtEnd($loopBody);
+        $idxI32 = $context->builder->truncOrBitCast($idx, $i32);
+        $byte = $context->builder->load($context->builder->gep($srcPtr, $idx));
+        $byteI32 = $context->builder->zExt($byte, $i32);
+        $hi = $context->builder->lShr($byteI32, $i32->constInt(4, false));
+        $lo = $context->builder->bitwiseAnd($byteI32, $i32->constInt(0x0F, false));
+        $outPos = $context->builder->mulNoSignedWrap($idxI32, $i32->constInt(2, false));
+        $context->builder->store(
+            $context->builder->load($context->builder->gep($hexTable, $hi)),
+            $context->builder->gep($destPtr, $outPos)
+        );
+        $context->builder->store(
+            $context->builder->load($context->builder->gep($hexTable, $lo)),
+            $context->builder->gep($destPtr, $context->builder->add($outPos, $i32->constInt(1, false)))
+        );
+        $context->builder->store($context->builder->add($idx, $i64->constInt(1, false)), $idxSlot);
+        $context->builder->branch($loopHead);
 
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'Bin2hexJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('Bin2hexJitHelper.php parseAndCompile failed (#14603)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#14603)');
-            }
-        }
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        foreach (self::ABI_FUNCTIONS as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException($name.' missing after StringBin2hex bridge (#14603)');
-            }
-            $context->registerFunction($name, $fn);
-        }
+        $context->builder->positionAtEnd($loopDone);
+        $context->builder->returnValue($hexStr);
+        $context->registerFunction(self::ABI, $fn);
     }
 }

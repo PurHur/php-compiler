@@ -12,7 +12,7 @@ use PHPUnit\Framework\TestCase;
 /** array_combine() JIT routes all operands through ArrayCombineJitHelper PHP not ArrayBuiltinHelper native LLVM (#12502, #14437, #18013). */
 final class ArrayCombineRuntimeShrinkTest extends TestCase
 {
-    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 8920;
+    private const ARRAY_BUILTIN_HELPER_MAX_LINES = 920;
 
     public function testArrayCombineRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {

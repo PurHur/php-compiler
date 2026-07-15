@@ -6,8 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -57,6 +59,13 @@ final class mime_content_type extends Internal
     {
         if (1 !== \count($args)) {
             throw new \LogicException('mime_content_type() requires exactly one argument in this compiler build');
+        }
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitRaise($context, VmMime::filenameOrStreamTypeErrorMessage('null'));
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
         return JitMimeContentType::invoke(

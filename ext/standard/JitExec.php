@@ -9,7 +9,6 @@ use PHPCompiler\JIT\Builtin\ObOutputRuntime;
 use PHPCompiler\JIT\Builtin\ProcessRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -26,9 +25,7 @@ final class JitExec
             throw new \LogicException('exec() accepts one to three arguments in this compiler build');
         }
 
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'exec', 'command', 1);
-
-        $cmd = JitStringBuiltinArg::lower($context, $args[0], 'exec', 0, 'command');
+        $cmd = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'exec', 0, 'command', 'string', null, false);
         self::rejectEmptyCommand($context, $args[0], $cmd, 'exec');
         $capture = self::capture($context, $cmd);
         $failed = $context->builder->icmp(
@@ -76,8 +73,6 @@ final class JitExec
             throw new \LogicException('passthru() accepts one or two arguments in this compiler build');
         }
 
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'passthru', 'command', 1);
-
         return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, false, 'passthru');
     }
 
@@ -87,8 +82,6 @@ final class JitExec
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('system() accepts one or two arguments in this compiler build');
         }
-
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'system', 'command', 1);
 
         return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, true, 'system');
     }
@@ -100,7 +93,7 @@ final class JitExec
         bool $returnLastLine,
         string $function
     ): Value {
-        $cmd = JitStringBuiltinArg::lower($context, $commandArg, $function, 0, 'command');
+        $cmd = JitStringBuiltinArg::lowerStrictOrCoercible($context, $commandArg, $function, 0, 'command', 'string', null, false);
         self::rejectEmptyCommand($context, $commandArg, $cmd, $function);
         $capture = self::capture($context, $cmd);
         $failed = $context->builder->icmp(
@@ -135,13 +128,7 @@ final class JitExec
             self::writeStatusRef($context, $statusArg, self::readStatus($context, $capture));
         }
         if ($returnLastLine) {
-            $lastLineBlock = BasicBlockHelper::append($context, 'proc_last_line');
-            $lastLineDone = BasicBlockHelper::append($context, 'proc_last_line_done');
-            $context->builder->branch($lastLineBlock);
-            $context->builder->positionAtEnd($lastLineBlock);
             $last = self::lastLine($context, $lines);
-            $context->builder->branch($lastLineDone);
-            $context->builder->positionAtEnd($lastLineDone);
             $context->builder->call(
                 $context->lookupFunction('__value__writeString'),
                 $ptr,

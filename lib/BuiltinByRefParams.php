@@ -68,6 +68,9 @@ final class BuiltinByRefParams
             case 'preg_match':
             case 'preg_match_all':
                 return [2];
+            case 'mb_ereg':
+            case 'mb_eregi':
+                return [2];
             case 'preg_replace':
                 return [4];
             case 'str_replace':
@@ -83,9 +86,20 @@ final class BuiltinByRefParams
                 return [2];
             case 'openssl_random_pseudo_bytes':
             case 'openssl_sign':
+            case 'openssl_public_encrypt':
+            case 'openssl_private_decrypt':
+            case 'openssl_private_encrypt':
+            case 'openssl_public_decrypt':
+            case 'openssl_open':
             case 'openssl_pkey_export':
+            case 'openssl_pkcs12_export':
                 return [1];
+            case 'openssl_pkcs12_read':
+                return [1];
+            case 'openssl_seal':
+                return [1, 2, 5];
             case 'stream_context_set_options':
+            case 'stream_context_set_option':
             case 'stream_context_set_params':
                 return [0];
             case 'exec':

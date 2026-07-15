@@ -9,6 +9,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\ext\standard\VmFsStdio;
 use PHPCompiler\ext\standard\VmStreamMeta;
 
 /**
@@ -78,7 +79,12 @@ final class VmSocket
             return false;
         }
 
-        $streamType = VmStreamMeta::streamTypeForUri(VmFs::handleUri($handle));
+        $uri = VmFs::handleUri($handle);
+        if (VmFsStdio::isStdioUri($uri)) {
+            return false;
+        }
+
+        $streamType = VmStreamMeta::streamTypeForUri($uri);
         if (null === $streamType || !\in_array($streamType, self::SOCKET_STREAM_TYPES, true)) {
             return false;
         }
@@ -114,10 +120,20 @@ final class VmSocket
 
         self::$streamResources[$objAddr] = $stream;
         self::$streamHandles[$objAddr] = $streamHandle;
-        $fd = VmFs::socketFdForHandle($streamHandle);
+        $fd = self::socketFdForImportableHandle($streamHandle);
         if (null !== $fd) {
             self::$hostSocketFds[$objAddr] = $fd;
         }
+    }
+
+    private static function socketFdForImportableHandle(int $handle): ?int
+    {
+        $fd = VmFs::socketFdForHandle($handle);
+        if (null !== $fd) {
+            return $fd;
+        }
+
+        return VmFsStdio::stdioFdForUri(VmFs::handleUri($handle));
     }
 
     private static function wrapImportedStream(int $handle, mixed $stream, Context $ctx): Variable
@@ -128,7 +144,7 @@ final class VmSocket
         $object->constructed = true;
         self::$streamResources[$object->id] = $stream;
         self::$streamHandles[$object->id] = $handle;
-        $fd = VmFs::socketFdForHandle($handle);
+        $fd = self::socketFdForImportableHandle($handle);
         if (null !== $fd) {
             self::$hostSocketFds[$object->id] = $fd;
         }

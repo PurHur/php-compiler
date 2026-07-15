@@ -23,15 +23,15 @@ final class DomElementTextContentRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI_NAME);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI_NAME, $probe);
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            DomDocumentMethodUserScriptLlvm::ensureElementTextContentBridge($context);
 
             return;
         }
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureElementTextContentBridge($context);
+        $probe = $context->module->getNamedFunction(self::ABI_NAME);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_NAME, $probe);
 
             return;
         }

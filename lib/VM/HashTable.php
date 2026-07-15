@@ -990,7 +990,7 @@ final class HashTable {
         $out = new self();
         foreach ($this->iterateKeyed(true) as [$key, $value]) {
             $copy = new Variable();
-            $copy->copyFrom($value);
+            $copy->duplicateFrom($value);
             if (Variable::TYPE_INTEGER === $key->type) {
                 $out->addIndex($key->toInt(), $copy);
             } else {
@@ -1008,7 +1008,7 @@ final class HashTable {
     {
         foreach ($other->iterateKeyed(true) as [$key, $value]) {
             $copy = new Variable();
-            $copy->copyFrom($value);
+            $copy->duplicateFrom($value);
             if (Variable::TYPE_INTEGER === $key->type) {
                 $idx = $key->toInt();
                 $existing = $out->findIndex($idx);
@@ -1016,7 +1016,11 @@ final class HashTable {
                     $existing = $existing->resolveIndirect();
                     $overlay = $copy->resolveIndirect();
                     if (Variable::TYPE_ARRAY === $existing->type && Variable::TYPE_ARRAY === $overlay->type) {
-                        $existing->array($existing->toArray()->replaceRecursiveCopy($overlay->toArray()));
+                        $merged = $existing->toArray()->replaceRecursiveCopy($overlay->toArray());
+                        $slot = $out->findIndex($idx);
+                        if (null !== $slot) {
+                            $slot->array($merged);
+                        }
                     } else {
                         $slot = $out->findIndex($idx);
                         if (null !== $slot) {
@@ -1033,7 +1037,11 @@ final class HashTable {
                     $existing = $existing->resolveIndirect();
                     $overlay = $copy->resolveIndirect();
                     if (Variable::TYPE_ARRAY === $existing->type && Variable::TYPE_ARRAY === $overlay->type) {
-                        $existing->array($existing->toArray()->replaceRecursiveCopy($overlay->toArray()));
+                        $merged = $existing->toArray()->replaceRecursiveCopy($overlay->toArray());
+                        $slot = $out->find($k);
+                        if (null !== $slot) {
+                            $slot->array($merged);
+                        }
                     } else {
                         $slot = $out->find($k);
                         if (null !== $slot) {

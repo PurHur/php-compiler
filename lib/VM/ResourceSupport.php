@@ -357,12 +357,25 @@ final class ResourceSupport
                 && self::resourceKindsMatch($left, $right);
         }
 
+        $leftCtxId = self::isStreamContextResource($left) ? VmStreamContext::idFrom($left) : null;
+        $rightCtxId = self::isStreamContextResource($right) ? VmStreamContext::idFrom($right) : null;
+        if (null !== $leftCtxId || null !== $rightCtxId) {
+            return null !== $leftCtxId
+                && null !== $rightCtxId
+                && $leftCtxId === $rightCtxId;
+        }
+
+        $leftHandle = self::resolveHandle($left);
+        $rightHandle = self::resolveHandle($right);
+
         return $left->streamResource === $right->streamResource
             && $left->dirResource === $right->dirResource
             && $left->brigadeResource === $right->brigadeResource
             && $left->bucketResource === $right->bucketResource
             && $left->streamFilterResource === $right->streamFilterResource
-            && $left->integer === $right->integer;
+            && null !== $leftHandle
+            && null !== $rightHandle
+            && $leftHandle === $rightHandle;
     }
 
     private static function resourceKindsMatch(Variable $left, Variable $right): bool
@@ -372,6 +385,7 @@ final class ResourceSupport
             && self::isBrigadeResource($left) === self::isBrigadeResource($right)
             && self::isBucketResource($left) === self::isBucketResource($right)
             && self::isStreamFilterResource($left) === self::isStreamFilterResource($right)
-            && self::isProcessResource($left) === self::isProcessResource($right);
+            && self::isProcessResource($left) === self::isProcessResource($right)
+            && self::isStreamContextResource($left) === self::isStreamContextResource($right);
     }
 }

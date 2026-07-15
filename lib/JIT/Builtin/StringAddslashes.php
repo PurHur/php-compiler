@@ -6,20 +6,19 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /**
- * JIT/AOT link for addslashes() — LLVM on __string__addslashes or AddslashesJitHelper PHP (#16734).
+ * JIT/AOT link for addslashes() via AddslashesJitHelper PHP (#14741, #18391).
  *
+ * User-script AOT uses HelperRuntimeCache prelinked units (#15889) instead of LLVM defer.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(addslashes)
  */
 final class StringAddslashes
 {
-    private const ABI = 'phpc_jit_addslashes';
+    private const ABI = '__string__addslashes';
 
     private const HELPER_PATH = '/ext/standard/AddslashesJitHelper.php';
 
@@ -42,20 +41,14 @@ final class StringAddslashes
         self::implement($context);
     }
 
-    private static function implement(Context $context): void
+    public static function implement(Context $context): void
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            StringAddslashesLlvm::implement($context);
-
-            return;
-        }
-
         if (NestedJitCompileScope::isActive()) {
             return;
         }
 
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
@@ -82,7 +75,7 @@ final class StringAddslashes
             self::ADDSLASHES_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#14741'
+            '#18391'
         );
     }
 }

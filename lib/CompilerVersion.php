@@ -365,10 +365,10 @@ final class CompilerVersion
     }
 
     /**
-     * str_increment()/str_decrement() visible to function_exists() — stable runtime or forward 8.3+ (#16292).
+     * str_increment()/str_decrement() visible to function_exists() — stable runtime or forward 8.3+ (#16292, #18614).
      *
-     * Callable under forward profile via {@see supportsStrIncrement()}; withheld from introspection on 8.4.0-dev
-     * reference harness like Zend 8.2.
+     * Callable under forward profile via {@see supportsStrIncrement()}; withheld on 8.4.0-dev reference harness
+     * (no {@code PHP_COMPILER_PROFILE}) like Zend 8.2.
      */
     public static function advertisesStrIncrement(): bool
     {
@@ -376,17 +376,16 @@ final class CompilerVersion
             return true;
         }
 
+        if (!self::supportsStrIncrement()) {
+            return false;
+        }
+
         $raw = getenv('PHP_COMPILER_PROFILE');
         if (!\is_string($raw) || '' === trim($raw)) {
             return false;
         }
 
-        $profile = self::languageProfileVersion();
-        if (version_compare($profile, '8.4.0', '>=')) {
-            return false;
-        }
-
-        return version_compare($profile, '8.3.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /**
@@ -730,6 +729,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ json_decode()/json_validate() typed string $json — null operand TypeError (#18852).
+     *
+     * Distinct from general Z_PARAM_STR null coerce (#19161): ext/json/json.stub.php declares `string $json`.
+     */
+    public static function jsonStringOperandRequiresStrictType(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * fpow()/fmin()/fmax()/fadd()/fsub()/fmul() visible to function_exists() — stable runtime or forward 8.4+ (#16677).
      *
      * Callable under forward profile via {@see supportsFpow()}; withheld from introspection on 8.4.0-dev
@@ -972,8 +981,8 @@ final class CompilerVersion
     /**
      * PHP 8.4+ property hooks (`$prop { get; set; }`, default initializer + hook block).
      *
-     * Enabled on the 8.4 development line by default (#15994, #16068). Explicit
-     * `PHP_COMPILER_PROFILE=8.2` (or older) keeps Zend 8.2 reference rejection (#14062, #15800).
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
+     * (#14062, #15800, #18531). Forward profile: `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+.
      * php-src: Zend/zend_language_parser.y / Zend/zend_compile.c property hooks.
      */
     public static function supportsPropertyHooks(): bool
@@ -1006,10 +1015,27 @@ final class CompilerVersion
     /**
      * PHP 8.4+ instance property default `new Class(...)` initializers (#18040, Zend/zend_compile.c).
      *
-     * Static property defaults and class constants keep php-src rejection rules on every profile.
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2.
      */
     public static function supportsPropertyDefaultObjectExpressions(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ static property default `new Class` / `new Class(...)` initializers (#18816, Zend/zend_compile.c).
+     */
+    public static function supportsStaticPropertyDefaultObjectExpressions(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ bare `new Class` (without trailing `()`) in class constants and static property initializers (#18816).
+     *
+     * php-src: Zend/zend_compile.c — zend_compile_const_expr / NewWithoutParens.
+     */
+    public static function supportsNewWithoutParensInConstAndStaticInitializers(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
@@ -1079,6 +1105,18 @@ final class CompilerVersion
      * (method absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
      */
     public static function supportsReflectionEnumUnitCaseIsDeprecated(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ ReflectionEnumUnitCase::isBacked() / ReflectionEnumBackedCase::isBacked()
+     * (ext/reflection/php_reflection.c, #5675, #18648).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * (method absent). Enable forward profile on dev via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsReflectionEnumCaseIsBacked(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
@@ -1805,30 +1843,6 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ proc_get_status() cached bool — exit code cached after child exit (ext/standard/proc_open.c, #17362, #17883).
-     *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 status array). Enable via stable 8.4.0+
-     * or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
-     */
-    public static function supportsProcGetStatusCached(): bool
-    {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
-    }
-
-    /**
      * PHP 8.3+ proc_get_status() pending_signals array (ext/standard/proc_open.c, #16707, #17907).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 status array). Enable via stable 8.4.0+
@@ -2285,6 +2299,28 @@ final class CompilerVersion
     }
 
     /**
+     * ext/xmlrpc via pure PHP {@see \PHPCompiler\ext\xmlrpc\VmXmlrpc} — withheld on reference profile (#18503).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * phantom gate (host ext-xmlrpc absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsXmlrpc(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * ext/wddx via pure PHP {@see \PHPCompiler\ext\wddx\VmWddx} — withheld on reference profile (#6327).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * phantom gate (host ext-wddx absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsWddx(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * ext/zip via pure PHP {@see \PHPCompiler\ext\zip\VmZipArchive} — withheld on reference profile (#18137, #11676).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
@@ -2318,10 +2354,10 @@ final class CompilerVersion
     }
 
     /**
-     * ext/sqlite3 exception surface — withheld on reference profile (#17106, #17194).
+     * ext/sqlite3 SQLite3 class + query API — forward profile only (#3434).
      *
-     * Forward profile ({@code PHP_COMPILER_PROFILE=8.4}) advertises extension_loaded('sqlite3')
-     * and SQLite3Exception for catch/class_exists parity before the SQLite3 API lands (#3434).
+     * {@code extension_loaded('sqlite3')} and {@code SQLite3Exception} are advertised whenever
+     * the in-tree module loads ({@see Sqlite3ExtensionPolicy::advertisesExtensionLoaded()}, #19047).
      */
     public static function supportsSqlite3(): bool
     {
@@ -2383,11 +2419,11 @@ final class CompilerVersion
     }
 
     /**
-     * Forward DOM APIs gated like gc_status / str_increment (#15613, #14535).
+     * Forward DOM APIs gated like str_increment() (#18614) and compareDocumentPosition (#18504).
      *
-     * On `8.4.0-dev` reference profile (unset `PHP_COMPILER_PROFILE`), withhold PHP 8.3+/8.4+
-     * DOM methods so `method_exists()` matches Zend 8.2. Enable via stable `8.4.0+` or explicit
-     * `PHP_COMPILER_PROFILE=8.3` / `8.4`.
+     * Unset `PHP_COMPILER_PROFILE` on `8.4.0-dev` withholds PHP 8.3+/8.4+ DOM methods so
+     * `method_exists` matches Zend 8.2 while `phpversion()` reports 8.2.31. Enable via stable
+     * 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
      */
     private static function supportsDomApiSince(string $since): bool
     {
@@ -2415,10 +2451,7 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #17696, #18092).
-     *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 method_exists gate).
-     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     * PHP 8.4+ DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #17696, #18092, #18504).
      */
     public static function supportsDomNodeCompareDocumentPosition(): bool
     {
@@ -2517,6 +2550,14 @@ final class CompilerVersion
      * PHP 8.4+ Dom\ living-standard namespace (Dom\HTMLDocument, Dom\XMLDocument, …; ext/dom/html_document.c).
      */
     public static function supportsDomLivingStandardNamespace(): bool
+    {
+        return self::supportsDomApiSince('8.4.0');
+    }
+
+    /**
+     * PHP 8.4+ DOMXPath::quote() static XPath literal escaper (ext/dom/xpath.c, #18650).
+     */
+    public static function supportsDomXPathQuote(): bool
     {
         return self::supportsDomApiSince('8.4.0');
     }

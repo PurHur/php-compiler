@@ -53,6 +53,8 @@ class Module extends ModuleAbstract
             new session_cache_limiter(),
             new session_set_cookie_params(),
             new session_get_cookie_params(),
+            new session_set_save_handler(),
+            new session_register_shutdown(),
         ];
     }
 }

@@ -62,6 +62,26 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([1], BuiltinByRefParams::forFunction('OPENSSL_SIGN'));
     }
 
+    public function testOpensslPublicEncryptPrivateDecryptOutputArguments(): void
+    {
+        foreach (['openssl_public_encrypt', 'openssl_private_decrypt', 'openssl_private_encrypt', 'openssl_public_decrypt'] as $fn) {
+            $this->assertSame([1], BuiltinByRefParams::forFunction($fn), $fn);
+        }
+        $this->assertSame([1], BuiltinByRefParams::forFunction('OPENSSL_PUBLIC_ENCRYPT'));
+    }
+
+    public function testOpensslSealOpenByRefIndices(): void
+    {
+        $this->assertSame([1, 2, 5], BuiltinByRefParams::forFunction('openssl_seal'));
+        $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_open'));
+    }
+
+    public function testOpensslPkcs12ByRefIndices(): void
+    {
+        $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_pkcs12_read'));
+        $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_pkcs12_export'));
+    }
+
     public function testIsCallableThirdArgument(): void
     {
         $this->assertSame([2], BuiltinByRefParams::forFunction('is_callable'));
@@ -122,5 +142,12 @@ final class BuiltinByRefParamsTest extends TestCase
     {
         $this->assertSame([1, 2], BuiltinByRefParams::forFunction('stream_socket_server'));
         $this->assertSame([1, 2], BuiltinByRefParams::forFunction('STREAM_SOCKET_SERVER'));
+    }
+
+    public function testStreamContextMutatorsFirstArgByRef(): void
+    {
+        foreach (['stream_context_set_options', 'stream_context_set_option', 'stream_context_set_params'] as $fn) {
+            $this->assertSame([0], BuiltinByRefParams::forFunction($fn), $fn);
+        }
     }
 }

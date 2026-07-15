@@ -261,7 +261,33 @@ final class VmXml
      */
     public static function validationErrorRecord(string $data): ?array
     {
-        return self::validateWellFormed($data);
+        $records = self::validationErrorRecords($data);
+
+        return $records[0] ?? null;
+    }
+
+    /**
+     * libxml may emit multiple FATAL errors for one malformed document (e.g. unclosed start tag
+     * plus premature end in outer element — php-src ext/dom/document.c via libxml2; #18332).
+     *
+     * @return list<array{level: int, code: int, column: int, message: string, file: string, line: int}>
+     */
+    public static function validationErrorRecords(string $data): array
+    {
+        $primary = self::validateWellFormed($data);
+        if (null === $primary) {
+            return [];
+        }
+
+        $records = [$primary];
+        if (self::XML_ERR_TAG_NOT_FINISHED === $primary['code']) {
+            $secondary = self::detectPrematureEnd(trim($data));
+            if (null !== $secondary && self::XML_ERR_UNCLOSED_NODE_TAG === $secondary['code']) {
+                $records[] = $secondary;
+            }
+        }
+
+        return $records;
     }
 
     /**

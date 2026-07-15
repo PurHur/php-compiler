@@ -10,18 +10,15 @@ use PHPUnit\Framework\TestCase;
 /** GcCollectCycles embed registry routes through GcCollectCyclesRegistryJitHelper PHP (#9541). */
 final class GcCollectCyclesRegistryRuntimeShrinkTest extends TestCase
 {
-    public function testGcCollectCyclesRuntimeUsesRegistryJitHelperOnEmbedOnly(): void
+    public function testGcCollectCyclesRuntimeUsesRegistryJitHelperOnEmbed(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesRuntime.php');
         $this->assertStringContainsString('GcCollectCyclesRegistryJitHelper', $source);
         $this->assertStringContainsString('implementGcRegisterPhpBridge', $source);
         $this->assertStringContainsString('implementDestructAlreadyInvokedPhpBridge', $source);
         $this->assertStringContainsString('implementDestructMarkInvokedPhpBridge', $source);
-        $this->assertStringContainsString('usesPhpRegistry', $source);
         $this->assertStringContainsString('gc_register_php_entry', $source);
-        // Standalone AOT keeps LLVM registry until #15889 helper-TU isolation (#16133).
-        $this->assertStringContainsString("G_OBJECTS = 'phpc_gc_objects'", $source);
-        $this->assertStringContainsString('gc_register_entry', $source);
+        $this->assertStringContainsString('usesPhpRegistry', $source);
     }
 
     public function testGcCollectCyclesRegistryJitHelperRoundtrip(): void

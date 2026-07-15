@@ -24,9 +24,10 @@ final class JitFilestatArg
         JITVariable $arg,
         string $function,
         int $argIndex = 0,
-        string $paramName = 'filename'
+        string $paramName = 'filename',
+        bool $softNullPath = false
     ): Value {
-        return JitStringBuiltinArg::lowerPath($context, $arg, $function, $argIndex, $paramName);
+        return JitStringBuiltinArg::lowerPath($context, $arg, $function, $argIndex, $paramName, 'string', null, $softNullPath);
     }
 
     /** touch() $filename — typed string; reject null (#18245, ext/standard/file.c). */
@@ -119,7 +120,7 @@ final class JitFilestatArg
         );
     }
 
-    /** chmod()/mkdir() mode — Z_PARAM_LONG; honor caller strict_types for string operands (#17927). */
+    /** mkdir() mode — Z_PARAM_LONG decimal numeric strings (#17819, #18923, ext/standard/filestat.c). */
     public static function lowerFileMode(
         Context $context,
         JITVariable $arg,
@@ -127,25 +128,71 @@ final class JitFilestatArg
         int $argIndex,
         string $paramName
     ): Value {
+        return self::lowerFileModeArg($context, $arg, $function, $argIndex, $paramName);
+    }
+
+    /** chmod() mode — Z_PARAM_LONG decimal numeric strings (#18923, ext/standard/filestat.c). */
+    public static function lowerChmodMode(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        return self::lowerFileModeArg($context, $arg, $function, $argIndex, $paramName);
+    }
+
+    private static function lowerFileModeArg(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        self::guardFileModeString($context, $arg, $function, $argIndex, $paramName);
+        if (JITVariable::TYPE_STRING === $arg->type && null !== $arg->compileTimeString) {
+            $i64 = $context->getTypeFromString('int64');
+
+            return $i64->constInt(
+                VmFilestatArg::parseFileModeString($arg->compileTimeString),
+                false
+            );
+        }
         if (JITVariable::TYPE_STRING === $arg->type) {
-            if ($context->callerStrictTypes) {
+            return JitLongArg::lowerStringValue(
+                $context,
+                $context->helper->loadValue($arg)
+            );
+        }
+
+        return JitLongArg::lower($context, $arg, $function.'() '.$paramName);
+    }
+
+    private static function guardFileModeString(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (JITVariable::TYPE_STRING !== $arg->type) {
+            return;
+        }
+        if ($context->callerStrictTypes) {
+            self::emitTypeErrorAndAbort(
+                $context,
+                self::intTypeError($function, $argIndex, $paramName, 'string')
+            );
+        }
+        if (null !== $arg->compileTimeString) {
+            $raw = $arg->compileTimeString;
+            if ('' === $raw || !is_numeric($raw)) {
                 self::emitTypeErrorAndAbort(
                     $context,
                     self::intTypeError($function, $argIndex, $paramName, 'string')
                 );
             }
-            if (null !== $arg->compileTimeString) {
-                $raw = $arg->compileTimeString;
-                if ('' === $raw || !is_numeric($raw)) {
-                    self::emitTypeErrorAndAbort(
-                        $context,
-                        self::intTypeError($function, $argIndex, $paramName, 'string')
-                    );
-                }
-            }
         }
-
-        return JitLongArg::lower($context, $arg, $function.'() '.$paramName);
     }
 
     public static function coerceIntOrStringJitArg(

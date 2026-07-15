@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TimeSleepRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Builtin\MathIsFinite;
+use PHPCompiler\JIT\InternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -61,7 +62,7 @@ final class JitSleep
     {
         TimeSleepRuntime::ensureLinked($context);
 
-        $target = self::lowerDouble($context, $arg, 'time_sleep_until() timestamp');
+        $target = self::lowerDouble($context, $arg, 'time_sleep_until', 1, 'timestamp');
         $ok = $context->builder->call(
             $context->lookupFunction('__compiler_time_sleep_until'),
             $target
@@ -109,6 +110,19 @@ final class JitSleep
         int $argIndex,
         string $paramName
     ): Value {
+        if ($context->callerStrictTypes) {
+            InternalStrictArg::requireInt($context, $arg, $function, $paramName, $argIndex);
+            if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+                return $context->helper->loadValue($arg);
+            }
+            if (JITVariable::TYPE_VALUE === $arg->type) {
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+
+                return $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+            }
+
+            return JitLongArg::lower($context, $arg, sprintf('%s() %s', $function, $paramName));
+        }
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -535,25 +549,29 @@ final class JitSleep
         $context->builder->call($context->lookupFunction('abort'));
     }
 
-    private static function lowerDouble(Context $context, JITVariable $arg, string $label): Value
-    {
+    /** Z_PARAM_DOUBLE-style lowering (php-src basic_functions.c time_sleep_until; #18972). */
+    private static function lowerDouble(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        $double = $context->getTypeFromString('double');
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return $double->constReal(0.0);
+        }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
             return $context->helper->loadValue($arg);
         }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->call(
-                $context->lookupFunction('__value__readDouble'),
-                $context->helper->loadValue($arg)
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+            return $context->builder->sitofp(
+                $context->helper->loadValue($arg),
+                $double
             );
         }
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
-            $i64 = $context->getTypeFromString('int64');
-            $longVal = $context->helper->loadValue($arg);
-            $doubleType = $context->getTypeFromString('double');
 
-            return $context->builder->sitofp($longVal, $doubleType);
-        }
-
-        throw new \LogicException($label.' must be float or int in this compiler build');
+        return JitFdiv::lowerSingleOperand($context, $arg, $argIndex, $paramName, $function, 'float');
     }
+
 }

@@ -8,14 +8,18 @@ use PHPCompiler\ext\standard\StripslashesJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** stripslashes() JIT routes through StripslashesJitHelper PHP not inline LLVM (#14742). */
+/** stripslashes() JIT routes through StripslashesJitHelper PHP for embed + user-script AOT (#14742, #18792). */
 final class StripslashesRuntimeShrinkTest extends TestCase
 {
-    public function testStringStripslashesUsesJitHelperNotInlineLlvm(): void
+    public function testStringStripslashesUsesJitHelperNotLlvmMonolith(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStripslashes.php');
         $this->assertStringContainsString('StripslashesJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('StringStripslashesLlvm', $source);
         $this->assertStringNotContainsString('stripslashes_count_head', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringStripslashesLlvm.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitStripslashes.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/stripslashes.php');
@@ -35,10 +39,11 @@ final class StripslashesRuntimeShrinkTest extends TestCase
         $this->assertSame("a'b\\0c", $expected);
     }
 
-    public function testSpineBundleOmitsDeletedJitStripslashes(): void
+    public function testSpineBundleOmitsDeletedStripslashesLlvm(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringNotContainsString('JitStripslashes.php', $spine);
+        $this->assertStringNotContainsString('StringStripslashesLlvm.php', $spine);
         $this->assertStringContainsString('StripslashesJitHelper.php', $spine);
         $this->assertStringContainsString('StringStripslashes.php', $spine);
     }

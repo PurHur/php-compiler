@@ -69,7 +69,8 @@ final class StringFilterIp
         }
 
         $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $i64);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
@@ -78,7 +79,8 @@ final class StringFilterIp
         $context->builder->positionAtEnd($entry);
         $result = $context->builder->call(
             self::helperFunction($context, self::VALIDATE_HELPER),
-            $fn->getParam(0)
+            $fn->getParam(0),
+            $fn->getParam(1)
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);

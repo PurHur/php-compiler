@@ -51,7 +51,35 @@ class P {
 }
 echo (new P)->m();
 PHP;
-        $this->assertSame('', $this->runVm($code));
+        if (CompilerVersion::supportsPropertyHooks()) {
+            $this->expectCompileError($code, 'Cannot use __PROPERTY__ outside of a property hook');
+
+            return;
+        }
+
+        $runtime = new Runtime(Runtime::MODE_NORMAL);
+        $block = $runtime->parseAndCompile($code, 'magic-constants-test.php');
+        $this->assertNotNull($block);
+        $this->expectException(\Error::class);
+        $this->expectExceptionMessage('Undefined constant "__PROPERTY__"');
+        ob_start();
+        try {
+            $runtime->run($block);
+        } finally {
+            ob_end_clean();
+        }
+    }
+
+    public function testPropertyMagicConstTopLevelOutsideHookOn84Profile(): void
+    {
+        if (!CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('requires PHP_COMPILER_PROFILE=8.4 property hooks gate');
+        }
+
+        $this->expectCompileError(
+            "<?php\necho __PROPERTY__, \"\\n\";",
+            'Cannot use __PROPERTY__ outside of a property hook'
+        );
     }
 
     public function testFunctionMagicConstInClassConst(): void
@@ -138,5 +166,23 @@ PHP;
         $out = ob_get_clean();
 
         return is_string($out) ? $out : '';
+    }
+
+    private function expectCompileError(string $code, string $message): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime(Runtime::MODE_NORMAL);
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage($message);
+            $runtime->parseAndCompile($code, 'magic-constants-test.php');
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
     }
 }

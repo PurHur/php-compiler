@@ -80,7 +80,7 @@ final class JitHttpResponseCode
             return $ptr;
         }
 
-        if (JITVariable::TYPE_NULL === $arg->type) {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             $context->builder->call(
                 $context->lookupFunction('__phpc_http_response_code_apply'),
                 $i8->constInt(Hrc::APPLY_GET, false),

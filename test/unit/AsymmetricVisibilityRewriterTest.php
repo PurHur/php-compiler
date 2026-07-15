@@ -76,7 +76,8 @@ PHP;
         );
     }
 
-    public function testRewriteUnparenthesizedPublicProtectedSet(): void
+    /** @covers issue #18820 — unparenthesized public protected(set) rewrites on 8.4 forward profile */
+    public function testRewriteUnparenthesizedPublicProtectedSetRejects(): void
     {
         $source = <<<'PHP'
 <?php
@@ -84,6 +85,13 @@ class Demo {
     public protected(set) string $name = 'x';
 }
 PHP;
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+            AsymmetricVisibilityRewriter::rewrite($source);
+
+            return;
+        }
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
         self::assertStringContainsString(
             '/*phpc-asymmetric-set:protected*/ /*phpc-asymmetric-explicit-read*/ public string $name',
@@ -91,8 +99,8 @@ PHP;
         );
     }
 
-    /** @covers issue #17114 — default 8.4.0-dev line without forward profile env */
-    public function testRewriteUnparenthesizedPublicPrivateSetWithoutForwardProfile(): void
+    /** @covers issue #18820 — unparenthesized public private(set) rewrites on 8.4 forward profile */
+    public function testRewriteUnparenthesizedPublicPrivateSetRejects(): void
     {
         $source = <<<'PHP'
 <?php
@@ -100,6 +108,13 @@ class Demo {
     public private(set) string $name = 'x';
 }
 PHP;
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+            AsymmetricVisibilityRewriter::rewrite($source);
+
+            return;
+        }
         $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
         self::assertStringContainsString(
             '/*phpc-asymmetric-set:private*/ /*phpc-asymmetric-explicit-read*/ public string $name',
@@ -273,7 +288,7 @@ PHP;
         );
     }
 
-    public function testRewriteUnparenthesizedPublicPrivateSet(): void
+    public function testRewriteUnparenthesizedPublicPrivateSetRejectsOnForwardProfile(): void
     {
         $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
@@ -289,7 +304,7 @@ PHP;
         );
     }
 
-    public function testPromotedExplicitReadBeforePrivateSetRewrites(): void
+    public function testPromotedExplicitReadBeforePrivateSetRejects(): void
     {
         $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'
@@ -305,7 +320,7 @@ PHP;
         );
     }
 
-    public function testPromotedExplicitReadBeforeProtectedSetRewrites(): void
+    public function testPromotedExplicitReadBeforeProtectedSetRejects(): void
     {
         $this->requireParenthesizedAsymmetricSetModifier();
         $source = <<<'PHP'

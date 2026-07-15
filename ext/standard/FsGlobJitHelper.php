@@ -30,6 +30,8 @@ final class FsGlobJitHelper
     {
         $result = VmDir::scandir($path, $sortOrder);
         if (false === $result) {
+            ScandirFailureJitHelper::emitWarnings($path);
+
             return null;
         }
 

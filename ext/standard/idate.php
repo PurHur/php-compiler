@@ -10,15 +10,16 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** idate() — format local date part as integer (VM VmDate; JIT IdateJitHelper, #6830, #9181). */
 final class idate extends Internal
 {
-    private const MSG_FORMAT_ONE_CHAR = 'idate format is one char';
+    private const MSG_FORMAT_ONE_CHAR = 'idate(): idate format is one char';
 
-    private const MSG_UNRECOGNIZED = 'Unrecognized date format token';
+    private const MSG_UNRECOGNIZED = 'idate(): Unrecognized date format token';
 
     public function __construct()
     {
@@ -31,11 +32,7 @@ final class idate extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('idate() requires one or two arguments');
         }
-        $formatVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $formatVar->type) {
-            throw new \LogicException('idate() format must be a string in this compiler build');
-        }
-        $format = $formatVar->toString();
+        $format = self::resolveFormatArg($frame);
         if (1 !== \strlen($format)) {
             $this->triggerWarning($frame, self::MSG_FORMAT_ONE_CHAR);
             BuiltinExecute::writeReturn($frame, static function ($ret): void {
@@ -78,6 +75,15 @@ final class idate extends Internal
         }
 
         return JitIdate::invoke($context, $args[0], $timestamp);
+    }
+
+    private static function resolveFormatArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, 0, 'idate', 'format');
+        }
+
+        return VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'idate', 0, 'format');
     }
 
     private function triggerWarning(Frame $frame, string $message): void

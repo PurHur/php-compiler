@@ -12,6 +12,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -369,6 +370,47 @@ final class VmFilter
         }
 
         return $out;
+    }
+
+    /**
+     * Z_PARAM_LONG $filter — null coerces to 0 on default profile (ext/filter/filter.c; #18943).
+     */
+    public static function parseFilterIdArg(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        string $paramName,
+        int $userArgIndex
+    ): int {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireBuiltinTypedInt($frame, $argIndex, $function, $paramName)->toInt();
+        }
+        $resolved = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return $resolved->toInt();
+        }
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return 0;
+        }
+        $given = match ($resolved->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => $resolved->toObject()->class->name,
+            default => 'mixed',
+        };
+
+        throw new \TypeError(
+            \sprintf(
+                '%s(): Argument #%d ($%s) must be of type int, %s given',
+                $function,
+                $userArgIndex,
+                $paramName,
+                $given
+            )
+        );
     }
 
     public static function resolveInputType(Variable $var, string $fn): int

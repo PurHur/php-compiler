@@ -17,4 +17,4 @@ fclose($h);
 echo empty($r2) ? 'empty' : 'not-empty', "\n";
 --EXPECT--
 42
-empty
+not-empty

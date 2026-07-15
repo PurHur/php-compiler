@@ -26,7 +26,7 @@ final class ModuleRegistryTest extends TestCase
         $this->assertTrue(VmInfo::extension_loaded('zlib'));
         $this->assertTrue(VmInfo::extension_loaded('openssl'));
         $this->assertFalse(VmInfo::extension_loaded('curl'));
-        $this->assertFalse(VmInfo::extension_loaded('sqlite3'));
+        $this->assertTrue(VmInfo::extension_loaded('sqlite3'));
         $this->assertFalse(VmInfo::extension_loaded('nonexistent_xyz'));
 
         $this->assertNotFalse(VmInfo::phpversion('zip'));
@@ -100,5 +100,17 @@ final class ModuleRegistryTest extends TestCase
         $this->assertContains('strlen', $advertised);
 
         unset($runtime);
+    }
+
+    public function testReflectionOwningExtensionRoutesBundledModules(): void
+    {
+        $this->assertSame('core', ModuleRegistry::reflectionOwningExtension('func_num_args'));
+        $this->assertSame('standard', ModuleRegistry::reflectionOwningExtension('is_array'));
+        $this->assertSame('standard', ModuleRegistry::reflectionOwningExtension('strptime'));
+        $this->assertSame('hash', ModuleRegistry::reflectionOwningExtension('hash_hmac'));
+        $this->assertSame('spl', ModuleRegistry::reflectionOwningExtension('spl_autoload'));
+        $this->assertSame('random', ModuleRegistry::reflectionOwningExtension('mt_rand'));
+        $this->assertSame('curl', ModuleRegistry::reflectionOwningExtension('curl_version'));
+        $this->assertSame('standard', ModuleRegistry::reflectionOwningExtension('socket_get_status'));
     }
 }

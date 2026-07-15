@@ -385,7 +385,7 @@ final class BuiltinExceptionSupport
             return self::materializeTypeError($ctx, $error->getMessage(), $file, $line);
         }
         if ($error instanceof \DivisionByZeroError) {
-            return self::materializeDivisionByZeroError($ctx, $error->getMessage());
+            return self::materializeDivisionByZeroError($ctx, $error->getMessage(), $file, $line);
         }
         if ($error instanceof \ArithmeticError) {
             return self::materializeArithmeticError($ctx, $error->getMessage());
@@ -421,14 +421,19 @@ final class BuiltinExceptionSupport
         return $var;
     }
 
-    public static function materializeDivisionByZeroError(Context $ctx, string $message): Variable
-    {
+    public static function materializeDivisionByZeroError(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
         if (!isset($ctx->classes[self::CLASS_DIVISION_BY_ZERO_ERROR])) {
             throw new \LogicException('DivisionByZeroError builtin class is not registered');
         }
         $entry = $ctx->classes[self::CLASS_DIVISION_BY_ZERO_ERROR];
         $obj = new ObjectEntry($entry);
         $obj->getProperty(self::PROP_MESSAGE)->string($message);
+        ExceptionSupport::stampThrowableSite($obj, $file, $line);
         $obj->constructed = true;
         $var = new Variable();
         $var->object($obj);

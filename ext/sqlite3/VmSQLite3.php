@@ -1,0 +1,217 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\sqlite3;
+
+use PHPCfg\Func as CfgFunc;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\VmString;
+
+/**
+ * SQLite3 VM class (php-src ext/sqlite3/sqlite3.c; issue #3434).
+ */
+final class VmSQLite3
+{
+    public const CLASS_LC = 'sqlite3';
+
+    /** @var array<int, Sqlite3State> */
+    private static array $store = [];
+
+    public static function registerClass(Context $ctx): void
+    {
+        if (isset($ctx->classes[self::CLASS_LC])) {
+            return;
+        }
+
+        $entry = new ClassEntry('SQLite3');
+        $entry->isInternal = true;
+        foreach (Sqlite3Constants::CLASS_CONSTANTS as $name => $value) {
+            $const = new Variable(Variable::TYPE_INTEGER);
+            $const->int($value);
+            $entry->constants[$name] = $const;
+            $entry->constNames[$name] = Sqlite3Constants::CLASS_CONSTANT_NAMES[$name];
+        }
+
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $entry->constructor = new SQLite3Construct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+
+        $methods = [
+            'close' => new SQLite3Close(),
+            'exec' => new SQLite3Exec(),
+            'querysingle' => new SQLite3QuerySingle(),
+        ];
+        foreach ($methods as $name => $method) {
+            $entry->methods[$name] = $method;
+            $entry->methodVisibility[$name] = $pub;
+            $entry->methodNames[$name] = self::methodDisplayName($name);
+        }
+
+        $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    public static function initObject(ObjectEntry $entry, string $filename, int $flags): void
+    {
+        if (!VmSqlite3Native::available()) {
+            throw new \LogicException('SQLite3 requires libsqlite3 FFI in this compiler build');
+        }
+
+        $state = new Sqlite3State();
+        $state->filename = $filename;
+        $state->db = VmSqlite3Native::open($filename, $flags);
+        self::$store[$entry->id] = $state;
+        $entry->constructed = true;
+    }
+
+    public static function requireReceiver(Variable $var, string $label): ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf('%s must be called on SQLite3, %s given', $label, self::typeLabel($var)));
+        }
+        $object = $var->toObject();
+        if (self::CLASS_LC !== strtolower($object->class->name)) {
+            throw new \TypeError(\sprintf('%s must be called on SQLite3, %s given', $label, $object->class->name));
+        }
+        if (!$object->constructed) {
+            throw new \TypeError(\sprintf('%s must be called on SQLite3, uninitialized %s given', $label, $object->class->name));
+        }
+
+        return $object;
+    }
+
+    public static function state(ObjectEntry $entry): Sqlite3State
+    {
+        $state = self::$store[$entry->id] ?? null;
+        if (null === $state) {
+            throw new \LogicException('SQLite3 internal state missing in this compiler build');
+        }
+
+        return $state;
+    }
+
+    public static function requireOpenDb(ObjectEntry $entry, string $label): \FFI\CData
+    {
+        $state = self::state($entry);
+        if ($state->closed || null === $state->db) {
+            throw new \LogicException(\sprintf('%s(): The SQLite3 object has not been properly initialized', $label));
+        }
+
+        return $state->db;
+    }
+
+    public static function coerceStringArg(Variable $var, string $label, int $index, string $paramName): string
+    {
+        return VmString::coerceStringBuiltinArg($var, $label, $index, $paramName);
+    }
+
+    public static function coerceIntArg(Variable $var, string $label, int $index, string $paramName, int $default = 0): int
+    {
+        if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
+            return $default;
+        }
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return $resolved->toInt();
+        }
+        if (Variable::TYPE_DOUBLE === $resolved->type) {
+            return (int) $resolved->toFloat();
+        }
+        if (Variable::TYPE_BOOL === $resolved->type) {
+            return $resolved->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_STRING === $resolved->type) {
+            $raw = $resolved->toString();
+            if ('' === $raw) {
+                return 0;
+            }
+            if (is_numeric($raw)) {
+                return (int) $raw;
+            }
+        }
+
+        throw new \TypeError(\sprintf('%s(): Argument #%d ($%s) must be of type int, %s given', $label, $index + 1, $paramName, self::typeLabel($var)));
+    }
+
+    public static function coerceBoolArg(Variable $var, string $label, int $index, string $paramName, bool $default = false): bool
+    {
+        if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
+            return $default;
+        }
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_BOOL === $resolved->type) {
+            return $resolved->toBool();
+        }
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return 0 !== $resolved->toInt();
+        }
+
+        throw new \TypeError(\sprintf('%s(): Argument #%d ($%s) must be of type bool, %s given', $label, $index + 1, $paramName, self::typeLabel($var)));
+    }
+
+    public static function assignReturnValue(Variable $returnVar, array|string|int|float|null|false $value): void
+    {
+        if (false === $value) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        if (null === $value) {
+            $returnVar->null();
+
+            return;
+        }
+        if (\is_int($value)) {
+            $returnVar->int($value);
+
+            return;
+        }
+        if (\is_float($value)) {
+            $returnVar->float($value);
+
+            return;
+        }
+        if (\is_string($value)) {
+            $returnVar->string($value);
+
+            return;
+        }
+        $ht = new \PHPCompiler\VM\HashTable();
+        foreach ($value as $key => $item) {
+            $slot = new Variable();
+            self::assignReturnValue($slot, $item);
+            $ht->add((string) $key, $slot);
+        }
+        $returnVar->array($ht);
+    }
+
+    private static function methodDisplayName(string $lc): string
+    {
+        return match ($lc) {
+            'querysingle' => 'querySingle',
+            default => $lc,
+        };
+    }
+
+    private static function typeLabel(Variable $var): string
+    {
+        $resolved = $var->resolveIndirect();
+
+        return match ($resolved->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOL => 'bool',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => $resolved->toObject()->class->name,
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
+    }
+}

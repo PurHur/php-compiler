@@ -187,7 +187,7 @@ class Helper {
 return_double:
         return new Variable($this->context, Variable::TYPE_NATIVE_DOUBLE, Variable::KIND_VALUE, $result);
 return_long:
-        return new Variable($this->context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $result);
+        return $this->nativeLongResultVariable($result);
 return_bool:
         return new Variable($this->context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $result);
 return_string:
@@ -1839,7 +1839,7 @@ restart:
 return_double:
         return new Variable($this->context, Variable::TYPE_NATIVE_DOUBLE, Variable::KIND_VALUE, $result);
 return_long:
-        return new Variable($this->context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $result);
+        return $this->nativeLongResultVariable($result);
 return_bool:
         return new Variable($this->context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $result);
     }
@@ -2098,6 +2098,18 @@ return_bool:
         }
 
         return null;
+    }
+
+    /** Preserve folded int literals for compile-time consumers (#19090). */
+    private function nativeLongResultVariable($result): Variable
+    {
+        $var = new Variable($this->context, Variable::TYPE_NATIVE_LONG, Variable::KIND_VALUE, $result);
+        $lib = $this->context->llvm->lib;
+        if (null !== $lib->LLVMIsAConstantInt($result->value)) {
+            $var->compileTimeLong = (int) $lib->LLVMConstIntGetZExtValue($result->value);
+        }
+
+        return $var;
     }
 
 }

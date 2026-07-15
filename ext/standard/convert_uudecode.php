@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** convert_uudecode() — decode uuencoded string (php-src ext/standard/uuencode.c). */
@@ -30,7 +31,7 @@ final class convert_uudecode extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'convert_uudecode', 0, 'string');
+        $data = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'convert_uudecode', 'string');
         $result = VmString::convert_uudecode($data);
         if (false === $result) {
             if (null !== $frame->vmContext) {
@@ -57,7 +58,7 @@ final class convert_uudecode extends Internal
 
         return JitConvertUudecode::decode(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'convert_uudecode', 0, 'string')
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'convert_uudecode', 0, 'string')
         );
     }
 }

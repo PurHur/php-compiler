@@ -14,8 +14,13 @@ use PHPCompiler\VM\Variable;
  */
 final class VmParseIni
 {
-    public static function parseString(string $ini, bool $processSections, int $scannerMode, ?Frame $frame = null): array|false
-    {
+    public static function parseString(
+        string $ini,
+        bool $processSections,
+        int $scannerMode,
+        ?Frame $frame = null,
+        ?string $source = null
+    ): array|false {
         if (!\in_array($scannerMode, [
             ParseIniEngine::SCANNER_NORMAL,
             ParseIniEngine::SCANNER_RAW,
@@ -31,7 +36,7 @@ final class VmParseIni
         $parsed = ParseIniEngine::parse($ini, $processSections, $scannerMode);
         if (false === $parsed) {
             if (null !== $frame) {
-                self::triggerSyntaxWarning($frame);
+                self::triggerSyntaxWarning($frame, $source);
             }
 
             return false;
@@ -54,7 +59,7 @@ final class VmParseIni
             return false;
         }
 
-        return self::parseString($contents, $processSections, $scannerMode);
+        return self::parseString($contents, $processSections, $scannerMode, $frame, $filename);
     }
 
     public static function assignParsedResult(Variable $returnVar, array|false $parsed): void
@@ -121,7 +126,7 @@ final class VmParseIni
         );
     }
 
-    public static function triggerSyntaxWarning(Frame $frame): void
+    public static function triggerSyntaxWarning(Frame $frame, ?string $source = null): void
     {
         if (null === $frame->vmContext) {
             return;
@@ -129,7 +134,7 @@ final class VmParseIni
         $detail = ParseIniEngine::lastSyntaxError() ?? "unexpected '='";
         $line = ParseIniEngine::lastSyntaxLine() ?? 1;
         $frame->vmContext->errors->triggerError(
-            'syntax error, '.$detail.' in Unknown on line '.$line,
+            'syntax error, '.$detail.' in '.($source ?? 'Unknown').' on line '.$line,
             ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,

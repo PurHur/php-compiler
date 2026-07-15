@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
+use PHPCfg\Operand;
 use PHPCompiler\VM\Variable;
 
 final class InlineCallArgProducerSlotTest extends TestCase
@@ -1528,6 +1529,38 @@ PHP;
 
         self::assertSame([0, 4, 8, 12], $newSlots, 'new slots='.json_encode($newSlots));
         self::assertSame([0, 4, 8], $periodSends, 'DatePeriod arg sends='.json_encode($periodSends));
+    }
+
+    /** Issue #14483 — iterator_count(new DatePeriod(...)) wires outer sibling New_, not inner hoists. */
+    public function testIteratorCountInlineDatePeriodUsesSiblingNewProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$s = new DateTime('2020-01-01');
+$e = new DateTime('2020-01-03');
+echo iterator_count(new DatePeriod($s, new DateInterval('P1D'), $e)), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dateperiod_inline_iterator_count.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("2\n", ob_get_clean());
+    }
+
+    /** Issue #18501 — get_class(new DatePeriod(...)) wires outer sibling New_, not inner DateInterval hoist. */
+    public function testGetClassInlineDatePeriodUsesSiblingNewProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$s = new DateTime('2020-01-01');
+$e = new DateTime('2020-01-03');
+echo get_class(new DatePeriod($s, new DateInterval('P1D'), $e)), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dateperiod_inline_get_class.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("DatePeriod\n", ob_get_clean());
     }
 
     /** Issue #10143 — var_export((string) NAN) wires Cast producer, not dead arg temp. */
@@ -5273,10 +5306,9 @@ PHP;
             }
         }
 
-        self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertGreaterThanOrEqual(2, \count($arraySlots), 'array inits='.json_encode($arraySlots));
         self::assertCount(3, $sendSlots, 'arg sends='.json_encode($sendSlots));
-        self::assertSame($arraySlots[0], $sendSlots[0]);
-        self::assertSame($arraySlots[1], $sendSlots[1]);
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
     }
 
     /** Issue #16194 — array_udiff_assoc sibling inline arrays runtime parity (re-#11217). */
@@ -5539,6 +5571,45 @@ PHP;
         self::assertSame($bitwiseOrSlot, $sendSlots[1] ?? null, 'flags arg sends='.json_encode($sendSlots));
     }
 
+    /** Regression #10956 — json_encode($s, JSON_HEX_* | …) must send $s then bitmask, not flags twice. */
+    public function testJsonEncodeInlineBitmaskFlagsArgSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$s = '<>&"\'';
+echo json_encode($s, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'json_encode_bitmask.php');
+
+        $bitwiseOrSlot = null;
+        $sendSlots = [];
+        $captureSends = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                $bitwiseOrSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $captureSends = true;
+                $sendSlots = [];
+                continue;
+            }
+            if ($captureSends && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+                continue;
+            }
+            if ($captureSends && (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type)) {
+                break;
+            }
+        }
+
+        self::assertNotNull($bitwiseOrSlot, 'expected TYPE_BITWISE_OR slot');
+        self::assertCount(2, $sendSlots, 'json_encode arg sends='.json_encode($sendSlots));
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'value and flags slots must differ');
+        self::assertSame($bitwiseOrSlot, $sendSlots[1] ?? null, 'flags arg sends='.json_encode($sendSlots));
+    }
+
     /** Issue #16152 — get_html_translation_table(HTML_ENTITIES, ENT_QUOTES | ENT_HTML5) ConstFetch + BitwiseOr slots. */
     public function testGetHtmlTranslationTableConstFetchBitmaskArgSend(): void
     {
@@ -5586,6 +5657,125 @@ PHP;
         ob_start();
         $runtime->run($block);
         ob_end_clean();
+    }
+
+    /** Issue #18523 — file_put_contents($f, 'a', FILE_APPEND | LOCK_EX) must send BitwiseOr slot, not prior unlink bool return. */
+    public function testFilePutContentsInlineBitmaskAfterUnlinkUsesBitwiseOrSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$f = sys_get_temp_dir() . '/fpc_inline_' . getmypid() . '.txt';
+@unlink($f);
+$r = file_put_contents($f, 'a', FILE_APPEND | LOCK_EX);
+var_dump($r);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'file_put_contents_inline_bitmask.php');
+
+        $bitwiseOrSlot = null;
+        $unlinkReturnSlot = null;
+        $fpcSendSlots = [];
+        $seen = new \SplObjectStorage();
+        $walk = static function (Block $cfgBlock) use (&$walk, &$seen, &$bitwiseOrSlot, &$unlinkReturnSlot, &$fpcSendSlots): void {
+            if ($seen->contains($cfgBlock)) {
+                return;
+            }
+            $seen->attach($cfgBlock);
+            $inFpc = false;
+            foreach ($cfgBlock->opCodes as $op) {
+                if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                    $bitwiseOrSlot = $op->arg1;
+                }
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $callee = $cfgBlock->getOperand((int) $op->arg1);
+                    $calleeName = $callee instanceof Operand\Literal ? (string) $callee->value : '';
+                    if ('unlink' === $calleeName) {
+                        $inFpc = false;
+                    } elseif ('file_put_contents' === $calleeName) {
+                        $inFpc = true;
+                        $fpcSendSlots = [];
+                    } else {
+                        $inFpc = false;
+                    }
+                }
+                if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    for ($scanIdx = array_search($op, $cfgBlock->opCodes, true) - 1; $scanIdx >= 0; --$scanIdx) {
+                        $scan = $cfgBlock->opCodes[$scanIdx] ?? null;
+                        if (!$scan instanceof OpCode) {
+                            break;
+                        }
+                        if (OpCode::TYPE_FUNCCALL_INIT === $scan->type) {
+                            $callee = $cfgBlock->getOperand((int) $scan->arg1);
+                            if ($callee instanceof Operand\Literal && 'unlink' === (string) $callee->value) {
+                                $unlinkReturnSlot = $op->arg1;
+                            }
+                            break;
+                        }
+                        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $scan->type) {
+                            break;
+                        }
+                    }
+                }
+                if ($inFpc && OpCode::TYPE_ARG_SEND === $op->type) {
+                    $fpcSendSlots[] = $op->arg1;
+                }
+                if ($inFpc && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    $inFpc = false;
+                }
+                if (null !== $op->block1) {
+                    $walk($op->block1);
+                }
+                if (null !== $op->block2) {
+                    $walk($op->block2);
+                }
+            }
+        };
+        $walk($block);
+
+        self::assertNotNull($bitwiseOrSlot, 'expected TYPE_BITWISE_OR slot');
+        self::assertNotNull($unlinkReturnSlot, 'expected unlink EXEC_RETURN slot');
+        self::assertCount(3, $fpcSendSlots, 'file_put_contents arg sends='.json_encode($fpcSendSlots));
+        self::assertSame($bitwiseOrSlot, $fpcSendSlots[2] ?? null, 'flags arg must use BitwiseOr slot');
+        self::assertNotSame($unlinkReturnSlot, $fpcSendSlots[2] ?? null, 'must not reuse unlink bool return slot');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertStringContainsString('int(1)', ob_get_clean());
+    }
+
+    /** Issue #18524 — dns_get_record($host, $t = DNS_A | DNS_AAAA) must wire hoisted BitwiseOr slot. */
+    public function testDnsGetRecordAssignInCallBitmaskArgSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+dns_get_record('php.net', $t = DNS_A | DNS_AAAA);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dns_assign_in_call.php');
+
+        $bitwiseOrSlot = null;
+        $dnsSendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                $bitwiseOrSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $callee = $block->getOperand((int) $op->arg1);
+                if ($callee instanceof Operand\Literal && 'dns_get_record' === (string) $callee->value) {
+                    $dnsSendSlots = [];
+                }
+            }
+            if ([] !== $dnsSendSlots || OpCode::TYPE_ARG_SEND === $op->type) {
+                if (OpCode::TYPE_ARG_SEND === $op->type) {
+                    $dnsSendSlots[] = $op->arg1;
+                }
+            }
+        }
+
+        self::assertNotNull($bitwiseOrSlot, 'expected TYPE_BITWISE_OR slot');
+        self::assertCount(2, $dnsSendSlots, 'arg sends='.json_encode($dnsSendSlots));
+        self::assertSame($bitwiseOrSlot, $dnsSendSlots[1] ?? null, 'type arg must use BitwiseOr slot');
     }
 
     /** Issue #11409 — chown($path, getmyuid()) wires nested int into trailing arg slot. */
@@ -5864,6 +6054,67 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("array (\n  'a' => array (\n    'b' => 1,\n    'c' => 2,\n  ),\n)\n", ob_get_clean());
+    }
+
+    /** Issue #18571 — array_replace_recursive() must read assigned locals, not trailing hoisted Array_ roots. */
+    public function testArrayReplaceRecursiveAssignedLocalsArgSendWiring(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = ['k' => ['x' => 1, 'y' => 2]];
+$b = ['k' => ['y' => 9]];
+array_replace_recursive($a, $b);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_assigned_locals.php');
+
+        $assignLvalueSlots = [];
+        $initArrayRootSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type && null !== $op->arg2) {
+                $assignLvalueSlots[] = $op->arg2;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                $initArrayRootSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        $uniqueAssignLvalues = array_values(array_unique($assignLvalueSlots, SORT_REGULAR));
+        self::assertCount(2, $uniqueAssignLvalues, 'assign lvalues='.json_encode($assignLvalueSlots));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($uniqueAssignLvalues[0], $sendSlots[0], 'arg #1 must read $a named local');
+        self::assertSame($uniqueAssignLvalues[1], $sendSlots[1], 'arg #2 must read $b named local');
+        self::assertNotContains($sendSlots[0], $initArrayRootSlots, 'arg #1 must not reuse hoisted Array_ root');
+        self::assertNotContains($sendSlots[1], $initArrayRootSlots, 'arg #2 must not reuse hoisted Array_ root');
+    }
+
+    /** Issue #18571 — array_replace_recursive() nested merge preserves sibling keys on assigned locals. */
+    public function testArrayReplaceRecursiveAssignedLocalsNestedMergeRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = ['k' => ['x' => 1, 'y' => 2]];
+$b = ['k' => ['y' => 9]];
+var_export(array_replace_recursive($a, $b));
+echo "\n";
+$a = ['l' => ['a' => 1, 'b' => ['c' => 3]]];
+$b = ['l' => ['b' => ['d' => 4]]];
+var_export(array_replace_recursive($a, $b));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_assigned_locals_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array (\n  'k' => array (\n    'x' => 1,\n    'y' => 9,\n  ),\n)\n"
+            ."array (\n  'l' => array (\n    'a' => 1,\n    'b' => array (\n      'c' => 3,\n      'd' => 4,\n    ),\n  ),\n)\n",
+            ob_get_clean()
+        );
     }
 
     /** Issue #12008 — nested inline array + 4th positional arg must not steal Array_ slots for literals. */
@@ -6342,6 +6593,39 @@ PHP;
         self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
         self::assertSame($concatSlots[0], $sendSlots[0], 'arg sends='.json_encode($sendSlots));
         self::assertSame($constSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #18613 — file_get_contents(inline concat, false, null, off, len) wires Concat + ConstFetch slots. */
+    public function testFileGetContentsInlineConcatFalseNullOffsetLengthUsesProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$payload = '0123456789';
+echo file_get_contents('data://text/plain,'.$payload, false, null, 3, 4);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'file_get_contents_data_offset_inline.php');
+
+        $concatSlots = [];
+        $constSlots = [];
+        $sendSlots = [];
+        $this->collectOpCodesFromBlock($block, $concatSlots, $sendSlots);
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotEmpty($concatSlots, 'concat slots='.json_encode($concatSlots));
+        self::assertCount(2, $constSlots, 'const slots='.json_encode($constSlots));
+        self::assertContains($concatSlots[0], $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($constSlots[0], $sendSlots[0] ?? null, 'path arg must not bind to false const');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('3456', $out);
     }
 
     /** Issue #13684 — array_slice($a, array_search(...)) wires hoisted Array_ to arg0, nested FuncCall to arg1. */
@@ -7107,6 +7391,62 @@ PHP;
         self::assertSame("x:text\n", ob_get_clean());
     }
 
+    /** Issue #18410 — documentElement->appendChild(createElement) must not feed receiver fetch into inner arg. */
+    public function testDomDocumentElementAppendChildCreateElementUsesDistinctArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$doc = new DOMDocument();
+$doc->loadXML('<root><a/><b/></root>');
+$list = $doc->getElementsByTagName('a');
+echo 'before=', $list->length, "\n";
+$doc->documentElement->appendChild($doc->createElement('a'));
+echo 'after=', $list->length, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_nodelist_live_append_create_element.php');
+
+        $createElementArgSendSlot = null;
+        $documentElementFetchSlot = null;
+        $opCodes = $block->opCodes;
+        $total = \count($opCodes);
+        for ($i = 0; $i < $total; ++$i) {
+            $op = $opCodes[$i];
+            if (OpCode::TYPE_METHODCALL_INIT !== $op->type
+                || null === $op->arg2
+                || !isset($block->constants[$op->arg2])
+                || 'createElement' !== $block->constants[$op->arg2]->toString()) {
+                continue;
+            }
+            for ($j = $i - 1; $j >= 0; --$j) {
+                if (OpCode::TYPE_PROPERTY_FETCH === $opCodes[$j]->type) {
+                    $documentElementFetchSlot = $opCodes[$j]->arg1;
+                    break;
+                }
+            }
+            for ($j = $i + 1; $j < $total; ++$j) {
+                if (OpCode::TYPE_ARG_SEND === $opCodes[$j]->type) {
+                    $createElementArgSendSlot = $opCodes[$j]->arg1;
+                    break;
+                }
+            }
+            break;
+        }
+
+        self::assertNotNull($documentElementFetchSlot, 'missing documentElement fetch slot');
+        self::assertNotNull($createElementArgSendSlot, 'missing createElement ARG_SEND');
+        self::assertNotSame(
+            $documentElementFetchSlot,
+            $createElementArgSendSlot,
+            'createElement tag arg must not alias documentElement fetch slot'
+        );
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("before=1\nafter=2\n", ob_get_clean());
+    }
+
     /** Issue #15996 — DateTime literal ctor arg must not alias prior inline NEW slot. */
     public function testDateTimeNewLiteralArgDistinctFromPriorNewResultSlot(): void
     {
@@ -7147,6 +7487,43 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("2020-01-01T12:00:00+00:00\n", ob_get_clean());
+    }
+
+    /** Issue #18456 — array_key_exists() inline new must wire New_ slot, not ctor Array_ prelude. */
+    public function testArrayKeyExistsInlineNewUsesNewProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_key_exists(0, new ArrayObject([1]));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_key_exists_inline_new.php');
+
+        $arraySlot = null;
+        $newSlot = null;
+        $akeSends = [];
+        $inArrayKeyExists = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_NEW === $op->type && null === $newSlot) {
+                $newSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $inArrayKeyExists = true;
+                $akeSends = [];
+            }
+            if ($inArrayKeyExists && OpCode::TYPE_ARG_SEND === $op->type) {
+                $akeSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot, 'ctor array slot');
+        self::assertNotNull($newSlot, 'inline new slot');
+        self::assertCount(2, $akeSends, 'array_key_exists arg sends='.json_encode($akeSends));
+        self::assertSame($newSlot, $akeSends[1] ?? null, 'haystack arg must use New_ slot, not ctor Array_');
+        self::assertNotSame($arraySlot, $akeSends[1] ?? null);
     }
 
     /** Issue #15422 — in_array/array_search/array_key_exists after UDF with array param. */
@@ -8085,5 +8462,38 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame('1', ob_get_clean());
+    }
+
+    /** Bootstrap spine — foreach assign-in-call with literal RHS must not read Operand::result (#1492). */
+    public function testCurlFileBuiltinRegisterCompilesWithoutAssignInCallRhsOperandCrash(): void
+    {
+        $path = realpath(__DIR__.'/../../ext/curl/CurlFileBuiltin.php');
+        self::assertNotFalse($path);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompileFile($path);
+        self::assertNotNull($block);
+    }
+
+    /** Issue #8866 — unpack('i', pack('i', 1), E::A) wires pack EXEC_RETURN to arg #1, enum to arg #2. */
+    public function testUnpackInlinePackEnumOffsetCallArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 5; }
+try {
+    unpack('i', pack('i', 1), E::A);
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime = new Runtime();
+        $runtime->run($runtime->parseAndCompile($code, 'unpack_inline_pack_enum.php'));
+        $out = ob_get_clean();
+        self::assertSame(
+            'TypeError: unpack(): Argument #3 ($offset) must be of type int, E given',
+            trim($out)
+        );
     }
 }

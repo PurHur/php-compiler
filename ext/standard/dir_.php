@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** dir() — open directory as Directory object (php-src ext/standard/dir.c; #13368). */
@@ -24,8 +23,7 @@ final class dir_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('dir() requires exactly one argument in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'dir', 'directory', 0, $frame);
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'dir', 0, 'directory');
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'dir', 0, 'directory', $frame);
         if (null === $frame->returnVar) {
             return;
         }

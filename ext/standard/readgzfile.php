@@ -29,7 +29,7 @@ final class readgzfile extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'readgzfile', 0, 'filename');
+        $filename = VmZlibArg::resolveFilenameString($frame, 'readgzfile');
         $useIncludePath = 0;
         if (2 === $argc) {
             $useIncludePath = VmMath::parseIntBuiltinArg(
@@ -62,7 +62,7 @@ final class readgzfile extends Internal
 
         return JitReadgzfile::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'readgzfile', 0, 'filename'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'readgzfile', 0, 'filename'),
             $useIncludePath
         );
     }

@@ -4,17 +4,26 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\gd;
 
-use PHPCompiler\ext\standard\ModuleRegistry;
-
 /**
- * ext/gd surface advertisement — php-src ext/gd/gd.c (#11675).
+ * ext/gd surface advertisement — php-src ext/gd/gd.c (#11675, #6215).
  *
- * imagecreate/GdImage register only when {@see ModuleRegistry::extensionLoaded}('gd') is true (#3496).
+ * Decode builtins ({@see imagecreatefromstring}) register when this returns true.
+ * Canvas drawing ({@see imagecreate}) remains stubbed until libgd parity (#3496).
  */
 final class GdExtensionPolicy
 {
     public static function advertisesExtension(): bool
     {
-        return ModuleRegistry::extensionLoaded('gd');
+        return true;
+    }
+
+    public static function advertisesDecodeFromString(): bool
+    {
+        return self::advertisesExtension();
+    }
+
+    public static function advertisesDrawing(): bool
+    {
+        return self::advertisesExtension();
     }
 }

@@ -4,21 +4,31 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
-use PHPLLVM\BasicBlock;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
- * JIT/AOT link for __compiler_base64_decode via Base64JitHelper PHP (#17234, #17249).
+ * JIT/AOT link for base64_decode() via Base64JitHelper PHP (#17234, #17249, #18918).
  *
+ * User-script AOT uses HelperRuntimeCache prelinked units (#15889) instead of LLVM defer.
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/base64.c — PHP_FUNCTION(base64_decode)
  */
 final class StringBase64Decode
 {
+    private const ABI = '__compiler_base64_decode';
+
+    private const HELPER_PATH = '/ext/standard/Base64JitHelper.php';
+
+    private const DECODE_HELPER = 'PHPCompiler\\ext\\standard\\Base64JitHelper::decodeArgv';
+
+    private const BRIDGE_ENTRY = 'base64_decode_bridge_entry';
+
     /** @var list<string> */
-    private const ABI_FUNCTIONS = [
-        '__compiler_base64_decode',
+    private const COMPILED_HELPERS = [
+        self::DECODE_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -33,80 +43,39 @@ final class StringBase64Decode
 
     public static function implement(Context $context): void
     {
-        $savedBlock = self::captureInsertBlock($context);
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            StringBase64DecodeLlvm::implement($context);
-            self::restoreInsertBlock($context, $savedBlock);
-
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
-        $probe = $context->module->getNamedFunction('__compiler_base64_decode');
+        $probe = $context->module->getNamedFunction(self::ABI);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-            self::restoreInsertBlock($context, $savedBlock);
+            $context->registerFunction(self::ABI, $probe);
 
             return;
         }
 
-        Base64JitLink::ensureJitHelpersCompiled($context);
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::implementBridge($context);
-        self::registerLinkedRuntime($context);
-        self::restoreInsertBlock($context, $savedBlock);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBridge(Context $context): void
     {
-        $abiName = '__compiler_base64_decode';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
         $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('base64_decode_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            Base64JitLink::helperFunction($context, Base64JitLink::decodeHelper()),
-            $fn->getParam(0)
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI,
+            self::BRIDGE_ENTRY,
+            [$strPtr],
+            $strPtr,
+            self::DECODE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#18918'
         );
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        foreach (self::ABI_FUNCTIONS as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException($name.' missing after StringBase64Decode bridge (#17249)');
-            }
-            $context->registerFunction($name, $fn);
-        }
-    }
-
-    private static function captureInsertBlock(Context $context): ?BasicBlock
-    {
-        try {
-            return $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private static function restoreInsertBlock(Context $context, ?BasicBlock $savedBlock): void
-    {
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 }

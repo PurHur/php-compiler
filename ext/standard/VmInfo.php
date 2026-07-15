@@ -613,9 +613,6 @@ final class VmInfo
             $text .= self::phpinfoRowText($label, $value);
         }
         $text .= self::generalSectionRuntimeTailText();
-        $text .= self::phpinfoRowText('PHP Version', $version);
-        $text .= self::phpinfoRowText('Zend Engine Version', CompilerVersion::zendVersion());
-        $text .= "\n";
 
         return $text;
     }
@@ -679,15 +676,6 @@ final class VmInfo
         'PHP Extension Build',
         'Debug Build',
         'Thread Safety',
-        'Zend Signal Handling',
-        'Zend Memory Manager',
-        'Zend Multibyte Support',
-        'Zend Max Execution Timers',
-        'IPv6 Support',
-        'DTrace Support',
-        'Registered PHP Streams',
-        'Registered Stream Socket Transports',
-        'Registered Stream Filters',
     ];
 
     /** php-src phpinfo(INFO_GENERAL) runtime rows before stream registry tail (#16551). */

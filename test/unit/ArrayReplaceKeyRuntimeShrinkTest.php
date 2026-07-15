@@ -16,8 +16,12 @@ final class ArrayReplaceKeyRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayReplaceKeyRuntime.php');
         $this->assertStringContainsString('ArrayReplaceKeyJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::arrayReplaceKey', $runtime);
+        $this->assertStringContainsString('nativeListToHashTable', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayReplaceKey', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+
+        $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayBuiltinHelper.php');
+        $this->assertStringNotContainsString('function arrayReplaceKey(', $helper);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_replace_key.php');
         $this->assertStringContainsString('ArrayReplaceKeyRuntime::replaceKey', $builtin);

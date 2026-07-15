@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\StringStrtr;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -44,20 +47,22 @@ final class JitStrtr
 
     public static function translateArray(
         Context $context,
-        Value $subject,
-        Value $replacePairs,
-        ?JITVariable $subjectArg = null,
-        ?JITVariable $pairsArg = null
+        JITVariable $subjectArg,
+        JITVariable $pairsArg
     ): Value {
-        if (null !== $subjectArg && null !== $pairsArg) {
+        $pairsLit = self::compileTimePairs($pairsArg);
+        if (null !== $pairsLit) {
             $sLit = JitStringArg::compileTimeLiteral($subjectArg);
-            $pairsLit = self::compileTimePairs($pairsArg);
-            if (null !== $sLit && null !== $pairsLit) {
+            if (null !== $sLit) {
                 return $context->builder->load(
                     $context->constantStringFromString(VmString::strtrArray($sLit, $pairsLit))
                 );
             }
         }
+
+        $subject = JitStringBuiltinArg::lowerStrictOrCoercible($context, $subjectArg, 'strtr', 0, 'string');
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'strtr_array_subject_cont');
+        $replacePairs = ArrayBuiltinHelper::loadHashTable($context, $pairsArg);
         StringStrtr::ensureLinked($context);
 
         return $context->builder->call(

@@ -1,5 +1,11 @@
 --TEST--
-Language: readonly property with hooks — post-construct write Error (#9835, zend_property_hooks.c)
+Language: readonly property with hooks must compile-error (#19172, re-#9835, zend_property_hooks.c)
+--SKIPIF--
+<?php
+die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI');
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class C {
@@ -11,12 +17,7 @@ class C {
         $this->x = 0;
     }
 }
-$c = new C();
-try {
-    $c->x = 1;
-    echo "no-resume\n";
-} catch (Error $e) {
-    echo 'caught: ', get_class($e), "\n";
-}
---EXPECT--
-caught: Error
+--EXPECT_EXIT--
+255
+--EXPECTF--
+parseAndCompile failure: target=%s: Hooked properties cannot be readonly

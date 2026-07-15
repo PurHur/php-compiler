@@ -22,9 +22,12 @@ final class OpendirJitHelper
         }
         $handle = VmDir::opendir($path);
         if (false === $handle) {
-            $reason = VmStatPath::isFile($path) ? 'Not a directory' : 'No such file or directory';
             TriggerErrorJitHelper::warning(
-                \sprintf('opendir(%s): Failed to open directory: %s', $path, $reason)
+                \sprintf(
+                    'opendir(%s): Failed to open directory: %s',
+                    $path,
+                    VmDirOpenFailure::openDirFailureReason($path)
+                )
             );
 
             return -1;

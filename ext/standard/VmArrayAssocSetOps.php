@@ -4,19 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+require_once __DIR__.'/VmArray.php';
+
 use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
  * Shared VM helpers for array_diff_assoc / array_intersect_assoc (php-src ext/standard/array.c).
+ *
+ * Final class (not trait) so self-host spine compile avoids Stmt_TraitUse / TraitClassConstConflictCheck (#1492).
  */
-trait VmArrayAssocSetOps
+final class VmArrayAssocSetOps
 {
     /**
      * @param list<HashTable> $others
      */
-    private static function pairInAnyOther(Variable $key, Variable $value, array $others): bool
+    public static function pairInAnyOther(Variable $key, Variable $value, array $others): bool
     {
         foreach ($others as $haystack) {
             if (self::pairInHashTable($key, $value, $haystack)) {
@@ -30,7 +34,7 @@ trait VmArrayAssocSetOps
     /**
      * @param list<HashTable> $others
      */
-    private static function pairInAllOthers(Variable $key, Variable $value, array $others): bool
+    public static function pairInAllOthers(Variable $key, Variable $value, array $others): bool
     {
         foreach ($others as $haystack) {
             if (!self::pairInHashTable($key, $value, $haystack)) {
@@ -54,7 +58,7 @@ trait VmArrayAssocSetOps
     /**
      * @param list<HashTable> $others
      */
-    private static function keyInAnyOther(Variable $key, array $others): bool
+    public static function keyInAnyOther(Variable $key, array $others): bool
     {
         foreach ($others as $haystack) {
             if (null !== self::valueAtKey($haystack, $key)) {
@@ -68,7 +72,7 @@ trait VmArrayAssocSetOps
     /**
      * @param list<HashTable> $others
      */
-    private static function keyInAllOthers(Variable $key, array $others): bool
+    public static function keyInAllOthers(Variable $key, array $others): bool
     {
         foreach ($others as $haystack) {
             if (null === self::valueAtKey($haystack, $key)) {
@@ -98,7 +102,7 @@ trait VmArrayAssocSetOps
     /**
      * @param list<\PHPCompiler\VM\Variable> $calledArgs
      */
-    private static function guardSetOpOperands(Frame $frame, array $calledArgs, string $fn): void
+    public static function guardSetOpOperands(Frame $frame, array $calledArgs, string $fn): void
     {
         $first = $calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $first->type) {
@@ -116,7 +120,7 @@ trait VmArrayAssocSetOps
      *
      * @return list<HashTable>
      */
-    private static function collectOtherHashTables(array $calledArgs, string $fn): array
+    public static function collectOtherHashTables(array $calledArgs, string $fn): array
     {
         $others = [];
         for ($i = 1, $n = \count($calledArgs); $i < $n; ++$i) {

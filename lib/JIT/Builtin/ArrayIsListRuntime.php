@@ -58,7 +58,7 @@ final class ArrayIsListRuntime
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_IS_LIST);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, 'array_is_list_bridge_entry')) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -81,7 +81,7 @@ final class ArrayIsListRuntime
             self::IS_LIST_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#13645'
+            '#18990'
         );
         self::registerLinkedRuntime($context);
 

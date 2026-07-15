@@ -12,6 +12,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -49,7 +50,21 @@ final class JitIniGetAll
      */
     private static function invokeWithRuntimeExtension(Context $context, array $args): Value
     {
-        $literal = $args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]);
+        if (self::isInvalidExtensionScalar($context, $args[0])) {
+            return self::emitExtensionScalarTypeError($context, $args[0]);
+        }
+
+        if (!$context->callerStrictTypes && self::isNativeScalarExtensionArg($args[0])) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return $ptr;
+        }
+
+        $literal = JITVariable::TYPE_STRING === $args[0]->type
+            ? ($args[0]->compileTimeString ?? JitStringArg::compileTimeLiteral($args[0]))
+            : null;
         if (null !== $literal) {
             if (!VmIni::isKnownIniExtension($literal)) {
                 $slot = JitValueBox::alloc($context);
@@ -71,7 +86,23 @@ final class JitIniGetAll
     private static function invokeRuntimeExtensionSelect(Context $context, array $args): Value
     {
         $argc = \count($args);
-        $extStr = JitStringBuiltinArg::lower($context, $args[0], 'ini_get_all', 0, 'extension');
+        $extStr = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerRequiredString(
+                $context,
+                $args[0],
+                'ini_get_all',
+                0,
+                'extension',
+                '?string'
+            )
+            : JitStringBuiltinArg::lower(
+                $context,
+                $args[0],
+                'ini_get_all',
+                0,
+                'extension',
+                '?string'
+            );
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
 
@@ -223,5 +254,47 @@ final class JitIniGetAll
     private static function isNullExtensionArg(JITVariable $arg): bool
     {
         return JITVariable::TYPE_VALUE === $arg->type && ($arg->isNullConstant ?? false);
+    }
+
+    private static function isInvalidExtensionScalar(Context $context, JITVariable $arg): bool
+    {
+        if (!$context->callerStrictTypes) {
+            return false;
+        }
+
+        return self::isNativeScalarExtensionArg($arg);
+    }
+
+    private static function isNativeScalarExtensionArg(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NATIVE_BOOL === $arg->type
+            || JITVariable::TYPE_NATIVE_LONG === $arg->type
+            || JITVariable::TYPE_NATIVE_DOUBLE === $arg->type;
+    }
+
+    private static function emitExtensionScalarTypeError(Context $context, JITVariable $arg): Value
+    {
+        $given = match ($arg->type) {
+            JITVariable::TYPE_NATIVE_BOOL => 'bool',
+            JITVariable::TYPE_NATIVE_LONG => 'int',
+            JITVariable::TYPE_NATIVE_DOUBLE => 'float',
+            default => 'mixed',
+        };
+        TypeErrorRaise::ensureLinked($context);
+        $message = \sprintf(
+            'ini_get_all(): Argument #1 ($extension) must be of type ?string, %s given',
+            $given
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        if (null !== TryCatchHelper::resolveThrowHandler($context)) {
+            TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message);
+
+            return $ptr;
+        }
+        TypeErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+
+        return $ptr;
     }
 }

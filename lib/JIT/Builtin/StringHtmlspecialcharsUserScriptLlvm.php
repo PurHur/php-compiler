@@ -8,11 +8,11 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * User-script standalone AOT: native LLVM htmlspecialchars ABI without nested JIT (#15417).
+ * User-script standalone AOT: native LLVM htmlspecialchars ABI without nested JIT (#15417, #18832).
  *
- * Nested {@see HtmlspecialcharsJitHelper} compile segfaults after minimal standalone init on HEAD
- * (#15407 regression). Identity stub suffices for examples/001 alphanumeric smoke; full escape
- * remains on the nested-JIT path for non-defer standalone builds.
+ * Nested {@see HtmlspecialcharsJitHelper} compile breaks $_REQUEST runtime reads in examples/001
+ * (#18974 regression). Identity stub suffices for alphanumeric smoke; full escape remains on the
+ * nested-JIT path for non-defer standalone builds.
  * php-src: ext/standard/html.c
  */
 final class StringHtmlspecialcharsUserScriptLlvm

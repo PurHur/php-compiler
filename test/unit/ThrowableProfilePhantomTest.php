@@ -28,7 +28,15 @@ final class ThrowableProfilePhantomTest extends TestCase
         $this->assertFalse(ThrowableManifest::isAdvertised('DateMalformedPeriodException'));
         $this->assertTrue(ThrowableManifest::isAdvertised('Exception'));
         $this->assertFalse(ThrowableManifest::isAdvertised('RequestParseBodyException'));
-        $this->assertFalse(ThrowableManifest::isAdvertised('SQLite3Exception'));
+        $this->assertTrue(ThrowableManifest::isAdvertised('SQLite3Exception'));
+    }
+
+    public function testVmRegistersSqlite3ExceptionOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        $this->assertTrue(isset($ctx->classes['sqlite3exception']));
+        $this->assertSame('exception', $ctx->classes['sqlite3exception']->parentLc);
     }
 
     public function testVmOmitsDateHierarchyOnReferenceProfile(): void
@@ -42,7 +50,7 @@ final class ThrowableProfilePhantomTest extends TestCase
         $this->assertFalse(isset($ctx->classes['datemalformedstring']));
         $this->assertFalse(isset($ctx->classes['datemalformedperiodexception']));
         $this->assertFalse(isset($ctx->classes['requestparsebodyexception']));
-        $this->assertFalse(isset($ctx->classes['sqlite3exception']));
+        $this->assertTrue(isset($ctx->classes['sqlite3exception']));
         $this->assertTrue(isset($ctx->classes['exception']));
     }
 
@@ -52,6 +60,7 @@ final class ThrowableProfilePhantomTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsSqlite3());
+            $this->assertTrue(\PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExtension());
             $this->assertTrue(\PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExceptionClass());
             $this->assertTrue(ThrowableManifest::isAdvertised('SQLite3Exception'));
 
@@ -59,6 +68,7 @@ final class ThrowableProfilePhantomTest extends TestCase
             $ctx = $runtime->vmContext;
             $this->assertTrue(isset($ctx->classes['sqlite3exception']));
             $this->assertSame('exception', $ctx->classes['sqlite3exception']->parentLc);
+            $this->assertTrue(isset($ctx->classes['sqlite3']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');

@@ -33,12 +33,12 @@ final class http_response_code extends Internal
             if (0 === $argc) {
                 return;
             }
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $arg->type) {
-                $code = VmHttpResponse::resolveCodeArg($frame->calledArgs[0], 'http_response_code');
-                if (0 !== $code) {
-                    VmHttpResponse::writeHttpResponseCode($code);
-                }
+            if (Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type) {
+                return;
+            }
+            $code = VmHttpResponse::resolveCodeArg($frame->calledArgs[0], 'http_response_code');
+            if (0 !== $code) {
+                VmHttpResponse::writeHttpResponseCode($code);
             }
 
             return;
@@ -52,8 +52,7 @@ final class http_response_code extends Internal
 
             return;
         }
-        $arg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_NULL === $arg->type) {
+        if (Variable::TYPE_NULL === $frame->calledArgs[0]->resolveIndirect()->type) {
             VmHttpResponse::assignReadResult(
                 $frame->returnVar,
                 VmHttpResponse::readHttpResponseCode($ctx),

@@ -41,12 +41,7 @@ final class json_decode extends Internal
                 ));
             }
         }
-        $json = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'json_decode',
-            0,
-            'json'
-        );
+        $json = JsonStringOperandArg::vmJson($frame, 'json_decode');
         $depth = 512;
         if (isset($frame->calledArgs[2])) {
             $depth = VmMath::parseIntBuiltinArgForFrame(
@@ -91,7 +86,6 @@ final class json_decode extends Internal
         if ($argc > 4) {
             throw new \LogicException('json_decode() expects at most 4 arguments');
         }
-
         $depth = self::resolveDepthJit($context, $args);
         $flags = self::resolveFlagsJit($context, $args);
         $assoc = self::resolveAssocFlag($context, $args, $flags);
@@ -110,8 +104,8 @@ final class json_decode extends Internal
             return JitJsonDecode::decodeRuntime($context, $args[0]);
         }
 
-        // assoc=false runtime path is unsupported; still reject enum operands first (#5907).
-        JitStringBuiltinArg::lower($context, $args[0], 'json_decode', 0, 'json');
+        // assoc=false runtime path is unsupported; still reject enum/null operands first (#5907, #18665, #18852).
+        JsonStringOperandArg::jitJson($context, $args[0], 'json_decode');
 
         return JitJsonDecode::decodeRuntimeObjectMode($context, $args[0]);
     }

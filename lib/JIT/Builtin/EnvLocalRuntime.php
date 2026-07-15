@@ -47,6 +47,86 @@ final class EnvLocalRuntime
         self::implement($context);
     }
 
+    /** bootstrap-aot-link: linkable putenv/getenv ABI without nested EnvLocalJitHelper JIT (#1492). */
+    public static function ensureBootstrapAotStubLinked(Context $context): void
+    {
+        $register = $context->module->getNamedFunction('__compiler_env_register_putenv');
+        if (null !== $register && $register->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        self::ensureLibc($context);
+        self::implementBootstrapLookupStub($context);
+        self::implementBootstrapRegisterStub($context);
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementBootstrapLookupStub(Context $context): void
+    {
+        $abiName = '__compiler_env_local_lookup';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i8p = $context->getTypeFromString('int8*');
+        $ft = $context->context->functionType($i8p, false, $i8p);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock('el_bootstrap_lookup');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($i8p->constNull());
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementBootstrapRegisterStub(Context $context): void
+    {
+        $abiName = '__compiler_env_register_putenv';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $voidTy = $context->getTypeFromString('void');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $ft = $context->context->functionType($voidTy, false, $i8p);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('el_bootstrap_reg_entry');
+        $skipBb = $fn->appendBasicBlock('el_bootstrap_reg_skip');
+        $bodyBb = $fn->appendBasicBlock('el_bootstrap_reg_body');
+        $context->builder->positionAtEnd($entry);
+
+        $settingCstr = $fn->getParam(0);
+        $null = $i8p->constNull();
+        $settingNull = $context->builder->icmp(Builder::INT_EQ, $settingCstr, $null);
+        $context->builder->branchIf($settingNull, $skipBb, $bodyBb);
+
+        $context->builder->positionAtEnd($bodyBb);
+        self::ensureExternal(
+            $context,
+            'putenv',
+            $context->context->functionType($i32, false, $i8p)
+        );
+        $context->builder->call($context->lookupFunction('putenv'), $settingCstr);
+        $context->builder->branch($skipBb);
+
+        $context->builder->positionAtEnd($skipBb);
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+    }
+
     public static function implement(Context $context): void
     {
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);

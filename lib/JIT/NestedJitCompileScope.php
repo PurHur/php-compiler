@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPLLVM\BasicBlock;
 
 /**
- * Isolate CFG block maps during nested php-in-PHP JIT helper compiles (#8559, #9091, #10343).
+ * Isolate CFG block maps and operand variable bindings during nested php-in-PHP JIT helper compiles (#8559, #9091, #10343, #17737).
  */
 final class NestedJitCompileScope
 {
@@ -42,9 +42,11 @@ final class NestedJitCompileScope
         $restoreBlock = self::captureInsertBlock($context);
         $savedBlockStorage = $context->scope->blockStorage;
         $savedBlockEntryStorage = $context->scope->blockEntryStorage;
+        $savedVariables = $context->scope->variables;
         $savedNamedBindings = $context->namedVariableBindings;
         $context->scope->blockStorage = new \SplObjectStorage();
         $context->scope->blockEntryStorage = new \SplObjectStorage();
+        $context->scope->variables = new \SplObjectStorage();
         $context->namedVariableBindings = [];
         $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
         if (\function_exists('putenv')) {
@@ -59,6 +61,7 @@ final class NestedJitCompileScope
             --self::$depth;
             $context->scope->blockStorage = $savedBlockStorage;
             $context->scope->blockEntryStorage = $savedBlockEntryStorage;
+            $context->scope->variables = $savedVariables;
             $context->namedVariableBindings = $savedNamedBindings;
             self::resyncNamedBindings($context);
             $context->builder = $savedBuilder;

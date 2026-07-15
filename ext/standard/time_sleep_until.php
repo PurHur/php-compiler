@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** time_sleep_until() — sleep until absolute timestamp (VM via VmSleepPure; JIT/AOT via SleepJitHelper, #9378). */
@@ -30,7 +29,12 @@ final class time_sleep_until extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $timestamp = self::requireFloat($frame->calledArgs[0]);
+        $timestamp = VmMath::parseDoubleBuiltinArg(
+            $frame->calledArgs[0],
+            'time_sleep_until',
+            1,
+            'timestamp'
+        );
         if (VmSleepPure::isTimestampInPast($timestamp)) {
             self::emitPastTimestampWarning($frame);
             $frame->returnVar->bool(false);
@@ -64,34 +68,5 @@ final class time_sleep_until extends Internal
         }
 
         return JitSleep::timeSleepUntil($context, $args[0]);
-    }
-
-    private static function requireFloat(Variable $arg): float
-    {
-        $v = $arg->resolveIndirect();
-        if (Variable::TYPE_FLOAT === $v->type) {
-            return $v->toFloat();
-        }
-        if (Variable::TYPE_INTEGER === $v->type) {
-            return (float) $v->toInt();
-        }
-        throw new \TypeError(
-            'time_sleep_until(): Argument #1 ($timestamp) must be of type float, '
-            .self::zendTypeName($v).' given'
-        );
-    }
-
-    private static function zendTypeName(Variable $v): string
-    {
-        return match ($v->type) {
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'resource',
-        };
     }
 }

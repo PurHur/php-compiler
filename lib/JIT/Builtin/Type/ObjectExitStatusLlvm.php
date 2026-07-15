@@ -8,6 +8,9 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ScriptExit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\MagicMethodDispatch;
+use PHPCompiler\JIT\ValueEchoHelper;
+use PHPCompiler\JIT\Variable as JitVariable;
 use PHPLLVM;
 use PHPLLVM\Value;
 
@@ -65,7 +68,7 @@ final class ObjectExitStatusLlvm
             }
             $context->builder->positionAtEnd($afterExitStatus);
         } elseif ([] === $enumEntries) {
-            ScriptExit::emitStatusTypeErrorAndAbort($context, 'object');
+            self::emitStringableObjectExit($context, $objPtr);
 
             return;
         }
@@ -79,7 +82,27 @@ final class ObjectExitStatusLlvm
             true
         );
         $context->builder->positionAtEnd($typeErrorBlock);
-        ScriptExit::emitStatusTypeErrorAndAbort($context, 'object');
+        self::emitStringableObjectExit($context, $objPtr);
+    }
+
+    private static function emitStringableObjectExit(Context $context, Value $objPtr): void
+    {
+        $objectVar = new JitVariable(
+            $context,
+            JitVariable::TYPE_OBJECT,
+            JitVariable::KIND_VALUE,
+            $objPtr
+        );
+        $asString = MagicMethodDispatch::coerceObjectToString($context, $objectVar);
+        if (null !== $asString) {
+            ValueEchoHelper::echoStringVariable($context, $asString);
+        } else {
+            ValueEchoHelper::echoObjectVariable($context, $objectVar);
+        }
+        ScriptExit::emitLibcExitWithStatus(
+            $context,
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
     }
 
     /**

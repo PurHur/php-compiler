@@ -27,7 +27,7 @@ final class printf_ extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireAtLeastArgCount($frame, 'printf', 1);
-        $format = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'printf', 0, 'format');
+        $format = VmString::stringBuiltinArgForFrame($frame, 0, 'printf', 0, 'format');
         $argc = \count($frame->calledArgs);
         $values = [];
         for ($i = 1; $i < $argc; ++$i) {

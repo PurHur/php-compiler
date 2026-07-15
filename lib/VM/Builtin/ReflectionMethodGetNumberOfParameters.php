@@ -27,7 +27,7 @@ final class ReflectionMethodGetNumberOfParameters extends VmClassMethod
             throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
         }
         $methodLc = strtolower($method);
-        $count = \count($entry->methodParameterMetadata[$methodLc] ?? []);
+        $count = ReflectionSupport::methodNumberOfParameters($entry, $method);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($count);
         }

@@ -16,7 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Nested {@see SuperglobalRefreshJitHelper} JIT during init segfaults (#13571); the PHP
  * bridge returns VM {@see __object__*} handles that cannot populate native sg_* (#12039).
- * Process environ mirror uses {@see EnvironMirrorUserScriptLlvm} (no nested GetenvJitHelper JIT, #15417).
+ * Process environ mirror routes through {@see EnvironMirrorRuntime} + {@see EnvironMirrorNativeJitHelper} (#18984).
  * Form/cookie parsing routes through {@see ParseStrRuntime} + {@see __compiler_parse_str}
  * ({@see ParseStrJitHelper::parseIntoNative} streaming materializer — #13900).
  * php-src: main/php_variables.c
@@ -39,10 +39,10 @@ final class SuperglobalRefreshUserScriptLlvm
     public static function ensurePrerequisites(Context $context): void
     {
         LibcExtern::register($context);
+        self::ensureGlobals($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptLinked($context);
-        EnvironMirrorUserScriptLlvm::ensureLinked($context);
-        self::ensureGlobals($context);
+        EnvironMirrorRuntime::ensureLinked($context);
         self::ensureHeaderQueueExternal($context);
     }
 
@@ -50,7 +50,9 @@ final class SuperglobalRefreshUserScriptLlvm
     public static function emitRefresh(Context $context): void
     {
         if ($context->isThinStandaloneAotMain()) {
-            self::ensureDeferredEmitPrerequisites($context);
+            // Re-link parse_str/cookie bridges after user-script lowering — nested helper
+            // compile can replace the v8 bridge with the embed ParseStrJitHelper body (#18832).
+            self::ensureEmitRefreshPrerequisites($context);
         }
 
         $probe = $context->module->getNamedFunction('__superglobals__refresh');
@@ -122,10 +124,9 @@ final class SuperglobalRefreshUserScriptLlvm
         $context->builder->branch($workBb);
         $context->builder->positionAtEnd($workBb);
 
-        $queryStr = self::cstrToPhpcString($context, $queryCstr);
         $getHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $context->builder->store($getHt, self::sgGlobalPtr($context, 'sg_GET'));
-        self::parseFormEncoded($context, $getHt, $queryStr);
+        self::parseFormEncodedFromCstrSlot($context, $getHt, $queryCstr);
 
         $postHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $filesHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
@@ -137,7 +138,7 @@ final class SuperglobalRefreshUserScriptLlvm
         $afterPostBb = $fn->appendBasicBlock('sg_user_refresh_after_post');
         $context->builder->branchIf($postBodyEmpty, $afterPostBb, $populatePostBb);
         $context->builder->positionAtEnd($populatePostBb);
-        self::populatePostBodyFromCstrSlot($context, $postHt, $contentTypeCstr, $postBodyCstr);
+        self::populatePostBodyFromCstrSlot($context, $postHt, $filesHt, $contentTypeCstr, $postBodyCstr);
         $context->builder->branch($afterPostBb);
         $context->builder->positionAtEnd($afterPostBb);
 
@@ -148,7 +149,7 @@ final class SuperglobalRefreshUserScriptLlvm
         $reqAfterQsBb = $fn->appendBasicBlock('sg_user_refresh_req_after_qs');
         $context->builder->branchIf($queryNonEmpty, $reqQsBb, $reqAfterQsBb);
         $context->builder->positionAtEnd($reqQsBb);
-        self::parseFormEncoded($context, $requestHt, $queryStr);
+        self::parseFormEncodedFromCstrSlot($context, $requestHt, $queryCstr);
         $context->builder->branch($reqAfterQsBb);
         $context->builder->positionAtEnd($reqAfterQsBb);
         $reqPostBb = $fn->appendBasicBlock('sg_user_refresh_req_post');
@@ -332,20 +333,6 @@ final class SuperglobalRefreshUserScriptLlvm
         self::parseFormEncoded($context, $ht, self::cstrToPhpcString($context, $cstrSlot));
     }
 
-    private static function populatePostBodyFromCstrSlot(
-        Context $context,
-        Value $postHt,
-        Value $contentTypeCstr,
-        Value $postBodyCstr
-    ): void {
-        $context->builder->call(
-            $context->lookupFunction('__compiler_multipart_populate_post_body'),
-            $postHt,
-            $context->builder->load($contentTypeCstr),
-            $context->builder->load($postBodyCstr)
-        );
-    }
-
     private static function parseCookieFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
     {
         $context->builder->call(
@@ -353,6 +340,55 @@ final class SuperglobalRefreshUserScriptLlvm
             $ht,
             self::cstrToPhpcString($context, $cstrSlot)
         );
+    }
+
+    private static function populatePostBodyFromCstrSlot(
+        Context $context,
+        Value $postHt,
+        Value $filesHt,
+        Value $contentTypeCstr,
+        Value $postBodyCstr
+    ): void {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $multipartBb = $fn->appendBasicBlock('sg_user_refresh_post_multipart');
+        $urlencodedBb = $fn->appendBasicBlock('sg_user_refresh_post_urlencoded');
+        $doneBb = $fn->appendBasicBlock('sg_user_refresh_post_done');
+
+        $contentType = $context->builder->load($contentTypeCstr);
+        $contentTypeEmpty = self::isCstrEmpty($context, $contentType);
+        $needle = self::literalCstr($context, 'multipart/form-data');
+        $sizeT = $context->getTypeFromString('size_t');
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strncasecmp'),
+            $contentType,
+            $needle,
+            $sizeT->constInt(19, false)
+        );
+        $prefixMatch = $context->builder->icmp(
+            Builder::INT_EQ,
+            $cmp,
+            $context->getTypeFromString('int32')->constInt(0, false)
+        );
+        $isMultipart = $context->builder->and(
+            $context->builder->not($contentTypeEmpty),
+            $prefixMatch
+        );
+        $context->builder->branchIf($isMultipart, $multipartBb, $urlencodedBb);
+
+        $context->builder->positionAtEnd($multipartBb);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_multipart_populate_post_body'),
+            $postHt,
+            $contentType,
+            $context->builder->load($postBodyCstr)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($urlencodedBb);
+        self::parseFormEncodedFromCstrSlot($context, $postHt, $postBodyCstr);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
     }
 
     private static function cstrToPhpcString(Context $context, Value $cstrSlot): Value
@@ -392,7 +428,7 @@ final class SuperglobalRefreshUserScriptLlvm
     private static function fillServerFromProcessEnviron(Context $context, LlvmFunction $fn, Value $serverHt): void
     {
         unset($fn);
-        EnvironMirrorUserScriptLlvm::emitFillCall($context, $serverHt);
+        EnvironMirrorRuntime::emitFillCall($context, $serverHt);
     }
 
     private static function setServerKeyFromCstr(Context $context, Value $ht, string $key, Value $valCstrSlot): void
@@ -458,13 +494,24 @@ final class SuperglobalRefreshUserScriptLlvm
         }
     }
 
+    /** Real POST populate before user-script refresh LLVM emit (#15624). */
+    private static function ensureEmitRefreshPrerequisites(Context $context): void
+    {
+        LibcExtern::register($context);
+        self::ensureGlobals($context);
+        ParseStrRuntime::ensureUserScriptLinked($context);
+        MultipartRuntime::ensureUserScriptLinked($context);
+        EnvironMirrorRuntime::ensureLinked($context);
+        self::ensureHeaderQueueExternal($context);
+    }
+
     /** preg prelink defers user init — link refresh deps without nested Multipart JIT (#16075). */
     private static function ensureDeferredEmitPrerequisites(Context $context): void
     {
         LibcExtern::register($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
         MultipartRuntime::ensureUserScriptNoOpPopulateStub($context);
-        EnvironMirrorUserScriptLlvm::ensureLinked($context);
+        EnvironMirrorRuntime::ensureLinked($context);
         self::ensureGlobals($context);
         self::ensureHeaderQueueExternal($context);
     }

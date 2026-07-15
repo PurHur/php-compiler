@@ -29,4 +29,31 @@ final class CurlExtensionPolicy
     {
         return self::advertisesExtension();
     }
+
+    /** curl_share_* + minimal easy-handle stubs for CURLOPT_SHARE (#6322). */
+    public static function advertisesShareHandles(): bool
+    {
+        return self::advertisesBuiltins();
+    }
+
+    /**
+     * curl_init/curl_setopt/curl_close — only when ext/curl is loaded (#18470, #11627).
+     *
+     * Share-handle stubs (#6322) stay on {@see advertisesShareHandles}; easy-handle entrypoints
+     * must not appear in function_exists until extension_loaded('curl') is true (Zend parity).
+     */
+    public static function advertisesEasyHandleStubs(): bool
+    {
+        return self::advertisesExtension();
+    }
+
+    /**
+     * curl_version/curl_strerror/… — function_exists only when ext/curl is loaded (#18554, #18470).
+     *
+     * Phase-2 stubs may stay registered for direct calls; introspection matches Zend ext/curl/interface.c.
+     */
+    public static function advertisesIntrospectionFunctions(): bool
+    {
+        return self::advertisesExtension();
+    }
 }

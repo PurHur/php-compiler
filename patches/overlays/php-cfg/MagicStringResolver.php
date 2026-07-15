@@ -21,6 +21,9 @@ class MagicStringResolver extends NodeVisitorAbstract
 
     private const PROPERTY_SET_HOOK_PREFIX = '__phpc_property_set_';
 
+    /** Zend/zend_compile.c — __PROPERTY__ (T_PROPERTY_C) requires active property hook (#18815, re-#5978). */
+    private const PROPERTY_MAGIC_OUTSIDE_HOOK = 'Cannot use __PROPERTY__ outside of a property hook';
+
     protected $classStack = [];
 
     protected $parentStack = [];
@@ -40,6 +43,9 @@ class MagicStringResolver extends NodeVisitorAbstract
 
     /** True while visiting StaticCall::class — preserve `parent` for runtime dispatch (#6735). */
     protected bool $inStaticCallClassName = false;
+
+    /** True while visiting trait `self::class` — preserve `self` for composing-class resolution (#18879). */
+    protected bool $inTraitSelfClassPseudoConst = false;
 
     private const PRESERVE_LEXICAL_TYPE = 'phpcPreserveLexicalType';
 
@@ -133,11 +139,30 @@ class MagicStringResolver extends NodeVisitorAbstract
             }
         } elseif ($node instanceof Node\Expr\StaticCall) {
             $this->inStaticCallClassName = true;
+        } elseif ($node instanceof Node\Expr\ClassConstFetch) {
+            $constName = $node->name instanceof Node\Identifier
+                ? $node->name->toString()
+                : ($node->name instanceof Node\Name ? $node->name->toString() : '');
+            if (
+                'class' === strtolower($constName)
+                && $node->class instanceof Node\Name
+                && 'self' === strtolower($node->class->toString())
+                && [] !== $this->traitStack
+            ) {
+                $this->inTraitSelfClassPseudoConst = true;
+            }
         } elseif ($node instanceof Node\Expr\ConstFetch) {
             if ('__property__' === strtolower($node->name->toString())) {
-                $name = $this->propertyStack !== [] ? end($this->propertyStack) : '';
+                if ($this->propertyStack === []) {
+                    if ($this->propertyHooksProfileEnabled()) {
+                        throw new \CompileError(self::PROPERTY_MAGIC_OUTSIDE_HOOK);
+                    }
 
-                return new Node\Scalar\String_($name, $node->getAttributes());
+                    // Default profile: leave ConstFetch — runtime Undefined constant (Zend 8.2+, #18900).
+                    return null;
+                }
+
+                return new Node\Scalar\String_(end($this->propertyStack), $node->getAttributes());
             }
         } elseif ($node instanceof Node\Name) {
             if ($node->getAttribute(self::PRESERVE_LEXICAL_TYPE)) {
@@ -145,6 +170,9 @@ class MagicStringResolver extends NodeVisitorAbstract
             }
             switch (strtolower($node->toString())) {
                 case 'self':
+                    if ($this->inTraitSelfClassPseudoConst) {
+                        break;
+                    }
                     if (! empty($this->classStack)) {
                         return new Node\Name\FullyQualified(end($this->classStack), $node->getAttributes());
                     }
@@ -224,6 +252,8 @@ class MagicStringResolver extends NodeVisitorAbstract
             }
         } elseif ($node instanceof Node\Expr\StaticCall) {
             $this->inStaticCallClassName = false;
+        } elseif ($node instanceof Node\Expr\ClassConstFetch) {
+            $this->inTraitSelfClassPseudoConst = false;
         }
     }
 
@@ -256,6 +286,27 @@ class MagicStringResolver extends NodeVisitorAbstract
         }
 
         return null;
+    }
+
+    /**
+     * Forward 8.4 profile gate — mirrors PHPCompiler\CompilerVersion::supportsPropertyHooks() without coupling namespaces.
+     */
+    private function propertyHooksProfileEnabled(): bool
+    {
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+        $raw = trim($raw);
+        if (preg_match('/^\d+\.\d+$/', $raw)) {
+            $version = $raw.'.0';
+        } elseif (preg_match('/^\d+\.\d+\.\d+/', $raw, $m)) {
+            $version = $m[0];
+        } else {
+            return false;
+        }
+
+        return version_compare($version, '8.4.0', '>=');
     }
 
     private function stripClass($class)

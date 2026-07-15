@@ -22,6 +22,27 @@ final class PropertyVisibility
     }
 
     /**
+     * Parent private slots are not visible by plain name from a child method scope (zend_fetch_property).
+     */
+    public static function isParentPrivatePropertyInvisibleFromChildScope(
+        int $visibilityFlags,
+        ?string $callerClassLc,
+        string $declaringClassLc,
+        callable $isSubclassOf,
+        int $storedGetVisibility = 0
+    ): bool {
+        $readVis = self::effectiveGetVisibility($visibilityFlags, $storedGetVisibility);
+        if (($readVis & CfgFunc::FLAG_PRIVATE) === 0) {
+            return false;
+        }
+        if (null === $callerClassLc || $callerClassLc === $declaringClassLc) {
+            return false;
+        }
+
+        return $isSubclassOf($callerClassLc, $declaringClassLc);
+    }
+
+    /**
      * @throws \LogicException when access is not allowed
      */
     public static function assertAccessible(

@@ -15,7 +15,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringNl2br;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -35,13 +34,7 @@ final class nl2br extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('nl2br() requires one or two arguments');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'nl2br', 'string', 0, $frame);
-        $subject = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'nl2br',
-            0,
-            'string'
-        );
+        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'nl2br', 'string');
         $useXhtml = true;
         if (2 === $argc) {
             $useXhtml = self::resolveUseXhtmlBool($frame, 1);
@@ -59,8 +52,6 @@ final class nl2br extends Internal
             throw new \LogicException('nl2br() requires one or two arguments');
         }
 
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'nl2br', 'string', 1);
-
         $strLit = JitStringArg::compileTimeLiteral($args[0]);
         $flagLit = 2 === $argc ? JitStringArg::compileTimeLiteral($args[1]) : null;
         if (null !== $strLit && (1 === $argc || null !== $flagLit)) {
@@ -74,7 +65,7 @@ final class nl2br extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'nl2br', 0, 'string');
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'nl2br', 0, 'string');
         $i8 = $context->getTypeFromString('int8');
         $useXhtmlI8 = $i8->constInt(1, false);
         if (2 === $argc) {

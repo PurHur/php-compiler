@@ -60,11 +60,15 @@ final class JitNumberFormat
 
     public static function format(Context $context, JITVariable ...$args): Value
     {
+        // User-standalone init skips StringFormat::ensureLinked (#13571) —
+        // link __compiler_number_format on first call-site lowering (#15642, #18525).
+        if ('1' !== getenv('PHP_COMPILER_HELPER_RUNTIME_EMITTING')) {
+            \PHPCompiler\JIT\Builtin\StringFormat::implementIfDeclared($context, true);
+        }
+
         $argc = \count($args);
 
-        if ($context->callerStrictTypes) {
-            self::rejectNullNum($context, $args[0]);
-        }
+        self::rejectNullNum($context, $args[0]);
 
         $number = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'number_format', 'float');
         $i64 = $context->getTypeFromString('int64');
@@ -112,6 +116,9 @@ final class JitNumberFormat
 
     private static function rejectNullNum(Context $context, JITVariable $arg): void
     {
+        if (!$context->callerStrictTypes && !VmMath::requiresForwardProfileStrictLongNull()) {
+            return;
+        }
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             self::emitNullNumTypeErrorAndAbort($context);
 

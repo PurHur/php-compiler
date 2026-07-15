@@ -34,6 +34,97 @@ final class BuiltinInternalArgInfo
         return \count($info['params']);
     }
 
+    public static function paramCountForClassMethod(string $class, string $method): ?int
+    {
+        $classLc = strtolower($class);
+        $methodLc = strtolower($method);
+        $methods = self::instance()->methods[$classLc]['methods'] ?? [];
+        $info = $methods[$methodLc] ?? null;
+        if (null === $info) {
+            return null;
+        }
+
+        return \count($info['params']);
+    }
+
+    public static function requiredParamCountForFunction(string $name): ?int
+    {
+        $lc = strtolower($name);
+        $info = self::instance()->functions[$lc] ?? null;
+        if (null === $info) {
+            return null;
+        }
+
+        return self::requiredParamCountFromRawParams($info['params']);
+    }
+
+    public static function requiredParamCountForClassMethod(string $class, string $method): ?int
+    {
+        $classLc = strtolower($class);
+        $methodLc = strtolower($method);
+        $methods = self::instance()->methods[$classLc]['methods'] ?? [];
+        $info = $methods[$methodLc] ?? null;
+        if (null === $info) {
+            return null;
+        }
+
+        return self::requiredParamCountFromRawParams($info['params']);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function paramNamesForClassMethod(string $class, string $method): array
+    {
+        $classLc = strtolower($class);
+        $methodLc = strtolower($method);
+        $methods = self::instance()->methods[$classLc]['methods'] ?? [];
+        $info = $methods[$methodLc] ?? null;
+        if (null === $info) {
+            return [];
+        }
+        $names = [];
+        foreach ($info['params'] as $param) {
+            $names[] = self::normalizeParamInfo($param)['name'];
+        }
+
+        return $names;
+    }
+
+    /**
+     * @return array<string, array{total: int, required: int}>
+     */
+    public static function functionArityTables(): array
+    {
+        $tables = [];
+        foreach (self::instance()->functions as $funcLc => $info) {
+            $tables[$funcLc] = [
+                'total' => \count($info['params']),
+                'required' => self::requiredParamCountFromRawParams($info['params']),
+            ];
+        }
+
+        return $tables;
+    }
+
+    /**
+     * @return array<string, array<string, array{total: int, required: int}>>
+     */
+    public static function methodArityTables(): array
+    {
+        $tables = [];
+        foreach (self::instance()->methods as $classLc => $classInfo) {
+            foreach ($classInfo['methods'] ?? [] as $methodLc => $info) {
+                $tables[$classLc][$methodLc] = [
+                    'total' => \count($info['params']),
+                    'required' => self::requiredParamCountFromRawParams($info['params']),
+                ];
+            }
+        }
+
+        return $tables;
+    }
+
     /**
      * @return array{name: string, type: string, isOptional: bool}|null
      */
@@ -132,12 +223,33 @@ final class BuiltinInternalArgInfo
      *
      * @return array{name: string, type: string, isOptional: bool}
      */
+    /**
+     * @param list<array{name: string, type: string}> $params
+     */
+    private static function requiredParamCountFromRawParams(array $params): int
+    {
+        $required = 0;
+        foreach ($params as $param) {
+            $name = $param['name'] ?? '';
+            if (str_ends_with($name, '=') || str_starts_with($name, '...')) {
+                break;
+            }
+            ++$required;
+        }
+
+        return $required;
+    }
+
     private static function normalizeParamInfo(array $param): array
     {
         $name = $param['name'];
         $isOptional = str_ends_with($name, '=');
         if ($isOptional) {
             $name = substr($name, 0, -1);
+        }
+        if (str_starts_with($name, '...')) {
+            $name = substr($name, 3);
+            $isOptional = true;
         }
 
         return [

@@ -6,17 +6,34 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\HashAlgosRegistry;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __compiler_hash_hmac_algos (issue #7189 phase 1).
+ * JIT/AOT link for __compiler_hash_hmac_algos via HashAlgosJitHelper PHP (#18908).
  *
- * php-src: ext/hash/hash.c — HMAC-capable digest names.
- * VM semantics: ext/standard/VmHash::hmacAlgos().
+ * User-script standalone AOT uses inline registry LLVM (same as {@see StringHashAlgos})
+ * because nested HashAlgosJitHelper emits invalid __hashtable__ bridge types (#3357).
+ * SSOT: {@see \PHPCompiler\ext\standard\VmHash::hmacAlgos()}
+ * php-src: ext/hash/hash.c — php_hash_hmac_algos()
  */
 final class StringHashHmacAlgos
 {
+    private const ABI_HASH_HMAC_ALGOS = '__compiler_hash_hmac_algos';
+
+    private const HELPER_PATH = '/ext/hash/HashAlgosJitHelper.php';
+
+    private const HMAC_ALGOS_HELPER = 'PHPCompiler\\ext\\hash\\HashAlgosJitHelper::hmacAlgosArgv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::HMAC_ALGOS_HELPER,
+    ];
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -24,35 +41,63 @@ final class StringHashHmacAlgos
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_hash_hmac_algos');
+        $probe = $context->module->getNamedFunction(self::ABI_HASH_HMAC_ALGOS);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('__compiler_hash_hmac_algos', $probe);
+            $context->registerFunction(self::ABI_HASH_HMAC_ALGOS, $probe);
 
             return;
         }
 
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            self::implementInlineRegistry($context, $probe);
+
+            return;
+        }
+
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#18908');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::HMAC_ALGOS_HELPER, '#18908');
+
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        $ft = $context->context->functionType($htPtr, false);
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction('__compiler_hash_hmac_algos', $ft);
-        self::implementHashHmacAlgos($context, $fn);
-        $context->registerFunction('__compiler_hash_hmac_algos', $fn);
+            : $context->module->addFunction(
+                self::ABI_HASH_HMAC_ALGOS,
+                $context->context->functionType($htPtr, false)
+            );
+        self::implementBridge($context, $fn, $helperFn);
+        $context->registerFunction(self::ABI_HASH_HMAC_ALGOS, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
-    private static function implementHashHmacAlgos(Context $context, LlvmFunction $fn): void
+    private static function implementBridge(Context $context, LlvmFunction $fn, LlvmFunction $helperFn): void
     {
-        $entry = $fn->appendBasicBlock('hash_hmac_algos_entry');
+        $entry = $fn->appendBasicBlock('hash_hmac_algos_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $htRaw = $context->builder->call($helperFn);
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+        $context->builder->returnValue($ht);
+    }
+
+    private static function implementInlineRegistry(Context $context, ?LlvmFunction $probe): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_HASH_HMAC_ALGOS,
+                $context->context->functionType($htPtr, false)
+            );
+
+        $entry = $fn->appendBasicBlock('hash_hmac_algos_inline_entry');
         $context->builder->positionAtEnd($entry);
 
-        $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $nullHt = $htPtr->constNull();
         $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $nullHt);
 
-        $failBb = $fn->appendBasicBlock('hash_hmac_algos_fail');
-        $buildBb = $fn->appendBasicBlock('hash_hmac_algos_build');
+        $failBb = $fn->appendBasicBlock('hash_hmac_algos_inline_fail');
+        $buildBb = $fn->appendBasicBlock('hash_hmac_algos_inline_build');
         $context->builder->branchIf($isNull, $failBb, $buildBb);
 
         $context->builder->positionAtEnd($failBb);
@@ -71,9 +116,11 @@ final class StringHashHmacAlgos
         }
         $context->builder->returnValue($ht);
         $context->builder->clearInsertionPosition();
+
+        $context->registerFunction(self::ABI_HASH_HMAC_ALGOS, $fn);
     }
 
-    private static function literalString(Context $context, string $text): \PHPLLVM\Value
+    private static function literalString(Context $context, string $text): Value
     {
         $i64 = $context->getTypeFromString('int64');
         $charPtr = $context->getTypeFromString('char*');

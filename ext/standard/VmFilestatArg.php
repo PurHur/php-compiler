@@ -22,13 +22,14 @@ final class VmFilestatArg
         string $function,
         int $argIndex = 0,
         string $paramName = 'filename',
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        bool $softNullPath = false
     ): string {
         if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::rejectNullString($var, $function, $paramName, $argIndex, $frame);
         }
 
-        return VmString::coercePathBuiltinArg($var, $function, $argIndex, $paramName);
+        return VmString::coercePathBuiltinArg($var, $function, $argIndex, $paramName, $softNullPath);
     }
 
     /**
@@ -204,7 +205,29 @@ final class VmFilestatArg
     }
 
     /**
-     * chmod()/mkdir() mode — Z_PARAM_LONG; honor caller strict_types for string operands (#17927, #17822).
+     * chmod() mode — Z_PARAM_LONG decimal numeric strings (#18923, ext/standard/filestat.c).
+     *
+     * String modes parse as base-10 ('0644' → 644), unlike int literal 0644 (octal 420).
+     *
+     * @throws \TypeError
+     */
+    public static function parseChmodModeArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        string $paramName
+    ): int {
+        return self::parseFileModeArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $argIndex,
+            $paramName,
+            $frame
+        );
+    }
+
+    /**
+     * mkdir() mode — Z_PARAM_LONG decimal numeric strings (#17819, #18923, ext/standard/filestat.c).
      *
      * @throws \TypeError
      */
@@ -224,7 +247,7 @@ final class VmFilestatArg
     }
 
     /**
-     * File mode coercion — Z_PARAM_LONG decimal numeric strings (#17819, #17860, ext/standard/filestat.c).
+     * File mode coercion — Z_PARAM_LONG base-10 for mkdir() and chmod() (#18923).
      *
      * @throws \TypeError
      */
@@ -274,7 +297,7 @@ final class VmFilestatArg
                 throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'string'));
             }
 
-            return (int) VmMath::baseToZval($s, 10);
+            return self::parseFileModeString($s);
         }
         throw new \TypeError(self::intTypeError(
             $function,
@@ -282,6 +305,12 @@ final class VmFilestatArg
             $paramName,
             self::vmTypeName($var->type)
         ));
+    }
+
+    /** php-src ext/standard/filestat.c — Z_PARAM_LONG decimal parse for chmod()/mkdir() mode strings (#18923). */
+    public static function parseFileModeString(string $mode): int
+    {
+        return (int) VmMath::baseToZval($mode, 10);
     }
 
     private static function vmTypeName(int $type): string

@@ -64,7 +64,7 @@ final class InArrayRuntime
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_CONTAINS);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, 'in_array_bridge_entry')) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -88,7 +88,7 @@ final class InArrayRuntime
             self::CONTAINS_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#12503'
+            '#18990'
         );
         self::registerLinkedRuntime($context);
 

@@ -23,9 +23,25 @@ final class JitDomElementTextContent
     {
         $context = $objectType->jitContext();
         if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            return self::fetchFromLlvmLayout($objectType, $obj);
-        }
+            $classId = $objectType->lookup(self::CLASS_ELEMENT);
+            if (!$objectType->hasProperty($classId, self::PROP_TEXT_CONTENT)) {
+                $objectType->defineProperty($classId, self::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
+            }
+            $slot = $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, self::PROP_TEXT_CONTENT);
+            $loaded = $context->builder->load($slot);
+            $typed = $context->builder->pointerCast(
+                $loaded,
+                $context->getTypeFromString('__string__*')
+            );
 
+            return new JITVariable(
+                $context,
+                JITVariable::TYPE_STRING,
+                JITVariable::KIND_VALUE,
+                $typed
+            );
+        }
+        DomElementTextContentRuntime::ensureLinked($context);
         $str = $context->builder->call(
             $context->lookupFunction(DomElementTextContentRuntime::ABI_NAME),
             $obj
@@ -36,28 +52,6 @@ final class JitDomElementTextContent
             JITVariable::TYPE_STRING,
             JITVariable::KIND_VALUE,
             $str
-        );
-    }
-
-    private static function fetchFromLlvmLayout(Object_ $objectType, Value $obj): JITVariable
-    {
-        $context = $objectType->jitContext();
-        $classId = $objectType->lookup(self::CLASS_ELEMENT);
-        if (!$objectType->hasProperty($classId, self::PROP_TEXT_CONTENT)) {
-            $objectType->defineProperty($classId, self::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);
-        }
-        $slot = $objectType->propertySlotFor($obj, self::CLASS_ELEMENT, self::PROP_TEXT_CONTENT);
-        $loaded = $context->builder->load($slot);
-        $typed = $context->builder->pointerCast(
-            $loaded,
-            $context->getTypeFromString('__string__*')
-        );
-
-        return new JITVariable(
-            $context,
-            JITVariable::TYPE_STRING,
-            JITVariable::KIND_VALUE,
-            $typed
         );
     }
 

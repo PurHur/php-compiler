@@ -358,9 +358,10 @@ final class SplFileObjectSeek extends VmClassMethod
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::seek()'
         );
-        if (\count($frame->calledArgs) < 2) {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
             throw new \ArgumentCountError(
-                'SplFileObject::seek() expects exactly 1 argument, '.\count($frame->calledArgs).' given'
+                'SplFileObject::seek() expects exactly 1 argument, '.($argc - 1).' given'
             );
         }
         $line = VmMath::parseIntBuiltinArg(

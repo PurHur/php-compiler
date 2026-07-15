@@ -15,6 +15,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -40,7 +41,7 @@ final class hex2bin extends Internal
                 \sprintf('hex2bin() expects exactly 1 argument, %d given', $argc)
             );
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hex2bin', 0, 'string');
+        $data = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'hex2bin', 'string');
         $strict = false;
         if (2 === $argc) {
             $strictVar = $frame->calledArgs[1]->resolveIndirect();
@@ -129,7 +130,7 @@ final class hex2bin extends Internal
         $outPtr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
             $context->lookupFunction('__compiler_hex2bin'),
-            JitStringBuiltinArg::lower($context, $args[0], 'hex2bin', 0, 'string'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hex2bin', 0, 'string'),
             $strictI8,
             $outPtr
         );

@@ -1,5 +1,5 @@
 --TEST--
-stdlib substr_count() — null needle ValueError JIT (#18265, ext/standard/string.c)
+stdlib substr_count() — null needle coerces to empty ValueError (#18347, ext/standard/string.c)
 --JIT--
 --FILE--
 <?php

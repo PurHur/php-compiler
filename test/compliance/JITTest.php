@@ -245,6 +245,8 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'property_hook_type_enum')
                     || str_contains($name, 'exit_status_enum')
                     || str_contains($name, 'socket_type_enum')
+                    || str_contains($name, 'ftp_ssl_connect')
+                    || str_contains($name, 'ftp_connect')
                     || str_contains($name, 'ftp_connection_class')
                     || str_contains($name, 'trim_named_mode'))
                 && !str_contains($name, 'builtin_stub_enums_phantom')) {
@@ -634,6 +636,16 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'extension_loaded_msgpack')) {
                 continue;
             }
+            if (!CompilerVersion::supportsXmlrpc()
+                && str_contains($name, 'xmlrpc')
+                && !str_contains($name, 'extension_loaded_xmlrpc')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsWddx()
+                && str_contains($name, 'wddx')
+                && !str_contains($name, 'extension_loaded_wddx')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZip()
                 && (str_contains($name, 'zip')
                     || str_contains($name, 'ziparchive'))
@@ -778,25 +790,22 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'asymmetric_visibility_forward_84')) {
                 continue;
             }
-            // 8.4-target reject gate; skipped when property hooks enabled (#12574, #14432).
-            if (CompilerVersion::supportsPropertyHooks()
-                && str_contains($name, 'property_hook')
-                && str_contains($name, 'reference_profile')) {
-                continue;
-            }
             if (!CompilerVersion::supportsPropertyHooks()
                 && (str_contains($name, 'property_hook')
                     || str_contains($name, 'property_magic_const'))
-                && !str_contains($name, 'reference_profile')) {
+                && !str_contains($name, 'reference_profile')
+                && !str_contains($name, 'profile_gate')
+                && !str_contains($name, 'forward_profile')
+                && !str_contains($name, 'property_magic_outside_hook_compile_error')) {
+                continue;
+            }
+            if (CompilerVersion::supportsPropertyHooks()
+                && str_contains($name, 'property_magic_outside_hook_runtime_error')) {
                 continue;
             }
             if (!CompilerVersion::supportsPropertyHooks()
                 && (str_contains($name, 'asymmetric_get_only_hook_compile')
                     || str_contains($name, 'asymmetric_get_only_hook_write'))) {
-                continue;
-            }
-            if (CompilerVersion::supportsPropertyHooks()
-                && str_contains($name, 'asymmetric_get_only_hook_reference_profile')) {
                 continue;
             }
             // 8.4-target reject gate; skipped when bare rethrow enabled (#3508, #14239, #15357).
@@ -961,6 +970,16 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'clone_with_forward_profile')) {
                 continue;
             }
+            // 8.4-target reject gate; skipped when try/catch/else enabled (#15817, #19128).
+            if (CompilerVersion::supportsTryCatchElse()
+                && str_contains($name, 'try_catch_else_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsTryCatchElse()
+                && str_contains($name, 'try_catch_else')
+                && !str_contains($name, 'try_catch_else_reference_profile')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when pipe operator enabled (#12424, #18007).
             if (CompilerVersion::supportsPipeOperator()
                 && str_contains($name, 'pipe_operator_reference_profile')) {
@@ -1075,6 +1094,15 @@ class JITTest extends BaseTest {
             }
             if (CompilerVersion::supportsClassHasFunctions()
                 && str_contains($name, 'class_has_functions_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()
+                && str_contains($name, 'dom_html_document')
+                && !str_contains($name, 'dom_html_document_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomLivingStandardNamespace()
+                && str_contains($name, 'dom_html_document_phantom')) {
                 continue;
             }
             // ?-> LLVM lowering verified in NullsafeJitCompileTest (#3219); MCJIT execute needs jit-runtime-probe (#98).
@@ -1354,6 +1382,10 @@ class JITTest extends BaseTest {
             }
             // printf()/sprintf() null format TypeError getMessage in try/catch: VM + AOT (#16042); MCJIT pending TypeError introspection (#98).
             if (str_contains($name, 'printf_null_format_typeerror') && !str_contains($name, '_jit')) {
+                continue;
+            }
+            // printf(null) E_DEPRECATED writes to SAPI stdout under MCJIT — VM + AOT (#18764); JIT via sprintf_null_deprecated_jit.
+            if (str_contains($name, 'printf_null_deprecated') && !str_contains($name, '_jit')) {
                 continue;
             }
             // addcslashes() null characters TypeError getMessage in try/catch under strict_types: VM + AOT (#17829); MCJIT pending TypeError introspection (#98).

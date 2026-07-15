@@ -36,12 +36,6 @@ final class mb_convert_encoding extends Internal
                 $argc
             ));
         }
-        $source = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_convert_encoding',
-            0,
-            'string'
-        );
         if (null === $frame->returnVar) {
             return;
         }
@@ -61,6 +55,27 @@ final class mb_convert_encoding extends Internal
                 $to
             ));
         }
+        $sourceVar = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $sourceVar->type) {
+            $result = VmMbstring::convertEncodingSourceArray($sourceVar->toArray(), $to, $from);
+            BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
+                if (false === $result) {
+                    $ret->bool(false);
+
+                    return;
+                }
+                $ret->array($result);
+            });
+
+            return;
+        }
+        $source = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'mb_convert_encoding',
+            0,
+            'string',
+            'array|string'
+        );
         $result = VmMbstring::convertEncoding($source, $to, $from);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
             if (false === $result) {

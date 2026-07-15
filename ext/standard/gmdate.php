@@ -41,8 +41,17 @@ final class gmdate extends Internal
 
     private static function vmFormatArg(Frame $frame): string
     {
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'gmdate', 'format', 0, $frame);
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, 0, 'gmdate', 'format');
+        }
 
-        return VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gmdate', 0, 'format');
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'gmdate',
+            0,
+            'format',
+            'string',
+            false
+        );
     }
 }

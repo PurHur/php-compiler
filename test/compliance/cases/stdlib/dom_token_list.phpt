@@ -1,5 +1,7 @@
 --TEST--
 stdlib DOMElement::$classList / DOMTokenList — PHP 8.4 profile (#16876, ext/dom/token_list.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 if (!class_exists('DOMTokenList')) {

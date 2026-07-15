@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\iconv\CharsetEngine;
+use PHPCompiler\ext\standard\mail as MailBuiltin;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -363,6 +365,37 @@ final class VmMbstring
         }
 
         return CharsetEngine::convert($from, $to, $source);
+    }
+
+    /**
+     * mb_convert_encoding() array operand — convert string elements, preserve other types (#3222).
+     */
+    public static function convertEncodingSourceArray(
+        HashTable $table,
+        string $to,
+        string $from
+    ): HashTable|false {
+        $out = new HashTable();
+        foreach ($table->iterateKeyed(true) as [$key, $value]) {
+            $value = $value->resolveIndirect();
+            $elem = new Variable();
+            if (Variable::TYPE_STRING === $value->type) {
+                $converted = self::convertEncoding($value->toString(), $to, $from);
+                if (false === $converted) {
+                    return false;
+                }
+                $elem->string($converted);
+            } else {
+                $elem->copyFrom($value);
+            }
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $elem);
+            } else {
+                $out->add($key->toString(), $elem);
+            }
+        }
+
+        return $out;
     }
 
     public static function convertCase(
@@ -2444,6 +2477,351 @@ final class VmMbstring
             return null;
         }
 
-        return '#'.$pattern.'#u';
+        return self::mbEregRegex($pattern, false);
+    }
+
+    /**
+     * Build PCRE pattern for mb_ereg* (php-src ext/mbstring/php_mbregex.c; #4635).
+     *
+     * Oniguruma semantics are approximated via PCRE u-flag (same approach as mb_split).
+     */
+    public static function mbEregRegex(string $pattern, bool $caseInsensitive): ?string
+    {
+        return '#'.$pattern.'#'.self::mbEregPcreSuffix($caseInsensitive);
+    }
+
+    /**
+     * @return array{matched: bool, registers: array<int, string>}
+     */
+    public static function eregMatch(
+        string $pattern,
+        string $string,
+        bool $caseInsensitive
+    ): array {
+        if (!self::checkEncoding($string, MbstringState::regexEncoding())) {
+            return ['matched' => false, 'registers' => []];
+        }
+
+        $regex = self::mbEregRegex($pattern, $caseInsensitive);
+        if (null === $regex) {
+            return ['matched' => false, 'registers' => []];
+        }
+
+        $matches = [];
+        $result = @preg_match($regex, $string, $matches);
+        if (false === $result || PREG_NO_ERROR !== preg_last_error()) {
+            return ['matched' => false, 'registers' => []];
+        }
+        if (0 === $result) {
+            return ['matched' => false, 'registers' => []];
+        }
+
+        return ['matched' => true, 'registers' => $matches];
+    }
+
+    public static function eregReplace(
+        string $pattern,
+        string $replacement,
+        string $string,
+        bool $caseInsensitive
+    ): string|false {
+        if (!self::checkEncoding($string, MbstringState::regexEncoding())) {
+            return false;
+        }
+
+        $regex = self::mbEregRegex($pattern, $caseInsensitive);
+        if (null === $regex) {
+            return false;
+        }
+
+        $result = @preg_replace($regex, $replacement, $string);
+        if (null === $result) {
+            return false;
+        }
+        if (PREG_NO_ERROR !== preg_last_error()) {
+            return false;
+        }
+
+        return $result;
+    }
+
+    /**
+     * mb_send_mail() VM entry (php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_send_mail); #6548).
+     */
+    public static function runSendMailBuiltin(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3 || $argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'mb_send_mail() expects at least 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+
+        $to = VmString::coercePathBuiltinArg($frame->calledArgs[0], 'mb_send_mail', 0, 'to');
+        $subject = VmString::coercePathBuiltinArg($frame->calledArgs[1], 'mb_send_mail', 1, 'subject');
+        $message = VmString::coercePathBuiltinArg($frame->calledArgs[2], 'mb_send_mail', 2, 'message');
+        $headersArg = $argc >= 4 ? $frame->calledArgs[3] : null;
+        $extraParams = null;
+        if ($argc >= 5) {
+            $extraParams = VmString::coercePathBuiltinArg(
+                $frame->calledArgs[4],
+                'mb_send_mail',
+                4,
+                'additional_params'
+            );
+        }
+
+        $prepared = self::prepareSendMail(
+            $to,
+            $subject,
+            $message,
+            $headersArg,
+            $extraParams
+        );
+        self::dispatchMailTransport($frame, $prepared);
+    }
+
+    /**
+     * @return array{to: string, subject: string, message: string, headers: string, params: ?string}
+     */
+    public static function prepareSendMail(
+        string $to,
+        string $subject,
+        string $message,
+        ?Variable $headersArg = null,
+        ?string $extraParams = null
+    ): array {
+        $profile = MbstringMailProfile::forLanguage(MbstringState::language());
+        $mailCharset = $profile['charset'];
+        $headerBase64 = 'base64' === $profile['header'];
+        $bodyEncoding = $profile['body'];
+
+        $to = self::normalizeMailRecipient($to);
+        $subject = self::encodeMimeheader(
+            self::convertEncoding($subject, $mailCharset, MbstringState::internalEncoding()) ?: $subject,
+            $mailCharset,
+            $headerBase64
+        );
+        $converted = self::convertEncoding($message, $mailCharset, MbstringState::internalEncoding());
+        $message = false === $converted ? $message : $converted;
+        $message = self::applyMailBodyEncoding($message, $bodyEncoding);
+
+        [$headersText, $suppressContentType, $suppressTransferEncoding] = self::coerceSendMailHeaders($headersArg);
+        $headers = self::buildSendMailHeaders(
+            $headersText,
+            $mailCharset,
+            $bodyEncoding,
+            $suppressContentType,
+            $suppressTransferEncoding
+        );
+
+        return [
+            'to' => $to,
+            'subject' => $subject,
+            'message' => $message,
+            'headers' => $headers,
+            'params' => $extraParams,
+        ];
+    }
+
+    /**
+     * @return array{0: string, 1: bool, 2: bool}
+     */
+    private static function coerceSendMailHeaders(?Variable $headersArg): array
+    {
+        if (null === $headersArg) {
+            return ['', false, false];
+        }
+
+        $headersArg = $headersArg->resolveIndirect();
+        if (Variable::TYPE_NULL === $headersArg->type) {
+            return ['', false, false];
+        }
+        if (Variable::TYPE_STRING === $headersArg->type) {
+            $headers = $headersArg->toString();
+            VmString::rejectNullByteBuiltinStringArg($headers, 'mb_send_mail', 3, 'additional_headers');
+            $headers = trim($headers);
+
+            return [$headers, self::sendMailHeaderHas($headers, 'content-type'), self::sendMailHeaderHas($headers, 'content-transfer-encoding')];
+        }
+        if (Variable::TYPE_ARRAY !== $headersArg->type) {
+            throw new \TypeError(\sprintf(
+                'mb_send_mail(): Argument #4 ($additional_headers) must be of type array|string, %s given',
+                self::typeLabel($headersArg)
+            ));
+        }
+
+        return [self::buildMailHeadersFromArray($headersArg->toArray()), false, false];
+    }
+
+    private static function buildMailHeadersFromArray(\PHPCompiler\VM\HashTable $headers): string
+    {
+        $lines = [];
+        foreach ($headers->iterateKeyed(true) as [$key, $value]) {
+            $value = $value->resolveIndirect();
+            if (EnumCaseSupport::isEnumCaseVariable($value)) {
+                throw new \TypeError(\sprintf(
+                    'mb_send_mail(): Argument #4 ($additional_headers) must be of type array|string, %s given',
+                    EnumCaseSupport::typeNameForVariable($value)
+                ));
+            }
+            if (Variable::TYPE_STRING !== $value->type) {
+                throw new \TypeError(\sprintf(
+                    'mb_send_mail(): Argument #4 ($additional_headers) must be of type array|string, %s given',
+                    self::typeLabel($value)
+                ));
+            }
+            $line = $value->toString();
+            VmString::rejectNullByteBuiltinStringArg($line, 'mb_send_mail', 3, 'additional_headers');
+            if (\is_int($key) || (\is_string($key) && ctype_digit($key))) {
+                $lines[] = $line;
+                continue;
+            }
+            $lines[] = $key.': '.$line;
+        }
+
+        return implode("\r\n", $lines);
+    }
+
+    private static function buildSendMailHeaders(
+        string $headersText,
+        string $mailCharset,
+        string $bodyEncoding,
+        bool $suppressContentType,
+        bool $suppressTransferEncoding
+    ): string {
+        $parts = [];
+        if ('' !== $headersText) {
+            $parts[] = rtrim(str_replace(["\r\n", "\n"], "\r\n", $headersText), "\r\n");
+        }
+        if (!self::sendMailHeaderHas($headersText, 'mime-version')) {
+            $parts[] = 'MIME-Version: 1.0';
+        }
+        if (!$suppressContentType) {
+            $parts[] = 'Content-Type: text/plain; charset='.$mailCharset;
+        }
+        if (!$suppressTransferEncoding) {
+            $parts[] = 'Content-Transfer-Encoding: '.$bodyEncoding;
+        }
+
+        return implode("\r\n", array_filter($parts, static fn (string $part): bool => '' !== $part));
+    }
+
+    private static function sendMailHeaderHas(string $headers, string $name): bool
+    {
+        return 1 === preg_match('/^'.preg_quote($name, '/').'\s*:/mi', $headers);
+    }
+
+    private static function normalizeMailRecipient(string $to): string
+    {
+        if ('' === $to) {
+            return '';
+        }
+        $to = rtrim($to);
+        $len = \strlen($to);
+        $out = '';
+        for ($i = 0; $i < $len; ++$i) {
+            $byte = $to[$i];
+            if ($byte < "\x20" || "\x7F" === $byte) {
+                if ("\r" === $byte && ($i + 2) < $len && "\n" === $to[$i + 1]
+                    && (' ' === $to[$i + 2] || "\t" === $to[$i + 2])) {
+                    $i += 2;
+                    while (($i + 1) < $len && (' ' === $to[$i + 1] || "\t" === $to[$i + 1])) {
+                        ++$i;
+                    }
+                    continue;
+                }
+                $out .= ' ';
+                continue;
+            }
+            $out .= $byte;
+        }
+
+        return $out;
+    }
+
+    private static function applyMailBodyEncoding(string $message, string $bodyEncoding): string
+    {
+        return match (strtolower($bodyEncoding)) {
+            'base64' => rtrim(chunk_split(base64_encode($message), 76, "\r\n"), "\r\n"),
+            default => $message,
+        };
+    }
+
+    /**
+     * @param array{to: string, subject: string, message: string, headers: string, params: ?string} $prepared
+     */
+    private static function dispatchMailTransport(Frame $frame, array $prepared): void
+    {
+        $frame->calledArgs = [
+            self::stringVariable($prepared['to']),
+            self::stringVariable($prepared['subject']),
+            self::stringVariable($prepared['message']),
+            self::stringVariable($prepared['headers']),
+        ];
+        if (null !== $prepared['params']) {
+            $frame->calledArgs[] = self::stringVariable($prepared['params']);
+        }
+        (new MailBuiltin())->execute($frame);
+    }
+
+    private static function stringVariable(string $value): Variable
+    {
+        $var = new Variable();
+        $var->string($value);
+
+        return $var;
+    }
+
+    public static function mbEregRegexCompileError(string $pattern, bool $caseInsensitive): ?string
+    {
+        $regex = self::mbEregRegex($pattern, $caseInsensitive);
+        if (null === $regex) {
+            return 'invalid pattern';
+        }
+        @preg_match($regex, '');
+
+        return PREG_NO_ERROR === preg_last_error() ? null : preg_last_error_msg();
+    }
+
+    public static function warnMbEregRegexFailure(
+        Frame $frame,
+        string $function,
+        string $pattern,
+        bool $caseInsensitive
+    ): void {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $detail = self::mbEregRegexCompileError($pattern, $caseInsensitive) ?? 'invalid pattern';
+        $frame->vmContext->errors->triggerErrorWithHandlerFirst(
+            $function.'(): mbregex compile err: '.$detail,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    private static function mbEregPcreSuffix(bool $caseInsensitive): string
+    {
+        $flags = 'u';
+        if ($caseInsensitive) {
+            $flags .= 'i';
+        }
+        foreach (str_split(MbstringState::regexOptions()) as $option) {
+            if ('i' === $option && $caseInsensitive) {
+                continue;
+            }
+            if (\in_array($option, ['m', 's', 'x', 'U'], true) && !str_contains($flags, $option)) {
+                $flags .= $option;
+            }
+        }
+
+        return $flags;
     }
 }

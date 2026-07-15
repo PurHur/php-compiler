@@ -40,8 +40,6 @@ final class spl_autoload_extensions extends Internal
                         'file_extensions'
                     )
                 );
-            } else {
-                VmSplAutoload::setFileExtensions(null);
             }
         }
         if (null === $frame->returnVar) {

@@ -17,10 +17,8 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringTrimMask;
 use PHPCompiler\JIT\Builtin\StringTrimModeJit;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -44,8 +42,7 @@ final class string_trim extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('trim() requires one to three arguments');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'trim', 'string', 0, $frame);
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'trim', 0, 'string');
+        $string = VmString::stringBuiltinArgForFrame($frame, 0, 'trim', 0, 'string');
         [$mask, $mode] = VmString::resolveTrimMaskAndMode(
             \array_slice($frame->calledArgs, 1),
             'trim',
@@ -66,7 +63,6 @@ final class string_trim extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('trim() requires one to three arguments');
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'trim', 'string', 1);
         $literal = $args[0]->compileTimeString ?? null;
         $optional = \array_slice($args, 1);
         $optCount = \count($optional);
@@ -108,7 +104,7 @@ final class string_trim extends Internal
                 $mode = $modeLiteral;
             }
         }
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'trim', 0, 'string');
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'trim', 0, 'string');
         $str = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         if (null !== $maskStr) {
             $maskStr = $context->builder->call($context->lookupFunction('__string__separate'), $maskStr);

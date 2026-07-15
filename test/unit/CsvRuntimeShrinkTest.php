@@ -57,6 +57,19 @@ final class CsvRuntimeShrinkTest extends TestCase
         $this->assertSame($fields, $rebuilt);
     }
 
+    /** Issue #18592 — unterminated empty enclosure yields NUL byte via shared VmCsv SSOT. */
+    public function testCsvJitHelperLoneQuoteNulByteField(): void
+    {
+        $fields = \PHPCompiler\ext\standard\VmCsv::parseLine('"');
+        $this->assertSame(["\0"], $fields);
+        $ht = CsvJitHelper::strGetcsvArgv('"', ',', '"', '\\');
+        $rebuilt = [];
+        foreach ($ht->iterate() as $cell) {
+            $rebuilt[] = $cell->toString();
+        }
+        $this->assertSame($fields, $rebuilt);
+    }
+
     public function testFputcsvFormatLineDoesNotDoubleBackslashEscape(): void
     {
         $line = \PHPCompiler\ext\standard\VmCsv::formatLine(['a\b'], ',', '"', '\\');

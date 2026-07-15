@@ -1,5 +1,5 @@
 --TEST--
-stdlib chmod()/mkdir() decimal numeric-string permissions (#17819, #17860, ext/standard/filestat.c)
+stdlib chmod()/mkdir() decimal numeric-string permissions (#18923, ext/standard/filestat.c)
 --FILE--
 <?php
 

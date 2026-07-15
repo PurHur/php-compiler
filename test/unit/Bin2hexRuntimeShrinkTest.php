@@ -8,22 +8,26 @@ use PHPCompiler\ext\standard\Bin2hexJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** bin2hex() user-script AOT defers nested JIT; full builds use Bin2hexJitHelper (#14603, #16734). */
+/** bin2hex() JIT routes through Bin2hexJitHelper PHP; standalone defer uses inline LLVM (#14603, #18884, #3357). */
 final class Bin2hexRuntimeShrinkTest extends TestCase
 {
-    public function testStringBin2hexUsesJitHelperNotInlineLlvm(): void
+    public function testStringBin2hexUsesJitHelperNotLlvmMonolith(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringBin2hex.php');
         $this->assertStringContainsString('Bin2hexJitHelper', $source);
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitBin2hex.php');
-        $this->assertStringContainsString('StringBin2hexLlvm', $source);
-        $this->assertStringContainsString('shouldDefer', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('bin2hex_inline_entry', $source);
+        $this->assertStringNotContainsString('StringBin2hexLlvm', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringBin2hexLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitBin2hex.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/bin2hex.php');
         $this->assertStringContainsString('StringBin2hex::ensureLinked', $builtin);
         $this->assertStringContainsString('__compiler_bin2hex', $builtin);
-        $this->assertStringContainsString('coerceTypedStringBuiltinArg', $builtin);
-        $this->assertStringContainsString('lowerTypedString', $builtin);
+        $this->assertStringContainsString('stringBuiltinArgForFrame', $builtin);
+        $this->assertStringContainsString('lowerStrictOrCoercible', $builtin);
+        $this->assertStringNotContainsString('JitBin2hex', $builtin);
     }
 
     public function testBin2hexJitHelperDelegatesToVmString(): void
@@ -35,10 +39,11 @@ final class Bin2hexRuntimeShrinkTest extends TestCase
         $this->assertSame('616263', VmString::bin2hex('abc'));
     }
 
-    public function testSpineBundleIncludesBin2hexJitHelper(): void
+    public function testSpineBundleOmitsDeletedBin2hexLlvm(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringNotContainsString('JitBin2hex.php', $spine);
+        $this->assertStringNotContainsString('StringBin2hexLlvm.php', $spine);
         $this->assertStringContainsString('Bin2hexJitHelper.php', $spine);
         $this->assertStringContainsString('StringBin2hex.php', $spine);
     }

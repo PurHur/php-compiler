@@ -57,6 +57,55 @@ final class VmStreamMetaRuntimeShrinkTest extends TestCase
         VmFs::fclose($handle);
     }
 
+    public function testWrapperTypeForDataUri(): void
+    {
+        $this->assertSame('RFC2397', VmStreamMeta::wrapperTypeForUri('data://text/plain,hello'));
+    }
+
+    public function testWrapperTypeForPhpFilterUri(): void
+    {
+        $this->assertSame('PHP', VmStreamMeta::wrapperTypeForUri('php://filter/read=string.rot13/resource=data://text/plain,hello'));
+    }
+
+    public function testStreamGetMetaDataForDataUri(): void
+    {
+        $handle = VmFs::fopen('data://text/plain,hello', 'r');
+        $this->assertNotFalse($handle);
+        $meta = VmFs::streamGetMetaData($handle);
+        $wrapperType = null;
+        foreach ($meta->iterateKeyed(false) as [$keyVar, $value]) {
+            if (Variable::TYPE_STRING === $keyVar->type && 'wrapper_type' === $keyVar->toString()) {
+                $wrapperType = $value->toString();
+            }
+        }
+        $this->assertSame('RFC2397', $wrapperType);
+        VmFs::fclose($handle);
+    }
+
+    public function testStreamGetMetaDataForPhpFilterUri(): void
+    {
+        $filterUri = 'php://filter/read=string.rot13/resource=data://text/plain,hello';
+        $handle = VmFs::fopen($filterUri, 'r');
+        $this->assertNotFalse($handle);
+        $meta = VmFs::streamGetMetaData($handle);
+        $wrapperType = null;
+        $uri = null;
+        foreach ($meta->iterateKeyed(false) as [$keyVar, $value]) {
+            if (Variable::TYPE_STRING !== $keyVar->type) {
+                continue;
+            }
+            $key = $keyVar->toString();
+            if ('wrapper_type' === $key) {
+                $wrapperType = $value->toString();
+            } elseif ('uri' === $key) {
+                $uri = $value->toString();
+            }
+        }
+        $this->assertSame('PHP', $wrapperType);
+        $this->assertSame($filterUri, $uri);
+        VmFs::fclose($handle);
+    }
+
     public function testBuildMetaArrayForPlainFilePath(): void
     {
         $fp = fopen('php://memory', 'r+');
@@ -70,6 +119,55 @@ final class VmStreamMetaRuntimeShrinkTest extends TestCase
         } finally {
             fclose($fp);
         }
+    }
+
+    public function testStdioStreamTypeInheritsNonStdioFromHostResource(): void
+    {
+        if (!\function_exists('stream_socket_pair')) {
+            $this->markTestSkipped('stream_socket_pair unavailable');
+        }
+        $pair = @\stream_socket_pair(\AF_UNIX, \SOCK_STREAM, \STREAM_IPPROTO_IP);
+        if (false === $pair) {
+            $this->markTestSkipped('stream_socket_pair failed');
+        }
+        try {
+            $hostType = VmStreamMeta::stdioInheritedStreamType('php://stdin', $pair[0]);
+            $this->assertSame('unix_socket', $hostType);
+
+            $meta = VmStreamMeta::buildMetaArray('php://stdin', $pair[0]);
+            $this->assertSame('unix_socket', $meta['stream_type']);
+            $this->assertSame('PHP', $meta['wrapper_type']);
+        } finally {
+            fclose($pair[0]);
+            fclose($pair[1]);
+        }
+    }
+
+    public function testStreamGetMetaDataForPhpStdinUsesHostInheritedType(): void
+    {
+        $handle = VmFs::fopen('php://stdin', 'r');
+        $this->assertNotFalse($handle);
+        $meta = VmFs::streamGetMetaData($handle);
+        $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $meta);
+        $streamType = null;
+        foreach ($meta->iterateKeyed(false) as [$keyVar, $value]) {
+            if (Variable::TYPE_STRING === $keyVar->type && 'stream_type' === $keyVar->toString()) {
+                $streamType = $value->toString();
+            }
+        }
+        $hostFp = @\fopen('php://stdin', 'rb');
+        $expected = 'STDIO';
+        if (\is_resource($hostFp)) {
+            $hostMeta = @\stream_get_meta_data($hostFp);
+            if (\is_array($hostMeta) && isset($hostMeta['stream_type']) && \is_string($hostMeta['stream_type'])) {
+                $expected = 'STDIO' === $hostMeta['stream_type']
+                    ? 'STDIO'
+                    : VmStreamMeta::stdioInheritedStreamType('php://stdin', $hostFp) ?? $hostMeta['stream_type'];
+            }
+            fclose($hostFp);
+        }
+        $this->assertSame($expected, $streamType);
+        VmFs::fclose($handle);
     }
 
     public function testStreamGetMetaDataViaVmFsHandle(): void

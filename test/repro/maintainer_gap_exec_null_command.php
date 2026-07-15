@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 foreach (['exec', 'shell_exec', 'system', 'passthru', 'popen'] as $fn) {
     try {
         if ('popen' === $fn) {
@@ -9,9 +7,20 @@ foreach (['exec', 'shell_exec', 'system', 'passthru', 'popen'] as $fn) {
         } else {
             $fn(null);
         }
-        fwrite(STDERR, "$fn(null): expected TypeError\n");
+        fwrite(STDERR, "$fn(null): expected ValueError\n");
         exit(1);
-    } catch (TypeError) {
+    } catch (ValueError) {
         echo "$fn(null): ok\n";
+    } catch (TypeError) {
+        fwrite(STDERR, "$fn(null): got TypeError, expected ValueError\n");
+        exit(1);
     }
 }
+
+$pipes = [];
+$result = proc_open(null, [], $pipes);
+if (null !== $result) {
+    fwrite(STDERR, 'proc_open(null): expected NULL'."\n");
+    exit(1);
+}
+echo "proc_open(null): ok\n";

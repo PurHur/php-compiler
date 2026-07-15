@@ -6,7 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\ext\session\SessionConstants;
 use PHPCompiler\ext\session\SessionFileStorage;
+use PHPCompiler\ext\session\SessionUserHandler;
 use PHPCompiler\Frame;
+use PHPCompiler\VM;
 use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -91,6 +93,8 @@ final class VmSession
 
     private static string $cookieSamesite = '';
 
+    private static bool $useStrictMode = false;
+
     public static function reset(): void
     {
         self::$active = false;
@@ -100,6 +104,8 @@ final class VmSession
         self::$cacheExpire = self::DEFAULT_CACHE_EXPIRE;
         self::$cacheLimiter = self::DEFAULT_CACHE_LIMITER;
         self::resetCookieParams();
+        self::$useStrictMode = false;
+        SessionUserHandler::reset();
     }
 
     public static function resetCookieParams(): void
@@ -334,7 +340,12 @@ final class VmSession
 
     public static function isSupportedModule(string $module): bool
     {
-        return self::DEFAULT_MODULE === strtolower($module);
+        $module = strtolower($module);
+        if ('user' === $module) {
+            return SessionUserHandler::hasHandler();
+        }
+
+        return self::DEFAULT_MODULE === $module;
     }
 
     public static function canChangeSaveHandler(?Frame $frame): bool
@@ -442,7 +453,10 @@ final class VmSession
      */
     public static function setId(string $id) {
         if ('' === $id) {
-            return self::$id;
+            $previous = self::$id;
+            self::$id = '';
+
+            return $previous;
         }
         $sanitized = self::sanitizeId($id);
         if ('' === $sanitized) {
@@ -454,6 +468,22 @@ final class VmSession
         return $previous;
     }
 
+    public static function setUseStrictMode(bool $enabled): void
+    {
+        self::$useStrictMode = $enabled;
+    }
+
+    public static function isUseStrictMode(): bool
+    {
+        return self::$useStrictMode;
+    }
+
+    /** php-src session_start read_and_close — close without persisting after read (#18457). */
+    public static function readClose(): void
+    {
+        self::$active = false;
+    }
+
     public static function start(Context $ctx): bool
     {
         if (self::$active) {
@@ -461,7 +491,15 @@ final class VmSession
         }
         $incomingId = self::readCookieId($ctx);
         if ('' !== $incomingId) {
-            self::$id = $incomingId;
+            if (self::$useStrictMode && !self::sessionIdExists($incomingId)) {
+                self::$id = self::generateId();
+                ResponseContext::addHeader(
+                    self::buildSessionSetCookieLine(self::$id),
+                    false
+                );
+            } else {
+                self::$id = $incomingId;
+            }
         } elseif ('' === self::$id) {
             // php-src ext/session/session.c — reuse PS(id) after session_write_close() in-request.
             self::$id = self::generateId();
@@ -469,6 +507,9 @@ final class VmSession
                 self::buildSessionSetCookieLine(self::$id),
                 false
             );
+        }
+        if (SessionUserHandler::isActiveModule() && !SessionUserHandler::open($ctx)) {
+            return false;
         }
         self::loadSession($ctx);
         self::$active = true;
@@ -482,6 +523,9 @@ final class VmSession
             return false;
         }
         self::saveSession($ctx);
+        if (SessionUserHandler::isActiveModule()) {
+            SessionUserHandler::close($ctx);
+        }
         self::$active = false;
 
         return true;
@@ -493,9 +537,13 @@ final class VmSession
             return false;
         }
         if ('' !== self::$id) {
-            $path = SessionFileStorage::storagePath(self::$id);
-            if (VmStatPath::isFile($path)) {
-                VmFsUnlink::unlink($path);
+            if (SessionUserHandler::isActiveModule()) {
+                SessionUserHandler::destroy($ctx, self::$id);
+            } else {
+                $path = SessionFileStorage::storagePath(self::$id);
+                if (VmStatPath::isFile($path)) {
+                    VmFsUnlink::unlink($path);
+                }
             }
         }
         $ctx->ensureSuperglobal('_SESSION')->array(new HashTable());
@@ -602,6 +650,15 @@ final class VmSession
             return false;
         }
 
+        if (SessionUserHandler::isActiveModule()) {
+            $vm = VM::running();
+            if (null === $vm) {
+                return false;
+            }
+
+            return SessionUserHandler::gc($vm->context, VmIni::getSessionGcMaxlifetime());
+        }
+
         return self::gcExpiredFiles();
     }
 
@@ -692,6 +749,23 @@ final class VmSession
         );
     }
 
+    private static function sessionIdExists(string $id): bool
+    {
+        if ('' === $id) {
+            return false;
+        }
+        if (SessionUserHandler::isActiveModule()) {
+            $vm = VM::running();
+            if (null === $vm) {
+                return false;
+            }
+
+            return SessionUserHandler::validateId($vm->context, $id);
+        }
+
+        return VmStatPath::isFile(SessionFileStorage::storagePath($id));
+    }
+
     private static function readCookieId(Context $ctx): string
     {
         $cookieVar = $ctx->getSuperglobal('_COOKIE');
@@ -711,6 +785,14 @@ final class VmSession
         $sessionVar = $ctx->ensureSuperglobal('_SESSION');
         if ('' === self::$id) {
             $sessionVar->array(new HashTable());
+
+            return;
+        }
+        if (SessionUserHandler::isActiveModule()) {
+            $raw = SessionUserHandler::read($ctx, self::$id);
+            if ('' === $raw || !VmSessionSerializer::decodePhp($ctx, $raw)) {
+                $sessionVar->array(new HashTable());
+            }
 
             return;
         }
@@ -742,6 +824,11 @@ final class VmSession
         }
         $payload = VmSessionSerializer::encodePhp($ctx, $sessionVar->toArray());
         if (false === $payload) {
+            return;
+        }
+        if (SessionUserHandler::isActiveModule()) {
+            SessionUserHandler::write($ctx, self::$id, $payload);
+
             return;
         }
         $dir = SessionFileStorage::storageDir();

@@ -23,6 +23,9 @@ final class VmFsUnlinkPure
         if (str_contains($path, "\0")) {
             return false;
         }
+        if (VmFsPhpWrapper::isPhpWrapperPath($path)) {
+            return false;
+        }
 
         return @\unlink($path);
     }

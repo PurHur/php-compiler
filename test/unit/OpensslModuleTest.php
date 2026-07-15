@@ -19,7 +19,7 @@ final class OpensslModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_verify', 'openssl_get_cipher_methods', 'openssl_get_md_methods', 'openssl_pkey_new', 'openssl_pkey_derive', 'openssl_cipher_iv_length', 'openssl_cipher_key_length', 'openssl_digest', 'openssl_pbkdf2'] as $fn) {
+        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_verify', 'openssl_seal', 'openssl_open', 'openssl_get_cipher_methods', 'openssl_get_md_methods', 'openssl_pkey_new', 'openssl_pkey_derive', 'openssl_cipher_iv_length', 'openssl_cipher_key_length', 'openssl_digest', 'openssl_pbkdf2'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
@@ -86,15 +86,85 @@ PHP;
         self::assertSame(16, $frame->returnVar->toInt());
     }
 
-    public function test_openssl_encrypt_stub_throws_logic_exception(): void
+    public function test_openssl_encrypt_decrypt_roundtrip_when_ffi_available(): void
     {
-        $runtime = new Runtime();
-        $fn = new \PHPCompiler\ext\openssl\openssl_encrypt();
-        $frame = $fn->getFrame($runtime->vmContext);
+        if (!\PHPCompiler\ext\openssl\VmOpensslCipherNative::available()) {
+            self::markTestSkipped('libcrypto FFI unavailable');
+        }
 
-        $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('openssl_encrypt() is not implemented in this compiler build (issue #3324)');
-        $fn->execute($frame);
+        $runtime = new Runtime();
+        $key = '0123456789abcdef';
+        $iv = '0123456789abcdef';
+
+        $encryptFn = new \PHPCompiler\ext\openssl\openssl_encrypt();
+        $encryptFrame = $encryptFn->getFrame($runtime->vmContext);
+        $dataVar = new \PHPCompiler\VM\Variable();
+        $dataVar->string('data');
+        $cipherVar = new \PHPCompiler\VM\Variable();
+        $cipherVar->string('AES-128-CBC');
+        $keyVar = new \PHPCompiler\VM\Variable();
+        $keyVar->string($key);
+        $optionsVar = new \PHPCompiler\VM\Variable();
+        $optionsVar->int(\PHPCompiler\ext\openssl\OpensslConstants::OPENSSL_RAW_DATA);
+        $ivVar = new \PHPCompiler\VM\Variable();
+        $ivVar->string($iv);
+        $encryptFrame->calledArgs = [$dataVar, $cipherVar, $keyVar, $optionsVar, $ivVar];
+        $encryptFrame->returnVar = new \PHPCompiler\VM\Variable();
+        $encryptFn->execute($encryptFrame);
+        self::assertSame(\PHPCompiler\VM\Variable::TYPE_STRING, $encryptFrame->returnVar->type);
+        self::assertSame('840a0c413dca6e7dcc58783214795053', \bin2hex($encryptFrame->returnVar->toString()));
+
+        $decryptFn = new \PHPCompiler\ext\openssl\openssl_decrypt();
+        $decryptFrame = $decryptFn->getFrame($runtime->vmContext);
+        $encVar = new \PHPCompiler\VM\Variable();
+        $encVar->string($encryptFrame->returnVar->toString());
+        $decryptFrame->calledArgs = [$encVar, $cipherVar, $keyVar, $optionsVar, $ivVar];
+        $decryptFrame->returnVar = new \PHPCompiler\VM\Variable();
+        $decryptFn->execute($decryptFrame);
+        self::assertSame('data', $decryptFrame->returnVar->toString());
+    }
+
+    public function test_openssl_encrypt_null_coerces_to_empty_string_when_ffi_available(): void
+    {
+        if (!\PHPCompiler\ext\openssl\VmOpensslCipherNative::available()) {
+            self::markTestSkipped('libcrypto FFI unavailable');
+        }
+
+        $runtime = new Runtime();
+        $encryptFn = new \PHPCompiler\ext\openssl\openssl_encrypt();
+        $key = str_repeat('k', 32);
+        $iv = str_repeat('i', 16);
+
+        $makeFrame = static function (?\PHPCompiler\VM\Variable $dataVar) use ($runtime, $encryptFn, $key, $iv) {
+            $frame = $encryptFn->getFrame($runtime->vmContext);
+            $cipherVar = new \PHPCompiler\VM\Variable();
+            $cipherVar->string('aes-256-cbc');
+            $keyVar = new \PHPCompiler\VM\Variable();
+            $keyVar->string($key);
+            $optionsVar = new \PHPCompiler\VM\Variable();
+            $optionsVar->int(0);
+            $ivVar = new \PHPCompiler\VM\Variable();
+            $ivVar->string($iv);
+            $frame->calledArgs = [$dataVar, $cipherVar, $keyVar, $optionsVar, $ivVar];
+            $frame->returnVar = new \PHPCompiler\VM\Variable();
+
+            return $frame;
+        };
+
+        $emptyVar = new \PHPCompiler\VM\Variable();
+        $emptyVar->string('');
+        $emptyFrame = $makeFrame($emptyVar);
+        $encryptFn->execute($emptyFrame);
+
+        $nullVar = new \PHPCompiler\VM\Variable();
+        $nullVar->null();
+        $nullFrame = $makeFrame($nullVar);
+        $encryptFn->execute($nullFrame);
+
+        self::assertSame(\PHPCompiler\VM\Variable::TYPE_STRING, $emptyFrame->returnVar->type);
+        self::assertSame(\PHPCompiler\VM\Variable::TYPE_STRING, $nullFrame->returnVar->type);
+        self::assertNotSame('', $emptyFrame->returnVar->toString());
+        self::assertSame($emptyFrame->returnVar->toString(), $nullFrame->returnVar->toString());
     }
 
     public function test_openssl_sign_verify_roundtrip_when_ffi_available(): void

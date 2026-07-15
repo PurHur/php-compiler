@@ -29,8 +29,8 @@ final class JitPregMatchEx
 
         StringPregMatch::ensureLinked($context);
 
-        $pattern = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'preg_match', 0, 'pattern');
-        $subject = JitStringBuiltinArg::lowerTypedString($context, $args[1], 'preg_match', 1, 'subject');
+        $pattern = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_match', 0, 'pattern');
+        $subject = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'preg_match', 1, 'subject');
 
         if (2 === $argc) {
             return JitPregMatch::invoke($context, $pattern, $subject);

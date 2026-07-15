@@ -34,6 +34,10 @@ final class MbstringState
 
     private static int $substituteCodepoint = 63;
 
+    private static string $regexEncoding = 'UTF-8';
+
+    private static string $regexOptions = 'pr';
+
     public static function internalEncoding(): string
     {
         return self::$internalEncoding;
@@ -274,6 +278,26 @@ final class MbstringState
         }
 
         return true;
+    }
+
+    public static function regexEncoding(?string $encoding = null): string|bool
+    {
+        if (null === $encoding) {
+            return self::$regexEncoding;
+        }
+        self::$regexEncoding = MbstringEncodingRegistry::assertValid($encoding, 'mb_regex_encoding', 0);
+
+        return true;
+    }
+
+    public static function regexOptions(?string $options = null): string
+    {
+        $previous = self::$regexOptions;
+        if (null !== $options) {
+            self::$regexOptions = $options;
+        }
+
+        return $previous;
     }
 
     private static function syncHttpInputListFromInternalEncoding(): void

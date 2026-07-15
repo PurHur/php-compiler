@@ -42,19 +42,13 @@ final class SpaceshipCompareJit
 
     private static int $blockSuffix = 0;
 
-    public static function implement(Context $context): void
+    /**
+     * Forward-declare spaceship ABI symbols before CompareJitHelper nested compile (#19048).
+     *
+     * @return array{0: LlvmFunction, 1: LlvmFunction, 2: LlvmFunction}
+     */
+    public static function declareAbiFunctions(Context $context): array
     {
-        $restore = self::captureInsertBlock($context);
-        self::$blockSuffix = 0;
-
-        $probe = $context->module->getNamedFunction('__value__spaceship');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerFunctions($context);
-            self::restoreInsertBlock($context, $restore);
-
-            return;
-        }
-
         self::ensureExternals($context);
 
         $valueFn = self::declareFunction(
@@ -84,6 +78,24 @@ final class SpaceshipCompareJit
                 $context->getTypeFromString('__hashtable__*'),
             ]
         );
+
+        return [$valueFn, $objectFn, $htFn];
+    }
+
+    public static function implement(Context $context): void
+    {
+        $restore = self::captureInsertBlock($context);
+        self::$blockSuffix = 0;
+
+        $probe = $context->module->getNamedFunction('__value__spaceship');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerFunctions($context);
+            self::restoreInsertBlock($context, $restore);
+
+            return;
+        }
+
+        [$valueFn, $objectFn, $htFn] = self::declareAbiFunctions($context);
 
         self::emitHashtableCompareSpaceshipBridge($context, $htFn);
         self::emitObjectCompareSpaceshipBridge($context, $objectFn);

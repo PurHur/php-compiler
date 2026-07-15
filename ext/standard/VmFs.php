@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\ext\posix\VmPosix;
+use PHPCompiler\VM;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ScriptStack;
@@ -642,6 +644,22 @@ final class VmFs
 
             return VmString::byteSlice($body, $offset, $length);
         }
+        if (VmFsStdio::isStdioUri($path) || 'php://output' === $path) {
+            if ('php://stdin' === $path) {
+                $data = self::readPathContentsViaOpen($path, $ctx);
+            } else {
+                // php://stdout|stderr|output — write-only; Zend file_get_contents returns '' (ext/standard/file.c).
+                $data = '';
+            }
+            if (false === $data) {
+                return false;
+            }
+            if (0 !== $offset || null !== $length) {
+                return VmString::byteSlice($data, $offset, $length);
+            }
+
+            return $data;
+        }
         if (VmPhpMemoryStream::isSupportedUri($path)) {
             $data = self::readPathContentsViaOpen($path, $ctx);
             if (false === $data) {
@@ -786,7 +804,7 @@ final class VmFs
         if (false === $handle) {
             return false;
         }
-        $total = self::passthruHandleToStdout($handle);
+        $total = self::passthruHandleToStdout($handle, $path);
         self::fclose($handle);
 
         return $total;
@@ -833,6 +851,11 @@ final class VmFs
 
     private static function filePutContentsViaOpen(string $path, string $data, int $flags): int|false
     {
+        if (0 !== ($flags & \LOCK_EX)) {
+            self::warnLockExNonRegularFile();
+
+            return false;
+        }
         $mode = (0 !== ($flags & StdlibConstants::FILE_APPEND)) ? 'ab' : 'wb';
         $handle = self::fopen($path, $mode);
         if (false === $handle) {
@@ -845,6 +868,29 @@ final class VmFs
         }
 
         return $written;
+    }
+
+    private static function warnLockExNonRegularFile(): void
+    {
+        $message = 'file_put_contents(): Exclusive locks may only be set for regular files';
+        $vm = VM::running();
+        if (null === $vm) {
+            @\trigger_error($message, \E_WARNING);
+
+            return;
+        }
+        $frame = $vm->builtinHandlerFrame();
+        if (null === $frame) {
+            $frames = $vm->context->runStackFrames();
+            $frame = [] !== $frames ? $frames[0] : null;
+        }
+        $vm->context->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            null,
+            $vm->context,
+            $frame
+        );
     }
 
     public static function fopen(string $path, string $mode, ?\PHPCompiler\VM\Context $ctx = null) {
@@ -879,7 +925,12 @@ final class VmFs
             return self::finalizeStreamOpen(VmPhpInputOutputStream::open($path, $mode), $mode);
         }
         if (VmPhpFilterStream::isSupportedUri($path)) {
-            return self::finalizeStreamOpen(VmPhpFilterStream::open($path, $mode, $ctx), $mode);
+            $handle = self::finalizeStreamOpen(VmPhpFilterStream::open($path, $mode, $ctx), $mode);
+            if (false !== $handle) {
+                self::registerStreamPath($handle, $path);
+            }
+
+            return $handle;
         }
         if (VmPhpFdStream::isFdUri($path)) {
             return self::finalizeStreamOpen(VmPhpFdStream::openFromUri($path, $mode), $mode);
@@ -1230,11 +1281,32 @@ final class VmFs
     }
 
     /**
+     * php_stream_passthru sentinel for php://output — Zend returns -1 when bytes
+     * go directly to stdout (ext/standard/streams.c; #18417).
+     *
+     * @param int|false $total
+     *
+     * @return int|false
+     */
+    private static function finalizePassthruResult(int $handle, ?string $path, int|false $total): int|false
+    {
+        if (false === $total) {
+            return false;
+        }
+        $uri = null !== $path && '' !== $path ? $path : self::handleUri($handle);
+        if ('php://output' === $uri) {
+            return -1;
+        }
+
+        return $total;
+    }
+
+    /**
      * Stream remaining bytes from an open VM handle to STDOUT (php_stream_passthru parity).
      *
      * @return int|false Bytes read, or false on I/O failure
      */
-    private static function passthruHandleToStdout(int $handle) {
+    private static function passthruHandleToStdout(int $handle, ?string $path = null) {
         $total = 0;
         while (!self::feof($handle)) {
             $chunk = self::fread($handle, 8192);
@@ -1249,7 +1321,7 @@ final class VmFs
             $total += $readLen;
         }
 
-        return $total;
+        return self::finalizePassthruResult($handle, $path, $total);
     }
 
     /**
@@ -2603,6 +2675,10 @@ final class VmFs
 
     public static function handleUri(int $handle): string
     {
+        $registered = self::$handlePaths[$handle] ?? '';
+        if ('' !== $registered) {
+            return $registered;
+        }
         if (VmUserStream::isValidHandle($handle)) {
             return VmUserStream::uriForHandle($handle);
         }
@@ -2616,7 +2692,7 @@ final class VmFs
             return VmPhpFdStream::uriForHandle($handle);
         }
 
-        return self::$handlePaths[$handle] ?? '';
+        return '';
     }
 
     /** Record fopen URI for JIT/AOT stream handles ({@see StreamPathJitHelper}, #9480). */

@@ -29,7 +29,7 @@ final class ReflectionMethodGetParameters extends VmClassMethod
             throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
         }
         $methodLc = strtolower($method);
-        $params = $entry->methodParameterMetadata[$methodLc] ?? [];
+        $paramNames = ReflectionSupport::methodParameterNames($entry, $method);
         $rpClass = $ctx->classes[ReflectionSupport::REFLECTION_PARAMETER] ?? null;
         if (null === $rpClass) {
             throw new \LogicException('ReflectionParameter is not registered in this compiler build');
@@ -37,12 +37,12 @@ final class ReflectionMethodGetParameters extends VmClassMethod
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        foreach ($params as $position => $meta) {
+        foreach ($paramNames as $position => $name) {
             $rp = new ObjectEntry($rpClass);
             $rp->constructed = true;
             $rp->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($entry->name);
             $rp->getProperty(ReflectionSupport::PROP_METHOD_NAME)->string($method);
-            $rp->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($meta->name);
+            $rp->getProperty(ReflectionSupport::PROP_PARAM_NAME)->string($name);
             $rp->getProperty(ReflectionSupport::PROP_PARAM_POSITION)->int($position);
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($rp);

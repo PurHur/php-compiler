@@ -38,6 +38,7 @@ class Module extends ModuleAbstract
         return [
             new sodium_crypto_secretbox(),
             new sodium_crypto_secretbox_open(),
+            new sodium_crypto_secretbox_keygen(),
             new sodium_crypto_auth(),
             new sodium_crypto_auth_verify(),
             new sodium_memcmp(),

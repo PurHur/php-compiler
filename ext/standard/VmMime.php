@@ -10,17 +10,28 @@ use PHPCompiler\VM\Variable;
 /**
  * MIME type sniffing for mime_content_type() (php-src ext/standard/file.c; #6196, #7865).
  *
- * VM and JIT/AOT share byte sniff via detectFromBytes() — no host fileinfo delegation.
+ * VM and JIT/AOT share byte sniff via detectFromBytes() — no host fileinfo or stream API delegation.
  * JIT/AOT: {@see MimeContentTypeJitHelper} via lib/JIT/Builtin/MimeContentTypeRuntime.php.
  */
 final class VmMime
 {
+    public static function filenameOrStreamTypeErrorMessage(string $given): string
+    {
+        return \sprintf(
+            'mime_content_type(): Argument #1 ($filename) must be of type resource|string, %s given',
+            $given
+        );
+    }
+
     /**
      * @return string|false
      */
     public static function mimeContentType(Variable $operand)
     {
         $operand = $operand->resolveIndirect();
+        if (Variable::TYPE_NULL === $operand->type) {
+            throw new \TypeError(self::filenameOrStreamTypeErrorMessage('null'));
+        }
         if (EnumCaseSupport::isEnumCaseVariable($operand)) {
             throw new \TypeError(\sprintf(
                 'mime_content_type(): Argument #1 ($filename_or_stream) must be of type string, %s given',
@@ -61,23 +72,20 @@ final class VmMime
      */
     private static function mimeContentTypeFromStream(Variable $operand)
     {
-        $handle = $operand->isStreamResource()
-            ? $operand->toInt()
-            : $operand->toInt();
-        $fp = VmFs::lookupResource($handle);
-        if (null === $fp) {
+        $handle = $operand->toInt();
+        if (!VmFs::isValidHandle($handle)) {
             return false;
         }
 
-        $pos = @\ftell($fp);
+        $pos = VmFs::ftell($handle);
         if (false === $pos) {
             $pos = 0;
         }
-        $data = @\stream_get_contents($fp);
+        $data = VmFs::streamGetContents($handle);
         if (false === $data) {
             return false;
         }
-        if (0 !== @\fseek($fp, $pos)) {
+        if (0 !== VmFs::fseek($handle, $pos)) {
             return false;
         }
 
@@ -85,7 +93,7 @@ final class VmMime
     }
 
     /**
-     * Minimal libmagic/fileinfo parity for JIT/AOT and host fallback (php-src php_stream_mime_type).
+     * Minimal libmagic/fileinfo parity (php-src php_stream_mime_type).
      */
     public static function detectFromBytes(string $data): string
     {

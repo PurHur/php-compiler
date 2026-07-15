@@ -8,15 +8,22 @@ use PHPCompiler\ext\standard\ConvertUuJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** convert_uuencode/uudecode JIT routes through ConvertUuJitHelper PHP not StringConvertUuJit LLVM (#13227). */
+/** convert_uuencode()/convert_uudecode() JIT routes through ConvertUuJitHelper PHP (#13227, #18827). */
 final class ConvertUuRuntimeShrinkTest extends TestCase
 {
-    public function testStringConvertUuIsThinBridge(): void
+    public function testStringConvertUuUsesJitHelperNotLlvmMonolith(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringConvertUu.php');
         $this->assertStringContainsString('ConvertUuJitHelper', $source);
-        $this->assertStringNotContainsString('StringConvertUuJit', $source);
-        $this->assertLessThan(230, \substr_count($source, "\n") + 1);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('StringConvertUuEncodeLlvm', $source);
+        $this->assertStringNotContainsString('StringConvertUuDecodeLlvm', $source);
+        $this->assertStringNotContainsString('JitConvertUuBodies', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringConvertUuEncodeLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringConvertUuDecodeLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitConvertUuBodies.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringConvertUuJit.php');
     }
 
@@ -41,5 +48,15 @@ final class ConvertUuRuntimeShrinkTest extends TestCase
     {
         ConvertUuJitHelper::resetForTest();
         $this->assertSame(0, ConvertUuJitHelper::decodeTag('not-uue'));
+    }
+
+    public function testSpineBundleOmitsDeletedConvertUuLlvm(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringNotContainsString('JitConvertUuBodies.php', $spine);
+        $this->assertStringNotContainsString('StringConvertUuEncodeLlvm.php', $spine);
+        $this->assertStringNotContainsString('StringConvertUuDecodeLlvm.php', $spine);
+        $this->assertStringContainsString('ConvertUuJitHelper.php', $spine);
+        $this->assertStringContainsString('StringConvertUu.php', $spine);
     }
 }

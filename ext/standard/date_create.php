@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\DateTimeSupport;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -41,8 +40,8 @@ final class date_create extends Internal
 
         $time = 'now';
         if ($argc >= 1) {
-            InternalStrictArg::rejectNullString($frame->calledArgs[0], 'date_create', 'datetime', 0, $frame);
-            $time = VmString::coerceStringBuiltinArg(
+            $time = VmDateTimeCreateArg::coerceDatetime(
+                $frame,
                 $frame->calledArgs[0],
                 'date_create',
                 0,

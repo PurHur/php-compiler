@@ -22,6 +22,7 @@ final class DomDocumentLoadHTML implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         if (DomDocumentMethodUserScriptLlvm::shouldUse($context) && isset($args[1])) {
+            JitDomLoadHTMLUserScript::rememberCompileTimeOptions($context, $args[2] ?? null);
             $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
             if (null !== $lit) {
                 $parsed = DomParseSimpleHtmlJitHelper::parseArgv($lit);

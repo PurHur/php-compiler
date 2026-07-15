@@ -68,8 +68,12 @@ final class JitFdiv
                 } elseif ('float' === $expectedType) {
                     JitInternalStrictArg::requireFloat($context, $arg, $function, $paramName, $argIndex);
                 }
+            } elseif ('number' === $expectedType && VmMath::requiresForwardProfileStrictNumberNull()) {
+                self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
             } elseif ('number' === $expectedType) {
                 self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName);
+            } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull()) {
+                self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
             }
 
             return $double->constReal(0.0);
@@ -188,8 +192,14 @@ final class JitFdiv
         $context->builder->positionAtEnd($nullBlock);
         if ($context->callerStrictTypes && 'number' === $expectedType) {
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
+        } elseif ($context->callerStrictTypes && 'float' === $expectedType) {
+            self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
+        } elseif ('number' === $expectedType && VmMath::requiresForwardProfileStrictNumberNull()) {
+            self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
         } elseif (!$context->callerStrictTypes && 'number' === $expectedType) {
             self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName);
+        } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull()) {
+            self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
         }
         $context->builder->branch($mergeBlock);
 

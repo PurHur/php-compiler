@@ -127,6 +127,117 @@ final class VmOpensslX509Native
     }
 
     /**
+     * Extract PEM public key from certificate material (php-src ext/openssl/x509.c).
+     */
+    public static function extractPublicKeyPem(string $certPem): string|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $inBio = null;
+        $outBio = null;
+        $x509 = null;
+        $pkey = null;
+
+        try {
+            $inBio = $ffi->BIO_new_mem_buf($certPem, \strlen($certPem));
+            if (null === $inBio) {
+                return false;
+            }
+
+            $x509 = $ffi->PEM_read_bio_X509($inBio, null, null, null);
+            if (null === $x509) {
+                return false;
+            }
+
+            $pkey = $ffi->X509_get_pubkey($x509);
+            if (null === $pkey) {
+                return false;
+            }
+
+            $outBio = $ffi->BIO_new($ffi->BIO_s_mem());
+            if (null === $outBio) {
+                return false;
+            }
+
+            if (1 !== (int) $ffi->PEM_write_bio_PUBKEY($outBio, $pkey)) {
+                return false;
+            }
+
+            $pending = (int) $ffi->BIO_ctrl_pending($outBio);
+            if ($pending <= 0) {
+                return false;
+            }
+
+            $buf = $ffi->new("char[{$pending}]");
+            $read = (int) $ffi->BIO_read($outBio, $buf, $pending);
+
+            return $read > 0 ? \FFI::string($buf, $read) : false;
+        } finally {
+            if (null !== $pkey) {
+                $ffi->EVP_PKEY_free($pkey);
+            }
+            if (null !== $x509) {
+                $ffi->X509_free($x509);
+            }
+            if (null !== $inBio) {
+                $ffi->BIO_free($inBio);
+            }
+            if (null !== $outBio) {
+                $ffi->BIO_free($outBio);
+            }
+        }
+    }
+
+    /**
+     * X509_verify certificate signature against a public/private key PEM (php-src openssl_x509_verify).
+     *
+     * @return int 1 valid, 0 invalid, -1 error
+     */
+    public static function verifyCertificatePem(string $certPem, string $publicKeyPem): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+
+        $certBio = null;
+        $x509 = null;
+        $pkey = null;
+
+        try {
+            $certBio = $ffi->BIO_new_mem_buf($certPem, \strlen($certPem));
+            if (null === $certBio) {
+                return -1;
+            }
+
+            $x509 = $ffi->PEM_read_bio_X509($certBio, null, null, null);
+            if (null === $x509) {
+                return -1;
+            }
+
+            $pkey = self::readPublicOrPrivateKey($ffi, $publicKeyPem);
+            if (null === $pkey) {
+                return -1;
+            }
+
+            return (int) $ffi->X509_verify($x509, $pkey);
+        } finally {
+            if (null !== $pkey) {
+                $ffi->EVP_PKEY_free($pkey);
+            }
+            if (null !== $x509) {
+                $ffi->X509_free($x509);
+            }
+            if (null !== $certBio) {
+                $ffi->BIO_free($certBio);
+            }
+        }
+    }
+
+    /**
      * Parse PEM and return normalized certificate PEM, or false when invalid/unavailable.
      */
     public static function normalizeCertificatePem(string $pem): string|false
@@ -245,6 +356,13 @@ int X509_get_signature_nid(const X509 *x);
 typedef struct evp_md_st EVP_MD;
 const EVP_MD *EVP_get_digestbyname(const char *name);
 int X509_digest(const X509 *data, const EVP_MD *type, unsigned char *md, unsigned int *len);
+typedef struct evp_pkey_st EVP_PKEY;
+EVP_PKEY *X509_get_pubkey(X509 *x);
+int X509_verify(X509 *a, EVP_PKEY *r);
+void EVP_PKEY_free(EVP_PKEY *pkey);
+EVP_PKEY *PEM_read_bio_PUBKEY(BIO *bp, EVP_PKEY **x, void *cb, void *u);
+EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, void *cb, void *u);
+int PEM_write_bio_PUBKEY(BIO *bp, EVP_PKEY *x);
 CDEF;
 
         foreach (['libcrypto.so.3', 'libcrypto.so'] as $lib) {
@@ -420,5 +538,38 @@ CDEF;
         }
 
         return null !== $length ? \FFI::string($ptr, $length) : \FFI::string($ptr);
+    }
+
+    /**
+     * @param \FFI $ffi
+     *
+     * @return \FFI\CData|null
+     */
+    private static function readPublicOrPrivateKey($ffi, string $pem)
+    {
+        $bio = $ffi->BIO_new_mem_buf($pem, \strlen($pem));
+        if (null === $bio) {
+            return null;
+        }
+
+        try {
+            $pub = $ffi->PEM_read_bio_PUBKEY($bio, null, null, null);
+            if (null !== $pub) {
+                return $pub;
+            }
+        } finally {
+            $ffi->BIO_free($bio);
+        }
+
+        $bio = $ffi->BIO_new_mem_buf($pem, \strlen($pem));
+        if (null === $bio) {
+            return null;
+        }
+
+        try {
+            return $ffi->PEM_read_bio_PrivateKey($bio, null, null, null);
+        } finally {
+            $ffi->BIO_free($bio);
+        }
     }
 }

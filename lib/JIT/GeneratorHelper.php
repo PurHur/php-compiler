@@ -351,6 +351,16 @@ final class GeneratorHelper
         return GeneratorIteratorJitHelper::resolveResumeLc($context, $genVar);
     }
 
+    public static function resolveResumeFunction(Context $context, Variable $genVar): Value\Function_
+    {
+        return GeneratorIteratorJitHelper::resolveResumeFunction($context, $genVar);
+    }
+
+    public static function hydrateGeneratorMetadata(Context $context, Variable $genVar): bool
+    {
+        return GeneratorIteratorJitHelper::hydrateGeneratorMetadata($context, $genVar);
+    }
+
     public static function boxCurrentOrNull(Context $context, Value $statePtr): Value
     {
         return GeneratorIteratorJitHelper::boxCurrentOrNull($context, $statePtr);
@@ -388,5 +398,10 @@ final class GeneratorHelper
     public static function compileIterReset(Context $context, Variable $gen): void
     {
         GeneratorIteratorJitHelper::compileIterReset($context, $gen);
+    }
+
+    public static function compileAssertGeneratorIterableForRewind(Context $context, Variable $gen): void
+    {
+        GeneratorIteratorJitHelper::compileAssertGeneratorIterableForRewind($context, $gen);
     }
 }

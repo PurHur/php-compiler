@@ -13,4 +13,4 @@ echo 'share=', (int) class_exists('CurlShareHandle', false), "\n";
 curl_loaded=0
 handle=0
 multi=0
-share=0
+share=1

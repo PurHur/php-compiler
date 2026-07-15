@@ -7,11 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -34,13 +32,7 @@ final class popen extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'popen', 'command', 0, $frame);
-        $command = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
-            'popen',
-            0,
-            'command'
-        );
+        $command = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'popen', 'command', false);
         $mode = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
             'popen',
@@ -62,11 +54,9 @@ final class popen extends Internal
             throw new \LogicException('popen() requires exactly two arguments in this compiler build');
         }
 
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'popen', 'command', 1);
-
         return JitPopen::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'popen', 0, 'command'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'popen', 0, 'command', 'string', null, false),
             JitStringBuiltinArg::lower($context, $args[1], 'popen', 1, 'mode')
         );
     }

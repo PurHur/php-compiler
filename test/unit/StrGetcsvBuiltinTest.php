@@ -248,4 +248,36 @@ final class StrGetcsvBuiltinTest extends TestCase
             ["\r"],
         ];
     }
+
+    /** Issue #18592 — lone quote / unterminated empty enclosure yields NUL byte (php-src file.c PHP 8.2). */
+    public function testLoneQuoteYieldsNulByteField(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $arg = new VMVariable();
+        $arg->string('"');
+        $frame->calledArgs = [$arg];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $vals = [];
+        foreach ($frame->returnVar->toArray()->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(["\0"], $vals);
+    }
+
+    public function testClosedEmptyQuoteYieldsEmptyString(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $arg = new VMVariable();
+        $arg->string('""');
+        $frame->calledArgs = [$arg];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $field = $frame->returnVar->toArray()->iterate(true)[0]->resolveIndirect()->toString();
+        $this->assertSame(0, \strlen($field));
+    }
 }

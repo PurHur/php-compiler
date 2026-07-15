@@ -12,6 +12,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
 use PHPLLVM\LLVMAbstract\Builder as LLVMBuilderImpl;
 use PHPLLVM\Value;
@@ -92,6 +93,13 @@ final class PregMatchRuntime
 
     public static function implement(Context $context): void
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            PregMatchUserScriptLlvm::implement($context);
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_preg_match');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -142,8 +150,11 @@ final class PregMatchRuntime
             : $context->module->addFunction($abiName, $context->context->functionType($i64, false));
         $entry = $fn->appendBasicBlock('preg_last_error_entry');
         $context->builder->positionAtEnd($entry);
-        $raw = $context->builder->call(self::helperFunction($context, self::LAST_ERROR_HELPER));
-        $context->builder->returnValue(JitNestedHelperCoerce::scalarToI64($context, $raw, $raw->typeOf()));
+        $helperFn = self::helperFunction($context, self::LAST_ERROR_HELPER);
+        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, []);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
         $context->registerFunction($abiName, $fn);
     }
 
@@ -187,12 +198,15 @@ final class PregMatchRuntime
             );
         $entry = $fn->appendBasicBlock('preg_i64_pair_entry');
         $context->builder->positionAtEnd($entry);
-        $raw = $context->builder->call(
-            self::helperFunction($context, $helperLogical),
-            $fn->getParam(0),
-            $fn->getParam(1)
+        $helperFn = self::helperFunction($context, $helperLogical);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            $helperFn,
+            [$fn->getParam(0), $fn->getParam(1)]
         );
-        $context->builder->returnValue(JitNestedHelperCoerce::scalarToI64($context, $raw, $raw->typeOf()));
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
         $context->registerFunction($abiName, $fn);
     }
 

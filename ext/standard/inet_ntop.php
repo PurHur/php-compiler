@@ -9,6 +9,8 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -26,7 +28,23 @@ final class inet_ntop extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('inet_ntop() requires exactly one argument in this compiler build');
         }
-        $in_addr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'inet_ntop', 0, 'in_addr');
+        $resolved = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            if (InternalStrictArg::isCallerStrict($frame)
+                || VmString::requiresForwardProfileStrictStringNull()) {
+                throw new \TypeError(
+                    'inet_ntop(): Argument #1 ($in_addr) must be of type string, null given'
+                );
+            }
+            if (null === $frame->returnVar) {
+                return;
+            }
+            // php-src basic_functions.c — null in_addr returns false (#19053).
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $in_addr = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'inet_ntop', 0, 'in_addr');
         if (null === $frame->returnVar) {
             return;
         }

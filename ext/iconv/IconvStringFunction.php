@@ -35,7 +35,9 @@ abstract class IconvStringFunction extends Internal
         return VmIconv::coerceOptionalEncodingArg(
             $frame->calledArgs[$index],
             $this->getName(),
-            $index
+            $index,
+            'encoding',
+            $frame
         );
     }
 

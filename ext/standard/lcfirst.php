@@ -15,7 +15,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
@@ -34,13 +33,7 @@ final class lcfirst extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('lcfirst() requires exactly one argument');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'lcfirst', 'string', 0, $frame);
-        $subject = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'lcfirst',
-            0,
-            'string'
-        );
+        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'lcfirst', 'string');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::asciiLcfirst($subject))
@@ -55,8 +48,7 @@ final class lcfirst extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('lcfirst() requires exactly one argument');
         }
-        JitInternalStrictArg::rejectNullString($context, $args[0], 'lcfirst', 'string', 1);
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'lcfirst', 0, 'string');
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'lcfirst', 0, 'string');
         $copy = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         self::transformFirstAscii($context, $copy, ord('A'), ord('Z'), 32);
 

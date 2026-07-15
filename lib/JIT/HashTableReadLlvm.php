@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -22,7 +23,7 @@ final class HashTableReadLlvm
         $tag = 'rb'.(string) self::nextSeq();
         $slot = JitValueBox::alloc($context);
         $destPtr = JitValueBox::pointer($context, $slot);
-        $entryPtr = HashTableHelper::listEntryPointer($context, $ht, $index);
+        $entryPtr = self::listEntryPointer($context, $ht, $index);
         $valueMap = $context->structFieldMap['__value__'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($entryPtr, $valueMap['type'])
@@ -750,6 +751,154 @@ final class HashTableReadLlvm
         $result->addIncoming($ht, $ready);
 
         return $result;
+    }
+
+    /**
+     * Load a native {@see __hashtable__*} from a boxed or direct array variable (#107, #18942 v8).
+     */
+    public static function loadHashtablePointer(Context $context, Variable $array): Value
+    {
+        if (Variable::TYPE_STRING === $array->type) {
+            ErrorRaise::registerDeclarations($context);
+            ErrorRaise::ensureLinked($context);
+            ErrorRaise::emitRaise(
+                $context,
+                \PHPCompiler\VM\TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE
+            );
+
+            return $context->getTypeFromString('__hashtable__*')->constNull();
+        }
+        if (null !== $array->objectPropertySlot) {
+            if (Variable::TYPE_HASHTABLE === ($array->objectPropertyType ?? null)) {
+                return $context->builder->pointerCast(
+                    $context->builder->load($array->objectPropertySlot),
+                    $context->getTypeFromString('__hashtable__*')
+                );
+            }
+
+            return self::ensureHashtablePointer($context, $array);
+        }
+        if (Variable::TYPE_HASHTABLE === $array->type) {
+            return $context->helper->loadValue($array);
+        }
+        if (Variable::TYPE_VALUE === $array->type || $array->valueBoxHashtable) {
+            return self::ensureHashtablePointer($context, $array);
+        }
+
+        throw new \LogicException(
+            'Array offset access requires hashtable or boxed array, got '
+            .Variable::getStringType($array->type)
+        );
+    }
+
+    public static function listEntryPointer(Context $context, Value $ht, Value $index): Value
+    {
+        $map = $context->structFieldMap['__hashtable__'];
+        $values = $context->builder->load(
+            $context->builder->structGep($ht, $map['values'])
+        );
+
+        return $context->builder->inBoundsGep($values, $index);
+    }
+
+    public static function readStringAt(Context $context, Value $ht, Value $index): Value
+    {
+        $entry = self::listEntryPointer($context, $ht, $index);
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $entry
+        );
+    }
+
+    /**
+     * Walk native __strkey_node__ list — shared by extract/compact scope import (#19035).
+     *
+     * @param callable(Context, Value, Value): void $body  ($keyStr, $valEntry)
+     */
+    public static function forEachStringKeyNode(
+        Context $context,
+        Value $ht,
+        string $tagPrefix,
+        callable $body
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $tag = $tagPrefix.'_'.(string) self::nextSeq();
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, $tag.'_walk');
+        $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+
+        $headBb = BasicBlockHelper::append($context, $tag.'_head');
+        $bodyBb = BasicBlockHelper::append($context, $tag.'_body');
+        $nextBb = BasicBlockHelper::append($context, $tag.'_next');
+        $doneBb = BasicBlockHelper::append($context, $tag.'_done');
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($headBb);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $doneBb, $bodyBb);
+
+        $context->builder->positionAtEnd($bodyBb);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $body($context, $keyStr, $valEntry);
+        if (null === $context->builder->getInsertBlock()?->getTerminator()) {
+            $context->builder->branch($nextBb);
+        }
+
+        $context->builder->positionAtEnd($nextBb);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($doneBb);
+    }
+
+    /**
+     * Walk packed list indices 0..count-1 reading string elements (#19035).
+     *
+     * @param callable(Context, Value, Value): void $body  ($index, $str)
+     */
+    public static function forEachIndexedStringAt(
+        Context $context,
+        Value $ht,
+        Value $count,
+        string $tagPrefix,
+        callable $body
+    ): void {
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $tag = $tagPrefix.'_'.(string) self::nextSeq();
+        $idxSlot = $context->builder->alloca($sizeT, 1, $tag.'_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $headBb = BasicBlockHelper::append($context, $tag.'_head');
+        $bodyBb = BasicBlockHelper::append($context, $tag.'_body');
+        $advanceBb = BasicBlockHelper::append($context, $tag.'_advance');
+        $doneBb = BasicBlockHelper::append($context, $tag.'_done');
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($headBb);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBb, $bodyBb);
+
+        $context->builder->positionAtEnd($bodyBb);
+        $str = self::readStringAt($context, $ht, $idx);
+        $body($context, $idx, $str);
+        if (null === $context->builder->getInsertBlock()?->getTerminator()) {
+            $context->builder->branch($advanceBb);
+        }
+
+        $context->builder->positionAtEnd($advanceBb);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($doneBb);
     }
 
 }

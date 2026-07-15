@@ -9,9 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\CallUnpackRuntime;
-use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 final class HashTableHelper
@@ -67,37 +65,7 @@ final class HashTableHelper
 
     public static function loadHashtablePointer(Context $context, Variable $array): Value
     {
-        if (Variable::TYPE_STRING === $array->type) {
-            ErrorRaise::registerDeclarations($context);
-            ErrorRaise::ensureLinked($context);
-            ErrorRaise::emitRaise(
-                $context,
-                \PHPCompiler\VM\TypeCheck::SCALAR_USED_AS_ARRAY_MESSAGE
-            );
-
-            return $context->getTypeFromString('__hashtable__*')->constNull();
-        }
-        if (null !== $array->objectPropertySlot) {
-            if (Variable::TYPE_HASHTABLE === ($array->objectPropertyType ?? null)) {
-                return $context->builder->pointerCast(
-                    $context->builder->load($array->objectPropertySlot),
-                    $context->getTypeFromString('__hashtable__*')
-                );
-            }
-
-            return self::ensureHashtablePointer($context, $array);
-        }
-        if (Variable::TYPE_HASHTABLE === $array->type) {
-            return $context->helper->loadValue($array);
-        }
-        if (Variable::TYPE_VALUE === $array->type || $array->valueBoxHashtable) {
-            return self::ensureHashtablePointer($context, $array);
-        }
-
-        throw new \LogicException(
-            'Array offset access requires hashtable or boxed array, got '
-            .Variable::getStringType($array->type)
-        );
+        return HashTableReadLlvm::loadHashtablePointer($context, $array);
     }
 
     /**
@@ -105,34 +73,7 @@ final class HashTableHelper
      */
     public static function objectPointerAsStringKey(Context $context, Variable $keyObject): Variable
     {
-        if (Variable::TYPE_OBJECT !== $keyObject->type) {
-            throw new \LogicException('SplObjectStorage keys must be objects in this compiler build');
-        }
-        $objPtr = $context->helper->loadValue($keyObject);
-        $sizeT = $context->getTypeFromString('size_t');
-        $i8p = $context->getTypeFromString('int8*');
-        $ptrInt = $context->builder->ptrToInt($objPtr, $sizeT);
-        $buf = $context->builder->alloca($context->getTypeFromString('int8'), $sizeT->constInt(32, false), 'spl_key_buf');
-        $bufC = $context->builder->pointerCast($buf, $i8p);
-        $fmt = $context->builder->pointerCast($context->constantFromString('%zu'), $i8p);
-        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $ptrInt);
-        $len = $context->builder->call($context->lookupFunction('strlen'), $bufC);
-        $lenI64 = $context->getTypeFromString('int64');
-        $lenForInit = $len->typeOf() === $lenI64
-            ? $len
-            : $context->builder->zExt($len, $lenI64);
-        $str = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $lenForInit,
-            $bufC
-        );
-
-        return new Variable(
-            $context,
-            Variable::TYPE_STRING,
-            Variable::KIND_VALUE,
-            $str
-        );
+        return HashTableWriteLlvm::objectPointerAsStringKey($context, $keyObject);
     }
 
     public static function alloc(Context $context): Value
@@ -155,133 +96,7 @@ final class HashTableHelper
 
     public static function variableFromVmHashTable(Context $context, \PHPCompiler\VM\HashTable $table): Variable
     {
-        $ht = self::alloc($context);
-        $setLong = $context->lookupFunction('__hashtable__setLongAt');
-        $setStringAt = $context->lookupFunction('__hashtable__setStringAt');
-        $setStringKey = $context->lookupFunction('__hashtable__setStringKeyString');
-        foreach ($table->iterateKeyed(true) as [$keyVar, $valueVar]) {
-            $resolved = $valueVar->resolveIndirect();
-            if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $keyVar->type) {
-                $idx = $context->constantFromInteger($keyVar->toInt(), 'size_t');
-                if (\PHPCompiler\VM\Variable::TYPE_INTEGER === $resolved->type) {
-                    $context->builder->call(
-                        $setLong,
-                        $ht,
-                        $idx,
-                        $context->getTypeFromString('int64')->constInt($resolved->toInt(), false)
-                    );
-                } elseif (\PHPCompiler\VM\Variable::TYPE_STRING === $resolved->type) {
-                    $str = $context->builder->load(
-                        $context->constantStringFromString($resolved->toString())
-                    );
-                    $context->builder->call($setStringAt, $ht, $idx, $str);
-                } elseif (\PHPCompiler\VM\Variable::TYPE_BOOLEAN === $resolved->type) {
-                    $context->builder->call(
-                        $setLong,
-                        $ht,
-                        $idx,
-                        $context->getTypeFromString('int64')->constInt($resolved->toBool() ? 1 : 0, false)
-                    );
-                } elseif (\PHPCompiler\VM\Variable::TYPE_FLOAT === $resolved->type) {
-                    $context->builder->call(
-                        $context->lookupFunction('__hashtable__setDoubleAt'),
-                        $ht,
-                        $idx,
-                        $context->constantFromFloat($resolved->toFloat())
-                    );
-                } elseif (\PHPCompiler\VM\Variable::TYPE_NULL === $resolved->type) {
-                    $context->builder->call(
-                        $context->lookupFunction('__hashtable__setNullAt'),
-                        $ht,
-                        $idx
-                    );
-                } elseif (\PHPCompiler\VM\Variable::TYPE_ARRAY === $resolved->type) {
-                    self::setAtIndex(
-                        $context,
-                        $ht,
-                        $idx,
-                        self::variableFromVmHashTable($context, $resolved->toArray())
-                    );
-                } elseif (\PHPCompiler\VM\Variable::TYPE_OBJECT === $resolved->type
-                    || \PHPCompiler\VM\Variable::TYPE_ENUM_CASE === $resolved->type) {
-                    $context->type->object->embedClassConstArrayVmElementAtIndex($context, $ht, $idx, $resolved);
-                } else {
-                    throw new \LogicException(
-                        'Unsupported class constant array element type for JIT: '
-                        .Variable::getStringType(Variable::fromVMVariable($resolved->type))
-                    );
-                }
-
-                continue;
-            }
-            if (\PHPCompiler\VM\Variable::TYPE_STRING !== $keyVar->type) {
-                continue;
-            }
-            $key = $context->builder->load(
-                $context->constantStringFromString($keyVar->toString())
-            );
-            if (\PHPCompiler\VM\Variable::TYPE_STRING === $resolved->type) {
-                $str = $context->builder->load(
-                    $context->constantStringFromString($resolved->toString())
-                );
-                $context->builder->call($setStringKey, $ht, $key, $str);
-            } elseif (\PHPCompiler\VM\Variable::TYPE_INTEGER === $resolved->type) {
-                $context->builder->call(
-                    $context->lookupFunction('__hashtable__setStringKeyLong'),
-                    $ht,
-                    $key,
-                    $context->getTypeFromString('int64')->constInt($resolved->toInt(), false)
-                );
-            } elseif (\PHPCompiler\VM\Variable::TYPE_BOOLEAN === $resolved->type) {
-                $context->builder->call(
-                    $context->lookupFunction('__hashtable__setStringKeyBool'),
-                    $ht,
-                    $key,
-                    $context->getTypeFromString('bool')->constInt($resolved->toBool() ? 1 : 0, false)
-                );
-            } elseif (\PHPCompiler\VM\Variable::TYPE_FLOAT === $resolved->type) {
-                $context->builder->call(
-                    $context->lookupFunction('__hashtable__setStringKeyDouble'),
-                    $ht,
-                    $key,
-                    $context->constantFromFloat($resolved->toFloat())
-                );
-            } elseif (\PHPCompiler\VM\Variable::TYPE_ARRAY === $resolved->type) {
-                self::setAtKeyCoercingNumericString(
-                    $context,
-                    $ht,
-                    $key,
-                    self::variableFromVmHashTable($context, $resolved->toArray())
-                );
-            } elseif (\PHPCompiler\VM\Variable::TYPE_NULL === $resolved->type) {
-                self::setAtKeyCoercingNumericString(
-                    $context,
-                    $ht,
-                    $key,
-                    new Variable(
-                        $context,
-                        Variable::TYPE_NULL,
-                        Variable::KIND_VALUE,
-                        $context->getTypeFromString('__value__*')->constNull()
-                    )
-                );
-            } elseif (\PHPCompiler\VM\Variable::TYPE_OBJECT === $resolved->type
-                || \PHPCompiler\VM\Variable::TYPE_ENUM_CASE === $resolved->type) {
-                $context->type->object->embedClassConstArrayVmElementAtStringKey($context, $ht, $key, $resolved);
-            } else {
-                throw new \LogicException(
-                    'Unsupported class constant array element type for JIT: '
-                    .Variable::getStringType(Variable::fromVMVariable($resolved->type))
-                );
-            }
-        }
-
-        return new Variable(
-            $context,
-            Variable::TYPE_HASHTABLE,
-            Variable::KIND_VALUE,
-            $ht
-        );
+        return HashTableWriteLlvm::variableFromVmHashTable($context, $table);
     }
 
     /**
@@ -291,40 +106,12 @@ final class HashTableHelper
      */
     public static function packVariables(Context $context, array $vars): Variable
     {
-        $ht = self::alloc($context);
-        $i64 = $context->getTypeFromString('int64');
-        foreach ($vars as $index => $var) {
-            if (!$var instanceof Variable) {
-                continue;
-            }
-            self::setAtIndex($context, $ht, $i64->constInt($index, false), $var);
-        }
-
-        return new Variable(
-            $context,
-            Variable::TYPE_HASHTABLE,
-            Variable::KIND_VALUE,
-            $ht
-        );
-    }
-
-    public static function buildIntegerRange(
-        Context $context,
-        Value $start,
-        Value $end,
-        Value $step
-    ): Value {
-        return HashTableWriteLlvm::buildIntegerRange($context, $start, $end, $step);
+        return HashTableWriteLlvm::packVariables($context, $vars);
     }
 
     public static function listEntryPointer(Context $context, Value $ht, Value $index): Value
     {
-        $map = $context->structFieldMap['__hashtable__'];
-        $values = $context->builder->load(
-            $context->builder->structGep($ht, $map['values'])
-        );
-
-        return $context->builder->inBoundsGep($values, $index);
+        return HashTableReadLlvm::listEntryPointer($context, $ht, $index);
     }
 
     public static function offsetUnset(Context $context, Variable $container, Variable $dim): void
@@ -354,12 +141,7 @@ final class HashTableHelper
 
     public static function readStringAt(Context $context, Value $ht, Value $index): Value
     {
-        $entry = self::listEntryPointer($context, $ht, $index);
-
-        return $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $entry
-        );
+        return HashTableReadLlvm::readStringAt($context, $ht, $index);
     }
 
     /**
@@ -404,11 +186,7 @@ final class HashTableHelper
 
     public static function unsetStringKey(Context $context, Value $ht, Value $keyStr): void
     {
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__unsetStringKey'),
-            $ht,
-            $keyStr
-        );
+        HashTableWriteLlvm::unsetStringKey($context, $ht, $keyStr);
     }
 
     public static function readSuperglobalStringKeyToValueBox(
@@ -426,34 +204,7 @@ final class HashTableHelper
 
     public static function initArray(Context $context, Variable $result): void
     {
-        $result->nextFreeElement = 0;
-        if ($result->type & Variable::IS_NATIVE_ARRAY) {
-            return;
-        }
-        if (Variable::TYPE_STRING === $result->type) {
-            // Inline include may bind array-literal temps to inherited string slots (#16866).
-            $slot = BasicBlockHelper::entryAlloca(
-                $context,
-                $context->getTypeFromString('__hashtable__*')
-            );
-            $result->free();
-            $result->type = Variable::TYPE_HASHTABLE;
-            $result->kind = Variable::KIND_VARIABLE;
-            $result->value = $slot;
-            $result->initialize();
-        }
-        $ht = self::alloc($context);
-        if (Variable::TYPE_VALUE === $result->type) {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeHashtable'),
-                $result->value,
-                $ht
-            );
-            $result->valueBoxHashtable = true;
-
-            return;
-        }
-        $context->builder->store($ht, $result->value);
+        HashTableWriteLlvm::initArray($context, $result);
     }
 
     public static function spreadAddElement(

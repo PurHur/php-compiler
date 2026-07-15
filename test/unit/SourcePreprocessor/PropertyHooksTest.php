@@ -711,9 +711,10 @@ PHP;
         $runtime->parseAndCompile($src, 'property_hook_virtual_duplicate_name.php');
     }
 
-    /** @covers issue #9835 — readonly hooked property compiles; runtime enforces post-construct writes */
-    public function testReadonlyHookedPropertyLowers(): void
+    /** @covers issue #19172 — readonly + property hooks rejected at compile time (php-src #15439) */
+    public function testReadonlyHookedPropertyFailsAtCompileTime(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class C {
@@ -727,6 +728,11 @@ PHP;
         self::assertStringContainsString('public readonly int $x;', $out);
         self::assertStringContainsString('__phpc_property_set_x', $out);
         self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
+
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Hooked properties cannot be readonly');
+        $runtime->parseAndCompile($src, 'readonly_hooked_property.php');
     }
 
     /** @covers issue #18170 — explicit virtual modifier stripped before php-parser; registry marks virtual */

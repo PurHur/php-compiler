@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 
 /**
@@ -148,6 +149,30 @@ final class InternalStrictArg
         }
 
         return $arg;
+    }
+
+    /**
+     * Z_PARAM_STR with caller strict_types parity — null coerces to '' outside strict scope (#18377).
+     */
+    public static function resolveCoercibleStringArg(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        string $paramName,
+        bool $rejectNullOnForwardProfile = true
+    ): string {
+        if (self::isCallerStrict($frame)) {
+            self::requireString($frame, $argIndex, $function, $paramName);
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $argIndex,
+            $paramName,
+            'string',
+            $rejectNullOnForwardProfile
+        );
     }
 
     /**

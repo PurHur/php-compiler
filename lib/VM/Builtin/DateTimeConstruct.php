@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
-use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\ext\standard\VmDateTimeCreateArg;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\DateTimeSupport;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /** DateTime::__construct(string $time = 'now', ?DateTimeZone $timezone = null) — VM (#3072). */
@@ -33,8 +32,8 @@ final class DateTimeConstruct extends VmClassMethod
         );
         $time = 'now';
         if (isset($frame->calledArgs[1])) {
-            InternalStrictArg::rejectNullString($frame->calledArgs[1], 'DateTime::__construct', 'datetime', 0, $frame);
-            $time = VmString::coerceStringBuiltinArg(
+            $time = VmDateTimeCreateArg::coerceDatetime(
+                $frame,
                 $frame->calledArgs[1],
                 'DateTime::__construct',
                 0,

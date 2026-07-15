@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -35,7 +34,13 @@ final class openssl_random_pseudo_bytes extends Internal
                 'openssl_random_pseudo_bytes() expects one or two arguments in this compiler build'
             );
         }
-        $length = self::parseLength($frame->calledArgs[0]->resolveIndirect());
+        $length = VmMath::parseZParamLongBuiltinArgForFrame(
+            $frame,
+            0,
+            'openssl_random_pseudo_bytes',
+            1,
+            'length'
+        );
         if ($length <= 0) {
             throw new \ValueError(self::LENGTH_ERROR);
         }
@@ -69,15 +74,5 @@ final class openssl_random_pseudo_bytes extends Internal
         }
 
         return $result;
-    }
-
-    /**
-     * Z_PARAM_LONG length (ext/standard/random.c; same rules as random_bytes()).
-     *
-     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
-     */
-    private static function parseLength(Variable $var): int
-    {
-        return VmMath::parseIntBuiltinArg($var, 'openssl_random_pseudo_bytes', 1, 'length');
     }
 }

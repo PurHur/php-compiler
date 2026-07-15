@@ -18,6 +18,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -33,7 +34,7 @@ final class str_rot13 extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('str_rot13() requires exactly one argument');
         }
-        $subject = VmString::stringBuiltinArgForFrame($frame, 0, 'str_rot13', 0, 'string');
+        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'str_rot13', 'string');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::strRot13($subject))

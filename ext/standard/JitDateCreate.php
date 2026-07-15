@@ -10,6 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\NativeDateInvalidTimeZoneException;
+use PHPLLVM\Value;
 
 /** LLVM lowering for date_create() / date_create_immutable() (#4124, ext/date/php_date.c). */
 final class JitDateCreate
@@ -26,7 +27,24 @@ final class JitDateCreate
             ));
         }
 
-        $timeLit = $argc >= 1 ? self::compileTimeStringArg($args[0]) : 'now';
+        $timeLit = 'now';
+        if ($argc >= 1) {
+            if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+                $timeLit = VmDateTimeCreateArg::jitNullDatetimeLiteral($context, $args[0], $function, 0, 'datetime');
+            } else {
+                $lit = self::compileTimeStringArg($args[0]);
+                if (null !== $lit) {
+                    $timeLit = $lit;
+                } else {
+                    throw new \LogicException(
+                        $function.'() requires compile-time string operands in this compiler build (issue #4124)'
+                    );
+                }
+            }
+        }
+        if ('' === $timeLit) {
+            $timeLit = 'now';
+        }
         $tzLit = $argc >= 2 ? self::compileTimeTimezoneName($context, $args[1], $function) : null;
         if (null !== $timeLit && (2 !== $argc || null !== $tzLit)) {
             $parsed = self::parseAtCompileTime($context, $timeLit, $tzLit, $immutable);
@@ -44,7 +62,7 @@ final class JitDateCreate
         }
 
         throw new \LogicException(
-            $function.'() requires compile-time string operands in this compiler build (issue #4124)'
+            $function.'() requires compile-time operands in this compiler build (issue #4124)'
         );
     }
 

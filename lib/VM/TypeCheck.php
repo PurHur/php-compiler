@@ -12,8 +12,35 @@ use PHPCompiler\GenericArrayTypeSpec;
  */
 final class TypeCheck
 {
+    private static ?UserParamErrorContext $paramErrorContext = null;
+
+  /**
+   * @template T
+   * @param callable(): T $fn
+   * @return T
+   */
+    public static function withParamErrorContext(?UserParamErrorContext $ctx, callable $fn)
+    {
+        $prev = self::$paramErrorContext;
+        self::$paramErrorContext = $ctx;
+        try {
+            return $fn();
+        } finally {
+            self::$paramErrorContext = $prev;
+        }
+    }
+
+    public static function currentParamErrorContext(): ?UserParamErrorContext
+    {
+        return self::$paramErrorContext;
+    }
+
     public static function assertNeverParameter(Variable $argument): void
     {
+        $ctx = self::$paramErrorContext;
+        if (null !== $ctx) {
+            $ctx->throwExpectedType('never', $argument);
+        }
         throw new \TypeError(
             'Argument must be of type never, '.self::valueTypeLabel($argument).' given'
         );
@@ -166,17 +193,18 @@ final class TypeCheck
         Variable $value,
         bool $strict,
         int $constraint,
-        ?string $literalBoolType = null
+        ?string $literalBoolType = null,
+        ?string $callableName = null
     ): void {
         if (null !== $literalBoolType) {
             $probe = new Variable();
             $probe->copyFrom($value);
             $probe->resolveIndirect()->literalBoolType = $literalBoolType;
-            self::coerceTypedSlot($probe, true, 'Return value', $constraint);
+            self::coerceTypedSlot($probe, true, 'Return value', $constraint, false, $callableName);
 
             return;
         }
-        self::coerceTypedSlot($value, $strict, 'Return value', $constraint);
+        self::coerceTypedSlot($value, $strict, 'Return value', $constraint, false, $callableName);
     }
 
     /**
@@ -387,7 +415,8 @@ final class TypeCheck
         bool $strict,
         string $kind,
         ?int $constraint = null,
-        bool $propertyWrite = false
+        bool $propertyWrite = false,
+        ?string $returnCallableName = null
     ): void {
         $target = $dest->resolveIndirect();
         $constraint ??= $target->typeConstraint;
@@ -409,11 +438,11 @@ final class TypeCheck
                 throw self::propertyTypeError($target, $expected, $value);
             }
 
-            throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, $expected);
+            throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, $expected, $returnCallableName);
         }
         if ($strict) {
             if (!self::isExactType($value, $constraint)) {
-                throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite);
+                throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, null, $returnCallableName);
             }
 
             return;
@@ -424,7 +453,7 @@ final class TypeCheck
         try {
             self::weakCoerceInPlace($target, $constraint, $value, $kind, $propertyWrite);
         } catch (\TypeError $e) {
-            throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite);
+            throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, null, $returnCallableName);
         }
     }
 
@@ -596,12 +625,12 @@ final class TypeCheck
             case Variable::TYPE_STRING:
                 $s = $value->toString();
                 if (!is_numeric($s)) {
-                    throw new \TypeError("{$kind} must be of type int, string given");
+                    self::throwCoerceKindError($kind, 'int', 'string given', Variable::TYPE_INTEGER, $value);
                 }
 
                 return (int) (float) $s;
         }
-        throw new \TypeError("{$kind} must be of type int");
+        self::throwCoerceKindError($kind, 'int', self::valueTypeLabel($value).' given', Variable::TYPE_INTEGER, $value);
     }
 
     private static function coerceToFloat(Variable $value, string $kind = 'Argument'): float
@@ -616,12 +645,12 @@ final class TypeCheck
             case Variable::TYPE_STRING:
                 $s = $value->toString();
                 if (!is_numeric($s)) {
-                    throw new \TypeError("{$kind} must be of type float, string given");
+                    self::throwCoerceKindError($kind, 'float', 'string given', Variable::TYPE_FLOAT, $value);
                 }
 
                 return (float) $s;
         }
-        throw new \TypeError("{$kind} must be of type float");
+        self::throwCoerceKindError($kind, 'float', self::valueTypeLabel($value).' given', Variable::TYPE_FLOAT, $value);
     }
 
     private static function coerceToBool(Variable $value, string $kind = 'Argument'): bool
@@ -641,9 +670,25 @@ final class TypeCheck
                 if (in_array($lower, ['0', 'false', 'off', 'no', ''], true)) {
                     return false;
                 }
-                throw new \TypeError("{$kind} must be of type bool, string given");
+                self::throwCoerceKindError($kind, 'bool', 'string given', Variable::TYPE_BOOLEAN, $value);
         }
-        throw new \TypeError("{$kind} must be of type bool");
+        self::throwCoerceKindError($kind, 'bool', self::valueTypeLabel($value).' given', Variable::TYPE_BOOLEAN, $value);
+    }
+
+    private static function throwCoerceKindError(
+        string $kind,
+        string $expected,
+        string $given,
+        int $constraint,
+        Variable $value
+    ): void {
+        if ('Argument' === $kind) {
+            $ctx = self::$paramErrorContext;
+            if (null !== $ctx) {
+                $ctx->throwExpectedType($expected, $value);
+            }
+        }
+        throw new \TypeError("{$kind} must be of type {$expected}, {$given}");
     }
 
     private static function matchesClassTypeHint(Variable $value, string $classConstraint): bool
@@ -712,7 +757,8 @@ final class TypeCheck
         string $kind,
         bool $propertyWrite,
         ?string $literalBoolType = null,
-        ?string $expectedOverride = null
+        ?string $expectedOverride = null,
+        ?string $returnCallableName = null
     ): \TypeError {
         $expected = $expectedOverride
             ?? (null !== $literalBoolType
@@ -720,6 +766,45 @@ final class TypeCheck
                 : ($target->declaredTypeLabel ?? self::typeName($constraint)));
         if ($propertyWrite && ('Property' === $kind || 'Static variable' === $kind)) {
             return self::propertyTypeError($target, $expected, $value);
+        }
+        if ('Argument' === $kind) {
+            $ctx = self::$paramErrorContext;
+            if (null !== $ctx) {
+                if (null !== $literalBoolType) {
+                    return ParamTypeError::forUserCall(
+                        $ctx->functionName,
+                        $ctx->paramIndex,
+                        $ctx->paramName,
+                        $constraint,
+                        $value,
+                        $ctx->scriptPath,
+                        $ctx->callSiteLine,
+                        $literalBoolType,
+                        $ctx->omitParamName
+                    );
+                }
+
+                return ParamTypeError::forUserCallWithExpectedType(
+                    $ctx->functionName,
+                    $ctx->paramIndex,
+                    $ctx->paramName,
+                    $expected,
+                    $value,
+                    $ctx->scriptPath,
+                    $ctx->callSiteLine,
+                    $ctx->omitParamName
+                );
+            }
+        }
+
+        if ('Return value' === $kind) {
+            $given = self::valueTypeLabel($value);
+            $message = "Return value must be of type {$expected}, {$given} returned";
+            if (null !== $returnCallableName && '' !== $returnCallableName) {
+                $message = "{$returnCallableName}(): {$message}";
+            }
+
+            return new \TypeError($message);
         }
 
         return new \TypeError(self::strictMessage($constraint, $value, $kind, $expected));

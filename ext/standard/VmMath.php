@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -15,6 +16,30 @@ use PHPCompiler\VM\Variable;
 final class VmMath
 {
     private const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
+
+    /**
+     * Z_PARAM_LONG null coercion — php-src coerces to 0 outside caller strict_types (#19161, chr/ord).
+     */
+    public static function requiresForwardProfileStrictLongNull(): bool
+    {
+        return false;
+    }
+
+    /**
+     * Z_PARAM_NUMBER null rejection on PHP 8.4 forward profile (ext/standard/math.c abs/round; #18924).
+     */
+    public static function requiresForwardProfileStrictNumberNull(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * Z_PARAM_DOUBLE null rejection on PHP 8.4 forward profile (ext/standard/math.c fpow/fadd; #19182).
+     */
+    public static function requiresForwardProfileStrictDoubleNull(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
 
     public static function toFloat(Variable $v): float
     {
@@ -227,6 +252,9 @@ final class VmMath
             return $var->toBool() ? 1 : 0;
         }
         if (Variable::TYPE_NULL === $var->type) {
+            if (self::requiresForwardProfileStrictNumberNull()) {
+                throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+            }
             if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
                 throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'null'));
             }
@@ -324,6 +352,50 @@ final class VmMath
         }
 
         return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName);
+    }
+
+    /**
+     * Z_PARAM_LONG coercion where null becomes 0 when the caller is not strict_types
+     * (ext/random/random.c random_bytes without strict_types; #19054).
+     *
+     * Prefer {@see parseZParamLongBuiltinArgForFrame} so `declare(strict_types=1)` matches
+     * Zend TypeError (#19230, same as sleep #19079).
+     */
+    public static function parseZParamLongBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): int {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return 0;
+        }
+
+        return self::parseIntBuiltinArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
+     * Z_PARAM_LONG builtin args — null coerces to 0 without caller strict_types (php-src basic_functions.c
+     * sleep/usleep/time_nanosleep; #19077). With strict_types, null/non-int operands TypeError like chr() (#19079).
+     */
+    public static function parseZParamLongBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): int {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return self::parseIntBuiltinArgForFrame($frame, $argIndex, $function, $userArgIndex, $paramName);
+        }
+        $var = $frame->calledArgs[$argIndex];
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_FLOAT === $resolved->type && null !== $frame->vmContext) {
+            self::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
+        }
+
+        return self::parseZParamLongBuiltinArg($var, $function, $userArgIndex, $paramName);
     }
 
     /**
@@ -447,6 +519,10 @@ final class VmMath
             case Variable::TYPE_BOOLEAN:
                 return $var->toBool() ? 1 : 0;
             case Variable::TYPE_NULL:
+                if (self::requiresForwardProfileStrictLongNull()) {
+                    throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+                }
+
                 return 0;
             case Variable::TYPE_STRING:
                 $s = $var->toString();
@@ -496,6 +572,10 @@ final class VmMath
             case Variable::TYPE_BOOLEAN:
                 return $var->toBool() ? 1.0 : 0.0;
             case Variable::TYPE_NULL:
+                if (self::requiresForwardProfileStrictDoubleNull()) {
+                    throw new \TypeError(self::doubleBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+                }
+
                 return 0.0;
             case Variable::TYPE_STRING:
                 $s = $var->toString();

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Frame;
+
 /**
  * BackedEnum::from / tryFrom lookup (Zend parity, #3114).
  *
@@ -20,6 +22,40 @@ final class BackedEnum
             return self::caseForValue($enum, $value);
         } catch (\TypeError) {
             return null;
+        }
+    }
+
+    /**
+     * Caller strict_types: reject non-exact backing scalars before coercion (#18476, zend_verify_arg_type).
+     */
+    public static function assertStrictCallerBackingArg(
+        ClassEntry $enum,
+        Variable $arg,
+        Frame $frame,
+        string $methodName,
+    ): void {
+        if (!InternalStrictArg::isCallerStrict($frame) || null === $enum->backedType) {
+            return;
+        }
+        $resolved = $arg->resolveIndirect();
+        $function = $enum->name.'::'.$methodName;
+        if ('int' === $enum->backedType) {
+            if (Variable::TYPE_INTEGER !== $resolved->type) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #1 ($value) must be of type int, %s given',
+                    $function,
+                    EnumCaseSupport::typeNameForVariable($resolved)
+                ));
+            }
+
+            return;
+        }
+        if ('string' === $enum->backedType && Variable::TYPE_STRING !== $resolved->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($value) must be of type string, %s given',
+                $function,
+                EnumCaseSupport::typeNameForVariable($resolved)
+            ));
         }
     }
 

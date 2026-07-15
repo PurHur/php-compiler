@@ -37,6 +37,33 @@ if (!function_exists('php_compiler_cli_should_run_entry_driver')) {
     }
 }
 
+if (!function_exists('php_compiler_cli_print_usage')) {
+    /** Short usage banner for bin/* entrypoints (issue #18690, sapi/cli/php_cli.c). */
+    function php_compiler_cli_print_usage(): void
+    {
+        $script = basename((string) ($GLOBALS['argv'][0] ?? 'bin/vm.php'));
+        $usage = <<<USAGE
+Usage: {$script} [options] [--] [file] [args...]
+   {$script} [options] -r <code> [--] [args...]
+   {$script} [options] [-] [args...]
+  -h --help               Print this help message
+  -l                      Lint source without executing
+  -r <code>               Run PHP code without using script tags
+  -d <ini>=<value>        Define INI entry (may be used multiple times)
+  --include <file>        Include file before main script (repeatable)
+  --no-cache              Disable compile cache (PHP_COMPILER_CACHE=0)
+  -o [<file>]             Write output (AOT/JIT entrypoints)
+  -y [<file>]             Write YAML sidecar (AOT entrypoints)
+  --debug-symbols         Emit debug symbols (AOT entrypoints)
+  -q <query>              CGI query string for superglobals
+  -p <body>               CGI POST body for superglobals
+  --script-name <name>    Override SCRIPT_NAME superglobal
+
+USAGE;
+        fwrite(STDOUT, $usage);
+    }
+}
+
 if (!function_exists('php_compiler_cli_dispatch')) {
     function php_compiler_cli_note_progress(string $msg): void
     {
@@ -169,6 +196,10 @@ if (!function_exists('php_compiler_cli_dispatch')) {
             $opt = $argv[$i];
             ++$i;
             switch ($opt) {
+                case '-h':
+                case '--help':
+                    php_compiler_cli_print_usage();
+                    exit(0);
                 case '-l':
                     $options['-l'] = true;
 
@@ -196,6 +227,10 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     $options['--debug-symbols'] = true;
 
                     break;
+                case '-v':
+                case '--version':
+                    php_compiler_cli_print_version();
+                    exit(0);
                 case '-d':
                     if ($i >= $argc) {
                         die("Option -d requires an argument\n");
@@ -288,7 +323,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
 
                             break;
                         }
-                        die("Unsupported bare argument {$opt}\n");
+                        php_compiler_cli_usage_error("Unsupported bare argument {$opt}");
                     }
                     $scriptPath = php_compiler_cli_resolve_user_path($opt);
                     $execCode = file_get_contents($scriptPath);

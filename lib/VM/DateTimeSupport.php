@@ -40,6 +40,28 @@ final class DateTimeSupport
      */
     private static array|false $createFromFormatLastErrors = false;
 
+    /**
+     * php-src ext/date/php_date.c — unix-timestamp strings with `@` prefix ("@0", "@1700000000").
+     *
+     * When the `@` prefix is used, Zend uses a numeric timezone offset (+00:00) regardless of the
+     * default timezone or the optional timezone argument.
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function tryParseAtUnixTimestampString(string $time): ?array
+    {
+        if ('' === $time || '@' !== $time[0]) {
+            return null;
+        }
+        if (!\preg_match('/^@([+-]?(?:\\d+)(?:\\.\\d+)?)$/', $time, $m)) {
+            return null;
+        }
+        $raw = $m[1];
+        $num = false !== \str_contains($raw, '.') ? (float) $raw : (int) $raw;
+
+        return self::splitTimestampNumber($num);
+    }
+
     public static function requireDateTimeZone(Variable $var, string $label): ObjectEntry
     {
         $var = $var->resolveIndirect();
@@ -489,6 +511,22 @@ final class DateTimeSupport
             throw new \LogicException('DateTime is not registered in this compiler build');
         }
         $entry = new ObjectEntry($class);
+        $atTimestamp = self::tryParseAtUnixTimestampString($time);
+        if (null !== $atTimestamp) {
+            $tzName = '+00:00';
+            try {
+                VmDateTimeNative::validateTimezoneId($tzName);
+            } catch (NativeDateInvalidTimeZoneException) {
+                return null;
+            }
+            self::applyParsedState($entry, $atTimestamp, $tzName);
+            $entry->constructed = true;
+            self::markDateTimeLikeInitialized($entry);
+            $var = new Variable(Variable::TYPE_OBJECT);
+            $var->object($entry);
+
+            return $var;
+        }
         $tzName = null !== $timezone
             ? self::timezoneName($timezone)
             : VmDate::defaultTimezoneGet();
@@ -557,6 +595,20 @@ final class DateTimeSupport
 
     public static function initDateTime(ObjectEntry $dt, string $time, ?ObjectEntry $timezone = null): void
     {
+        $atTimestamp = self::tryParseAtUnixTimestampString($time);
+        if (null !== $atTimestamp) {
+            $tzName = '+00:00';
+            try {
+                VmDateTimeNative::validateTimezoneId($tzName);
+            } catch (NativeDateInvalidTimeZoneException) {
+                self::throwDateInvalidTimeZoneException($tzName);
+            }
+            self::applyParsedState($dt, $atTimestamp, $tzName);
+            $dt->constructed = true;
+            self::markDateTimeLikeInitialized($dt);
+
+            return;
+        }
         $tzName = null !== $timezone
             ? self::timezoneName($timezone)
             : VmDate::defaultTimezoneGet();
@@ -1117,6 +1169,12 @@ final class DateTimeSupport
         return $var;
     }
 
+    /** php-src ext/date/php_date.c — TIMELIB_ZONETYPE_OFFSET (1) vs TIMELIB_ZONETYPE_ID (3). */
+    public static function zendTimezoneWireType(string $tzName): int
+    {
+        return null !== VmDateTimeNative::parseNumericTimezoneOffset($tzName) ? 1 : 3;
+    }
+
     /**
      * php-src ext/json/php_json.c — DateTime/DateTimeImmutable json encode wire (#14143).
      *
@@ -1132,7 +1190,7 @@ final class DateTimeSupport
 
         return [
             'date' => VmDateTimeNative::formatZendDateWire($timestamp, $microsecond, $tzName),
-            'timezone_type' => 3,
+            'timezone_type' => self::zendTimezoneWireType($tzName),
             'timezone' => $tzName,
         ];
     }
@@ -1144,9 +1202,11 @@ final class DateTimeSupport
      */
     public static function exportZendJsonWireDateTimeZone(ObjectEntry $zone): array
     {
+        $tzName = self::timezoneName($zone);
+
         return [
-            'timezone_type' => 3,
-            'timezone' => self::timezoneName($zone),
+            'timezone_type' => self::zendTimezoneWireType($tzName),
+            'timezone' => $tzName,
         ];
     }
 

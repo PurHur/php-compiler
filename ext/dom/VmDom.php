@@ -8,6 +8,7 @@ use PHPCfg\Func as CfgFunc;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\ext\xml\VmXml;
@@ -91,6 +92,8 @@ final class VmDom
     public const PROP_DOCTYPE = 'doctype';
 
     public const PROP_ENCODING = 'encoding';
+
+    public const PROP_XML_ENCODING = 'xmlEncoding';
 
     public const PROP_XML_VERSION = 'xmlVersion';
 
@@ -198,6 +201,8 @@ final class VmDom
         }
         $node->methods['clonenode'] = new NodeCloneNode();
         $node->methodVisibility['clonenode'] = $pub;
+        $node->methods['appendchild'] = new NodeAppendChild();
+        $node->methodVisibility['appendchild'] = $pub;
         $node->methods['replacechild'] = new NodeReplaceChild();
         $node->methodVisibility['replacechild'] = $pub;
         $node->methods['insertbefore'] = new NodeInsertBefore();
@@ -450,6 +455,11 @@ final class VmDom
         $xpath->methods['registernamespace'] = new XPathRegisterNamespace();
         $xpath->methodVisibility['registernamespace'] = $pub;
         $xpath->methodNames['registernamespace'] = 'registerNamespace';
+        if (CompilerVersion::supportsDomXPathQuote()) {
+            $pubStatic = $pub | CfgFunc::FLAG_STATIC;
+            $xpath->methods['quote'] = new XPathQuote();
+            $xpath->methodVisibility['quote'] = $pubStatic;
+        }
         $ctx->classes[self::CLASS_XPATH] = $xpath;
 
         $impl = new ClassEntry('DOMImplementation');
@@ -500,6 +510,7 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_RECOVER, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_STRICT_ERROR_CHECKING, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_ENCODING, $nullProto, $strProto);
+        $document->properties[] = new ClassProperty(self::PROP_XML_ENCODING, $nullProto, $strProto);
         $document->properties[] = new ClassProperty(self::PROP_XML_VERSION, null, $strProto);
         $document->properties[] = new ClassProperty(self::PROP_XML_STANDALONE, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
@@ -512,6 +523,9 @@ final class VmDom
         $document->methods['loadhtml'] = new DocumentLoadHTML();
         $document->methodVisibility['loadhtml'] = $pub;
         $document->methodNames['loadhtml'] = 'loadHTML';
+        $document->methods['loadhtmlfile'] = new DocumentLoadHTMLFile();
+        $document->methodVisibility['loadhtmlfile'] = $pub;
+        $document->methodNames['loadhtmlfile'] = 'loadHTMLFile';
         $document->methods['createelement'] = new DocumentCreateElement();
         $document->methodVisibility['createelement'] = $pub;
         $document->methods['createelementns'] = new DocumentCreateElementNS();
@@ -541,6 +555,8 @@ final class VmDom
         $document->methodVisibility['appendchild'] = $pub;
         $document->methods['savexml'] = new DocumentSaveXML();
         $document->methodVisibility['savexml'] = $pub;
+        $document->methods['save'] = new DocumentSave();
+        $document->methodVisibility['save'] = $pub;
         $document->methods['savehtml'] = new DocumentSaveHTML();
         $document->methodVisibility['savehtml'] = $pub;
         $document->methodNames['savehtml'] = 'saveHTML';
@@ -573,6 +589,14 @@ final class VmDom
         $document->methods['relaxngvalidate'] = new DocumentRelaxNGValidate();
         $document->methodVisibility['relaxngvalidate'] = $pub;
         $document->methodNames['relaxngvalidate'] = 'relaxNGValidate';
+        $document->methods['schemavalidatesource'] = new DocumentSchemaValidateSource();
+        $document->methodVisibility['schemavalidatesource'] = $pub;
+        $document->methodNames['schemavalidatesource'] = 'schemaValidateSource';
+        $document->methods['relaxngvalidatesource'] = new DocumentRelaxNGValidateSource();
+        $document->methodVisibility['relaxngvalidatesource'] = $pub;
+        $document->methodNames['relaxngvalidatesource'] = 'relaxNGValidateSource';
+        $document->methods['validate'] = new DocumentValidate();
+        $document->methodVisibility['validate'] = $pub;
         $ctx->classes[self::CLASS_DOCUMENT] = $document;
 
         $element = new ClassEntry('DOMElement');
@@ -900,6 +924,62 @@ final class VmDom
         return DomRegistry::state($fragment);
     }
 
+    /**
+     * User-script AOT: LLVM-materialized DOM objects may lack DomRegistry state (#18927).
+     */
+    public static function ensureDomTreeNodeRegistered(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?ObjectEntry $ownerDocument = null
+    ): void {
+        if (DomRegistry::has($entry)) {
+            return;
+        }
+
+        $classLc = strtolower($entry->class->name);
+        if (self::CLASS_DOCUMENT === $classLc) {
+            self::ensureDocument($entry);
+
+            return;
+        }
+        if (self::CLASS_DOCUMENT_FRAGMENT === $classLc) {
+            self::ensureDocumentFragment($entry);
+
+            return;
+        }
+        if (self::CLASS_ELEMENT !== $classLc) {
+            throw new \LogicException('DOM object has no registered node state in this compiler build');
+        }
+
+        $name = self::PROP_NODE_NAME;
+        $nodeName = 'unknown';
+        if ($entry->hasProperty($name)) {
+            $nameVar = $entry->getProperty($name)->resolveIndirect();
+            if (Variable::TYPE_STRING === $nameVar->type) {
+                $nodeName = $nameVar->toString();
+            }
+        }
+        if ($entry->hasProperty(self::PROP_TAG_NAME)) {
+            $entry->getProperty(self::PROP_TAG_NAME)->string($nodeName);
+        }
+        self::initElementPropertySlots($entry);
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_ELEMENT_NODE;
+        $state->nodeName = $nodeName;
+        $state->localName = $nodeName;
+        if (null !== $ownerDocument) {
+            self::ensureDomTreeNodeRegistered($ctx, $ownerDocument);
+            $state->documentId = $ownerDocument->id;
+        }
+        DomRegistry::attach($entry, $state);
+        if (CompilerVersion::supportsDomTokenList()) {
+            self::syncElementClassList($ctx, $entry);
+        }
+        self::ensureChildNodesList($ctx, $entry);
+        self::ensureElementAttributesMap($ctx, $entry);
+    }
+
     public static function createElement(
         Context $ctx,
         string $name,
@@ -981,6 +1061,30 @@ final class VmDom
         $var->object($entry);
 
         return $var;
+    }
+
+    /**
+     * DOMDocument::createAttributeNS() — requires a document element (php-src ext/dom/document.c; #19200).
+     *
+     * @return Variable DOMAttr or false when the document has no root element
+     */
+    public static function documentCreateAttributeNS(
+        Context $ctx,
+        ObjectEntry $document,
+        ?string $namespace,
+        string $qualifiedName,
+        ?Frame $frame = null
+    ): Variable {
+        $root = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_NULL === $root->type) {
+            self::triggerDomWarning($frame, 'DOMDocument::createAttributeNS(): Document Missing Root Element');
+            $false = new Variable(Variable::TYPE_BOOLEAN);
+            $false->bool(false);
+
+            return $false;
+        }
+
+        return self::createAttributeNS($ctx, $namespace, $qualifiedName, $document);
     }
 
     public static function createAttributeNS(
@@ -2087,16 +2191,18 @@ final class VmDom
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
         $generalEntities = self::parseDoctypeGeneralEntities($trimmed);
         [$elementXml, $elementOffset] = self::stripDoctypeWithOffset($trimmed);
-        $validationError = VmXml::validationErrorRecord($elementXml);
-        if (null !== $validationError) {
-            self::reportDomLibxmlError(
-                $ctx,
-                $validationError['message'],
-                $validationError['code'],
-                $validationError['column'],
-                $frame,
-                $validationError['level']
-            );
+        $validationErrors = VmXml::validationErrorRecords($elementXml);
+        if ([] !== $validationErrors) {
+            foreach ($validationErrors as $validationError) {
+                self::reportDomLibxmlError(
+                    $ctx,
+                    $validationError['message'],
+                    $validationError['code'],
+                    $validationError['column'],
+                    $frame,
+                    $validationError['level']
+                );
+            }
 
             return false;
         }
@@ -2137,7 +2243,10 @@ final class VmDom
         self::propagateDocumentId($root, $document->id);
         self::syncSubtree($ctx, $document);
         self::reindexDocumentIds($document, $root);
+        self::syncElementIdMapProperty($document);
         $state->documentUri = self::defaultDocumentUri();
+        $state->loadedViaXml = true;
+        $state->sourceXml = $trimmed;
 
         return true;
     }
@@ -2150,7 +2259,7 @@ final class VmDom
         ?\PHPCompiler\Frame $frame = null
     ): bool {
         unset($options);
-        $contents = @file_get_contents($filename);
+        $contents = VmFsReadNative::read($filename);
         if (false === $contents) {
             VmLibxml::handleError($ctx, [
                 'level' => 2,
@@ -2167,11 +2276,44 @@ final class VmDom
         return self::loadXML($ctx, $document, $contents, $frame);
     }
 
+    public static function loadHTMLFile(
+        Context $ctx,
+        ObjectEntry $document,
+        string $filename,
+        int $options = 0,
+        ?\PHPCompiler\Frame $frame = null
+    ): bool {
+        self::rejectEmptyFilename($filename, 'DOMDocument::loadHTMLFile()');
+        $contents = VmFsReadNative::read($filename);
+        if (false === $contents) {
+            VmLibxml::handleError($ctx, [
+                'level' => 2,
+                'code' => 4,
+                'column' => 0,
+                'message' => 'failed to load external entity "'.$filename.'"',
+                'file' => null !== $frame ? '' : $filename,
+                'line' => 0,
+            ], $frame, null, 'DOMDocument::loadHTMLFile(): I/O warning : failed to load external entity "'.$filename.'"');
+
+            return false;
+        }
+
+        return self::loadHTML($ctx, $document, $contents, $options, $frame);
+    }
+
     /** php-src ext/dom/document.c — empty $source rejected since PHP 8.0 (#17616). */
     private static function rejectEmptyLoadSource(string $source, string $method): void
     {
         if ('' === $source) {
             throw new \ValueError($method.': Argument #1 ($source) must not be empty');
+        }
+    }
+
+    /** php-src ext/dom/document.c — empty $filename rejected since PHP 8.0 (#18734). */
+    private static function rejectEmptyFilename(string $filename, string $method): void
+    {
+        if ('' === $filename) {
+            throw new \ValueError($method.': Argument #1 ($filename) must not be empty');
         }
     }
 
@@ -2221,6 +2363,9 @@ final class VmDom
         }
     }
 
+    /** php-src ext/dom/node.c — xml:id namespace URI. */
+    private const XML_NAMESPACE_URI = 'http://www.w3.org/XML/1998/namespace';
+
     private static function indexElementIdsRecursive(ObjectEntry $document, ObjectEntry $node): void
     {
         if (!self::isElement($node)) {
@@ -2228,16 +2373,7 @@ final class VmDom
         }
         $docState = DomRegistry::state($document);
         $nodeState = DomRegistry::state($node);
-        $idAttr = null;
-        if (self::documentValidateOnParse($document)) {
-            $idAttr = $docState->idAttrByElement[$nodeState->nodeName] ?? null;
-        }
-        if (null === $idAttr && null !== $nodeState->idAttributeName) {
-            $idAttr = $nodeState->idAttributeName;
-        }
-        if (null === $idAttr && $docState->isHtmlDocument && isset($nodeState->attributes['id'])) {
-            $idAttr = 'id';
-        }
+        $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
         if (null !== $idAttr) {
             $value = $nodeState->attributes[$idAttr] ?? null;
             if (null !== $value && '' !== $value) {
@@ -2250,6 +2386,36 @@ final class VmDom
                 self::indexElementIdsRecursive($document, $child);
             }
         }
+    }
+
+    /**
+     * Resolve which attribute qName holds this element's document-wide ID (php-src ext/dom/node.c; #19211).
+     */
+    private static function resolveElementIdAttributeName(
+        ObjectEntry $document,
+        DomNodeState $docState,
+        DomNodeState $nodeState
+    ): ?string {
+        $idAttr = null;
+        if (!$docState->isHtmlDocument || self::documentValidateOnParse($document)) {
+            $idAttr = $docState->idAttrByElement[$nodeState->nodeName] ?? null;
+        }
+        if (null === $idAttr && null !== $nodeState->idAttributeName) {
+            $idAttr = $nodeState->idAttributeName;
+        }
+        if (null === $idAttr && $docState->isHtmlDocument && isset($nodeState->attributes['id'])) {
+            $idAttr = 'id';
+        }
+        if (null === $idAttr && !$docState->isHtmlDocument) {
+            if (isset($nodeState->attributes['xml:id'])) {
+                $idAttr = 'xml:id';
+            } elseif (isset($nodeState->attributes['id'])
+                && self::XML_NAMESPACE_URI === ($nodeState->attributeNamespaces['id'] ?? '')) {
+                $idAttr = 'id';
+            }
+        }
+
+        return $idAttr;
     }
 
     /**
@@ -3001,21 +3167,95 @@ final class VmDom
     }
 
     /**
+     * Parse HTML/XML markup attribute substring (libxml HTML semantics; #18319).
+     *
+     * Supports double-quoted, single-quoted, and unquoted HTML attribute values.
+     *
      * @return array<string, string>
      */
-    private static function parseAttributes(string $attrString): array
+    public static function parseMarkupAttributes(string $attrString): array
     {
         $attrs = [];
         if ('' === $attrString) {
             return $attrs;
         }
-        if (preg_match_all('/\s([A-Za-z_][\w:.-]*)\s*=\s*"([^"]*)"/', $attrString, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $match) {
-                $attrs[$match[1]] = $match[2];
+        $len = \strlen($attrString);
+        $pos = 0;
+        while ($pos < $len) {
+            while ($pos < $len && ctype_space($attrString[$pos])) {
+                ++$pos;
             }
+            if ($pos >= $len) {
+                break;
+            }
+            if (!self::isMarkupAttributeNameStart($attrString[$pos])) {
+                ++$pos;
+
+                continue;
+            }
+            $nameStart = $pos;
+            ++$pos;
+            while ($pos < $len && self::isMarkupAttributeNameChar($attrString[$pos])) {
+                ++$pos;
+            }
+            $name = substr($attrString, $nameStart, $pos - $nameStart);
+            while ($pos < $len && ctype_space($attrString[$pos])) {
+                ++$pos;
+            }
+            if ($pos >= $len || '=' !== $attrString[$pos]) {
+                continue;
+            }
+            ++$pos;
+            while ($pos < $len && ctype_space($attrString[$pos])) {
+                ++$pos;
+            }
+            if ($pos >= $len) {
+                break;
+            }
+            $quote = $attrString[$pos];
+            if ('"' === $quote || "'" === $quote) {
+                ++$pos;
+                $valueStart = $pos;
+                while ($pos < $len && $attrString[$pos] !== $quote) {
+                    ++$pos;
+                }
+                $attrs[$name] = substr($attrString, $valueStart, $pos - $valueStart);
+                if ($pos < $len) {
+                    ++$pos;
+                }
+
+                continue;
+            }
+            $valueStart = $pos;
+            while ($pos < $len
+                && !ctype_space($attrString[$pos])
+                && '>' !== $attrString[$pos]
+                && '/' !== $attrString[$pos]
+            ) {
+                ++$pos;
+            }
+            $attrs[$name] = substr($attrString, $valueStart, $pos - $valueStart);
         }
 
         return $attrs;
+    }
+
+    private static function isMarkupAttributeNameStart(string $char): bool
+    {
+        return (bool) preg_match('/[A-Za-z_]/', $char);
+    }
+
+    private static function isMarkupAttributeNameChar(string $char): bool
+    {
+        return (bool) preg_match('/[\w:.-]/', $char);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function parseAttributes(string $attrString): array
+    {
+        return self::parseMarkupAttributes($attrString);
     }
 
     public static function appendChild(Context $ctx, ObjectEntry $parent, ObjectEntry $child): ObjectEntry
@@ -3220,6 +3460,16 @@ final class VmDom
         self::removeAllLiveStandardChildren($ctx, $parent);
         foreach ($args as $arg) {
             $child = self::resolveLiveStandardAppendArg($ctx, $parent, $arg, 'DOMNode::replaceChildren()');
+            self::appendLiveStandardChild($ctx, $parent, $child);
+        }
+        self::syncSubtree($ctx, $parent);
+    }
+
+    public static function replaceChildrenLiveStandardObjects(Context $ctx, ObjectEntry $parent, ObjectEntry ...$children): void
+    {
+        self::assertMutationParent($parent);
+        self::removeAllLiveStandardChildren($ctx, $parent);
+        foreach ($children as $child) {
             self::appendLiveStandardChild($ctx, $parent, $child);
         }
         self::syncSubtree($ctx, $parent);
@@ -3824,7 +4074,7 @@ final class VmDom
         return $object;
     }
 
-    public static function saveXML(ObjectEntry $document, ?ObjectEntry $node = null): string
+    public static function saveXML(ObjectEntry $document, ?ObjectEntry $node = null, int $options = 0): string
     {
         $state = self::ensureDocument($document);
         if (DomConstants::XML_DOCUMENT_NODE !== $state->nodeType) {
@@ -3832,13 +4082,14 @@ final class VmDom
         }
 
         $formatOutput = self::documentFormatOutput($document);
+        $noEmptyTag = 0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_NOEMPTYTAG);
 
         if (null !== $node) {
             if (!self::isDomNode($node)) {
                 throw new \TypeError('DOMDocument::saveXML(): Argument #1 ($node) must be of type DOMNode');
             }
 
-            return self::serializeNode($node, 0, $formatOutput);
+            return self::serializeNode($node, 0, $formatOutput, $noEmptyTag);
         }
 
         $lines = [self::serializeXmlDeclaration($state)];
@@ -3855,15 +4106,16 @@ final class VmDom
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
                 if (null !== $child) {
-                    $lines[] = self::serializeNode($child, 0, $formatOutput);
+                    $lines[] = self::serializeNode($child, 0, $formatOutput, $noEmptyTag);
                 }
             }
         } else {
             $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
             if (Variable::TYPE_OBJECT === $rootVar->type) {
-                $lines[] = self::serializeElement($rootVar->toObject(), 0, $formatOutput);
+                $lines[] = self::serializeElement($rootVar->toObject(), 0, $formatOutput, $noEmptyTag);
             } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
-                $lines[] = '<'.self::escapeName($state->documentElementName).'/>';
+                $name = self::escapeName($state->documentElementName);
+                $lines[] = $noEmptyTag ? '<'.$name.'></'.$name.'>' : '<'.$name.'/>';
             }
         }
 
@@ -3934,6 +4186,7 @@ final class VmDom
 
         $state = DomRegistry::state($document);
         $state->isHtmlDocument = true;
+        $noDefDtd = 0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_HTML_NODEFDTD);
         if (null !== $doctypeDecl) {
             $childIds = array_merge(
                 [self::attachDoctypeChild(
@@ -3945,7 +4198,7 @@ final class VmDom
                 )->id],
                 $childIds
             );
-        } else {
+        } elseif (!$noDefDtd) {
             $childIds = array_merge(
                 [self::attachDoctypeChild(
                     $ctx,
@@ -3982,7 +4235,7 @@ final class VmDom
         return true;
     }
 
-    public static function saveHTML(ObjectEntry $document, ?ObjectEntry $node = null): string
+    public static function saveHTML(ObjectEntry $document, ?ObjectEntry $node = null, int $options = 0): string
     {
         $state = self::ensureDocument($document);
         if (DomConstants::XML_DOCUMENT_NODE !== $state->nodeType) {
@@ -3994,24 +4247,26 @@ final class VmDom
                 throw new \TypeError('DOMDocument::saveHTML(): Argument #1 ($node) must be of type ?DOMNode');
             }
 
-            return self::serializeHtmlNode($node);
+            return self::serializeHtmlNode($node, !$state->loadedViaXml);
         }
 
+        $emptySelfClosing = !$state->loadedViaXml;
         $lines = [];
         if ([] !== $state->childIds) {
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
                 if (null !== $child) {
-                    $lines[] = self::serializeHtmlNode($child);
+                    $lines[] = self::serializeHtmlNode($child, $emptySelfClosing);
                 }
             }
         } else {
             $lines[] = self::serializeHtmlDoctypeFromDocumentState($state);
             $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
             if (Variable::TYPE_OBJECT === $rootVar->type) {
-                $lines[] = self::serializeHtmlNode($rootVar->toObject());
+                $lines[] = self::serializeHtmlNode($rootVar->toObject(), $emptySelfClosing);
             } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
-                $lines[] = '<'.self::escapeName($state->documentElementName).'/>';
+                $name = self::escapeName($state->documentElementName);
+                $lines[] = $emptySelfClosing ? '<'.$name.'/>' : '<'.$name.'></'.$name.'>';
             }
         }
 
@@ -4024,6 +4279,32 @@ final class VmDom
         $written = file_put_contents($filename, $html);
         if (false === $written) {
             return 0;
+        }
+
+        return $written;
+    }
+
+    /**
+     * DOMDocument::save() — write saveXML() bytes to $filename (php-src ext/dom/php_dom.c; #18435).
+     *
+     * @return int|false byte count, or false when the file cannot be written
+     */
+    public static function save(
+        ObjectEntry $document,
+        string $filename,
+        int $options = 0,
+        ?Frame $frame = null
+    ): int|false {
+        unset($options);
+        $xml = self::saveXML($document);
+        $written = @file_put_contents($filename, $xml);
+        if (false === $written) {
+            self::triggerDomWarning(
+                $frame,
+                'DOMDocument::save('.$filename.'): Failed to open stream: No such file or directory'
+            );
+
+            return false;
         }
 
         return $written;
@@ -4381,7 +4662,7 @@ final class VmDom
             .' PUBLIC "'.self::escapeAttr($publicId).'" "'.self::escapeAttr($systemId).'">'."\n";
     }
 
-    private static function serializeHtmlNode(ObjectEntry $entry): string
+    private static function serializeHtmlNode(ObjectEntry $entry, bool $emptySelfClosing = true): string
     {
         if (self::isDocumentType($entry)) {
             $dt = DomRegistry::state($entry);
@@ -4398,7 +4679,7 @@ final class VmDom
             return '<?'.$pi->nodeName.' '.($pi->textContent ?? '').'?>';
         }
         if (self::isElement($entry)) {
-            return self::serializeHtmlElement($entry);
+            return self::serializeHtmlElement($entry, $emptySelfClosing);
         }
         if (self::isTextNode($entry)) {
             return DomRegistry::state($entry)->textContent ?? '';
@@ -4410,19 +4691,23 @@ final class VmDom
         throw new \DOMException('Cannot serialize node type in this compiler build');
     }
 
-    private static function serializeHtmlElement(ObjectEntry $entry): string
+    private static function serializeHtmlElement(ObjectEntry $entry, bool $emptySelfClosing = true): string
     {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
         $attrPart = self::serializeAttributes($state);
         if ([] === $state->childIds) {
-            return '<'.$name.$attrPart.'/>';
+            if ($emptySelfClosing) {
+                return '<'.$name.$attrPart.'/>';
+            }
+
+            return '<'.$name.$attrPart.'></'.$name.'>';
         }
         $parts = [];
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                $parts[] = self::serializeHtmlNode($child);
+                $parts[] = self::serializeHtmlNode($child, $emptySelfClosing);
             }
         }
 
@@ -4633,10 +4918,10 @@ final class VmDom
         return null;
     }
 
-    private static function serializeNode(ObjectEntry $entry, int $depth = 0, bool $format = false): string
+    private static function serializeNode(ObjectEntry $entry, int $depth = 0, bool $format = false, bool $noEmptyTag = false): string
     {
         if (self::isElement($entry)) {
-            return self::serializeElement($entry, $depth, $format);
+            return self::serializeElement($entry, $depth, $format, $noEmptyTag);
         }
         if (self::isTextNode($entry)) {
             $text = self::escapeText(DomRegistry::state($entry)->textContent ?? '');
@@ -4664,13 +4949,15 @@ final class VmDom
         throw new \DOMException('Cannot serialize node type in this compiler build');
     }
 
-    private static function serializeElement(ObjectEntry $entry, int $depth = 0, bool $format = false): string
+    private static function serializeElement(ObjectEntry $entry, int $depth = 0, bool $format = false, bool $noEmptyTag = false): string
     {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
         $attrPart = self::serializeAttributes($state);
         if ([] === $state->childIds) {
-            $tag = '<'.$name.$attrPart.'/>';
+            $tag = $noEmptyTag
+                ? '<'.$name.$attrPart.'></'.$name.'>'
+                : '<'.$name.$attrPart.'/>';
 
             return $format ? str_repeat('  ', $depth).$tag : $tag;
         }
@@ -4679,7 +4966,7 @@ final class VmDom
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
                 if (null !== $child) {
-                    $parts[] = self::serializeNode($child);
+                    $parts[] = self::serializeNode($child, 0, false, $noEmptyTag);
                 }
             }
 
@@ -4691,7 +4978,7 @@ final class VmDom
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                $lines[] = self::serializeNode($child, $depth + 1, true);
+                $lines[] = self::serializeNode($child, $depth + 1, true, $noEmptyTag);
             }
         }
         $lines[] = $indent.'</'.$name.'>';
@@ -5222,6 +5509,9 @@ final class VmDom
         if (!$entry->hasProperty(self::PROP_CHILD_NODES)) {
             $entry->allocateProperty(self::PROP_CHILD_NODES)->null();
         }
+        if (!$entry->hasProperty(self::PROP_REGISTRY_ID)) {
+            $entry->allocateProperty(self::PROP_REGISTRY_ID)->int(0);
+        }
     }
 
     private static function initElementPropertySlots(ObjectEntry $entry): void
@@ -5469,6 +5759,23 @@ final class VmDom
             if (null !== $child) {
                 self::syncSubtree($ctx, $child);
             }
+        }
+    }
+
+    /** Mirror live child links onto a user-script handle that aliases DomRegistry (#18951). */
+    public static function mirrorNodeLinkProperties(ObjectEntry $dest, ObjectEntry $source): void
+    {
+        if ($dest->id !== $source->id) {
+            return;
+        }
+        self::initNodePropertySlots($dest);
+        self::initNodePropertySlots($source);
+        foreach ([
+            self::PROP_FIRST_CHILD,
+            self::PROP_LAST_CHILD,
+            self::PROP_CHILD_NODES,
+        ] as $prop) {
+            $dest->getProperty($prop)->copyFrom($source->getProperty($prop));
         }
     }
 
@@ -6579,7 +6886,72 @@ final class VmDom
         return false;
     }
 
-    /** DOMDocument::schemaValidate() — XSD validation stub (php-src ext/dom/document.c; #14370). */
+    /** DOMDocument::validate() — in-document DTD validation via libxml2 FFI (php-src ext/dom/document.c; #18833). */
+    public static function validate(Context $ctx, ObjectEntry $document, ?Frame $frame = null): bool
+    {
+        self::ensureDocument($document);
+        unset($ctx);
+        if (!VmDomValidationNative::available()) {
+            self::triggerDomWarning($frame, 'DOMDocument::validate(): not implemented in this compiler build');
+
+            return false;
+        }
+
+        $state = DomRegistry::state($document);
+        $docXml = $state->sourceXml;
+        if (null === $docXml || '' === $docXml) {
+            if (null === self::parseDoctypeNameFromDocument($document)) {
+                self::triggerDomWarning($frame, 'DOMDocument::validate(): no DTD found!');
+
+                return false;
+            }
+            $docXml = self::serializeXmlForValidation($document);
+        }
+
+        $result = VmDomValidationNative::validateDtdDocument($docXml);
+        foreach ($result['errors'] as $error) {
+            self::triggerDomWarning($frame, 'DOMDocument::validate(): '.$error);
+        }
+
+        return $result['valid'];
+    }
+
+    private static function parseDoctypeNameFromDocument(ObjectEntry $document): ?string
+    {
+        $state = DomRegistry::state($document);
+        if (null !== $state->doctypeName && '' !== $state->doctypeName) {
+            return $state->doctypeName;
+        }
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && self::isDocumentType($child)) {
+                return DomRegistry::state($child)->nodeName;
+            }
+        }
+
+        return null;
+    }
+
+    private static function serializeXmlForValidation(ObjectEntry $document): string
+    {
+        $state = DomRegistry::state($document);
+        $lines = [self::serializeXmlDeclaration($state)];
+        if (null !== $state->doctypeName) {
+            $lines[] = self::serializeDoctype(
+                $state->doctypeName,
+                $state->doctypePublicId ?? '',
+                $state->doctypeSystemId ?? ''
+            );
+        }
+        $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $rootVar->type) {
+            $lines[] = self::serializeNode($rootVar->toObject(), 0, false, false);
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /** DOMDocument::schemaValidate() — XSD file validation via libxml2 FFI (php-src ext/dom/document.c; #14370, #18806). */
     public static function schemaValidate(
         Context $ctx,
         ObjectEntry $document,
@@ -6603,12 +6975,28 @@ final class VmDom
 
             return false;
         }
-        self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): not implemented in this compiler build');
+        if (!VmDomValidationNative::available()) {
+            self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): not implemented in this compiler build');
 
-        return false;
+            return false;
+        }
+
+        $docXml = self::saveXML($document);
+        $ok = VmDomValidationNative::validateSchemaDocument($docXml, $filename);
+        if (!$ok) {
+            $errors = VmDomValidationNative::consumeLastErrors();
+            foreach ($errors as $error) {
+                self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): '.$error);
+            }
+            if ([] === $errors) {
+                self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): Invalid Schema');
+            }
+        }
+
+        return $ok;
     }
 
-    /** DOMDocument::relaxNGValidate() — RelaxNG validation stub (php-src ext/dom/document.c; #14370). */
+    /** DOMDocument::relaxNGValidate() — RelaxNG file validation via libxml2 FFI (php-src ext/dom/document.c; #14370, #18806). */
     public static function relaxNGValidate(
         Context $ctx,
         ObjectEntry $document,
@@ -6631,9 +7019,135 @@ final class VmDom
 
             return false;
         }
-        self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): not implemented in this compiler build');
+        if (!VmDomValidationNative::available()) {
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): not implemented in this compiler build');
+
+            return false;
+        }
+
+        $docXml = self::saveXML($document);
+        $ok = VmDomValidationNative::validateRelaxNGDocument($docXml, $filename);
+        if (!$ok) {
+            $errors = VmDomValidationNative::consumeLastErrors();
+            foreach ($errors as $error) {
+                self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): '.$error);
+            }
+            if ([] === $errors) {
+                self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): Invalid RelaxNG');
+            }
+        }
+
+        return $ok;
+    }
+
+    /** DOMDocument::schemaValidateSource() — in-memory XSD validation stub (php-src ext/dom/document.c; #18748). */
+    public static function schemaValidateSource(
+        Context $ctx,
+        ObjectEntry $document,
+        string $source,
+        int $flags,
+        ?Frame $frame = null
+    ): bool {
+        self::ensureDocument($document);
+        unset($flags);
+        self::rejectEmptyLoadSource($source, 'DOMDocument::schemaValidateSource()');
+        $validationErrors = VmXml::validationErrorRecords($source);
+        if ([] !== $validationErrors) {
+            self::reportDomValidationSourceParseError($ctx, $source, 'DOMDocument::schemaValidateSource()', $frame, true);
+
+            return false;
+        }
+
+        $rootName = DomRegistry::state($document)->documentElementName ?? 'root';
+        if ('' === $rootName) {
+            $rootName = 'root';
+        }
+        self::triggerDomWarning(
+            $frame,
+            'DOMDocument::schemaValidateSource(): '.sprintf(
+                "Element '%s': No matching global declaration available for the validation root.",
+                $rootName
+            )
+        );
 
         return false;
+    }
+
+    /** DOMDocument::relaxNGValidateSource() — in-memory RelaxNG validation stub (php-src ext/dom/document.c; #18748). */
+    public static function relaxNGValidateSource(
+        Context $ctx,
+        ObjectEntry $document,
+        string $source,
+        ?Frame $frame = null
+    ): bool {
+        self::ensureDocument($document);
+        self::rejectEmptyLoadSource($source, 'DOMDocument::relaxNGValidateSource()');
+        $validationErrors = VmXml::validationErrorRecords($source);
+        if ([] !== $validationErrors) {
+            self::reportDomValidationSourceParseError($ctx, $source, 'DOMDocument::relaxNGValidateSource()', $frame, false);
+
+            return false;
+        }
+
+        if (preg_match('/<grammar\b/i', $source) && !preg_match('/<start\b/i', $source)) {
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidateSource(): grammar has no children');
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidateSource(): Element <grammar> has no <start>');
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidateSource(): Invalid RelaxNG');
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * DOMDocument::schemaValidateSource()/relaxNGValidateSource() libxml warning surface
+     * (php-src ext/dom/document.c via libxml2; #18748).
+     */
+    private static function reportDomValidationSourceParseError(
+        Context $ctx,
+        string $source,
+        string $methodLabel,
+        ?Frame $frame,
+        bool $isSchema
+    ): void {
+        $record = VmXml::validationErrorRecord($source);
+        if (null === $record) {
+            $record = [
+                'level' => LibxmlConstants::LIBXML_ERR_FATAL,
+                'code' => 4,
+                'column' => 1,
+                'message' => 'Malformed XML document',
+                'file' => '',
+                'line' => 1,
+            ];
+        }
+
+        $prefix = $methodLabel.': ';
+        $line = $record['line'];
+        VmLibxml::handleError(
+            $ctx,
+            $record,
+            $frame,
+            null,
+            $prefix.'Entity: line '.$line.': parser error : '.$record['message']
+        );
+
+        $snippet = trim($source);
+        VmLibxml::handleError($ctx, $record, $frame, null, $prefix.$snippet);
+
+        $caretColumn = self::domLibxmlCaretColumn($snippet, $record);
+        VmLibxml::handleError($ctx, $record, $frame, null, $prefix.str_repeat(' ', $caretColumn).'^');
+
+        if ($isSchema) {
+            self::triggerDomWarning($frame, $prefix."Failed to parse the XML resource 'in_memory_buffer'.");
+            self::triggerDomWarning($frame, $prefix.'Invalid Schema');
+
+            return;
+        }
+
+        self::triggerDomWarning($frame, $prefix.'xmlRelaxNGParse: could not parse schemas');
+        self::triggerDomWarning($frame, $prefix.'Invalid RelaxNG');
     }
 
     /**
@@ -6651,7 +7165,7 @@ final class VmDom
         ?array $nsPrefixes
     ): string|false {
         unset($ctx);
-        if ($exclusive || $withComments || null !== $xpath || null !== $nsPrefixes) {
+        if ($exclusive || null !== $xpath || null !== $nsPrefixes) {
             return false;
         }
         if (!DomRegistry::has($node)) {
@@ -6664,10 +7178,10 @@ final class VmDom
                 return '';
             }
 
-            return self::c14nSerializeNode($rootVar->toObject());
+            return self::c14nSerializeNode($rootVar->toObject(), $withComments);
         }
 
-        return self::c14nSerializeNode($node);
+        return self::c14nSerializeNode($node, $withComments);
     }
 
     /**
@@ -6699,19 +7213,26 @@ final class VmDom
         return $written;
     }
 
-    private static function c14nSerializeNode(ObjectEntry $entry): string|false
+    private static function c14nSerializeNode(ObjectEntry $entry, bool $withComments): string|false
     {
         if (!DomRegistry::has($entry)) {
             return false;
         }
         if (self::isElement($entry)) {
-            return self::c14nSerializeElement($entry);
+            return self::c14nSerializeElement($entry, $withComments);
         }
         if (self::isTextNode($entry)) {
             return self::escapeText(DomRegistry::state($entry)->textContent ?? '');
         }
         if (self::isCdataNode($entry)) {
             return DomRegistry::state($entry)->textContent ?? '';
+        }
+        if (self::isCommentNode($entry)) {
+            if (!$withComments) {
+                return '';
+            }
+
+            return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
         }
         if (self::isEntityReference($entry)) {
             return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
@@ -6720,7 +7241,7 @@ final class VmDom
         return false;
     }
 
-    private static function c14nSerializeElement(ObjectEntry $entry): string
+    private static function c14nSerializeElement(ObjectEntry $entry, bool $withComments): string
     {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
@@ -6734,7 +7255,7 @@ final class VmDom
             if (null === $child) {
                 continue;
             }
-            $chunk = self::c14nSerializeNode($child);
+            $chunk = self::c14nSerializeNode($child, $withComments);
             if (false === $chunk) {
                 continue;
             }

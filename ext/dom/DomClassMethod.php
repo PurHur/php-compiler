@@ -95,4 +95,71 @@ abstract class DomClassMethod extends VmClassMethod
 
         return $object;
     }
+
+    /**
+     * DOMDocument::saveXML/saveHTML — ?DOMNode $node, int $options (php-src ext/dom/document.c).
+     *
+     * @return array{0: ?ObjectEntry, 1: int}
+     */
+    protected function parseSaveNodeAndOptionsArgs(Frame $frame, string $label): array
+    {
+        $node = null;
+        $options = 0;
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc >= 1) {
+            $first = $frame->calledArgs[1]->resolveIndirect();
+            if (1 === $argc && \in_array($first->type, [Variable::TYPE_INTEGER, Variable::TYPE_FLOAT], true)) {
+                $options = $first->toInt();
+            } else {
+                $node = $this->saveSerializationOptionalDomNodeArg($frame->calledArgs[1], $label, 0);
+                if ($argc >= 2) {
+                    $options = $this->optionsIntArg($frame->calledArgs[2], $label, 1);
+                }
+            }
+        }
+
+        return [$node, $options];
+    }
+
+    protected function saveSerializationOptionalDomNodeArg(Variable $var, string $label, int $index): ?ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s expects argument #%d to be of type ?DOMNode, %s given',
+                $label,
+                $index + 1,
+                VmDom::typeLabel($var)
+            ));
+        }
+        $object = $var->toObject();
+        if (!VmDom::isDomNode($object)) {
+            throw new \TypeError(\sprintf(
+                '%s expects argument #%d to be of type ?DOMNode, %s given',
+                $label,
+                $index + 1,
+                $object->class->name
+            ));
+        }
+
+        return $object;
+    }
+
+    protected function optionsIntArg(Variable $var, string $label, int $index): int
+    {
+        $var = $var->resolveIndirect();
+        if (!\in_array($var->type, [Variable::TYPE_INTEGER, Variable::TYPE_FLOAT], true)) {
+            throw new \TypeError(\sprintf(
+                '%s expects argument #%d to be of type int, %s given',
+                $label,
+                $index + 1,
+                VmDom::typeLabel($var)
+            ));
+        }
+
+        return $var->toInt();
+    }
 }

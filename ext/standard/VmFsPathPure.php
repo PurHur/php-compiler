@@ -24,6 +24,9 @@ final class VmFsPathPure
         if (str_contains($from, "\0") || str_contains($to, "\0")) {
             return false;
         }
+        if (null !== VmFsPhpWrapper::renameWarningMessage($from, $to)) {
+            return false;
+        }
 
         return @\rename($from, $to);
     }

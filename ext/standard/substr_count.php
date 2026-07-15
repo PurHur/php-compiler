@@ -11,6 +11,8 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -29,8 +31,8 @@ final class substr_count extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $haystack = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'substr_count', 0, 'haystack');
-        $needle = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'substr_count', 1, 'needle');
+        $haystack = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'substr_count', 'haystack');
+        $needle = self::vmNeedleArg($frame);
         $offset = 0;
         if ($argc >= 3) {
             $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'substr_count', 3, 'offset');
@@ -58,8 +60,8 @@ final class substr_count extends Internal
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $fn = $context->lookupFunction('phpc_substr_count');
-        $hay = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'substr_count', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lower($context, $args[1], 'substr_count', 1, 'needle');
+        $hay = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'substr_count', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'substr_count', 1, 'needle');
         $offset = $argc >= 3
             ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'substr_count', 3, 'offset')
             : $i64->constInt(0, false);
@@ -151,5 +153,23 @@ final class substr_count extends Internal
         $phi->addIncoming($lenResult, $lenEnd);
 
         return $phi;
+    }
+
+    /**
+     * php-src Z_PARAM_STR for needle — null coerces to "" without deprecation, then empty check (#18347).
+     */
+    private static function vmNeedleArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, 1, 'substr_count', 'needle');
+
+            return $frame->calledArgs[1]->resolveIndirect()->toString();
+        }
+        $var = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return '';
+        }
+
+        return VmString::coerceStringBuiltinArg($var, 'substr_count', 1, 'needle');
     }
 }

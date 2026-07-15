@@ -29,7 +29,10 @@ final class VmFilestatFailure
 
     public static function warnUnlinkFailed(Frame $frame, string $path): void
     {
-        self::triggerWarning($frame, \sprintf('unlink(%s): No such file or directory', $path));
+        $message = VmFsPhpWrapper::isPhpWrapperPath($path)
+            ? VmFsPhpWrapper::unlinkWarningMessage()
+            : \sprintf('unlink(%s): No such file or directory', $path);
+        self::triggerWarning($frame, $message);
     }
 
     public static function warnTouchCreateFailed(Frame $frame, string $path): void
@@ -42,10 +45,11 @@ final class VmFilestatFailure
 
     public static function warnRenameFailed(Frame $frame, string $from, string $to): void
     {
-        self::triggerWarning(
-            $frame,
-            \sprintf('rename(%s,%s): No such file or directory', $from, $to)
-        );
+        $wrapperMessage = VmFsPhpWrapper::renameWarningMessage($from, $to);
+        $message = null !== $wrapperMessage
+            ? $wrapperMessage
+            : \sprintf('rename(%s,%s): No such file or directory', $from, $to);
+        self::triggerWarning($frame, $message);
     }
 
     public static function warnRmdirNotEmpty(Frame $frame, string $path): void
@@ -73,13 +77,17 @@ final class VmFilestatFailure
         self::warnPathOpenDirFailed($frame, 'opendir', $path);
     }
 
-    /** php-src dir.c php_opendir — distinguish file vs missing path (#14861). */
+    /** php-src dir.c php_opendir — distinguish file vs missing path (#14861, #18418). */
     public static function warnPathOpenDirFailed(Frame $frame, string $function, string $path): void
     {
-        $reason = VmStatPath::isFile($path) ? 'Not a directory' : 'No such file or directory';
         self::triggerWarningWithHandlerFirst(
             $frame,
-            \sprintf('%s(%s): Failed to open directory: %s', $function, $path, $reason)
+            \sprintf(
+                '%s(%s): Failed to open directory: %s',
+                $function,
+                $path,
+                VmDirOpenFailure::openDirFailureReason($path)
+            )
         );
     }
 
@@ -94,6 +102,7 @@ final class VmFilestatFailure
     public static function warnScandirFailed(Frame $frame, string $path): void
     {
         self::warnPathOpenDirFailed($frame, 'scandir', $path);
+        self::triggerWarningWithHandlerFirst($frame, VmDirOpenFailure::scandirFollowupWarning($path));
     }
 
     public static function warnRmdirMissing(Frame $frame, string $path): void

@@ -140,9 +140,7 @@ final class levenshtein extends Internal
         int $argNumber,
         string $paramName
     ): Value {
-        JitInternalStrictArg::requireString($context, $arg, 'levenshtein', $paramName, $argNumber);
-
-        return JitStringBuiltinArg::lower(
+        return JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,
             $arg,
             'levenshtein',

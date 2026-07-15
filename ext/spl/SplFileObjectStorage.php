@@ -88,6 +88,11 @@ final class SplFileObjectStorage
         $state = &self::$state[$object->id];
         if (null === $state['currentLine']) {
             if (!self::readLineForIterator($object, true)) {
+                // php-src spl_filesystem_file_read_line — BOF before first line is '' not false (#18429).
+                if (0 === $state['lineNum']) {
+                    return '';
+                }
+
                 return false;
             }
         }
@@ -110,12 +115,17 @@ final class SplFileObjectStorage
         $state['lineNum'] = 0;
         for ($i = 0; $i < $line; ++$i) {
             if (!self::readLineForIterator($object, true)) {
+                // php-src ext/spl/spl_directory.c — key reflects requested line past EOF (#18304).
+                $state['lineNum'] = $line;
+
                 return;
             }
             self::freeLine($state);
             ++$state['lineNum'];
         }
-        self::readLineForIterator($object, true);
+        if (!self::readLineForIterator($object, true)) {
+            $state['lineNum'] = $line;
+        }
     }
 
     public static function fseek(ObjectEntry $object, int $offset, int $whence = \SEEK_SET): int
@@ -235,14 +245,46 @@ final class SplFileObjectStorage
             return false;
         }
         $readLen = $length ?? ($state['maxLineLen'] > 0 ? $state['maxLineLen'] : null);
-        $line = VmFs::fgets($state['handle'], $readLen);
-        if (false === $line) {
-            return false;
-        }
-        $state['currentLine'] = $line;
-        $state['lineNum'] += $lineAdd;
+        do {
+            if (VmFs::feof($state['handle'])) {
+                return false;
+            }
+            $line = VmFs::fgets($state['handle'], $readLen);
+            if (false === $line) {
+                return false;
+            }
+            $line = self::applyDropNewLine($line, $state['flags']);
+            if (self::shouldSkipEmptyLine($state['flags'], $line)) {
+                continue;
+            }
+            $state['currentLine'] = $line;
+            $state['lineNum'] += $lineAdd;
 
-        return true;
+            return true;
+        } while (true);
+    }
+
+    private static function applyDropNewLine(string $line, int $flags): string
+    {
+        if (0 === ($flags & SplFileObjectBuiltin::DROP_NEW_LINE)) {
+            return $line;
+        }
+        if ('' === $line) {
+            return $line;
+        }
+        if (str_ends_with($line, "\r\n")) {
+            return substr($line, 0, -2);
+        }
+        if (str_ends_with($line, "\n") || str_ends_with($line, "\r")) {
+            return substr($line, 0, -1);
+        }
+
+        return $line;
+    }
+
+    private static function shouldSkipEmptyLine(int $flags, string $line): bool
+    {
+        return 0 !== ($flags & SplFileObjectBuiltin::SKIP_EMPTY) && '' === $line;
     }
 
     /** @param array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int, separator: string, enclosure: string, escape: string} $state */

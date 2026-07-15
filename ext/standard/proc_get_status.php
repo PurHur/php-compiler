@@ -26,9 +26,7 @@ final class proc_get_status extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('proc_get_status() requires exactly one argument in this compiler build');
-        }
+        $this->requireExactArgCount($frame, 'proc_get_status', 1);
         if (null === $frame->returnVar) {
             return;
         }
@@ -52,7 +50,10 @@ final class proc_get_status extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (1 !== \count($args)) {
-            throw new \LogicException('proc_get_status() requires exactly one argument in this compiler build');
+            throw new \ArgumentCountError(\sprintf(
+                'proc_get_status() expects exactly 1 argument, %d given',
+                \count($args)
+            ));
         }
 
         return JitProcGetStatus::invoke($context, $args[0]);

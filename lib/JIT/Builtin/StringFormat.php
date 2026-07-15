@@ -34,6 +34,12 @@ final class StringFormat
     /** @var list<string> */
     private const COMPILED_PATHS = [
         '/ext/standard/VmString.php',
+        '/ext/standard/Ieee754.php',
+        '/ext/standard/VmIni.php',
+        '/ext/standard/VmMath.php',
+        '/ext/standard/VmRound.php',
+        '/ext/standard/VmSerializeFormat.php',
+        '/ext/standard/VmFloatDtoa.php',
         '/ext/standard/VmNumberFormat.php',
         '/ext/standard/VmSprintf.php',
         '/ext/standard/PackJitHelper.php',

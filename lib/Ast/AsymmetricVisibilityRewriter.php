@@ -523,12 +523,14 @@ final class AsymmetricVisibilityRewriter
         if (self::lineViolatesDuplicateSetModifierRules($line)) {
             return true;
         }
-        // php-src 8.4+: unparenthesized `public private(set)` is valid when asymmetric visibility is enabled (#16858, #17114).
-        if (CompilerVersion::supportsAsymmetricVisibility()) {
-            return false;
+
+        // Reference profile: explicit read + bare set is a duplicate-modifier fatal (#12576, #13960).
+        // PHP 8.4 forward profile accepts `public private(set)` and rewrites to marker form (#18820).
+        if (!CompilerVersion::supportsParenthesizedAsymmetricSetModifier()) {
+            return self::lineHasExplicitReadPlusSetModifier($line);
         }
 
-        return self::lineHasExplicitReadPlusSetModifier($line);
+        return false;
     }
 
     /**

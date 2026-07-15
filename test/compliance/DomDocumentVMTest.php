@@ -68,6 +68,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_create_attribute_ns.phpt',
             'dom_create_attribute_ns.phpt'
         );
+        yield 'dom_create_attribute_ns_no_root.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_create_attribute_ns_no_root.phpt',
+            'dom_create_attribute_ns_no_root.phpt'
+        );
         yield 'element_remove_attribute_ns.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/element_remove_attribute_ns.phpt',
             'element_remove_attribute_ns.phpt'
@@ -196,6 +200,14 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_document_schema_validate_warning.phpt',
             'dom_document_schema_validate_warning.phpt'
         );
+        yield 'dom_document_validate.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_document_validate.phpt',
+            'dom_document_validate.phpt'
+        );
+        yield 'dom_document_save.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_document_save.phpt',
+            'dom_document_save.phpt'
+        );
         yield 'dom_fragment_appendxml_warnings.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_fragment_appendxml_warnings.phpt',
             'dom_fragment_appendxml_warnings.phpt'
@@ -235,6 +247,10 @@ final class DomDocumentVMTest extends BaseTest
         yield 'dom_childnodes_empty.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/dom_childnodes_empty.phpt',
             'dom_childnodes_empty.phpt'
+        );
+        yield 'dom_import_node_chained_deep.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_import_node_chained_deep.phpt',
+            'dom_import_node_chained_deep.phpt'
         );
     }
 

@@ -17,7 +17,7 @@ final class ValueSortRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ValueSortRuntime.php');
         $this->assertStringContainsString('ValueSortJitHelper', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::isNativeArray', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::asortByValue', $runtime);
 
         $asort = (string) file_get_contents(__DIR__.'/../../ext/standard/asort_.php');
         $arsort = (string) file_get_contents(__DIR__.'/../../ext/standard/arsort_.php');

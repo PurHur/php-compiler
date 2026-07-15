@@ -25,8 +25,7 @@ final class ProcessPhpcRunCommandJitHelper
         $envArray = null;
         if (null !== $env) {
             $envArray = [];
-            foreach ($env->iterateKeyed(true) as $pair) {
-                [$keyVar, $valVar] = $pair;
+            foreach ($env->exportKeyValuePairs(true) as [$keyVar, $valVar]) {
                 if (Variable::TYPE_STRING !== $keyVar->type || Variable::TYPE_STRING !== $valVar->type) {
                     continue;
                 }

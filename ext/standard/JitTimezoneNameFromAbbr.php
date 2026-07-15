@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -33,6 +34,22 @@ final class JitTimezoneNameFromAbbr
             return JitValueBox::pointer($context, $slot);
         }
 
+        $gmtoffset = -1;
+        $isdst = -1;
+        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+            if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
+                JitInternalStrictArg::rejectNullString(
+                    $context,
+                    $args[0],
+                    'timezone_name_from_abbr',
+                    'abbr',
+                    1
+                );
+            }
+
+            return self::writeResult($context, VmDateTimeNative::timezoneNameFromAbbr('', $gmtoffset, $isdst));
+        }
+
         $abbrLiteral = JitStringArg::compileTimeLiteral($args[0]);
         if (null === $abbrLiteral) {
             throw new \LogicException(
@@ -40,8 +57,6 @@ final class JitTimezoneNameFromAbbr
             );
         }
 
-        $gmtoffset = -1;
-        $isdst = -1;
         if ($argc >= 2) {
             $offsetLiteral = self::tryCompileTimeInt($context, $args[1]);
             if (null === $offsetLiteral) {

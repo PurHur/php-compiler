@@ -32,6 +32,12 @@ final class EnumFromHandler extends Internal
             );
         }
         $arg = $frame->calledArgs[0];
+        BackedEnum::assertStrictCallerBackingArg(
+            $enum,
+            $arg,
+            $frame,
+            $this->try ? 'tryFrom' : 'from'
+        );
         $match = BackedEnum::caseForValue($enum, $arg);
         if (null === $match) {
             if (!$this->try) {

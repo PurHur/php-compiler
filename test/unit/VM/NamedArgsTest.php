@@ -174,6 +174,22 @@ PHP;
         $this->assertSame(9, $packed->find('extra')?->toInt());
     }
 
+    /** @covers issue #18647 — typed variadic accepts named overflow with per-element checks */
+    public function testTypedVariadicNamedArgumentsSum(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function f(int ...$args): int {
+    return array_sum($args);
+}
+echo f(a: 1, b: 2, c: 3), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'typed_variadic_named.php'));
+        $this->assertSame("6\n", ob_get_clean());
+    }
+
     /** @covers issue #11844 — promoted ctor named args skip default slots (Zend/zend_compile.c) */
     public function testPromotedConstructorNamedArgsSkipDefaultSlot(): void
     {

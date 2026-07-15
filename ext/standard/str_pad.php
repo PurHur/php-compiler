@@ -21,6 +21,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -37,21 +38,11 @@ final class str_pad extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('str_pad() requires two to four arguments');
         }
-        $input = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'str_pad',
-            0,
-            'string'
-        );
+        $input = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'str_pad', 'string');
         $padLength = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_pad', 2, 'length');
         $padString = ' ';
         if (isset($frame->calledArgs[2])) {
-            $padString = VmString::coerceStringBuiltinArg(
-                $frame->calledArgs[2],
-                'str_pad',
-                2,
-                'pad_string'
-            );
+            $padString = InternalStrictArg::resolveCoercibleStringArg($frame, 2, 'str_pad', 'pad_string');
         }
         // Compiler convention: 0 = STR_PAD_LEFT, 1 = STR_PAD_RIGHT (default).
         $padType = 1;
@@ -74,10 +65,10 @@ final class str_pad extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('str_pad() requires two to four arguments');
         }
-        $input = JitStringBuiltinArg::lower($context, $args[0], 'str_pad', 0, 'string');
+        $input = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'str_pad', 0, 'string');
         $padLength = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_pad', 2, 'length');
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
-            $padString = JitStringBuiltinArg::lower($context, $args[2], 'str_pad', 2, 'pad_string');
+            $padString = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'str_pad', 2, 'pad_string');
         } else {
             $padString = $context->builder->load($context->constantStringFromString(' '));
         }
