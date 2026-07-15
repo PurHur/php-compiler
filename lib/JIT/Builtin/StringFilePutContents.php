@@ -6,13 +6,19 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPCompiler\ext\standard\JitFilePutContentsKernel;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_file_put_contents via FilePutContentsJitHelper PHP (#15310).
+ * JIT/AOT link for __compiler_file_put_contents via FilePutContentsJitHelper PHP (#15310, #19294).
  *
- * Replaces ~177 LOC inline libc fopen/flock/fwrite LLVM.
+ * Embed / non-user-script: {@see FilePutContentsJitHelper} via compile helper.
+ * User-script standalone AOT: thin {@see JitFilePutContentsKernel} libc fopen/fwrite — nested
+ * helper TUs skip __init__ under PHP_COMPILER_AOT_USER_SCRIPT (#16075).
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::filePutContents()}.
  * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_stream_ex
  */
@@ -29,6 +35,8 @@ final class StringFilePutContents
         self::WRITE_HELPER,
     ];
 
+    private const KERNEL_ENTRY = 'fpc_kernel_entry';
+
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::implement($context);
@@ -36,6 +44,10 @@ final class StringFilePutContents
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction(self::ABI);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI, $probe);
@@ -44,11 +56,16 @@ final class StringFilePutContents
         }
 
         if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            StringFilePutContentsLibc::implement($context);
+            self::implementUserScriptKernel($context);
 
             return;
         }
 
+        self::implementPhpBridge($context, $probe);
+    }
+
+    private static function implementPhpBridge(Context $context, ?LlvmFunction $probe): void
+    {
         $fn = null !== $probe
             ? $probe
             : $context->lookupFunction(self::ABI);
@@ -66,6 +83,44 @@ final class StringFilePutContents
         $context->builder->returnValue($result);
         $context->registerFunction(self::ABI, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementUserScriptKernel(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
+            $context->registerFunction(self::ABI, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        LibcExtern::register($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI,
+                $context->context->functionType($i64, false, $strPtr, $strPtr, $i64)
+            );
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::KERNEL_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        JitFilePutContentsKernel::emitBody($context, $fn);
+        $context->registerFunction(self::ABI, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function helperFunction(Context $context): LlvmFunction

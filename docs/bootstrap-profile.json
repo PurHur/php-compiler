@@ -972,6 +972,7 @@
         "ext/spl/MultipleIteratorBuiltin.php",
         "ext/spl/ParentIteratorBuiltin.php",
         "ext/spl/RecursiveArrayIteratorBuiltin.php",
+        "ext/spl/RecursiveCachingIteratorBuiltin.php",
         "ext/spl/RecursiveCallbackFilterIteratorBuiltin.php",
         "ext/spl/RecursiveTreeIteratorBuiltin.php",
         "ext/spl/RegexIteratorBuiltin.php",
@@ -1314,7 +1315,9 @@
         "ext/standard/JitFgets.php",
         "ext/standard/JitFile.php",
         "ext/standard/JitFileGetContents.php",
+        "ext/standard/JitFileGetContentsKernel.php",
         "ext/standard/JitFilePutContents.php",
+        "ext/standard/JitFilePutContentsKernel.php",
         "ext/standard/JitFileatime.php",
         "ext/standard/JitFilectime.php",
         "ext/standard/JitFilegroup.php",
@@ -3827,7 +3830,6 @@
         "lib/JIT/Builtin/StringFgetcsvJit.php",
         "lib/JIT/Builtin/StringFileGetContents.php",
         "lib/JIT/Builtin/StringFilePutContents.php",
-        "lib/JIT/Builtin/StringFilePutContentsLibc.php",
         "lib/JIT/Builtin/StringFilterBoolean.php",
         "lib/JIT/Builtin/StringFilterDomain.php",
         "lib/JIT/Builtin/StringFilterEmail.php",
@@ -5194,9 +5196,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4960,
+        "inventory_files": 4962,
         "excluded": 0,
-        "eligible": 4960,
+        "eligible": 4962,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

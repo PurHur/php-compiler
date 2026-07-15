@@ -1279,6 +1279,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitFileGetContents.php` | 0 | 1 |
 | `ext/standard/JitFileGetContentsKernel.php` | 0 | 1 |
 | `ext/standard/JitFilePutContents.php` | 0 | 1 |
+| `ext/standard/JitFilePutContentsKernel.php` | 0 | 1 |
 | `ext/standard/JitFileatime.php` | 0 | 1 |
 | `ext/standard/JitFilectime.php` | 0 | 1 |
 | `ext/standard/JitFilegroup.php` | 0 | 1 |
@@ -3769,7 +3770,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringFilePutContentsLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterBoolean.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterDomain.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterEmail.php` | 0 | 2 |
@@ -13455,6 +13455,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitFilePutContentsKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/JitFileatime.php`
 
@@ -23696,7 +23701,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_contains.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/str_decrement.php`
@@ -23707,7 +23712,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_ends_with.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/str_getcsv.php`
@@ -23770,7 +23775,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_starts_with.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/str_word_count.php`
@@ -29807,13 +29812,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFilePutContents.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 102)
-- 4 class method(s)
-
-### `lib/JIT/Builtin/StringFilePutContentsLibc.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- new JIT (line 157)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/StringFilterBoolean.php`
 
