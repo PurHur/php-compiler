@@ -274,7 +274,8 @@ final class VmString
         int $argIndex,
         string $function,
         int $userArgIndex,
-        string $paramName
+        string $paramName,
+        bool $rejectNullOnForwardProfile = true
     ): string {
         if (InternalStrictArg::isCallerStrict($frame)) {
             InternalStrictArg::requireString($frame, $argIndex, $function, $paramName);
@@ -286,7 +287,9 @@ final class VmString
             $frame->calledArgs[$argIndex],
             $function,
             $userArgIndex,
-            $paramName
+            $paramName,
+            'string',
+            $rejectNullOnForwardProfile
         );
     }
 
