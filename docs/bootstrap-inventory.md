@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4896 |
-| Phase A inventory files (M2 ratio SSOT) | 4896 |
+| PHP files on vm.php path | 4899 |
+| Phase A inventory files (M2 ratio SSOT) | 4899 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13127 |
+| Source constructs flagged (warnings) | 13135 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -382,11 +382,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 4 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 17 |
+| `ext/gd/Module.php` | 0 | 20 |
 | `ext/gd/VmGd.php` | 0 | 4 |
 | `ext/gd/VmGdPng.php` | 0 | 1 |
 | `ext/gd/imagecolorallocate.php` | 0 | 1 |
 | `ext/gd/imagecolorat.php` | 0 | 1 |
+| `ext/gd/imagecopy.php` | 0 | 1 |
+| `ext/gd/imagecopymerge.php` | 0 | 1 |
+| `ext/gd/imagecopyresampled.php` | 0 | 1 |
 | `ext/gd/imagecreatefromstring.php` | 0 | 1 |
 | `ext/gd/imagecreatetruecolor.php` | 0 | 1 |
 | `ext/gd/imagecrop.php` | 0 | 1 |
@@ -3429,7 +3432,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/FunctionStaticRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/GcCollectCyclesNativeOpsJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/GcCollectCyclesRuntime.php` | 0 | 5 |
+| `lib/JIT/Builtin/GcCollectCyclesRuntime.php` | 0 | 7 |
 | `lib/JIT/Builtin/GcCollectCyclesStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/GcStatusRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/GcToggleRuntime.php` | 0 | 3 |
@@ -7305,13 +7308,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagesx (line 63)
 - new imagesy (line 64)
 - new imagecolorat (line 65)
-- new imagesetpixel (line 66)
-- new imagefilter (line 67)
-- new imageflip (line 68)
-- new imagecrop (line 69)
-- new imagecropauto (line 70)
-- new imagecreatefromstring (line 73)
-- new imagepng (line 74)
+- new imagecopy (line 66)
+- new imagecopymerge (line 67)
+- new imagecopyresampled (line 68)
+- new imagesetpixel (line 69)
+- new imagefilter (line 70)
+- new imageflip (line 71)
+- new imagecrop (line 72)
+- new imagecropauto (line 73)
+- new imagecreatefromstring (line 76)
+- new imagepng (line 77)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -7319,8 +7325,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 53)
 - new ObjectEntry (line 76)
-- new ObjectEntry (line 513)
-- 37 class method(s)
+- new ObjectEntry (line 676)
+- 42 class method(s)
 
 ### `ext/gd/VmGdPng.php`
 
@@ -7333,6 +7339,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imagecolorat.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecopy.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecopymerge.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecopyresampled.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -19368,7 +19389,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmZlibArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/VmZlibContext.php`
 
@@ -27714,11 +27735,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GcCollectCyclesRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 923)
-- new JIT (line 966)
-- new JIT (line 1009)
-- 56 class method(s)
-- 3 closure(s)
+- new JIT (line 955)
+- new JIT (line 998)
+- new JIT (line 1041)
+- new JIT (line 1351)
+- new JIT (line 1382)
+- 62 class method(s)
+- 5 closure(s)
 
 ### `lib/JIT/Builtin/GcCollectCyclesStandaloneLlvm.php`
 
