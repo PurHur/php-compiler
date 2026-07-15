@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
+// DOMTokenList is PHP 8.4+ (ext/dom/token_list.c). Run with:
+// PHP_COMPILER_PROFILE=8.4 php bin/vm.php test/repro/maintainer_gap_dom_element_class_list.php
 if (!class_exists('DOMTokenList')) {
-    fwrite(STDERR, "DOMTokenList class missing\n");
+    fwrite(STDERR, "DOMTokenList class missing (requires PHP_COMPILER_PROFILE=8.4 forward profile)\n");
     exit(1);
 }
 
