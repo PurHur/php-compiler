@@ -109,9 +109,12 @@ final class MultipleIteratorBuiltin
     public static function attachIterator(ObjectEntry $object, ObjectEntry $inner, int|string|null $info): void
     {
         self::ensureState($object);
+        $index = \count(self::$store[$object->id]['iterators']);
+        $pinKey = 'multi:'.$object->id.':'.$index.':'.$inner->id;
         self::$store[$object->id]['iterators'][] = [
-            'iterator' => $inner,
+            'iterator' => SplIteratorSupport::pinObject($inner, $pinKey),
             'info' => $info,
+            'pinKey' => $pinKey,
         ];
     }
 
@@ -121,6 +124,7 @@ final class MultipleIteratorBuiltin
         $iterators = &self::$store[$object->id]['iterators'];
         foreach ($iterators as $index => $entry) {
             if ($entry['iterator']->id === $inner->id) {
+                SplIteratorSupport::unpinObject($entry['iterator'], $entry['pinKey'] ?? '');
                 unset($iterators[$index]);
                 self::$store[$object->id]['iterators'] = array_values($iterators);
 

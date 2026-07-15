@@ -160,7 +160,7 @@ final class SplDualIteratorStorage
 
     private const RS_NEXT = 4;
 
-    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool}> */
+    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool, innerPinKey: string}> */
     private static array $store = [];
 
     public static function hasStateFor(ObjectEntry $object): bool
@@ -182,45 +182,82 @@ final class SplDualIteratorStorage
 
     public static function initSimple(ObjectEntry $object, ObjectEntry $inner): void
     {
-        self::$store[$object->id] = [
-            'inner' => $inner,
+        $pinKey = 'dual:'.$object->id.':inner';
+        self::replaceStore($object->id, [
+            'inner' => SplIteratorSupport::pinObject($inner, $pinKey),
             'recursive' => false,
             'mode' => IteratorIteratorBuiltin::LEAVES_ONLY,
             'stack' => [],
             'maxDepth' => -1,
             'rewound' => false,
             'noRewind' => false,
-        ];
+            'innerPinKey' => $pinKey,
+        ]);
     }
 
     /** NoRewindIterator — valid/current without outer rewind(); inner position preserved (#15150). */
     public static function initNoRewind(ObjectEntry $object, ObjectEntry $inner): void
     {
-        self::$store[$object->id] = [
-            'inner' => $inner,
+        $pinKey = 'dual:'.$object->id.':inner';
+        self::replaceStore($object->id, [
+            'inner' => SplIteratorSupport::pinObject($inner, $pinKey),
             'recursive' => false,
             'mode' => IteratorIteratorBuiltin::LEAVES_ONLY,
             'stack' => [],
             'maxDepth' => -1,
             'rewound' => true,
             'noRewind' => true,
-        ];
+            'innerPinKey' => $pinKey,
+        ]);
     }
 
     public static function initRecursive(ObjectEntry $object, ObjectEntry $inner, int $mode): void
     {
         // php-src spl_recursive_it_it_construct — inner iterator on stack at RS_START (#16904).
-        self::$store[$object->id] = [
-            'inner' => $inner,
+        // Pin once: stack[0] aliases the same ObjectEntry as inner (#6138).
+        $pinKey = 'dual:'.$object->id.':inner';
+        $pinned = SplIteratorSupport::pinObject($inner, $pinKey);
+        self::replaceStore($object->id, [
+            'inner' => $pinned,
             'recursive' => true,
             'mode' => $mode,
             'stack' => [
-                ['iterator' => $inner, 'state' => self::RS_START],
+                ['iterator' => $pinned, 'state' => self::RS_START],
             ],
             'maxDepth' => -1,
             'rewound' => false,
             'noRewind' => false,
-        ];
+            'innerPinKey' => $pinKey,
+        ]);
+    }
+
+    /**
+     * @param array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool, innerPinKey: string} $state
+     */
+    private static function replaceStore(int $objectId, array $state): void
+    {
+        if (isset(self::$store[$objectId])) {
+            self::releasePinnedIterators(self::$store[$objectId]);
+        }
+        self::$store[$objectId] = $state;
+    }
+
+    /**
+     * @param array{inner: ObjectEntry, stack: list<array{iterator: ObjectEntry, state: int}>, innerPinKey?: string} $state
+     */
+    private static function releasePinnedIterators(array $state): void
+    {
+        $innerKey = $state['innerPinKey'] ?? ('obj:'.$state['inner']->id);
+        SplIteratorSupport::unpinObject($state['inner'], $innerKey);
+        $released = [$state['inner']->id => true];
+        foreach ($state['stack'] as $index => $frame) {
+            $id = $frame['iterator']->id;
+            if (isset($released[$id])) {
+                continue;
+            }
+            SplIteratorSupport::unpinObject($frame['iterator'], 'dual-stack:'.$id.':'.$index);
+            $released[$id] = true;
+        }
     }
 
     public static function getDepth(ObjectEntry $object): int
@@ -341,11 +378,25 @@ final class SplDualIteratorStorage
     {
         $state = &self::$store[$object->id];
         $state['rewound'] = true;
+        self::clearStackKeepingInner($object->id);
         $state['stack'] = [
             ['iterator' => $state['inner'], 'state' => self::RS_START],
         ];
         self::invokeInner($frame, $state['inner'], 'rewind');
         self::advanceToYield($frame, $object);
+    }
+
+    private static function clearStackKeepingInner(int $objectId): void
+    {
+        $state = &self::$store[$objectId];
+        $innerId = $state['inner']->id;
+        foreach ($state['stack'] as $index => $frame) {
+            if ($frame['iterator']->id === $innerId) {
+                continue;
+            }
+            SplIteratorSupport::unpinObject($frame['iterator'], 'dual-stack:'.$frame['iterator']->id.':'.$index);
+        }
+        $state['stack'] = [];
     }
 
     public static function validRecursive(Frame $frame, ObjectEntry $object): bool
@@ -485,7 +536,14 @@ final class SplDualIteratorStorage
                         self::invokeInner($frame, $iterator, 'next');
                     }
                     if (!self::isIteratorValid($frame, $iterator)) {
-                        \array_pop($state['stack']);
+                        $popIndex = \count($state['stack']) - 1;
+                        $popped = \array_pop($state['stack']);
+                        if (null !== $popped && $popped['iterator']->id !== $state['inner']->id) {
+                            SplIteratorSupport::unpinObject(
+                                $popped['iterator'],
+                                'dual-stack:'.$popped['iterator']->id.':'.$popIndex
+                            );
+                        }
                         if ([] !== $state['stack']) {
                             $parentLevel = \count($state['stack']) - 1;
                             if (self::RS_SELF !== $state['stack'][$parentLevel]['state']) {
@@ -541,6 +599,8 @@ final class SplDualIteratorStorage
         $state = &self::$store[$object->id];
         $entry = &$state['stack'][$level];
         $child = self::getChildren($frame, $entry['iterator']);
+        $stackIndex = \count($state['stack']);
+        SplIteratorSupport::pinObject($child, 'dual-stack:'.$child->id.':'.$stackIndex);
         self::invokeInner($frame, $child, 'rewind');
         $mode = self::traversalMode($state['mode']);
         if (IteratorIteratorBuiltin::CHILD_FIRST === $mode) {
@@ -638,12 +698,16 @@ final class SplDualIteratorStorage
     /** @internal Shared by LimitIterator (#12893). */
     public static function callInner(Frame $frame, ObjectEntry $inner, string $method): Variable
     {
+        SplIteratorSupport::ensurePinnedObjectAlive($inner);
+
         return self::vm($frame)->invokeInstanceMethod($inner, $method);
     }
 
     /** @internal Shared by LimitIterator (#12893, #13963). */
     public static function callInnerWithArg(Frame $frame, ObjectEntry $inner, string $method, Variable $arg): Variable
     {
+        SplIteratorSupport::ensurePinnedObjectAlive($inner);
+
         return self::vm($frame)->invokeInstanceMethod($inner, $method, $arg);
     }
 
@@ -881,6 +945,7 @@ final class IteratorIteratorGetInnerIterator extends VmClassMethod
             return;
         }
         $inner = SplDualIteratorStorage::inner($object);
+        SplIteratorSupport::ensurePinnedObjectAlive($inner);
         $frame->returnVar->object($inner);
     }
 }
@@ -982,6 +1047,7 @@ final class RecursiveIteratorIteratorGetSubIterator extends VmClassMethod
             }
         }
         $inner = SplDualIteratorStorage::getSubIterator($object, $level);
+        SplIteratorSupport::ensurePinnedObjectAlive($inner);
         $frame->returnVar->object($inner);
     }
 }
@@ -1004,6 +1070,7 @@ final class RecursiveIteratorIteratorGetInnerIterator extends VmClassMethod
             return;
         }
         $inner = SplDualIteratorStorage::inner($object);
+        SplIteratorSupport::ensurePinnedObjectAlive($inner);
         $frame->returnVar->object($inner);
     }
 }
