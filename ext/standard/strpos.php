@@ -72,7 +72,10 @@ final class strpos extends Internal
         }
 
         StringStrpos::ensureLinked($context);
-        $hay = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strpos', 0, 'haystack');
+        // Z_PARAM_STR haystack: null TypeError on 8.4 forward profile (#19242); keep strict_types path.
+        $hay = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strpos', 0, 'haystack')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strpos', 0, 'haystack');
         $needle = JitStringBuiltinArg::lower($context, $args[1], 'strpos', 1, 'needle');
         $offset = 3 === $argc
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'strpos', 3, 'offset')
@@ -103,6 +106,15 @@ final class strpos extends Internal
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'strpos', $paramName)->toString();
+        }
+
+        if (0 === $argIndex) {
+            return VmString::coerceZparamStrBuiltinArg(
+                $frame->calledArgs[$argIndex],
+                'strpos',
+                $argIndex,
+                $paramName
+            );
         }
 
         return VmString::coerceStringBuiltinArg(

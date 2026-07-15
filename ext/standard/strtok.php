@@ -55,7 +55,7 @@ final class strtok extends Internal
             return JitStrtok::tokenize(
                 $context,
                 null,
-                JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'string', 'string', 'string')
+                JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'token', 'string', 'string')
             );
         }
 
@@ -70,7 +70,7 @@ final class strtok extends Internal
         );
         return JitStrtok::tokenize(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'string', 'string', 'string'),
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strtok', 0, 'string', 'string', 'string'),
             $tok
         );
     }
