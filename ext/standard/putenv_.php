@@ -36,6 +36,20 @@ final class putenv_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('putenv() requires exactly one argument');
         }
+        // Compile-time "NAME=value" when CTS is trustworthy. Slot-backed concat temps may
+        // carry partial CTS like "REQUEST_BODY=" (empty value) after `$body = …; putenv(…)`,
+        // which setenv's an empty REQUEST_BODY and breaks multipart AOT (#5965).
+        $literal = \PHPCompiler\JIT\JitStringArg::compileTimeLiteral($args[0]);
+        if (null !== $literal && '' !== $literal) {
+            $eqPos = strpos($literal, '=');
+            if (false !== $eqPos && 0 !== $eqPos) {
+                $valueLen = \strlen($literal) - $eqPos - 1;
+                $slotPartial = JITVariable::KIND_VARIABLE === $args[0]->kind && 0 === $valueLen;
+                if (!$slotPartial) {
+                    return JitEnv::putenvFromCStringLiteral($context, $literal);
+                }
+            }
+        }
         $assignment = JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,
             $args[0],

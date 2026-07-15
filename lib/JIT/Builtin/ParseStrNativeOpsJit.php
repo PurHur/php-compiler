@@ -28,8 +28,8 @@ final class ParseStrNativeOpsJit
     public static function setStringKey(Context $context, JITVariable $htPtr, JITVariable $key, JITVariable $value): void
     {
         $ht = self::htFromI64($context, $htPtr);
-        $keyStr = self::loadStringArg($context, $key);
-        $valStr = self::loadStringArg($context, $value);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
+        $valStr = self::ownedString($context, self::loadStringArg($context, $value));
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyString'),
             $ht,
@@ -45,7 +45,7 @@ final class ParseStrNativeOpsJit
         JITVariable $childPtr
     ): void {
         $ht = self::htFromI64($context, $htPtr);
-        $keyStr = self::loadStringArg($context, $key);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
         $childHt = self::htFromI64($context, $childPtr);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyHashtable'),
@@ -58,7 +58,7 @@ final class ParseStrNativeOpsJit
     public static function setStringAt(Context $context, JITVariable $htPtr, JITVariable $index, JITVariable $value): void
     {
         $ht = self::htFromI64($context, $htPtr);
-        $valStr = self::loadStringArg($context, $value);
+        $valStr = self::ownedString($context, self::loadStringArg($context, $value));
         $sizeT = $context->getTypeFromString('size_t');
         $idx = $context->builder->zext(
             JitLongArg::lower($context, $index, 'phpc_native_ht index'),
@@ -75,7 +75,7 @@ final class ParseStrNativeOpsJit
     public static function setStringKeyLong(Context $context, JITVariable $htPtr, JITVariable $key, JITVariable $value): void
     {
         $ht = self::htFromI64($context, $htPtr);
-        $keyStr = self::loadStringArg($context, $key);
+        $keyStr = self::ownedString($context, self::loadStringArg($context, $key));
         $longVal = JitLongArg::lower($context, $value, 'phpc_native_ht long value');
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringKeyLong'),
@@ -147,5 +147,11 @@ final class ParseStrNativeOpsJit
         }
 
         throw new \LogicException('ParseStrNativeOpsJit: expected string argument, got '.$ty);
+    }
+
+    /** Own Nested JIT temps/views before HT store (#5965). */
+    private static function ownedString(Context $context, Value $str): Value
+    {
+        return $context->builder->call($context->lookupFunction('__string__separate'), $str);
     }
 }

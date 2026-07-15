@@ -86,6 +86,79 @@ final class JitEnv
         return $result;
     }
 
+    /**
+     * putenv from a compile-time "NAME=value" literal — avoid __string__ GEPs (#5965).
+     *
+     * Uses the same malloc+NUL+setenv path as {@see emitLibcPutenvMirror} so long values
+     * with CR/LF (multipart REQUEST_BODY) round-trip under deferred user-script AOT.
+     * Direct setenv(nameConst, valueConst) left REQUEST_BODY empty after getenv (#5965).
+     */
+    public static function putenvFromCStringLiteral(Context $context, string $assignment): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'putenv_lit_emit_cont');
+        LibcExtern::register($context);
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $eqPos = strpos($assignment, '=');
+        if (false === $eqPos || 0 === $eqPos) {
+            return $i8->constInt(0, false);
+        }
+
+        $len = strlen($assignment);
+        $src = $context->pointerFromStringConstant($assignment);
+        $one = $sizeT->constInt(1, false);
+        $lenVal = $sizeT->constInt($len, false);
+        $bufLen = $context->builder->add($lenVal, $one);
+        $buf = $context->builder->call($context->lookupFunction('malloc'), $bufLen);
+        $cStr = $context->builder->pointerCast($buf, $i8p);
+        $context->intrinsic->memcpy($cStr, $src, $i64->constInt($len, false), false);
+        $context->builder->store(
+            $i8->constInt(0, false),
+            $context->builder->inBoundsGEP($cStr, $lenVal)
+        );
+
+        $eq = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $cStr,
+            $i32->constInt(ord('='), false)
+        );
+        $hasEq = $context->builder->icmp(Builder::INT_NE, $eq, $i8p->constNull());
+        $ok = BasicBlockHelper::append($context, 'putenv_lit_setenv_ok');
+        $skip = BasicBlockHelper::append($context, 'putenv_lit_setenv_skip');
+        $context->builder->branchIf($hasEq, $ok, $skip);
+
+        $context->builder->positionAtEnd($ok);
+        $context->builder->store($i8->constInt(0, false), $eq);
+        $valueStart = $context->builder->inBoundsGEP($eq, $one);
+        $context->builder->call(
+            $context->lookupFunction('setenv'),
+            $cStr,
+            $valueStart,
+            $i32->constInt(1, false)
+        );
+        $context->builder->branch($skip);
+        $context->builder->positionAtEnd($skip);
+        $context->builder->call($context->lookupFunction('free'), $cStr);
+
+        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            $str = $context->builder->load($context->constantStringFromString($assignment));
+            StringGetenv::ensurePutenvLinked($context);
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                StringGetenv::helperFunction(
+                    $context,
+                    'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv'
+                ),
+                [$str]
+            );
+        }
+
+        return $i8->constInt(1, false);
+    }
+
     public static function apacheSetenv(Context $context, Value $variableStr, Value $valueStr): Value
     {
         StringGetenv::ensureLinked($context);

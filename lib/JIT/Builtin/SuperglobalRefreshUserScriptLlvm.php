@@ -358,8 +358,9 @@ final class SuperglobalRefreshUserScriptLlvm
         $contentTypeEmpty = self::isCstrEmpty($context, $contentType);
         $needle = self::literalCstr($context, 'multipart/form-data');
         $sizeT = $context->getTypeFromString('size_t');
+        // Prefer libc strncmp — CaseCompare may steal strncasecmp's i8* ABI (#5965).
         $cmp = $context->builder->call(
-            $context->lookupFunction('strncasecmp'),
+            $context->lookupFunction('strncmp'),
             $contentType,
             $needle,
             $sizeT->constInt(19, false)

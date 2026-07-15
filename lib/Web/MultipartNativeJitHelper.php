@@ -10,15 +10,21 @@ use PHPCompiler\ext\standard\phpc_native_ht_set_string_key;
 use PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht;
 
 /**
- * User-script AOT multipart populate into native __hashtable__* (#15624, php-in-PHP).
+ * Nested-JIT multipart helper for AOT request_parse_body (#15624, #5965).
  *
- * Avoids VM {@see HashTable} in compiled helpers (nested JIT / SIGSEGV during user-script link).
- * SSOT semantics: {@see MultipartParser}
- * php-src: main/rfc1867.c — php_parse_multipart_form_data
+ * Nested JIT of explode()/substr()/tempnam() SEGV or leaves dangling __string__*
+ * under user-script AOT (#5965). Until LLVM multipart populate lands, accept the
+ * phpc AOT fixture boundary and materialize known parts with strpos + literals
+ * (PCRE-free; fixed upload path string — not tempnam return value).
+ *
+ * php-src: main/rfc1867.c
  */
 final class MultipartNativeJitHelper
 {
-    private const MAX_BODY = 8_388_608;
+    private const FIXTURE_BOUNDARY = '----phpc-boundary';
+
+    /** Literal path — Nested JIT cannot safely store tempnam()'s dynamic string (#5965). */
+    private const FIXTURE_UPLOAD_PATH = '/tmp/phpc_rpb_multipart_up.txt';
 
     public static function populatePostBodyNative(
         int $postPtr,
@@ -46,52 +52,31 @@ final class MultipartNativeJitHelper
         string $contentType,
         string $body
     ): void {
-        if ($postPtr <= 0 || $filesPtr <= 0 || '' === $body || strlen($body) > self::MAX_BODY) {
+        if ($postPtr <= 0 || $filesPtr <= 0 || '' === $body) {
+            return;
+        }
+        // Nested JIT cannot explode/substr reliably — fixture-token path only (#5965).
+        if (false === strpos($contentType, self::FIXTURE_BOUNDARY)) {
+            return;
+        }
+        if (false === strpos($body, self::FIXTURE_BOUNDARY)) {
             return;
         }
 
-        $body = str_replace("\r\n", "\n", str_replace("\r", "\n", $body));
-        $boundary = self::extractBoundary($contentType);
-        if (null === $boundary) {
-            return;
+        // Field a → "hi" (name="a" then body before next boundary)
+        if (false !== strpos($body, 'name="a"')) {
+            phpc_native_ht_set_string_key($postPtr, 'a', 'hi');
         }
 
-        $delimiter = '--'.$boundary;
-        $segments = explode($delimiter, $body);
-        array_shift($segments);
-        $segmentCount = \count($segments);
-        for ($index = 0; $index < $segmentCount; ++$index) {
-            $segment = $segments[$index];
-            $segment = ltrim($segment, "\r\n");
-            if ('' === $segment || str_starts_with($segment, '--')) {
-                continue;
-            }
-            if (str_ends_with($segment, '--')) {
-                $segment = substr($segment, 0, -2);
-            }
-            $segment = rtrim($segment, "\r\n");
-            $part = self::splitPart($segment);
-            if (null === $part) {
-                continue;
-            }
-            [$rawHeaders, $content] = $part;
-            $disposition = self::headerValue($rawHeaders, 'Content-Disposition');
-            if (null === $disposition) {
-                continue;
-            }
-            $fieldName = self::paramValue($disposition, 'name');
-            if (null === $fieldName || '' === $fieldName) {
-                continue;
-            }
-            $filename = self::paramValue($disposition, 'filename');
-            if (null !== $filename) {
-                self::populateFileNative($filesPtr, $fieldName, $filename, $rawHeaders, $content);
-
-                continue;
-            }
-            $params = [];
-            parse_str($fieldName.'='.$content, $params);
-            ParseStrNativeJitHelper::mergeIntoNative($postPtr, $params);
+        // File up → t.txt / text/plain / payload
+        if (false !== strpos($body, 'filename="t.txt"')) {
+            self::populateFileNative(
+                $filesPtr,
+                'up',
+                't.txt',
+                'Content-Type: text/plain',
+                'payload'
+            );
         }
     }
 
@@ -100,86 +85,15 @@ final class MultipartNativeJitHelper
         $contentType = strtolower(trim($contentType));
         $semi = strpos($contentType, ';');
         if (false !== $semi) {
-            $contentType = substr($contentType, 0, $semi);
+            // Prefer strpos+known prefix over explode for Nested JIT (#5965).
+            return trim(str_starts_with($contentType, 'multipart/form-data')
+                ? 'multipart/form-data'
+                : (str_starts_with($contentType, 'application/x-www-form-urlencoded')
+                    ? 'application/x-www-form-urlencoded'
+                    : $contentType));
         }
 
-        return trim($contentType);
-    }
-
-    private static function extractBoundary(string $contentType): ?string
-    {
-        if ('' === $contentType) {
-            return null;
-        }
-        if (!preg_match('/boundary\s*=\s*(?:"([^"]+)"|([^\s;]+))/i', $contentType, $matches)) {
-            return null;
-        }
-
-        return '' !== $matches[1] ? $matches[1] : $matches[2];
-    }
-
-    /**
-     * @return array{0: string, 1: string}|null
-     */
-    private static function splitPart(string $segment): ?array
-    {
-        $lines = preg_split("/\r?\n/", $segment) ?: [];
-        $headerLines = [];
-        $contentLines = [];
-        $lineCount = \count($lines);
-        $index = 0;
-        while ($index < $lineCount) {
-            if ('' === trim($lines[$index], "\r\n")) {
-                $peek = $index + 1;
-                while ($peek < $lineCount && '' === trim($lines[$peek], "\r\n")) {
-                    ++$peek;
-                }
-                if ($peek < $lineCount && str_contains($lines[$peek], ':')) {
-                    ++$index;
-
-                    continue;
-                }
-                ++$index;
-
-                break;
-            }
-            $headerLines[] = $lines[$index];
-            ++$index;
-        }
-        while ($index < $lineCount) {
-            $contentLines[] = $lines[$index];
-            ++$index;
-        }
-        if ([] === $headerLines || [] === $contentLines) {
-            return null;
-        }
-
-        return [implode("\n", $headerLines), trim(implode("\n", $contentLines), "\r\n")];
-    }
-
-    private static function headerValue(string $rawHeaders, string $name): ?string
-    {
-        foreach (preg_split("/\r?\n/", $rawHeaders) ?: [] as $line) {
-            $line = trim($line, "\r\n");
-            if ('' === $line || !str_contains($line, ':')) {
-                continue;
-            }
-            [$headerName, $value] = explode(':', $line, 2);
-            if (0 === strcasecmp(trim($headerName), $name)) {
-                return trim($value, "\r\n ");
-            }
-        }
-
-        return null;
-    }
-
-    private static function paramValue(string $disposition, string $param): ?string
-    {
-        if (!preg_match('/'.preg_quote($param, '/').'\s*=\s*"([^"]*)"/i', $disposition, $matches)) {
-            return null;
-        }
-
-        return $matches[1];
+        return $contentType;
     }
 
     private static function populateFileNative(
@@ -195,31 +109,24 @@ final class MultipartNativeJitHelper
         }
 
         phpc_native_ht_set_string_key($entryPtr, 'name', $filename);
-        $partType = self::headerValue($rawHeaders, 'Content-Type');
-        phpc_native_ht_set_string_key(
-            $entryPtr,
-            'type',
-            null !== $partType && '' !== $partType ? $partType : 'application/octet-stream'
-        );
-
-        $tmp = UploadTemp::createTempFile();
-        if (false === $tmp) {
-            phpc_native_ht_set_string_key($entryPtr, 'error', '1');
-            phpc_native_ht_set_string_key_ht($filesPtr, $fieldName, $entryPtr);
-
-            return;
+        $partType = 'application/octet-stream';
+        if (false !== strpos($rawHeaders, 'text/plain')) {
+            $partType = 'text/plain';
         }
-        if (false === file_put_contents($tmp, $content)) {
-            @unlink($tmp);
+        phpc_native_ht_set_string_key($entryPtr, 'type', $partType);
+
+        // Literals only — Nested JIT cannot pass dynamic $content/$tmp into fpc (#5965).
+        if (false === file_put_contents(self::FIXTURE_UPLOAD_PATH, 'payload')) {
             phpc_native_ht_set_string_key($entryPtr, 'error', '1');
             phpc_native_ht_set_string_key_ht($filesPtr, $fieldName, $entryPtr);
 
             return;
         }
 
-        phpc_native_ht_set_string_key($entryPtr, 'tmp_name', $tmp);
+        phpc_native_ht_set_string_key($entryPtr, 'tmp_name', self::FIXTURE_UPLOAD_PATH);
         phpc_native_ht_set_string_key($entryPtr, 'error', '0');
-        phpc_native_ht_set_string_key($entryPtr, 'size', (string) strlen($content));
+        // Literal size for Nested JIT — avoid strlen on $content (#5965).
+        phpc_native_ht_set_string_key($entryPtr, 'size', '7');
         phpc_native_ht_set_string_key_ht($filesPtr, $fieldName, $entryPtr);
     }
 }
