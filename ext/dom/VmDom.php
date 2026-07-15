@@ -611,6 +611,9 @@ final class VmDom
         $element->methodVisibility['getattribute'] = $pub;
         $element->methods['getattributenode'] = new ElementGetAttributeNode();
         $element->methodVisibility['getattributenode'] = $pub;
+        $element->methods['getattributenodens'] = new ElementGetAttributeNodeNS();
+        $element->methodVisibility['getattributenodens'] = $pub;
+        $element->methodNames['getattributenodens'] = 'getAttributeNodeNS';
         $element->methods['getattributens'] = new ElementGetAttributeNS();
         $element->methodVisibility['getattributens'] = $pub;
         $element->methods['hasattribute'] = new ElementHasAttribute();
@@ -625,6 +628,9 @@ final class VmDom
         $element->methodVisibility['setattribute'] = $pub;
         $element->methods['setattributenode'] = new ElementSetAttributeNode();
         $element->methodVisibility['setattributenode'] = $pub;
+        $element->methods['setattributenodens'] = new ElementSetAttributeNodeNS();
+        $element->methodVisibility['setattributenodens'] = $pub;
+        $element->methodNames['setattributenodens'] = 'setAttributeNodeNS';
         $element->methods['setattributens'] = new ElementSetAttributeNS();
         $element->methodVisibility['setattributens'] = $pub;
         $element->methods['removeattributens'] = new ElementRemoveAttributeNS();
@@ -1189,6 +1195,79 @@ final class VmDom
         }
 
         return $var;
+    }
+
+    /**
+     * DOMElement::getAttributeNodeNS() — null when missing (php-src ext/dom/element.c; #19265).
+     */
+    public static function getAttributeNodeNS(
+        Context $ctx,
+        ObjectEntry $element,
+        ?string $namespace,
+        string $localName
+    ): Variable {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $qName = self::findAttributeQNameByNsAndLocal($element, $namespace, $localName);
+        $var = new Variable();
+        if (null === $qName) {
+            $var->null();
+
+            return $var;
+        }
+        $state = DomRegistry::state($element);
+        $attr = self::attributeNodeForElement($ctx, $element, $qName, $state->attributes[$qName]);
+        $var->object($attr);
+
+        return $var;
+    }
+
+    /**
+     * DOMElement::setAttributeNodeNS() — replace by namespaceURI + localName (php-src ext/dom/element.c; #19265).
+     */
+    public static function setAttributeNodeNS(Context $ctx, ObjectEntry $element, ObjectEntry $attr): Variable
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        if (!self::isAttr($attr)) {
+            throw new \TypeError('DOMElement::setAttributeNodeNS(): Argument #1 ($attr) must be of type DOMAttr');
+        }
+        $attrState = DomRegistry::state($attr);
+        $localName = $attrState->localName ?? $attrState->nodeName;
+        $namespace = $attrState->namespaceUri;
+        $nsArg = (null === $namespace || '' === $namespace) ? null : $namespace;
+        $existingQName = self::findAttributeQNameByNsAndLocal($element, $nsArg, $localName);
+        $crossNameReplaced = null;
+        if (null !== $existingQName && $existingQName !== $attrState->nodeName) {
+            $elementState = DomRegistry::state($element);
+            $cachedId = $elementState->attributeNodeIds[$existingQName] ?? null;
+            if (null !== $cachedId) {
+                $cached = DomRegistry::entry($cachedId);
+                if (null !== $cached && $cached->id !== $attr->id) {
+                    $crossNameReplaced = $cached;
+                    self::detachAttributeNode($cached);
+                }
+            }
+            unset(
+                $elementState->attributes[$existingQName],
+                $elementState->attributeNamespaces[$existingQName],
+                $elementState->attributeNodeIds[$existingQName]
+            );
+            if (null !== $elementState->idAttributeName && $existingQName === $elementState->idAttributeName) {
+                $elementState->idAttributeName = $attrState->nodeName;
+            }
+        }
+        $result = self::setAttributeNode($ctx, $element, $attr);
+        if (null !== $crossNameReplaced) {
+            $var = new Variable();
+            $var->object($crossNameReplaced);
+
+            return $var;
+        }
+
+        return $result;
     }
 
     public static function removeAttributeNode(Context $ctx, ObjectEntry $element, ObjectEntry $attr): Variable

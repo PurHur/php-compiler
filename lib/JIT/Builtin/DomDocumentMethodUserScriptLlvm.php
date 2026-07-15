@@ -142,6 +142,54 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureGetAttributeNodeNSBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomImportNodeRuntime::ABI_GET_ATTRIBUTE_NODE_NS,
+            'dom_get_attribute_node_ns_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::getAttributeNodeNSArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureSetAttributeNodeNSBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        self::ensureBridge(
+            $context,
+            DomImportNodeRuntime::ABI_SET_ATTRIBUTE_NODE_NS,
+            'dom_set_attribute_node_ns_user_script',
+            [$objPtr, $objPtr],
+            $objPtr,
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::setAttributeNodeNSArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureCreateAttributeNSBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomImportNodeRuntime::ABI_CREATE_ATTRIBUTE_NS,
+            'dom_create_attribute_ns_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::createAttributeNSArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
     public static function ensureFirstChildBridge(Context $context): void
     {
         self::ensureBridge(
