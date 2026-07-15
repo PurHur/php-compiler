@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4986 |
-| Phase A inventory files (M2 ratio SSOT) | 4986 |
+| PHP files on vm.php path | 4993 |
+| Phase A inventory files (M2 ratio SSOT) | 4993 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13385 |
+| Source constructs flagged (warnings) | 13407 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -665,17 +665,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 42 |
+| `ext/openssl/Module.php` | 0 | 48 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
 | `ext/openssl/OpensslFunction.php` | 0 | 1 |
 | `ext/openssl/OpensslSignJitHelper.php` | 0 | 1 |
-| `ext/openssl/VmOpenssl.php` | 0 | 6 |
+| `ext/openssl/VmOpenssl.php` | 0 | 7 |
 | `ext/openssl/VmOpensslCipherNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslConfigNative.php` | 0 | 1 |
+| `ext/openssl/VmOpensslCsrNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslErrorNative.php` | 0 | 1 |
-| `ext/openssl/VmOpensslObjects.php` | 0 | 19 |
+| `ext/openssl/VmOpensslObjects.php` | 0 | 21 |
 | `ext/openssl/VmOpensslPkcs12Native.php` | 0 | 1 |
 | `ext/openssl/VmOpensslPkcs7Native.php` | 0 | 1 |
 | `ext/openssl/VmOpensslPkeyDeriveNative.php` | 0 | 1 |
@@ -686,6 +687,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/VmOpensslX509Native.php` | 0 | 1 |
 | `ext/openssl/openssl_cipher_iv_length.php` | 0 | 2 |
 | `ext/openssl/openssl_cipher_key_length.php` | 0 | 2 |
+| `ext/openssl/openssl_csr_export.php` | 0 | 2 |
+| `ext/openssl/openssl_csr_export_to_file.php` | 0 | 2 |
+| `ext/openssl/openssl_csr_get_public_key.php` | 0 | 2 |
+| `ext/openssl/openssl_csr_get_subject.php` | 0 | 2 |
+| `ext/openssl/openssl_csr_new.php` | 0 | 2 |
+| `ext/openssl/openssl_csr_sign.php` | 0 | 2 |
 | `ext/openssl/openssl_decrypt.php` | 0 | 2 |
 | `ext/openssl/openssl_dh_compute_key.php` | 0 | 2 |
 | `ext/openssl/openssl_digest.php` | 0 | 2 |
@@ -9321,14 +9328,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_pkcs7_encrypt (line 65)
 - new openssl_pkcs7_decrypt (line 66)
 - new openssl_x509_verify (line 67)
-- new openssl_free_key (line 68)
-- new openssl_spki_new (line 69)
-- new openssl_spki_verify (line 70)
-- new openssl_spki_export (line 71)
-- new openssl_spki_export_challenge (line 72)
-- new openssl_seal (line 73)
-- new openssl_open (line 74)
-- new openssl_error_string (line 75)
+- new openssl_csr_new (line 68)
+- new openssl_csr_export (line 69)
+- new openssl_csr_export_to_file (line 70)
+- new openssl_csr_sign (line 71)
+- new openssl_csr_get_subject (line 72)
+- new openssl_csr_get_public_key (line 73)
+- new openssl_free_key (line 74)
+- new openssl_spki_new (line 75)
+- new openssl_spki_verify (line 76)
+- new openssl_spki_export (line 77)
+- new openssl_spki_export_challenge (line 78)
+- new openssl_seal (line 79)
+- new openssl_open (line 80)
+- new openssl_error_string (line 81)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -9360,11 +9373,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 92)
-- new HashTable (line 1406)
-- new Variable (line 1408)
-- new HashTable (line 1419)
-- new Variable (line 1421)
-- 48 class method(s)
+- new Variable (line 852)
+- new HashTable (line 1741)
+- new Variable (line 1743)
+- new HashTable (line 1754)
+- new Variable (line 1756)
+- 57 class method(s)
 
 ### `ext/openssl/VmOpensslCipherNative.php`
 
@@ -9375,6 +9389,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/openssl/VmOpensslCsrNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 17 class method(s)
 
 ### `ext/openssl/VmOpensslErrorNative.php`
 
@@ -9390,19 +9409,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 121)
 - new ObjectEntry (line 133)
 - new Variable (line 136)
-- new Variable (line 185)
-- new Variable (line 195)
-- new Variable (line 202)
-- new Variable (line 231)
-- new Variable (line 243)
-- new Variable (line 251)
-- new Variable (line 258)
-- new Variable (line 277)
-- new Variable (line 284)
-- new Variable (line 300)
-- new HashTable (line 302)
-- new ClassEntry (line 454)
-- 19 class method(s)
+- new ObjectEntry (line 148)
+- new Variable (line 151)
+- new Variable (line 255)
+- new Variable (line 265)
+- new Variable (line 272)
+- new Variable (line 301)
+- new Variable (line 313)
+- new Variable (line 321)
+- new Variable (line 328)
+- new Variable (line 347)
+- new Variable (line 354)
+- new Variable (line 370)
+- new HashTable (line 372)
+- new ClassEntry (line 524)
+- 23 class method(s)
 
 ### `ext/openssl/VmOpensslPkcs12Native.php`
 
@@ -9454,6 +9475,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 34)
+- 2 class method(s)
+
+### `ext/openssl/openssl_csr_export.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/openssl/openssl_csr_export_to_file.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/openssl/openssl_csr_get_public_key.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/openssl/openssl_csr_get_subject.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/openssl/openssl_csr_new.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/openssl/openssl_csr_sign.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_decrypt.php`

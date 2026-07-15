@@ -736,6 +736,341 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_csr_new() — create certificate signing request (php-src ext/openssl/xp.c; #6421).
+     *
+     * @return Variable|false OpenSSLCertificateSigningRequest wrapper
+     */
+    public static function csrNew(
+        Variable $dnVar,
+        Variable $privateKeyVar,
+        ?Variable $optionsVar,
+        Context $ctx,
+        ?Frame $frame = null,
+    ): Variable|false {
+        if (!VmOpensslCsrNative::available()) {
+            self::userWarning('openssl_csr_new(): OpenSSL CSR is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $dn = self::assocStringArrayFromVariable($dnVar, 'openssl_csr_new', 0, 'distinguished_names');
+        $digestAlg = 'sha256';
+        $bits = 2048;
+        if (null !== $optionsVar) {
+            $optionsVar = $optionsVar->resolveIndirect();
+            if (Variable::TYPE_NULL !== $optionsVar->type && Variable::TYPE_ARRAY !== $optionsVar->type) {
+                throw new \TypeError(\sprintf(
+                    'openssl_csr_new(): Argument #3 ($options) must be of type ?array, %s given',
+                    self::typeLabel($optionsVar)
+                ));
+            }
+            if (Variable::TYPE_ARRAY === $optionsVar->type) {
+                foreach ($optionsVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                    if (Variable::TYPE_STRING !== $keyVar->type) {
+                        continue;
+                    }
+                    $key = $keyVar->toString();
+                    $valueVar = $valueVar->resolveIndirect();
+                    if ('digest_alg' === $key) {
+                        if (Variable::TYPE_STRING === $valueVar->type) {
+                            $digestAlg = strtolower($valueVar->toString());
+                        }
+                    }
+                    if ('private_key_bits' === $key && Variable::TYPE_INTEGER === $valueVar->type) {
+                        $bits = $valueVar->toInt();
+                    }
+                }
+            }
+        }
+
+        $keyPem = self::resolveOrCreatePrivateKeyPem($privateKeyVar, $bits, $ctx, $frame);
+        if (null === $keyPem) {
+            return false;
+        }
+
+        $csrPem = VmOpensslCsrNative::createCsrPem($dn, $keyPem, $digestAlg);
+        if (false === $csrPem) {
+            self::userWarning('openssl_csr_new(): Unable to create CSR', $frame);
+
+            return false;
+        }
+
+        return VmOpensslObjects::wrapCsr($ctx, $csrPem);
+    }
+
+    /**
+     * openssl_csr_export() — PEM export (php-src ext/openssl/xp.c; #6421).
+     */
+    public static function csrExportPem(Variable $csrArg, ?Frame $frame = null): string|false
+    {
+        if (!VmOpensslCsrNative::available()) {
+            self::userWarning('openssl_csr_export(): OpenSSL CSR is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $pem = VmOpensslObjects::resolveCsrPem($csrArg, 'openssl_csr_export');
+        if (null === $pem) {
+            return false;
+        }
+
+        $normalized = VmOpensslCsrNative::normalizeCsrPem($pem);
+        if (false === $normalized) {
+            self::userWarning('openssl_csr_export(): cannot get CSR from file', $frame);
+
+            return false;
+        }
+
+        return $normalized;
+    }
+
+    /**
+     * openssl_csr_get_subject() — DN fields (php-src ext/openssl/xp.c; #6421).
+     *
+     * @return Variable|false
+     */
+    public static function csrGetSubject(Variable $csrArg, bool $shortnames, ?Frame $frame = null): Variable|false
+    {
+        if (!VmOpensslCsrNative::available()) {
+            self::userWarning('openssl_csr_get_subject(): OpenSSL CSR is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $pem = VmOpensslObjects::resolveCsrPem($csrArg, 'openssl_csr_get_subject');
+        if (null === $pem) {
+            return false;
+        }
+
+        $subject = VmOpensslCsrNative::getSubject($pem, $shortnames);
+        if (false === $subject) {
+            self::userWarning('openssl_csr_get_subject(): cannot get CSR from file', $frame);
+
+            return false;
+        }
+
+        $result = new Variable();
+        $result->array(self::assocStringArrayToHashTable($subject));
+
+        return $result;
+    }
+
+    /**
+     * openssl_csr_get_public_key() (php-src ext/openssl/xp.c; #6421).
+     *
+     * @return Variable|false
+     */
+    public static function csrGetPublicKey(Variable $csrArg, Context $ctx, ?Frame $frame = null): Variable|false
+    {
+        if (!VmOpensslCsrNative::available()) {
+            self::userWarning('openssl_csr_get_public_key(): OpenSSL CSR is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $pem = VmOpensslObjects::resolveCsrPem($csrArg, 'openssl_csr_get_public_key');
+        if (null === $pem) {
+            return false;
+        }
+
+        $pubPem = VmOpensslCsrNative::getPublicKeyPem($pem);
+        if (false === $pubPem) {
+            self::userWarning('openssl_csr_get_public_key(): cannot get CSR from file', $frame);
+
+            return false;
+        }
+
+        return VmOpensslObjects::wrapKey($ctx, $pubPem);
+    }
+
+    /**
+     * openssl_csr_sign() — issue certificate from CSR (php-src ext/openssl/xp.c; #6421).
+     *
+     * @return Variable|false OpenSSLCertificate wrapper
+     */
+    public static function csrSign(
+        Variable $csrArg,
+        ?Variable $caCertArg,
+        Variable $privateKeyArg,
+        int $days,
+        ?Variable $optionsVar,
+        int $serial,
+        Context $ctx,
+        ?Frame $frame = null,
+    ): Variable|false {
+        if (!VmOpensslCsrNative::available()) {
+            self::userWarning('openssl_csr_sign(): OpenSSL CSR is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $csrPem = VmOpensslObjects::resolveCsrPem($csrArg, 'openssl_csr_sign');
+        if (null === $csrPem) {
+            return false;
+        }
+
+        $caPem = null;
+        if (null !== $caCertArg) {
+            $caCertArg = $caCertArg->resolveIndirect();
+            if (Variable::TYPE_NULL !== $caCertArg->type) {
+                $caPem = self::coerceCertificatePem($caCertArg, 'openssl_csr_sign', 1, 'ca_certificate');
+            }
+        }
+
+        $keyPem = self::resolvePemMaterial(
+            self::coercePkeyPem($privateKeyArg, 'openssl_csr_sign', 2, 'private_key'),
+            'openssl_csr_sign',
+            $frame
+        );
+        if (false === $keyPem) {
+            return false;
+        }
+
+        $digestAlg = 'sha256';
+        if (null !== $optionsVar) {
+            $optionsVar = $optionsVar->resolveIndirect();
+            if (Variable::TYPE_NULL !== $optionsVar->type && Variable::TYPE_ARRAY !== $optionsVar->type) {
+                throw new \TypeError(\sprintf(
+                    'openssl_csr_sign(): Argument #5 ($options) must be of type ?array, %s given',
+                    self::typeLabel($optionsVar)
+                ));
+            }
+            if (Variable::TYPE_ARRAY === $optionsVar->type) {
+                foreach ($optionsVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                    if (Variable::TYPE_STRING !== $keyVar->type) {
+                        continue;
+                    }
+                    if ('digest_alg' === $keyVar->toString()) {
+                        $valueVar = $valueVar->resolveIndirect();
+                        if (Variable::TYPE_STRING === $valueVar->type) {
+                            $digestAlg = strtolower($valueVar->toString());
+                        }
+                    }
+                }
+            }
+        }
+
+        $certPem = VmOpensslCsrNative::signCsrPem($csrPem, $caPem, $keyPem, $days, $digestAlg, $serial);
+        if (false === $certPem) {
+            self::userWarning('openssl_csr_sign(): Error signing request', $frame);
+
+            return false;
+        }
+
+        return VmOpensslObjects::wrapCertificate($ctx, $certPem);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function assocStringArrayFromVariable(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName,
+    ): array {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type array, %s given',
+                $function,
+                $argIndex + 1,
+                $paramName,
+                self::typeLabel($var)
+            ));
+        }
+
+        $out = [];
+        foreach ($var->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            if (Variable::TYPE_STRING !== $keyVar->type) {
+                continue;
+            }
+            $valueVar = $valueVar->resolveIndirect();
+            if (Variable::TYPE_STRING === $valueVar->type) {
+                $out[$keyVar->toString()] = $valueVar->toString();
+            } elseif (Variable::TYPE_INTEGER === $valueVar->type) {
+                $out[$keyVar->toString()] = (string) $valueVar->toInt();
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Resolve by-ref private key for openssl_csr_new(); generate when null.
+     */
+    private static function resolveOrCreatePrivateKeyPem(
+        Variable $privateKeyVar,
+        int $bits,
+        Context $ctx,
+        ?Frame $frame,
+    ): ?string {
+        $resolved = $privateKeyVar->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            if (!VmOpensslPkeyNative::available()) {
+                self::userWarning('openssl_csr_new(): Unable to generate key pair', $frame);
+
+                return null;
+            }
+            $pem = VmOpensslPkeyNative::generateRsa($bits);
+            if (false === $pem) {
+                self::userWarning('openssl_csr_new(): Unable to generate key pair', $frame);
+
+                return null;
+            }
+            $wrapped = VmOpensslObjects::wrapKey($ctx, $pem);
+            $resolved->object($wrapped->toObject());
+
+            return $pem;
+        }
+
+        return self::resolveOrNormalizePrivateKeyPem($resolved, 'openssl_csr_new', 1, 'private_key', $frame);
+    }
+
+    /**
+     * @return string|null private key PEM, or null after warning
+     */
+    private static function resolveOrNormalizePrivateKeyPem(
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        ?Frame $frame,
+    ): ?string {
+        $material = self::coercePkeyPem($arg, $function, $argIndex, $paramName);
+        $pem = self::resolvePemMaterial($material, $function, $frame);
+        if (false === $pem) {
+            return null;
+        }
+        if (str_contains($pem, 'BEGIN PUBLIC KEY') || str_contains($pem, 'BEGIN RSA PUBLIC KEY')) {
+            return $pem;
+        }
+        $normalized = VmOpensslPkeyNative::normalizePrivateKeyPem($pem, null);
+        if (false === $normalized) {
+            self::userWarning($function.'(): Unable to load private key', $frame);
+
+            return null;
+        }
+
+        return $normalized;
+    }
+
+    private static function typeLabel(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => $var->toObject()->class->name,
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'mixed',
+        };
+    }
+
+    /**
      * openssl_pkey_new() — generate asymmetric key pair (php-src ext/openssl/xp.c; #6295).
      *
      * @return \PHPCompiler\VM\Variable|false OpenSSLAsymmetricKey wrapper
