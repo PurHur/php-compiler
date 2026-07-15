@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
+// Issue #19112 — gzencode/gzdeflate/gzcompress(null) under declare(strict_types=1) call edge (ext/zlib/zlib.c).
 // Issue #19119 — zlib decompress/read helpers reject null under declare(strict_types=1) caller.
 
 $checks = [
+    'gzencode' => static fn () => gzencode(null),
+    'gzdeflate' => static fn () => gzdeflate(null),
+    'gzcompress' => static fn () => gzcompress(null),
     'gzuncompress' => static fn () => gzuncompress(null),
     'gzdecode' => static fn () => gzdecode(null),
     'gzinflate' => static fn () => gzinflate(null),

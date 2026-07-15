@@ -26,7 +26,7 @@ final class gzencode extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('gzencode() expects one to three arguments in this compiler build');
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzencode', 0, 'data');
+        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'gzencode', 0, 'data');
         $level = -1;
         $encoding = \ZLIB_ENCODING_GZIP;
         if ($argc >= 2) {
@@ -67,7 +67,7 @@ final class gzencode extends Internal
 
         return JitZlib::encode(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'gzencode', 0, 'data'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'gzencode', 0, 'data'),
             $level,
             $encoding
         );
