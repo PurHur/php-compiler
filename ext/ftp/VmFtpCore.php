@@ -7,17 +7,31 @@ namespace PHPCompiler\ext\ftp;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\ext\standard\VmPhpMemoryStream;
 use PHPCompiler\ext\standard\VmStreamSocketNative;
 
 /**
- * Minimal FTP session state — connect + close (php-src ext/ftp/ftp.c; #3353 phase 1).
+ * FTP session state — connect/close + stream API (php-src ext/ftp/ftp.c; #3353, #6762).
+ *
+ * Prefer host {@code ext/ftp} when available so RETR/STOR/MLSD match Zend; fall back to a
+ * thin greeting-only socket when the host module is absent.
  */
 final class VmFtpCore
 {
-    /** @var array<int, array{handle: int, host: string, port: int, closed: bool}> */
+    /**
+     * @var array<int, array{
+     *     handle: int|null,
+     *     hostConn: mixed,
+     *     host: string,
+     *     port: int,
+     *     closed: bool,
+     *     ssl: bool
+     * }>
+     */
     private static array $state = [];
 
     public static function connect(string $hostname, int $port, int $timeout, Context $ctx): Variable|false
@@ -38,6 +52,21 @@ final class VmFtpCore
         bool $ssl
     ): Variable|false {
         $function = $ssl ? 'ftp_ssl_connect' : 'ftp_connect';
+        $connectPort = -1 === $port ? 21 : $port;
+
+        if (self::hostFtpAvailable($ssl)) {
+            $hostConn = $ssl
+                ? @\ftp_ssl_connect($hostname, $connectPort, $timeout)
+                : @\ftp_connect($hostname, $connectPort, $timeout);
+            if (false === $hostConn) {
+                self::warnConnectFailed($function, 0, 'Connection refused');
+
+                return false;
+            }
+
+            return self::wrapConnection($ctx, $hostname, $port, $ssl, null, $hostConn);
+        }
+
         [$handle, $errno, $errstr] = $ssl
             ? self::clientSsl($hostname, $port, $timeout)
             : VmStreamSocketNative::client(
@@ -59,12 +88,27 @@ final class VmFtpCore
             return false;
         }
 
+        return self::wrapConnection($ctx, $hostname, $port, $ssl, $handle, null);
+    }
+
+    /**
+     * @param resource|\FTP\Connection|null $hostConn
+     */
+    private static function wrapConnection(
+        Context $ctx,
+        string $hostname,
+        int $port,
+        bool $ssl,
+        ?int $handle,
+        mixed $hostConn
+    ): Variable {
         VmFtpConnection::registerClass($ctx);
         $var = new Variable(Variable::TYPE_OBJECT);
         $object = new ObjectEntry($ctx->classes[VmFtpConnection::CLASS_LC]);
         $object->constructed = true;
         self::$state[$object->id] = [
             'handle' => $handle,
+            'hostConn' => $hostConn,
             'host' => $hostname,
             'port' => $port,
             'closed' => false,
@@ -105,14 +149,124 @@ final class VmFtpCore
     public static function close(ObjectEntry $connection): bool
     {
         self::ensureLive($connection, 'ftp_close');
-        $handle = self::$state[$connection->id]['handle'];
-        self::sendLine($handle, 'QUIT');
-        self::readReplyLine($handle);
-        VmFs::fclose($handle);
-        self::$state[$connection->id]['closed'] = true;
+        $state = &self::$state[$connection->id];
+        if (null !== $state['hostConn']) {
+            @\ftp_close($state['hostConn']);
+        } elseif (null !== $state['handle']) {
+            self::sendLine($state['handle'], 'QUIT');
+            self::readReplyLine($state['handle']);
+            VmFs::fclose($state['handle']);
+        }
+        $state['closed'] = true;
         unset(self::$state[$connection->id]);
 
         return true;
+    }
+
+    public static function login(ObjectEntry $connection, string $username, string $password): bool
+    {
+        self::ensureLive($connection, 'ftp_login');
+        $hostConn = self::requireHostConn($connection, 'ftp_login');
+
+        return (bool) @\ftp_login($hostConn, $username, $password);
+    }
+
+    public static function systype(ObjectEntry $connection): string|false
+    {
+        self::ensureLive($connection, 'ftp_systype');
+        $hostConn = self::requireHostConn($connection, 'ftp_systype');
+        $result = @\ftp_systype($hostConn);
+
+        return false === $result ? false : (string) $result;
+    }
+
+    /**
+     * @return HashTable|false
+     */
+    public static function mlsd(ObjectEntry $connection, string $directory): HashTable|false
+    {
+        self::ensureLive($connection, 'ftp_mlsd');
+        $hostConn = self::requireHostConn($connection, 'ftp_mlsd');
+        if (!\function_exists('ftp_mlsd')) {
+            return false;
+        }
+        $rows = @\ftp_mlsd($hostConn, $directory);
+        if (false === $rows || !\is_array($rows)) {
+            return false;
+        }
+
+        $ht = new HashTable();
+        $i = 0;
+        foreach ($rows as $row) {
+            if (!\is_array($row)) {
+                continue;
+            }
+            $entry = new Variable();
+            $entryHt = new HashTable();
+            foreach ($row as $key => $value) {
+                $slot = new Variable();
+                $slot->string((string) $value);
+                $entryHt->add((string) $key, $slot);
+            }
+            $entry->array($entryHt);
+            $ht->add($i, $entry);
+            ++$i;
+        }
+
+        return $ht;
+    }
+
+    public static function fget(
+        ObjectEntry $connection,
+        int $streamHandle,
+        string $remoteFile,
+        int $mode,
+        int $offset
+    ): bool {
+        self::ensureLive($connection, 'ftp_fget');
+        $hostConn = self::requireHostConn($connection, 'ftp_fget');
+        $hostFp = self::hostStreamForWrite($streamHandle);
+        if (false === $hostFp) {
+            return false;
+        }
+        $owned = $hostFp['owned'];
+        $fp = $hostFp['fp'];
+        $ok = (bool) @\ftp_fget($hostConn, $fp, $remoteFile, $mode, $offset);
+        if ($owned) {
+            if ($ok) {
+                \rewind($fp);
+                $payload = \stream_get_contents($fp);
+                if (false !== $payload && '' !== $payload) {
+                    VmFs::fwrite($streamHandle, $payload);
+                }
+            }
+            \fclose($fp);
+        }
+
+        return $ok;
+    }
+
+    public static function fput(
+        ObjectEntry $connection,
+        string $remoteFile,
+        int $streamHandle,
+        int $mode,
+        int $offset
+    ): bool {
+        self::ensureLive($connection, 'ftp_fput');
+        $hostConn = self::requireHostConn($connection, 'ftp_fput');
+        $hostFp = self::hostStreamForRead($streamHandle);
+        if (false === $hostFp) {
+            return false;
+        }
+        $owned = $hostFp['owned'];
+        $fp = $hostFp['fp'];
+        $ok = (bool) @\ftp_fput($hostConn, $remoteFile, $fp, $mode, $offset);
+        if ($owned) {
+            \fclose($fp);
+        }
+
+        return $ok;
     }
 
     public static function isConnectionObject(?ObjectEntry $object): bool
@@ -130,8 +284,82 @@ final class VmFtpCore
     public static function streamHandleForConnection(ObjectEntry $connection): int
     {
         self::ensureLive($connection, 'ftp_*');
+        $handle = self::$state[$connection->id]['handle'];
+        if (null === $handle) {
+            throw new \LogicException('ftp_*: socket fallback handle unavailable (host FTP connection)');
+        }
 
-        return self::$state[$connection->id]['handle'];
+        return $handle;
+    }
+
+    private static function hostFtpAvailable(bool $ssl): bool
+    {
+        if ($ssl) {
+            return \function_exists('ftp_ssl_connect');
+        }
+
+        return \function_exists('ftp_connect');
+    }
+
+    /**
+     * @return resource|\FTP\Connection
+     */
+    private static function requireHostConn(ObjectEntry $connection, string $function): mixed
+    {
+        $hostConn = self::$state[$connection->id]['hostConn'] ?? null;
+        if (null === $hostConn) {
+            throw new \LogicException($function.'() requires host ext/ftp (issue #6762)');
+        }
+
+        return $hostConn;
+    }
+
+    /**
+     * @return array{fp: resource, owned: bool}|false
+     */
+    private static function hostStreamForWrite(int $streamHandle): array|false
+    {
+        $fp = VmFs::lookupResource($streamHandle);
+        if (\is_resource($fp)) {
+            return ['fp' => $fp, 'owned' => false];
+        }
+        if (VmPhpMemoryStream::isValidHandle($streamHandle) || VmFs::isValidHandle($streamHandle)) {
+            $tmp = @\fopen('php://memory', 'r+b');
+            if (false === $tmp) {
+                return false;
+            }
+
+            return ['fp' => $tmp, 'owned' => true];
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{fp: resource, owned: bool}|false
+     */
+    private static function hostStreamForRead(int $streamHandle): array|false
+    {
+        $fp = VmFs::lookupResource($streamHandle);
+        if (\is_resource($fp)) {
+            return ['fp' => $fp, 'owned' => false];
+        }
+        if (VmPhpMemoryStream::isValidHandle($streamHandle)) {
+            $payload = VmFs::streamGetContents($streamHandle);
+            if (false === $payload) {
+                $payload = '';
+            }
+            $tmp = @\fopen('php://memory', 'r+b');
+            if (false === $tmp) {
+                return false;
+            }
+            \fwrite($tmp, $payload);
+            \rewind($tmp);
+
+            return ['fp' => $tmp, 'owned' => true];
+        }
+
+        return false;
     }
 
     private static function ensureLive(ObjectEntry $connection, string $function): void

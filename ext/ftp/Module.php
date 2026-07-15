@@ -40,6 +40,11 @@ class Module extends ModuleAbstract
             return;
         }
         BuiltinClasses::register($runtime->vmContext);
+        foreach (FtpConstants::registeredConstants() as $name => $value) {
+            $var = new \PHPCompiler\VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
     }
 
     public function getFunctions(): array
@@ -52,6 +57,11 @@ class Module extends ModuleAbstract
             new ftp_connect(),
             new ftp_ssl_connect(),
             new ftp_close(),
+            new ftp_login(),
+            new ftp_fget(),
+            new ftp_fput(),
+            new ftp_mlsd(),
+            new ftp_systype(),
         ];
     }
 }
