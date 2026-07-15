@@ -3414,6 +3414,16 @@ final class VmDom
         self::syncSubtree($ctx, $parent);
     }
 
+    public static function replaceChildrenLiveStandardObjects(Context $ctx, ObjectEntry $parent, ObjectEntry ...$children): void
+    {
+        self::assertMutationParent($parent);
+        self::removeAllLiveStandardChildren($ctx, $parent);
+        foreach ($children as $child) {
+            self::appendLiveStandardChild($ctx, $parent, $child);
+        }
+        self::syncSubtree($ctx, $parent);
+    }
+
     private static function removeAllLiveStandardChildren(Context $ctx, ObjectEntry $parent): void
     {
         $parentState = DomRegistry::state($parent);

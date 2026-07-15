@@ -152,6 +152,93 @@ final class DomCreateElementJitHelper
         self::prependObjectArgv2($parent, $a1, $a2);
     }
 
+    public static function replaceChildrenArgv0(ObjectEntry $parent): void
+    {
+        self::replaceChildrenObjectArgv0($parent);
+    }
+
+    public static function replaceChildrenArgv1(ObjectEntry $parent, Variable $a1): void
+    {
+        self::replaceChildrenFromVariables($parent, $a1);
+    }
+
+    public static function replaceChildrenArgv2(ObjectEntry $parent, Variable $a1, Variable $a2): void
+    {
+        self::replaceChildrenFromVariables($parent, $a1, $a2);
+    }
+
+    public static function replaceChildrenArgv3(ObjectEntry $parent, Variable $a1, Variable $a2, Variable $a3): void
+    {
+        self::replaceChildrenFromVariables($parent, $a1, $a2, $a3);
+    }
+
+    public static function replaceChildrenArgv4(ObjectEntry $parent, Variable $a1, Variable $a2, Variable $a3, Variable $a4): void
+    {
+        self::replaceChildrenFromVariables($parent, $a1, $a2, $a3, $a4);
+    }
+
+    public static function replaceChildrenObjectArgv0(ObjectEntry $parent): void
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        VmDom::replaceChildrenLiveStandardObjects($ctx, $canonical);
+        if ($canonical !== $parent) {
+            VmDom::mirrorNodeLinkProperties($parent, $canonical);
+        }
+    }
+
+    public static function replaceChildrenObjectArgv1(ObjectEntry $parent, ObjectEntry $a1): void
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        VmDom::replaceChildrenLiveStandardObjects($ctx, $canonical, $a1);
+        if ($canonical !== $parent) {
+            VmDom::mirrorNodeLinkProperties($parent, $canonical);
+        }
+    }
+
+    public static function replaceChildrenObjectArgv2(ObjectEntry $parent, ObjectEntry $a1, ObjectEntry $a2): void
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        VmDom::replaceChildrenLiveStandardObjects($ctx, $canonical, $a1, $a2);
+        if ($canonical !== $parent) {
+            VmDom::mirrorNodeLinkProperties($parent, $canonical);
+        }
+    }
+
+    public static function replaceChildrenObjectArgv3(ObjectEntry $parent, ObjectEntry $a1, ObjectEntry $a2, ObjectEntry $a3): void
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        VmDom::replaceChildrenLiveStandardObjects($ctx, $canonical, $a1, $a2, $a3);
+        if ($canonical !== $parent) {
+            VmDom::mirrorNodeLinkProperties($parent, $canonical);
+        }
+    }
+
+    public static function replaceChildrenObjectArgv4(ObjectEntry $parent, ObjectEntry $a1, ObjectEntry $a2, ObjectEntry $a3, ObjectEntry $a4): void
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        VmDom::replaceChildrenLiveStandardObjects($ctx, $canonical, $a1, $a2, $a3, $a4);
+        if ($canonical !== $parent) {
+            VmDom::mirrorNodeLinkProperties($parent, $canonical);
+        }
+    }
+
+    public static function replaceChildrenStringArgv1(ObjectEntry $parent, string $text): void
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        $owner = VmDom::ownerDocumentEntry($canonical);
+        if (null === $owner && VmDom::isDocument($canonical)) {
+            $owner = $canonical;
+        }
+        $child = VmDom::createTextNode($ctx, $text, $owner);
+        self::replaceChildrenObjectArgv1($parent, $child);
+    }
+
     public static function createDocumentFragmentArgv(Context $ctx, ObjectEntry $document): ObjectEntry
     {
         return VmDom::createDocumentFragment($ctx, $document)->toObject();
@@ -185,6 +272,20 @@ final class DomCreateElementJitHelper
         $childId = $first ? $childIds[0] : $childIds[\count($childIds) - 1];
 
         return DomRegistry::entry($childId);
+    }
+
+    private static function replaceChildrenFromVariables(ObjectEntry $parent, Variable ...$args): void
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        $resolved = [];
+        foreach ($args as $arg) {
+            $resolved[] = $arg->resolveIndirect();
+        }
+        VmDom::replaceChildrenLiveStandardNodes($ctx, $canonical, $resolved);
+        if ($canonical !== $parent) {
+            VmDom::mirrorNodeLinkProperties($parent, $canonical);
+        }
     }
 
     private static function objectFromAppendVariable(Variable $arg): ObjectEntry

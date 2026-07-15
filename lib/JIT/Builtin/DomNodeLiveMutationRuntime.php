@@ -55,6 +55,11 @@ final class DomNodeLiveMutationRuntime
         'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependArgv1',
         'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependArgv2',
         'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependStringArgv1',
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildrenArgv0',
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildrenArgv1',
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildrenArgv2',
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildrenArgv3',
+        'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildrenArgv4',
     ];
 
     public static function invokeAppend(Context $context, int $extraArgCount, Variable $receiver, Variable ...$extraArgs): Value
@@ -132,6 +137,16 @@ final class DomNodeLiveMutationRuntime
         return '__phpc_dom_node_replace_children_'.$extraArgCount;
     }
 
+    public static function replaceChildrenObjectAbi(int $extraArgCount): string
+    {
+        return '__phpc_dom_node_replace_children_object_'.$extraArgCount;
+    }
+
+    public static function replaceChildrenStringAbi(): string
+    {
+        return '__phpc_dom_node_replace_children_string';
+    }
+
     private static function invokeMutation(
         Context $context,
         string $kind,
@@ -142,10 +157,56 @@ final class DomNodeLiveMutationRuntime
         if ($extraArgCount !== \count($extraArgs)) {
             throw new \LogicException('DomNodeLiveMutationRuntime arity mismatch');
         }
-        if ($extraArgCount < 1 || $extraArgCount > self::MAX_EXTRA_ARGS) {
+        if ($extraArgCount < 0 || $extraArgCount > self::MAX_EXTRA_ARGS) {
+            throw new \LogicException('DomNodeLiveMutationRuntime unsupported arity');
+        }
+        $minArity = 'replacechildren' === $kind ? 0 : 1;
+        if ($extraArgCount < $minArity) {
             throw new \LogicException('DomNodeLiveMutationRuntime unsupported arity');
         }
         if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            if ('replacechildren' === $kind) {
+                if (0 === $extraArgCount) {
+                    DomDocumentMethodUserScriptLlvm::ensureReplaceChildrenBridge($context, $extraArgCount);
+                    $abi = self::abiFor($kind, $extraArgCount);
+                    $llvmArgs = [self::receiverObject($context, $receiver)];
+                } elseif (self::canUseObjectMutationBridge($extraArgs)) {
+                    DomDocumentMethodUserScriptLlvm::ensureReplaceChildrenObjectBridge($context, $extraArgCount);
+                    $abi = self::replaceChildrenObjectAbi($extraArgCount);
+                    $llvmArgs = [self::receiverObject($context, $receiver)];
+                    foreach ($extraArgs as $arg) {
+                        $llvmArgs[] = self::mutationArgObject($context, $arg);
+                    }
+                } elseif (1 === $extraArgCount && Variable::TYPE_STRING === $extraArgs[0]->type) {
+                    DomDocumentMethodUserScriptLlvm::ensureReplaceChildrenStringBridge($context);
+                    $abi = self::replaceChildrenStringAbi();
+                    $llvmArgs = [
+                        self::receiverObject($context, $receiver),
+                        JitStringArg::lower($context, $extraArgs[0], 'DOMNode::replaceChildren() string argument'),
+                    ];
+                } else {
+                    self::ensureMutationBridge($context, $kind, $extraArgCount);
+                    $abi = self::abiFor($kind, $extraArgCount);
+                    $llvmArgs = [self::receiverObject($context, $receiver)];
+                    foreach ($extraArgs as $arg) {
+                        $llvmArgs[] = JitValueBox::valuePtrFromVariable($context, $arg);
+                    }
+                }
+                $context->builder->call($context->lookupFunction($abi), ...$llvmArgs);
+                if ([] !== $extraArgs) {
+                    $firstArg = $extraArgs[0];
+                    $lastArg = $extraArgs[\count($extraArgs) - 1];
+                    $firstChildObj = self::childObjectForSlotSync($context, $firstArg);
+                    $lastChildObj = self::childObjectForSlotSync($context, $lastArg);
+                    if (null !== $firstChildObj && null !== $lastChildObj) {
+                        self::syncChildLinkSlots($context, $receiver, $firstChildObj, $lastChildObj);
+                    }
+                }
+                self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
+                self::syncChildNodesLengthSlot($context, $receiver, $extraArgCount);
+
+                return self::nullValuePtr($context);
+            }
             $orderedArgs = 'prepend' === $kind ? array_reverse($extraArgs) : $extraArgs;
             $firstArg = $extraArgs[0];
             $lastArg = $extraArgs[\count($extraArgs) - 1];
@@ -274,6 +335,40 @@ final class DomNodeLiveMutationRuntime
         );
     }
 
+    private static function syncChildNodesLengthSlot(Context $context, Variable $receiver, int $length): void
+    {
+        $objectType = $context->type->object;
+        $nodeClassId = $objectType->lookup('DOMNode');
+        if (!$objectType->hasProperty($nodeClassId, VmDom::PROP_CHILD_NODES)) {
+            $objectType->defineProperty($nodeClassId, VmDom::PROP_CHILD_NODES, Variable::TYPE_VALUE);
+        }
+        $listClassId = $objectType->lookup('DOMNodeList');
+        if (!$objectType->hasProperty($listClassId, 'length')) {
+            $objectType->defineProperty($listClassId, 'length', Variable::TYPE_NATIVE_LONG);
+        }
+
+        $receiverObj = self::receiverObject($context, $receiver);
+        $listObj = $objectType->allocate($listClassId);
+        $objectType->markObjectConstructed($listObj);
+        $lengthVar = new Variable(
+            $context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt($length, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($listObj, 'DOMNodeList', 'length'),
+            $lengthVar,
+            Variable::TYPE_NATIVE_LONG
+        );
+        $listJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $listObj);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($receiverObj, 'DOMNode', VmDom::PROP_CHILD_NODES),
+            $listJit,
+            Variable::TYPE_VALUE
+        );
+    }
+
     /** @param list<Variable> $extraArgs */
     private static function syncTextContentSlotFromLiteralArgs(
         Context $context,
@@ -390,6 +485,7 @@ final class DomNodeLiveMutationRuntime
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);
         DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+        $helperPath = self::HELPER_PATH;
         JitVmHelperLink::ensureBridge(
             $context,
             $abi,
@@ -397,7 +493,7 @@ final class DomNodeLiveMutationRuntime
             self::bridgeParamTypes($context, $extraArgCount),
             $context->context->voidType(),
             self::helperLogicalFor($kind, $extraArgCount),
-            self::HELPER_PATH,
+            $helperPath,
             self::COMPILED_HELPERS,
             '#18951'
         );
@@ -470,6 +566,18 @@ final class DomNodeLiveMutationRuntime
             'replacechildren' => self::replaceChildrenAbi($extraArgCount),
             default => throw new \LogicException('Unknown DOM live-mutation kind'),
         };
+    }
+
+    private static function childObjectForSlotSync(Context $context, Variable $arg): ?Value
+    {
+        if (Variable::TYPE_STRING === $arg->type) {
+            return JitDomCreateTextNode::materialize($context);
+        }
+        if (\in_array($arg->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)) {
+            return self::mutationArgObject($context, $arg);
+        }
+
+        return null;
     }
 
     private static function helperLogicalFor(string $kind, int $extraArgCount): string
