@@ -10,13 +10,13 @@ use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT lowering for generator_to_array() (issue #6025, php-src ext/standard/array.c).
+ * LLVM JIT/AOT lowering for generator_to_array() (issue #6025, #19131, php-src ext/standard/generator.c).
  */
 final class JitGeneratorToArray
 {
     public static function invoke(Context $context, Variable $generator, bool $preserveKeys): Value
     {
-        if (!GeneratorHelper::isGeneratorVariable($generator)) {
+        if (!GeneratorHelper::hydrateGeneratorMetadata($context, $generator)) {
             throw new \LogicException(
                 'generator_to_array() argument must be a Generator in this compiler build'
             );
@@ -25,9 +25,12 @@ final class JitGeneratorToArray
         return JitIteratorToArray::invoke($context, $generator, $preserveKeys);
     }
 
-    public static function invokeWithPreserveKeysFlag(Context $context, Variable $generator, Value $preserveKeys): Value
-    {
-        if (!GeneratorHelper::isGeneratorVariable($generator)) {
+    public static function invokeWithPreserveKeysFlag(
+        Context $context,
+        Variable $generator,
+        Value $preserveKeys
+    ): Value {
+        if (!GeneratorHelper::hydrateGeneratorMetadata($context, $generator)) {
             throw new \LogicException(
                 'generator_to_array() argument must be a Generator in this compiler build'
             );
