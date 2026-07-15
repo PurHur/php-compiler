@@ -34,7 +34,8 @@ final class mb_strlen extends Internal
                 $argc
             ));
         }
-        $str = VmString::stringBuiltinArgForFrame($frame, 0, 'mb_strlen', 0, 'string');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19297, mbstring.c).
+        $str = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'mb_strlen', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -63,7 +64,7 @@ final class mb_strlen extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'mb_strlen', 0, 'string');
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'mb_strlen', 0, 'string');
 
         if (1 === $argc) {
             return JitMbStrlen::utf8LengthFromPtr($context, $str);

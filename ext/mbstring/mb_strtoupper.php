@@ -32,12 +32,8 @@ final class mb_strtoupper extends Internal
                 $argc
             ));
         }
-        $string = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_strtoupper',
-            0,
-            'string'
-        );
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19297, mbstring.c).
+        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'mb_strtoupper', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
