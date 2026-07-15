@@ -344,12 +344,10 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            if (!$softNullPath && self::requiresForwardProfileStrictStringNull()) {
-                throw new \TypeError(
-                    self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null')
-                );
+            // Z_PARAM_PATH: null→"" then empty-path ValueError; caller strict_types rejects null upstream (#19146).
+            if (!self::requiresForwardProfileStrictStringNull()) {
+                VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
             }
-            VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
 
             return '';
         }

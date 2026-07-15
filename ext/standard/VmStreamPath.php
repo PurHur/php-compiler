@@ -54,7 +54,7 @@ final class VmStreamPath
         int $argIndex = 0,
         string $paramName = 'filename'
     ): string {
-        // Z_PARAM_PATH: null→"" even on 8.4 forward profile; empty path → ValueError (#19145, ext/standard/image.c).
+        // Z_PARAM_PATH: null→"" even on 8.4 forward profile; empty path → ValueError (#19145, #19146).
         $path = VmString::coercePathBuiltinArg($var, $function, $argIndex, $paramName, true);
         if ('' === $path) {
             throw new \ValueError(PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);

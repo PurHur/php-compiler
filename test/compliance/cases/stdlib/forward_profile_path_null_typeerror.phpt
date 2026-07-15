@@ -1,5 +1,5 @@
 --TEST--
-stdlib Z_PARAM_PATH builtins — null TypeError on 8.4 forward profile (#18817, ext/standard/filestat.c)
+stdlib Z_PARAM_PATH filestat builtins — null coerces on 8.4 forward profile (#19146 supersedes #18817, ext/standard/filestat.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -16,11 +16,13 @@ foreach ([
         echo "$label: uncaught\n";
     } catch (TypeError $e) {
         echo $label.': '.$e->getMessage()."\n";
+    } catch (ValueError $e) {
+        echo $label.': ValueError: '.$e->getMessage()."\n";
     }
 }
 --EXPECT--
-touch: touch(): Argument #1 ($filename) must be of type string, null given
-unlink: unlink(): Argument #1 ($filename) must be of type string, null given
-rename: rename(): Argument #1 ($from) must be of type string, null given
-mkdir: mkdir(): Argument #1 ($directory) must be of type string, null given
-filesize: filesize(): Argument #1 ($filename) must be of type string, null given
+touch: uncaught
+unlink: uncaught
+rename: uncaught
+mkdir: uncaught
+filesize: uncaught
