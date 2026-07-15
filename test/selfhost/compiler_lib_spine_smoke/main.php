@@ -5003,4 +5003,5 @@ require_once __DIR__.'/../../../ext/dom/JitDomImportNode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomImportNodeRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentImportNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementGetAttribute.php';
+require_once __DIR__.'/../../../ext/session/SessionHandlerBuiltin.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

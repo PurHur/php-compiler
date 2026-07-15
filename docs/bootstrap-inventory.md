@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4940 |
-| Phase A inventory files (M2 ratio SSOT) | 4940 |
+| PHP files on vm.php path | 4941 |
+| Phase A inventory files (M2 ratio SSOT) | 4941 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13239 |
+| Source constructs flagged (warnings) | 13253 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -792,6 +792,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/session/Module.php` | 0 | 25 |
 | `ext/session/SessionConstants.php` | 0 | 1 |
 | `ext/session/SessionFileStorage.php` | 0 | 1 |
+| `ext/session/SessionHandlerBuiltin.php` | 0 | 14 |
 | `ext/session/SessionUserHandler.php` | 0 | 9 |
 | `ext/session/session_register_shutdown.php` | 0 | 1 |
 | `ext/session/session_set_save_handler.php` | 0 | 3 |
@@ -10178,30 +10179,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/session/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 26)
-- new session_start (line 35)
-- new session_id (line 36)
-- new session_name (line 37)
-- new session_module_name (line 38)
-- new session_save_path (line 39)
-- new session_status (line 40)
-- new session_destroy (line 41)
-- new session_write_close (line 42)
-- new session_commit (line 43)
-- new session_regenerate_id (line 44)
-- new session_abort (line 45)
-- new session_reset (line 46)
-- new session_create_id (line 47)
-- new session_encode (line 48)
-- new session_decode (line 49)
-- new session_unset (line 50)
-- new session_gc (line 51)
-- new session_cache_expire (line 52)
-- new session_cache_limiter (line 53)
-- new session_set_cookie_params (line 54)
-- new session_get_cookie_params (line 55)
-- new session_set_save_handler (line 56)
-- new session_register_shutdown (line 57)
+- new VM\Variable (line 27)
+- new session_start (line 36)
+- new session_id (line 37)
+- new session_name (line 38)
+- new session_module_name (line 39)
+- new session_save_path (line 40)
+- new session_status (line 41)
+- new session_destroy (line 42)
+- new session_write_close (line 43)
+- new session_commit (line 44)
+- new session_regenerate_id (line 45)
+- new session_abort (line 46)
+- new session_reset (line 47)
+- new session_create_id (line 48)
+- new session_encode (line 49)
+- new session_decode (line 50)
+- new session_unset (line 51)
+- new session_gc (line 52)
+- new session_cache_expire (line 53)
+- new session_cache_limiter (line 54)
+- new session_set_cookie_params (line 55)
+- new session_get_cookie_params (line 56)
+- new session_set_save_handler (line 57)
+- new session_register_shutdown (line 58)
 - 2 class method(s)
 
 ### `ext/session/SessionConstants.php`
@@ -10213,6 +10214,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/session/SessionHandlerBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 44)
+- new Error (line 90)
+- new ArgumentCountError (line 220)
+- new ArgumentCountError (line 226)
+- new ArgumentCountError (line 276)
+- new ArgumentCountError (line 279)
+- new ArgumentCountError (line 315)
+- new ArgumentCountError (line 321)
+- new ArgumentCountError (line 353)
+- new ArgumentCountError (line 356)
+- new ArgumentCountError (line 387)
+- new ArgumentCountError (line 390)
+- 20 class method(s)
+- 12 closure(s)
 
 ### `ext/session/SessionUserHandler.php`
 
@@ -19051,22 +19070,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSession.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 145)
-- new Variable (line 147)
-- new Variable (line 150)
-- new Variable (line 153)
-- new Variable (line 156)
-- new Variable (line 159)
-- new Variable (line 162)
-- new Variable (line 284)
-- new HashTable (line 549)
-- new HashTable (line 615)
-- new HashTable (line 637)
-- new HashTable (line 787)
-- new HashTable (line 794)
-- new HashTable (line 801)
+- new HashTable (line 147)
+- new Variable (line 149)
+- new Variable (line 152)
+- new Variable (line 155)
+- new Variable (line 158)
+- new Variable (line 161)
+- new Variable (line 164)
+- new Variable (line 286)
+- new HashTable (line 555)
+- new HashTable (line 621)
+- new HashTable (line 643)
+- new HashTable (line 793)
+- new HashTable (line 800)
 - new HashTable (line 807)
-- new HashTable (line 812)
+- new HashTable (line 813)
+- new HashTable (line 818)
 - 53 class method(s)
 
 ### `ext/standard/VmSessionSerializer.php`
@@ -30794,32 +30813,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 886)
 - new Variable (line 925)
 - new Variable (line 962)
-- new Variable (line 1787)
-- new Variable (line 2215)
-- new Variable (line 2277)
-- new Variable (line 2301)
-- new Variable (line 2313)
-- new Variable (line 2326)
-- new Variable (line 2485)
-- new VMVariable (line 3187)
-- new VMVariable (line 3205)
-- new VMVariable (line 3213)
-- new VMVariable (line 3231)
-- new ReflectionClassConstant (line 4396)
-- new Variable (line 4757)
-- new Variable (line 4783)
-- new Variable (line 4791)
-- new Variable (line 4814)
-- new Variable (line 4840)
-- new Variable (line 4848)
-- new Variable (line 4922)
-- new Literal (line 4939)
-- new Literal (line 4944)
-- new Literal (line 4949)
-- new Variable (line 4960)
-- new Variable (line 4993)
-- new Variable (line 5016)
-- new Variable (line 5380)
+- new Variable (line 1788)
+- new Variable (line 2216)
+- new Variable (line 2278)
+- new Variable (line 2302)
+- new Variable (line 2314)
+- new Variable (line 2327)
+- new Variable (line 2486)
+- new VMVariable (line 3188)
+- new VMVariable (line 3206)
+- new VMVariable (line 3214)
+- new VMVariable (line 3232)
+- new ReflectionClassConstant (line 4397)
+- new Variable (line 4758)
+- new Variable (line 4784)
+- new Variable (line 4792)
+- new Variable (line 4815)
+- new Variable (line 4841)
+- new Variable (line 4849)
+- new Variable (line 4923)
+- new Literal (line 4940)
+- new Literal (line 4945)
+- new Literal (line 4950)
+- new Variable (line 4961)
+- new Variable (line 4994)
+- new Variable (line 5017)
+- new Variable (line 5381)
 - 257 class method(s)
 - 8 closure(s)
 
