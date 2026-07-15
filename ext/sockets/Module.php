@@ -8,16 +8,15 @@ use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
 /**
- * sockets extension module entry (php-src ext/sockets/sockets.c; issue #6544).
+ * sockets extension module entry (php-src ext/sockets/sockets.c; issue #6544, #19286).
  *
- * Register under {@see standard} so extension_loaded('sockets') stays false until
- * socket_create() and core socket API land (#3399, #11820).
+ * Registers as extension "sockets" once socket_create() is available (#11820).
  */
 class Module extends ModuleAbstract
 {
     public function getExtensionName(): string
     {
-        return 'standard';
+        return 'sockets';
     }
 
     public function init(Runtime $runtime): void
@@ -34,18 +33,21 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
-        if (!VmSockets::isAtmarkSupported()) {
+        if (!VmSockets::isSocketApiSupported()) {
             return [];
         }
 
-        $fns = [
+        return [
             new socket_atmark(),
             new socket_import_stream(),
             new socket_export_stream(),
             new socket_set_nonblock(),
             new socket_set_block(),
+            new socket_create(),
+            new socket_connect(),
+            new socket_read(),
+            new socket_write(),
+            new socket_close(),
         ];
-
-        return $fns;
     }
 }
