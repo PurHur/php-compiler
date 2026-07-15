@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\iconv;
 
-use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
@@ -36,8 +35,7 @@ final class iconv extends Internal
         }
         $from = VmIconv::coerceEncodingArg($frame->calledArgs[0], 'iconv', 0, 'from_encoding', $frame);
         $to = VmIconv::coerceEncodingArg($frame->calledArgs[1], 'iconv', 1, 'to_encoding', $frame);
-        InternalStrictArg::rejectNullString($frame->calledArgs[2], 'iconv', 'string', 2, $frame);
-        $input = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'iconv', 2, 'string');
+        $input = InternalStrictArg::resolveCoercibleStringArg($frame, 2, 'iconv', 'string');
         if (null === $frame->returnVar) {
             return;
         }
