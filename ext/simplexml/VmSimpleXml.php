@@ -38,6 +38,9 @@ final class VmSimpleXml
         }
         SimpleXmlElementIterator::registerInterfaces($entry, $ctx);
 
+        $entry->constructor = new SimpleXmlElementConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
         $entry->methods['__get'] = new SimpleXmlElementGet();
         $entry->methodVisibility['__get'] = $pub;
         $entry->methods['__tostring'] = new SimpleXmlElementToString();
@@ -62,7 +65,11 @@ final class VmSimpleXml
         $entry->methods['addchild'] = new SimpleXmlElementAddChild();
         $entry->methodVisibility['addchild'] = $pub;
         $entry->methodNames['addchild'] = 'addChild';
+        $entry->methods['addattribute'] = new SimpleXmlElementAddAttribute();
+        $entry->methodVisibility['addattribute'] = $pub;
+        $entry->methodNames['addattribute'] = 'addAttribute';
         $entry->methods['xpath'] = new SimpleXmlElementXpath();
+
         $entry->methodVisibility['xpath'] = $pub;
         $entry->methods['attributes'] = new SimpleXmlElementAttributes();
         $entry->methodVisibility['attributes'] = $pub;
@@ -107,6 +114,36 @@ final class VmSimpleXml
         }
 
         return self::wrapNode($ctx, $class, $root);
+    }
+
+    /**
+     * SimpleXMLElement::__construct — attach parsed root onto $this
+     * (php-src zim_simplexmlelement___construct; #19307 / #19306).
+     */
+    public static function constructFromData(
+        Context $ctx,
+        ObjectEntry $entry,
+        string $data,
+        ?Frame $frame = null
+    ): void {
+        $trimmed = trim($data);
+        if ('' === $trimmed) {
+            throw new \Exception('String could not be parsed as XML');
+        }
+
+        if (!VmXml::validateAndReport($ctx, $trimmed, $frame)) {
+            throw new \Exception('String could not be parsed as XML');
+        }
+
+        $root = self::parseDocumentRoot($trimmed);
+        if (null === $root) {
+            self::warn($ctx, 'SimpleXMLElement::__construct(): Entity: line 1: parser error', $frame);
+
+            throw new \Exception('String could not be parsed as XML');
+        }
+
+        SimpleXmlRegistry::attach($entry, $root, $entry->id);
+        $entry->constructed = true;
     }
 
     public static function loadFile(Context $ctx, string $filename, ?Frame $frame = null): ?ObjectEntry
@@ -335,6 +372,48 @@ final class VmSimpleXml
         SimpleXmlRegistry::state($entry)->children[] = $child;
 
         return self::wrapNode($ctx, $entry->class, $child, SimpleXmlRegistry::documentKey($entry));
+    }
+
+    /**
+     * SimpleXMLElement::addAttribute (php-src ext/simplexml/sxe.c zim_simplexmlelement_addAttribute; #19307).
+     */
+    public static function addAttribute(
+        Context $ctx,
+        ObjectEntry $entry,
+        string $qualifiedName,
+        string $value,
+        ?string $namespace = null,
+        ?Frame $frame = null
+    ): void {
+        if ('' === $qualifiedName) {
+            throw new \ValueError('SimpleXMLElement::addAttribute(): Argument #1 ($qualifiedName) cannot be empty');
+        }
+        if (SimpleXmlRegistry::isView($entry) && !SimpleXmlRegistry::isAttributesView($entry)) {
+            throw new \LogicException('SimpleXMLElement::addAttribute() cannot be called on a children view in this compiler build');
+        }
+
+        $state = SimpleXmlRegistry::state($entry);
+
+        if (\array_key_exists($qualifiedName, $state->attributes)) {
+            self::warn($ctx, 'SimpleXMLElement::addAttribute(): Attribute already exists', $frame);
+
+            return;
+        }
+
+        if (null !== $namespace && '' !== $namespace) {
+            $colon = strpos($qualifiedName, ':');
+            if (false !== $colon) {
+                $prefix = substr($qualifiedName, 0, $colon);
+                if ('' !== $prefix) {
+                    $xmlnsKey = 'xmlns:'.$prefix;
+                    if (!\array_key_exists($xmlnsKey, $state->attributes)) {
+                        $state->attributes[$xmlnsKey] = $namespace;
+                    }
+                }
+            }
+        }
+
+        $state->attributes[$qualifiedName] = $value;
     }
 
     /** @return HashTable list of SimpleXMLElement objects */
