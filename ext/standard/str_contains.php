@@ -18,6 +18,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -52,14 +53,49 @@ final class str_contains extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'str_contains', 2)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
-        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_contains', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_contains', 1, 'needle');
+        $hay = self::jitStringArg($context, $args[0], 0, 'haystack');
+        $needle = self::jitStringArg($context, $args[1], 1, 'needle');
 
         return StringStrContains::invokeContains($context, $hay, $needle);
     }
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        return VmString::stringBuiltinArgForFrame($frame, $argIndex, 'str_contains', $argIndex, $paramName);
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'str_contains', $paramName)->toString();
+        }
+
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19273, string.c).
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'str_contains',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'str_contains',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'str_contains',
+            $argIndex,
+            $paramName
+        );
     }
 }
