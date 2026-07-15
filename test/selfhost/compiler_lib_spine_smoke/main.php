@@ -4110,6 +4110,7 @@ require_once __DIR__.'/../../../lib/JIT/ClassConstVisibilityJitGuard.php';
 require_once __DIR__.'/../../../lib/JIT/ClassParamCheck.php';
 require_once __DIR__.'/../../../lib/JIT/ClassReturnCheck.php';
 require_once __DIR__.'/../../../lib/JIT/CliArgvGlobalInit.php';
+require_once __DIR__.'/../../../lib/JIT/CloneOperandHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ClosureBindHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ClosureHelper.php';
 require_once __DIR__.'/../../../lib/JIT/CoalesceHelper.php';
