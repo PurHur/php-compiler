@@ -14,11 +14,11 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialchars.php');
         $this->assertStringContainsString('HtmlspecialcharsJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertStringNotContainsString('StringHtmlspecialcharsUserScriptLlvm', $source);
+        $this->assertStringContainsString('StreamIoRuntime::shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringContainsString('StringHtmlspecialcharsUserScriptLlvm::ensureLinked', $source);
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
         $this->assertStringNotContainsString('htmlspecialchars_count_head', $source);
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsUserScriptLlvm.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsUserScriptLlvm.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php');
     }
 
@@ -49,7 +49,6 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('HtmlspecialcharsJitHelper.php', $spine);
         $this->assertStringContainsString('StringHtmlspecialchars.php', $spine);
-        $this->assertStringNotContainsString('StringHtmlspecialcharsUserScriptLlvm.php', $spine);
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm.php', $spine);
     }
 
