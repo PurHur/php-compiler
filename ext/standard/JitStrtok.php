@@ -56,4 +56,15 @@ final class JitStrtok
 
         return $ptr;
     }
+
+    /** Dummy false result after compile-time TypeError abort (#19242). */
+    public static function deadFalseResult(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+        return $ptr;
+    }
 }
