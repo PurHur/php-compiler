@@ -11100,26 +11100,29 @@ restart:
         return null;
     }
 
-    /** Reject reads/isset/empty on set-only hooked instance properties (#6484, #18072, zend_property_hooks.c). */
+    /** Reject reads/isset/empty on write-only virtual hooked instance properties (#6484, #19163, zend_property_hooks.c). */
     private function enforceWriteOnlyVirtualPropertyRead(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null === $meta || null === $meta->setHookMethodLc || null !== $meta->getHookMethodLc) {
+        if (!$this->instancePropertyIsWriteOnlyVirtualHook($object, $propName)) {
             return null;
         }
+        $meta = $this->classPropertyMeta($object, $propName);
         $className = $object->class->name;
-        if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
+        if (null !== $meta && '' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
             $className = $this->context->classes[$meta->declaringClassLc]->name;
         }
 
         return $this->raiseWriteOnlyVirtualPropertyReadError($className, $propName, $frame);
     }
 
-    /** Reject reads on write-only hooked static properties (#6484). */
+    /** Reject reads on write-only virtual hooked static properties (#6484, #19163). */
     private function enforceWriteOnlyVirtualStaticPropertyRead(string $classLc, string $propName, Frame $frame): ?Frame
     {
         $hooks = $this->resolveStaticPropertyHooks($classLc, strtolower($propName));
         if (null === $hooks || empty($hooks['set']) || !empty($hooks['get'])) {
+            return null;
+        }
+        if (!$this->staticPropertyIsWriteOnlyVirtualHook($classLc, $propName, $hooks)) {
             return null;
         }
         $className = $this->context->classes[$classLc]->name ?? $classLc;
@@ -11241,18 +11244,31 @@ restart:
         return is_array($propMeta) && !empty($propMeta['virtual']);
     }
 
-    /** Set-only hook with short `set =>` backing or explicit virtual — external reads forbidden (#6484, #12941). */
+    /** Set-only hook with short `set =>` backing or explicit virtual — external reads forbidden (#6484, #12941, #19163). */
     private function instancePropertyIsWriteOnlyVirtualHook(ObjectEntry $object, string $propName): bool
     {
-        if ($this->instancePropertyIsVirtualHook($object, $propName)) {
-            return true;
+        $meta = $this->classPropertyMeta($object, $propName);
+        if (null === $meta || null === $meta->setHookMethodLc || null !== $meta->getHookMethodLc) {
+            return false;
         }
         $lcClass = strtolower($object->class->name);
         $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
             ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
             ?? null;
 
-        return is_array($propMeta) && !empty($propMeta['setBacking']);
+        return VM\AbstractPropertyHookCheck::isWriteOnlyVirtualHook($propMeta, $meta->propertyHookVirtual);
+    }
+
+    /**
+     * @param array<string, mixed> $hooks
+     */
+    private function staticPropertyIsWriteOnlyVirtualHook(string $classLc, string $propName, array $hooks): bool
+    {
+        $propMeta = $this->context->propertyHookRegistry[$classLc][$propName]
+            ?? $this->context->propertyHookRegistry[$classLc][strtolower($propName)]
+            ?? null;
+
+        return VM\AbstractPropertyHookCheck::isWriteOnlyVirtualHook($propMeta, !empty($hooks['virtual']));
     }
 
     private function raiseVirtualPropertyHookRawAccessError(
