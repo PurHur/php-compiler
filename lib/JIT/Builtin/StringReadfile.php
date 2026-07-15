@@ -6,17 +6,26 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPCompiler\ext\standard\JitReadfileKernel;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_readfile via ReadfileJitHelper PHP (#9188).
+ * JIT/AOT link for __compiler_readfile via ReadfileJitHelper PHP (#9188, #19311).
  *
- * Replaces ~150-line libc open/read/write LLVM loop. SSOT: {@see \PHPCompiler\ext\standard\VmFs::readfile}.
+ * Embed / non-user-script: {@see ReadfileJitHelper} via compile helper.
+ * User-script standalone AOT: thin {@see JitReadfileKernel} libc open/read/write —
+ * nested helper TUs skip __init__ under PHP_COMPILER_AOT_USER_SCRIPT (#16075).
+ * SSOT: {@see \PHPCompiler\ext\standard\VmFs::readfile()}.
  * php-src: ext/standard/streamsfuncs.c — php_stream_passthru
  */
 final class StringReadfile
 {
+    private const ABI = '__compiler_readfile';
+
     private const HELPER_PATH = '/ext/standard/ReadfileJitHelper.php';
 
     private const READFILE_HELPER = 'PHPCompiler\\ext\\standard\\ReadfileJitHelper::readfile';
@@ -25,6 +34,8 @@ final class StringReadfile
     private const COMPILED_HELPERS = [
         self::READFILE_HELPER,
     ];
+
+    private const KERNEL_ENTRY = 'rf_kernel_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -38,28 +49,31 @@ final class StringReadfile
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_readfile');
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('__compiler_readfile', $probe);
+            $context->registerFunction(self::ABI, $probe);
 
             return;
         }
 
         if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            StringReadfileLibc::implement($context);
+            self::implementUserScriptKernel($context);
 
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
+        self::implementPhpBridge($context, $probe);
+    }
 
+    private static function implementPhpBridge(Context $context, ?LlvmFunction $probe): void
+    {
         $fn = null !== $probe
             ? $probe
-            : $context->lookupFunction('__compiler_readfile');
+            : $context->lookupFunction(self::ABI);
 
         self::ensureJitHelperCompiled($context);
 
@@ -70,7 +84,41 @@ final class StringReadfile
             $fn->getParam(0)
         );
         $context->builder->returnValue($result);
-        $context->registerFunction('__compiler_readfile', $fn);
+        $context->registerFunction(self::ABI, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementUserScriptKernel(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
+            $context->registerFunction(self::ABI, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        LibcExtern::register($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI,
+                $context->context->functionType($i64, false, $strPtr)
+            );
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::KERNEL_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        JitReadfileKernel::emitBody($context, $fn);
+        $context->registerFunction(self::ABI, $fn);
+
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
         } else {

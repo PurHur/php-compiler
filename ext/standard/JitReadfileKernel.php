@@ -2,23 +2,21 @@
 
 declare(strict_types=1);
 
-/**
- * Thin libc open/read/write bridge for user-script standalone AOT (#17036).
- *
- * Nested ReadfileJitHelper does not run in minimal standalone init.
- * Restored from pre-#9188 LLVM — stream a file to stdout via open/read/write.
- *
- * Returns total bytes written, or -1 when the path cannot be opened.
- */
+namespace PHPCompiler\ext\standard;
 
-namespace PHPCompiler\JIT\Builtin;
-
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
-final class StringReadfileLibc
+/**
+ * LLVM lowering for user-script AOT readfile — thin libc open/read/write (#19311).
+ *
+ * Nested {@see ReadfileJitHelper} does not run under minimal standalone init
+ * (#16075); this kernel mirrors pre-#9188 LLVM from ext/ not lib/JIT/Builtin/.
+ * php-src: ext/standard/streamsfuncs.c — php_stream_passthru
+ */
+final class JitReadfileKernel
 {
     private const CHUNK = 8192;
 
@@ -26,23 +24,9 @@ final class StringReadfileLibc
 
     private const STDOUT_FILENO = 1;
 
-    private const ABI = '__compiler_readfile';
-
-    public static function implement(Context $context): void
+    /** Emit libc passthru loop; builder must be positioned at the bridge entry block. */
+    public static function emitBody(Context $context, LlvmFunction $fn): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI, $probe);
-
-            return;
-        }
-
-        $fn = null !== $probe
-            ? $probe
-            : $context->lookupFunction(self::ABI);
-        $entry = $fn->appendBasicBlock('rf_entry');
-        $context->builder->positionAtEnd($entry);
-
         $path = $fn->getParam(0);
         $strMap = $context->structFieldMap['__string__'];
         $i8 = $context->getTypeFromString('int8');
@@ -62,13 +46,8 @@ final class StringReadfileLibc
         );
         $pathBytes = $context->builder->structGep($path, $strMap['value']);
         $bufLen = $context->builder->add($pathLen, $oneI64);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $pathBuf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufLen);
-            $pathCStr = $context->builder->pointerCast($pathBuf, $i8p);
-        } else {
-            $pathBuf = $context->builder->alloca($i8, $bufLen, 'readfile_path');
-            $pathCStr = $context->builder->pointerCast($pathBuf, $i8p);
-        }
+        $pathBuf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufLen);
+        $pathCStr = $context->builder->pointerCast($pathBuf, $i8p);
         $context->intrinsic->memcpy($pathCStr, $pathBytes, $pathLen, false);
         $context->builder->store(
             $i8->constInt(0, false),
@@ -79,38 +58,31 @@ final class StringReadfileLibc
             $context->lookupFunction('open'),
             $pathCStr,
             $oRdonly,
-            $i32->constInt(0, false)
+            $zeroI32
         );
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('__mm__free'), $pathBuf);
-        }
+        $context->builder->call($context->lookupFunction('__mm__free'), $pathBuf);
 
         $openFail = $context->builder->icmp(Builder::INT_SLT, $fd, $zeroI32);
-        $failBlock = $fn->appendBasicBlock('rf_open_fail');
-        $okBlock = $fn->appendBasicBlock('rf_open_ok');
+        $failBlock = $fn->appendBasicBlock('rf_kernel_open_fail');
+        $okBlock = $fn->appendBasicBlock('rf_kernel_open_ok');
         $context->builder->branchIf($openFail, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
         $context->builder->returnValue($minusOne);
 
         $context->builder->positionAtEnd($okBlock);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $chunkBuf = $context->builder->call(
-                $context->lookupFunction('__mm__malloc'),
-                $chunkSize
-            );
-            $chunkPtr = $context->builder->pointerCast($chunkBuf, $i8p);
-        } else {
-            $chunkBuf = $context->builder->alloca($i8, self::CHUNK, 'readfile_chunk');
-            $chunkPtr = $context->builder->pointerCast($chunkBuf, $i8p);
-        }
+        $chunkBuf = $context->builder->call(
+            $context->lookupFunction('__mm__malloc'),
+            $chunkSize
+        );
+        $chunkPtr = $context->builder->pointerCast($chunkBuf, $i8p);
 
-        $totalSlot = $context->builder->alloca($i64, 1, 'readfile_total');
+        $totalSlot = $context->builder->alloca($i64, 1, 'rf_kernel_total');
         $context->builder->store($i64->constInt(0, false), $totalSlot);
 
-        $loopHead = BasicBlockHelper::append($context, 'rf_loop_head');
-        $loopBody = BasicBlockHelper::append($context, 'rf_loop_body');
-        $loopDone = BasicBlockHelper::append($context, 'rf_loop_done');
+        $loopHead = BasicBlockHelper::append($context, 'rf_kernel_loop_head');
+        $loopBody = BasicBlockHelper::append($context, 'rf_kernel_loop_body');
+        $loopDone = BasicBlockHelper::append($context, 'rf_kernel_loop_done');
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -136,15 +108,13 @@ final class StringReadfileLibc
             $context->builder->icmp(Builder::INT_SLT, $nWritten, $i64->constInt(0, false)),
             $context->builder->icmp(Builder::INT_NE, $nWrittenAsRead, $nRead)
         );
-        $writeFailBlock = BasicBlockHelper::append($context, 'rf_write_fail');
-        $writeOkBlock = BasicBlockHelper::append($context, 'rf_write_ok');
+        $writeFailBlock = BasicBlockHelper::append($context, 'rf_kernel_write_fail');
+        $writeOkBlock = BasicBlockHelper::append($context, 'rf_kernel_write_ok');
         $context->builder->branchIf($writeFail, $writeFailBlock, $writeOkBlock);
 
         $context->builder->positionAtEnd($writeFailBlock);
         $context->builder->call($context->lookupFunction('close'), $fd);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('__mm__free'), $chunkBuf);
-        }
+        $context->builder->call($context->lookupFunction('__mm__free'), $chunkBuf);
         $context->builder->returnValue($minusOne);
 
         $context->builder->positionAtEnd($writeOkBlock);
@@ -157,12 +127,7 @@ final class StringReadfileLibc
 
         $context->builder->positionAtEnd($loopDone);
         $context->builder->call($context->lookupFunction('close'), $fd);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('__mm__free'), $chunkBuf);
-        }
+        $context->builder->call($context->lookupFunction('__mm__free'), $chunkBuf);
         $context->builder->returnValue($context->builder->load($totalSlot));
-
-        $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
     }
 }
