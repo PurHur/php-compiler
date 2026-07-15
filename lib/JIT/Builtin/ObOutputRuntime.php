@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /** JIT/AOT ob_* dispatch — standalone routes through ObOutputJitBridge (#9268, #13571). */
 final class ObOutputRuntime
@@ -41,10 +40,7 @@ final class ObOutputRuntime
         if (!ObOutputUserScriptLlvm::shouldUse($context)) {
             return;
         }
-        if (!UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            return;
-        }
-        ObOutputExecCaptureLlvm::ensureReadApiLinked($context);
+        ObOutputExecCaptureRuntime::ensureReadApiLinked($context);
     }
 
     public static function implement(Context $context): void
