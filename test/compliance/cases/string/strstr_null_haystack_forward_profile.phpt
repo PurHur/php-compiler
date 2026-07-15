@@ -1,3 +1,8 @@
+--TEST--
+stdlib PHP 8.4 profile — str* search haystack null TypeError (#19242)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
+--FILE--
 <?php
 foreach (['strpos', 'stripos', 'strrpos', 'strripos', 'strstr', 'stristr', 'strchr', 'strrchr', 'strpbrk', 'strtok'] as $f) {
     try {
@@ -7,3 +12,15 @@ foreach (['strpos', 'stripos', 'strrpos', 'strripos', 'strstr', 'stristr', 'strc
         echo "$f: TypeError\n";
     }
 }
+?>
+--EXPECT--
+strpos: TypeError
+stripos: TypeError
+strrpos: TypeError
+strripos: TypeError
+strstr: TypeError
+stristr: TypeError
+strchr: TypeError
+strrchr: TypeError
+strpbrk: TypeError
+strtok: TypeError

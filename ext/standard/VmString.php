@@ -581,7 +581,7 @@ final class VmString
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            if (self::requiresForwardProfileStrictStringNull()) {
+            if (self::requiresZparamStrStrictNullOnForwardProfile()) {
                 throw new \TypeError(self::stringBuiltinTypeError('strtok', 0, 'string', 'null'));
             }
 
