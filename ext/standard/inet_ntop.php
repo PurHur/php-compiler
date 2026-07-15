@@ -26,7 +26,7 @@ final class inet_ntop extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('inet_ntop() requires exactly one argument in this compiler build');
         }
-        $in_addr = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'inet_ntop', 0, 'in_addr');
+        $in_addr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'inet_ntop', 0, 'in_addr');
         if (null === $frame->returnVar) {
             return;
         }
@@ -47,7 +47,7 @@ final class inet_ntop extends Internal
 
         return JitInet::inetNtop(
             $context,
-            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'inet_ntop', 0, 'in_addr')
+            JitStringBuiltinArg::lower($context, $args[0], 'inet_ntop', 0, 'in_addr')
         );
     }
 }

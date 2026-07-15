@@ -1,13 +1,9 @@
 --TEST--
-stdlib inet_ntop(null) — TypeError (#18789, ext/standard/basic_functions.c)
+stdlib inet_ntop(null) — null coerces to false on default profile (#19053, ext/standard/basic_functions.c)
 --FILE--
 <?php
-try {
-    inet_ntop(null);
-} catch (Throwable $e) {
-    echo get_class($e), "\n";
-    echo $e->getMessage(), "\n";
-}
+var_export(inet_ntop(null));
+echo "\n";
+?>
 --EXPECT--
-TypeError
-inet_ntop(): Argument #1 ($in_addr) must be of type string, null given
+false

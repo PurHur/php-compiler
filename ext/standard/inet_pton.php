@@ -26,7 +26,7 @@ final class inet_pton extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('inet_pton() requires exactly one argument in this compiler build');
         }
-        $address = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'inet_pton', 0, 'address');
+        $address = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'inet_pton', 0, 'address');
         if (null === $frame->returnVar) {
             return;
         }
@@ -47,7 +47,7 @@ final class inet_pton extends Internal
 
         return JitInet::inetPton(
             $context,
-            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'inet_pton', 0, 'address')
+            JitStringBuiltinArg::lower($context, $args[0], 'inet_pton', 0, 'address')
         );
     }
 }

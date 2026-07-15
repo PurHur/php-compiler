@@ -1,7 +1,7 @@
 <?php
 
-$result = @getimagesizefromstring(null);
-if (false === $result) {
+$result = @gethostbyname(null);
+if ('' === $result) {
     echo "ok\n";
 } else {
     echo 'fail: ', var_export($result, true), "\n";
