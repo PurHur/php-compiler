@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4888 |
-| Phase A inventory files (M2 ratio SSOT) | 4888 |
+| PHP files on vm.php path | 4890 |
+| Phase A inventory files (M2 ratio SSOT) | 4890 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13108 |
+| Source constructs flagged (warnings) | 13110 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1696,7 +1696,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/RmdirJitHelper.php` | 0 | 1 |
 | `ext/standard/RoundJitHelper.php` | 0 | 1 |
 | `ext/standard/ScandirFailureJitHelper.php` | 0 | 1 |
-| `ext/standard/ScopeBuiltinJitHelper.php` | 0 | 4 |
+| `ext/standard/ScopeBuiltinJitHelper.php` | 0 | 8 |
 | `ext/standard/SerializeJitHelper.php` | 0 | 2 |
 | `ext/standard/SessionCookieParams.php` | 0 | 4 |
 | `ext/standard/SessionCreateIdJitHelper.php` | 0 | 1 |
@@ -2048,7 +2048,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmRoundMode.php` | 0 | 1 |
 | `ext/standard/VmSapiHeaderGuard.php` | 0 | 1 |
 | `ext/standard/VmScalarType.php` | 0 | 6 |
-| `ext/standard/VmScope.php` | 0 | 12 |
+| `ext/standard/VmScope.php` | 0 | 6 |
 | `ext/standard/VmSerialize.php` | 0 | 43 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
 | `ext/standard/VmSession.php` | 0 | 17 |
@@ -4159,8 +4159,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/RuntimeInitCompiler.php` | 0 | 2 |
 | `lib/JIT/RuntimeInitVmContext.php` | 0 | 8 |
 | `lib/JIT/ScalarDimFetchHelper.php` | 0 | 2 |
+| `lib/JIT/ScopeBuiltinDefinedLlvm.php` | 0 | 2 |
 | `lib/JIT/ScopeBuiltinEmitHelper.php` | 0 | 4 |
 | `lib/JIT/ScopeBuiltinHelper.php` | 0 | 1 |
+| `lib/JIT/ScopeBuiltinIndexLlvm.php` | 0 | 2 |
 | `lib/JIT/ScopeVariableAssignedFlags.php` | 0 | 1 |
 | `lib/JIT/ScriptMagic.php` | 0 | 1 |
 | `lib/JIT/SelfHostBuiltinPolicy.php` | 0 | 1 |
@@ -16334,9 +16336,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ScopeBuiltinJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 195)
-- new Variable (line 236)
-- 15 class method(s)
+- new Variable (line 197)
+- new HashTable (line 253)
+- new HashTable (line 303)
+- new Variable (line 312)
+- new Variable (line 322)
+- new Variable (line 354)
+- 19 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/SerializeJitHelper.php`
@@ -18729,15 +18735,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 259)
 - new Variable (line 267)
 - new Variable (line 284)
-- new HashTable (line 388)
-- new Variable (line 400)
-- new Variable (line 435)
-- new Variable (line 473)
-- new Variable (line 481)
-- new HashTable (line 494)
-- new Variable (line 506)
-- new Variable (line 519)
-- 26 class method(s)
+- new Variable (line 422)
+- 24 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/VmSerialize.php`
 
@@ -31597,7 +31597,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 507)
 - new Variable (line 559)
 - new Variable (line 673)
-- 15 class method(s)
+- 16 class method(s)
 
 ### `lib/JIT/HashTableWriteLlvm.php`
 
@@ -32104,18 +32104,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 24)
 - 1 class method(s)
 
+### `lib/JIT/ScopeBuiltinDefinedLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+- 2 closure(s)
+
 ### `lib/JIT/ScopeBuiltinEmitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 201)
-- new Variable (line 282)
-- 27 class method(s)
-- 5 closure(s)
+- new ArgumentCountError (line 160)
+- new Variable (line 241)
+- 23 class method(s)
+- 4 closure(s)
 
 ### `lib/JIT/ScopeBuiltinHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
+
+### `lib/JIT/ScopeBuiltinIndexLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/ScopeVariableAssignedFlags.php`
 
