@@ -109,6 +109,39 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureImportNodeBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomImportNodeRuntime::ABI_NAME,
+            'dom_import_node_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::importNodeArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureGetAttributeBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomImportNodeRuntime::ABI_GET_ATTRIBUTE,
+            'dom_get_attribute_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('__string__*'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::getAttributeArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
     public static function ensureFirstChildBridge(Context $context): void
     {
         self::ensureBridge(
