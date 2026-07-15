@@ -10,12 +10,18 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 
-/** JIT/AOT link for DOMNode::$firstChild / $lastChild live reads (#18951). */
+/** JIT/AOT link for DOMNode live link property reads (#18951, #19240). */
 final class DomNodeChildPropertyRuntime
 {
     public const ABI_FIRST_CHILD = '__phpc_dom_node_first_child';
 
     public const ABI_LAST_CHILD = '__phpc_dom_node_last_child';
+
+    public const ABI_PARENT_NODE = '__phpc_dom_node_parent_node';
+
+    public const ABI_NEXT_SIBLING = '__phpc_dom_node_next_sibling';
+
+    public const ABI_PREVIOUS_SIBLING = '__phpc_dom_node_previous_sibling';
 
     public const ABI_FIRST_CHILD_BY_ID = '__phpc_dom_node_first_child_by_id';
 
@@ -27,6 +33,12 @@ final class DomNodeChildPropertyRuntime
 
     public const HELPER_LAST = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::lastChildArgv';
 
+    public const HELPER_PARENT = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::parentNodeArgv';
+
+    public const HELPER_NEXT = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::nextSiblingArgv';
+
+    public const HELPER_PREV = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::previousSiblingArgv';
+
     public const HELPER_FIRST_BY_ID = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::firstChildByIdArgv';
 
     public const HELPER_LAST_BY_ID = 'PHPCompiler\\ext\\dom\\DomNodeChildPropertyJitHelper::lastChildByIdArgv';
@@ -35,19 +47,68 @@ final class DomNodeChildPropertyRuntime
     private const COMPILED_HELPERS = [
         self::HELPER_FIRST,
         self::HELPER_LAST,
+        self::HELPER_PARENT,
+        self::HELPER_NEXT,
+        self::HELPER_PREV,
     ];
 
     public static function abiFor(string $propName): string
     {
-        return 'lastchild' === strtolower($propName) ? self::ABI_LAST_CHILD : self::ABI_FIRST_CHILD;
+        return match (strtolower($propName)) {
+            'lastchild' => self::ABI_LAST_CHILD,
+            'parentnode' => self::ABI_PARENT_NODE,
+            'nextsibling' => self::ABI_NEXT_SIBLING,
+            'previoussibling' => self::ABI_PREVIOUS_SIBLING,
+            default => self::ABI_FIRST_CHILD,
+        };
+    }
+
+    public static function helperFor(string $propName): string
+    {
+        return match (strtolower($propName)) {
+            'lastchild' => self::HELPER_LAST,
+            'parentnode' => self::HELPER_PARENT,
+            'nextsibling' => self::HELPER_NEXT,
+            'previoussibling' => self::HELPER_PREV,
+            default => self::HELPER_FIRST,
+        };
+    }
+
+    public static function isLinkProperty(string $propLc): bool
+    {
+        return \in_array(strtolower($propLc), [
+            'firstchild',
+            'lastchild',
+            'parentnode',
+            'nextsibling',
+            'previoussibling',
+        ], true);
     }
 
     public static function ensureLinked(Context $context, string $propName): void
     {
         $propLc = strtolower($propName);
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            match ($propLc) {
+                'lastchild' => DomDocumentMethodUserScriptLlvm::ensureLastChildBridge($context),
+                'parentnode' => DomDocumentMethodUserScriptLlvm::ensureParentNodeBridge($context),
+                'nextsibling' => DomDocumentMethodUserScriptLlvm::ensureNextSiblingBridge($context),
+                'previoussibling' => DomDocumentMethodUserScriptLlvm::ensurePreviousSiblingBridge($context),
+                default => DomDocumentMethodUserScriptLlvm::ensureFirstChildBridge($context),
+            };
+
+            return;
+        }
+
         $abi = self::abiFor($propName);
-        $helper = 'lastchild' === $propLc ? self::HELPER_LAST : self::HELPER_FIRST;
-        $entry = 'lastchild' === $propLc ? 'dom_last_child_bridge' : 'dom_first_child_bridge';
+        $helper = self::helperFor($propName);
+        $entry = match ($propLc) {
+            'lastchild' => 'dom_last_child_bridge',
+            'parentnode' => 'dom_parent_node_bridge',
+            'nextsibling' => 'dom_next_sibling_bridge',
+            'previoussibling' => 'dom_previous_sibling_bridge',
+            default => 'dom_first_child_bridge',
+        };
 
         $probe = $context->module->getNamedFunction($abi);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entry)) {

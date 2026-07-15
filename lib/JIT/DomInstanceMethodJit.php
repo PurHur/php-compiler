@@ -60,6 +60,10 @@ final class DomInstanceMethodJit
         'domnode::append' => true,
         'domnode::prepend' => true,
         'domnode::replacechildren' => true,
+        'domnode::removechild' => true,
+        'domelement::removechild' => true,
+        'domnode::replacechild' => true,
+        'domelement::replacechild' => true,
         'domdocument::createdocumentfragment' => true,
         'domdocument::importnode' => true,
         'domelement::getattribute' => true,
@@ -184,6 +188,16 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domelement::removechild' === $lc || 'domnode::removechild' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeRemoveChild();
+
+                return;
+            }
+            if ('domelement::replacechild' === $lc || 'domnode::replacechild' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeReplaceChild();
+
+                return;
+            }
             if ('domdocument::createdocumentfragment' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentCreateDocumentFragment();
 
@@ -245,6 +259,10 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domnode::append');
             self::ensureProxy($context, 'domnode::prepend');
             self::ensureProxy($context, 'domnode::replacechildren');
+            self::ensureProxy($context, 'domnode::removechild');
+            self::ensureProxy($context, 'domelement::removechild');
+            self::ensureProxy($context, 'domnode::replacechild');
+            self::ensureProxy($context, 'domelement::replacechild');
             self::ensureProxy($context, 'domdocument::createdocumentfragment');
             self::ensureProxy($context, 'domxpath::query');
             self::ensureProxy($context, 'domxpath::evaluate');
@@ -289,7 +307,13 @@ final class DomInstanceMethodJit
         }
         foreach (['DOMNode', 'DOMElement', 'DOMDocument'] as $nodeClass) {
             $nodeId = $object->lookup($nodeClass);
-            foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+            foreach ([
+                VmDom::PROP_FIRST_CHILD,
+                VmDom::PROP_LAST_CHILD,
+                VmDom::PROP_PARENT_NODE,
+                VmDom::PROP_NEXT_SIBLING,
+                VmDom::PROP_PREVIOUS_SIBLING,
+            ] as $prop) {
                 if (!$object->hasProperty($nodeId, $prop)) {
                     $object->defineProperty($nodeId, $prop, Variable::TYPE_VALUE);
                 }
