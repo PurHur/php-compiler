@@ -27,12 +27,7 @@ final class ord extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'ord', 1);
-        $s = VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[0],
-            'ord',
-            0,
-            'character'
-        );
+        $s = VmString::stringBuiltinArgForFrame($frame, 0, 'ord', 1, 'character');
         if (null === $frame->returnVar) {
             return;
         }
@@ -48,7 +43,7 @@ final class ord extends Internal
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
 
-        $strPtr = JitStringBuiltinArg::lowerZparamStr(
+        $strPtr = JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,
             $args[0],
             'ord',
