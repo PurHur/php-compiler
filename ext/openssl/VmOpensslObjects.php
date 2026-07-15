@@ -139,9 +139,79 @@ final class VmOpensslObjects
         return $var;
     }
 
+    public static function wrapCsr(Context $ctx, string $pem): Variable
+    {
+        $class = $ctx->classes[self::CSR_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('OpenSSLCertificateSigningRequest is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        self::$csrStore[$entry->id] = $pem;
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
     public static function keyPem(\PHPCompiler\VM\ObjectEntry $entry): string
     {
         return self::$keyStore[$entry->id] ?? '';
+    }
+
+    public static function csrPem(ObjectEntry $entry): string
+    {
+        return self::$csrStore[$entry->id] ?? '';
+    }
+
+    public static function isCsr(Variable $var): bool
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return false;
+        }
+
+        return self::CSR_LC === strtolower($var->toObject()->class->name);
+    }
+
+    /**
+     * Resolve OpenSSLCertificateSigningRequest|string to CSR PEM (php-src openssl_csr_*).
+     *
+     * @return string|null PEM, or null when caller should return false
+     */
+    public static function resolveCsrPem(Variable $arg, string $function, int $argIndex = 0): ?string
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $object = $arg->toObject();
+            if (self::CSR_LC === strtolower($object->class->name)) {
+                return self::csrPem($object);
+            }
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($csr) must be of type OpenSSLCertificateSigningRequest|string, %s given',
+                $function,
+                $argIndex + 1,
+                $object->class->name
+            ));
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($csr) must be of type OpenSSLCertificateSigningRequest|string, %s given',
+                $function,
+                $argIndex + 1,
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_STRING !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($csr) must be of type OpenSSLCertificateSigningRequest|string, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($arg)
+            ));
+        }
+
+        return $arg->toString();
     }
 
     public static function isCertificate(Variable $var): bool

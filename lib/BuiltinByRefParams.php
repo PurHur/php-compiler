@@ -93,6 +93,9 @@ final class BuiltinByRefParams
             case 'openssl_open':
             case 'openssl_pkey_export':
             case 'openssl_pkcs12_export':
+            case 'openssl_csr_export':
+                return [1];
+            case 'openssl_csr_new':
                 return [1];
             case 'openssl_pkcs12_read':
                 return [1];
