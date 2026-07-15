@@ -25,15 +25,13 @@ final class DocumentCreateAttributeNS extends DomClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createAttributeNS() requires VM context in this compiler build');
         }
-        if (!VmDom::documentHasRootElement($document)) {
-            VmDom::warnCreateAttributeNsMissingRoot($frame);
-            if (null !== $frame->returnVar) {
-                $frame->returnVar->bool(false);
-            }
-
-            return;
-        }
-        $attr = VmDom::createAttributeNS($frame->vmContext, $namespace, $qualifiedName, $document);
+        $attr = VmDom::documentCreateAttributeNS(
+            $frame->vmContext,
+            $document,
+            $namespace,
+            $qualifiedName,
+            $frame
+        );
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($attr);
         }

@@ -1063,25 +1063,28 @@ final class VmDom
         return $var;
     }
 
-    /** php-src ext/dom/document.c — createAttributeNS requires a document element (#19200). */
-    public static function documentHasRootElement(ObjectEntry $document): bool
-    {
-        self::ensureDocument($document);
-        $state = DomRegistry::state($document);
-        if (null !== $state->documentElementName && '' !== $state->documentElementName) {
-            return true;
-        }
-        if (!$document->hasProperty(self::PROP_DOCUMENT_ELEMENT)) {
-            return false;
-        }
+    /**
+     * DOMDocument::createAttributeNS() — requires a document element (php-src ext/dom/document.c; #19200).
+     *
+     * @return Variable DOMAttr or false when the document has no root element
+     */
+    public static function documentCreateAttributeNS(
+        Context $ctx,
+        ObjectEntry $document,
+        ?string $namespace,
+        string $qualifiedName,
+        ?Frame $frame = null
+    ): Variable {
         $root = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_NULL === $root->type) {
+            self::triggerDomWarning($frame, 'DOMDocument::createAttributeNS(): Document Missing Root Element');
+            $false = new Variable(Variable::TYPE_BOOLEAN);
+            $false->bool(false);
 
-        return Variable::TYPE_OBJECT === $root->type;
-    }
+            return $false;
+        }
 
-    public static function warnCreateAttributeNsMissingRoot(Frame $frame): void
-    {
-        self::triggerDomWarning($frame, 'DOMDocument::createAttributeNS(): Document Missing Root Element');
+        return self::createAttributeNS($ctx, $namespace, $qualifiedName, $document);
     }
 
     public static function createAttributeNS(
