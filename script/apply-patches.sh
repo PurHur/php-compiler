@@ -1229,12 +1229,23 @@ import sys
 from pathlib import Path
 path = Path(sys.argv[1])
 text = path.read_text()
+lazy = (
+    "\n    /** PHP 8.4 lazy property modifier recovered from phpc-lazy-property marker (#16813). */\n"
+    "    public bool $propertyLazy = false;\n"
+)
+# Prefer propertyFlags (#3149); fall back when vendor still has legacy $readonly (#4230 path).
 needle = "    public int $propertyFlags = 0;\n"
-insert = needle + "\n    /** PHP 8.4 lazy property modifier recovered from phpc-lazy-property marker (#16813). */\n    public bool $propertyLazy = false;\n"
-if needle not in text:
-    sys.stderr.write("php-cfg-lazy-property: Property.php propertyFlags anchor missing\n")
-    raise SystemExit(1)
-path.write_text(text.replace(needle, insert, 1))
+if needle in text:
+    path.write_text(text.replace(needle, needle + lazy, 1))
+    raise SystemExit(0)
+alt = "    public $readonly = false;\n"
+if alt in text:
+    path.write_text(text.replace(alt, alt + lazy, 1))
+    raise SystemExit(0)
+sys.stderr.write(
+    "php-cfg-lazy-property: Property.php propertyFlags/$readonly anchor missing\n"
+)
+raise SystemExit(1)
 PY
     echo "Applied php-cfg-lazy-property.patch (Property overlay #16813)"
   fi
@@ -1258,16 +1269,23 @@ PY
   fi
   if ! grep -q 'propertyLazy = $this->extractLazyPropertyFromAttributes' "$parser" 2>/dev/null; then
     python3 - "$parser" <<'PY'
+import re
 import sys
 from pathlib import Path
 path = Path(sys.argv[1])
 text = path.read_text()
-needle = "            $prop->getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes($prop->getAttributes());\n"
-insert = needle + "            $prop->propertyLazy = $this->extractLazyPropertyFromAttributes($prop->getAttributes());\n"
-if needle not in text:
+# Vendor may use $prop or $cfgProp depending on php-cfg revision / readonly overlay.
+pat = re.compile(
+    r"^([ \t]*)\$(prop|cfgProp)->getVisibility = \$this->extractAsymmetricGetVisibilityFromAttributes\(\$\2->getAttributes\(\)\);\n",
+    re.M,
+)
+m = pat.search(text)
+if not m:
     sys.stderr.write("php-cfg-lazy-property: Parser getVisibility anchor missing\n")
     raise SystemExit(1)
-path.write_text(text.replace(needle, insert, 1))
+indent, var = m.group(1), m.group(2)
+wire = f"{indent}${var}->propertyLazy = $this->extractLazyPropertyFromAttributes(${var}->getAttributes());\n"
+path.write_text(text[: m.end()] + wire + text[m.end() :])
 PY
     echo "Applied php-cfg-lazy-property.patch (Parser propertyLazy wire #16813)"
   fi
@@ -5120,21 +5138,30 @@ def patch_one(path: Path) -> bool:
     if "MagicScriptConst::KIND_LINE" not in text:
         return False
 
-    # Try an exact-string replacement first (fast path).
-    old = """                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
+    # Try an exact-string replacement first (fast path). Both operand orders appear in vendor trees.
+    old_variants = [
+        """                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind) {
                     return [Type::int()];
-                }"""
+                }""",
+        """                if ($op->kind === \\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE) {
+                    return [Type::int()];
+                }""",
+    ]
     new = """                if (\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE === $op->kind
                     || \\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_HALT_OFFSET === $op->kind) {
                     return [Type::int()];
                 }"""
-    if old in text:
-        path.write_text(text.replace(old, new, 1))
-        return True
+    for old in old_variants:
+        if old in text:
+            path.write_text(text.replace(old, new, 1))
+            return True
 
-    # Anchor drift: match the KIND_LINE guard even if formatting/spacing differs.
+    # Anchor drift: match the KIND_LINE guard even if formatting/spacing/operand order differs.
     pattern = re.compile(
-        r"(?P<indent>[ \t]+)if\s*\(\s*\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE\s*===\s*\\$op->kind\s*\)\s*\{\s*\n"
+        r"(?P<indent>[ \t]+)if\s*\(\s*(?:"
+        r"\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE\s*===\s*\\$op->kind"
+        r"|\\$op->kind\s*===\s*\\PHPCfg\\Op\\Expr\\MagicScriptConst::KIND_LINE"
+        r")\s*\)\s*\{\s*\n"
         r"(?P=indent)[ \t]+return\s*\\[Type::int\\(\\)\\];\s*\n"
         r"(?P=indent)\\}",
         re.MULTILINE,
