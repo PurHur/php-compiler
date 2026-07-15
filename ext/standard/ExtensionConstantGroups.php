@@ -8,6 +8,8 @@ use PHPCompiler\ext\calendar\CalendarConstants;
 use PHPCompiler\ext\curl\CurlConstants;
 use PHPCompiler\ext\dom\DomExceptionConstants;
 use PHPCompiler\ext\filter\FilterConstants;
+use PHPCompiler\ext\gd\GdConstants;
+use PHPCompiler\ext\gd\GdExtensionPolicy;
 use PHPCompiler\ext\hash\MhashRegistry;
 use PHPCompiler\ext\iconv\IconvConstants;
 use PHPCompiler\ext\inotify\InotifyConstants;
@@ -74,6 +76,9 @@ final class ExtensionConstantGroups
         $groups['uuid'] = UuidConstants::registeredConstants();
         $groups['xml'] = XmlConstants::registeredConstants();
         $groups['sockets'] = SocketConstants::registeredConstants();
+        if (GdExtensionPolicy::advertisesDrawing()) {
+            $groups['gd'] = GdConstants::REGISTERED;
+        }
         $groups['readline'] = ReadlineConstants::registeredConstants();
         if (\PHPCompiler\ext\xsl\XslExtensionPolicy::advertisesExtension()) {
             $groups['xsl'] = XslConstants::registeredConstants();
