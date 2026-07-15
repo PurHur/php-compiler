@@ -950,6 +950,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'dom_token_list')) {
                 continue;
             }
+            // socket_create/connect/read/write — VM + libc FFI first; JIT lowering follows (#19286).
+            if (str_contains($name, 'socket_create_connect_rw')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when encapsed ?? interpolation enabled (#14063).
             if (CompilerVersion::supportsEncapsedCoalesce()
                 && str_contains($name, 'encapsed_coalesce_parse_error')) {

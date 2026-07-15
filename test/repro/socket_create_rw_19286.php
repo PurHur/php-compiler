@@ -1,0 +1,24 @@
+<?php
+declare(strict_types=1);
+echo "exists=", (int) function_exists("socket_create"), "\n";
+echo "loaded=", (int) extension_loaded("sockets"), "\n";
+$server = stream_socket_server("tcp://127.0.0.1:0", $errno, $errstr);
+$name = stream_socket_get_name($server, false);
+preg_match('/:(\d+)$/', $name, $m);
+$port = (int) $m[1];
+$sock = socket_create(AF_INET, SOCK_STREAM, SOL_TCP);
+echo "class=", $sock instanceof Socket ? "Socket" : gettype($sock), "\n";
+$ok = @socket_connect($sock, "127.0.0.1", $port);
+echo "connect=", (int) $ok, "\n";
+$peer = stream_socket_accept($server, 2.0);
+$n = socket_write($sock, "ping");
+echo "wrote=", var_export($n, true), "\n";
+$got = fread($peer, 16);
+echo "stream_got=", var_export($got, true), "\n";
+fwrite($peer, "pong\n");
+$back = socket_read($sock, 16, PHP_NORMAL_READ);
+echo "sock_got=", var_export($back, true), "\n";
+socket_close($sock);
+fclose($peer);
+fclose($server);
+echo "done\n";

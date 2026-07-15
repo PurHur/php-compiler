@@ -95,8 +95,8 @@ final class ExtensionConstantGroups
     /**
      * Whether get_defined_constants(true) should emit a module bucket (#18083).
      *
-     * Socket constants register on the reference profile while extension_loaded('sockets')
-     * stays false until socket_create() lands (#11820).
+     * Socket constants register with the sockets extension once socket_create() lands (#11820, #19286).
+     * Keep materializing the sockets bucket when the extension is withheld on older profiles.
      */
     public static function shouldMaterializeExtensionBucket(string $extension): bool
     {
