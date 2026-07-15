@@ -9,7 +9,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -17,8 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __superglobals__mirror_process_environ via EnvironMirrorNativeJitHelper PHP (#18984).
  *
- * User-script AOT refresh defers to {@see EnvironMirrorRuntimeUserScriptCstr} (init-safe libc
- * environ walk, #15417). Full embed/self-host uses nested {@see EnvironMirrorNativeJitHelper}.
+ * User-script AOT and embed route through helper-runtime + {@see EnvironMirrorNativeJitHelper} (#19157).
  * SSOT: {@see \PHPCompiler\Web\Superglobals::applyProcessEnvironMirror()}
  * php-src: sapi/cli/php_cli.c
  */
@@ -54,12 +52,6 @@ final class EnvironMirrorRuntime
             return;
         }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            EnvironMirrorRuntimeUserScriptCstr::ensureLinked($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI);
         if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
@@ -73,6 +65,7 @@ final class EnvironMirrorRuntime
     private static function implementEmbedBridge(Context $context, ?LlvmFunction $probe): void
     {
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::ensureNativeHtInternalProxies($context);
         JitVmHelperLink::ensureCompiled(
             $context,
             self::HELPER_PATH,
@@ -121,6 +114,21 @@ final class EnvironMirrorRuntime
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /** Register phpc_native_ht_* Internal JIT handlers before nested environ-mirror compile (#19157). */
+    private static function ensureNativeHtInternalProxies(Context $context): void
+    {
+        $internals = [
+            new \PHPCompiler\ext\standard\phpc_native_environ_mirror_into_ht(),
+        ];
+        foreach ($internals as $internal) {
+            $lc = strtolower($internal->getName());
+            $existing = $context->functionProxies[$lc] ?? null;
+            if (null === $existing || $existing instanceof \PHPCompiler\JIT\Call\ExternalMethod) {
+                $context->functionProxies[$lc] = $internal;
+            }
         }
     }
 }
