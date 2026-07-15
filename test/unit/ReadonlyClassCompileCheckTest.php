@@ -367,4 +367,45 @@ PHP;
         $this->expectExceptionMessage('Cannot redeclare non-readonly property B::$x as readonly C::$x');
         $runtime->parseAndCompile($code, 'readonly_narrow.php');
     }
+
+    /** @covers issue #19172 */
+    public function testReadonlyClassWithHookedPropertyFailsAtCompileTime(): void
+    {
+        if (!CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks require PHP_COMPILER_PROFILE=8.4');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class R {
+    public int $x {
+        get => 1;
+        set => $value;
+    }
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Hooked properties cannot be readonly');
+        $runtime->parseAndCompile($code, 'readonly_class_hooked_property.php');
+    }
+
+    /** @covers issue #19172 */
+    public function testReadonlyPropertyWithHookFailsAtCompileTime(): void
+    {
+        if (!CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks require PHP_COMPILER_PROFILE=8.4');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public readonly int $x {
+        get => 1;
+    }
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Hooked properties cannot be readonly');
+        $runtime->parseAndCompile($code, 'readonly_property_hook.php');
+    }
 }

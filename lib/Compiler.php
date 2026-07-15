@@ -557,7 +557,7 @@ class Compiler {
         EnumParentCompileCheck::validate($script);
         EnumBackedCaseCheck::validate($script);
         ClassConstDuplicateCheck::validate($script);
-        ReadonlyClassCompileCheck::validate($script, $this->knownClassReadonly);
+        ReadonlyClassCompileCheck::validate($script, $this->knownClassReadonly, $this->propertyHookRegistry);
         AsymmetricVisibilityCompileCheck::validate($script);
         GeneratorStaticMethodCompileCheck::validate($script);
         GeneratorNeverReturnCompileCheck::validate($script);
