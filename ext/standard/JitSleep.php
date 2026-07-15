@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TimeSleepRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Builtin\MathIsFinite;
+use PHPCompiler\JIT\InternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -109,6 +110,19 @@ final class JitSleep
         int $argIndex,
         string $paramName
     ): Value {
+        if ($context->callerStrictTypes) {
+            InternalStrictArg::requireInt($context, $arg, $function, $paramName, $argIndex);
+            if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
+                return $context->helper->loadValue($arg);
+            }
+            if (JITVariable::TYPE_VALUE === $arg->type) {
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+
+                return $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+            }
+
+            return JitLongArg::lower($context, $arg, sprintf('%s() %s', $function, $paramName));
+        }
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
