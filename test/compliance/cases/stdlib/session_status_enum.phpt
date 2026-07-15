@@ -2,6 +2,7 @@
 stdlib SessionStatus enum for session_status() (#7321, ext/session/session.c)
 --FILE--
 <?php
+ob_start();
 var_export(enum_exists('SessionStatus', false));
 echo "\n";
 var_export(SessionStatus::None->name);

@@ -2,6 +2,7 @@
 stdlib session_name() JIT get and set (issue #1184)
 --FILE--
 <?php
+ob_start();
 echo session_name(), "\n";
 echo session_name('APPSESS'), "\n";
 echo session_name(), "\n";

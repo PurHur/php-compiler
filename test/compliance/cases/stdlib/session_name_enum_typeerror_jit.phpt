@@ -8,6 +8,7 @@ enum E: string {
     case A = 'PHPSESSID';
 }
 
+ob_start();
 try {
     session_name(E::A);
     echo "uncaught\n";
