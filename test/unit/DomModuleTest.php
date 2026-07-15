@@ -393,6 +393,9 @@ PHP;
         $code = <<<'PHP'
 <?php
 $doc = new DOMDocument();
+$attr = @$doc->createAttributeNS('http://example.com', 'ex:foo');
+echo var_export($attr, true), "\n";
+$doc->loadXML('<root/>');
 $attr = $doc->createAttributeNS('http://example.com', 'ex:foo');
 echo get_class($attr), "\n";
 echo $attr->localName, "\n";
@@ -402,7 +405,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'dom_create_attribute_ns.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("DOMAttr\nfoo\nx\n", ob_get_clean());
+        self::assertSame("false\nDOMAttr\nfoo\nx\n", ob_get_clean());
     }
 
     public function test_dom_create_entity_reference(): void

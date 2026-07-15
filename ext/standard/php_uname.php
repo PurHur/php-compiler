@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
@@ -30,14 +31,7 @@ final class php_uname extends Internal
         }
         $mode = 'a';
         if (1 === $argc) {
-            $mode = VmString::coerceStringBuiltinArg(
-                $frame->calledArgs[0],
-                'php_uname',
-                0,
-                'mode',
-                'string',
-                false
-            );
+            $mode = self::coerceModeArg($frame->calledArgs[0]);
         }
         $frame->returnVar->string(VmInfo::php_uname($mode));
     }
@@ -47,20 +41,58 @@ final class php_uname extends Internal
         if (\count($args) > 1) {
             throw new \LogicException('php_uname() accepts at most one argument');
         }
-        $mode = null;
-        if (isset($args[0])) {
-            $mode = JitStringBuiltinArg::lower(
-                $context,
-                $args[0],
-                'php_uname',
-                0,
-                'mode',
-                'string',
-                null,
-                false
-            );
+        if (!isset($args[0])) {
+            return JitInfo::php_uname($context, null);
         }
+        $mode = JitStringBuiltinArg::lower(
+            $context,
+            $args[0],
+            'php_uname',
+            0,
+            'mode',
+            'string',
+            null,
+            self::forwardsProfile84()
+        );
 
         return JitInfo::php_uname($context, $mode);
+    }
+
+    private static function forwardsProfile84(): bool
+    {
+        return version_compare(self::effectiveProfileVersion(), '8.4.0', '>=');
+    }
+
+    private static function effectiveProfileVersion(): string
+    {
+        $raw = VmEnv::getenv('PHP_COMPILER_PROFILE');
+        if (false === $raw || '' === $raw) {
+            return CompilerVersion::languageProfileVersion();
+        }
+        $raw = trim($raw);
+        if (preg_match('/^\d+\.\d+$/', $raw)) {
+            return $raw.'.0';
+        }
+        if (preg_match('/^\d+\.\d+\.\d+/', $raw, $m)) {
+            return $m[0];
+        }
+
+        return CompilerVersion::languageProfileVersion();
+    }
+
+    private static function coerceModeArg(\PHPCompiler\VM\Variable $arg): string
+    {
+        if (self::forwardsProfile84()) {
+            return VmString::coerceTypedStringBuiltinArg($arg, 'php_uname', 0, 'mode');
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $arg,
+            'php_uname',
+            0,
+            'mode',
+            'string',
+            false
+        );
     }
 }
