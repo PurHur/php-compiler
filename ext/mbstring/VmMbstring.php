@@ -11,6 +11,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -364,6 +365,37 @@ final class VmMbstring
         }
 
         return CharsetEngine::convert($from, $to, $source);
+    }
+
+    /**
+     * mb_convert_encoding() array operand — convert string elements, preserve other types (#3222).
+     */
+    public static function convertEncodingSourceArray(
+        HashTable $table,
+        string $to,
+        string $from
+    ): HashTable|false {
+        $out = new HashTable();
+        foreach ($table->iterateKeyed(true) as [$key, $value]) {
+            $value = $value->resolveIndirect();
+            $elem = new Variable();
+            if (Variable::TYPE_STRING === $value->type) {
+                $converted = self::convertEncoding($value->toString(), $to, $from);
+                if (false === $converted) {
+                    return false;
+                }
+                $elem->string($converted);
+            } else {
+                $elem->copyFrom($value);
+            }
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $elem);
+            } else {
+                $out->add($key->toString(), $elem);
+            }
+        }
+
+        return $out;
     }
 
     public static function convertCase(
