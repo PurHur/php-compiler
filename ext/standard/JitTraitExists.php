@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * JIT/AOT helper for trait_exists() via TraitExistsJitHelper PHP (#1371, #16173).
+ * JIT/AOT helper for trait_exists() via TraitExistsJitHelper PHP (#1371, #16173, #19223).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -24,9 +24,15 @@ final class JitTraitExists
             return ReflectionBuiltinHelper::traitExistsLiteral($context, $literal);
         }
 
-        return StringTraitExists::invoke(
+        return self::invokeLowered(
             $context,
             JitStringArg::lower($context, $nameArg, 'trait_exists() trait name')
         );
+    }
+
+    /** Pre-lowered {@see __string__*} name (8.4 Z_PARAM_STR null guard at call site, #19223). */
+    public static function invokeLowered(Context $context, Value $nameStr): Value
+    {
+        return StringTraitExists::invoke($context, $nameStr);
     }
 }

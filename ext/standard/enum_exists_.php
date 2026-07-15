@@ -13,7 +13,7 @@ use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** enum_exists() — whether a user enum is registered (issue #1373). */
+/** enum_exists() — whether a user enum is registered (issue #1373, #19223). */
 final class enum_exists_ extends Internal
 {
     public function __construct()
@@ -27,7 +27,8 @@ final class enum_exists_ extends Internal
             throw new \LogicException('enum_exists() requires one or two arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'enum_exists', 0, 'enum');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19223, zend_builtin_functions.c).
+        $name = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'enum_exists', 0, 'enum');
         $autoload = VmReflection::autoloadFlagFromFrame($frame);
         $exists = VmReflection::enumExists($ctx, $name, $autoload);
         if (null !== $frame->returnVar) {
@@ -47,7 +48,28 @@ final class enum_exists_ extends Internal
 
         return JitEnumExists::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'enum_exists', 0, 'enum')
+            self::jitNameArg($context, $args[0])
+        );
+    }
+
+    private static function jitNameArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'enum_exists',
+                0,
+                'enum'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'enum_exists',
+            0,
+            'enum'
         );
     }
 }
