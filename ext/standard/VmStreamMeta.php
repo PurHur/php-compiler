@@ -25,6 +25,7 @@ final class VmStreamMeta
 
         $socketType = self::streamTypeForUri($uri);
         $phpNativeStreamType = self::phpNativeStreamType($uri);
+        $stdioInheritedType = self::stdioInheritedStreamType($uri, $fp);
         $eof = null !== $eofOverride ? $eofOverride : \feof($fp);
         $reportedMode = null !== $mode ? $mode : self::defaultReportedMode($uri, $isPhpMemory);
 
@@ -58,7 +59,7 @@ final class VmStreamMeta
             'blocked' => $blocked ?? true,
             'eof' => $eof,
             'wrapper_type' => self::wrapperTypeForUri($uri),
-            'stream_type' => $socketType ?? $phpNativeStreamType ?? ($isPhp ? 'STDIO' : 'STDIO'),
+            'stream_type' => $socketType ?? $stdioInheritedType ?? $phpNativeStreamType ?? ($isPhp ? 'STDIO' : 'STDIO'),
             'mode' => $reportedMode,
             'unread_bytes' => 0,
             'seekable' => self::supportsSeekable($uri),
@@ -247,6 +248,39 @@ final class VmStreamMeta
     public static function isSocketTransport(string $uri): bool
     {
         return null !== self::streamTypeForUri($uri);
+    }
+
+    /**
+     * php://stdin|stdout|stderr may wrap an inherited socket fd — mirror host stream_type (#19129).
+     *
+     * php-src: main/streams/php_stream_stdio.c — php_stream_stdio_cast / is_socket probe
+     *
+     * @param resource|null $fp host stream adopted by {@see VmFsStdioPure::openDupFd()}
+     */
+    public static function stdioInheritedStreamType(string $uri, $fp): ?string
+    {
+        if (!VmFsStdio::isStdioUri($uri) || !\is_resource($fp)) {
+            return null;
+        }
+        $meta = @\stream_get_meta_data($fp);
+        if (!\is_array($meta)) {
+            return null;
+        }
+        $type = $meta['stream_type'] ?? null;
+        if (!\is_string($type) || '' === $type || 'STDIO' === $type) {
+            return null;
+        }
+
+        return self::normalizeHostStreamType($type);
+    }
+
+    /** Map host wrapper labels to php-src stream_type strings consumed by socket_import_stream. */
+    private static function normalizeHostStreamType(string $type): string
+    {
+        return match ($type) {
+            'generic_socket' => 'unix_socket',
+            default => $type,
+        };
     }
 
     /**
