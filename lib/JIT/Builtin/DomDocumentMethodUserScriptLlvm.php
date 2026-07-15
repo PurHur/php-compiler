@@ -416,12 +416,48 @@ final class DomDocumentMethodUserScriptLlvm
 
     public static function ensureReplaceChildrenBridge(Context $context, int $arity): void
     {
-        self::ensureLiveMutationBridge(
+        $objPtr = $context->getTypeFromString('__object__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $paramTypes = [$objPtr];
+        for ($i = 0; $i < $arity; ++$i) {
+            $paramTypes[] = $valuePtr;
+        }
+        self::ensureBridge(
             $context,
             DomNodeLiveMutationRuntime::replaceChildrenAbi($arity),
             'dom_replace_children_user_script_'.$arity,
+            $paramTypes,
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildrenArgv'.$arity,
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensureReplaceChildrenObjectBridge(Context $context, int $arity): void
+    {
+        self::ensureObjectLiveMutationBridge(
+            $context,
+            DomNodeLiveMutationRuntime::replaceChildrenObjectAbi($arity),
+            'dom_replace_children_object_user_script_'.$arity,
             $arity,
-            'PHPCompiler\\ext\\dom\\DomNodeLiveMutationJitHelper::replaceChildrenArgv'.$arity
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildrenObjectArgv'.$arity,
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensureReplaceChildrenStringBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeLiveMutationRuntime::replaceChildrenStringAbi(),
+            'dom_replace_children_string_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildrenStringArgv1',
+            '/ext/dom/DomCreateElementJitHelper.php'
         );
     }
 
@@ -460,7 +496,8 @@ final class DomDocumentMethodUserScriptLlvm
         string $abi,
         string $entryBlock,
         int $arity,
-        string $helperLogical
+        string $helperLogical,
+        string $helperPath = '/ext/dom/DomCreateElementJitHelper.php'
     ): void {
         $objPtr = $context->getTypeFromString('__object__*');
         $paramTypes = [$objPtr];
@@ -474,7 +511,7 @@ final class DomDocumentMethodUserScriptLlvm
             $paramTypes,
             $context->context->voidType(),
             $helperLogical,
-            '/ext/dom/DomCreateElementJitHelper.php'
+            $helperPath
         );
     }
 

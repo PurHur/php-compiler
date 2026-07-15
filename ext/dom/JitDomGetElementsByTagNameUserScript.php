@@ -33,21 +33,32 @@ final class JitDomGetElementsByTagNameUserScript
         if (null === $xml) {
             return null;
         }
-        DomUserScriptLiveTagListLlvm::initCount(
-            $context,
-            $tagLit,
-            DomParseSimpleXmlJitHelper::countTagArgv($xml, $tagLit)
-        );
+        $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tagLit);
+        DomUserScriptLiveTagListLlvm::initCount($context, $tagLit, $count);
 
-        return self::boxNodeList($context);
+        return self::boxNodeList($context, $count);
     }
 
-    private static function boxNodeList(Context $context): Value
+    private static function boxNodeList(Context $context, int $length): Value
     {
         $objectType = $context->type->object;
         $classId = $objectType->lookup(self::CLASS_NODELIST);
         $list = $objectType->allocate($classId);
         $objectType->markObjectConstructed($list);
+        if (!$objectType->hasProperty($classId, 'length')) {
+            $objectType->defineProperty($classId, 'length', JITVariable::TYPE_NATIVE_LONG);
+        }
+        $lengthVar = new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt($length, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($list, self::CLASS_NODELIST, 'length'),
+            $lengthVar,
+            JITVariable::TYPE_NATIVE_LONG
+        );
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(

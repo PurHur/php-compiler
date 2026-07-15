@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\Type\Object_;
+use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -27,13 +28,13 @@ final class JitDomNodeListLength
         if (!DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
             return $objectType->propertyFetchOrdinary($obj, self::CLASS_NODELIST, self::PROP_LENGTH);
         }
-        $length = DomUserScriptLiveTagListLlvm::readStoredCount($context);
 
-        return new JITVariable(
-            $context,
-            JITVariable::TYPE_NATIVE_LONG,
-            JITVariable::KIND_VALUE,
-            $length
+        return ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
+            $objectType,
+            $obj,
+            self::CLASS_NODELIST,
+            self::PROP_LENGTH,
+            $objectType->lookup(self::CLASS_NODELIST)
         );
     }
 }
