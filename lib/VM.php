@@ -9079,8 +9079,6 @@ restart:
             $dst->copyFrom($src);
 
             return null;
-        } catch (\Error $e) {
-            return $this->dispatchVmError($e->getMessage(), $frame);
         } catch (\TypeError $e) {
             $resolved = $dst->resolveIndirect();
             if ($resolved->isArrayAccessOffset()) {
@@ -9088,6 +9086,8 @@ restart:
             }
 
             return $this->dispatchVmTypeError($e, $frame);
+        } catch (\Error $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
         }
     }
 

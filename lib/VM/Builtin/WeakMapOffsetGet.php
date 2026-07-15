@@ -25,6 +25,7 @@ final class WeakMapOffsetGet extends VmClassMethod
             return;
         }
         $receiver = WeakRefSupport::requireObject($frame->calledArgs[0], 'WeakMap');
+        WeakRefSupport::requireWeakMapKey($frame->calledArgs[1]);
         $map = $receiver->toObject();
         WeakRefSupport::purgeStaleMapEntries($map);
         if (!WeakRefSupport::isTargetAlive($frame->calledArgs[1])) {
