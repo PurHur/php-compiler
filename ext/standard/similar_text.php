@@ -74,11 +74,12 @@ final class similar_text extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+        if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'similar_text', $paramName)->toString();
         }
 
-        return VmString::coerceStringBuiltinArg(
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19243, string.c).
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[$argIndex],
             'similar_text',
             $argIndex,
@@ -92,7 +93,17 @@ final class similar_text extends Internal
         int $argNumber,
         string $paramName
     ): Value {
-        return JitStringBuiltinArg::lowerStrictOrCoercible(
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'similar_text',
+                $argNumber - 1,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
             $context,
             $arg,
             'similar_text',
