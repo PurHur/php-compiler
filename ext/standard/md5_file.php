@@ -28,7 +28,7 @@ final class md5_file extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'md5_file', 0, 'filename', $frame);
+        $path = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 0, 'md5_file', 'filename');
         $raw = false;
         if (2 === $argc) {
             $rawArg = $frame->calledArgs[1]->resolveIndirect();
