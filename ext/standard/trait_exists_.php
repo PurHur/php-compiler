@@ -7,10 +7,13 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** trait_exists() — whether a user trait is registered (issue #1371). */
+/** trait_exists() — whether a user trait is registered (issue #1371, #19223). */
 final class trait_exists_ extends Internal
 {
     public function __construct()
@@ -24,7 +27,8 @@ final class trait_exists_ extends Internal
             throw new \LogicException('trait_exists() requires one or two arguments in this compiler build');
         }
         $ctx = VmReflection::requireContext($frame);
-        $name = VmReflection::stringArg($frame->calledArgs[0], 'trait_exists() trait name', 0);
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19223, zend_builtin_functions.c).
+        $name = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'trait_exists', 0, 'trait');
         $autoload = VmReflection::autoloadFlagFromFrame($frame);
         $exists = VmReflection::traitExists($ctx, $name, $autoload);
         if (null !== $frame->returnVar) {
@@ -37,11 +41,35 @@ final class trait_exists_ extends Internal
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('trait_exists() requires one or two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_STRING !== $args[0]->type && JITVariable::TYPE_VALUE !== $args[0]->type) {
-            throw new \LogicException('trait_exists() trait name must be a string in this compiler build');
+        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        if (null !== $literal) {
+            return ReflectionBuiltinHelper::traitExistsLiteral($context, $literal);
         }
 
-        return JitTraitExists::invoke($context, $args[0]);
+        return JitTraitExists::invokeLowered(
+            $context,
+            self::jitNameArg($context, $args[0])
+        );
+    }
+
+    private static function jitNameArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'trait_exists',
+                0,
+                'trait'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'trait_exists',
+            0,
+            'trait'
+        );
     }
 }
-

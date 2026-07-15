@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * JIT/AOT helper for interface_exists() via InterfaceExistsJitHelper PHP (#1371, #16185).
+ * JIT/AOT helper for interface_exists() via InterfaceExistsJitHelper PHP (#1371, #16185, #19223).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -24,9 +24,15 @@ final class JitInterfaceExists
             return ReflectionBuiltinHelper::interfaceExistsLiteral($context, $literal);
         }
 
-        return StringInterfaceExists::invoke(
+        return self::invokeLowered(
             $context,
             JitStringArg::lower($context, $nameArg, 'interface_exists() interface name')
         );
+    }
+
+    /** Pre-lowered {@see __string__*} name (8.4 Z_PARAM_STR null guard at call site, #19223). */
+    public static function invokeLowered(Context $context, Value $nameStr): Value
+    {
+        return StringInterfaceExists::invoke($context, $nameStr);
     }
 }
