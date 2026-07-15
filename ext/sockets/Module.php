@@ -48,6 +48,9 @@ class Module extends ModuleAbstract
             new socket_read(),
             new socket_write(),
             new socket_close(),
+            new socket_strerror(),
+            new socket_last_error(),
+            new socket_clear_error(),
         ];
     }
 }
