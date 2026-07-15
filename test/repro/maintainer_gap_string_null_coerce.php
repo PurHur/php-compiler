@@ -1,9 +1,9 @@
 <?php
 
 // #19161 — Z_PARAM_STR/Z_PARAM_LONG null coerces on PHP_COMPILER_PROFILE=8.4 (ext/standard/string.c).
+// trim()/ltrim()/rtrim()/chop() now TypeError on 8.4 (#19254); covered separately.
 
 $checks = [
-    ['trim(null)', trim(null)],
     ['dirname(null)', dirname(null)],
     ['explode(",", null)', explode(',', null)],
     ['ord(null)', ord(null)],
@@ -15,9 +15,6 @@ foreach ($checks as [$label, $result]) {
     echo $label, ' => ';
     var_export($result);
     echo "\n";
-    if ('trim(null)' === $label && '' !== $result) {
-        ++$failed;
-    }
     if ('dirname(null)' === $label && '' !== $result) {
         ++$failed;
     }

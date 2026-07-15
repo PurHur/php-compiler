@@ -65,10 +65,11 @@ final class VmString
     }
 
     /**
-     * Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222).
+     * Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222, #19254).
      *
-     * Distinct from {@see requiresForwardProfileStrictStringNull}: chr/trim/crc32 coerce null to "" on 8.4;
-     * unserialize/substr use this stricter guard (php-src ext/standard/string.c, var_unserializer.c).
+     * Distinct from {@see requiresForwardProfileStrictStringNull}: chr/crc32 still coerce null to "" on 8.4;
+     * trim/ltrim/rtrim/chop, unserialize/substr, and other typed string builtins use this stricter guard
+     * (php-src ext/standard/string.c, var_unserializer.c).
      */
     public static function requiresZparamStrStrictNullOnForwardProfile(): bool
     {
