@@ -54,6 +54,12 @@ final class StringHtmlspecialchars
             return;
         }
 
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            StringHtmlspecialcharsUserScriptLlvm::ensureLinked($context);
+
+            return;
+        }
+
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::implementBridge($context);
         if (null !== $savedInsert) {
