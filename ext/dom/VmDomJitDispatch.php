@@ -113,6 +113,27 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function importNode(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        $node = VariableObject::entry($extra[0] ?? self::missingArg('importNode', 0));
+        $deep = false;
+        if (isset($extra[1])) {
+            $deepVar = $extra[1]->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $deepVar->type) {
+                $deep = $deepVar->toBool();
+            } elseif (Variable::TYPE_INTEGER === $deepVar->type) {
+                $deep = 0 !== $deepVar->toInt();
+            } else {
+                throw new \TypeError('DOMDocument::importNode(): Argument #2 ($deep) must be of type bool');
+            }
+        }
+
+        return VmDom::importNode($ctx, $document, $node, $deep);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function createDocumentFragment(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
         return VmDom::createDocumentFragment($ctx, $document);

@@ -30,6 +30,7 @@ function collectCapabilities(string $root): array
         'ctype' => new PHPCompiler\ext\ctype\Module(),
         'tokenizer' => new PHPCompiler\ext\tokenizer\Module(),
         'filter' => new PHPCompiler\ext\filter\Module(),
+        'fileinfo' => new PHPCompiler\ext\fileinfo\Module(),
         'iconv' => new PHPCompiler\ext\iconv\Module(),
         'session' => new PHPCompiler\ext\session\Module(),
         'mbstring' => new PHPCompiler\ext\mbstring\Module(),
@@ -107,6 +108,9 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
     }
     if ('mime_content_type' === $fn->getName() && preg_match('/MimeContentTypeRuntime/i', $source)) {
         $notes[] = 'file MIME sniff (VM host fileinfo + AOT byte sniff) (#6196)';
+    }
+    if (str_starts_with($fn->getName(), 'finfo_') && preg_match('/VmFinfo|VmMime/i', $source)) {
+        $notes[] = 'ext/fileinfo VM sniff via VmMime (JIT deferred) (#3366)';
     }
     if ('openssl_cipher_key_length' === $fn->getName()
         && preg_match('/JitOpensslCipherKeyLength/i', $source)) {

@@ -61,6 +61,9 @@ final class DomInstanceMethodJit
         'domnode::prepend' => true,
         'domnode::replacechildren' => true,
         'domdocument::createdocumentfragment' => true,
+        'domdocument::importnode' => true,
+        'domelement::getattribute' => true,
+        'domnode::getattribute' => true,
         'domxpath::query' => true,
         'domxpath::evaluate' => true,
         'domnodelist::item' => true,
@@ -108,6 +111,16 @@ final class DomInstanceMethodJit
             }
             if ('domdocument::getelementbyid' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentGetElementById();
+
+                return;
+            }
+            if ('domdocument::importnode' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentImportNode();
+
+                return;
+            }
+            if ('domelement::getattribute' === $lc || 'domnode::getattribute' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementGetAttribute();
 
                 return;
             }
@@ -236,6 +249,9 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domxpath::query');
             self::ensureProxy($context, 'domxpath::evaluate');
             self::ensureProxy($context, 'domnodelist::item');
+            self::ensureProxy($context, 'domdocument::importnode');
+            self::ensureProxy($context, 'domelement::getattribute');
+            self::ensureProxy($context, 'domnode::getattribute');
 
             return;
         }
