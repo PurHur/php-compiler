@@ -29,6 +29,12 @@ final class DomLoadHTMLRuntime
 
     public static function ensureLinked(Context $context): void
     {
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            DomDocumentMethodUserScriptLlvm::ensureLoadHTMLBridge($context);
+
+            return;
+        }
+
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);

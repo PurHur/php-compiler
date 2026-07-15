@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\Intdiv as JitIntdiv;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -28,6 +28,8 @@ final class JitDomLoadHTML
         if (JitDomLoadHTMLUserScript::shouldUse($context)) {
             return JitDomLoadHTMLUserScript::invoke($context, ...$args);
         }
+
+        DomLoadHTMLRuntime::ensureLinked($context);
 
         $document = self::loadObjectArg($context, $args[0]);
         $htmlStr = self::loadStringArg($context, $args[1]);

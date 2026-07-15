@@ -4135,21 +4135,19 @@ final class VmDom
 
         $state = DomRegistry::state($document);
         $state->isHtmlDocument = true;
-        $noDoctype = 0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_HTML_NODEFDTD);
+        $noDefDtd = 0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_HTML_NODEFDTD);
         if (null !== $doctypeDecl) {
-            if (!$noDoctype) {
-                $childIds = array_merge(
-                    [self::attachDoctypeChild(
-                        $ctx,
-                        $document,
-                        $doctypeDecl['name'],
-                        $doctypeDecl['publicId'],
-                        $doctypeDecl['systemId']
-                    )->id],
-                    $childIds
-                );
-            }
-        } elseif (!$noDoctype) {
+            $childIds = array_merge(
+                [self::attachDoctypeChild(
+                    $ctx,
+                    $document,
+                    $doctypeDecl['name'],
+                    $doctypeDecl['publicId'],
+                    $doctypeDecl['systemId']
+                )->id],
+                $childIds
+            );
+        } elseif (!$noDefDtd) {
             $childIds = array_merge(
                 [self::attachDoctypeChild(
                     $ctx,

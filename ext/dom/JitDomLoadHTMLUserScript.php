@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\ext\libxml\LibxmlConstants;
+use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
@@ -11,6 +13,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -36,9 +39,16 @@ final class JitDomLoadHTMLUserScript
     /** @var array{tag: string, id: string, text: string}|null */
     private static ?array $lastCompileTimeParsed = null;
 
+    private static ?int $lastCompileTimeOptions = null;
+
     public static function lastCompileTimeParsedHtml(): ?string
     {
         return self::$lastCompileTimeHtml;
+    }
+
+    public static function lastCompileTimeOptions(): ?int
+    {
+        return self::$lastCompileTimeOptions;
     }
 
     /**
@@ -66,12 +76,18 @@ final class JitDomLoadHTMLUserScript
             throw new \LogicException('DOMDocument::loadHTML() expects receiver and HTML string');
         }
 
+        self::rememberCompileTimeOptions($context, $args[2] ?? null);
+
         $parsed = self::tryParseCompileTimeHtml($args[1]);
         if (null === $parsed) {
             $parsed = self::$lastCompileTimeParsed;
         }
         $i1 = $context->getTypeFromString('int1');
         if (null === $parsed) {
+            if (self::hasCompileTimeFragmentLoad($args[1])) {
+                return $i1->constInt(1, false);
+            }
+
             return $i1->constInt(0, false);
         }
         self::$lastCompileTimeParsed = $parsed;
@@ -96,6 +112,66 @@ final class JitDomLoadHTMLUserScript
         }
 
         return DomParseSimpleHtmlJitHelper::parseArgv($lit);
+    }
+
+    public static function rememberCompileTimeOptions(Context $context, ?JITVariable $optionsArg): void
+    {
+        if (null === $optionsArg || NamedOptionalCallArgs::isOmittedOptional($optionsArg)) {
+            self::$lastCompileTimeOptions = 0;
+
+            return;
+        }
+        $resolved = self::tryCompileTimeInt($context, $optionsArg);
+        self::$lastCompileTimeOptions = $resolved;
+    }
+
+    private static function tryCompileTimeInt(Context $context, JITVariable $optionsArg): ?int
+    {
+        if (null !== $optionsArg->compileTimeLong) {
+            return $optionsArg->compileTimeLong;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $optionsArg->type && JITVariable::KIND_VALUE === $optionsArg->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($optionsArg->value->value)) {
+                return (int) $lib->LLVMConstIntGetZExtValue($optionsArg->value->value);
+            }
+        }
+        $literal = $optionsArg->compileTimeString ?? null;
+        if (null !== $literal && is_numeric($literal) && ((string) (int) $literal) === $literal) {
+            return (int) $literal;
+        }
+        $name = $optionsArg->compileTimeConstantName ?? null;
+        if (null !== $name) {
+            $lookup = strtolower($name);
+            if (isset(StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+                return StdlibConstants::CORE_INT_BY_NAME[$lookup];
+            }
+            $vm = $context->runtime->vmContext;
+            if (null !== $vm) {
+                $phpVar = $vm->constantFetch($name);
+                if (null !== $phpVar && \PHPCompiler\VM\Variable::TYPE_INTEGER === $phpVar->type) {
+                    return $phpVar->toInt();
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function hasCompileTimeFragmentLoad(JITVariable $htmlArg): bool
+    {
+        $options = self::$lastCompileTimeOptions;
+        if (null === $options || 0 === $options) {
+            return false;
+        }
+        $noImplied = 0 !== ($options & LibxmlConstants::LIBXML_HTML_NOIMPLIED);
+        $noDefDtd = 0 !== ($options & LibxmlConstants::LIBXML_HTML_NODEFDTD);
+        if (!$noImplied || !$noDefDtd) {
+            return false;
+        }
+        $lit = JitStringBuiltinArg::compileTimeLiteral($htmlArg) ?? $htmlArg->compileTimeString;
+
+        return null !== $lit && '' !== trim($lit);
     }
 
     /**
