@@ -30,7 +30,7 @@ final class soundex extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('soundex() requires exactly one argument in this compiler build');
         }
-        $string = self::vmStringArg($frame, 0, 'string');
+        $string = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'soundex', 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -50,36 +50,7 @@ final class soundex extends Internal
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_soundex'),
-            self::jitStringArg($context, $args[0], 1, 'string')
-        );
-    }
-
-    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
-    {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'soundex', $paramName)->toString();
-        }
-
-        return VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[$argIndex],
-            'soundex',
-            $argIndex,
-            $paramName
-        );
-    }
-
-    private static function jitStringArg(
-        Context $context,
-        JITVariable $arg,
-        int $argNumber,
-        string $paramName
-    ): Value {
-        return JitStringBuiltinArg::lowerStrictOrCoercible(
-            $context,
-            $arg,
-            'soundex',
-            $argNumber - 1,
-            $paramName
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'soundex', 0, 'string')
         );
     }
 }

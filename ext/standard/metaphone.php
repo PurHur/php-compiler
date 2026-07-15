@@ -32,7 +32,7 @@ final class metaphone extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('metaphone() accepts one or two arguments in this compiler build');
         }
-        $string = self::vmStringArg($frame, 0, 'string');
+        $string = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'metaphone', 'string');
         $maxPhonemes = 0;
         if ($argc >= 2) {
             $maxVar = $frame->calledArgs[1]->resolveIndirect();
@@ -72,37 +72,8 @@ final class metaphone extends Internal
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_metaphone'),
-            self::jitStringArg($context, $args[0], 1, 'string'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'metaphone', 0, 'string'),
             $maxPhonemes
-        );
-    }
-
-    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
-    {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'metaphone', $paramName)->toString();
-        }
-
-        return VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[$argIndex],
-            'metaphone',
-            $argIndex,
-            $paramName
-        );
-    }
-
-    private static function jitStringArg(
-        Context $context,
-        JITVariable $arg,
-        int $argNumber,
-        string $paramName
-    ): Value {
-        return JitStringBuiltinArg::lowerStrictOrCoercible(
-            $context,
-            $arg,
-            'metaphone',
-            $argNumber - 1,
-            $paramName
         );
     }
 }

@@ -31,7 +31,7 @@ final class hebrev extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('hebrev() accepts one or two arguments in this compiler build');
         }
-        $string = self::vmStringArg($frame, 0, 'string');
+        $string = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'hebrev', 'string');
         $maxCharsPerLine = 0;
         if ($argc >= 2) {
             $maxVar = $frame->calledArgs[1]->resolveIndirect();
@@ -51,17 +51,4 @@ final class hebrev extends Internal
         return JitHebrev::invoke($context, ...$args);
     }
 
-    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
-    {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'hebrev', $paramName)->toString();
-        }
-
-        return VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[$argIndex],
-            'hebrev',
-            $argIndex,
-            $paramName
-        );
-    }
 }
