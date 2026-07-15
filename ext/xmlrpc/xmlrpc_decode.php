@@ -29,6 +29,11 @@ final class xmlrpc_decode extends XmlrpcFunction
             throw new \LogicException('xmlrpc_decode() accepts at most two arguments');
         }
 
+        $falseLiteral = JitXmlrpcCompileTime::tryDecodeFalseLiteral($context, $args[0]);
+        if (null !== $falseLiteral) {
+            return $falseLiteral;
+        }
+
         return JitXmlrpc::decode($context, $args[0]);
     }
 

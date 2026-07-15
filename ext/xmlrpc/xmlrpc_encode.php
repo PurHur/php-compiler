@@ -23,6 +23,16 @@ final class xmlrpc_encode extends XmlrpcFunction
             throw new \LogicException('xmlrpc_encode() requires exactly one argument');
         }
 
+        $encoded = JitXmlrpcCompileTime::tryEncode(
+            $context,
+            $args[0],
+            $context->jitEnclosingBlock,
+            $context->jitXmlrpcEncodeValueOperand
+        );
+        if (null !== $encoded) {
+            return $encoded;
+        }
+
         return JitXmlrpc::encode($context, $args[0]);
     }
 

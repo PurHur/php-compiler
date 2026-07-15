@@ -75,6 +75,9 @@ class Context {
     /** Operand for json_encode() value arg during FUNCCALL lowering (#14040). */
     public ?Operand $jitJsonEncodeValueOperand = null;
 
+    /** Operand for compile-time xmlrpc_encode() array/scalar literals (#19048). */
+    public ?Operand $jitXmlrpcEncodeValueOperand = null;
+
     /** Operand for call_user_func_array() $args during FUNCCALL lowering (#10359). */
     public ?Operand $jitCallUserFuncArrayParamsOperand = null;
 

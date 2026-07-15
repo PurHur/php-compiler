@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\xmlrpc;
 
 /**
- * xmlrpc_decode() JIT step-1 — XML string to JSON text (#19048).
+ * xmlrpc_decode() JIT/AOT helper (#19048).
  *
  * Manual JSON emitter avoids nested json_encode() JIT during helper compile.
  */

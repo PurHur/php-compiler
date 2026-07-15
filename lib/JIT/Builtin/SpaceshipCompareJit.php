@@ -372,7 +372,7 @@ final class SpaceshipCompareJit
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $dbl = $context->getTypeFromString('double');
-        $zeroDbl = $dbl->constFloat(0.0, false);
+        $zeroDbl = $dbl->constFloat(0.0);
 
         $boolLeftCases = [
             [self::TYPE_LONG, fn () => $context->builder->sitofp(
@@ -525,7 +525,7 @@ final class SpaceshipCompareJit
             $i64->constInt(0, false),
             self::spaceshipNumberString(
                 $context,
-                $context->getTypeFromString('double')->constFloat(0.0, false),
+                $context->getTypeFromString('double')->constFloat(0.0),
                 $str,
                 $numOnLeft
             )

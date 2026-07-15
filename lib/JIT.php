@@ -9928,6 +9928,14 @@ class JIT {
                     ) {
                         $this->context->jitJsonEncodeValueOperand = $callOperands[0];
                     }
+                    $savedXmlrpcEncodeValueOperand = $this->context->jitXmlrpcEncodeValueOperand;
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'xmlrpc_encode' === strtolower($this->context->scope->toCall->getName())
+                        && isset($callOperands[0])
+                    ) {
+                        $this->context->jitXmlrpcEncodeValueOperand = $callOperands[0];
+                    }
                     $savedCallUserFuncArrayOperand = $this->context->jitCallUserFuncArrayParamsOperand;
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
@@ -9953,6 +9961,7 @@ class JIT {
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
                     $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
+                    $this->context->jitXmlrpcEncodeValueOperand = $savedXmlrpcEncodeValueOperand;
                     $this->context->jitCallUserFuncArrayParamsOperand = $savedCallUserFuncArrayOperand;
                     $this->context->jitMbNumericEntityConvmapOperand = $savedMbNumericEntityConvmapOperand;
                     $this->context->jitMbNumericEntityConvmapBlock = $savedMbNumericEntityConvmapBlock;
