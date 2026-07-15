@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\ext\calendar\CalendarConstants;
 use PHPCompiler\ext\curl\CurlConstants;
 use PHPCompiler\ext\dom\DomExceptionConstants;
+use PHPCompiler\ext\fileinfo\FileinfoConstants;
 use PHPCompiler\ext\filter\FilterConstants;
 use PHPCompiler\ext\gd\GdConstants;
 use PHPCompiler\ext\gd\GdExtensionPolicy;
@@ -76,6 +77,7 @@ final class ExtensionConstantGroups
         $groups['uuid'] = UuidConstants::registeredConstants();
         $groups['xml'] = XmlConstants::registeredConstants();
         $groups['sockets'] = SocketConstants::registeredConstants();
+        $groups['fileinfo'] = FileinfoConstants::registeredConstants();
         if (GdExtensionPolicy::advertisesDrawing()) {
             $groups['gd'] = GdConstants::REGISTERED;
         }
