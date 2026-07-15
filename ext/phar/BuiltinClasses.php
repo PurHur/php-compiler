@@ -9,10 +9,16 @@ use PHPCompiler\VM\Builtin\PharRunning;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 
-/** Register ext/phar builtin classes (php-src ext/phar/phar.stub.php; #3436). */
+/** Register ext/phar builtin classes (php-src ext/phar/phar.stub.php; #3436, #6490). */
 final class BuiltinClasses
 {
     public static function register(Context $ctx): void
+    {
+        self::registerPhar($ctx);
+        PharDataBuiltin::register($ctx);
+    }
+
+    public static function registerPhar(Context $ctx): void
     {
         if (isset($ctx->classes[VmPhar::CLASS_LC])) {
             return;

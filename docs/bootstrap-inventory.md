@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4927 |
-| Phase A inventory files (M2 ratio SSOT) | 4927 |
+| PHP files on vm.php path | 4930 |
+| Phase A inventory files (M2 ratio SSOT) | 4930 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13199 |
+| Source constructs flagged (warnings) | 13222 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -724,8 +724,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pcntl/pcntl_wifexited.php` | 0 | 4 |
 | `ext/phar/BuiltinClasses.php` | 0 | 3 |
 | `ext/phar/Module.php` | 0 | 1 |
+| `ext/phar/PharDataBuiltin.php` | 0 | 9 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 1 |
+| `ext/phar/VmPharData.php` | 0 | 13 |
+| `ext/phar/VmPharTar.php` | 0 | 1 |
 | `ext/posix/JitPosix.php` | 0 | 1 |
 | `ext/posix/JitPosixTimes.php` | 0 | 1 |
 | `ext/posix/Module.php` | 0 | 29 |
@@ -9647,14 +9650,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 22)
-- new PharRunning (line 23)
-- 1 class method(s)
+- new ClassEntry (line 28)
+- new PharRunning (line 29)
+- 2 class method(s)
 
 ### `ext/phar/Module.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/phar/PharDataBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 31)
+- new PharDataConstruct (line 43)
+- new ArgumentCountError (line 80)
+- new ArgumentCountError (line 100)
+- new ArgumentCountError (line 126)
+- new ArgumentCountError (line 151)
+- new ArgumentCountError (line 171)
+- new ArgumentCountError (line 194)
+- 9 class method(s)
 
 ### `ext/phar/PharExtensionPolicy.php`
 
@@ -9665,6 +9681,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/phar/VmPharData.php`
+
+**Warnings** (review for bootstrap subset):
+- new UnexpectedValueException (line 46)
+- new UnexpectedValueException (line 59)
+- new UnexpectedValueException (line 71)
+- new BadMethodCallException (line 117)
+- new Variable (line 120)
+- new ObjectEntry (line 121)
+- new Error (line 135)
+- new Error (line 144)
+- new UnexpectedValueException (line 171)
+- new Error (line 182)
+- new ClassEntry (line 193)
+- new PharFileInfoGetContent (line 195)
+- 13 class method(s)
+
+### `ext/phar/VmPharTar.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
 
 ### `ext/posix/JitPosix.php`
 
