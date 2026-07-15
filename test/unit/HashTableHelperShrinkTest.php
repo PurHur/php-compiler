@@ -193,5 +193,6 @@ final class HashTableHelperShrinkTest extends TestCase
         $read = (string) file_get_contents(__DIR__.'/../../lib/JIT/HashTableReadLlvm.php');
         $this->assertStringContainsString('public static function loadHashtablePointer', $read);
         $this->assertStringContainsString('public static function listEntryPointer', $read);
+        $this->assertStringContainsString('public static function forEachStringKeyNode', $read);
     }
 }

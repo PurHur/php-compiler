@@ -106,7 +106,10 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ScopeBuiltinEmitHelper.php');
         $loc = substr_count($source, "\n") + 1;
-        $this->assertLessThan(835, $loc, 'ScopeBuiltinEmitHelper.php LOC');
+        $this->assertLessThan(800, $loc, 'ScopeBuiltinEmitHelper.php LOC');
+        $this->assertStringContainsString('HashTableReadLlvm::forEachStringKeyNode', $source);
+        $this->assertStringNotContainsString('scope_import_str_head', $source);
+        $this->assertStringNotContainsString('compact_names_str_head', $source);
         $this->assertStringContainsString('branchOnNamedVariableIndex', $source);
         $this->assertStringNotContainsString("lookupFunction('strcmp')", $source);
     }
