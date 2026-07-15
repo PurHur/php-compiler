@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -71,14 +71,13 @@ final class strtr extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $subjectEarly = self::lowerStrtrSubjectEarly($context, $args[0]);
+        if (null !== $subjectEarly) {
+            return $subjectEarly;
+        }
+
         if (\count($args) >= 2 && self::isReplacePairsArg($args[1])) {
-            return JitStrtr::translateArray(
-                $context,
-                JitStringBuiltinArg::lower($context, $args[0], 'strtr', 0, 'string'),
-                $this->loadReplacePairs($context, $args[1]),
-                $args[0],
-                $args[1]
-            );
+            return JitStrtr::translateArray($context, $args[0], $args[1]);
         }
         if (3 === \count($args)) {
             return JitStrtr::translate(
@@ -118,6 +117,31 @@ final class strtr extends Internal
         return new \TypeError('strtr(): Argument #2 ($from) must be of type array, string given');
     }
 
+    /**
+     * Compile-time / literal null subject — avoid StringStrtr::ensureLinked on sealed blocks (#18981).
+     */
+    private static function lowerStrtrSubjectEarly(Context $context, JITVariable $subject): ?Value
+    {
+        if (!self::isNullStrtrSubject($subject)) {
+            return null;
+        }
+        if ($context->callerStrictTypes || JitStringBuiltinArg::requiresForwardProfileStrictStringNull()) {
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $subject, 'strtr', 0, 'string');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'strtr_null_typeerror_done');
+
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+        JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'strtr', 0, 'string');
+
+        return $context->builder->load($context->constantStringFromString(''));
+    }
+
+    private static function isNullStrtrSubject(JITVariable $subject): bool
+    {
+        return JITVariable::TYPE_NULL === $subject->type
+            || ($subject->isNullConstant ?? false);
+    }
+
     private static function isReplacePairsArg(JITVariable $arg): bool
     {
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
@@ -131,10 +155,5 @@ final class strtr extends Internal
         }
 
         return false;
-    }
-
-    private function loadReplacePairs(Context $context, JITVariable $arg): Value
-    {
-        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 }

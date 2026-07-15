@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\StringStrtr;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -22,6 +25,11 @@ final class JitStrtr
         ?JITVariable $fromArg = null,
         ?JITVariable $toArg = null
     ): Value {
+        $nullEarly = self::lowerNullSubjectEarly($context, $subjectArg);
+        if (null !== $nullEarly) {
+            return $nullEarly;
+        }
+
         if (null !== $subjectArg && null !== $fromArg && null !== $toArg) {
             $sLit = JitStringArg::compileTimeLiteral($subjectArg);
             $fLit = JitStringArg::compileTimeLiteral($fromArg);
@@ -44,20 +52,27 @@ final class JitStrtr
 
     public static function translateArray(
         Context $context,
-        Value $subject,
-        Value $replacePairs,
-        ?JITVariable $subjectArg = null,
-        ?JITVariable $pairsArg = null
+        JITVariable $subjectArg,
+        JITVariable $pairsArg
     ): Value {
-        if (null !== $subjectArg && null !== $pairsArg) {
+        $nullEarly = self::lowerNullSubjectEarly($context, $subjectArg);
+        if (null !== $nullEarly) {
+            return $nullEarly;
+        }
+
+        $pairsLit = self::compileTimePairs($pairsArg);
+        if (null !== $pairsLit) {
             $sLit = JitStringArg::compileTimeLiteral($subjectArg);
-            $pairsLit = self::compileTimePairs($pairsArg);
-            if (null !== $sLit && null !== $pairsLit) {
+            if (null !== $sLit) {
                 return $context->builder->load(
                     $context->constantStringFromString(VmString::strtrArray($sLit, $pairsLit))
                 );
             }
         }
+
+        $subject = JitStringBuiltinArg::lower($context, $subjectArg, 'strtr', 0, 'string');
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'strtr_array_subject_cont');
+        $replacePairs = ArrayBuiltinHelper::loadHashTable($context, $pairsArg);
         StringStrtr::ensureLinked($context);
 
         return $context->builder->call(
@@ -84,5 +99,24 @@ final class JitStrtr
         }
 
         return $pairs;
+    }
+
+    private static function lowerNullSubjectEarly(Context $context, ?JITVariable $subjectArg): ?Value
+    {
+        if (null === $subjectArg) {
+            return null;
+        }
+        if (JITVariable::TYPE_NULL !== $subjectArg->type && !($subjectArg->isNullConstant ?? false)) {
+            return null;
+        }
+        if ($context->callerStrictTypes || JitStringBuiltinArg::requiresForwardProfileStrictStringNull()) {
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $subjectArg, 'strtr', 0, 'string');
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'strtr_null_subject_typeerror_done');
+
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+        JitStringBuiltinArg::emitNullStringParamDeprecation($context, 'strtr', 0, 'string');
+
+        return $context->builder->load($context->constantStringFromString(''));
     }
 }

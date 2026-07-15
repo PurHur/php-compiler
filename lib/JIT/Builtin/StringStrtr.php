@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableNestedExportLlvm;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -46,6 +47,10 @@ final class StringStrtr
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $twoStringProbe = $context->module->getNamedFunction('__compiler_strtr');
         $arrayProbe = $context->module->getNamedFunction('__compiler_strtr_array');
         if (null !== $twoStringProbe && $twoStringProbe->countBasicBlocks() > 0
@@ -55,12 +60,17 @@ final class StringStrtr
             return;
         }
 
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureTwoStringHelperCompiled($context);
         self::implementTwoStringBridge($context);
         self::ensureArrayHelperCompiled($context);
         self::implementArrayBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementTwoStringBridge(Context $context): void
