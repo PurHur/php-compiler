@@ -1,5 +1,6 @@
 --TEST--
 openssl openssl_digest(null) — empty-string SHA256 on default profile JIT (#19039, ext/openssl/openssl.c)
+--JIT--
 --FILE--
 <?php
 echo openssl_digest(null, 'sha256'), "\n";

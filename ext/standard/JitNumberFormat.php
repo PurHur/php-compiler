@@ -68,9 +68,7 @@ final class JitNumberFormat
 
         $argc = \count($args);
 
-        if ($context->callerStrictTypes || version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
-            self::rejectNullNum($context, $args[0]);
-        }
+        self::rejectNullNum($context, $args[0]);
 
         $number = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'number_format', 'float');
         $i64 = $context->getTypeFromString('int64');
