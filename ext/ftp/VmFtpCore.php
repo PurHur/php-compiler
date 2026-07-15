@@ -22,14 +22,31 @@ final class VmFtpCore
 
     public static function connect(string $hostname, int $port, int $timeout, Context $ctx): Variable|false
     {
-        $remote = self::remoteUri($hostname, $port);
-        [$handle, $errno, $errstr] = VmStreamSocketNative::client(
-            $remote,
-            (float) $timeout,
-            \STREAM_CLIENT_CONNECT
-        );
+        return self::openConnection($hostname, $port, $timeout, $ctx, false);
+    }
+
+    public static function sslConnect(string $hostname, int $port, int $timeout, Context $ctx): Variable|false
+    {
+        return self::openConnection($hostname, $port, $timeout, $ctx, true);
+    }
+
+    private static function openConnection(
+        string $hostname,
+        int $port,
+        int $timeout,
+        Context $ctx,
+        bool $ssl
+    ): Variable|false {
+        $function = $ssl ? 'ftp_ssl_connect' : 'ftp_connect';
+        [$handle, $errno, $errstr] = $ssl
+            ? self::clientSsl($hostname, $port, $timeout)
+            : VmStreamSocketNative::client(
+                self::remoteUri($hostname, $port, 'tcp'),
+                (float) $timeout,
+                \STREAM_CLIENT_CONNECT
+            );
         if (false === $handle) {
-            self::warnConnectFailed($hostname, $port, $errno, $errstr);
+            self::warnConnectFailed($function, $errno, $errstr);
 
             return false;
         }
@@ -37,7 +54,7 @@ final class VmFtpCore
         $greeting = self::readReplyLine($handle);
         if (null === $greeting || !self::isPositivePreliminary($greeting)) {
             VmFs::fclose($handle);
-            self::warnConnectFailed($hostname, $port, 0, 'Unexpected FTP response');
+            self::warnConnectFailed($function, 0, 'Unexpected FTP response');
 
             return false;
         }
@@ -51,10 +68,38 @@ final class VmFtpCore
             'host' => $hostname,
             'port' => $port,
             'closed' => false,
+            'ssl' => $ssl,
         ];
         $var->object($object);
 
         return $var;
+    }
+
+    /**
+     * @return array{0: int|false, 1: int, 2: string}
+     */
+    private static function clientSsl(string $hostname, int $port, int $timeout): array
+    {
+        if (!\function_exists('stream_socket_client')) {
+            return [false, 0, 'ssl:// transport is not supported in this compiler build'];
+        }
+
+        $remote = self::remoteUri($hostname, $port, 'ssl');
+        $errno = 0;
+        $errstr = '';
+        $sock = @\stream_socket_client($remote, $errno, $errstr, (float) $timeout, \STREAM_CLIENT_CONNECT);
+        if (false === $sock) {
+            return [false, $errno, '' !== $errstr ? $errstr : 'Connection refused'];
+        }
+
+        $handle = VmFs::adoptStreamResource($sock, $remote);
+        if (false === $handle) {
+            @\fclose($sock);
+
+            return [false, 0, 'Unable to create stream from socket'];
+        }
+
+        return [$handle, 0, ''];
     }
 
     public static function close(ObjectEntry $connection): bool
@@ -99,13 +144,13 @@ final class VmFtpCore
         }
     }
 
-    private static function remoteUri(string $hostname, int $port): string
+    private static function remoteUri(string $hostname, int $port, string $transport = 'tcp'): string
     {
         if (-1 === $port) {
-            return 'tcp://'.$hostname;
+            return $transport.'://'.$hostname;
         }
 
-        return 'tcp://'.$hostname.':'.$port;
+        return $transport.'://'.$hostname.':'.$port;
     }
 
     private static function readReplyLine(int $handle): ?string
@@ -134,14 +179,13 @@ final class VmFtpCore
         return 220 === $code || (120 <= $code && $code < 200);
     }
 
-    private static function warnConnectFailed(string $hostname, int $port, int $errno, string $errstr): void
+    private static function warnConnectFailed(string $function, int $errno, string $errstr): void
     {
-        unset($hostname, $port);
         $detail = '' !== $errstr ? $errstr : 'Connection refused';
         if (0 !== $errno) {
             $detail .= ' ('.$errno.')';
         }
-        $message = 'ftp_connect(): connect() failed: '.$detail;
+        $message = $function.'(): connect() failed: '.$detail;
         $vm = VM::running();
         if (null === $vm) {
             @\trigger_error($message, \E_WARNING);
