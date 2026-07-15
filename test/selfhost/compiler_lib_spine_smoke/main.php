@@ -3591,7 +3591,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/MathSqrt.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathTan.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathTanh.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MbNumericEntity.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/MbNumericEntityLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MbStrcut.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MbStrwidth.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MemoryManager.php';

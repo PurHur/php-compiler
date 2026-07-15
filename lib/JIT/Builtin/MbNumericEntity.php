@@ -8,7 +8,6 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /**
  * JIT/AOT link for mb_encode/decode_numericentity() via MbNumericEntityJitHelper PHP (#7237).
@@ -48,12 +47,6 @@ final class MbNumericEntity
     private static function implement(Context $context): void
     {
         if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            MbNumericEntityLlvm::implement($context);
-
             return;
         }
 

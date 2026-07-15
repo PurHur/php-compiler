@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4894 |
-| Phase A inventory files (M2 ratio SSOT) | 4894 |
+| PHP files on vm.php path | 4893 |
+| Phase A inventory files (M2 ratio SSOT) | 4893 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13128 |
+| Source constructs flagged (warnings) | 13126 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1867,7 +1867,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmDirNative.php` | 0 | 1 |
 | `ext/standard/VmDirOpenFailure.php` | 0 | 1 |
 | `ext/standard/VmDirPure.php` | 0 | 1 |
-| `ext/standard/VmDns.php` | 0 | 11 |
+| `ext/standard/VmDns.php` | 0 | 10 |
 | `ext/standard/VmDnsMx.php` | 0 | 8 |
 | `ext/standard/VmDnsUdpNative.php` | 0 | 1 |
 | `ext/standard/VmDnsUdpPure.php` | 0 | 1 |
@@ -3523,7 +3523,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MathTan.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathTanh.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbNumericEntity.php` | 0 | 1 |
-| `lib/JIT/Builtin/MbNumericEntityLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbStrcut.php` | 0 | 2 |
 | `lib/JIT/Builtin/MbStrwidth.php` | 0 | 2 |
 | `lib/JIT/Builtin/MemoryManager.php` | 0 | 4 |
@@ -17453,14 +17452,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 128)
 - new Variable (line 130)
-- new HashTable (line 340)
 - new HashTable (line 366)
 - new HashTable (line 369)
 - new Variable (line 371)
-- new HashTable (line 547)
-- new Variable (line 570)
-- new Variable (line 577)
-- 42 class method(s)
+- new HashTable (line 591)
+- new Variable (line 614)
+- new Variable (line 621)
+- 46 class method(s)
 - 2 closure(s)
 
 ### `ext/standard/VmDnsMx.php`
@@ -18177,7 +18175,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMath.php`
 
 **Warnings** (review for bootstrap subset):
-- 82 class method(s)
+- 83 class method(s)
 
 ### `ext/standard/VmMemory.php`
 
@@ -20607,7 +20605,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/dns_get_record.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 93)
+- new Variable (line 88)
 - 3 class method(s)
 
 ### `ext/standard/doubleval.php`
@@ -28247,11 +28245,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
-
-### `lib/JIT/Builtin/MbNumericEntityLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
 
 ### `lib/JIT/Builtin/MbStrcut.php`
 
