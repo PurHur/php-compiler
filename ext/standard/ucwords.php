@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\StringUcwords;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -25,20 +26,10 @@ final class ucwords extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ucwords() requires one or two arguments');
         }
-        $string = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'ucwords',
-            0,
-            'string'
-        );
+        $string = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'ucwords', 'string');
         $separators = VmString::TRIM_DEFAULT;
         if (2 === $argc) {
-            $separators = VmString::coerceStringBuiltinArg(
-                $frame->calledArgs[1],
-                'ucwords',
-                1,
-                'separators'
-            );
+            $separators = InternalStrictArg::resolveCoercibleStringArg($frame, 1, 'ucwords', 'separators');
         }
         if (null === $frame->returnVar) {
             return;
@@ -56,7 +47,7 @@ final class ucwords extends Internal
             throw new \LogicException('ucwords() requires one or two arguments');
         }
         StringUcwords::ensureLinked($context);
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'ucwords', 0, 'string');
+        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'ucwords', 0, 'string');
         if (1 === $argc) {
             return $context->builder->call(
                 $context->lookupFunction('__string__ucwords'),
@@ -67,7 +58,7 @@ final class ucwords extends Internal
         return $context->builder->call(
             $context->lookupFunction('__string__ucwords_ex'),
             $str,
-            JitStringBuiltinArg::lower($context, $args[1], 'ucwords', 1, 'separators')
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'ucwords', 1, 'separators')
         );
     }
 }

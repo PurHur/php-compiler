@@ -56,16 +56,7 @@ final class soundex extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'soundex', $paramName)->toString();
-        }
-
-        return VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[$argIndex],
-            'soundex',
-            $argIndex,
-            $paramName
-        );
+        return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, 'soundex', $paramName);
     }
 
     private static function jitStringArg(
