@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -58,7 +57,7 @@ final class gzinflate extends Internal
 
         return JitZlib::inflate(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'gzinflate', 0, 'data'),
+            VmZlibArg::jitDataString($context, $args[0], 'gzinflate'),
             $maxLength
         );
     }
