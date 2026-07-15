@@ -310,6 +310,34 @@ final class VmString
     }
 
     /**
+     * Z_PARAM_STR frame arg — null TypeError on 8.4 forward profile (#19297, #19276).
+     *
+     * @throws \TypeError when caller strict_types rejects non-string, or PROFILE=8.4 rejects null
+     */
+    public static function zparamStrBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName,
+        string $expectedType = 'string'
+    ): string {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, $argIndex, $function, $paramName);
+
+            return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
+        }
+
+        return self::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $userArgIndex,
+            $paramName,
+            $expectedType
+        );
+    }
+
+    /**
      * Internal method string param — frame arg index may include $this (#18189, zend_exceptions.c).
      *
      * @throws \TypeError when caller strict_types rejects non-string operands

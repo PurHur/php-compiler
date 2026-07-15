@@ -69,7 +69,8 @@ final class mb_convert_encoding extends Internal
 
             return;
         }
-        $source = VmString::coerceStringBuiltinArg(
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19297, mbstring.c).
+        $source = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'mb_convert_encoding',
             0,
