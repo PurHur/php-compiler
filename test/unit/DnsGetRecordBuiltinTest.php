@@ -95,6 +95,57 @@ final class DnsGetRecordBuiltinTest extends TestCase
         $this->assertSame(0, $result->getNumElements());
     }
 
+    public function testVmDnsEmptyHostnameDnsAllReturnsRootDelegationWhenResolverAvailable(): void
+    {
+        $result = VmDns::dnsGetRecord('', StdlibConstants::DNS_ALL);
+        if (!$result instanceof \PHPCompiler\VM\HashTable || 0 === $result->getNumElements()) {
+            $this->markTestSkipped('root DNS delegation unavailable');
+        }
+
+        $first = $result->find('0');
+        $this->assertInstanceOf(VMVariable::class, $first);
+        $record = $first->resolveIndirect()->toArray();
+        $typeVar = $record->find('type');
+        $this->assertInstanceOf(VMVariable::class, $typeVar);
+        $type = $typeVar->resolveIndirect()->toString();
+        $this->assertContains($type, ['NS', 'SOA']);
+    }
+
+    public function testParseDnsNsRecordsExtractsTargetFromAnswer(): void
+    {
+        $root = "\0";
+        $target = "\x01a\x0croot-servers\x03net\x00";
+        $typeClassTtlRdlen = \pack('nnNn', 2, 1, 3600, \strlen($target));
+        $packet = \pack('nnnnnn', 0x1234, 0x8180, 1, 1, 0, 0)
+            .$root.\pack('nn', 2, 1)
+            .$root.$typeClassTtlRdlen.$target;
+
+        $entries = VmDns::parseDnsNsRecords($packet);
+        $this->assertCount(1, $entries);
+        $this->assertSame('a.root-servers.net', $entries[0]['target']);
+        $this->assertSame(3600, $entries[0]['ttl']);
+    }
+
+    public function testParseDnsSoaRecordsExtractsFieldsFromAnswer(): void
+    {
+        $root = "\0";
+        $mname = "\x01a\x0croot-servers\x03net\x00";
+        $rname = "\x01b\x0croot-servers\x03net\x00";
+        $rdata = $mname.$rname.\pack('NNNNN', 1, 2, 3, 4, 5);
+        $typeClassTtlRdlen = \pack('nnNn', 6, 1, 7200, \strlen($rdata));
+        $packet = \pack('nnnnnn', 0x1234, 0x8180, 1, 1, 0, 0)
+            .$root.\pack('nn', 6, 1)
+            .$root.$typeClassTtlRdlen.$rdata;
+
+        $entries = VmDns::parseDnsSoaRecords($packet);
+        $this->assertCount(1, $entries);
+        $this->assertSame('a.root-servers.net', $entries[0]['mname']);
+        $this->assertSame('b.root-servers.net', $entries[0]['rname']);
+        $this->assertSame(1, $entries[0]['serial']);
+        $this->assertSame(5, $entries[0]['minimum']);
+        $this->assertSame(7200, $entries[0]['ttl']);
+    }
+
     public function testNxdomainHostnameReturnsEmptyArray(): void
     {
         $result = VmDns::dnsGetRecord('invalid.invalid', StdlibConstants::DNS_A);

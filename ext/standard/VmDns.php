@@ -336,12 +336,6 @@ final class VmDns
      */
     public static function dnsGetRecord(string $hostname, int $type = 1)
     {
-        if ('' === $hostname) {
-            return new HashTable();
-        }
-        if (!self::isValidDnsHostname($hostname)) {
-            return false;
-        }
         self::validateDnsGetRecordType($type);
 
         $requested = self::expandDnsTypeBitmask($type);
@@ -349,12 +343,18 @@ final class VmDns
             return false;
         }
 
+        if ('' !== $hostname && !self::isValidDnsHostname($hostname)) {
+            return false;
+        }
+
         $records = [];
         foreach ($requested as $flag => $meta) {
             $chunk = match ($flag) {
-                0x00000001 => self::collectARecords($hostname),
-                0x00000040 => self::collectMxRecords($hostname),
-                0x00000100 => self::collectAaaaRecords($hostname),
+                0x00000001 => '' === $hostname ? [] : self::collectARecords($hostname),
+                0x00000002 => self::collectNsRecords($hostname),
+                0x00000008 => self::collectSoaRecords($hostname),
+                0x00000040 => '' === $hostname ? [] : self::collectMxRecords($hostname),
+                0x00000100 => '' === $hostname ? [] : self::collectAaaaRecords($hostname),
                 default => [],
             };
             foreach ($chunk as $record) {
@@ -519,6 +519,50 @@ final class VmDns
         }
 
         return $ips;
+    }
+
+    /** @return list<HashTable> */
+    private static function collectNsRecords(string $hostname): array
+    {
+        $packet = self::queryViaUdp($hostname, self::DNS_RECORD_TYPES['NS']);
+        if (null === $packet) {
+            return [];
+        }
+
+        $records = [];
+        foreach (self::parseDnsNsRecords($packet) as $entry) {
+            $records[] = self::makeDnsRecord($hostname, 'NS', [
+                'ttl' => $entry['ttl'],
+                'target' => $entry['target'],
+            ]);
+        }
+
+        return $records;
+    }
+
+    /** @return list<HashTable> */
+    private static function collectSoaRecords(string $hostname): array
+    {
+        $packet = self::queryViaUdp($hostname, self::DNS_RECORD_TYPES['SOA']);
+        if (null === $packet) {
+            return [];
+        }
+
+        $records = [];
+        foreach (self::parseDnsSoaRecords($packet) as $entry) {
+            $records[] = self::makeDnsRecord($hostname, 'SOA', [
+                'ttl' => $entry['ttl'],
+                'mname' => $entry['mname'],
+                'rname' => $entry['rname'],
+                'serial' => $entry['serial'],
+                'refresh' => $entry['refresh'],
+                'retry' => $entry['retry'],
+                'expire' => $entry['expire'],
+                'minimum-ttl' => $entry['minimum'],
+            ]);
+        }
+
+        return $records;
     }
 
     /** @return list<HashTable> */
@@ -827,6 +871,9 @@ final class VmDns
     private static function encodeDnsName(string $hostname): string
     {
         $hostname = \rtrim($hostname, '.');
+        if ('' === $hostname) {
+            return "\0";
+        }
         $encoded = '';
         foreach (\explode('.', $hostname) as $label) {
             $len = \strlen($label);
@@ -882,6 +929,138 @@ final class VmDns
     private static function udpDnsExchange(string $nameserver, string $query): ?string
     {
         return VmDnsUdpNative::exchange($nameserver, $query);
+    }
+
+    /**
+     * @return list<array{target: string, ttl: int}>
+     */
+    public static function parseDnsNsRecords(string $packet): array
+    {
+        $len = \strlen($packet);
+        if ($len < 12) {
+            return [];
+        }
+
+        $qdcount = self::readUint16($packet, 4);
+        $ancount = self::readUint16($packet, 6);
+        $offset = 12;
+
+        for ($i = 0; $i < $qdcount; ++$i) {
+            $next = self::skipDnsName($packet, $len, $offset);
+            if (null === $next) {
+                return [];
+            }
+            $offset = $next + 4;
+            if ($offset > $len) {
+                return [];
+            }
+        }
+
+        $ns = [];
+        for ($i = 0; $i < $ancount; ++$i) {
+            $parsed = self::readDnsName($packet, $len, $offset);
+            if (null === $parsed) {
+                break;
+            }
+            [$offset] = $parsed;
+            if ($offset + 10 > $len) {
+                break;
+            }
+            $type = self::readUint16($packet, $offset);
+            $ttl = self::readUint32($packet, $offset + 4);
+            $offset += 8;
+            $rdlength = self::readUint16($packet, $offset);
+            $offset += 2;
+            if ($offset + $rdlength > $len) {
+                break;
+            }
+            if (2 === $type) {
+                $target = self::readDnsName($packet, $len, $offset);
+                if (null !== $target) {
+                    $ns[] = ['target' => $target[1], 'ttl' => $ttl];
+                }
+            }
+            $offset += $rdlength;
+        }
+
+        return $ns;
+    }
+
+    /**
+     * @return list<array{mname: string, rname: string, serial: int, refresh: int, retry: int, expire: int, minimum: int, ttl: int}>
+     */
+    public static function parseDnsSoaRecords(string $packet): array
+    {
+        $len = \strlen($packet);
+        if ($len < 12) {
+            return [];
+        }
+
+        $qdcount = self::readUint16($packet, 4);
+        $ancount = self::readUint16($packet, 6);
+        $offset = 12;
+
+        for ($i = 0; $i < $qdcount; ++$i) {
+            $next = self::skipDnsName($packet, $len, $offset);
+            if (null === $next) {
+                return [];
+            }
+            $offset = $next + 4;
+            if ($offset > $len) {
+                return [];
+            }
+        }
+
+        $soa = [];
+        for ($i = 0; $i < $ancount; ++$i) {
+            $parsed = self::readDnsName($packet, $len, $offset);
+            if (null === $parsed) {
+                break;
+            }
+            [$offset] = $parsed;
+            if ($offset + 10 > $len) {
+                break;
+            }
+            $type = self::readUint16($packet, $offset);
+            $ttl = self::readUint32($packet, $offset + 4);
+            $offset += 8;
+            $rdlength = self::readUint16($packet, $offset);
+            $offset += 2;
+            if ($offset + $rdlength > $len) {
+                break;
+            }
+            if (6 === $type && $rdlength >= 20) {
+                $rdataOffset = $offset;
+                $mname = self::readDnsName($packet, $len, $rdataOffset);
+                if (null === $mname) {
+                    $offset += $rdlength;
+                    continue;
+                }
+                $rdataOffset = $mname[0];
+                $rname = self::readDnsName($packet, $len, $rdataOffset);
+                if (null === $rname) {
+                    $offset += $rdlength;
+                    continue;
+                }
+                $rdataOffset = $rname[0];
+                if ($rdataOffset + 20 > $len) {
+                    break;
+                }
+                $soa[] = [
+                    'mname' => $mname[1],
+                    'rname' => $rname[1],
+                    'serial' => self::readUint32($packet, $rdataOffset),
+                    'refresh' => self::readUint32($packet, $rdataOffset + 4),
+                    'retry' => self::readUint32($packet, $rdataOffset + 8),
+                    'expire' => self::readUint32($packet, $rdataOffset + 12),
+                    'minimum' => self::readUint32($packet, $rdataOffset + 16),
+                    'ttl' => $ttl,
+                ];
+            }
+            $offset += $rdlength;
+        }
+
+        return $soa;
     }
 
     /**
