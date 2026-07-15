@@ -40,6 +40,7 @@ final class BuiltinClasses
         RecursiveCachingIteratorBuiltin::registerClass($ctx);
         SplFileObjectBuiltin::registerClass($ctx);
         SplTempFileObjectBuiltin::registerClass($ctx);
+        SplHeapBuiltin::registerClasses($ctx);
         VmSplObserver::register($ctx);
         VmSplRegistry::registerStubs($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {

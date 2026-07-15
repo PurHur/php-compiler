@@ -1,0 +1,1146 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\spl;
+
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\Variable;
+use PHPCfg\Func as CfgFunc;
+
+/**
+ * SplHeap / SplMinHeap / SplMaxHeap — binary heap (php-src ext/spl/spl_heap.c; #4387).
+ */
+final class SplHeapBuiltin
+{
+    public const CLASS_LC = 'splheap';
+
+    public const KIND_MAX = 1;
+
+    public const KIND_MIN = -1;
+
+    /** @var array<int, array{elements: list<Variable>, kind: int, flags: int, iterPos: int}> */
+    private static array $store = [];
+
+    public static function registerClasses(Context $ctx): void
+    {
+        self::registerHeap($ctx);
+        SplMinHeapBuiltin::registerClass($ctx);
+        SplMaxHeapBuiltin::registerClass($ctx);
+        SplPriorityQueueBuiltin::registerClass($ctx);
+    }
+
+    public static function registerHeap(Context $ctx): void
+    {
+        if (isset($ctx->classes[self::CLASS_LC]) && self::classIsComplete($ctx->classes[self::CLASS_LC])) {
+            return;
+        }
+
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $prot = CfgFunc::FLAG_PROTECTED;
+        $entry = isset($ctx->classes[self::CLASS_LC])
+            ? $ctx->classes[self::CLASS_LC]
+            : new ClassEntry('SplHeap');
+        foreach (['iterator', 'traversable', 'countable'] as $iface) {
+            if (isset($ctx->classes[$iface]) && !\in_array($iface, $entry->interfaces, true)) {
+                $entry->interfaces[] = $iface;
+            }
+        }
+        $entry->isAbstract = true;
+        $entry->abstractMethods['compare'] = true;
+        $entry->methodNames['compare'] = 'compare';
+        $entry->constructor = new SplHeapConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methods['compare'] = new SplHeapCompareAbstract();
+        $entry->methodVisibility['compare'] = $prot;
+        foreach ([
+            'insert' => SplHeapInsert::class,
+            'extract' => SplHeapExtract::class,
+            'top' => SplHeapTop::class,
+            'count' => SplHeapCount::class,
+            'isempty' => SplHeapIsEmpty::class,
+            'rewind' => SplHeapRewind::class,
+            'valid' => SplHeapValid::class,
+            'current' => SplHeapCurrent::class,
+            'key' => SplHeapKey::class,
+            'next' => SplHeapNext::class,
+            'recoverfromcorruption' => SplHeapRecoverFromCorruption::class,
+        ] as $lc => $class) {
+            $entry->methods[$lc] = new $class();
+            $entry->methodVisibility[$lc] = $pub;
+        }
+        $entry->methodNames['isempty'] = 'isEmpty';
+        $entry->methodNames['recoverfromcorruption'] = 'recoverFromCorruption';
+        $entry->isInternal = true;
+        $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    private static function classIsComplete(ClassEntry $entry): bool
+    {
+        return isset($entry->methods['insert'], $entry->methods['extract'], $entry->methods['rewind']);
+    }
+
+    public static function init(ObjectEntry $object, int $kind): void
+    {
+        self::$store[$object->id] = [
+            'elements' => [],
+            'kind' => $kind,
+            'flags' => 0,
+            'iterPos' => -1,
+        ];
+    }
+
+    public static function kind(ObjectEntry $object): int
+    {
+        return self::state($object)['kind'];
+    }
+
+    public static function insert(ObjectEntry $object, Variable $value): void
+    {
+        $state = &self::$store[$object->id];
+        $copy = new Variable();
+        $copy->copyFrom($value->resolveIndirect());
+        $state['elements'][] = $copy;
+        self::siftUp($object, \count($state['elements']) - 1);
+    }
+
+    public static function extract(ObjectEntry $object): Variable
+    {
+        $state = &self::$store[$object->id];
+        $n = \count($state['elements']);
+        if (0 === $n) {
+            throw new \RuntimeException("Can't extract from an empty heap");
+        }
+        $top = $state['elements'][0];
+        $last = array_pop($state['elements']);
+        if ($n > 1 && null !== $last) {
+            $state['elements'][0] = $last;
+            self::siftDown($object, 0);
+        }
+        $state['iterPos'] = -1;
+        $result = new Variable();
+        $result->copyFrom($top);
+
+        return $result;
+    }
+
+    public static function top(ObjectEntry $object): Variable
+    {
+        $state = self::state($object);
+        if ([] === $state['elements']) {
+            throw new \RuntimeException("Can't peek at an empty heap");
+        }
+        $result = new Variable();
+        $result->copyFrom($state['elements'][0]);
+
+        return $result;
+    }
+
+    public static function count(ObjectEntry $object): int
+    {
+        return \count(self::state($object)['elements']);
+    }
+
+    public static function isEmpty(ObjectEntry $object): bool
+    {
+        return 0 === self::count($object);
+    }
+
+    public static function rewind(ObjectEntry $object): void
+    {
+        self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
+    }
+
+    public static function valid(ObjectEntry $object): bool
+    {
+        return self::state($object)['iterPos'] >= 0 && self::count($object) > 0;
+    }
+
+    public static function current(ObjectEntry $object): Variable
+    {
+        return self::top($object);
+    }
+
+    public static function key(ObjectEntry $object): int
+    {
+        return self::state($object)['iterPos'];
+    }
+
+    public static function next(ObjectEntry $object): void
+    {
+        if (!self::valid($object)) {
+            return;
+        }
+        // php-src: iterating SplHeap extracts elements (heap empties under foreach).
+        self::extract($object);
+        self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
+    }
+
+    public static function recoverFromCorruption(ObjectEntry $object): bool
+    {
+        self::state($object);
+
+        return true;
+    }
+
+    public static function compareElements(ObjectEntry $object, Variable $a, Variable $b): int
+    {
+        $cmp = Variable::spaceshipCompare($a, $b);
+        $kind = self::kind($object);
+
+        return $kind < 0 ? -$cmp : $cmp;
+    }
+
+    private static function siftUp(ObjectEntry $object, int $index): void
+    {
+        $state = &self::$store[$object->id];
+        while ($index > 0) {
+            $parent = intdiv($index - 1, 2);
+            if (self::compareElements($object, $state['elements'][$index], $state['elements'][$parent]) <= 0) {
+                break;
+            }
+            $tmp = $state['elements'][$index];
+            $state['elements'][$index] = $state['elements'][$parent];
+            $state['elements'][$parent] = $tmp;
+            $index = $parent;
+        }
+    }
+
+    private static function siftDown(ObjectEntry $object, int $index): void
+    {
+        $state = &self::$store[$object->id];
+        $n = \count($state['elements']);
+        while (true) {
+            $largest = $index;
+            $left = 2 * $index + 1;
+            $right = 2 * $index + 2;
+            if ($left < $n
+                && self::compareElements($object, $state['elements'][$left], $state['elements'][$largest]) > 0) {
+                $largest = $left;
+            }
+            if ($right < $n
+                && self::compareElements($object, $state['elements'][$right], $state['elements'][$largest]) > 0) {
+                $largest = $right;
+            }
+            if ($largest === $index) {
+                break;
+            }
+            $tmp = $state['elements'][$index];
+            $state['elements'][$index] = $state['elements'][$largest];
+            $state['elements'][$largest] = $tmp;
+            $index = $largest;
+        }
+    }
+
+    /** @return array{elements: list<Variable>, kind: int, flags: int, iterPos: int} */
+    private static function state(ObjectEntry $object): array
+    {
+        if (!isset(self::$store[$object->id])) {
+            throw new \LogicException('SplHeap object state missing');
+        }
+
+        return self::$store[$object->id];
+    }
+}
+
+final class SplMinHeapBuiltin
+{
+    public const CLASS_LC = 'splminheap';
+
+    public static function registerClass(Context $ctx): void
+    {
+        SplHeapBuiltin::registerHeap($ctx);
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['compare'])
+            && !$ctx->classes[self::CLASS_LC]->isAbstract) {
+            return;
+        }
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $prot = CfgFunc::FLAG_PROTECTED;
+        $entry = isset($ctx->classes[self::CLASS_LC])
+            ? $ctx->classes[self::CLASS_LC]
+            : new ClassEntry('SplMinHeap');
+        $entry->parentLc = SplHeapBuiltin::CLASS_LC;
+        $entry->isAbstract = false;
+        unset($entry->abstractMethods['compare']);
+        $entry->constructor = new SplMinHeapConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methods['compare'] = new SplMinHeapCompare();
+        $entry->methodVisibility['compare'] = $prot;
+        $entry->methodNames['compare'] = 'compare';
+        $entry->isInternal = true;
+        $ctx->classes[self::CLASS_LC] = $entry;
+    }
+}
+
+final class SplMaxHeapBuiltin
+{
+    public const CLASS_LC = 'splmaxheap';
+
+    public static function registerClass(Context $ctx): void
+    {
+        SplHeapBuiltin::registerHeap($ctx);
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['compare'])
+            && !$ctx->classes[self::CLASS_LC]->isAbstract) {
+            return;
+        }
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $prot = CfgFunc::FLAG_PROTECTED;
+        $entry = isset($ctx->classes[self::CLASS_LC])
+            ? $ctx->classes[self::CLASS_LC]
+            : new ClassEntry('SplMaxHeap');
+        $entry->parentLc = SplHeapBuiltin::CLASS_LC;
+        $entry->isAbstract = false;
+        unset($entry->abstractMethods['compare']);
+        $entry->constructor = new SplMaxHeapConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methods['compare'] = new SplMaxHeapCompare();
+        $entry->methodVisibility['compare'] = $prot;
+        $entry->methodNames['compare'] = 'compare';
+        $entry->isInternal = true;
+        $ctx->classes[self::CLASS_LC] = $entry;
+    }
+}
+
+/**
+ * SplPriorityQueue — priority heap with extract flags (php-src ext/spl/spl_heap.c; #4387).
+ */
+final class SplPriorityQueueBuiltin
+{
+    public const CLASS_LC = 'splpriorityqueue';
+
+    public const EXTR_DATA = 1;
+
+    public const EXTR_PRIORITY = 2;
+
+    public const EXTR_BOTH = 3;
+
+    /** @var array<int, array{elements: list<array{data: Variable, priority: Variable}>, flags: int, iterPos: int}> */
+    private static array $store = [];
+
+    public static function registerClass(Context $ctx): void
+    {
+        if (isset($ctx->classes[self::CLASS_LC]) && self::classIsComplete($ctx->classes[self::CLASS_LC])) {
+            return;
+        }
+
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $entry = isset($ctx->classes[self::CLASS_LC])
+            ? $ctx->classes[self::CLASS_LC]
+            : new ClassEntry('SplPriorityQueue');
+        foreach (['iterator', 'traversable', 'countable'] as $iface) {
+            if (isset($ctx->classes[$iface]) && !\in_array($iface, $entry->interfaces, true)) {
+                $entry->interfaces[] = $iface;
+            }
+        }
+        $entry->constructor = new SplPriorityQueueConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        foreach ([
+            'insert' => SplPriorityQueueInsert::class,
+            'extract' => SplPriorityQueueExtract::class,
+            'top' => SplPriorityQueueTop::class,
+            'count' => SplPriorityQueueCount::class,
+            'isempty' => SplPriorityQueueIsEmpty::class,
+            'setextractflags' => SplPriorityQueueSetExtractFlags::class,
+            'getextractflags' => SplPriorityQueueGetExtractFlags::class,
+            'rewind' => SplPriorityQueueRewind::class,
+            'valid' => SplPriorityQueueValid::class,
+            'current' => SplPriorityQueueCurrent::class,
+            'key' => SplPriorityQueueKey::class,
+            'next' => SplPriorityQueueNext::class,
+            'recoverfromcorruption' => SplPriorityQueueRecoverFromCorruption::class,
+            'compare' => SplPriorityQueueCompare::class,
+        ] as $lc => $class) {
+            $entry->methods[$lc] = new $class();
+            $entry->methodVisibility[$lc] = $pub;
+        }
+        $entry->methodVisibility['compare'] = CfgFunc::FLAG_PROTECTED;
+        $entry->methodNames['isempty'] = 'isEmpty';
+        $entry->methodNames['setextractflags'] = 'setExtractFlags';
+        $entry->methodNames['getextractflags'] = 'getExtractFlags';
+        $entry->methodNames['recoverfromcorruption'] = 'recoverFromCorruption';
+        SplClassConstants::registerIntConstants($entry, [
+            'EXTR_DATA' => self::EXTR_DATA,
+            'EXTR_PRIORITY' => self::EXTR_PRIORITY,
+            'EXTR_BOTH' => self::EXTR_BOTH,
+        ]);
+        $entry->isInternal = true;
+        $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    private static function classIsComplete(ClassEntry $entry): bool
+    {
+        return isset($entry->methods['insert'], $entry->methods['extract'], $entry->methods['setextractflags']);
+    }
+
+    public static function init(ObjectEntry $object): void
+    {
+        self::$store[$object->id] = [
+            'elements' => [],
+            'flags' => self::EXTR_DATA,
+            'iterPos' => -1,
+        ];
+    }
+
+    public static function setExtractFlags(ObjectEntry $object, int $flags): int
+    {
+        self::$store[$object->id]['flags'] = $flags & self::EXTR_BOTH;
+
+        return self::$store[$object->id]['flags'];
+    }
+
+    public static function getExtractFlags(ObjectEntry $object): int
+    {
+        return self::state($object)['flags'];
+    }
+
+    public static function insert(ObjectEntry $object, Variable $data, Variable $priority): void
+    {
+        $state = &self::$store[$object->id];
+        $dataCopy = new Variable();
+        $dataCopy->copyFrom($data->resolveIndirect());
+        $prioCopy = new Variable();
+        $prioCopy->copyFrom($priority->resolveIndirect());
+        $state['elements'][] = ['data' => $dataCopy, 'priority' => $prioCopy];
+        self::siftUp($object, \count($state['elements']) - 1);
+    }
+
+    public static function extract(ObjectEntry $object): Variable
+    {
+        $state = &self::$store[$object->id];
+        $n = \count($state['elements']);
+        if (0 === $n) {
+            throw new \RuntimeException("Can't extract from an empty heap");
+        }
+        $top = $state['elements'][0];
+        $last = array_pop($state['elements']);
+        if ($n > 1 && null !== $last) {
+            $state['elements'][0] = $last;
+            self::siftDown($object, 0);
+        }
+        $state['iterPos'] = -1;
+
+        return self::formatElement($object, $top);
+    }
+
+    public static function top(ObjectEntry $object): Variable
+    {
+        $state = self::state($object);
+        if ([] === $state['elements']) {
+            throw new \RuntimeException("Can't peek at an empty heap");
+        }
+
+        return self::formatElement($object, $state['elements'][0]);
+    }
+
+    public static function count(ObjectEntry $object): int
+    {
+        return \count(self::state($object)['elements']);
+    }
+
+    public static function isEmpty(ObjectEntry $object): bool
+    {
+        return 0 === self::count($object);
+    }
+
+    public static function rewind(ObjectEntry $object): void
+    {
+        self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
+    }
+
+    public static function valid(ObjectEntry $object): bool
+    {
+        return self::state($object)['iterPos'] >= 0 && self::count($object) > 0;
+    }
+
+    public static function current(ObjectEntry $object): Variable
+    {
+        return self::top($object);
+    }
+
+    public static function key(ObjectEntry $object): int
+    {
+        return self::state($object)['iterPos'];
+    }
+
+    public static function next(ObjectEntry $object): void
+    {
+        if (!self::valid($object)) {
+            return;
+        }
+        self::extract($object);
+        self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
+    }
+
+    public static function recoverFromCorruption(ObjectEntry $object): bool
+    {
+        self::state($object);
+
+        return true;
+    }
+
+    /** @param array{data: Variable, priority: Variable} $element */
+    private static function formatElement(ObjectEntry $object, array $element): Variable
+    {
+        $flags = self::getExtractFlags($object);
+        if (self::EXTR_PRIORITY === $flags) {
+            $out = new Variable();
+            $out->copyFrom($element['priority']);
+
+            return $out;
+        }
+        if (self::EXTR_BOTH === $flags) {
+            $ht = new HashTable();
+            $data = new Variable();
+            $data->copyFrom($element['data']);
+            $prio = new Variable();
+            $prio->copyFrom($element['priority']);
+            $ht->add('data', $data);
+            $ht->add('priority', $prio);
+            $out = new Variable();
+            $out->array($ht);
+
+            return $out;
+        }
+        $out = new Variable();
+        $out->copyFrom($element['data']);
+
+        return $out;
+    }
+
+    private static function comparePriority(Variable $a, Variable $b): int
+    {
+        return Variable::spaceshipCompare($a, $b);
+    }
+
+    private static function siftUp(ObjectEntry $object, int $index): void
+    {
+        $state = &self::$store[$object->id];
+        while ($index > 0) {
+            $parent = intdiv($index - 1, 2);
+            if (self::comparePriority($state['elements'][$index]['priority'], $state['elements'][$parent]['priority']) <= 0) {
+                break;
+            }
+            $tmp = $state['elements'][$index];
+            $state['elements'][$index] = $state['elements'][$parent];
+            $state['elements'][$parent] = $tmp;
+            $index = $parent;
+        }
+    }
+
+    private static function siftDown(ObjectEntry $object, int $index): void
+    {
+        $state = &self::$store[$object->id];
+        $n = \count($state['elements']);
+        while (true) {
+            $largest = $index;
+            $left = 2 * $index + 1;
+            $right = 2 * $index + 2;
+            if ($left < $n
+                && self::comparePriority(
+                    $state['elements'][$left]['priority'],
+                    $state['elements'][$largest]['priority']
+                ) > 0) {
+                $largest = $left;
+            }
+            if ($right < $n
+                && self::comparePriority(
+                    $state['elements'][$right]['priority'],
+                    $state['elements'][$largest]['priority']
+                ) > 0) {
+                $largest = $right;
+            }
+            if ($largest === $index) {
+                break;
+            }
+            $tmp = $state['elements'][$index];
+            $state['elements'][$index] = $state['elements'][$largest];
+            $state['elements'][$largest] = $tmp;
+            $index = $largest;
+        }
+    }
+
+    /** @return array{elements: list<array{data: Variable, priority: Variable}>, flags: int, iterPos: int} */
+    private static function state(ObjectEntry $object): array
+    {
+        if (!isset(self::$store[$object->id])) {
+            throw new \LogicException('SplPriorityQueue object state missing');
+        }
+
+        return self::$store[$object->id];
+    }
+}
+
+final class SplHeapConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        throw new \Error('Cannot instantiate abstract class SplHeap');
+    }
+}
+
+final class SplHeapCompareAbstract extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('compare');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        throw new \Error('Cannot call abstract method SplHeap::compare()');
+    }
+}
+
+final class SplMinHeapConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplMinHeapBuiltin::CLASS_LC, 'SplMinHeap::__construct()');
+        SplHeapBuiltin::init($object, SplHeapBuiltin::KIND_MIN);
+    }
+}
+
+final class SplMaxHeapConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplMaxHeapBuiltin::CLASS_LC, 'SplMaxHeap::__construct()');
+        SplHeapBuiltin::init($object, SplHeapBuiltin::KIND_MAX);
+    }
+}
+
+final class SplMinHeapCompare extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('compare');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        SplIteratorSupport::receiverIsA($frame, SplMinHeapBuiltin::CLASS_LC, 'SplMinHeap::compare()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError('SplMinHeap::compare() expects exactly 2 arguments');
+        }
+        $cmp = -Variable::spaceshipCompare($frame->calledArgs[1], $frame->calledArgs[2]);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int($cmp);
+        }
+    }
+}
+
+final class SplMaxHeapCompare extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('compare');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        SplIteratorSupport::receiverIsA($frame, SplMaxHeapBuiltin::CLASS_LC, 'SplMaxHeap::compare()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError('SplMaxHeap::compare() expects exactly 2 arguments');
+        }
+        $cmp = Variable::spaceshipCompare($frame->calledArgs[1], $frame->calledArgs[2]);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int($cmp);
+        }
+    }
+}
+
+final class SplHeapInsert extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('insert');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::insert()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplHeap::insert() expects exactly 1 argument, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplHeapBuiltin::insert($object, $frame->calledArgs[1]);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+}
+
+final class SplHeapExtract extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('extract');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::extract()');
+        SplIteratorSupport::copyReturnFrom($frame, SplHeapBuiltin::extract($object));
+    }
+}
+
+final class SplHeapTop extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('top');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::top()');
+        SplIteratorSupport::copyReturnFrom($frame, SplHeapBuiltin::top($object));
+    }
+}
+
+final class SplHeapCount extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('count');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::count()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplHeapBuiltin::count($object));
+    }
+}
+
+final class SplHeapIsEmpty extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isEmpty');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::isEmpty()');
+        SplIteratorSupport::setReturnBool($frame, SplHeapBuiltin::isEmpty($object));
+    }
+}
+
+final class SplHeapRewind extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('rewind');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::rewind()');
+        SplHeapBuiltin::rewind($object);
+    }
+}
+
+final class SplHeapValid extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('valid');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::valid()');
+        SplIteratorSupport::setReturnBool($frame, SplHeapBuiltin::valid($object));
+    }
+}
+
+final class SplHeapCurrent extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('current');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::current()');
+        SplIteratorSupport::copyReturnFrom($frame, SplHeapBuiltin::current($object));
+    }
+}
+
+final class SplHeapKey extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('key');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::key()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplHeapBuiltin::key($object));
+    }
+}
+
+final class SplHeapNext extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('next');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::next()');
+        SplHeapBuiltin::next($object);
+    }
+}
+
+final class SplHeapRecoverFromCorruption extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('recoverFromCorruption');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::recoverFromCorruption()');
+        SplIteratorSupport::setReturnBool($frame, SplHeapBuiltin::recoverFromCorruption($object));
+    }
+}
+
+final class SplPriorityQueueConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::__construct()'
+        );
+        SplPriorityQueueBuiltin::init($object);
+    }
+}
+
+final class SplPriorityQueueInsert extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('insert');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::insert()'
+        );
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'SplPriorityQueue::insert() expects exactly 2 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplPriorityQueueBuiltin::insert($object, $frame->calledArgs[1], $frame->calledArgs[2]);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+}
+
+final class SplPriorityQueueExtract extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('extract');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::extract()'
+        );
+        SplIteratorSupport::copyReturnFrom($frame, SplPriorityQueueBuiltin::extract($object));
+    }
+}
+
+final class SplPriorityQueueTop extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('top');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::top()'
+        );
+        SplIteratorSupport::copyReturnFrom($frame, SplPriorityQueueBuiltin::top($object));
+    }
+}
+
+final class SplPriorityQueueCount extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('count');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::count()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplPriorityQueueBuiltin::count($object));
+    }
+}
+
+final class SplPriorityQueueIsEmpty extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isEmpty');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::isEmpty()'
+        );
+        SplIteratorSupport::setReturnBool($frame, SplPriorityQueueBuiltin::isEmpty($object));
+    }
+}
+
+final class SplPriorityQueueSetExtractFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setExtractFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::setExtractFlags()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplPriorityQueue::setExtractFlags() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $result = SplPriorityQueueBuiltin::setExtractFlags($object, $flags);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int($result);
+        }
+    }
+}
+
+final class SplPriorityQueueGetExtractFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getExtractFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::getExtractFlags()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplPriorityQueueBuiltin::getExtractFlags($object));
+    }
+}
+
+final class SplPriorityQueueRewind extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('rewind');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::rewind()'
+        );
+        SplPriorityQueueBuiltin::rewind($object);
+    }
+}
+
+final class SplPriorityQueueValid extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('valid');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::valid()'
+        );
+        SplIteratorSupport::setReturnBool($frame, SplPriorityQueueBuiltin::valid($object));
+    }
+}
+
+final class SplPriorityQueueCurrent extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('current');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::current()'
+        );
+        SplIteratorSupport::copyReturnFrom($frame, SplPriorityQueueBuiltin::current($object));
+    }
+}
+
+final class SplPriorityQueueKey extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('key');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::key()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplPriorityQueueBuiltin::key($object));
+    }
+}
+
+final class SplPriorityQueueNext extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('next');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::next()'
+        );
+        SplPriorityQueueBuiltin::next($object);
+    }
+}
+
+final class SplPriorityQueueRecoverFromCorruption extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('recoverFromCorruption');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::recoverFromCorruption()'
+        );
+        SplIteratorSupport::setReturnBool($frame, SplPriorityQueueBuiltin::recoverFromCorruption($object));
+    }
+}
+
+final class SplPriorityQueueCompare extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('compare');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::compare()'
+        );
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError('SplPriorityQueue::compare() expects exactly 2 arguments');
+        }
+        $cmp = Variable::spaceshipCompare($frame->calledArgs[1], $frame->calledArgs[2]);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int($cmp);
+        }
+    }
+}
