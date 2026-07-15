@@ -10514,6 +10514,27 @@ class JIT {
                         }
                         if (
                             !$forWrite
+                            && JIT\InstancePropertyVisibilityJitGuard::isInvisibleParentPrivateFetch(
+                                $this->context->type->object,
+                                $classId,
+                                $name->value,
+                                $block
+                            )
+                        ) {
+                            if ($op->nullsafeFetchPropertyRead) {
+                                JIT\NonObjectPropertyFetchHelper::lowerNullPropertyDest($this->context, $result);
+                                break;
+                            }
+                            JIT\UndefinedPropertyFetchHelper::lowerUndefinedDynamicPropertyRead(
+                                $this->context,
+                                $result,
+                                $declaringClass,
+                                $name->value
+                            );
+                            break;
+                        }
+                        if (
+                            !$forWrite
                             && !$this->context->type->object->hasProperty($classId, $name->value)
                             && $this->context->type->object->allowsDynamicProperties($classId)
                         ) {
