@@ -64,6 +64,17 @@ final class VmString
         return false;
     }
 
+    /**
+     * Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222).
+     *
+     * Distinct from {@see requiresForwardProfileStrictStringNull}: chr/trim/crc32 coerce null to "" on 8.4;
+     * unserialize/substr use this stricter guard (php-src ext/standard/string.c, var_unserializer.c).
+     */
+    public static function requiresZparamStrStrictNullOnForwardProfile(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
 
     /** php-src php_trim_int(): trim left side. */
@@ -126,12 +137,25 @@ final class VmString
         string $paramName = 'string',
         string $expectedType = 'string'
     ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            if (self::requiresZparamStrStrictNullOnForwardProfile()) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null', $expectedType)
+                );
+            }
+            VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+
+            return '';
+        }
+
         return self::coerceStringBuiltinArg(
             $var,
             $function,
             $argIndex,
             $paramName,
-            $expectedType
+            $expectedType,
+            false
         );
     }
 

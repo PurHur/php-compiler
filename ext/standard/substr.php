@@ -104,7 +104,7 @@ final class substr extends Internal
         if (null === $strLit
             && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
         ) {
-            if ($context->callerStrictTypes || JitStringBuiltinArg::requiresForwardProfileStrictStringNull()) {
+            if ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()) {
                 $strLit = null;
             } else {
                 $strLit = '';
@@ -134,12 +134,9 @@ final class substr extends Internal
 
         if (
             (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
-            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresForwardProfileStrictStringNull())
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
         ) {
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'substr', 0, 'string');
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'substr_null_typeerror_done');
-
-            return $context->builder->load($context->constantStringFromString(''));
+            return JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'substr', 0, 'string');
         }
 
         $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'substr', 0, 'string');

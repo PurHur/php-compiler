@@ -104,16 +104,15 @@ final class unserialize extends Internal
     private static function compileTimeUnserialize(Context $context, JITVariable $arg, ?array $options = null): ?Value
     {
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
-            if ($context->callerStrictTypes || VmString::requiresForwardProfileStrictStringNull()) {
+            if ($context->callerStrictTypes || VmString::requiresZparamStrStrictNullOnForwardProfile()) {
                 $message = 'unserialize(): Argument #1 ($data) must be of type string, null given';
                 if (null !== TryCatchHelper::resolveThrowHandler($context)) {
                     TryCatchHelper::emitCatchableClassError($context, 'TypeError', $message);
-                } else {
-                    TypeErrorRaise::emitRaise($context, $message);
-                    $context->builder->call($context->lookupFunction('abort'));
+
+                    return JitJsonDecode::materializeScalar($context, false);
                 }
 
-                return JitJsonDecode::materializeScalar($context, false);
+                return null;
             }
 
             return $context->helper->loadValue(
