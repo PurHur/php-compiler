@@ -1276,6 +1276,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitFgets.php` | 0 | 1 |
 | `ext/standard/JitFile.php` | 0 | 1 |
 | `ext/standard/JitFileGetContents.php` | 0 | 1 |
+| `ext/standard/JitFileGetContentsKernel.php` | 0 | 1 |
 | `ext/standard/JitFilePutContents.php` | 0 | 1 |
 | `ext/standard/JitFileatime.php` | 0 | 1 |
 | `ext/standard/JitFilectime.php` | 0 | 1 |
@@ -3766,7 +3767,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringExplode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringFileGetContentsLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilePutContentsLibc.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterBoolean.php` | 0 | 2 |
@@ -13432,6 +13432,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/standard/JitFileGetContentsKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/JitFilePutContents.php`
 
@@ -29784,12 +29789,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFileGetContents.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
-### `lib/JIT/Builtin/StringFileGetContentsLibc.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringFilePutContents.php`
 
