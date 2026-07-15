@@ -64,6 +64,20 @@ final class TryCatchHelper
         return $arms;
     }
 
+    /** php-cfg try body ends with JUMP to else or merge; compileSubBlock omits that opcode (#19128). */
+    private static function tryBodyTrailingJumpTarget(?Block $tryBody): ?Block
+    {
+        if (null === $tryBody || 0 === $tryBody->nOpCodes) {
+            return null;
+        }
+        $last = $tryBody->opCodes[$tryBody->nOpCodes - 1];
+        if (OpCode::TYPE_JUMP !== $last->type) {
+            return null;
+        }
+
+        return $last->block1;
+    }
+
     public static function findFinallyOp(Block $handlerBlock, int $afterTryIndex): ?OpCode
     {
         $n = $handlerBlock->nOpCodes;
@@ -190,12 +204,29 @@ final class TryCatchHelper
         }
         $handler->dispatchBb = self::dispatchBbFor($jit, $func, $context, $handler, $args);
         self::emitMergeEntryCheck($jit, $func, $context, $mergeBlock, $mergeBb, $args);
+        $savedTrySynthetic = $tryOp->block1->syntheticCfgBranch;
+        $tryOp->block1->syntheticCfgBranch = true;
         $jit->compileSubBlock($func, $tryOp->block1, ...$args);
-        $tryTail = $builder->getInsertBlock();
-        if (null !== $tryTail && null === $tryTail->getTerminator()) {
-            $builder->positionAtEnd($tryTail);
+        $tryOp->block1->syntheticCfgBranch = $savedTrySynthetic;
+        $elseExit = self::tryBodyTrailingJumpTarget($tryOp->block1);
+        $elseEntryBb = null;
+        if (null !== $elseExit && $elseExit !== $mergeBlock) {
+            $elseEntryBb = $context->scope->blockEntryStorage[$elseExit]
+                ?? $context->scope->blockStorage[$elseExit]
+                ?? null;
+            if (null === $elseEntryBb) {
+                $elseEntryBb = self::appendBlock($func, 'try_else_'.self::blockSuffix($handler));
+                // Entry only — blockStorage is set when opcodes are lowered (#19128).
+                $context->scope->blockEntryStorage[$elseExit] = $elseEntryBb;
+            }
+        }
+        $tryLlvm = $context->scope->blockStorage[$tryOp->block1] ?? null;
+        if (null !== $tryLlvm && null === $tryLlvm->getTerminator()) {
+            $builder->positionAtEnd($tryLlvm);
             if (null !== $handler->finallyBb) {
                 $builder->branch($handler->finallyBb);
+            } elseif (null !== $elseEntryBb) {
+                $builder->branch($elseEntryBb);
             } elseif (null !== $handler->mergeEntryBb) {
                 $builder->branch($handler->mergeEntryBb);
             }
@@ -207,6 +238,22 @@ final class TryCatchHelper
         }
         if (null === $branchBlock->getTerminator()) {
             $builder->branch($tryEntry);
+        }
+        if (null !== $elseExit && null !== $elseEntryBb && $elseExit !== $mergeBlock) {
+            $savedInsert = $builder->getInsertBlock();
+            $savedElseSynthetic = $elseExit->syntheticCfgBranch;
+            $elseExit->syntheticCfgBranch = true;
+            $builder->positionAtEnd($elseEntryBb);
+            $jit->compileIncludedAtEntry($func, $elseExit, $elseEntryBb);
+            $elseExit->syntheticCfgBranch = $savedElseSynthetic;
+            $elseTail = $builder->getInsertBlock();
+            if (null !== $elseTail && null === $elseTail->getTerminator() && null !== $handler->mergeEntryBb) {
+                $builder->positionAtEnd($elseTail);
+                $builder->branch($handler->mergeEntryBb);
+            }
+            if (null !== $savedInsert) {
+                BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+            }
         }
     }
 
