@@ -176,11 +176,18 @@ final class DomNodePropertySupport
         if (strtolower(VmDom::PROP_NODE_VALUE) !== $lc
             && strtolower(VmDom::PROP_TEXT_CONTENT) !== $lc
             && strtolower(VmDom::PROP_VALUE) !== $lc
+            && strtolower(VmDom::PROP_DATA) !== $lc
         ) {
             return false;
         }
         if (!DomRegistry::has($owner)) {
             return false;
+        }
+        // CharacterData::$data write (php-src ext/dom/characterdata.c dom_characterdata_data_write; #19295).
+        if (strtolower(VmDom::PROP_DATA) === $lc) {
+            if (!VmDom::isCharacterData($owner)) {
+                return false;
+            }
         }
         $resolved = $value->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
@@ -192,6 +199,8 @@ final class DomNodePropertySupport
         }
         if (strtolower(VmDom::PROP_TEXT_CONTENT) === $lc) {
             VmDom::writeTextContent($ctx, $owner, $text);
+        } elseif (strtolower(VmDom::PROP_DATA) === $lc) {
+            VmDom::writeCharacterDataContent($owner, $text);
         } else {
             VmDom::writeNodeValue($ctx, $owner, $text);
         }

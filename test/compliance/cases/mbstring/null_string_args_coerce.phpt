@@ -3,10 +3,10 @@ mbstring null $string operands coerce when non-strict (#18273, ext/mbstring/mbst
 --FILE--
 <?php
 echo mb_strlen(null), "\n";
-echo mb_substr(null, 0), "\n";
-echo mb_strtolower(null), "\n";
+echo var_export(mb_substr(null, 0), true), "\n";
+echo var_export(mb_strtolower(null), true), "\n";
 ?>
 --EXPECT--
 0
-
-0
+''
+''
