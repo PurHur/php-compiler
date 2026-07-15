@@ -138,6 +138,12 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([2], BuiltinByRefParams::forFunction('STREAM_SOCKET_ACCEPT'));
     }
 
+    public function testSocketCreatePairPairByRef(): void
+    {
+        $this->assertSame([3], BuiltinByRefParams::forFunction('socket_create_pair'));
+        $this->assertSame([3], BuiltinByRefParams::forFunction('SOCKET_CREATE_PAIR'));
+    }
+
     public function testStreamSocketServerErrnoErrstrByRef(): void
     {
         $this->assertSame([1, 2], BuiltinByRefParams::forFunction('stream_socket_server'));

@@ -57,6 +57,26 @@ final class SocketsLibcThinAbi
         return (int) $ffi->socket($domain, $type, $protocol);
     }
 
+    /**
+     * socketpair(2) — connected sockets (`int sv[2]`).
+     *
+     * @return array{0: int, 1: int}|false
+     */
+    public static function socketpair(int $domain, int $type, int $protocol): array|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $sv = $ffi->new('int[2]');
+        $rc = (int) $ffi->socketpair($domain, $type, $protocol, $sv);
+        if (0 !== $rc) {
+            return false;
+        }
+
+        return [(int) $sv[0], (int) $sv[1]];
+    }
+
     public static function connectInet(int $fd, string $addr, int $port): int
     {
         $ffi = self::ffi();
@@ -274,6 +294,7 @@ struct sockaddr_in {
     char sin_zero[8];
 };
 int socket(int domain, int type, int protocol);
+int socketpair(int domain, int type, int protocol, int sv[2]);
 int connect(int sockfd, const void *addr, unsigned int addrlen);
 int bind(int sockfd, const void *addr, unsigned int addrlen);
 int listen(int sockfd, int backlog);
