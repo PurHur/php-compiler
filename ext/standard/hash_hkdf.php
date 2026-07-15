@@ -8,10 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -27,14 +25,10 @@ final class hash_hkdf extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('hash_hkdf() requires two to five arguments in this compiler build');
         }
-        $algo = $frame->calledArgs[0]->resolveIndirect();
-        $key = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $algo->type || Variable::TYPE_STRING !== $key->type) {
-            throw new \LogicException(
-                'hash_hkdf() requires string algorithm and key in this compiler build'
-            );
-        }
-        VmString::rejectEmptyBuiltinStringArg($key->toString(), 'hash_hkdf', 1, 'key');
+        // Z_PARAM_STR $algo / $key — null coerces to "" then empty-key ValueError (php-src hash_hkdf.c; #19341).
+        $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash_hkdf', 0, 'algo');
+        $key = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash_hkdf', 1, 'key');
+        VmString::rejectEmptyBuiltinStringArg($key, 'hash_hkdf', 1, 'key');
         $length = 0;
         if ($argc >= 3) {
             $length = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'hash_hkdf', 3, 'length');
@@ -50,7 +44,7 @@ final class hash_hkdf extends Internal
         if (5 === $argc) {
             $salt = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'hash_hkdf', 5, 'salt');
         }
-        $algoName = strtolower($algo->toString());
+        $algoName = strtolower($algo);
         if (!\in_array($algoName, ['sha256', 'sha1', 'md5'], true)) {
             throw new \ValueError(
                 'hash_hkdf(): Argument #1 ($algo) must be a valid cryptographic hashing algorithm'
@@ -60,8 +54,8 @@ final class hash_hkdf extends Internal
             return;
         }
         $frame->returnVar->string(VmHash::hashHkdf(
-            $algo->toString(),
-            $key->toString(),
+            $algo,
+            $key,
             $length,
             $info,
             $salt
@@ -77,9 +71,21 @@ final class hash_hkdf extends Internal
         if (isset($args[2])) {
             $length = JitLongArg::lower($context, $args[2], 'hash_hkdf() length');
         }
-        $info = JitStringArg::lower($context, $args[3] ?? self::emptyStringJit($context), 'hash_hkdf() info');
-        $salt = JitStringArg::lower($context, $args[4] ?? self::emptyStringJit($context), 'hash_hkdf() salt');
-        $key = JitStringArg::lower($context, $args[1], 'hash_hkdf() key');
+        $info = JitStringBuiltinArg::lower(
+            $context,
+            $args[3] ?? self::emptyStringJit($context),
+            'hash_hkdf',
+            3,
+            'info'
+        );
+        $salt = JitStringBuiltinArg::lower(
+            $context,
+            $args[4] ?? self::emptyStringJit($context),
+            'hash_hkdf',
+            4,
+            'salt'
+        );
+        $key = JitStringBuiltinArg::lower($context, $args[1], 'hash_hkdf', 1, 'key');
         JitStringBuiltinArg::rejectEmpty(
             $context,
             $args[1],
@@ -89,7 +95,7 @@ final class hash_hkdf extends Internal
 
         return JitHash::hashHkdf(
             $context,
-            JitStringArg::lower($context, $args[0], 'hash_hkdf() algorithm'),
+            JitStringBuiltinArg::lower($context, $args[0], 'hash_hkdf', 0, 'algo'),
             $key,
             $length,
             $info,
