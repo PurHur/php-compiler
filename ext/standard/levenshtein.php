@@ -108,11 +108,12 @@ final class levenshtein extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+        if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'levenshtein', $paramName)->toString();
         }
 
-        return VmString::coerceStringBuiltinArg(
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19243, levenshtein.c).
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[$argIndex],
             'levenshtein',
             $argIndex,
@@ -140,7 +141,17 @@ final class levenshtein extends Internal
         int $argNumber,
         string $paramName
     ): Value {
-        return JitStringBuiltinArg::lowerStrictOrCoercible(
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'levenshtein',
+                $argNumber - 1,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
             $context,
             $arg,
             'levenshtein',

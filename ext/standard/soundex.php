@@ -56,7 +56,17 @@ final class soundex extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, 'soundex', $paramName);
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'soundex', $paramName)->toString();
+        }
+
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19243, string.c).
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'soundex',
+            $argIndex,
+            $paramName
+        );
     }
 
     private static function jitStringArg(
@@ -65,7 +75,17 @@ final class soundex extends Internal
         int $argNumber,
         string $paramName
     ): Value {
-        return JitStringBuiltinArg::lowerStrictOrCoercible(
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'soundex',
+                $argNumber - 1,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
             $context,
             $arg,
             'soundex',
