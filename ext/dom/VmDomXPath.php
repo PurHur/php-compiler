@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\VmCallable;
 
 /** DOMXPath evaluation engine (php-src ext/dom/xpath.c; #6066). */
 final class VmDomXPath
@@ -63,6 +64,52 @@ final class VmDomXPath
         return true;
     }
 
+    /**
+     * DOMXPath::registerPhpFunctions() — php-src xpath_callbacks.c REG_FUNC_MODE (#19331).
+     *
+     * @param Variable|null $restrict null / TYPE_NULL = allow all; string or list of strings = SET mode
+     */
+    public static function registerPhpFunctions(ObjectEntry $xpath, ?Variable $restrict = null): void
+    {
+        self::ensureXPath($xpath);
+        $state = DomRegistry::state($xpath);
+        if (null === $restrict || Variable::TYPE_NULL === $restrict->type) {
+            $state->xpathPhpFunctionsMode = DomConstants::XPATH_REG_FUNC_MODE_ALL;
+            $state->xpathPhpFunctions = [];
+
+            return;
+        }
+        if (Variable::TYPE_STRING === $restrict->type) {
+            $name = $restrict->toString();
+            self::assertValidPhpFunctionName($name, false);
+            $state->xpathPhpFunctionsMode = DomConstants::XPATH_REG_FUNC_MODE_SET;
+            $state->xpathPhpFunctions[$name] = true;
+
+            return;
+        }
+        if (Variable::TYPE_ARRAY === $restrict->type || Variable::TYPE_HASHTABLE === $restrict->type) {
+            $state->xpathPhpFunctionsMode = DomConstants::XPATH_REG_FUNC_MODE_SET;
+            foreach ($restrict->toArray()->iterateKeyed(false) as $pair) {
+                [, $value] = $pair;
+                $value = $value->resolveIndirect();
+                if (Variable::TYPE_STRING !== $value->type) {
+                    throw new \TypeError(
+                        'DOMXPath::registerPhpFunctions(): Argument #1 ($restrict) must be of type array|string|null, array given with non-string values'
+                    );
+                }
+                $name = $value->toString();
+                self::assertValidPhpFunctionName($name, true);
+                $state->xpathPhpFunctions[$name] = true;
+            }
+
+            return;
+        }
+        throw new \TypeError(sprintf(
+            'DOMXPath::registerPhpFunctions(): Argument #1 ($restrict) must be of type array|string|null, %s given',
+            VmDom::typeLabel($restrict)
+        ));
+    }
+
     public static function query(
         Context $ctx,
         ObjectEntry $xpath,
@@ -83,6 +130,10 @@ final class VmDomXPath
         bool $registerNodeNS = false
     ): Variable {
         $expression = trim($expression);
+        $phpFn = self::tryEvaluatePhpFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+        if (null !== $phpFn) {
+            return $phpFn;
+        }
         if (self::isBooleanExpression($expression)) {
             $var = new Variable(Variable::TYPE_BOOLEAN);
             $var->bool(self::evaluateBoolean($xpath, $expression, $contextNode));
@@ -470,5 +521,281 @@ final class VmDomXPath
         }
 
         return false;
+    }
+
+    /**
+     * Top-level php:function() / php:functionString() evaluate (#19331, php-src xpath.c).
+     */
+    private static function tryEvaluatePhpFunction(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $expression,
+        ?ObjectEntry $contextNode,
+        bool $registerNodeNS
+    ): ?Variable {
+        if (!preg_match('~^([A-Za-z_][\w]*)\:(function(?:String)?)\(~i', $expression, $prefixMatch)) {
+            return null;
+        }
+        self::ensureXPath($xpath);
+        $state = DomRegistry::state($xpath);
+        if ($registerNodeNS && null !== $contextNode) {
+            self::registerContextNodeNamespaces($xpath, $contextNode);
+        }
+        $prefix = $prefixMatch[1];
+        $callName = strtolower($prefixMatch[2]);
+        $nsUri = $state->xpathNamespaces[$prefix] ?? null;
+        if (null === $nsUri) {
+            // Zend emits a libxml warning and returns false for evaluate().
+            $var = new Variable(Variable::TYPE_BOOLEAN);
+            $var->bool(false);
+
+            return $var;
+        }
+        if (DomConstants::PHP_XPATH_NS !== $nsUri) {
+            throw new \DOMException('Invalid expression');
+        }
+        $openParen = strpos($expression, '(');
+        if (false === $openParen) {
+            return null;
+        }
+        $closeParen = self::findMatchingCloseParen($expression, $openParen);
+        if (null === $closeParen || $closeParen !== \strlen($expression) - 1) {
+            return null;
+        }
+        $argsStr = substr($expression, $openParen + 1, $closeParen - $openParen - 1);
+        $argExprs = self::splitXPathCallArgs($argsStr);
+        if ([] === $argExprs) {
+            throw new \Error('Function name must be passed as the first argument');
+        }
+        $handlerName = self::resolvePhpFunctionHandlerName($xpath, trim($argExprs[0]), $contextNode);
+        if (!self::assertPhpFunctionAllowed($state, $handlerName)) {
+            $var = new Variable(Variable::TYPE_BOOLEAN);
+            $var->bool(false);
+
+            return $var;
+        }
+        $asString = 'functionstring' === $callName;
+        $callArgs = [];
+        for ($i = 1, $n = \count($argExprs); $i < $n; ++$i) {
+            $callArgs[] = self::evaluatePhpFunctionArg($xpath, trim($argExprs[$i]), $contextNode, $asString);
+        }
+        $callback = new Variable(Variable::TYPE_STRING);
+        $callback->string($handlerName);
+        $result = VmCallable::invoke($ctx, $callback, ...$callArgs);
+
+        return self::coercePhpFunctionReturn($result);
+    }
+
+    private static function assertValidPhpFunctionName(string $name, bool $isArray): void
+    {
+        if ('' === $name || str_contains($name, "\0")) {
+            throw new \ValueError($isArray
+                ? 'DOMXPath::registerPhpFunctions(): Argument #1 ($restrict) must be an array containing valid callback names'
+                : 'DOMXPath::registerPhpFunctions(): Argument #1 ($restrict) must be a valid callback name');
+        }
+    }
+
+    private static function assertPhpFunctionAllowed(DomNodeState $state, string $handlerName): bool
+    {
+        if (DomConstants::XPATH_REG_FUNC_MODE_NONE === $state->xpathPhpFunctionsMode) {
+            // php-src 8.2: warning + evaluate() returns false; do not throw for NONE.
+            return false;
+        }
+        if (DomConstants::XPATH_REG_FUNC_MODE_ALL === $state->xpathPhpFunctionsMode) {
+            return true;
+        }
+        if (!isset($state->xpathPhpFunctions[$handlerName])) {
+            throw new \Error(sprintf("Not allowed to call handler '%s()'.", $handlerName));
+        }
+
+        return true;
+    }
+
+    private static function resolvePhpFunctionHandlerName(
+        ObjectEntry $xpath,
+        string $expression,
+        ?ObjectEntry $contextNode
+    ): string {
+        if (preg_match('~^"(.*)"$~s', $expression, $m) || preg_match("~^'(.*)'$~s", $expression, $m)) {
+            return $m[1];
+        }
+        try {
+            $value = self::evaluateScalar($xpath, $expression, $contextNode);
+        } catch (\DOMException) {
+            throw new \TypeError('Handler name must be a string');
+        }
+        if (!is_string($value)) {
+            throw new \TypeError('Handler name must be a string');
+        }
+
+        return $value;
+    }
+
+    private static function evaluatePhpFunctionArg(
+        ObjectEntry $xpath,
+        string $expression,
+        ?ObjectEntry $contextNode,
+        bool $nodesetToString
+    ): Variable {
+        if (preg_match('~^"(.*)"$~s', $expression, $m) || preg_match("~^'(.*)'$~s", $expression, $m)) {
+            $var = new Variable(Variable::TYPE_STRING);
+            $var->string($m[1]);
+
+            return $var;
+        }
+        if (self::isBooleanExpression($expression)) {
+            $var = new Variable(Variable::TYPE_BOOLEAN);
+            $var->bool(self::evaluateBoolean($xpath, $expression, $contextNode));
+
+            return $var;
+        }
+        if (self::isNumericExpression($expression)) {
+            $var = new Variable(Variable::TYPE_FLOAT);
+            $var->float(self::evaluateNumber($xpath, $expression, $contextNode));
+
+            return $var;
+        }
+        if (self::isStringExpression($expression)) {
+            $var = new Variable(Variable::TYPE_STRING);
+            $var->string(self::evaluateString($xpath, $expression, $contextNode));
+
+            return $var;
+        }
+        // Node-set argument — php:function passes DOMNode arrays; functionString coerces to string.
+        $nodeIds = self::evaluateNodeSet($xpath, $expression, $contextNode, false);
+        if ($nodesetToString) {
+            $var = new Variable(Variable::TYPE_STRING);
+            if ([] === $nodeIds) {
+                $var->string('');
+
+                return $var;
+            }
+            $node = DomRegistry::entry($nodeIds[0]);
+            $var->string(null !== $node ? (VmDom::readNodeValue($node) ?? '') : '');
+
+            return $var;
+        }
+        // php:function() with string() already handled above; bare path → string via first node text.
+        $var = new Variable(Variable::TYPE_STRING);
+        if ([] === $nodeIds) {
+            $var->string('');
+
+            return $var;
+        }
+        $node = DomRegistry::entry($nodeIds[0]);
+        $var->string(null !== $node ? (VmDom::readNodeValue($node) ?? '') : '');
+
+        return $var;
+    }
+
+    private static function coercePhpFunctionReturn(Variable $result): Variable
+    {
+        $result = $result->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN === $result->type
+            || Variable::TYPE_STRING === $result->type
+            || Variable::TYPE_INTEGER === $result->type
+            || Variable::TYPE_FLOAT === $result->type
+            || Variable::TYPE_NULL === $result->type
+        ) {
+            if (Variable::TYPE_INTEGER === $result->type) {
+                // XPath numeric returns are floats in evaluate().
+                $out = new Variable(Variable::TYPE_FLOAT);
+                $out->float((float) $result->toInt());
+
+                return $out;
+            }
+
+            return $result;
+        }
+        // Non-DOM object returns → string cast (php-src xpath_callbacks.c).
+        $out = new Variable(Variable::TYPE_STRING);
+        if (Variable::TYPE_OBJECT === $result->type) {
+            throw new \TypeError('Only objects that are instances of DOM nodes can be converted to an XPath expression');
+        }
+        $out->string($result->toString());
+
+        return $out;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function splitXPathCallArgs(string $args): array
+    {
+        $args = trim($args);
+        if ('' === $args) {
+            return [];
+        }
+        $parts = [];
+        $buf = '';
+        $depth = 0;
+        $quote = null;
+        $len = \strlen($args);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $args[$i];
+            if (null !== $quote) {
+                $buf .= $ch;
+                if ($ch === $quote) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                $buf .= $ch;
+                continue;
+            }
+            if ('(' === $ch) {
+                ++$depth;
+                $buf .= $ch;
+                continue;
+            }
+            if (')' === $ch) {
+                --$depth;
+                $buf .= $ch;
+                continue;
+            }
+            if (',' === $ch && 0 === $depth) {
+                $parts[] = $buf;
+                $buf = '';
+                continue;
+            }
+            $buf .= $ch;
+        }
+        $parts[] = $buf;
+
+        return $parts;
+    }
+
+    private static function findMatchingCloseParen(string $expression, int $openParen): ?int
+    {
+        $depth = 0;
+        $quote = null;
+        $len = \strlen($expression);
+        for ($i = $openParen; $i < $len; ++$i) {
+            $ch = $expression[$i];
+            if (null !== $quote) {
+                if ($ch === $quote) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                continue;
+            }
+            if ('(' === $ch) {
+                ++$depth;
+                continue;
+            }
+            if (')' === $ch) {
+                --$depth;
+                if (0 === $depth) {
+                    return $i;
+                }
+            }
+        }
+
+        return null;
     }
 }
