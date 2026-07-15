@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\GeneratorHelper as JitGeneratorHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
@@ -120,11 +121,9 @@ final class GeneratorIteratorJitHelper
 
     public static function compileIterKey(Context $context, Variable $gen): Variable
     {
-        if (null === $gen->generatorStatePtr) {
-            throw new \LogicException('Generator iterator key requires generator state');
-        }
+        $statePtr = self::loadStateFromGeneratorObject($context, $gen);
         $keyField = $context->builder->structGep(
-            $gen->generatorStatePtr,
+            $statePtr,
             $context->structFieldMap['__generator_state__']['current_key']
         );
         $slot = JitValueBox::alloc($context);
@@ -135,11 +134,9 @@ final class GeneratorIteratorJitHelper
 
     public static function compileIterValue(Context $context, Variable $gen): Variable
     {
-        if (null === $gen->generatorStatePtr) {
-            throw new \LogicException('Generator iterator value requires generator state');
-        }
+        $statePtr = self::loadStateFromGeneratorObject($context, $gen);
         $valField = $context->builder->structGep(
-            $gen->generatorStatePtr,
+            $statePtr,
             $context->structFieldMap['__generator_state__']['current_value']
         );
         $slot = JitValueBox::alloc($context);
@@ -222,7 +219,21 @@ final class GeneratorIteratorJitHelper
         if (null !== $genVar->generatorStatePtr) {
             return $genVar->generatorStatePtr;
         }
-        throw new \LogicException('Generator missing __generator_state in JIT');
+        $genVar = self::normalizeGeneratorObjectVariable($context, $genVar);
+        JitGeneratorHelper::ensureTypes($context);
+        $stateVar = $context->type->object->propertyFetch(
+            $genVar->value,
+            'Generator',
+            GeneratorJitHelper::STATE_PROPERTY
+        );
+        $stateBits = self::loadNativeLongFromPropertyVariable($context, $stateVar);
+        $statePtr = $context->builder->inttoptr(
+            $stateBits,
+            $context->getTypeFromString('__generator_state__*')
+        );
+        $genVar->generatorStatePtr = $statePtr;
+
+        return $statePtr;
     }
 
     public static function resolveResumeLc(Context $context, Variable $genVar): string
@@ -230,7 +241,91 @@ final class GeneratorIteratorJitHelper
         if (null !== $genVar->generatorResumeName) {
             return strtolower($genVar->generatorResumeName);
         }
-        throw new \LogicException('Generator missing __generator_resume metadata in JIT');
+        $resumeName = self::inferResumeNameFromContext($context, $genVar);
+        if (null === $resumeName) {
+            throw new \LogicException('Generator missing __generator_resume metadata in JIT');
+        }
+        $genVar->generatorResumeName = $resumeName;
+
+        return strtolower($resumeName);
+    }
+
+    public static function resolveResumeFunction(Context $context, Variable $genVar): Value\Function_
+    {
+        $resumeLc = self::resolveResumeLc($context, $genVar);
+        $resumeFn = $context->functions[$resumeLc] ?? null;
+        if (!$resumeFn instanceof Value\Function_) {
+            throw new \LogicException('Generator resume function missing from JIT context');
+        }
+
+        return $resumeFn;
+    }
+
+    /**
+     * Populate JIT Generator metadata from a Generator object when call-site tags are missing (#19131).
+     */
+    public static function hydrateGeneratorMetadata(Context $context, Variable $genVar): bool
+    {
+        if (
+            null !== $genVar->generatorStatePtr
+            && null !== $genVar->generatorResumeName
+        ) {
+            $genVar->isJitGenerator = true;
+
+            return true;
+        }
+        try {
+            self::normalizeGeneratorObjectVariable($context, $genVar);
+            self::loadStateFromGeneratorObject($context, $genVar);
+            self::resolveResumeLc($context, $genVar);
+        } catch (\LogicException) {
+            return false;
+        }
+        $genVar->isJitGenerator = true;
+
+        return true;
+    }
+
+    private static function normalizeGeneratorObjectVariable(Context $context, Variable $genVar): Variable
+    {
+        if (Variable::TYPE_OBJECT === $genVar->type) {
+            return $genVar;
+        }
+        if (Variable::TYPE_VALUE === $genVar->type) {
+            $objPtr = $context->builder->call(
+                $context->lookupFunction('__value__readObject'),
+                JitValueBox::pointer($context, $genVar->value)
+            );
+
+            return new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $objPtr);
+        }
+
+        throw new \LogicException('Generator missing __generator_state in JIT');
+    }
+
+    private static function loadNativeLongFromPropertyVariable(Context $context, Variable $stateVar): Value
+    {
+        if (Variable::TYPE_NATIVE_LONG === $stateVar->type) {
+            return $stateVar->value;
+        }
+        if (Variable::TYPE_VALUE === $stateVar->type) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                JitValueBox::pointer($context, $stateVar->value)
+            );
+        }
+
+        throw new \LogicException('Generator missing __generator_state in JIT');
+    }
+
+    private static function inferResumeNameFromContext(Context $context, Variable $genVar): ?string
+    {
+        $creators = array_values(array_unique($context->generatorCreators));
+        if (1 === \count($creators)) {
+            return $creators[0];
+        }
+
+        return null;
     }
 
     public static function boxCurrentOrNull(Context $context, Value $statePtr): Value
