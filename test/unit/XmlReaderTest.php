@@ -59,6 +59,35 @@ PHP;
         self::assertSame('false', ob_get_clean());
     }
 
+    public function test_xmlreader_xml_memory_repro(): void
+    {
+        $runtime = new Runtime();
+        $code = (string) file_get_contents(__DIR__.'/../repro/maintainer_gap_xmlreader_xml.php');
+        $block = $runtime->parseAndCompile($code, 'xmlreader_xml_repro.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("r:a:\n", ob_get_clean());
+    }
+
+    public function test_xmlreader_xml_empty_source_value_error(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+try {
+    $r = new XMLReader();
+    $r->XML('');
+    echo "no-error\n";
+} catch (ValueError $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'xmlreader_xml_empty.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("XMLReader::XML(): Argument #1 (\$source) cannot be empty\n", ob_get_clean());
+    }
+
     public function test_xmlreader_tokenizer_matches_zend_event_shape(): void
     {
         $events = VmXmlReader::tokenize('<root><item id="1">a</item></root>');
