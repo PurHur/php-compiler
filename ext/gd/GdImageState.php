@@ -57,6 +57,14 @@ final class GdImageState
         return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true);
     }
 
+    /**
+     * @param list<int> $pixels
+     */
+    public static function fromRaster(int $width, int $height, array $pixels): self
+    {
+        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true);
+    }
+
     public function hasRaster(): bool
     {
         return $this->truecolor && $this->width > 0 && $this->height > 0;

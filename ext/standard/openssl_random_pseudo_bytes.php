@@ -78,6 +78,6 @@ final class openssl_random_pseudo_bytes extends Internal
      */
     private static function parseLength(Variable $var): int
     {
-        return VmMath::parseIntBuiltinArg($var, 'openssl_random_pseudo_bytes', 1, 'length');
+        return VmMath::parseZParamLongBuiltinArg($var, 'openssl_random_pseudo_bytes', 1, 'length');
     }
 }

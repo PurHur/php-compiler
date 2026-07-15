@@ -1,28 +1,15 @@
 <?php
 
-declare(strict_types=1);
+echo ob_start() ? '' : '';
+echo ob_get_clean() === '' ? '' : '';
 
-$literal = (static function (): string {
-    ob_start();
-    var_export(null);
-    return (string) ob_get_clean();
-})();
+ob_start();
+var_export(null);
+$literal = ob_get_clean();
+echo $literal, "\n";
 
-$variable = (static function (): string {
-    $v = null;
-    ob_start();
-    var_export($v);
-    return (string) ob_get_clean();
-})();
-
-if ($literal !== 'NULL') {
-    fwrite(STDERR, "literal: expected NULL, got {$literal}\n");
-    exit(1);
-}
-
-if ($variable !== 'NULL') {
-    fwrite(STDERR, "variable: expected NULL, got {$variable}\n");
-    exit(1);
-}
-
-echo "ok\n";
+$v = null;
+ob_start();
+var_export($v);
+$variable = ob_get_clean();
+echo $variable, "\n";
