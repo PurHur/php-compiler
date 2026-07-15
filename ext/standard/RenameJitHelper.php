@@ -20,7 +20,7 @@ final class RenameJitHelper
             TriggerErrorJitHelper::warning(
                 null !== $wrapperMessage
                     ? $wrapperMessage
-                    : \sprintf('rename(%s,%s): No such file or directory', $from, $to)
+                    : 'rename('.$from.','.$to.'): No such file or directory'
             );
         }
 
