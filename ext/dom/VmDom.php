@@ -6515,6 +6515,12 @@ final class VmDom
 
             return;
         }
+        // Text / CDATA / Comment — php-src dom_node_node_value_write / characterdata (#19295).
+        if (self::isCharacterData($node)) {
+            self::writeCharacterDataContent($node, $value);
+
+            return;
+        }
         if (DomConstants::XML_ELEMENT_NODE !== $state->nodeType) {
             return;
         }
