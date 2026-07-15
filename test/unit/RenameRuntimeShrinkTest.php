@@ -21,7 +21,9 @@ final class RenameRuntimeShrinkTest extends TestCase
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringRename.php');
         $this->assertStringContainsString('RenameJitHelper', $bridge);
+        $this->assertStringContainsString('JitNestedHelperCoerce::callHelper', $bridge);
         $this->assertStringNotContainsString("lookupFunction('rename')", $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
     }
 
     public function testRenameJitHelperDelegatesToVmFs(): void
