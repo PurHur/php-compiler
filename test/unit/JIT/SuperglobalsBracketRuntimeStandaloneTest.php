@@ -64,6 +64,41 @@ final class SuperglobalsBracketRuntimeStandaloneTest extends TestCase
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
     }
 
+    public function testUserScriptRefreshReplacesEmbedParseStrBridge(): void
+    {
+        $prev = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        try {
+            $runtime = new Runtime(Runtime::MODE_AOT);
+            $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+            // Simulate nested helper compile installing the embed bridge first (#18832).
+            ParseStrRuntime::ensureLinked($ctx);
+            SuperglobalRefreshUserScriptLlvm::ensurePrerequisites($ctx);
+
+            $fn = $ctx->module->getNamedFunction('__compiler_parse_str');
+            $this->assertNotNull($fn);
+            $hasV8Work = false;
+            foreach ($fn->getBasicBlocks() as $block) {
+                if (str_contains($block->getName(), '_work_v8')) {
+                    $hasV8Work = true;
+                    break;
+                }
+            }
+            $this->assertTrue($hasV8Work, '__compiler_parse_str must use user-script cstr v8 bridge after refresh prerequisites');
+        } finally {
+            if (false === $prev || '' === (string) $prev) {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+            } else {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prev);
+                $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prev;
+                $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prev;
+            }
+        }
+    }
+
     public function testSuperglobalsRefreshCFileRemoved(): void
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
