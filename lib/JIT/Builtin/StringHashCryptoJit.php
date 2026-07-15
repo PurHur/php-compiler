@@ -11,7 +11,8 @@ use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 /**
  * LLVM lowering for hash() / hash_hmac() / hash_pbkdf2() / hash_equals() / hash_hmac_algos().
  *
- * Digest helpers via {@see StringHashCryptoPhp} → HashCryptoJitHelper → VmHash (#9164, #19074).
+ * Digest helpers via {@see StringHashCryptoPhp} → HashCryptoJitHelper → VmHash (#9164).
+ * User-script standalone AOT: {@see StringHashCryptoLlvm} libcrypto EVP bridge (#3357).
  * hash_equals / hash_hmac_algos / hash_algos via {@see StringHashEquals} / {@see StringHashHmacAlgos} / {@see StringHashAlgos}.
  */
 final class StringHashCryptoJit
@@ -59,7 +60,7 @@ final class StringHashCryptoJit
 
     private static function implementDeferred(Context $context): void
     {
-        StringHashCryptoPhp::implement($context);
+        StringHashCryptoLlvm::implement($context);
         StringHashHmacAlgos::ensureLinked($context);
         StringHashAlgos::ensureLinked($context);
         self::ensureDeferredEqualsStub($context);
