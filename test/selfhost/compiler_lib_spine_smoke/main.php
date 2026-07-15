@@ -836,6 +836,7 @@ require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementGet.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementGetDocNamespaces.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementGetName.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementGetNamespaces.php';
+require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementIterator.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementOffsetExists.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementOffsetGet.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementRegisterXPathNamespace.php';
