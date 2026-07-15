@@ -18,8 +18,6 @@ final class BuiltinClasses
         SplDoublyLinkedListBuiltin::registerClass($ctx);
         SplQueueSplStackBuiltin::registerClasses($ctx);
         SplFileInfoBuiltin::registerClass($ctx);
-        SplFileObjectBuiltin::registerClass($ctx);
-        SplTempFileObjectBuiltin::registerClass($ctx);
         DirectoryIteratorBuiltin::registerClass($ctx);
         FilesystemIteratorBuiltin::registerClass($ctx);
         GlobIteratorBuiltin::registerClass($ctx);
@@ -37,7 +35,11 @@ final class BuiltinClasses
         InfiniteIteratorBuiltin::registerClass($ctx);
         NoRewindIteratorBuiltin::registerClass($ctx);
         RecursiveTreeIteratorBuiltin::registerClass($ctx);
+        // RecursiveIterator (and siblings) must exist before SplFileObject / RecursiveCachingIterator (#6393, #6915).
         VmSplIterators::register($ctx);
+        RecursiveCachingIteratorBuiltin::registerClass($ctx);
+        SplFileObjectBuiltin::registerClass($ctx);
+        SplTempFileObjectBuiltin::registerClass($ctx);
         VmSplObserver::register($ctx);
         VmSplRegistry::registerStubs($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {

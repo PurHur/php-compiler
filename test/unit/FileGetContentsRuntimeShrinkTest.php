@@ -7,20 +7,18 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\FileGetContentsJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** __compiler_file_get_contents: PHP helper for full JIT/self-host; libc defer for user-script AOT (#15309, #17036). */
+/** __compiler_file_get_contents: PHP helper for embed; ext kernel for user-script AOT (#15309, #19279). */
 final class FileGetContentsRuntimeShrinkTest extends TestCase
 {
-    public function testStringFileGetContentsUsesPhpBridgeWithUserScriptAotDefer(): void
+    public function testStringFileGetContentsRoutesDeferThroughExtKernelNotLibcBuiltin(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContents.php');
         $this->assertStringContainsString('FileGetContentsJitHelper', $bridge);
+        $this->assertStringContainsString('JitFileGetContentsKernel', $bridge);
         $this->assertStringContainsString('UserScriptAotDeferNestedJit', $bridge);
-        $this->assertStringContainsString('StringFileGetContentsLibc', $bridge);
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContentsLibc.php');
-
-        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContentsLibc.php');
-        $this->assertStringContainsString("lookupFunction('open')", $libc);
-        $this->assertStringContainsString("lookupFunction('read')", $libc);
+        $this->assertStringNotContainsString('StringFileGetContentsLibc', $bridge);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContentsLibc.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitFileGetContentsKernel.php');
     }
 
     public function testFileGetContentsJitHelperDelegatesToVmFs(): void
@@ -35,13 +33,13 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
         @unlink($path);
     }
 
-    public function testSpineBundleIncludesFileGetContentsJitHelper(): void
+    public function testSpineBundleIncludesFileGetContentsPhpPath(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('FileGetContentsJitHelper.php', $spine);
+        $this->assertStringContainsString('JitFileGetContentsKernel.php', $spine);
         $this->assertStringContainsString('StringFileGetContents.php', $spine);
-        $this->assertStringContainsString('StringFileGetContentsLibc.php', $spine);
-        $this->assertStringContainsString('StringReadfileLibc.php', $spine);
+        $this->assertStringNotContainsString('StringFileGetContentsLibc.php', $spine);
     }
 
     /** Inventory argv Zend helloworld link calls __compiler_file_get_contents from ensureFullStandaloneBodies (#15604). */
