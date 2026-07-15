@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -26,7 +25,7 @@ final class gzdeflate extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('gzdeflate() expects one to three arguments in this compiler build');
         }
-        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'gzdeflate', 0, 'data');
+        $data = VmZlibArg::resolveDataString($frame, 'gzdeflate');
         $level = -1;
         $encoding = \ZLIB_ENCODING_RAW;
         if ($argc >= 2) {
@@ -67,7 +66,7 @@ final class gzdeflate extends Internal
 
         return JitZlib::deflate(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'gzdeflate', 0, 'data'),
+            VmZlibArg::jitDataString($context, $args[0], 'gzdeflate'),
             $level,
             $encoding
         );

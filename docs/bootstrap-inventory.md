@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4996 |
-| Phase A inventory files (M2 ratio SSOT) | 4996 |
+| PHP files on vm.php path | 4997 |
+| Phase A inventory files (M2 ratio SSOT) | 4997 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13452 |
+| Source constructs flagged (warnings) | 13453 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3619,6 +3619,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MetaTagsRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/MimeContentTypeRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/MultipartRuntime.php` | 0 | 6 |
+| `lib/JIT/Builtin/MultipartRuntimeUserScriptLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/MultisortRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/NaturalSortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php` | 0 | 3 |
@@ -13603,7 +13604,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitEnv.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/JitErrorGetLast.php`
 
@@ -20012,7 +20013,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmZlibArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/VmZlibContext.php`
 
@@ -27520,63 +27521,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 10410)
 - new Variable (line 11505)
 - new Variable (line 11526)
-- new CompileError (line 12264)
-- new CompileError (line 12368)
-- new Variable (line 12419)
-- new Variable (line 12802)
-- new Variable (line 12822)
-- new Variable (line 12843)
-- new Variable (line 12877)
-- new Variable (line 12911)
-- new Variable (line 13003)
-- new Variable (line 13025)
-- new Variable (line 13035)
-- new Variable (line 13187)
-- new Variable (line 13205)
-- new Variable (line 13255)
-- new Variable (line 13282)
-- new Variable (line 13307)
-- new Variable (line 13636)
-- new Variable (line 14004)
-- new Variable (line 14034)
-- new Variable (line 14053)
-- new Variable (line 14083)
-- new Variable (line 14120)
-- new Variable (line 14168)
-- new Variable (line 14211)
-- new VM\Variable (line 14554)
-- new Variable (line 14588)
-- new Variable (line 14639)
-- new Variable (line 14655)
-- new Variable (line 14674)
-- new Variable (line 14681)
-- new OpCode (line 14701)
-- new Variable (line 14702)
-- new Variable (line 14874)
-- new Variable (line 14912)
-- new OpCode (line 14926)
-- new Variable (line 14927)
-- new Variable (line 14986)
-- new OpCode (line 15007)
-- new Variable (line 15008)
-- new Variable (line 15105)
-- new Variable (line 15127)
-- new Variable (line 15195)
-- new Operand\Literal (line 15204)
-- new Variable (line 15219)
-- new Variable (line 15383)
-- new VM\PropertyIsInitializedHandler (line 15465)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15505)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15598)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15674)
-- new JIT\Call\VmCoerceVariableToString (line 15764)
-- new JIT\Call\IncludePathResolverResolve (line 16018)
-- new Variable (line 17074)
-- new VM (line 17118)
-- new VM\Variable (line 17127)
-- new Variable (line 17148)
-- new Variable (line 17194)
-- new Variable (line 17688)
+- new CompileError (line 12273)
+- new CompileError (line 12377)
+- new Variable (line 12428)
+- new Variable (line 12811)
+- new Variable (line 12831)
+- new Variable (line 12852)
+- new Variable (line 12886)
+- new Variable (line 12920)
+- new Variable (line 13012)
+- new Variable (line 13034)
+- new Variable (line 13044)
+- new Variable (line 13196)
+- new Variable (line 13214)
+- new Variable (line 13264)
+- new Variable (line 13291)
+- new Variable (line 13316)
+- new Variable (line 13645)
+- new Variable (line 14013)
+- new Variable (line 14043)
+- new Variable (line 14062)
+- new Variable (line 14092)
+- new Variable (line 14129)
+- new Variable (line 14177)
+- new Variable (line 14220)
+- new VM\Variable (line 14563)
+- new Variable (line 14597)
+- new Variable (line 14648)
+- new Variable (line 14664)
+- new Variable (line 14683)
+- new Variable (line 14690)
+- new OpCode (line 14710)
+- new Variable (line 14711)
+- new Variable (line 14883)
+- new Variable (line 14921)
+- new OpCode (line 14935)
+- new Variable (line 14936)
+- new Variable (line 14995)
+- new OpCode (line 15016)
+- new Variable (line 15017)
+- new Variable (line 15114)
+- new Variable (line 15136)
+- new Variable (line 15204)
+- new Operand\Literal (line 15213)
+- new Variable (line 15228)
+- new Variable (line 15392)
+- new VM\PropertyIsInitializedHandler (line 15474)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15514)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15607)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15683)
+- new JIT\Call\VmCoerceVariableToString (line 15773)
+- new JIT\Call\IncludePathResolverResolve (line 16027)
+- new Variable (line 17083)
+- new VM (line 17127)
+- new VM\Variable (line 17136)
+- new Variable (line 17157)
+- new Variable (line 17203)
+- new Variable (line 17697)
 - 369 class method(s)
 - 7 closure(s)
 
@@ -29049,12 +29050,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MultipartRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 218)
-- new phpc_native_ht_set_string_key (line 219)
-- new phpc_native_ht_set_string_key_ht (line 220)
-- new phpc_native_ht_set_string_at (line 221)
-- new phpc_native_ht_set_hashtable_at (line 222)
-- 13 class method(s)
+- new phpc_native_ht_alloc (line 326)
+- new phpc_native_ht_set_string_key (line 327)
+- new phpc_native_ht_set_string_key_ht (line 328)
+- new phpc_native_ht_set_string_at (line 329)
+- new phpc_native_ht_set_hashtable_at (line 330)
+- 16 class method(s)
+
+### `lib/JIT/Builtin/MultipartRuntimeUserScriptLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/MultisortRuntime.php`
 
@@ -29182,7 +29188,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ParseStrNativeOpsJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `lib/JIT/Builtin/ParseStrRuntime.php`
 
@@ -29431,7 +29437,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/RequestParseBodyUserScriptLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/ResolveSidecarRuntime.php`
 
@@ -37835,7 +37841,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Web/MultipartNativeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 4 class method(s)
 
 ### `lib/Web/MultipartParser.php`
 

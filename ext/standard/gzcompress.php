@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -26,7 +25,7 @@ final class gzcompress extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('gzcompress() expects one to three arguments in this compiler build');
         }
-        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'gzcompress', 0, 'data');
+        $data = VmZlibArg::resolveDataString($frame, 'gzcompress');
         $level = -1;
         $encoding = \ZLIB_ENCODING_DEFLATE;
         if ($argc >= 2) {
@@ -67,7 +66,7 @@ final class gzcompress extends Internal
 
         return JitZlib::compress(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'gzcompress', 0, 'data'),
+            VmZlibArg::jitDataString($context, $args[0], 'gzcompress'),
             $level,
             $encoding
         );

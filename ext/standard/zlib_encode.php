@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -61,7 +60,7 @@ final class zlib_encode extends Internal
 
         return JitZlib::zlibEncode(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'zlib_encode', 0, 'data'),
+            VmZlibArg::jitDataString($context, $args[0], 'zlib_encode'),
             JitStrictIntArg::lower($context, $args[1], 'zlib_encode', 2, 'encoding'),
             $level
         );

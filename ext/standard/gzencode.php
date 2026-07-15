@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -26,7 +25,7 @@ final class gzencode extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('gzencode() expects one to three arguments in this compiler build');
         }
-        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'gzencode', 0, 'data');
+        $data = VmZlibArg::resolveDataString($frame, 'gzencode');
         $level = -1;
         $encoding = \ZLIB_ENCODING_GZIP;
         if ($argc >= 2) {
@@ -67,7 +66,7 @@ final class gzencode extends Internal
 
         return JitZlib::encode(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'gzencode', 0, 'data'),
+            VmZlibArg::jitDataString($context, $args[0], 'gzencode'),
             $level,
             $encoding
         );

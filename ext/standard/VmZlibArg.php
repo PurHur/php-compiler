@@ -5,17 +5,49 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
 
 /** Shared VM argument parsing for ext/zlib builtins (php-src ext/zlib/zlib.c, issue #4497). */
 final class VmZlibArg
 {
-    /** Z_PARAM_STR $data with declare(strict_types=1) caller edge (#19119). */
+    /**
+     * Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#19332, #19112).
+     *
+     * Also covers declare(strict_types=1) caller edge before coercion.
+     */
     public static function resolveDataString(Frame $frame, string $function, int $argIndex = 0): string
     {
-        return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, $function, 'data');
+        return VmString::zparamStrBuiltinArgForFrame($frame, $argIndex, $function, $argIndex, 'data');
+    }
+
+    /**
+     * JIT Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#19332).
+     */
+    public static function jitDataString(Context $context, JITVariable $arg, string $function): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                $function,
+                0,
+                'data'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            $function,
+            0,
+            'data'
+        );
     }
 
     /** Z_PARAM_STR $filename with declare(strict_types=1) caller edge (#19119). */

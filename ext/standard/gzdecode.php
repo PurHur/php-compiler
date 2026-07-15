@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -58,7 +57,7 @@ final class gzdecode extends Internal
 
         return JitZlib::decode(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'gzdecode', 0, 'data'),
+            VmZlibArg::jitDataString($context, $args[0], 'gzdecode'),
             $maxLength
         );
     }
