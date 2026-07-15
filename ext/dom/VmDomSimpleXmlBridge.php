@@ -9,6 +9,7 @@ use PHPCompiler\ext\simplexml\SimpleXmlRegistry;
 use PHPCompiler\ext\simplexml\VmSimpleXml;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -132,10 +133,17 @@ final class VmDomSimpleXmlBridge
     public static function requireSimpleXmlElement(Variable $var, string $label): ObjectEntry
     {
         $var = $var->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $var->type) {
-            throw new \ValueError(sprintf(
-                '%s(): Argument #1 ($node) is not a valid node type',
+        if (Variable::TYPE_NULL === $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($node) must be of type object, null given',
                 $label
+            ));
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($node) must be of type object, %s given',
+                $label,
+                EnumCaseSupport::typeNameForVariable($var)
             ));
         }
         $object = $var->toObject();
