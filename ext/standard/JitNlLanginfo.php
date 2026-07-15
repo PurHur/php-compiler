@@ -83,7 +83,7 @@ final class JitNlLanginfo
         $i32 = $context->getTypeFromString('int32');
 
         return $context->builder->trunc(
-            JitIntdiv::lowerIntBuiltinArg($context, $arg, 'nl_langinfo', 1, 'item'),
+            JitSleep::zParamLong($context, $arg, 'nl_langinfo', 1, 'item'),
             $i32
         );
     }
