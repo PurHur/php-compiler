@@ -1,5 +1,7 @@
 --TEST--
 ext/ftp ftp_connect() refused connection returns false (#3353, php-src ext/ftp/php_ftp.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {

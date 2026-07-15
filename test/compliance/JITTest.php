@@ -245,6 +245,8 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'property_hook_type_enum')
                     || str_contains($name, 'exit_status_enum')
                     || str_contains($name, 'socket_type_enum')
+                    || str_contains($name, 'ftp_ssl_connect')
+                    || str_contains($name, 'ftp_connect')
                     || str_contains($name, 'ftp_connection_class')
                     || str_contains($name, 'trim_named_mode'))
                 && !str_contains($name, 'builtin_stub_enums_phantom')) {

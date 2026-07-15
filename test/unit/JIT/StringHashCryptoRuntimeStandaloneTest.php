@@ -22,9 +22,6 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoNativeJit.php');
         $jit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoJit.php');
         $php = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoPhp.php');
-        $llvm = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoLlvm.php');
-        $this->assertStringContainsString('emitHkdf', $llvm);
-        $this->assertStringNotContainsString('hc_llvm_hkdf_stub', $llvm);
         $this->assertStringContainsString('__compiler_hash', $jit);
         $this->assertStringContainsString('StringHashEquals', $jit);
         $this->assertStringContainsString('StringHashHmacAlgos', $jit);
@@ -33,11 +30,14 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('implementDeferred', $jit);
         $this->assertStringContainsString('ensureDeferredEqualsStub', $jit);
         $this->assertStringNotContainsString('StringHashCryptoNativeJit', $jit);
+        $this->assertStringNotContainsString('StringHashCryptoLlvm', $jit);
         $this->assertStringNotContainsString('ensureBitcode', $jit);
         $this->assertStringNotContainsString('hash_crypto_jit_runtime.c', $jit);
         $this->assertStringContainsString('HashCryptoJitHelper', $php);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $php);
         $this->assertStringContainsString('__compiler_hash', $php);
         $this->assertStringNotContainsString('__phpc_hc_sha256_transform', $php);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoLlvm.php');
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('runtime/hash_crypto.c', $linker);
         $this->assertStringNotContainsString('hash_crypto_jit_runtime.c', $linker);

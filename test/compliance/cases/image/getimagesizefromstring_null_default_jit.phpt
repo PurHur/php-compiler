@@ -1,6 +1,5 @@
 --TEST--
-image getimagesizefromstring(null) — E_NOTICE before false on default profile JIT (#19067, ext/standard/image.c)
---JIT--
+image getimagesizefromstring(null) JIT — notice + false on default profile (#19067, ext/standard/image.c)
 --FILE--
 <?php
 error_reporting(E_ALL);

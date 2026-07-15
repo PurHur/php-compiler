@@ -1,5 +1,5 @@
 --TEST--
-stdlib getimagesizefromstring(null) — E_NOTICE before false on default profile (#19067, ext/standard/image.c)
+stdlib getimagesizefromstring(null) — notice + false on default profile (#19067, ext/standard/image.c)
 --FILE--
 <?php
 error_reporting(E_ALL);
