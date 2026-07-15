@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCfg\Operand\Literal;
 use PHPCompiler\Block;
 use PHPCompiler\ext\spl\SplDualIteratorStorage;
 use PHPCompiler\Frame;
@@ -17,12 +18,76 @@ use PHPCompiler\VM as VmEngine;
  */
 final class ClassConstMaterializer
 {
+    /**
+     * Register user classes from the compilation unit so JIT/AOT const materialization
+     * can evaluate `new UserClass` (and bare `new UserClass` on 8.4+) before runtime (#19046).
+     */
+    public static function seedReferencedClasses(
+        VmEngine $vm,
+        ?Block $rootBlock,
+        Block $classBody,
+        int $valueSlot
+    ): void {
+        if (null === $rootBlock) {
+            return;
+        }
+        $classBlocks = self::collectScriptClassBlocks($rootBlock);
+        if ([] === $classBlocks) {
+            return;
+        }
+        $requiredLc = [];
+        foreach (self::expandRequiredNewClassNames($classBody, $valueSlot, $classBlocks) as $className) {
+            $requiredLc[strtolower(ltrim($className, '\\'))] = $className;
+        }
+        if ([] === $requiredLc) {
+            return;
+        }
+        foreach ($rootBlock->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_CLASS !== $op->type || null === $op->block1) {
+                continue;
+            }
+            $nameOp = $rootBlock->getOperand($op->arg1);
+            if (!$nameOp instanceof Literal) {
+                continue;
+            }
+            $lc = strtolower(ltrim($nameOp->value, '\\'));
+            if (!isset($requiredLc[$lc])) {
+                continue;
+            }
+            $vm->ensureClassDeclaredForConstMaterialization($nameOp->value, $op->block1);
+            unset($requiredLc[$lc]);
+        }
+        foreach ($requiredLc as $className) {
+            $body = $classBlocks[strtolower(ltrim($className, '\\'))] ?? null;
+            if (null !== $body) {
+                $vm->ensureClassDeclaredForConstMaterialization($className, $body);
+            }
+        }
+    }
+
     public static function materializeSlot(
         VmEngine $vm,
         Block $bodyBlock,
         int $valueSlot,
         ?string $declaringClassName = null
     ): Variable {
+        $initOps = [];
+        foreach ($bodyBlock->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type && $valueSlot === $op->arg2) {
+                break;
+            }
+            $initOps[] = $op;
+        }
+        $newResultSlot = self::newFragmentResultSlot($initOps);
+        if (null !== $newResultSlot) {
+            return self::detachConstantValue(
+                $vm->materializeClassConstInitFragment(
+                    $bodyBlock->fragmentForOpcodes($initOps),
+                    $newResultSlot
+                )
+            );
+        }
+
         $frame = $bodyBlock->getFrame($vm->context);
         $entry = self::declaringClassEntry($vm, $declaringClassName);
         foreach ($bodyBlock->opCodes as $op) {
@@ -46,6 +111,20 @@ final class ClassConstMaterializer
         }
 
         return self::detachConstantValue($frame->scope[$valueSlot]);
+    }
+
+    /**
+     * @param list<OpCode> $initOps
+     */
+    private static function newFragmentResultSlot(array $initOps): ?int
+    {
+        foreach ($initOps as $initOp) {
+            if (OpCode::TYPE_NEW === $initOp->type) {
+                return $initOp->arg1;
+            }
+        }
+
+        return null;
     }
 
     private static function declaringClassEntry(VmEngine $vm, ?string $declaringClassName): ?ClassEntry
@@ -235,5 +314,99 @@ final class ClassConstMaterializer
         $stored->object($object);
 
         return $stored;
+    }
+
+    /**
+     * @return array<string, Block> lowercase unqualified class name => body block
+     */
+    private static function collectScriptClassBlocks(Block $rootBlock): array
+    {
+        $map = [];
+        foreach ($rootBlock->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_CLASS !== $op->type || null === $op->block1) {
+                continue;
+            }
+            $nameOp = $rootBlock->getOperand($op->arg1);
+            if (!$nameOp instanceof Literal) {
+                continue;
+            }
+            $map[strtolower(ltrim($nameOp->value, '\\'))] = $op->block1;
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param array<string, Block> $classBlocks
+     *
+     * @return list<string>
+     */
+    private static function expandRequiredNewClassNames(
+        Block $classBody,
+        int $valueSlot,
+        array $classBlocks
+    ): array {
+        $required = [];
+        $queue = self::collectNewLiteralClassNamesInConstInit($classBody, $valueSlot);
+        while ([] !== $queue) {
+            $className = array_shift($queue);
+            $lc = strtolower(ltrim($className, '\\'));
+            if (isset($required[$lc])) {
+                continue;
+            }
+            $required[$lc] = $className;
+            $body = $classBlocks[$lc] ?? null;
+            if (null === $body) {
+                continue;
+            }
+            foreach (self::collectAllNewLiteralClassNamesInClassBody($body) as $dep) {
+                $depLc = strtolower(ltrim($dep, '\\'));
+                if (!isset($required[$depLc])) {
+                    $queue[] = $dep;
+                }
+            }
+        }
+
+        return array_values($required);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function collectNewLiteralClassNamesInConstInit(Block $classBody, int $valueSlot): array
+    {
+        $names = [];
+        foreach ($classBody->opCodes as $op) {
+            if (OpCode::TYPE_DECLARE_CLASS_CONST === $op->type && $valueSlot === $op->arg2) {
+                break;
+            }
+            if (OpCode::TYPE_NEW === $op->type) {
+                $classOp = $classBody->getOperand($op->arg2);
+                if ($classOp instanceof Literal && is_string($classOp->value) && '' !== $classOp->value) {
+                    $names[] = $classOp->value;
+                }
+            }
+        }
+
+        return $names;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function collectAllNewLiteralClassNamesInClassBody(Block $classBody): array
+    {
+        $names = [];
+        foreach ($classBody->opCodes as $op) {
+            if (OpCode::TYPE_NEW !== $op->type) {
+                continue;
+            }
+            $classOp = $classBody->getOperand($op->arg2);
+            if ($classOp instanceof Literal && is_string($classOp->value) && '' !== $classOp->value) {
+                $names[] = $classOp->value;
+            }
+        }
+
+        return $names;
     }
 }

@@ -17046,6 +17046,8 @@ class JIT {
         ) {
             $vm = new VM($this->context->runtime->vmContext);
             $className = $this->context->type->object->classNameForId($classId);
+            $rootBlock = $this->context->jitFunctionRootBlock ?? $this->context->jitEnclosingBlock;
+            VM\ClassConstMaterializer::seedReferencedClasses($vm, $rootBlock, $block, $op->arg2);
             $value = VM\ClassConstMaterializer::materializeSlot($vm, $block, $op->arg2, $className);
         } else {
             $value = $block->constants[$op->arg2];
