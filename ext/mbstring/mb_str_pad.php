@@ -33,7 +33,7 @@ final class mb_str_pad extends Internal
                 $argc
             ));
         }
-        $input = VmString::coerceStringBuiltinArg(
+        $input = VmString::coerceTypedStringBuiltinArg(
             $frame->calledArgs[0],
             'mb_str_pad',
             0,
