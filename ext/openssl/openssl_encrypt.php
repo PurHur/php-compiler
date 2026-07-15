@@ -34,7 +34,7 @@ final class openssl_encrypt extends Internal
             return;
         }
 
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'openssl_encrypt', 0, 'data');
+        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'openssl_encrypt', 0, 'data');
         $cipherAlgo = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'openssl_encrypt', 1, 'cipher_algo');
         $passphrase = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'openssl_encrypt', 2, 'passphrase');
         $options = 0;

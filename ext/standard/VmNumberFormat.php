@@ -62,11 +62,7 @@ final class VmNumberFormat
         }
         switch ($value->type) {
             case Variable::TYPE_NULL:
-                if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
-                    throw new \TypeError(self::numTypeError('null'));
-                }
-
-                return 0.0;
+                throw new \TypeError(self::numTypeError('null'));
             case Variable::TYPE_INTEGER:
                 return (float) $value->toInt();
             case Variable::TYPE_FLOAT:

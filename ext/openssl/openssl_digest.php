@@ -32,7 +32,7 @@ final class openssl_digest extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'openssl_digest', 0, 'data');
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'openssl_digest', 0, 'data');
         $method = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'openssl_digest', 1, 'method');
         $rawOutput = false;
         if (3 === $argc) {

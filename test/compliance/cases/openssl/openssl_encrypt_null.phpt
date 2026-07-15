@@ -1,5 +1,5 @@
 --TEST--
-openssl openssl_encrypt(null) — coerces to empty string ciphertext (#19016, ext/openssl/openssl.c)
+openssl openssl_encrypt(null) — TypeError under strict_types (#19038, ext/openssl/openssl.c)
 --SKIPIF--
 <?php
 if (!extension_loaded('ffi')) {
@@ -15,16 +15,11 @@ declare(strict_types=1);
 $key = str_repeat('k', 32);
 $iv = str_repeat('i', 16);
 
-$empty = @openssl_encrypt('', 'aes-256-cbc', $key, 0, $iv);
-$null = @openssl_encrypt(null, 'aes-256-cbc', $key, 0, $iv);
-
-if (false === $empty || false === $null) {
-    echo "fail\n";
-    exit(1);
+try {
+    openssl_encrypt(null, 'aes-256-cbc', $key, 0, $iv);
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
 }
-
-echo ($empty === $null) ? "match\n" : "mismatch\n";
-echo strlen($null) > 0 ? "nonempty\n" : "empty\n";
 --EXPECT--
-match
-nonempty
+openssl_encrypt(): Argument #1 ($data) must be of type string, null given

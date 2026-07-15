@@ -1,8 +1,14 @@
 --TEST--
-stdlib number_format() JIT — null $num coerces to 0 (#11017, ext/standard/number_format.c)
+stdlib number_format() JIT — null $num TypeError (#18979, ext/standard/number_format.c)
 --JIT--
 --FILE--
 <?php
-echo number_format(null), "\n";
+try {
+    number_format(null);
+} catch (Throwable $e) {
+    echo get_class($e), "\n";
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
-0
+TypeError
+number_format(): Argument #1 ($num) must be of type float, null given

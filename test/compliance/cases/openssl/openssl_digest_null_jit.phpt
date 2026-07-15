@@ -1,13 +1,9 @@
 --TEST--
-openssl openssl_digest(null) — TypeError on default profile JIT (#19002, ext/openssl/openssl.c)
+openssl openssl_digest(null) — coerces to empty-string SHA256 JIT (#19039, ext/openssl/openssl.c)
+--JIT--
 --FILE--
 <?php
-try {
-    openssl_digest(null, 'sha256');
-    echo "uncaught\n";
-} catch (TypeError $e) {
-    echo $e->getMessage(), "\n";
-}
+echo openssl_digest(null, 'sha256'), "\n";
 ?>
 --EXPECT--
-openssl_digest(): Argument #1 ($data) must be of type string, null given
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
