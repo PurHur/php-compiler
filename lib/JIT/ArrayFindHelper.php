@@ -6,8 +6,6 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\JitArrayElem;
 use PHPCompiler\JIT\Builtin\ArrayFindRuntime;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -132,9 +130,6 @@ final class ArrayFindHelper
                 return $vacuous;
             }
         }
-        if (self::MODE_FIND === $mode || self::MODE_FIND_KEY === $mode) {
-            self::requireNonEmptyFindArray($context, $array, self::functionNameForMode($mode));
-        }
         $function = self::functionNameForMode($mode);
         if ($callback->isNullConstant) {
             throw new \TypeError(ArrayFindCallbackPolicy::invalidCallbackTypeError($function));
@@ -190,35 +185,4 @@ final class ArrayFindHelper
         };
     }
 
-    private static function requireNonEmptyFindArray(Context $context, Variable $array, string $fn): void
-    {
-        $message = \sprintf('%s(): Argument #1 ($array) must not be empty', $fn);
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            $sizeT = $context->getTypeFromString('size_t');
-            $zero = $sizeT->constInt(0, false);
-            $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
-            $isEmpty = $context->builder->icmp(Builder::INT_EQ, $count, $zero);
-            TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
-                $context,
-                $context->builder->not($isEmpty),
-                'array_find_nonempty',
-                $message
-            );
-
-            return;
-        }
-
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $map = $context->structFieldMap['__hashtable__'];
-        $num = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
-        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zero);
-        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
-            $context,
-            $context->builder->not($isEmpty),
-            'array_find_ht_nonempty',
-            $message
-        );
-    }
 }
