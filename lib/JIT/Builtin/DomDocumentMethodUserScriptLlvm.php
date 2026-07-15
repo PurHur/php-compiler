@@ -109,6 +109,36 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureFirstChildBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_FIRST_CHILD,
+            'dom_first_child_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            DomNodeChildPropertyRuntime::HELPER_FIRST,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
+        );
+    }
+
+    public static function ensureLastChildBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_LAST_CHILD,
+            'dom_last_child_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            DomNodeChildPropertyRuntime::HELPER_LAST,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
+        );
+    }
+
     public static function ensureXPathQueryBridge(Context $context): void
     {
         self::ensureContextBridge(
@@ -305,6 +335,170 @@ final class DomDocumentMethodUserScriptLlvm
             $context->getTypeFromString('void'),
             'PHPCompiler\\ext\\dom\\DomSyncElementIdMapJitHelper::syncArgv',
             '/ext/dom/DomSyncElementIdMapJitHelper.php'
+        );
+    }
+
+    public static function ensureAppendBridge(Context $context, int $arity): void
+    {
+        self::ensureLiveMutationBridge(
+            $context,
+            DomNodeLiveMutationRuntime::appendAbi($arity),
+            'dom_append_user_script_'.$arity,
+            $arity,
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendArgv'.$arity
+        );
+    }
+
+    public static function ensureAppendObjectBridge(Context $context, int $arity): void
+    {
+        self::ensureObjectLiveMutationBridge(
+            $context,
+            DomNodeLiveMutationRuntime::appendObjectAbi($arity),
+            'dom_append_object_user_script_'.$arity,
+            $arity,
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendObjectArgv'.$arity
+        );
+    }
+
+    public static function ensurePrependBridge(Context $context, int $arity): void
+    {
+        self::ensureLiveMutationBridge(
+            $context,
+            DomNodeLiveMutationRuntime::prependAbi($arity),
+            'dom_prepend_user_script_'.$arity,
+            $arity,
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependArgv'.$arity
+        );
+    }
+
+    public static function ensurePrependObjectBridge(Context $context, int $arity): void
+    {
+        self::ensureObjectLiveMutationBridge(
+            $context,
+            DomNodeLiveMutationRuntime::prependObjectAbi($arity),
+            'dom_prepend_object_user_script_'.$arity,
+            $arity,
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependObjectArgv'.$arity
+        );
+    }
+
+    public static function ensureAppendStringBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeLiveMutationRuntime::appendStringAbi(),
+            'dom_append_string_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::appendStringArgv1',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensurePrependStringBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeLiveMutationRuntime::prependStringAbi(),
+            'dom_prepend_string_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::prependStringArgv1',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensureReplaceChildrenBridge(Context $context, int $arity): void
+    {
+        self::ensureLiveMutationBridge(
+            $context,
+            DomNodeLiveMutationRuntime::replaceChildrenAbi($arity),
+            'dom_replace_children_user_script_'.$arity,
+            $arity,
+            'PHPCompiler\\ext\\dom\\DomNodeLiveMutationJitHelper::replaceChildrenArgv'.$arity
+        );
+    }
+
+    public static function ensureCreateDocumentFragmentBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomNodeLiveMutationRuntime::ABI_CREATE_FRAGMENT,
+            'dom_create_document_fragment_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::createDocumentFragmentArgv',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensureCreateDocumentFragmentObjectBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeLiveMutationRuntime::ABI_CREATE_FRAGMENT_OBJECT,
+            'dom_create_document_fragment_object_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::createDocumentFragmentObjectArgv',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    private static function ensureObjectLiveMutationBridge(
+        Context $context,
+        string $abi,
+        string $entryBlock,
+        int $arity,
+        string $helperLogical
+    ): void {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $paramTypes = [$objPtr];
+        for ($i = 0; $i < $arity; ++$i) {
+            $paramTypes[] = $objPtr;
+        }
+        self::ensureBridge(
+            $context,
+            $abi,
+            $entryBlock,
+            $paramTypes,
+            $context->context->voidType(),
+            $helperLogical,
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    private static function ensureLiveMutationBridge(
+        Context $context,
+        string $abi,
+        string $entryBlock,
+        int $arity,
+        string $helperLogical
+    ): void {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $paramTypes = [$objPtr];
+        for ($i = 0; $i < $arity; ++$i) {
+            $paramTypes[] = $valuePtr;
+        }
+        self::ensureBridge(
+            $context,
+            $abi,
+            $entryBlock,
+            $paramTypes,
+            $context->context->voidType(),
+            $helperLogical,
+            '/ext/dom/DomCreateElementJitHelper.php'
         );
     }
 
@@ -590,7 +784,21 @@ final class DomDocumentMethodUserScriptLlvm
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);
         NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'toobject');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
         DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+    }
+
+    /**
+     * @param list<string> $compiledHelpers
+     */
+    public static function compileMainModuleHelpers(
+        Context $context,
+        string $relativePath,
+        array $compiledHelpers
+    ): void {
+        self::ensureNestedHelperProxies($context);
+        self::ensureMainModuleHelperCompiled($context, $relativePath, $compiledHelpers);
     }
 
     /**

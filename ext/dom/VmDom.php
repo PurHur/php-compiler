@@ -5447,6 +5447,9 @@ final class VmDom
         if (!$entry->hasProperty(self::PROP_CHILD_NODES)) {
             $entry->allocateProperty(self::PROP_CHILD_NODES)->null();
         }
+        if (!$entry->hasProperty(self::PROP_REGISTRY_ID)) {
+            $entry->allocateProperty(self::PROP_REGISTRY_ID)->int(0);
+        }
     }
 
     private static function initElementPropertySlots(ObjectEntry $entry): void
@@ -5694,6 +5697,23 @@ final class VmDom
             if (null !== $child) {
                 self::syncSubtree($ctx, $child);
             }
+        }
+    }
+
+    /** Mirror live child links onto a user-script handle that aliases DomRegistry (#18951). */
+    public static function mirrorNodeLinkProperties(ObjectEntry $dest, ObjectEntry $source): void
+    {
+        if ($dest->id !== $source->id) {
+            return;
+        }
+        self::initNodePropertySlots($dest);
+        self::initNodePropertySlots($source);
+        foreach ([
+            self::PROP_FIRST_CHILD,
+            self::PROP_LAST_CHILD,
+            self::PROP_CHILD_NODES,
+        ] as $prop) {
+            $dest->getProperty($prop)->copyFrom($source->getProperty($prop));
         }
     }
 

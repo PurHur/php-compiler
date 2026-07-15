@@ -171,6 +171,9 @@ final class JitNestedHelperCoerce
 
             return JitValueBox::pointer($context, $slot);
         }
+        if ('__value__*' === $haveStr && '__value__' === $wantStr) {
+            return $context->builder->load($arg);
+        }
         if ('__hashtable__*' === $haveStr && self::isValueBoxType($context, $wantTy)) {
             $slot = JitValueBox::alloc($context);
             $context->builder->call(

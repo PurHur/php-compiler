@@ -15510,6 +15510,15 @@ class JIT {
             } elseif ('appendchild' === $methodLc && $this->context->functionIsRegistered('domnode::appendchild')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
+            } elseif ('append' === $methodLc && $this->context->functionIsRegistered('domnode::append')) {
+                $className = 'DOMNode';
+                $declaringClassLc = 'domnode';
+            } elseif ('prepend' === $methodLc && $this->context->functionIsRegistered('domnode::prepend')) {
+                $className = 'DOMNode';
+                $declaringClassLc = 'domnode';
+            } elseif ('replacechildren' === $methodLc && $this->context->functionIsRegistered('domnode::replacechildren')) {
+                $className = 'DOMNode';
+                $declaringClassLc = 'domnode';
             } elseif ('comparedocumentposition' === $methodLc && $this->context->functionIsRegistered('domnode::comparedocumentposition')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
@@ -15517,6 +15526,7 @@ class JIT {
         }
 
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
+        $proxyName = $this->resolveDomSubclassInstanceMethodProxy($declaringClassLc, $methodLc, $proxyName);
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
         $receiverVar = $this->resolveUserScriptDomDocumentReceiver(
             $block,
@@ -15832,6 +15842,41 @@ class JIT {
         }
 
         return strtolower(ltrim($classLc, '\\')).'::'.$methodLc;
+    }
+
+    /**
+     * ext/dom internal classes inherit DOMNode methods without LLVM parentClassLc (#18951).
+     */
+    private function resolveDomSubclassInstanceMethodProxy(string $classLc, string $methodLc, string $proxyName): string
+    {
+        if ($this->context->functionIsRegistered($proxyName)) {
+            return $proxyName;
+        }
+        $classLc = strtolower(ltrim($classLc, '\\'));
+        if (!str_starts_with($classLc, 'dom') || 'domnode' === $classLc) {
+            return $proxyName;
+        }
+        JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnode::'.$methodLc);
+        $nodeProxy = 'domnode::'.strtolower($methodLc);
+        if ($this->context->functionIsRegistered($nodeProxy)) {
+            return $nodeProxy;
+        }
+        if ('createdocumentfragment' === strtolower($methodLc)) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocument::createdocumentfragment');
+            $docProxy = 'domdocument::createdocumentfragment';
+            if ($this->context->functionIsRegistered($docProxy)) {
+                return $docProxy;
+            }
+        }
+        if ('appendchild' === strtolower($methodLc)) {
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domdocumentfragment::appendchild');
+            $fragmentProxy = 'domdocumentfragment::appendchild';
+            if ($this->context->functionIsRegistered($fragmentProxy)) {
+                return $fragmentProxy;
+            }
+        }
+
+        return $proxyName;
     }
 
     private function isSelfHostSuperglobalsClassLc(string $classLc): bool
