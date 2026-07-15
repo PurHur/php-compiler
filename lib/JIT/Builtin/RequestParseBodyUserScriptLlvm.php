@@ -14,9 +14,11 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * User-script standalone AOT: init-safe LLVM for request_parse_body() (#5965, #17316).
  *
- * Reads REQUEST_BODY via libc getenv (mirrored from putenv() via POSIX setenv in JitEnv —
- * not putenv(malloc), which heap-corrupted under ≥2 mirrors #17316). strdup's the body
- * before strtok/urldecode in-place parse so environ is not mutated.
+ * Reads REQUEST_BODY / CONTENT_TYPE via libc getenv (mirrored from putenv() via POSIX setenv).
+ * strdup's the body before strtok/urldecode in-place parse so environ is not mutated.
+ * Multipart uses {@see MultipartNativeJitHelper::populateMultipartIntoNative} (prelinked;
+ * no sg_FILES legacy bridge). Media-type detect uses libc `strncmp` — not `strncasecmp`,
+ * which may resolve to CaseCompareJitHelper's PHP string ABI in deferred AOT (#5965).
  * php-src: ext/standard/http.c
  */
 final class RequestParseBodyUserScriptLlvm
@@ -35,6 +37,7 @@ final class RequestParseBodyUserScriptLlvm
         $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         LibcExtern::register($context);
         ParseStrRuntime::ensureUserScriptLinked($context);
+        MultipartRuntime::ensurePopulateHelperCompiled($context);
         self::emitBridge($context);
         BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
@@ -61,8 +64,6 @@ final class RequestParseBodyUserScriptLlvm
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
         $bodySlot = self::entryAlloca($context, $entry, $i8p);
-        // Owned copy: parse_delimited_pairs mutates via strtok_r / urldecode in-place.
-        // Feeding libc getenv's environ buffer directly corrupts setenv mirrors (#17316).
         $ownedSlot = self::entryAlloca($context, $entry, $i8);
         $context->builder->store($i8->constInt(0, false), $ownedSlot);
 
@@ -87,12 +88,26 @@ final class RequestParseBodyUserScriptLlvm
         $context->builder->branch($afterBody);
 
         $context->builder->positionAtEnd($afterBody);
+        $ctRaw = $context->builder->call(
+            $context->lookupFunction('getenv'),
+            $context->pointerFromStringConstant('CONTENT_TYPE')
+        );
+        $ctNull = $context->builder->icmp(Builder::INT_EQ, $ctRaw, $i8p->constNull());
+        $contentType = $context->builder->select(
+            $ctNull,
+            $context->pointerFromStringConstant(''),
+            $ctRaw
+        );
+
         $post = $fn->getParam(0);
+        $files = $fn->getParam(1);
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $nullPost = $context->builder->icmp(Builder::INT_EQ, $post, $htPtr->constNull());
+        $nullFiles = $context->builder->icmp(Builder::INT_EQ, $files, $htPtr->constNull());
+        $anyNull = $context->builder->or($nullPost, $nullFiles);
         $early = $fn->appendBasicBlock('rpb_user_early');
         $work = $fn->appendBasicBlock('rpb_user_work');
-        $context->builder->branchIf($nullPost, $early, $work);
+        $context->builder->branchIf($anyNull, $early, $work);
 
         $context->builder->positionAtEnd($early);
         self::emitFreeOwnedBody($context, $bodySlot, $ownedSlot);
@@ -105,6 +120,16 @@ final class RequestParseBodyUserScriptLlvm
         $context->builder->branchIf($bodyEmpty, $done, $parse);
 
         $context->builder->positionAtEnd($parse);
+        $multipartBb = $fn->appendBasicBlock('rpb_user_multipart');
+        $urlencodedBb = $fn->appendBasicBlock('rpb_user_urlencoded');
+        $isMultipart = self::isMultipartContentType($context, $contentType);
+        $context->builder->branchIf($isMultipart, $multipartBb, $urlencodedBb);
+
+        $context->builder->positionAtEnd($multipartBb);
+        self::emitMultipartPopulate($context, $post, $files, $contentType, $bodySlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($urlencodedBb);
         $i32 = $context->getTypeFromString('int32');
         $context->builder->call(
             $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
@@ -121,6 +146,46 @@ final class RequestParseBodyUserScriptLlvm
 
         $context->registerFunction(self::BRIDGE_NAME, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function isMultipartContentType(Context $context, Value $contentType): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $isEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($contentType),
+            $i8->constInt(0, false)
+        );
+        // Fixtures/php-src use lowercase "multipart/form-data". Prefer strncmp so we keep
+        // the libc i8* ABI if StringCaseCompare stole the strncasecmp symbol (#5965).
+        $needle = $context->pointerFromStringConstant('multipart/form-data');
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $contentType,
+            $needle,
+            $context->constantFromInteger(19, 'size_t')
+        );
+        $prefixMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+
+        return $context->builder->and($context->builder->not($isEmpty), $prefixMatch);
+    }
+
+    private static function emitMultipartPopulate(
+        Context $context,
+        Value $post,
+        Value $files,
+        Value $contentTypeCstr,
+        Value $bodySlot
+    ): void {
+        // Call init-linked ABI (post+files) — mirrors CGI legacy bridge, no sg_FILES (#5965).
+        $context->builder->call(
+            $context->lookupFunction(MultipartRuntime::RPB_MULTIPART_RUNTIME_FUNCTION),
+            $post,
+            $files,
+            $contentTypeCstr,
+            $context->builder->load($bodySlot)
+        );
     }
 
     private static function emitFreeOwnedBody(Context $context, Value $bodySlot, Value $ownedSlot): void
@@ -178,7 +243,7 @@ final class RequestParseBodyUserScriptLlvm
     private static function bridgeBodyComplete(LlvmFunction $fn): bool
     {
         foreach ($fn->getBasicBlocks() as $block) {
-            if ('rpb_user_work' === $block->getName() && null !== $block->getTerminator()) {
+            if ('rpb_user_multipart' === $block->getName() && null !== $block->getTerminator()) {
                 return true;
             }
         }
