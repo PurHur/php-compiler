@@ -10,7 +10,7 @@ use PHPCompiler\VM\Variable;
 /**
  * XML-RPC encode/decode (php-src ext/xmlrpc/xmlrpc-epi-php.c; #6579).
  *
- * PHP-in-PHP value serialization — host DOM only on VM execute path.
+ * PHP-in-PHP value serialization — string XML parser (no host DOMDocument; #19048 AOT).
  */
 final class VmXmlrpc
 {
@@ -44,32 +44,21 @@ final class VmXmlrpc
     {
         self::$lastError = null;
         $xml = trim($xml);
-        if ('' === $xml) {
+        if ('' === $xml || !str_contains($xml, '<')) {
             self::$lastError = 'Invalid XML';
 
             return false;
         }
 
-        $doc = new \DOMDocument();
-        $prev = libxml_use_internal_errors(true);
-        $loaded = $doc->loadXML($xml);
-        libxml_clear_errors();
-        libxml_use_internal_errors($prev);
-        if (!$loaded) {
+        $valueInner = self::extractBalancedElementInner($xml, 'value');
+        if (null === $valueInner) {
             self::$lastError = 'Invalid XML';
-
-            return false;
-        }
-
-        $valueNode = self::locateValueElement($doc);
-        if (null === $valueNode) {
-            self::$lastError = 'Invalid XML-RPC payload';
 
             return false;
         }
 
         try {
-            return self::decodeValueElement($valueNode);
+            return self::decodeValueString($valueInner);
         } catch (\Throwable) {
             self::$lastError = 'Invalid XML-RPC payload';
 
@@ -130,7 +119,11 @@ final class VmXmlrpc
 
     private static function escapeXml(string $value): string
     {
-        return htmlspecialchars($value, ENT_XML1 | ENT_QUOTES, 'UTF-8');
+        return str_replace(
+            ['&', '<', '>', '"', "'"],
+            ['&amp;', '&lt;', '&gt;', '&quot;', '&apos;'],
+            $value
+        );
     }
 
     private static function formatDouble(float $value): string
@@ -148,25 +141,27 @@ final class VmXmlrpc
         return rtrim(rtrim(sprintf('%.17F', $value), '0'), '.');
     }
 
-    private static function locateValueElement(\DOMDocument $doc): ?\DOMElement
+    private static function extractBalancedElementInner(string $xml, string $tag): ?string
     {
-        $root = $doc->documentElement;
-        if (null === $root) {
+        $tagPattern = preg_quote($tag, '/');
+        if (!preg_match('/<'.$tagPattern.'(\s[^>]*)?>/i', $xml, $open, PREG_OFFSET_CAPTURE)) {
             return null;
         }
-        if ('value' === strtolower($root->localName ?? $root->nodeName)) {
-            return $root;
-        }
-        if ('param' === strtolower($root->localName ?? $root->nodeName)) {
-            foreach ($root->childNodes as $child) {
-                if ($child instanceof \DOMElement && 'value' === strtolower($child->localName ?? $child->nodeName)) {
-                    return $child;
+        $innerStart = $open[0][1] + \strlen($open[0][0]);
+        $depth = 1;
+        $pos = $innerStart;
+        $closePattern = '/<(\/?)'.$tagPattern.'(\s[^>]*)?>/i';
+        while ($depth > 0 && preg_match($closePattern, $xml, $match, PREG_OFFSET_CAPTURE, $pos)) {
+            $isClose = '' !== $match[1][0];
+            $pos = $match[0][1] + \strlen($match[0][0]);
+            if ($isClose) {
+                --$depth;
+                if (0 === $depth) {
+                    return \substr($xml, $innerStart, $match[0][1] - $innerStart);
                 }
+            } else {
+                ++$depth;
             }
-        }
-        $values = $doc->getElementsByTagName('value');
-        if ($values->length > 0 && $values->item(0) instanceof \DOMElement) {
-            return $values->item(0);
         }
 
         return null;
@@ -175,40 +170,64 @@ final class VmXmlrpc
     /**
      * @return mixed
      */
-    private static function decodeValueElement(\DOMElement $valueNode)
+    private static function decodeValueString(string $valueInner)
     {
-        $typed = self::firstElementChild($valueNode);
-        if (null === $typed) {
-            return trim($valueNode->textContent ?? '');
+        $valueInner = trim($valueInner);
+        if ('' === $valueInner) {
+            return '';
         }
+        if ('<' !== $valueInner[0]) {
+            return $valueInner;
+        }
+        if (!preg_match('/^<([a-zA-Z0-9]+)/', $valueInner, $tagMatch)) {
+            return $valueInner;
+        }
+        $tag = strtolower($tagMatch[1]);
+        $typedInner = self::extractBalancedElementInner($valueInner, $tag);
+        if (null === $typedInner) {
+            return trim($valueInner);
+        }
+        $typedInner = trim($typedInner);
 
-        $tag = strtolower($typed->localName ?? $typed->nodeName);
         return match ($tag) {
-            'int', 'i4', 'i8' => (int) trim($typed->textContent ?? '0'),
-            'boolean', 'bool' => '1' === trim($typed->textContent ?? '0') || 'true' === strtolower(trim($typed->textContent ?? '')),
-            'double', 'float' => self::parseDouble(trim($typed->textContent ?? '0')),
-            'string' => (string) ($typed->textContent ?? ''),
-            'base64' => base64_decode(trim($typed->textContent ?? ''), true) ?: '',
-            'array' => self::decodeArrayElement($typed),
-            'struct' => self::decodeStructElement($typed),
-            default => trim($typed->textContent ?? ''),
+            'int', 'i4', 'i8' => (int) $typedInner,
+            'boolean', 'bool' => '1' === $typedInner || 'true' === strtolower($typedInner),
+            'double', 'float' => self::parseDouble($typedInner),
+            'string' => $typedInner,
+            'base64' => self::decodeBase64($typedInner),
+            'array' => self::decodeArrayString($typedInner),
+            'struct' => self::decodeStructString($typedInner),
+            default => $typedInner,
         };
     }
 
     /**
      * @return list<mixed>
      */
-    private static function decodeArrayElement(\DOMElement $arrayNode): array
+    private static function decodeArrayString(string $arrayInner): array
     {
-        $data = self::firstChildByName($arrayNode, 'data');
-        if (null === $data) {
+        $dataInner = self::extractBalancedElementInner($arrayInner, 'data');
+        if (null === $dataInner) {
             return [];
         }
         $out = [];
-        foreach ($data->childNodes as $child) {
-            if ($child instanceof \DOMElement && 'value' === strtolower($child->localName ?? $child->nodeName)) {
-                $out[] = self::decodeValueElement($child);
+        $pos = 0;
+        $dataLen = \strlen($dataInner);
+        while ($pos < $dataLen) {
+            if (!preg_match('/<value(\s[^>]*)?>/i', $dataInner, $match, PREG_OFFSET_CAPTURE, $pos)) {
+                break;
             }
+            $sliceStart = $match[0][1];
+            $valueInner = self::extractBalancedElementInner(\substr($dataInner, $sliceStart), 'value');
+            if (null === $valueInner) {
+                break;
+            }
+            $out[] = self::decodeValueString($valueInner);
+            $closePos = stripos($dataInner, '</value>', $sliceStart);
+            if (false === $closePos) {
+                break;
+            }
+            $pos = $closePos + 8;
         }
 
         return $out;
@@ -217,45 +236,40 @@ final class VmXmlrpc
     /**
      * @return array<string, mixed>
      */
-    private static function decodeStructElement(\DOMElement $structNode): array
+    private static function decodeStructString(string $structInner): array
     {
         $out = [];
-        foreach ($structNode->childNodes as $child) {
-            if (!$child instanceof \DOMElement || 'member' !== strtolower($child->localName ?? $child->nodeName)) {
-                continue;
+        $pos = 0;
+        $structLen = \strlen($structInner);
+        while ($pos < $structLen) {
+            if (!preg_match('/<member(\s[^>]*)?>/i', $structInner, $memberOpen, PREG_OFFSET_CAPTURE, $pos)) {
+                break;
             }
-            $nameNode = self::firstChildByName($child, 'name');
-            $valueNode = self::firstChildByName($child, 'value');
-            if (null === $nameNode || null === $valueNode) {
-                continue;
+            $sliceStart = $memberOpen[0][1];
+            $memberInner = self::extractBalancedElementInner(\substr($structInner, $sliceStart), 'member');
+            if (null === $memberInner) {
+                break;
             }
-            $out[trim($nameNode->textContent ?? '')] = self::decodeValueElement($valueNode);
+            $nameInner = self::extractBalancedElementInner($memberInner, 'name');
+            $valueInner = self::extractBalancedElementInner($memberInner, 'value');
+            if (null !== $nameInner && null !== $valueInner) {
+                $out[trim($nameInner)] = self::decodeValueString($valueInner);
+            }
+            $closePos = stripos($structInner, '</member>', $sliceStart);
+            if (false === $closePos) {
+                break;
+            }
+            $pos = $closePos + 9;
         }
 
         return $out;
     }
 
-    private static function firstElementChild(\DOMElement $node): ?\DOMElement
+    private static function decodeBase64(string $payload): string
     {
-        foreach ($node->childNodes as $child) {
-            if ($child instanceof \DOMElement) {
-                return $child;
-            }
-        }
+        $decoded = base64_decode(trim($payload), true);
 
-        return null;
-    }
-
-    private static function firstChildByName(\DOMElement $node, string $name): ?\DOMElement
-    {
-        $want = strtolower($name);
-        foreach ($node->childNodes as $child) {
-            if ($child instanceof \DOMElement && $want === strtolower($child->localName ?? $child->nodeName)) {
-                return $child;
-            }
-        }
-
-        return null;
+        return false === $decoded ? '' : $decoded;
     }
 
     private static function parseDouble(string $raw): float
