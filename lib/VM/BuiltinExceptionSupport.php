@@ -376,6 +376,25 @@ final class BuiltinExceptionSupport
         return self::materializeThrowable($ctx, 'runtimeexception', $message, $file, $line);
     }
 
+    public static function materializeUnexpectedValueException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[ExceptionSupport::CLASS_UNEXPECTED_VALUE_EXCEPTION])) {
+            return self::materializeRuntimeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable(
+            $ctx,
+            ExceptionSupport::CLASS_UNEXPECTED_VALUE_EXCEPTION,
+            $message,
+            $file,
+            $line
+        );
+    }
+
     public static function materializeNativeError(Context $ctx, \Error $error, string $file = '', int $line = 0): Variable
     {
         if ($error instanceof \CompileError) {
