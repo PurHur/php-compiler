@@ -48,6 +48,9 @@ final class VmXmlReader
         $entry->methods['open'] = new XmlReaderOpen();
         $entry->methodVisibility['open'] = $pubStatic;
         $entry->methodNames['open'] = 'open';
+        $entry->methods['xml'] = new XmlReaderXML();
+        $entry->methodVisibility['xml'] = $pubStatic;
+        $entry->methodNames['xml'] = 'XML';
         $entry->methods['read'] = new XmlReaderRead();
         $entry->methodVisibility['read'] = $pub;
         $entry->methodNames['read'] = 'read';
@@ -85,6 +88,43 @@ final class VmXmlReader
 
     public static function openFromString(Context $ctx, string $uri, string $data, ?Frame $frame = null): ?ObjectEntry
     {
+        $class = $ctx->classes[self::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('XMLReader is not registered in this compiler build');
+        }
+
+        $entry = new ObjectEntry($class);
+        self::bindParsedSource($ctx, $entry, $uri, $data, $frame);
+
+        return $entry;
+    }
+
+    /**
+     * XMLReader::XML() static factory — php-src zim_xmlreader_XML / xmlReaderForMemory (#19308).
+     */
+    public static function xml(Context $ctx, string $source, ?Frame $frame = null): ?ObjectEntry
+    {
+        return self::openFromString($ctx, '', $source, $frame);
+    }
+
+    /**
+     * XMLReader::XML() instance form — reset parser state on an existing reader (#19308).
+     */
+    public static function xmlOnto(Context $ctx, ObjectEntry $entry, string $source, ?Frame $frame = null): bool
+    {
+        self::requireClass($entry, 'XMLReader::XML()');
+        self::bindParsedSource($ctx, $entry, '', $source, $frame);
+
+        return true;
+    }
+
+    private static function bindParsedSource(
+        Context $ctx,
+        ObjectEntry $entry,
+        string $uri,
+        string $data,
+        ?Frame $frame
+    ): void {
         $valid = VmXml::validateAndReport($ctx, $data, $frame);
         $events = [];
         if ($valid) {
@@ -95,19 +135,21 @@ final class VmXmlReader
             }
         }
 
-        $class = $ctx->classes[self::CLASS_LC] ?? null;
-        if (null === $class) {
-            throw new \LogicException('XMLReader is not registered in this compiler build');
-        }
-
-        $entry = new ObjectEntry($class);
         $state = new XmlReaderState();
         $state->uri = $uri;
         $state->valid = $valid;
         $state->events = $events;
+        $state->position = -1;
+        $state->current = null;
+        $state->closed = false;
         XmlReaderRegistry::attach($entry, $state);
+    }
 
-        return $entry;
+    private static function requireClass(ObjectEntry $entry, string $label): void
+    {
+        if (self::CLASS_LC !== strtolower($entry->class->name)) {
+            throw new \TypeError(sprintf('%s(): Argument must be XMLReader, %s given', $label, $entry->class->name));
+        }
     }
 
     public static function read(ObjectEntry $entry): bool

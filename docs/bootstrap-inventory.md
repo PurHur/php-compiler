@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4993 |
-| Phase A inventory files (M2 ratio SSOT) | 4993 |
+| PHP files on vm.php path | 4996 |
+| Phase A inventory files (M2 ratio SSOT) | 4996 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13407 |
+| Source constructs flagged (warnings) | 13452 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -853,7 +853,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
 | `ext/sockets/JitSocketExportStream.php` | 0 | 1 |
 | `ext/sockets/JitSocketImportStream.php` | 0 | 1 |
-| `ext/sockets/Module.php` | 0 | 14 |
+| `ext/sockets/Module.php` | 0 | 15 |
 | `ext/sockets/SocketAtmarkJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketConstants.php` | 0 | 1 |
 | `ext/sockets/SocketExportStreamJitHelper.php` | 0 | 1 |
@@ -867,6 +867,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_close.php` | 0 | 3 |
 | `ext/sockets/socket_connect.php` | 0 | 3 |
 | `ext/sockets/socket_create.php` | 0 | 3 |
+| `ext/sockets/socket_create_pair.php` | 0 | 7 |
 | `ext/sockets/socket_export_stream.php` | 0 | 3 |
 | `ext/sockets/socket_import_stream.php` | 0 | 3 |
 | `ext/sockets/socket_last_error.php` | 0 | 3 |
@@ -981,7 +982,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplFileObjectStorage.php` | 0 | 1 |
 | `ext/spl/SplFixedArrayBuiltin.php` | 0 | 34 |
 | `ext/spl/SplFixedArraySerializeSupport.php` | 0 | 3 |
-| `ext/spl/SplIteratorSupport.php` | 0 | 2 |
+| `ext/spl/SplHeapBuiltin.php` | 0 | 31 |
+| `ext/spl/SplIteratorSupport.php` | 0 | 3 |
 | `ext/spl/SplLegacySerializableMethods.php` | 0 | 5 |
 | `ext/spl/SplObjectStorageBuiltin.php` | 0 | 24 |
 | `ext/spl/SplObjectStorageSerializeSupport.php` | 0 | 3 |
@@ -3152,7 +3154,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/xml_set_unparsed_entity_decl_handler.php` | 0 | 2 |
 | `ext/xmlreader/BuiltinClasses.php` | 0 | 1 |
 | `ext/xmlreader/Module.php` | 0 | 1 |
-| `ext/xmlreader/VmXmlReader.php` | 0 | 11 |
+| `ext/xmlreader/VmXmlReader.php` | 0 | 12 |
 | `ext/xmlreader/XmlReaderClose.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderConstants.php` | 0 | 1 |
 | `ext/xmlreader/XmlReaderGetAttribute.php` | 0 | 3 |
@@ -3161,6 +3163,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlreader/XmlReaderPropertySupport.php` | 0 | 2 |
 | `ext/xmlreader/XmlReaderRead.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderRegistry.php` | 0 | 1 |
+| `ext/xmlreader/XmlReaderXML.php` | 0 | 4 |
 | `ext/xmlrpc/JitXmlrpc.php` | 0 | 1 |
 | `ext/xmlrpc/JitXmlrpcCompileTime.php` | 0 | 5 |
 | `ext/xmlrpc/Module.php` | 0 | 3 |
@@ -10709,13 +10712,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new socket_set_nonblock (line 44)
 - new socket_set_block (line 45)
 - new socket_create (line 46)
-- new socket_connect (line 47)
-- new socket_read (line 48)
-- new socket_write (line 49)
-- new socket_close (line 50)
-- new socket_strerror (line 51)
-- new socket_last_error (line 52)
-- new socket_clear_error (line 53)
+- new socket_create_pair (line 47)
+- new socket_connect (line 48)
+- new socket_read (line 49)
+- new socket_write (line 50)
+- new socket_close (line 51)
+- new socket_strerror (line 52)
+- new socket_last_error (line 53)
+- new socket_clear_error (line 54)
 - 3 class method(s)
 
 ### `ext/sockets/SocketAtmarkJitHelper.php`
@@ -10741,7 +10745,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/SocketsLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
-- 19 class method(s)
+- 20 class method(s)
 
 ### `ext/sockets/VmSocket.php`
 
@@ -10761,7 +10765,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/VmSockets.php`
 
 **Warnings** (review for bootstrap subset):
-- 25 class method(s)
+- 26 class method(s)
 
 ### `ext/sockets/socket_atmark.php`
 
@@ -10795,6 +10799,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
+- 2 class method(s)
+- 2 closure(s)
+
+### `ext/sockets/socket_create_pair.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- new HashTable (line 53)
+- new Variable (line 54)
+- new Variable (line 57)
+- new Variable (line 60)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -11313,7 +11328,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 36)
 - new AppendIteratorConstruct (line 45)
-- new ArgumentCountError (line 193)
+- new ArgumentCountError (line 197)
 - 17 class method(s)
 
 ### `ext/spl/ArrayIteratorBuiltin.php`
@@ -11391,11 +11406,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 48)
 - new CachingIteratorConstruct (line 65)
-- new Variable (line 170)
-- new Variable (line 183)
-- new BadMethodCallException (line 239)
-- new ArgumentCountError (line 311)
-- new ArgumentCountError (line 539)
+- new Variable (line 178)
+- new Variable (line 191)
+- new BadMethodCallException (line 247)
+- new ArgumentCountError (line 319)
+- new ArgumentCountError (line 547)
 - 32 class method(s)
 
 ### `ext/spl/CallbackFilterIteratorBuiltin.php`
@@ -11489,14 +11504,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new IteratorIteratorGetInnerIterator (line 53)
 - new ClassEntry (line 99)
 - new RecursiveIteratorIteratorConstruct (line 108)
-- new OutOfBoundsException (line 253)
-- new OutOfBoundsException (line 260)
-- new UnexpectedValueException (line 403)
-- new Variable (line 452)
-- new UnexpectedValueException (line 627)
-- new ArgumentCountError (line 689)
-- new ArgumentCountError (line 721)
-- 64 class method(s)
+- new OutOfBoundsException (line 290)
+- new OutOfBoundsException (line 297)
+- new UnexpectedValueException (line 454)
+- new Variable (line 503)
+- new UnexpectedValueException (line 687)
+- new ArgumentCountError (line 753)
+- new ArgumentCountError (line 785)
+- 67 class method(s)
 - 1 closure(s)
 
 ### `ext/spl/JitSplClasses.php`
@@ -11510,13 +11525,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 33)
 - new LimitIteratorConstruct (line 42)
-- new Variable (line 124)
-- new Variable (line 136)
-- new OutOfBoundsException (line 164)
-- new OutOfBoundsException (line 170)
-- new Variable (line 183)
-- new ArgumentCountError (line 258)
-- new ArgumentCountError (line 426)
+- new Variable (line 132)
+- new Variable (line 144)
+- new OutOfBoundsException (line 172)
+- new OutOfBoundsException (line 178)
+- new Variable (line 191)
+- new ArgumentCountError (line 266)
+- new ArgumentCountError (line 434)
 - 24 class method(s)
 
 ### `ext/spl/Module.php`
@@ -11530,14 +11545,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 51)
 - new MultipleIteratorConstruct (line 59)
-- new HashTable (line 197)
-- new Variable (line 205)
-- new HashTable (line 230)
-- new Variable (line 238)
-- new ArgumentCountError (line 335)
-- new ArgumentCountError (line 394)
-- new ArgumentCountError (line 429)
-- new ArgumentCountError (line 485)
+- new HashTable (line 201)
+- new Variable (line 209)
+- new HashTable (line 234)
+- new Variable (line 242)
+- new ArgumentCountError (line 339)
+- new ArgumentCountError (line 398)
+- new ArgumentCountError (line 433)
+- new ArgumentCountError (line 489)
 - 30 class method(s)
 
 ### `ext/spl/ParentIteratorBuiltin.php`
@@ -11788,11 +11803,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 88)
 - 5 class method(s)
 
+### `ext/spl/SplHeapBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 48)
+- new SplHeapConstruct (line 57)
+- new SplHeapCompareAbstract (line 60)
+- new Variable (line 107)
+- new Variable (line 127)
+- new Variable (line 139)
+- new ClassEntry (line 267)
+- new SplMinHeapConstruct (line 271)
+- new SplMinHeapCompare (line 274)
+- new ClassEntry (line 297)
+- new SplMaxHeapConstruct (line 301)
+- new SplMaxHeapCompare (line 304)
+- new ClassEntry (line 337)
+- new SplPriorityQueueConstruct (line 343)
+- new Variable (line 408)
+- new Variable (line 410)
+- new Variable (line 495)
+- new HashTable (line 501)
+- new Variable (line 502)
+- new Variable (line 504)
+- new Variable (line 508)
+- new Variable (line 513)
+- new Error (line 591)
+- new Error (line 604)
+- new ArgumentCountError (line 647)
+- new ArgumentCountError (line 667)
+- new ArgumentCountError (line 687)
+- new ArgumentCountError (line 877)
+- new ArgumentCountError (line 979)
+- new ArgumentCountError (line 1139)
+- 75 class method(s)
+
 ### `ext/spl/SplIteratorSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 100)
-- 9 class method(s)
+- new Variable (line 102)
+- new Variable (line 151)
+- 12 class method(s)
 
 ### `ext/spl/SplLegacySerializableMethods.php`
 
@@ -25598,15 +25649,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 47)
 - new XmlReaderOpen (line 48)
-- new XmlReaderRead (line 51)
-- new XmlReaderClose (line 54)
-- new XmlReaderGetAttribute (line 57)
-- new XmlReaderIsValid (line 60)
-- new Variable (line 65)
-- new ObjectEntry (line 103)
-- new XmlReaderState (line 104)
-- new XmlReaderEvent (line 385)
-- 20 class method(s)
+- new XmlReaderXML (line 51)
+- new XmlReaderRead (line 54)
+- new XmlReaderClose (line 57)
+- new XmlReaderGetAttribute (line 60)
+- new XmlReaderIsValid (line 63)
+- new Variable (line 68)
+- new ObjectEntry (line 96)
+- new XmlReaderState (line 138)
+- new XmlReaderEvent (line 427)
+- 24 class method(s)
 
 ### `ext/xmlreader/XmlReaderClose.php`
 
@@ -25658,6 +25710,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `ext/xmlreader/XmlReaderXML.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 37)
+- 1 class method(s)
+- 2 closure(s)
 
 ### `ext/xmlrpc/JitXmlrpc.php`
 
