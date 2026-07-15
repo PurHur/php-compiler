@@ -2,6 +2,7 @@
 Stdlib: session_start(), session_id(), session_name() VM (#64, #1183–#1184)
 --FILE--
 <?php
+ob_start();
 echo session_name(), "\n";
 echo session_id(), "\n";
 echo session_start() ? 'started' : 'fail', "\n";

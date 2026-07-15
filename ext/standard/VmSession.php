@@ -453,7 +453,10 @@ final class VmSession
      */
     public static function setId(string $id) {
         if ('' === $id) {
-            return self::$id;
+            $previous = self::$id;
+            self::$id = '';
+
+            return $previous;
         }
         $sanitized = self::sanitizeId($id);
         if ('' === $sanitized) {

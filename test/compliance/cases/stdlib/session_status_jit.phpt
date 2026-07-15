@@ -2,6 +2,7 @@
 stdlib session_status() JIT with SessionStatus enum (#7321)
 --FILE--
 <?php
+ob_start();
 $st = session_status();
 if (is_object($st)) {
     echo $st->value, "\n";

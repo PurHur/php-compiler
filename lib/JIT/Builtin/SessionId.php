@@ -190,6 +190,13 @@ final class SessionId
         $context->builder->branchIf($isEmpty, $bbEmptyNoop, $bbLenCheck);
 
         $context->builder->positionAtEnd($bbEmptyNoop);
+        $context->builder->store($zero, SessionStorageGlobals::$idLenGlobal);
+        $bufPtr = $context->builder->inBoundsGEP(
+            SessionStorageGlobals::$idBufGlobal,
+            $context->getTypeFromString('int32')->constInt(0, false),
+            $zero
+        );
+        $context->builder->store($i8->constInt(0, false), $bufPtr);
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bbLenCheck);
