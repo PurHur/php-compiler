@@ -27,7 +27,8 @@ final class escapeshellcmd extends Internal
         if (1 !== $argc) {
             throw new \ArgumentCountError('escapeshellcmd() expects exactly 1 argument, '.$argc.' given');
         }
-        $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'escapeshellcmd', 0, 'command');
+        // php-src ext/standard/exec.c — Z_PARAM_PATH_STR; null → TypeError on 8.4 (#19333)
+        $command = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'escapeshellcmd', 0, 'command');
         VmString::rejectNullByteBuiltinStringArg($command, 'escapeshellcmd', 0, 'command');
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($command): void {
             $ret->string(VmEscapeshell::escapeshellcmd($command));
@@ -47,7 +48,32 @@ final class escapeshellcmd extends Internal
 
         return JitEscapeshellcmd::invoke(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'escapeshellcmd', 0, 'command')
+            self::jitPathArg($context, $args[0], 0, 'command')
+        );
+    }
+
+    private static function jitPathArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'escapeshellcmd',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'escapeshellcmd',
+            $argIndex,
+            $paramName
         );
     }
 }

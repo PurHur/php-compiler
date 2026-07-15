@@ -20114,7 +20114,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/addslashes.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/apache_get_version.php`
@@ -20733,7 +20733,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/chunk_split.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/clamp.php`
 
@@ -20897,7 +20897,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/convert_uuencode.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/copy_.php`
 
@@ -21303,16 +21303,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
-- new ArgumentCountError (line 40)
-- 2 class method(s)
+- new ArgumentCountError (line 41)
+- 3 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/escapeshellcmd.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
-- new ArgumentCountError (line 40)
-- 2 class method(s)
+- new ArgumentCountError (line 41)
+- 3 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/eval_.php`
@@ -23436,7 +23436,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/quotemeta.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/rad2deg.php`
 
@@ -24046,7 +24046,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_rot13.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/str_shuffle.php`
@@ -24074,7 +24074,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 59)
 - new Variable (line 62)
 - new Variable (line 68)
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/strcasecmp.php`
 
