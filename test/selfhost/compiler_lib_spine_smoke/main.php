@@ -3636,7 +3636,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/PregExpandRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PregMatchRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PregMatchUserScriptLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessExecCaptureLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessIdentityJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessOpen.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessOpenEmbedBridge.php';

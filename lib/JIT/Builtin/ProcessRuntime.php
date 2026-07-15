@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
@@ -16,6 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT process helpers via ProcessJitHelper PHP (#9337, #12950).
  *
  * JIT embed and AOT standalone compile thin LLVM bridges; SSOT {@see \PHPCompiler\ext\standard\ProcessJitHelper}.
+ * User-script exec capture via {@see ProcessExecCaptureNativeJitHelper} + {@see JitVmHelperLink} (#19006).
  * php-src: ext/standard/exec.c — shell_exec, escapeshellarg, escapeshellcmd
  */
 final class ProcessRuntime
@@ -204,12 +206,8 @@ final class ProcessRuntime
         }
 
         self::ensureNativeHtInternalProxies($context);
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            ProcessExecCaptureLlvm::implementBridge($context);
-        } else {
-            self::ensureExecCaptureHelperCompiled($context);
-            self::implementExecCaptureNativeBridge($context);
-        }
+        self::ensureExecCaptureHelperCompiled($context);
+        self::implementExecCaptureNativeBridge($context);
         $fn = $context->module->getNamedFunction('__compiler_process_exec_capture');
         if (null === $fn || 0 === $fn->countBasicBlocks()) {
             throw new \LogicException('__compiler_process_exec_capture missing after ProcessRuntime bridge (#9337)');
@@ -320,15 +318,11 @@ final class ProcessRuntime
 
     private static function ensureExecCaptureHelperCompiled(Context $context): void
     {
-        if (self::helpersPresent($context, [self::PROCESS_EXEC_CAPTURE])) {
-            return;
-        }
-
-        self::compileHelperFile(
+        JitVmHelperLink::ensureCompiled(
             $context,
             self::EXEC_CAPTURE_HELPER_PATH,
-            'ProcessExecCaptureNativeJitHelper.php',
-            [self::PROCESS_EXEC_CAPTURE]
+            [self::PROCESS_EXEC_CAPTURE],
+            '#19006'
         );
     }
 
