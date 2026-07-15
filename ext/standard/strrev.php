@@ -40,7 +40,7 @@ final class strrev extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'strrev', 'string');
+        $subject = self::vmStringArg($frame, 0, 'string');
         $frame->returnVar->string(VmString::strrev($subject));
     }
 
@@ -50,11 +50,61 @@ final class strrev extends Internal
             throw new \LogicException('strrev() requires exactly one argument');
         }
 
+        // Early TypeError return before StringStrrev::ensureLinked (AOT helper IR gap; #19276).
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strrev', 0, 'string');
+
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+
         StringStrrev::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_strrev'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strrev', 0, 'string')
+            self::jitStringArg($context, $args[0], 0, 'string')
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strrev', $paramName)->toString();
+        }
+
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19276, string.c).
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'strrev',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'strrev',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'strrev',
+            $argIndex,
+            $paramName
         );
     }
 }
