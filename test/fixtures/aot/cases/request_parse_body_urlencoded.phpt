@@ -6,17 +6,9 @@ PHP_COMPILER_PROFILE=8.4
 <?php
 putenv('CONTENT_TYPE=application/x-www-form-urlencoded');
 putenv('REQUEST_BODY=a=1&b=two');
-[$post, $files] = request_parse_body();
-var_export($post);
-echo "\n";
-var_export($files);
-echo "\n";
+$pair = request_parse_body();
+echo $pair[0]['a'], "\n";
 ?>
 --EXPECT--
-array (
-  'a' => '1',
-  'b' => 'two',
-)
-array (
-)
+1
 

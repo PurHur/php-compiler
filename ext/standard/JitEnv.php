@@ -120,7 +120,12 @@ final class JitEnv
         $context->builder->positionAtEnd($ok);
     }
 
-    /** Mirror overlay putenv into libc environ for init-safe LLVM readers (#17316). */
+    /**
+     * Mirror overlay putenv into process environ for libc getenv readers (#17316).
+     *
+     * Uses POSIX setenv() (copies name/value) — not putenv(malloc'd "NAME=value"), which
+     * heap-corrupts when parse_str/strtok later touch getenv buffers under ≥2 mirrors.
+     */
     private static function emitLibcPutenvMirror(Context $context, Value $assignmentStr): void
     {
         LibcExtern::register($context);
@@ -128,18 +133,32 @@ final class JitEnv
         $valueBytes = $context->builder->structGep($assignmentStr, $map['value']);
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
         $sizeT = $context->getTypeFromString('size_t');
-        $len = $context->builder->call($context->lookupFunction('strlen'), $valueBytes);
-        $buf = $context->builder->call(
-            $context->lookupFunction('malloc'),
-            $context->builder->add($len, $sizeT->constInt(1, false))
+        $one = $sizeT->constInt(1, false);
+
+        $dup = $context->builder->call($context->lookupFunction('strdup'), $valueBytes);
+        $eq = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $dup,
+            $i32->constInt(ord('='), false)
         );
-        $dest = $context->builder->pointerCast($buf, $i8p);
-        $context->builder->call($context->lookupFunction('memcpy'), $dest, $valueBytes, $len);
-        $context->builder->store(
-            $i8->constInt(0, false),
-            $context->builder->inBoundsGEP($dest, $len)
+        $hasEq = $context->builder->icmp(Builder::INT_NE, $eq, $i8p->constNull());
+        $ok = BasicBlockHelper::append($context, 'putenv_setenv_ok');
+        $skip = BasicBlockHelper::append($context, 'putenv_setenv_skip');
+        $context->builder->branchIf($hasEq, $ok, $skip);
+
+        $context->builder->positionAtEnd($ok);
+        $context->builder->store($i8->constInt(0, false), $eq);
+        $valueStart = $context->builder->inBoundsGEP($eq, $one);
+        $context->builder->call(
+            $context->lookupFunction('setenv'),
+            $dup,
+            $valueStart,
+            $i32->constInt(1, false)
         );
-        $context->builder->call($context->lookupFunction('putenv'), $dest);
+        $context->builder->branch($skip);
+        $context->builder->positionAtEnd($skip);
+        $context->builder->call($context->lookupFunction('free'), $dup);
     }
 }

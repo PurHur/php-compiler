@@ -14,8 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * User-script standalone AOT: init-safe LLVM for request_parse_body() (#5965, #17316).
  *
- * Reads REQUEST_BODY via libc getenv (mirrored from putenv() in user-script AOT — see JitEnv).
- * Avoids nested GetenvJitHelper calls from hand-lowering that miss overlay state (#17316).
+ * Reads REQUEST_BODY via libc getenv (mirrored from putenv() via POSIX setenv in JitEnv —
+ * not putenv(malloc), which heap-corrupted under ≥2 mirrors #17316).
  * php-src: ext/standard/http.c
  */
 final class RequestParseBodyUserScriptLlvm
