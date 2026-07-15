@@ -24,20 +24,24 @@ final class XmlrpcEncodeScalarJitHelper
 
     private static function encodeScalarPayload(Variable $value): string
     {
-        switch ($value->type) {
-            case Variable::TYPE_NULL:
-                return '<string></string>';
-            case Variable::TYPE_BOOLEAN:
-                return '<boolean>'.($value->toBool(null) ? '1' : '0').'</boolean>';
-            case Variable::TYPE_INTEGER:
-                return '<int>'.$value->toInt(null).'</int>';
-            case Variable::TYPE_FLOAT:
-                return '<double>'.self::formatDouble($value->toFloat(null)).'</double>';
-            case Variable::TYPE_STRING:
-                return '<string>'.self::escapeXml($value->toString(null)).'</string>';
-            default:
-                throw new \Exception('Cannot xmlrpc_encode() value of type '.$value->type);
+        $type = $value->type;
+        if (Variable::TYPE_NULL === $type) {
+            return '<string></string>';
         }
+        if (Variable::TYPE_BOOLEAN === $type) {
+            return '<boolean>'.($value->toBool(null) ? '1' : '0').'</boolean>';
+        }
+        if (Variable::TYPE_INTEGER === $type) {
+            return '<int>'.$value->toInt(null).'</int>';
+        }
+        if (Variable::TYPE_FLOAT === $type) {
+            return '<double>'.self::formatDouble($value->toFloat(null)).'</double>';
+        }
+        if (Variable::TYPE_STRING === $type) {
+            return '<string>'.self::escapeXml($value->toString(null)).'</string>';
+        }
+
+        throw new \Exception('Cannot xmlrpc_encode() value of type '.$type);
     }
 
     private static function escapeXml(string $value): string

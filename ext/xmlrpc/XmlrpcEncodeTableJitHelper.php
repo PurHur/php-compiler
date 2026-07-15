@@ -30,22 +30,27 @@ final class XmlrpcEncodeTableJitHelper
 
     private static function encodePayload(Variable $value): string
     {
-        switch ($value->type) {
-            case Variable::TYPE_NULL:
-                return '<string></string>';
-            case Variable::TYPE_BOOLEAN:
-                return '<boolean>'.($value->toBool(null) ? '1' : '0').'</boolean>';
-            case Variable::TYPE_INTEGER:
-                return '<int>'.$value->toInt(null).'</int>';
-            case Variable::TYPE_FLOAT:
-                return '<double>'.self::formatDouble($value->toFloat(null)).'</double>';
-            case Variable::TYPE_STRING:
-                return '<string>'.self::escapeXml($value->toString(null)).'</string>';
-            case Variable::TYPE_ARRAY:
-                return self::encodeTable($value->toArray());
-            default:
-                throw new \Exception('Cannot xmlrpc_encode() value of type '.$value->type);
+        $type = $value->type;
+        if (Variable::TYPE_NULL === $type) {
+            return '<string></string>';
         }
+        if (Variable::TYPE_BOOLEAN === $type) {
+            return '<boolean>'.($value->toBool(null) ? '1' : '0').'</boolean>';
+        }
+        if (Variable::TYPE_INTEGER === $type) {
+            return '<int>'.$value->toInt(null).'</int>';
+        }
+        if (Variable::TYPE_FLOAT === $type) {
+            return '<double>'.self::formatDouble($value->toFloat(null)).'</double>';
+        }
+        if (Variable::TYPE_STRING === $type) {
+            return '<string>'.self::escapeXml($value->toString(null)).'</string>';
+        }
+        if (Variable::TYPE_ARRAY === $type) {
+            return self::encodeTable($value->toArray());
+        }
+
+        throw new \Exception('Cannot xmlrpc_encode() value of type '.$type);
     }
 
     private static function encodeTable(HashTable $table): string
@@ -81,10 +86,11 @@ final class XmlrpcEncodeTableJitHelper
 
     private static function arrayKeyToString(Variable $key): string
     {
-        if (Variable::TYPE_STRING === $key->type) {
+        $type = $key->type;
+        if (Variable::TYPE_STRING === $type) {
             return $key->toString(null);
         }
-        if (Variable::TYPE_INTEGER === $key->type) {
+        if (Variable::TYPE_INTEGER === $type) {
             return (string) $key->toInt(null);
         }
 

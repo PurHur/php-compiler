@@ -94,6 +94,7 @@ final class SpaceshipRuntime
         } catch (\Throwable) {
         }
 
+        SpaceshipCompareJit::declareAbiFunctions($context);
         self::ensureCompareJitHelperCompiled($context);
         SpaceshipCompareJit::implement($context);
 
@@ -116,6 +117,8 @@ final class SpaceshipRuntime
         if (!$missing) {
             return;
         }
+
+        SpaceshipCompareJit::declareAbiFunctions($context);
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;

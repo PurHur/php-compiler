@@ -15649,6 +15649,19 @@ class JIT {
             return false;
         }
         if (
+            JIT\NestedVmObjectMethodLlvm::isNestedObjectMethod($methodLc)
+            && ('phpcompiler\\vm\\objectentry' === $declaringClassLc || 'object' === $declaringClassLc)
+        ) {
+            if (!JIT\NestedVmObjectMethodLlvm::ensureMethod($this->context, $methodLc)) {
+                return false;
+            }
+            $proxyName = 'phpcompiler\\vm\\objectentry::'.$methodLc;
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+            $this->context->scope->args = [$receiverVar];
+
+            return true;
+        }
+        if (
             JIT\NestedVmHashTableMethodLlvm::isNestedHashTableMethod($methodLc)
             && ('phpcompiler\\vm\\hashtable' === $declaringClassLc || 'object' === $declaringClassLc)
         ) {

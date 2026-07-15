@@ -57,13 +57,99 @@ final class CompareJitHelper
     /** @return int -1, 0, or 1 (LLVM i64 ABI) */
     public static function objectSpaceship(ObjectEntry $left, ObjectEntry $right): int
     {
-        return $left->compareSpaceship($right);
+        if (EnumCaseSupport::isEnumCase($left) && EnumCaseSupport::isEnumCase($right)) {
+            return EnumCaseSupport::compareSpaceship($left, $right);
+        }
+        if ($left === $right) {
+            return 0;
+        }
+        if ($left->class->name !== $right->class->name) {
+            return 1;
+        }
+        $names = array_keys($left->properties);
+        foreach (array_keys($right->properties) as $name) {
+            if (!\in_array($name, $names, true)) {
+                $names[] = $name;
+            }
+        }
+        foreach ($names as $name) {
+            $leftVar = isset($left->properties[$name])
+                ? $left->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            $rightVar = isset($right->properties[$name])
+                ? $right->properties[$name]->resolveIndirect()
+                : new Variable(Variable::TYPE_NULL);
+            $cmp = self::boxedSpaceship($leftVar, $rightVar);
+            if (0 !== $cmp) {
+                return $cmp;
+            }
+        }
+
+        return 0;
     }
 
     /** @return int -1, 0, or 1 (LLVM i64 ABI) */
     public static function hashtableSpaceship(HashTable $left, HashTable $right): int
     {
-        return $left->compareSpaceship($right);
+        $leftCount = $left->getNumElements();
+        $rightCount = $right->getNumElements();
+        if ($leftCount > $rightCount) {
+            return 1;
+        }
+        if ($leftCount < $rightCount) {
+            return -1;
+        }
+
+        $leftItems = iterator_to_array($left->iterateKeyed(true));
+        $rightItems = iterator_to_array($right->iterateKeyed(true));
+        for ($i = 0, $n = \count($leftItems); $i < $n; ++$i) {
+            [$leftKey, $leftVal] = $leftItems[$i];
+            [$rightKey, $rightVal] = $rightItems[$i];
+            $keyCmp = self::boxedSpaceship($leftKey->resolveIndirect(), $rightKey->resolveIndirect());
+            if (0 !== $keyCmp) {
+                return $keyCmp;
+            }
+            $valCmp = self::boxedSpaceship($leftVal->resolveIndirect(), $rightVal->resolveIndirect());
+            if (0 !== $valCmp) {
+                return $valCmp;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * Spaceship on resolved Variables without instance compareSpaceship() calls (#19048 nested JIT).
+     */
+    private static function boxedSpaceship(Variable $left, Variable $right): int
+    {
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        if ($left->type === $right->type) {
+            if (Variable::TYPE_OBJECT === $left->type) {
+                return self::objectSpaceship($left->toObject(), $right->toObject());
+            }
+            if (Variable::TYPE_ARRAY === $left->type) {
+                return self::hashtableSpaceship($left->toArray(), $right->toArray());
+            }
+            if (Variable::TYPE_INTEGER === $left->type) {
+                return self::longSpaceship($left->toInt(), $right->toInt());
+            }
+            if (Variable::TYPE_FLOAT === $left->type) {
+                return self::doubleSpaceship($left->toFloat(), $right->toFloat());
+            }
+            if (Variable::TYPE_STRING === $left->type) {
+                return self::stringSpaceship($left->toString(), $right->toString());
+            }
+            if (Variable::TYPE_BOOLEAN === $left->type) {
+                return self::longSpaceship((int) $left->toBool(), (int) $right->toBool());
+            }
+            if (Variable::TYPE_NULL === $left->type) {
+                return 0;
+            }
+        }
+
+        return self::zendUnlikeValueSpaceship($left, $right);
     }
 
     /**
