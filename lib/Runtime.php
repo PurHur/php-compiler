@@ -237,6 +237,7 @@ class Runtime {
         $this->load(new ext\xmlwriter\Module);
         $this->load(new ext\gd\Module);
         $this->load(new ext\exif\Module);
+        $this->load(new ext\fileinfo\Module);
         $this->load(new ext\iconv\Module);
         $this->load(new ext\gettext\Module);
         $this->load(new ext\mbstring\Module);
