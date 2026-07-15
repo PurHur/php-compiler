@@ -25,6 +25,22 @@ final class VmMath
         return false;
     }
 
+    /**
+     * Z_PARAM_NUMBER null rejection on PHP 8.4 forward profile (ext/standard/math.c abs/round; #18924).
+     */
+    public static function requiresForwardProfileStrictNumberNull(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * Z_PARAM_DOUBLE null rejection on PHP 8.4 forward profile (ext/standard/math.c fpow/fadd; #19182).
+     */
+    public static function requiresForwardProfileStrictDoubleNull(): bool
+    {
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
     public static function toFloat(Variable $v): float
     {
         if (Variable::TYPE_INTEGER === $v->type) {
@@ -236,7 +252,7 @@ final class VmMath
             return $var->toBool() ? 1 : 0;
         }
         if (Variable::TYPE_NULL === $var->type) {
-            if (self::requiresForwardProfileStrictLongNull()) {
+            if (self::requiresForwardProfileStrictNumberNull()) {
                 throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'null'));
             }
             if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
@@ -554,6 +570,10 @@ final class VmMath
             case Variable::TYPE_BOOLEAN:
                 return $var->toBool() ? 1.0 : 0.0;
             case Variable::TYPE_NULL:
+                if (self::requiresForwardProfileStrictDoubleNull()) {
+                    throw new \TypeError(self::doubleBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+                }
+
                 return 0.0;
             case Variable::TYPE_STRING:
                 $s = $var->toString();
