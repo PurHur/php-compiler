@@ -5040,4 +5040,7 @@ require_once __DIR__.'/../../../ext/standard/EnvLocalJitHelperVm.php';
 require_once __DIR__.'/../../../ext/standard/RequestParseBodyNativeJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/RequestParseBodyUserScriptLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarExportUserScriptLlvm.php';
+require_once __DIR__.'/../../../ext/sockets/socket_clear_error.php';
+require_once __DIR__.'/../../../ext/sockets/socket_last_error.php';
+require_once __DIR__.'/../../../ext/sockets/socket_strerror.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
