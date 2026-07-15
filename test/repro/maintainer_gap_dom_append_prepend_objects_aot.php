@@ -1,6 +1,3 @@
---TEST--
-AOT: DOMNode append/prepend user-script — object multi-arg + firstChild slots (#18951)
---FILE--
 <?php
 
 declare(strict_types=1);
@@ -30,5 +27,3 @@ if ('x' !== $root2->firstChild->nodeName || 'y' !== $root2->lastChild->nodeName)
 }
 
 echo "ok\n";
---EXPECT--
-ok

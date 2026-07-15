@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
@@ -126,26 +127,22 @@ final class DomNodeLiveMutationRuntime
             throw new \LogicException('DomNodeLiveMutationRuntime unsupported arity');
         }
         if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            $useObjectBridge = self::canUseObjectMutationBridge($extraArgs);
             $orderedArgs = 'prepend' === $kind ? array_reverse($extraArgs) : $extraArgs;
+            $firstArg = $extraArgs[0];
+            $lastArg = $extraArgs[\count($extraArgs) - 1];
+            $firstChildObj = null;
+            $lastChildObj = null;
             foreach ($orderedArgs as $arg) {
-                if ($useObjectBridge) {
-                    self::ensureObjectMutationBridge($context, $kind, 1);
-                    $abi = self::objectAbiFor($kind, 1);
-                    $context->builder->call(
-                        $context->lookupFunction($abi),
-                        self::receiverObject($context, $receiver),
-                        self::mutationArgObject($context, $arg)
-                    );
-                    continue;
+                $appended = self::invokeUserScriptMutationArg($context, $kind, $receiver, $arg);
+                if ($arg === $firstArg) {
+                    $firstChildObj = $appended;
                 }
-                self::ensureMutationBridge($context, $kind, 1);
-                $abi = self::abiFor($kind, 1);
-                $context->builder->call(
-                    $context->lookupFunction($abi),
-                    self::receiverObject($context, $receiver),
-                    JitValueBox::valuePtrFromVariable($context, $arg)
-                );
+                if ($arg === $lastArg) {
+                    $lastChildObj = $appended;
+                }
+            }
+            if (null !== $firstChildObj && null !== $lastChildObj) {
+                self::syncChildLinkSlots($context, $receiver, $firstChildObj, $lastChildObj);
             }
 
             return self::nullValuePtr($context);
@@ -161,6 +158,45 @@ final class DomNodeLiveMutationRuntime
         return self::nullValuePtr($context);
     }
 
+    private static function invokeUserScriptMutationArg(
+        Context $context,
+        string $kind,
+        Variable $receiver,
+        Variable $arg
+    ): Value {
+        if (Variable::TYPE_STRING === $arg->type) {
+            self::ensureMutationBridge($context, $kind, 1);
+            $abi = self::abiFor($kind, 1);
+            $context->builder->call(
+                $context->lookupFunction($abi),
+                self::receiverObject($context, $receiver),
+                JitValueBox::valuePtrFromVariable($context, $arg)
+            );
+
+            return self::receiverObject($context, $receiver);
+        }
+        if (\in_array($arg->type, [Variable::TYPE_OBJECT, Variable::TYPE_VALUE], true)) {
+            self::ensureObjectMutationBridge($context, $kind, 1);
+            $abi = self::objectAbiFor($kind, 1);
+            $context->builder->call(
+                $context->lookupFunction($abi),
+                self::receiverObject($context, $receiver),
+                self::mutationArgObject($context, $arg)
+            );
+
+            return self::mutationArgObject($context, $arg);
+        }
+        self::ensureMutationBridge($context, $kind, 1);
+        $abi = self::abiFor($kind, 1);
+        $context->builder->call(
+            $context->lookupFunction($abi),
+            self::receiverObject($context, $receiver),
+            JitValueBox::valuePtrFromVariable($context, $arg)
+        );
+
+        return self::receiverObject($context, $receiver);
+    }
+
     /** @param list<Variable> $extraArgs */
     private static function canUseObjectMutationBridge(array $extraArgs): bool
     {
@@ -174,6 +210,38 @@ final class DomNodeLiveMutationRuntime
         }
 
         return true;
+    }
+
+    /**
+     * Mirror live child links into LLVM property slots for user-script AOT reads (#18951).
+     */
+    private static function syncChildLinkSlots(
+        Context $context,
+        Variable $receiver,
+        Value $firstChildObj,
+        Value $lastChildObj
+    ): void {
+        $objectType = $context->type->object;
+        $nodeClassId = $objectType->lookup('DOMNode');
+        foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+            if (!$objectType->hasProperty($nodeClassId, $prop)) {
+                $objectType->defineProperty($nodeClassId, $prop, Variable::TYPE_VALUE);
+            }
+        }
+
+        $receiverObj = self::receiverObject($context, $receiver);
+        $firstJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $firstChildObj);
+        $lastJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $lastChildObj);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($receiverObj, 'DOMNode', VmDom::PROP_FIRST_CHILD),
+            $firstJit,
+            Variable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($receiverObj, 'DOMNode', VmDom::PROP_LAST_CHILD),
+            $lastJit,
+            Variable::TYPE_VALUE
+        );
     }
 
     private static function ensureObjectMutationBridge(Context $context, string $kind, int $extraArgCount): void
