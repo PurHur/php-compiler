@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmMime;
+use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** Issue #7865: VM mime_content_type must not delegate to host \\mime_content_type(). */
+/** Issue #7865 / #19203: VM mime_content_type must not delegate to host mime or stream APIs. */
 final class VmMimeTest extends TestCase
 {
     public function testVmMimeDoesNotReferenceHostMimeContentType(): void
@@ -16,6 +18,22 @@ final class VmMimeTest extends TestCase
         $this->assertIsString($source);
         $this->assertStringNotContainsString('function_exists(\'mime_content_type\')', $source);
         $this->assertStringNotContainsString('\\mime_content_type(', $source);
+        $this->assertStringNotContainsString('\\ftell(', $source);
+        $this->assertStringNotContainsString('\\stream_get_contents(', $source);
+        $this->assertStringNotContainsString('\\fseek(', $source);
+        $this->assertStringNotContainsString('lookupResource(', $source);
+    }
+
+    public function testMimeContentTypeFromPhpMemoryStream(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'w+');
+        $this->assertNotFalse($handle);
+        VmFs::fwrite($handle, '<?php echo 1;');
+        VmFs::rewind($handle);
+        $var = new Variable();
+        $var->streamHandle($handle);
+        $this->assertSame('text/x-php', VmMime::mimeContentType($var));
+        VmFs::fclose($handle);
     }
 
     public function testDetectFromBytesPhpSource(): void
