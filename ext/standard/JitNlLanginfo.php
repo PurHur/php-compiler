@@ -81,26 +81,11 @@ final class JitNlLanginfo
     private static function jitIntArg(Context $context, JITVariable $arg): Value
     {
         $i32 = $context->getTypeFromString('int32');
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
-            return $context->builder->trunc(
-                $context->helper->loadValue($arg),
-                $i32
-            );
-        }
-        if (null !== ($arg->compileTimeInteger ?? null)) {
-            return $i32->constInt((int) $arg->compileTimeInteger, false);
-        }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
-            return $context->builder->trunc(
-                $context->builder->call(
-                    $context->lookupFunction('__value__readLong'),
-                    $arg->value
-                ),
-                $i32
-            );
-        }
 
-        throw new \LogicException('nl_langinfo(): Argument #1 ($item) must be an integer in this compiler build');
+        return $context->builder->trunc(
+            JitIntdiv::lowerIntBuiltinArg($context, $arg, 'nl_langinfo', 1, 'item'),
+            $i32
+        );
     }
 
     private static function writeBool(Context $context, bool $value): Value
