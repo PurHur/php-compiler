@@ -31,36 +31,18 @@ final class ScopeBuiltinEmitHelper
         ?Value $countSlot,
         Value $prefixStr,
     ): void {
-        $map = $context->structFieldMap['__hashtable__'];
-        $nodeMap = $context->structFieldMap['__strkey_node__'];
-        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
-        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'scope_import_walk');
-        $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
-        $context->builder->store($head, $walkSlot);
-
-        $strHead = BasicBlockHelper::append($context, 'scope_import_str_head');
-        $strBody = BasicBlockHelper::append($context, 'scope_import_str_body');
-        $strNext = BasicBlockHelper::append($context, 'scope_import_str_next');
-        $strDone = BasicBlockHelper::append($context, 'scope_import_str_done');
-        $context->builder->branch($strHead);
-
-        $context->builder->positionAtEnd($strHead);
-        $node = $context->builder->load($walkSlot);
-        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
-        $context->builder->branchIf($nodeNull, $strDone, $strBody);
-
-        $context->builder->positionAtEnd($strBody);
-        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
-        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
-        self::importExtractKey($context, $keyStr, $valEntry, $named, $flags, $prefixStr, $countSlot);
-        $context->builder->branch($strNext);
-
-        $context->builder->positionAtEnd($strNext);
-        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
-        $context->builder->store($nextNode, $walkSlot);
-        $context->builder->branch($strHead);
-
-        $context->builder->positionAtEnd($strDone);
+        HashTableReadLlvm::forEachStringKeyNode(
+            $context,
+            $ht,
+            'scope_import',
+            static function (
+                Context $context,
+                Value $keyStr,
+                Value $valEntry
+            ) use ($named, $flags, $countSlot, $prefixStr): void {
+                self::importExtractKey($context, $keyStr, $valEntry, $named, $flags, $prefixStr, $countSlot);
+            }
+        );
     }
 
     /**
@@ -417,42 +399,21 @@ final class ScopeBuiltinEmitHelper
         Value $namesHt,
         array $named,
     ): void {
-        $map = $context->structFieldMap['__hashtable__'];
-        $nodeMap = $context->structFieldMap['__strkey_node__'];
-        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
-        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'compact_names_walk');
-        $head = $context->builder->load($context->builder->structGep($namesHt, $map['strKeys']));
-        $context->builder->store($head, $walkSlot);
-
-        $strHead = BasicBlockHelper::append($context, 'compact_names_str_head');
-        $strBody = BasicBlockHelper::append($context, 'compact_names_str_body');
-        $strNext = BasicBlockHelper::append($context, 'compact_names_str_next');
-        $strDone = BasicBlockHelper::append($context, 'compact_names_str_done');
-        $context->builder->branch($strHead);
-
-        $context->builder->positionAtEnd($strHead);
-        $node = $context->builder->load($walkSlot);
-        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
-        $context->builder->branchIf($nodeNull, $strDone, $strBody);
-
-        $context->builder->positionAtEnd($strBody);
-        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
-        $nameResume = self::captureInsertBlock($context);
-        self::compactApplyNameFromCstr(
+        HashTableReadLlvm::forEachStringKeyNode(
             $context,
-            $result,
-            self::stringDataPtr($context, $keyStr),
-            $named
+            $namesHt,
+            'compact_names',
+            static function (Context $context, Value $keyStr, Value $_valEntry) use ($result, $named): void {
+                $nameResume = self::captureInsertBlock($context);
+                self::compactApplyNameFromCstr(
+                    $context,
+                    $result,
+                    self::stringDataPtr($context, $keyStr),
+                    $named
+                );
+                self::restoreInsertBlock($context, $nameResume);
+            }
         );
-        self::restoreInsertBlock($context, $nameResume);
-        $context->builder->branch($strNext);
-
-        $context->builder->positionAtEnd($strNext);
-        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
-        $context->builder->store($nextNode, $walkSlot);
-        $context->builder->branch($strHead);
-
-        $context->builder->positionAtEnd($strDone);
     }
 
     /**

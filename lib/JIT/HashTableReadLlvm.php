@@ -811,4 +811,50 @@ final class HashTableReadLlvm
         );
     }
 
+    /**
+     * Walk native __strkey_node__ list — shared by extract/compact scope import (#19035).
+     *
+     * @param callable(Context, Value, Value): void $body  ($keyStr, $valEntry)
+     */
+    public static function forEachStringKeyNode(
+        Context $context,
+        Value $ht,
+        string $tagPrefix,
+        callable $body
+    ): void {
+        $map = $context->structFieldMap['__hashtable__'];
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $nodePtrType = $context->getTypeFromString('__strkey_node__*');
+        $tag = $tagPrefix.'_'.(string) self::nextSeq();
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, $tag.'_walk');
+        $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+        $context->builder->store($head, $walkSlot);
+
+        $headBb = BasicBlockHelper::append($context, $tag.'_head');
+        $bodyBb = BasicBlockHelper::append($context, $tag.'_body');
+        $nextBb = BasicBlockHelper::append($context, $tag.'_next');
+        $doneBb = BasicBlockHelper::append($context, $tag.'_done');
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($headBb);
+        $node = $context->builder->load($walkSlot);
+        $nodeNull = $context->builder->icmp(Builder::INT_EQ, $node, $nodePtrType->constNull());
+        $context->builder->branchIf($nodeNull, $doneBb, $bodyBb);
+
+        $context->builder->positionAtEnd($bodyBb);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
+        $body($context, $keyStr, $valEntry);
+        if (null === $context->builder->getInsertBlock()?->getTerminator()) {
+            $context->builder->branch($nextBb);
+        }
+
+        $context->builder->positionAtEnd($nextBb);
+        $nextNode = $context->builder->load($context->builder->structGep($node, $nodeMap['next']));
+        $context->builder->store($nextNode, $walkSlot);
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($doneBb);
+    }
+
 }
