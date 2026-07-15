@@ -27,7 +27,14 @@ final class simplexml_load_string extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('simplexml_load_string() requires VM context');
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'simplexml_load_string', 0, 'data');
+        $data = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'simplexml_load_string',
+            0,
+            'data',
+            'string',
+            false
+        );
         $entry = VmSimpleXml::loadString($frame->vmContext, $data, $frame);
         if (null !== $frame->returnVar) {
             if (null === $entry) {
