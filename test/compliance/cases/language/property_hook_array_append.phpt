@@ -1,5 +1,17 @@
 --TEST--
-Hooked array property append uses get/set hooks (#19171, zend_object_handlers.c)
+Hooked property array append read-modify-write via get/set hooks (#19171, zend_property_hooks.c)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+putenv('PHP_COMPILER_PROFILE=8.4');
+if (!PHPCompiler\CompilerVersion::supportsPropertyHooks()) {
+    die('skip requires PHP_COMPILER_PROFILE=8.4 property hooks gate');
+}
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 class C {

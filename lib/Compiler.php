@@ -14754,17 +14754,22 @@ class Compiler {
             if ($this->isIncDecUsingOperand($usage, $fetch->result)) {
                 continue;
             }
+            // $obj->prop[] = must read through get hook first; dim write uses FETCH not FETCH_W (#6775, #19171).
             if (
                 $usage instanceof Op\Expr\ArrayDimFetch
                 && $usage->var === $fetch->result
                 && $this->isArrayDimFetchForWrite($usage, $block)
             ) {
-                return true;
+                continue;
             }
 
             return false;
         }
         if (!empty($fetch->result->usages)) {
+            if ($this->propertyFetchOnlyUsedAsDimWriteContainer($fetch, $block)) {
+                return false;
+            }
+
             return true;
         }
         $children = $block->orig->children;
@@ -14792,18 +14797,40 @@ class Compiler {
             if ($this->isIncDecUsingOperand($next, $fetch->result)) {
                 return true;
             }
+            // $obj->prop[] = — read fetch + dim write container (#6775, #19171).
             if (
                 $next instanceof Op\Expr\ArrayDimFetch
                 && $next->var === $fetch->result
                 && $this->isArrayDimFetchForWrite($next, $block)
             ) {
-                return true;
+                return false;
             }
 
             return false;
         }
 
         return false;
+    }
+
+    /** True when every usage of the property fetch is $obj->prop[…] = write (#6775, #19171). */
+    private function propertyFetchOnlyUsedAsDimWriteContainer(Op\Expr\PropertyFetch $fetch, Block $block): bool
+    {
+        if ([] === $fetch->result->usages) {
+            return false;
+        }
+        foreach ($fetch->result->usages as $usage) {
+            if (
+                $usage instanceof Op\Expr\ArrayDimFetch
+                && $usage->var === $fetch->result
+                && $this->isArrayDimFetchForWrite($usage, $block)
+            ) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
