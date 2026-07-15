@@ -3816,7 +3816,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringGmmktime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashAlgos.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashCrypto.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoJit.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoPhp.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashEquals.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHashHmacAlgos.php';
