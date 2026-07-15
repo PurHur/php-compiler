@@ -20989,7 +20989,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 37)
-- 4 class method(s)
+- 5 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/fread.php`
@@ -27758,7 +27758,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/FputcsvRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/FsDirRuntime.php`
 
