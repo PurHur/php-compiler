@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\ext\session\SessionConstants;
 use PHPCompiler\ext\session\SessionFileStorage;
+use PHPCompiler\ext\session\SessionHandlerBuiltin;
 use PHPCompiler\ext\session\SessionUserHandler;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
@@ -106,6 +107,7 @@ final class VmSession
         self::resetCookieParams();
         self::$useStrictMode = false;
         SessionUserHandler::reset();
+        SessionHandlerBuiltin::reset();
     }
 
     public static function resetCookieParams(): void
@@ -508,11 +510,15 @@ final class VmSession
                 false
             );
         }
+        // php-src php_session_start() marks status active before save-handler open
+        // (SessionHandler::open requires php_session_active — #19246 / mod_user_class.c).
+        self::$active = true;
         if (SessionUserHandler::isActiveModule() && !SessionUserHandler::open($ctx)) {
+            self::$active = false;
+
             return false;
         }
         self::loadSession($ctx);
-        self::$active = true;
 
         return true;
     }
@@ -692,14 +698,14 @@ final class VmSession
      *
      * @return int|false deleted count, or false when directory cannot be opened
      */
-    public static function gcExpiredFiles(): int|false
+    public static function gcExpiredFiles(?int $maxLifetime = null): int|false
     {
         $dir = SessionFileStorage::storageDir();
         if (!VmStatPath::isDir($dir)) {
             return false;
         }
 
-        $maxLifetime = VmIni::getSessionGcMaxLifetime();
+        $maxLifetime ??= VmIni::getSessionGcMaxLifetime();
         $entries = VmDir::scandir($dir, \SCANDIR_SORT_NONE);
         if (false === $entries) {
             return false;
