@@ -26,7 +26,7 @@ final class gzdeflate extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('gzdeflate() expects one to three arguments in this compiler build');
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gzdeflate', 0, 'data');
+        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'gzdeflate', 0, 'data');
         $level = -1;
         $encoding = \ZLIB_ENCODING_RAW;
         if ($argc >= 2) {
@@ -67,7 +67,7 @@ final class gzdeflate extends Internal
 
         return JitZlib::deflate(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'gzdeflate', 0, 'data'),
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'gzdeflate', 0, 'data'),
             $level,
             $encoding
         );
