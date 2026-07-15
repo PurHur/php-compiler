@@ -16784,6 +16784,16 @@ class JIT {
                 continue;
             }
             if (
+                0 === $idx
+                && VM\ReferencableCheck::defersByRefForNullStreamContextSetter($name)
+                && (
+                    Variable::TYPE_NULL === $args[$idx]->type
+                    || $args[$idx]->isNullConstant
+                )
+            ) {
+                continue;
+            }
+            if (
                 VM\ReferencableCheck::skipsByRefWhenNotArray($name)
                 && !self::jitArgLooksLikeArray($args[$idx])
             ) {
