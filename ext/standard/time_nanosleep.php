@@ -28,8 +28,8 @@ final class time_nanosleep extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $seconds = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'time_nanosleep', 1, 'seconds');
-        $nanoseconds = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'time_nanosleep', 2, 'nanoseconds');
+        $seconds = VmMath::parseZParamLongBuiltinArgForFrame($frame, 0, 'time_nanosleep', 1, 'seconds');
+        $nanoseconds = VmMath::parseZParamLongBuiltinArgForFrame($frame, 1, 'time_nanosleep', 2, 'nanoseconds');
         $result = VmSleep::timeNanosleep($seconds, $nanoseconds);
         if (\is_array($result)) {
             $frame->returnVar->copyFrom(VmJson::import($result));

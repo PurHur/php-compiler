@@ -360,6 +360,26 @@ final class VmMath
     }
 
     /**
+     * Z_PARAM_LONG builtin args — null coerces to 0 even on forward 8.4 profile and with caller strict_types
+     * (php-src basic_functions.c sleep/usleep/time_nanosleep; #19077).
+     */
+    public static function parseZParamLongBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): int {
+        $var = $frame->calledArgs[$argIndex];
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_FLOAT === $resolved->type && null !== $frame->vmContext) {
+            self::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
+        }
+
+        return self::parseZParamLongBuiltinArg($var, $function, $userArgIndex, $paramName);
+    }
+
+    /**
      * int builtin args with strict_types TypeError on float (#10468, zend_verify_arg_type).
      */
     public static function parseIntBuiltinArgForFrame(
