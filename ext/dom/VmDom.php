@@ -5752,7 +5752,24 @@ final class VmDom
             } elseif (null !== $parentState->documentId) {
                 $childState->documentId = $parentState->documentId;
             }
+
+            return;
         }
+        // Detached nodes clear parent/sibling slots (php-src php_dom_unlink_node; #19240).
+        // syncSubtree(parent) only walks remaining childIds — it never refreshes the unlinked node.
+        self::clearDetachedNodeLinkProperties($child);
+    }
+
+    /** Clear live parent/sibling props after unlink (ext/dom/node.c; #19240). */
+    private static function clearDetachedNodeLinkProperties(ObjectEntry $node): void
+    {
+        self::initNodePropertySlots($node);
+        $node->getProperty(self::PROP_PARENT_NODE)->null();
+        if (CompilerVersion::supportsDomParentElement() && $node->hasProperty(self::PROP_PARENT_ELEMENT)) {
+            $node->getProperty(self::PROP_PARENT_ELEMENT)->null();
+        }
+        $node->getProperty(self::PROP_NEXT_SIBLING)->null();
+        $node->getProperty(self::PROP_PREVIOUS_SIBLING)->null();
     }
 
     private static function assertMutationParent(ObjectEntry $parent): void
