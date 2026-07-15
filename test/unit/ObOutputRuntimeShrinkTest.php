@@ -42,8 +42,9 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ObOutputExecCaptureJitHelper', $execCaptureRuntime);
         $this->assertStringContainsString('implementGetContents', $execCaptureRuntime);
         $this->assertStringContainsString('ensureReadApiLinked', $execCaptureRuntime);
-        $this->assertStringNotContainsString('ObOutputExecCaptureLlvm', $execCaptureRuntime);
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
+        $this->assertStringContainsString('ObOutputExecCaptureLlvm::ensureLinked', $execCaptureRuntime);
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $execCaptureRuntime);
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
 
         $userScript = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputUserScriptLlvm.php');
         $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $userScript);

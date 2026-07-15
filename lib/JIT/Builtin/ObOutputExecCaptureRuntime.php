@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -56,6 +57,13 @@ final class ObOutputExecCaptureRuntime
             return;
         }
 
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)
+            || StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            ObOutputExecCaptureLlvm::ensureLinked($context);
+
+            return;
+        }
+
         $restore = self::captureInsertBlock($context);
         ObOutputJitBridge::prepareUserScriptEmit($context);
         ObOutputEchoJitEmit::ensureEchoAbiDeclared($context);
@@ -76,6 +84,13 @@ final class ObOutputExecCaptureRuntime
     public static function ensureReadApiLinked(Context $context): void
     {
         if (self::isReadApiLinked($context)) {
+            return;
+        }
+
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)
+            || StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            ObOutputExecCaptureLlvm::ensureReadApiLinked($context);
+
             return;
         }
 
