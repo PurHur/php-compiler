@@ -21,15 +21,7 @@ final class VarExportJitHelper
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
-            try {
-                $ctx = VmActiveContextJitHelper::resolve();
-            } catch (\Throwable $e) {
-                throw new \LogicException(
-                    'var_export() JIT helper requires active VM context (#9189)',
-                    0,
-                    $e
-                );
-            }
+            $ctx = VmActiveContextJitHelper::resolve();
         }
         $vm = $ctx->runtime->vm;
         if (null === $vm) {

@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Builtin\StringVarExport;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\ValueEchoHelper;
@@ -39,22 +37,10 @@ final class JitVarExport
 
         StringVarExport::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $args[0]);
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            StringVarExport::ensureJitHelperCompiled($context);
-            $str = JitNestedHelperCoerce::callHelper(
-                $context,
-                StringVarExport::helperFunction(
-                    $context,
-                    'PHPCompiler\\ext\\standard\\VarExportJitHelper::formatValue'
-                ),
-                [$valuePtr]
-            );
-        } else {
-            $str = $context->builder->call(
-                $context->lookupFunction('__compiler_var_export'),
-                $valuePtr
-            );
-        }
+        $str = $context->builder->call(
+            $context->lookupFunction('__compiler_var_export'),
+            $valuePtr
+        );
         $outSlot = JitValueBox::alloc($context);
         $outPtr = JitValueBox::pointer($context, $outSlot);
         $context->builder->call(
