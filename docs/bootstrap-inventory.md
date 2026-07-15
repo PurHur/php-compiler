@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 4899 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13135 |
+| Source constructs flagged (warnings) | 13136 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4667,7 +4667,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/FiberSupport.php` | 0 | 4 |
 | `lib/VM/FiberTrace.php` | 0 | 5 |
 | `lib/VM/ForeachIterator.php` | 0 | 1 |
-| `lib/VM/GeneratorIteratorJitHelper.php` | 0 | 4 |
+| `lib/VM/GeneratorIteratorJitHelper.php` | 0 | 5 |
 | `lib/VM/GeneratorJitHelper.php` | 0 | 1 |
 | `lib/VM/GeneratorState.php` | 0 | 20 |
 | `lib/VM/GeneratorTrace.php` | 0 | 2 |
@@ -13774,13 +13774,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 105)
-- new Variable (line 152)
-- new Variable (line 215)
-- new Variable (line 230)
-- new Variable (line 245)
-- new Variable (line 318)
-- new Variable (line 320)
-- new Variable (line 334)
+- new Variable (line 150)
+- new Variable (line 210)
+- new Variable (line 225)
+- new Variable (line 240)
+- new Variable (line 313)
+- new Variable (line 315)
+- new Variable (line 329)
 - 12 class method(s)
 
 ### `ext/standard/JitIteratorWalk.php`
@@ -26914,7 +26914,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayFindHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/ArrayMapCallbackPolicy.php`
 
@@ -29242,7 +29242,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringBin2hex.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringBitwiseNot.php`
 
@@ -31322,7 +31322,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CloneOperandHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 85)
+- new Variable (line 66)
 - 4 class method(s)
 
 ### `lib/JIT/ClosureBindHelper.php`
@@ -31623,7 +31623,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\GeneratorValid (line 42)
 - new Call\GeneratorKey (line 43)
 - new Native (line 285)
-- 28 class method(s)
+- 30 class method(s)
 
 ### `lib/JIT/GlobalsTableInit.php`
 
@@ -36007,10 +36007,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/GeneratorIteratorJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 133)
-- new Variable (line 148)
-- new Variable (line 159)
-- 16 class method(s)
+- new Variable (line 132)
+- new Variable (line 145)
+- new Variable (line 156)
+- new Variable (line 300)
+- 21 class method(s)
 
 ### `lib/VM/GeneratorJitHelper.php`
 
