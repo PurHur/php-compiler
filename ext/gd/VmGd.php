@@ -216,6 +216,169 @@ final class VmGd
         return true;
     }
 
+    public static function copy(
+        ObjectEntry $dst,
+        ObjectEntry $src,
+        int $dstX,
+        int $dstY,
+        int $srcX,
+        int $srcY,
+        int $srcW,
+        int $srcH
+    ): bool {
+        $dstState = GdRegistry::state($dst);
+        $srcState = GdRegistry::state($src);
+        if (null === $dstState || null === $srcState
+            || !$dstState->hasRaster() || !$srcState->hasRaster()) {
+            return false;
+        }
+        if ($srcW <= 0 || $srcH <= 0) {
+            return false;
+        }
+
+        $dstPixels = $dstState->pixels;
+        $srcPixels = $srcState->pixels;
+        $dstWidth = $dstState->width;
+        $srcWidth = $srcState->width;
+
+        for ($row = 0; $row < $srcH; ++$row) {
+            $sy = $srcY + $row;
+            $dy = $dstY + $row;
+            if ($sy < 0 || $sy >= $srcState->height || $dy < 0 || $dy >= $dstState->height) {
+                continue;
+            }
+            for ($col = 0; $col < $srcW; ++$col) {
+                $sx = $srcX + $col;
+                $dx = $dstX + $col;
+                if ($sx < 0 || $sx >= $srcWidth || $dx < 0 || $dx >= $dstWidth) {
+                    continue;
+                }
+                $dstPixels[$dy * $dstWidth + $dx] = $srcPixels[$sy * $srcWidth + $sx];
+            }
+        }
+
+        $dstState->pixels = $dstPixels;
+
+        return true;
+    }
+
+    public static function copyMerge(
+        ObjectEntry $dst,
+        ObjectEntry $src,
+        int $dstX,
+        int $dstY,
+        int $srcX,
+        int $srcY,
+        int $srcW,
+        int $srcH,
+        int $pct
+    ): bool {
+        $dstState = GdRegistry::state($dst);
+        $srcState = GdRegistry::state($src);
+        if (null === $dstState || null === $srcState
+            || !$dstState->hasRaster() || !$srcState->hasRaster()) {
+            return false;
+        }
+        if ($srcW <= 0 || $srcH <= 0) {
+            return false;
+        }
+        if ($pct < 0) {
+            $pct = 0;
+        }
+        if ($pct > 100) {
+            $pct = 100;
+        }
+        if (0 === $pct) {
+            return true;
+        }
+        if (100 === $pct) {
+            return self::copy($dst, $src, $dstX, $dstY, $srcX, $srcY, $srcW, $srcH);
+        }
+
+        $dstPixels = $dstState->pixels;
+        $srcPixels = $srcState->pixels;
+        $dstWidth = $dstState->width;
+        $srcWidth = $srcState->width;
+        $invPct = 100 - $pct;
+
+        for ($row = 0; $row < $srcH; ++$row) {
+            $sy = $srcY + $row;
+            $dy = $dstY + $row;
+            if ($sy < 0 || $sy >= $srcState->height || $dy < 0 || $dy >= $dstState->height) {
+                continue;
+            }
+            for ($col = 0; $col < $srcW; ++$col) {
+                $sx = $srcX + $col;
+                $dx = $dstX + $col;
+                if ($sx < 0 || $sx >= $srcWidth || $dx < 0 || $dx >= $dstWidth) {
+                    continue;
+                }
+                $dstColor = $dstPixels[$dy * $dstWidth + $dx];
+                $srcColor = $srcPixels[$sy * $srcWidth + $sx];
+                $dstPixels[$dy * $dstWidth + $dx] = self::blendRgb($dstColor, $srcColor, $pct, $invPct);
+            }
+        }
+
+        $dstState->pixels = $dstPixels;
+
+        return true;
+    }
+
+    public static function copyResampled(
+        ObjectEntry $dst,
+        ObjectEntry $src,
+        int $dstX,
+        int $dstY,
+        int $srcX,
+        int $srcY,
+        int $dstW,
+        int $dstH,
+        int $srcW,
+        int $srcH
+    ): bool {
+        $dstState = GdRegistry::state($dst);
+        $srcState = GdRegistry::state($src);
+        if (null === $dstState || null === $srcState
+            || !$dstState->hasRaster() || !$srcState->hasRaster()) {
+            return false;
+        }
+        if ($dstW <= 0 || $dstH <= 0 || $srcW <= 0 || $srcH <= 0) {
+            return false;
+        }
+
+        $dstPixels = $dstState->pixels;
+        $dstWidth = $dstState->width;
+        $srcWidth = $srcState->width;
+        $srcHeight = $srcState->height;
+        $srcPixels = $srcState->pixels;
+
+        for ($row = 0; $row < $dstH; ++$row) {
+            $dy = $dstY + $row;
+            if ($dy < 0 || $dy >= $dstState->height) {
+                continue;
+            }
+            $srcFy = $srcY + ($row + 0.5) * $srcH / $dstH - 0.5;
+            for ($col = 0; $col < $dstW; ++$col) {
+                $dx = $dstX + $col;
+                if ($dx < 0 || $dx >= $dstWidth) {
+                    continue;
+                }
+                $srcFx = $srcX + ($col + 0.5) * $srcW / $dstW - 0.5;
+                $dstPixels[$dy * $dstWidth + $dx] = self::sampleBilinear(
+                    $srcPixels,
+                    $srcWidth,
+                    $srcHeight,
+                    $srcFx,
+                    $srcFy
+                );
+            }
+        }
+
+        $dstState->pixels = $dstPixels;
+
+        return true;
+    }
+
     public static function coerceIntArg(Variable $arg, string $function, int $position, string $name): int
     {
         $arg = $arg->resolveIndirect();
@@ -650,6 +813,63 @@ final class VmGd
     private static function packRgb(int $red, int $green, int $blue): int
     {
         return ($red << 16) | ($green << 8) | $blue;
+    }
+
+    private static function blendRgb(int $dstColor, int $srcColor, int $pct, int $invPct): int
+    {
+        [$dr, $dg, $db] = self::unpackRgb($dstColor);
+        [$sr, $sg, $sb] = self::unpackRgb($srcColor);
+
+        return self::packRgb(
+            (int) (($dr * $invPct + $sr * $pct) / 100),
+            (int) (($dg * $invPct + $sg * $pct) / 100),
+            (int) (($db * $invPct + $sb * $pct) / 100)
+        );
+    }
+
+    /**
+     * @param list<int> $pixels
+     */
+    private static function sampleBilinear(
+        array $pixels,
+        int $width,
+        int $height,
+        float $fx,
+        float $fy
+    ): int {
+        if ($fx < 0.0 || $fy < 0.0 || $fx >= $width || $fy >= $height) {
+            return 0;
+        }
+
+        $x1 = (int) floor($fx);
+        $y1 = (int) floor($fy);
+        $x2 = min($x1 + 1, $width - 1);
+        $y2 = min($y1 + 1, $height - 1);
+        $xFrac = $fx - $x1;
+        $yFrac = $fy - $y1;
+
+        $c11 = $pixels[$y1 * $width + $x1];
+        $c21 = $pixels[$y1 * $width + $x2];
+        $c12 = $pixels[$y2 * $width + $x1];
+        $c22 = $pixels[$y2 * $width + $x2];
+
+        [$r11, $g11, $b11] = self::unpackRgb($c11);
+        [$r21, $g21, $b21] = self::unpackRgb($c21);
+        [$r12, $g12, $b12] = self::unpackRgb($c12);
+        [$r22, $g22, $b22] = self::unpackRgb($c22);
+
+        $topR = $r11 + ($r21 - $r11) * $xFrac;
+        $topG = $g11 + ($g21 - $g11) * $xFrac;
+        $topB = $b11 + ($b21 - $b11) * $xFrac;
+        $botR = $r12 + ($r22 - $r12) * $xFrac;
+        $botG = $g12 + ($g22 - $g12) * $xFrac;
+        $botB = $b12 + ($b22 - $b12) * $xFrac;
+
+        return self::packRgb(
+            (int) round($topR + ($botR - $topR) * $yFrac),
+            (int) round($topG + ($botG - $topG) * $yFrac),
+            (int) round($topB + ($botB - $topB) * $yFrac)
+        );
     }
 
     private static function clampChannel(int $channel): int

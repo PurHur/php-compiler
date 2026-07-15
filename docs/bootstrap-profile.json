@@ -392,6 +392,9 @@
         "ext/gd/VmGdPng.php",
         "ext/gd/imagecolorallocate.php",
         "ext/gd/imagecolorat.php",
+        "ext/gd/imagecopy.php",
+        "ext/gd/imagecopymerge.php",
+        "ext/gd/imagecopyresampled.php",
         "ext/gd/imagecreate.php",
         "ext/gd/imagecreatefromstring.php",
         "ext/gd/imagecreatetruecolor.php",
@@ -4108,6 +4111,7 @@
         "lib/JIT/ClassParamCheck.php",
         "lib/JIT/ClassReturnCheck.php",
         "lib/JIT/CliArgvGlobalInit.php",
+        "lib/JIT/CloneOperandHelper.php",
         "lib/JIT/ClosureBindHelper.php",
         "lib/JIT/ClosureHelper.php",
         "lib/JIT/CoalesceHelper.php",
@@ -4694,6 +4698,7 @@
         "lib/VM/ClassSealed.php",
         "lib/VM/ClassStatic.php",
         "lib/VM/ClassValidator.php",
+        "lib/VM/CloneSupport.php",
         "lib/VM/CloneWithSupport.php",
         "lib/VM/ClosureBindJitHelper.php",
         "lib/VM/ClosureState.php",
@@ -5128,9 +5133,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4894,
+        "inventory_files": 4899,
         "excluded": 0,
-        "eligible": 4894,
+        "eligible": 4899,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
