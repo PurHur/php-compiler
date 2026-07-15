@@ -11256,6 +11256,9 @@ class JIT {
         if (str_starts_with($lcClass, 'phpcfg\\func') && 'cfg' === $lcName) {
             return 'PHPCfg\\Block';
         }
+        if ('domdocument' === $lcClass && 'documentelement' === $lcName) {
+            return 'DOMElement';
+        }
 
         return null;
     }
@@ -15516,6 +15519,13 @@ class JIT {
 
         $proxyName = $this->resolveJitInstanceMethodProxyName($declaringClassLc, $methodLc);
         $proxyName = $this->resolveDomSubclassInstanceMethodProxy($declaringClassLc, $methodLc, $proxyName);
+        if (
+            'appendchild' === $methodLc
+            && JIT\Builtin\DomDocumentMethodUserScriptLlvm::shouldUse($this->context)
+            && $this->context->functionIsRegistered('domnode::append')
+        ) {
+            $proxyName = 'domnode::append';
+        }
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
         $receiverVar = $this->resolveUserScriptDomDocumentReceiver(
             $block,
@@ -15600,6 +15610,12 @@ class JIT {
         // :object receivers use RuntimeIndirectInstanceMethodCall; MCJIT segfaults on
         // ReflectionAttribute::newInstance() through that path (#4598).
         if ('reflectionattribute::newinstance' === strtolower($proxyName)) {
+            $this->context->scope->toCall = $staticProxy;
+            $this->context->scope->args = [$receiverVar];
+
+            return;
+        }
+        if ('appendchild' === $methodLc && 'domnode::append' === $proxyName) {
             $this->context->scope->toCall = $staticProxy;
             $this->context->scope->args = [$receiverVar];
 
