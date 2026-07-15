@@ -1,10 +1,11 @@
 --TEST--
-stdlib Z_PARAM_STR builtins — null TypeError on 8.4 forward profile JIT (#18837, ext/standard/string.c)
+stdlib Z_PARAM_STR builtins — null coerces on 8.4 forward profile JIT (#19161 regression, was #18837)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_WARNING);
 foreach ([
     'nl2br' => static fn () => nl2br(null),
     'str_shuffle' => static fn () => str_shuffle(null),
@@ -17,21 +18,21 @@ foreach ([
     'hebrev' => static fn () => hebrev(null),
     'quoted_printable_encode' => static fn () => quoted_printable_encode(null),
 ] as $label => $factory) {
-    try {
-        $factory();
-        echo "$label: uncaught\n";
-    } catch (TypeError $e) {
-        echo $label.': '.$e->getMessage()."\n";
-    }
+    $result = $factory();
+    echo "$label: ";
+    var_export($result);
+    echo "\n";
 }
+?>
 --EXPECT--
-nl2br: nl2br(): Argument #1 ($string) must be of type string, null given
-str_shuffle: str_shuffle(): Argument #1 ($string) must be of type string, null given
-str_rot13: str_rot13(): Argument #1 ($string) must be of type string, null given
-crc32: crc32(): Argument #1 ($string) must be of type string, null given
-soundex: soundex(): Argument #1 ($string) must be of type string, null given
-metaphone: metaphone(): Argument #1 ($string) must be of type string, null given
-convert_uuencode: convert_uuencode(): Argument #1 ($string) must be of type string, null given
-bin2hex: bin2hex(): Argument #1 ($string) must be of type string, null given
-hebrev: hebrev(): Argument #1 ($string) must be of type string, null given
-quoted_printable_encode: quoted_printable_encode(): Argument #1 ($string) must be of type string, null given
+nl2br: ''
+str_shuffle: ''
+str_rot13: ''
+crc32: 0
+soundex: '0000'
+metaphone: ''
+convert_uuencode: '`
+'
+bin2hex: ''
+hebrev: ''
+quoted_printable_encode: ''

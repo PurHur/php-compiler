@@ -1,10 +1,11 @@
 --TEST--
-stdlib Z_PARAM_LONG / number_format builtins — null TypeError on 8.4 forward profile JIT (#18850, ext/standard/string.c)
+stdlib Z_PARAM_LONG / number_format builtins — null coerces on 8.4 forward profile JIT (#19161, ext/standard/string.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_WARNING);
 foreach ([
     'chr' => static fn () => chr(null),
     'wordwrap' => static fn () => wordwrap(null),
@@ -14,18 +15,17 @@ foreach ([
     'decoct' => static fn () => decoct(null),
     'str_pad' => static fn () => str_pad(null, 5),
 ] as $label => $factory) {
-    try {
-        $factory();
-        echo "$label: uncaught\n";
-    } catch (TypeError $e) {
-        echo $label.': '.$e->getMessage()."\n";
-    }
+    $result = $factory();
+    echo "$label: ";
+    var_export($result);
+    echo "\n";
 }
+?>
 --EXPECT--
-chr: chr(): Argument #1 ($codepoint) must be of type int, null given
-wordwrap: wordwrap(): Argument #1 ($string) must be of type string, null given
-number_format: number_format(): Argument #1 ($num) must be of type float, null given
-dechex: dechex(): Argument #1 ($num) must be of type int, null given
-decbin: decbin(): Argument #1 ($num) must be of type int, null given
-decoct: decoct(): Argument #1 ($num) must be of type int, null given
-str_pad: str_pad(): Argument #1 ($string) must be of type string, null given
+chr: '' . "\0" . ''
+wordwrap: ''
+number_format: '0'
+dechex: '0'
+decbin: '0'
+decoct: '0'
+str_pad: '     '
