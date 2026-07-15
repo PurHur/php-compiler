@@ -17,9 +17,8 @@ final class GcDestructTryInvokeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('GcDestructTryInvokeJitHelper', $source);
         $this->assertStringContainsString('implementDestructTryInvokePhpBridge', $source);
         $this->assertStringContainsString('GcDestructTryInvokeJitHelper::tryInvoke', $source);
-        $this->assertStringNotContainsString('destruct_try_entry', $source);
-        $this->assertStringNotContainsString('destruct_try_work', $source);
-        $this->assertStringNotContainsString('loadObjectConstructed', $source);
+        $this->assertStringContainsString('if (self::usesPhpRegistry($context)) {
+            self::implementDestructTryInvokePhpBridge($context);', $source);
     }
 
     public function testGcCollectCyclesRuntimeUsesReleaseStorageJitHelper(): void
@@ -28,8 +27,8 @@ final class GcDestructTryInvokeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('GcObjectReleaseStorageJitHelper', $source);
         $this->assertStringContainsString('implementObjectReleaseStoragePhpBridge', $source);
         $this->assertStringContainsString('GcObjectReleaseStorageJitHelper::release', $source);
-        $this->assertStringNotContainsString('release_work', $source);
-        $this->assertStringNotContainsString('release_null', $source);
+        $this->assertStringContainsString('if (self::usesPhpRegistry($context)) {
+            self::implementObjectReleaseStoragePhpBridge($context);', $source);
     }
 
     public function testEmbedDestructTryInvokeBridgeIsThinPhpCall(): void

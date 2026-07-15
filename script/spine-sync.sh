@@ -74,6 +74,34 @@ if [[ -s "$MISSING_LIST" ]]; then
 fi
 echo "    added ${added} spine entries"
 
+# Merge-race PRs can append the same require_once twice (#19033, #19111). Keep first
+# occurrence only so AOT spine-smoke does not double-load units.
+deduped=$("$PHP_BIN" -r '
+$path = $argv[1];
+$lines = file($path);
+$seen = [];
+$out = [];
+foreach ($lines as $line) {
+    if (preg_match("#^require_once __DIR__\\.\x27/#", $line)) {
+        $key = rtrim($line);
+        if (isset($seen[$key])) {
+            continue;
+        }
+        $seen[$key] = true;
+    }
+    $out[] = $line;
+}
+$before = count($lines);
+$after = count($out);
+if ($after < $before) {
+    file_put_contents($path, implode("", $out));
+}
+echo $before - $after;
+' "$SPINE")
+if [[ "${deduped:-0}" -gt 0 ]]; then
+  echo "    deduped ${deduped} duplicate require_once lines"
+fi
+
 echo "==> spine-sync 2/6: regenerate inventory + profile"
 "$PHP_BIN" script/bootstrap-inventory.php >/dev/null
 "$PHP_BIN" script/bootstrap-profile.php >/dev/null
