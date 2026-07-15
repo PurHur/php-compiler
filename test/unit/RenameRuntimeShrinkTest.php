@@ -19,19 +19,22 @@ final class RenameRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
     }
 
-    public function testStringRenameNoLibcDefer(): void
+    public function testStringRenameUserScriptKernelAndEmbedHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringRename.php');
         $this->assertStringContainsString('JitRenameKernel', $source);
-        $this->assertStringContainsString('StatCacheRuntime', $source);
-        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('RenameJitHelper', $source);
+        $this->assertStringNotContainsString("lookupFunction('rename')", $source);
+        $this->assertStringNotContainsString('StatCacheRuntime', $source);
     }
 
     public function testStringRenameBridgeUsesRenameJitHelper(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringRename.php');
         $this->assertStringContainsString('RenameJitHelper', $bridge);
-        $this->assertStringNotContainsString("lookupFunction('rename')", $bridge);
+        $this->assertStringContainsString('INVOKE_HELPER', $bridge);
     }
 
     public function testRenameJitHelperDelegatesToVmFs(): void

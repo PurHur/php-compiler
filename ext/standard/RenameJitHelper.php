@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * rename() for compiled JIT/AOT modules (#15533, php-in-PHP).
  *
- * SSOT: {@see VmFs::rename()}
+ * Kernel path: {@see phpc_rename_kernel}; VM SSOT remains VmFs rename.
  * php-src: ext/standard/filestat.c — php_rename
  */
 final class RenameJitHelper

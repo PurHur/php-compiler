@@ -6,16 +6,18 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\ext\standard\JitRenameKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for rename() via phpc_rename_kernel + stat cache (#15533, #19215).
+ * JIT/AOT link for rename() (#15533, #19215).
  *
- * User-script AOT uses {@see JitRenameKernel} libc rename(2) with stat invalidation;
- * {@see \PHPCompiler\ext\standard\RenameJitHelper} remains the php-in-PHP SSOT for
- * warnings/guards when nested-compiled (helper-runtime unit).
+ * Embed / non-user-script: {@see RenameJitHelper} via {@see JitVmHelperLink}.
+ * User-script standalone AOT: thin {@see JitRenameKernel} libc rename(2) — nested
+ * helper TUs poison string/echo constants when ensureCompiled mid-bridge (#19215).
  * php-src: ext/standard/filestat.c — php_rename
  */
 final class StringRename
@@ -56,6 +58,29 @@ final class StringRename
             return;
         }
 
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            self::implementUserScriptKernel($context);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i1 = $context->getTypeFromString('int1');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI,
+            self::BRIDGE_ENTRY,
+            [$strPtr, $strPtr],
+            $i1,
+            self::INVOKE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#19215'
+        );
+    }
+
+    private static function implementUserScriptKernel(Context $context): void
+    {
         $probe = $context->module->getNamedFunction(self::ABI);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
@@ -69,8 +94,7 @@ final class StringRename
         } catch (\Throwable) {
         }
 
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#19215');
-        StatCacheRuntime::ensureLinked($context);
+        LibcExtern::register($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i1 = $context->getTypeFromString('int1');
@@ -82,32 +106,9 @@ final class StringRename
             );
 
         $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
-        $okBlock = $fn->appendBasicBlock('rename_bridge_ok');
-        $done = $fn->appendBasicBlock('rename_bridge_done');
         $context->builder->positionAtEnd($entry);
-
-        $from = $fn->getParam(0);
-        $to = $fn->getParam(1);
-        $ok = JitRenameKernel::invoke($context, $from, $to);
-        $context->builder->branchIf($ok, $okBlock, $done);
-
-        $context->builder->positionAtEnd($okBlock);
-        $i64 = $context->getTypeFromString('int64');
-        $clearRealpath = $i64->constInt(1, false);
-        $clearPathHelper = $context->functions['phpcompiler\\ext\\standard\\statcachejithelper::clearpath'] ?? null;
-        if (null === $clearPathHelper) {
-            throw new \LogicException('StatCacheJitHelper::clearPath missing for rename bridge (#19215)');
-        }
-        $context->builder->call($clearPathHelper, $clearRealpath, $from);
-        $context->builder->call($clearPathHelper, $clearRealpath, $to);
-        $okEnd = $context->builder->getInsertBlock();
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($done);
-        $ret = $context->builder->phi($i1, 'rename_bridge_result');
-        $ret->addIncoming($ok, $entry);
-        $ret->addIncoming($ok, $okEnd);
-        $context->builder->returnValue($ret);
+        $ok = JitRenameKernel::invoke($context, $fn->getParam(0), $fn->getParam(1));
+        $context->builder->returnValue($ok);
         $context->registerFunction(self::ABI, $fn);
 
         if (null !== $savedBlock) {
