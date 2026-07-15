@@ -317,6 +317,10 @@ class AotTest extends BaseTest
                     || !\PHPCompiler\ext\openssl\VmOpensslSignNative::available())) {
                 continue;
             }
+            if (!CompilerVersion::supportsTryCatchElse()
+                && str_contains($name, 'try_catch_else')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
