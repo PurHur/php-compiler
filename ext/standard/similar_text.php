@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringSimilarText;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -79,7 +78,7 @@ final class similar_text extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'similar_text', $paramName)->toString();
         }
 
-        return VmString::coerceTypedStringBuiltinArg(
+        return VmString::coerceStringBuiltinArg(
             $frame->calledArgs[$argIndex],
             'similar_text',
             $argIndex,
@@ -93,9 +92,7 @@ final class similar_text extends Internal
         int $argNumber,
         string $paramName
     ): Value {
-        JitInternalStrictArg::requireString($context, $arg, 'similar_text', $paramName, $argNumber);
-
-        return JitStringBuiltinArg::lowerTypedString(
+        return JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,
             $arg,
             'similar_text',

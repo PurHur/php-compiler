@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringSoundex;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
@@ -61,7 +60,7 @@ final class soundex extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'soundex', $paramName)->toString();
         }
 
-        return VmString::coerceTypedStringBuiltinArg(
+        return VmString::coerceStringBuiltinArg(
             $frame->calledArgs[$argIndex],
             'soundex',
             $argIndex,
@@ -75,9 +74,7 @@ final class soundex extends Internal
         int $argNumber,
         string $paramName
     ): Value {
-        JitInternalStrictArg::requireString($context, $arg, 'soundex', $paramName, $argNumber);
-
-        return JitStringBuiltinArg::lowerTypedString(
+        return JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,
             $arg,
             'soundex',
