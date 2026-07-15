@@ -54,6 +54,6 @@ final class nl_langinfo extends Internal
 
     private static function parseItemArg(Variable $var): int
     {
-        return VmMath::parseIntBuiltinArg($var, 'nl_langinfo', 1, 'item');
+        return VmMath::parseZParamLongBuiltinArg($var, 'nl_langinfo', 1, 'item');
     }
 }
