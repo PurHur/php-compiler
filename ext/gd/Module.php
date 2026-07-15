@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\gd;
 
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
+use PHPCompiler\VM;
 
 /**
  * gd extension module entry (php-src ext/gd/gd.c; issue #7407).
@@ -36,6 +37,13 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
+        if (GdExtensionPolicy::advertisesDrawing()) {
+            foreach (GdConstants::REGISTERED as $name => $value) {
+                $var = new VM\Variable();
+                $var->int($value);
+                $runtime->vmContext->defineConstant($name, $var);
+            }
+        }
     }
 
     public function getFunctions(): array
@@ -55,6 +63,11 @@ class Module extends ModuleAbstract
             $functions[] = new imagesx();
             $functions[] = new imagesy();
             $functions[] = new imagecolorat();
+            $functions[] = new imagesetpixel();
+            $functions[] = new imagefilter();
+            $functions[] = new imageflip();
+            $functions[] = new imagecrop();
+            $functions[] = new imagecropauto();
         }
         if (GdExtensionPolicy::advertisesDecodeFromString()) {
             $functions[] = new imagecreatefromstring();

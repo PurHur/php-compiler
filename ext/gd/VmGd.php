@@ -200,6 +200,22 @@ final class VmGd
         return $state->pixels[$y * $state->width + $x];
     }
 
+    public static function setPixel(ObjectEntry $image, int $x, int $y, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if ($x < 0 || $y < 0 || $x >= $state->width || $y >= $state->height) {
+            return false;
+        }
+        $pixels = $state->pixels;
+        $pixels[$y * $state->width + $x] = $color;
+        $state->pixels = $pixels;
+
+        return true;
+    }
+
     public static function coerceIntArg(Variable $arg, string $function, int $position, string $name): int
     {
         $arg = $arg->resolveIndirect();
@@ -275,6 +291,379 @@ final class VmGd
         return true;
     }
 
+    public static function applyFilter(
+        Frame $frame,
+        ObjectEntry $image,
+        int $filter,
+        int $arg1,
+        int $arg2,
+        int $arg3,
+        int $arg4
+    ): bool {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+
+        $width = $state->width;
+        $height = $state->height;
+        $pixels = $state->pixels;
+
+        switch ($filter) {
+            case GdConstants::REGISTERED['IMG_FILTER_NEGATE']:
+                for ($i = 0, $n = $width * $height; $i < $n; ++$i) {
+                    $pixels[$i] = self::negateColor($pixels[$i]);
+                }
+                break;
+            case GdConstants::REGISTERED['IMG_FILTER_GRAYSCALE']:
+                for ($i = 0, $n = $width * $height; $i < $n; ++$i) {
+                    $pixels[$i] = self::grayscaleColor($pixels[$i]);
+                }
+                break;
+            case GdConstants::REGISTERED['IMG_FILTER_BRIGHTNESS']:
+                for ($i = 0, $n = $width * $height; $i < $n; ++$i) {
+                    $pixels[$i] = self::brightnessColor($pixels[$i], $arg1);
+                }
+                break;
+            default:
+                self::warnUnsupportedFilter($frame, $filter);
+
+                return false;
+        }
+
+        $state->pixels = $pixels;
+
+        return true;
+    }
+
+    public static function flip(ObjectEntry $image, int $mode): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+
+        if (!\in_array($mode, [
+            GdConstants::REGISTERED['IMG_FLIP_HORIZONTAL'],
+            GdConstants::REGISTERED['IMG_FLIP_VERTICAL'],
+            GdConstants::REGISTERED['IMG_FLIP_BOTH'],
+        ], true)) {
+            return false;
+        }
+
+        $width = $state->width;
+        $height = $state->height;
+        $flipped = $state->pixels;
+
+        if (GdConstants::REGISTERED['IMG_FLIP_VERTICAL'] === $mode
+            || GdConstants::REGISTERED['IMG_FLIP_BOTH'] === $mode) {
+            for ($y = 0; $y < (int) ($height / 2); ++$y) {
+                $mirrorY = $height - 1 - $y;
+                for ($x = 0; $x < $width; ++$x) {
+                    $a = $y * $width + $x;
+                    $b = $mirrorY * $width + $x;
+                    [$flipped[$a], $flipped[$b]] = [$flipped[$b], $flipped[$a]];
+                }
+            }
+        }
+
+        if (GdConstants::REGISTERED['IMG_FLIP_HORIZONTAL'] === $mode
+            || GdConstants::REGISTERED['IMG_FLIP_BOTH'] === $mode) {
+            for ($y = 0; $y < $height; ++$y) {
+                $row = $y * $width;
+                for ($x = 0; $x < (int) ($width / 2); ++$x) {
+                    $mirrorX = $width - 1 - $x;
+                    $a = $row + $x;
+                    $b = $row + $mirrorX;
+                    [$flipped[$a], $flipped[$b]] = [$flipped[$b], $flipped[$a]];
+                }
+            }
+        }
+
+        $state->pixels = $flipped;
+
+        return true;
+    }
+
+    public static function crop(Frame $frame, ObjectEntry $image, Variable $rectArg): ObjectEntry|false
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+
+        $rect = self::coerceCropRect($rectArg, 'imagecrop', 2);
+        if (null === $rect) {
+            return false;
+        }
+
+        ['x' => $x, 'y' => $y, 'width' => $cropWidth, 'height' => $cropHeight] = $rect;
+        if ($cropWidth <= 0 || $cropHeight <= 0) {
+            self::warnCropDimensions($frame);
+
+            return false;
+        }
+        if ($x < 0 || $y < 0 || $x + $cropWidth > $state->width || $y + $cropHeight > $state->height) {
+            self::warnCropOutOfBounds($frame);
+
+            return false;
+        }
+
+        $pixels = [];
+        for ($row = 0; $row < $cropHeight; ++$row) {
+            $srcRow = ($y + $row) * $state->width + $x;
+            for ($col = 0; $col < $cropWidth; ++$col) {
+                $pixels[] = $state->pixels[$srcRow + $col];
+            }
+        }
+
+        return self::createTruecolorFromPixels($frame, $cropWidth, $cropHeight, $pixels);
+    }
+
+    public static function cropAuto(
+        Frame $frame,
+        ObjectEntry $image,
+        int $mode,
+        float $threshold,
+        int $color
+    ): ObjectEntry|false {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+
+        $width = $state->width;
+        $height = $state->height;
+        $pixels = $state->pixels;
+        if (0 === $width || 0 === $height) {
+            return false;
+        }
+
+        $background = match ($mode) {
+            GdConstants::REGISTERED['IMG_CROP_BLACK'] => 0,
+            GdConstants::REGISTERED['IMG_CROP_WHITE'] => self::packRgb(255, 255, 255),
+            GdConstants::REGISTERED['IMG_CROP_TRANSPARENT'] => 0,
+            GdConstants::REGISTERED['IMG_CROP_THRESHOLD'] => $color,
+            default => $pixels[0],
+        };
+
+        $minX = $width;
+        $minY = $height;
+        $maxX = -1;
+        $maxY = -1;
+        for ($y = 0; $y < $height; ++$y) {
+            for ($x = 0; $x < $width; ++$x) {
+                $pixel = $pixels[$y * $width + $x];
+                if (self::pixelMatchesCropBackground($pixel, $background, $mode, $threshold)) {
+                    continue;
+                }
+                if ($x < $minX) {
+                    $minX = $x;
+                }
+                if ($y < $minY) {
+                    $minY = $y;
+                }
+                if ($x > $maxX) {
+                    $maxX = $x;
+                }
+                if ($y > $maxY) {
+                    $maxY = $y;
+                }
+            }
+        }
+
+        if ($maxX < $minX || $maxY < $minY) {
+            return self::createTruecolorFromPixels($frame, $width, $height, $pixels);
+        }
+
+        $cropWidth = $maxX - $minX + 1;
+        $cropHeight = $maxY - $minY + 1;
+        $cropped = [];
+        for ($row = 0; $row < $cropHeight; ++$row) {
+            $srcRow = ($minY + $row) * $width + $minX;
+            for ($col = 0; $col < $cropWidth; ++$col) {
+                $cropped[] = $pixels[$srcRow + $col];
+            }
+        }
+
+        return self::createTruecolorFromPixels($frame, $cropWidth, $cropHeight, $cropped);
+    }
+
+    /**
+     * @param list<int> $pixels
+     */
+    public static function createTruecolorFromPixels(
+        Frame $frame,
+        int $width,
+        int $height,
+        array $pixels
+    ): ObjectEntry|false {
+        if ($width <= 0 || $height <= 0) {
+            return false;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('GdImage creation requires VM context');
+        }
+        $class = $ctx->classes[self::CLASS_GDIMAGE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('GdImage is not registered in this compiler build');
+        }
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        GdRegistry::attach($entry, GdImageState::fromRaster($width, $height, $pixels));
+
+        return $entry;
+    }
+
+    /**
+     * @return array{x: int, y: int, width: int, height: int}|null
+     */
+    public static function coerceCropRect(Variable $arg, string $function, int $position): ?array
+    {
+        $arg = $arg->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($rect) must be of type array, %s given',
+                $function,
+                $position,
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($rect) must be of type array, %s given',
+                $function,
+                $position,
+                self::typeLabel($arg)
+            ));
+        }
+
+        $values = [];
+        $table = $arg->toArray();
+        foreach (['x', 'y', 'width', 'height'] as $key) {
+            $valueVar = $table->find($key);
+            if (null === $valueVar) {
+                $values[$key] = 0;
+
+                continue;
+            }
+            $valueVar = $valueVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $valueVar->type) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d ($rect[%s]) must be of type int, %s given',
+                    $function,
+                    $position,
+                    $key,
+                    self::typeLabel($valueVar)
+                ));
+            }
+            $values[$key] = $valueVar->toInt();
+        }
+
+        return [
+            'x' => $values['x'],
+            'y' => $values['y'],
+            'width' => $values['width'],
+            'height' => $values['height'],
+        ];
+    }
+
+    public static function coerceFloatArg(Variable $arg, string $function, int $position, string $name): float
+    {
+        $arg = $arg->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type float, %s given',
+                $function,
+                $position,
+                $name,
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_FLOAT === $arg->type) {
+            return $arg->toFloat();
+        }
+        if (Variable::TYPE_INTEGER === $arg->type) {
+            return (float) $arg->toInt();
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type float, %s given',
+            $function,
+            $position,
+            $name,
+            self::typeLabel($arg)
+        ));
+    }
+
+    private static function negateColor(int $color): int
+    {
+        [$r, $g, $b] = self::unpackRgb($color);
+
+        return self::packRgb(255 - $r, 255 - $g, 255 - $b);
+    }
+
+    private static function grayscaleColor(int $color): int
+    {
+        [$r, $g, $b] = self::unpackRgb($color);
+        $gray = (int) round(0.299 * $r + 0.587 * $g + 0.114 * $b);
+
+        return self::packRgb($gray, $gray, $gray);
+    }
+
+    private static function brightnessColor(int $color, int $level): int
+    {
+        [$r, $g, $b] = self::unpackRgb($color);
+
+        return self::packRgb(
+            self::clampChannel($r + $level),
+            self::clampChannel($g + $level),
+            self::clampChannel($b + $level)
+        );
+    }
+
+    private static function pixelMatchesCropBackground(
+        int $pixel,
+        int $background,
+        int $mode,
+        float $threshold
+    ): bool {
+        if (GdConstants::REGISTERED['IMG_CROP_THRESHOLD'] === $mode) {
+            [$pr, $pg, $pb] = self::unpackRgb($pixel);
+            [$br, $bg, $bb] = self::unpackRgb($background);
+            $distance = abs($pr - $br) + abs($pg - $bg) + abs($pb - $bb);
+
+            return $distance <= (int) round($threshold * 765.0);
+        }
+
+        return $pixel === $background;
+    }
+
+    /** @return array{0: int, 1: int, 2: int} */
+    private static function unpackRgb(int $color): array
+    {
+        return [($color >> 16) & 0xFF, ($color >> 8) & 0xFF, $color & 0xFF];
+    }
+
+    private static function packRgb(int $red, int $green, int $blue): int
+    {
+        return ($red << 16) | ($green << 8) | $blue;
+    }
+
+    private static function clampChannel(int $channel): int
+    {
+        if ($channel < 0) {
+            return 0;
+        }
+        if ($channel > 255) {
+            return 255;
+        }
+
+        return $channel;
+    }
+
     public static function coerceImageString(Frame $frame, Variable $arg, string $function): string
     {
         return VmString::coerceStringBuiltinArg($arg, $function, 0, 'image');
@@ -328,6 +717,48 @@ final class VmGd
         }
         $frame->vmContext->errors->triggerError(
             'imagecolorat(): X and Y must be within the image bounds',
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    private static function warnUnsupportedFilter(Frame $frame, int $filter): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            \sprintf('imagefilter(): Unknown filter identifier %d', $filter),
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    private static function warnCropDimensions(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            'imagecrop(): Width and height must be greater than 0',
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    private static function warnCropOutOfBounds(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            'imagecrop(): Crop rectangle does not fit within image bounds',
             ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,
