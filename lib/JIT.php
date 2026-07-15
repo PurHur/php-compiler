@@ -11555,6 +11555,15 @@ class JIT {
         if ('__destruct' === strtolower($cfgFunc->name)) {
             return 'void';
         }
+        // Literal `void`/`never` must win before rawTypeFromCfgReturn: Type::fromDecl('void')
+        // is TYPE_NULL, and callbackTypeFromPhptype(TYPE_NULL) yields `__value__` — that wrongly
+        // adds an sret slot and shifts every PHP arg (breaks MultipartNative etc., #5965).
+        if ($cfgFunc->returnType instanceof Op\Type\Literal) {
+            $lit = strtolower($cfgFunc->returnType->name);
+            if ('void' === $lit || 'never' === $lit) {
+                return 'void';
+            }
+        }
         if ($cfgFunc->returnType instanceof Op\Type\Void_) {
             return 'void';
         }

@@ -122,7 +122,29 @@ final class RequestParseBodyUserScriptLlvm
         $context->builder->positionAtEnd($parse);
         $multipartBb = $fn->appendBasicBlock('rpb_user_multipart');
         $urlencodedBb = $fn->appendBasicBlock('rpb_user_urlencoded');
-        $isMultipart = self::isMultipartContentType($context, $contentType);
+        $checkMatchBb = $fn->appendBasicBlock('rpb_user_ct_match');
+        $contentTypeEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($contentType),
+            $context->getTypeFromString('int8')->constInt(0, false)
+        );
+        // Empty CONTENT_TYPE → urlencoded (php-src default). Do not fold into "done":
+        // a mis-scheduled and(not empty, match) previously jumped empty CT to free/return (#5965).
+        $context->builder->branchIf($contentTypeEmpty, $urlencodedBb, $checkMatchBb);
+
+        $context->builder->positionAtEnd($checkMatchBb);
+        $needle = $context->pointerFromStringConstant('multipart/form-data');
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $contentType,
+            $needle,
+            $context->constantFromInteger(19, 'size_t')
+        );
+        $isMultipart = $context->builder->icmp(
+            Builder::INT_EQ,
+            $cmp,
+            $context->getTypeFromString('int32')->constInt(0, false)
+        );
         $context->builder->branchIf($isMultipart, $multipartBb, $urlencodedBb);
 
         $context->builder->positionAtEnd($multipartBb);
@@ -146,29 +168,6 @@ final class RequestParseBodyUserScriptLlvm
 
         $context->registerFunction(self::BRIDGE_NAME, $fn);
         $context->builder->clearInsertionPosition();
-    }
-
-    private static function isMultipartContentType(Context $context, Value $contentType): Value
-    {
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $isEmpty = $context->builder->icmp(
-            Builder::INT_EQ,
-            $context->builder->load($contentType),
-            $i8->constInt(0, false)
-        );
-        // Fixtures/php-src use lowercase "multipart/form-data". Prefer strncmp so we keep
-        // the libc i8* ABI if StringCaseCompare stole the strncasecmp symbol (#5965).
-        $needle = $context->pointerFromStringConstant('multipart/form-data');
-        $cmp = $context->builder->call(
-            $context->lookupFunction('strncmp'),
-            $contentType,
-            $needle,
-            $context->constantFromInteger(19, 'size_t')
-        );
-        $prefixMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-
-        return $context->builder->and($context->builder->not($isEmpty), $prefixMatch);
     }
 
     private static function emitMultipartPopulate(
