@@ -49085,11 +49085,19 @@ class Compiler {
             $callIndex = array_search($cfgCallOp, $block->orig->children, true);
             if (\is_int($callIndex) && $callIndex > 0) {
                 $stmtBefore = $block->orig->children[$callIndex - 1] ?? null;
+                $hoistedNullFeedsSoleArg = $stmtBefore instanceof Op\Expr\ConstFetch
+                    && $this->constFetchIsNull($stmtBefore)
+                    && \is_array($cfgCallOp->args ?? null)
+                    && 1 === \count($cfgCallOp->args)
+                    && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[0] ?? null);
                 if (
                     ($stmtBefore instanceof Op\Expr\ConstFetch || $stmtBefore instanceof Op\Expr\ClassConstFetch)
-                    && null === $this->nonConstInlineProducerBeforeTrailingScalarConstFetchPreludes(
-                        $callIndex,
-                        $block->orig->children
+                    && (
+                        null === $this->nonConstInlineProducerBeforeTrailingScalarConstFetchPreludes(
+                            $callIndex,
+                            $block->orig->children
+                        )
+                        || $hoistedNullFeedsSoleArg
                     )
                 ) {
                     // var_export($expr, true|false) — hoisted return flag is not arg #0 (#17895, #17251).
