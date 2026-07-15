@@ -50,7 +50,14 @@ final class JitDomGetElementById
 
         $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
         if (DomDocumentMethodUserScriptLlvm::shouldUse($context) && null !== $parsed) {
-            return self::lookupUserScriptCompileTimePaired($context, $args[0], $args[1], $parsed);
+            // Pair only on id match — otherwise consult the runtime id map (importNode; #19212).
+            $idLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
+            if (null === $idLit) {
+                $idLit = $args[1]->compileTimeString;
+            }
+            if (null !== $idLit && $parsed['id'] === $idLit) {
+                return self::lookupUserScriptCompileTimePaired($context, $args[0], $args[1], $parsed);
+            }
         }
 
         $document = self::loadObjectArg($context, $args[0]);
@@ -238,6 +245,8 @@ final class JitDomGetElementById
 
             return null;
         }
+
+        JitDomLoadHTMLUserScript::rememberLastGetElementByIdHit($parsed);
 
         $element = JitDomCreateElement::invoke(
             $context,

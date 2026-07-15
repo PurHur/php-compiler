@@ -69,6 +69,8 @@ final class VmDomInstanceInvoke
             'prepend' => VmDomJitDispatch::prepend($ctx, $self, $extra),
             'replacechildren' => VmDomJitDispatch::replaceChildren($ctx, $self, $extra),
             'createdocumentfragment' => VmDomJitDispatch::createDocumentFragment($ctx, $self, $extra),
+            'importnode' => VmDomJitDispatch::importNode($ctx, $self, $extra),
+            'getattribute' => VmDomJitDispatch::getAttribute($self, $extra),
             'setattribute' => VmDomJitDispatch::setAttribute($ctx, $self, $extra),
             'add' => VmDomJitDispatch::tokenListAdd($ctx, $self, $extra),
             'remove' => VmDomJitDispatch::tokenListRemove($ctx, $self, $extra),
