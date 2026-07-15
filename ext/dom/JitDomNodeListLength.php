@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -24,11 +23,6 @@ final class JitDomNodeListLength
 
     public static function fetch(Object_ $objectType, Value $obj): JITVariable
     {
-        $context = $objectType->jitContext();
-        if (!DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            return $objectType->propertyFetchOrdinary($obj, self::CLASS_NODELIST, self::PROP_LENGTH);
-        }
-
         return ObjectInstancePropertyLlvm::propertyFetchDeclaredSlot(
             $objectType,
             $obj,
