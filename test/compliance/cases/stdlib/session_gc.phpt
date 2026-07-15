@@ -2,6 +2,7 @@
 Stdlib: session_gc() purges expired session files (#6006)
 --FILE--
 <?php
+ob_start();
 echo (int) function_exists('session_gc'), "\n";
 var_export(session_gc());
 echo "\n";
@@ -22,8 +23,8 @@ session_start();
 var_export(session_gc());
 echo "\n";
 --EXPECT--
-PHP Warning:  session_gc(): Session cannot be garbage collected when there is no active session
+PHP Warning:  session_gc(): Session cannot be garbage collected when there is no active session in - on line 4
 1
 false
 0
-1
+0

@@ -24,6 +24,8 @@ final class JitStreamContextSetOptions
 
         StreamContextRuntime::ensureLinked($context);
 
+        JitStreamContextRequiredArg::validate($context, $args[0], 'stream_context_set_options', 1);
+
         $ctxHt = self::loadContextArray($context, $args[0]);
         $optHt = self::loadOptionsArray($context, $args[1], 2);
 

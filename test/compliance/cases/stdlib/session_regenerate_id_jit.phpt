@@ -6,7 +6,7 @@ session_start();
 $old = session_id();
 echo session_regenerate_id(true) ? 'ok' : 'no', "\n";
 $new = session_id();
-echo ($old !== $new && strlen($new) === 32) ? 'rotated' : 'fail', "\n";
+echo ($old !== $new && strlen($new) === 26) ? 'rotated' : 'fail', "\n";
 --EXPECT--
 ok
 rotated

@@ -55,6 +55,42 @@ final class DomUserScriptLiveTagListLlvm
         $context->builder->store($updated, $context->module->getNamedGlobal(self::GLOBAL_COUNT));
     }
 
+    /** Bump live tag count when child tag is unknown at compile time (#19208). */
+    public static function incrementCount(Context $context): void
+    {
+        self::ensureGlobals($context);
+        $countGlobal = $context->module->getNamedGlobal(self::GLOBAL_COUNT);
+        if (null === $countGlobal) {
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $storedCount = $context->builder->load($countGlobal);
+        $context->builder->store(
+            $context->builder->add($storedCount, $i64->constInt(1, false)),
+            $countGlobal
+        );
+    }
+
+    public static function incrementForChildArg(Context $context, \PHPCompiler\JIT\Variable $childArg): void
+    {
+        if (null === $context->module->getNamedGlobal(self::GLOBAL_TAG)
+            || null === $context->module->getNamedGlobal(self::GLOBAL_COUNT)
+        ) {
+            return;
+        }
+        $lit = \PHPCompiler\JIT\JitStringBuiltinArg::compileTimeLiteral($childArg)
+            ?? $childArg->compileTimeString;
+        if (null !== $lit) {
+            $childTag = $context->builder->load(
+                $context->constantStringFromString(strtolower($lit))
+            );
+            self::increment($context, $childTag);
+
+            return;
+        }
+        self::incrementCount($context);
+    }
+
     private static function ensureGlobals(Context $context): void
     {
         $strPtr = $context->getTypeFromString('__string__*');

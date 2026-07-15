@@ -24,6 +24,8 @@ final class JitStreamContextSetParams
 
         StreamContextRuntime::ensureLinked($context);
 
+        JitStreamContextRequiredArg::validate($context, $args[0], 'stream_context_set_params', 1);
+
         $ctxHt = self::loadContextArray($context, $args[0]);
         $paramsHt = self::loadParamsArray($context, $args[1]);
 

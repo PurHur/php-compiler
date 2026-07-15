@@ -28,6 +28,12 @@ final class JitStringBuiltinArg
         return VmString::requiresForwardProfileStrictStringNull();
     }
 
+    /** Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222). */
+    public static function requiresZparamStrStrictNullOnForwardProfile(): bool
+    {
+        return VmString::requiresZparamStrStrictNullOnForwardProfile();
+    }
+
     /**
      * Z_PARAM_STR with caller strict_types parity (#12276, #12274).
      */
@@ -92,7 +98,9 @@ final class JitStringBuiltinArg
             $argIndex,
             $paramName,
             $expectedType,
-            $arrayExpectedType
+            $arrayExpectedType,
+            false,
+            true
         );
     }
 
@@ -104,13 +112,15 @@ final class JitStringBuiltinArg
         string $paramName,
         string $expectedType = 'string',
         ?string $arrayExpectedType = null,
-        bool $rejectNullOnForwardProfile = true
+        bool $rejectNullOnForwardProfile = true,
+        bool $zparamStrNullGuard = false
     ): Value {
         JitNativeString::ensureInsertBlock($context);
         $arrayExpected = $arrayExpectedType ?? $expectedType;
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             if (
                 $context->callerStrictTypes
+                || ($zparamStrNullGuard && self::requiresZparamStrStrictNullOnForwardProfile())
                 || ($rejectNullOnForwardProfile && self::requiresForwardProfileStrictStringNull())
             ) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
