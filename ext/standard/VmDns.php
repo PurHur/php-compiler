@@ -310,22 +310,22 @@ final class VmDns
 
     /** php-src DNS_* bitmask → wire qtype (ext/standard/dns.c php_dns_record_types). */
     private const DNS_TYPE_FLAGS = [
-        0x00000001 => ['name' => 'A', 'qtype' => 1],
-        0x00000002 => ['name' => 'NS', 'qtype' => 2],
-        0x00000004 => ['name' => 'CNAME', 'qtype' => 5],
-        0x00000008 => ['name' => 'SOA', 'qtype' => 6],
-        0x00000010 => ['name' => 'PTR', 'qtype' => 12],
-        0x00000020 => ['name' => 'HINFO', 'qtype' => 13],
-        0x00000040 => ['name' => 'MX', 'qtype' => 15],
-        0x00000080 => ['name' => 'TXT', 'qtype' => 16],
-        0x00000100 => ['name' => 'AAAA', 'qtype' => 28],
-        0x00000200 => ['name' => 'SRV', 'qtype' => 33],
-        0x00000400 => ['name' => 'NAPTR', 'qtype' => 35],
-        0x00000800 => ['name' => 'A6', 'qtype' => 38],
-        0x00001000 => ['name' => 'ANY', 'qtype' => 255],
+        StdlibConstants::DNS_A => ['name' => 'A', 'qtype' => 1],
+        StdlibConstants::DNS_NS => ['name' => 'NS', 'qtype' => 2],
+        StdlibConstants::DNS_CNAME => ['name' => 'CNAME', 'qtype' => 5],
+        StdlibConstants::DNS_SOA => ['name' => 'SOA', 'qtype' => 6],
+        StdlibConstants::DNS_PTR => ['name' => 'PTR', 'qtype' => 12],
+        StdlibConstants::DNS_HINFO => ['name' => 'HINFO', 'qtype' => 13],
+        StdlibConstants::DNS_MX => ['name' => 'MX', 'qtype' => 15],
+        StdlibConstants::DNS_TXT => ['name' => 'TXT', 'qtype' => 16],
+        StdlibConstants::DNS_AAAA => ['name' => 'AAAA', 'qtype' => 28],
+        StdlibConstants::DNS_SRV => ['name' => 'SRV', 'qtype' => 33],
+        StdlibConstants::DNS_NAPTR => ['name' => 'NAPTR', 'qtype' => 35],
+        StdlibConstants::DNS_A6 => ['name' => 'A6', 'qtype' => 38],
+        StdlibConstants::DNS_ANY => ['name' => 'ANY', 'qtype' => 255],
     ];
 
-    private const DNS_VALID_TYPE_MASK = 0x00001FFF;
+    private const DNS_VALID_TYPE_MASK = StdlibConstants::DNS_ALL | StdlibConstants::DNS_ANY;
 
     /**
      * dns_get_record() — DNS record list for hostname (#6392).
@@ -350,11 +350,11 @@ final class VmDns
         $records = [];
         foreach ($requested as $flag => $meta) {
             $chunk = match ($flag) {
-                0x00000001 => '' === $hostname ? [] : self::collectARecords($hostname),
-                0x00000002 => self::collectNsRecords($hostname),
-                0x00000008 => self::collectSoaRecords($hostname),
-                0x00000040 => '' === $hostname ? [] : self::collectMxRecords($hostname),
-                0x00000100 => '' === $hostname ? [] : self::collectAaaaRecords($hostname),
+                StdlibConstants::DNS_A => '' === $hostname ? [] : self::collectARecords($hostname),
+                StdlibConstants::DNS_NS => self::collectNsRecords($hostname),
+                StdlibConstants::DNS_SOA => self::collectSoaRecords($hostname),
+                StdlibConstants::DNS_MX => '' === $hostname ? [] : self::collectMxRecords($hostname),
+                StdlibConstants::DNS_AAAA => '' === $hostname ? [] : self::collectAaaaRecords($hostname),
                 default => [],
             };
             foreach ($chunk as $record) {
@@ -410,13 +410,13 @@ final class VmDns
      */
     private static function expandDnsTypeBitmask(int $type): array
     {
-        if (0x00001000 & $type) {
+        if (StdlibConstants::DNS_ALL === $type || 0 !== ($type & StdlibConstants::DNS_ANY)) {
             return self::DNS_TYPE_FLAGS;
         }
 
         $requested = [];
         foreach (self::DNS_TYPE_FLAGS as $flag => $meta) {
-            if (0x00001000 === $flag) {
+            if (StdlibConstants::DNS_ANY === $flag) {
                 continue;
             }
             if (0 !== ($type & $flag)) {

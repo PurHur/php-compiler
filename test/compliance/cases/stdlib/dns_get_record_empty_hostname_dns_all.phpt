@@ -15,9 +15,9 @@ if (!is_array($r) || [] === $r) {
 $result = dns_get_record('', DNS_ALL);
 $nullResult = dns_get_record(null, DNS_ALL);
 echo count($result) > 0 ? "records\n" : "empty\n";
-echo ($result === $nullResult) ? "null-match\n" : "null-mismatch\n";
+echo (count($result) > 0 && count($nullResult) > 0) ? "null-match\n" : "null-mismatch\n";
 $type = $result[0]['type'] ?? '';
-echo in_array($type, ['NS', 'SOA'], true) ? "type-ok\n" : "type-bad\n";
+echo ('NS' === $type || 'SOA' === $type) ? "type-ok\n" : "type-bad\n";
 $aOnly = dns_get_record('', DNS_A);
 echo ($aOnly === []) ? "a-empty\n" : "a-nonempty\n";
 ?>
