@@ -15,7 +15,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * User-script standalone AOT: init-safe LLVM for request_parse_body() (#5965, #17316).
  *
  * Reads REQUEST_BODY via libc getenv (mirrored from putenv() via POSIX setenv in JitEnv —
- * not putenv(malloc), which heap-corrupted under ≥2 mirrors #17316).
+ * not putenv(malloc), which heap-corrupted under ≥2 mirrors #17316). strdup's the body
+ * before strtok/urldecode in-place parse so environ is not mutated.
  * php-src: ext/standard/http.c
  */
 final class RequestParseBodyUserScriptLlvm
@@ -57,20 +58,35 @@ final class RequestParseBodyUserScriptLlvm
         $entry = $fn->appendBasicBlock('rpb_user_entry');
         $context->builder->positionAtEnd($entry);
 
-        $bodySlot = self::entryAlloca($context, $entry, $context->getTypeFromString('int8*'));
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $bodySlot = self::entryAlloca($context, $entry, $i8p);
+        // Owned copy: parse_delimited_pairs mutates via strtok_r / urldecode in-place.
+        // Feeding libc getenv's environ buffer directly corrupts setenv mirrors (#17316).
+        $ownedSlot = self::entryAlloca($context, $entry, $i8);
+        $context->builder->store($i8->constInt(0, false), $ownedSlot);
+
         $envRaw = $context->builder->call(
             $context->lookupFunction('getenv'),
             $context->pointerFromStringConstant('REQUEST_BODY')
         );
-        $i8p = $context->getTypeFromString('int8*');
         $isNull = $context->builder->icmp(Builder::INT_EQ, $envRaw, $i8p->constNull());
-        $bodyVal = $context->builder->select(
-            $isNull,
-            $context->pointerFromStringConstant(''),
-            $envRaw
-        );
-        $context->builder->store($bodyVal, $bodySlot);
+        $dupBb = $fn->appendBasicBlock('rpb_user_dup');
+        $emptyBb = $fn->appendBasicBlock('rpb_user_empty');
+        $afterBody = $fn->appendBasicBlock('rpb_user_after_body');
+        $context->builder->branchIf($isNull, $emptyBb, $dupBb);
 
+        $context->builder->positionAtEnd($emptyBb);
+        $context->builder->store($context->pointerFromStringConstant(''), $bodySlot);
+        $context->builder->branch($afterBody);
+
+        $context->builder->positionAtEnd($dupBb);
+        $dup = $context->builder->call($context->lookupFunction('strdup'), $envRaw);
+        $context->builder->store($dup, $bodySlot);
+        $context->builder->store($i8->constInt(1, false), $ownedSlot);
+        $context->builder->branch($afterBody);
+
+        $context->builder->positionAtEnd($afterBody);
         $post = $fn->getParam(0);
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $nullPost = $context->builder->icmp(Builder::INT_EQ, $post, $htPtr->constNull());
@@ -79,6 +95,7 @@ final class RequestParseBodyUserScriptLlvm
         $context->builder->branchIf($nullPost, $early, $work);
 
         $context->builder->positionAtEnd($early);
+        self::emitFreeOwnedBody($context, $bodySlot, $ownedSlot);
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
@@ -88,7 +105,6 @@ final class RequestParseBodyUserScriptLlvm
         $context->builder->branchIf($bodyEmpty, $done, $parse);
 
         $context->builder->positionAtEnd($parse);
-        $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
         $context->builder->call(
             $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
@@ -100,10 +116,28 @@ final class RequestParseBodyUserScriptLlvm
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
+        self::emitFreeOwnedBody($context, $bodySlot, $ownedSlot);
         $context->builder->returnVoid();
 
         $context->registerFunction(self::BRIDGE_NAME, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitFreeOwnedBody(Context $context, Value $bodySlot, Value $ownedSlot): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $owned = $context->builder->load($ownedSlot);
+        $isOwned = $context->builder->icmp(Builder::INT_NE, $owned, $i8->constInt(0, false));
+        $freeBb = BasicBlockHelper::append($context, 'rpb_user_free');
+        $skipBb = BasicBlockHelper::append($context, 'rpb_user_free_skip');
+        $context->builder->branchIf($isOwned, $freeBb, $skipBb);
+        $context->builder->positionAtEnd($freeBb);
+        $context->builder->call(
+            $context->lookupFunction('free'),
+            $context->builder->load($bodySlot)
+        );
+        $context->builder->branch($skipBb);
+        $context->builder->positionAtEnd($skipBb);
     }
 
     private static function declareBridge(Context $context): LlvmFunction

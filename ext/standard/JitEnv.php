@@ -135,23 +135,41 @@ final class JitEnv
      *
      * Uses POSIX setenv() (copies name/value) — not putenv(malloc'd "NAME=value"), which
      * heap-corrupts when parse_str/strtok later touch getenv buffers under ≥2 mirrors.
-     * Callers must pass a NUL-terminated `__string__` (via `__string__separate` / literal).
+     *
+     * Copy via length+NUL (not strdup on `__string__.value`): string constants may lack a
+     * trailing NUL, so strdup over-reads and corrupts the heap on some literal lengths.
      */
     private static function emitLibcPutenvMirror(Context $context, Value $assignmentStr): void
     {
         LibcExtern::register($context);
         $map = $context->structFieldMap['__string__'];
-        $valueBytes = $context->builder->structGep($assignmentStr, $map['value']);
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
         $one = $sizeT->constInt(1, false);
+        $zero = $i64->constInt(0, false);
 
-        $dup = $context->builder->call($context->lookupFunction('strdup'), $valueBytes);
+        $len = $context->builder->load(
+            $context->builder->structGep($assignmentStr, $map['length'])
+        );
+        $bytes = $context->builder->structGep($assignmentStr, $map['value']);
+        $bufLen = $context->builder->add(
+            $len->typeOf() === $sizeT ? $len : $context->builder->truncOrBitCast($len, $sizeT),
+            $one
+        );
+        $buf = $context->builder->call($context->lookupFunction('malloc'), $bufLen);
+        $cStr = $context->builder->pointerCast($buf, $i8p);
+        $context->intrinsic->memcpy($cStr, $bytes, $len, false);
+        $context->builder->store(
+            $i8->constInt(0, false),
+            $context->builder->inBoundsGEP($cStr, $len)
+        );
+
         $eq = $context->builder->call(
             $context->lookupFunction('strchr'),
-            $dup,
+            $cStr,
             $i32->constInt(ord('='), false)
         );
         $hasEq = $context->builder->icmp(Builder::INT_NE, $eq, $i8p->constNull());
@@ -164,12 +182,12 @@ final class JitEnv
         $valueStart = $context->builder->inBoundsGEP($eq, $one);
         $context->builder->call(
             $context->lookupFunction('setenv'),
-            $dup,
+            $cStr,
             $valueStart,
             $i32->constInt(1, false)
         );
         $context->builder->branch($skip);
         $context->builder->positionAtEnd($skip);
-        $context->builder->call($context->lookupFunction('free'), $dup);
+        $context->builder->call($context->lookupFunction('free'), $cStr);
     }
 }
