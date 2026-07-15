@@ -341,6 +341,25 @@ final class VmMath
     }
 
     /**
+     * Z_PARAM_LONG coercion where null always becomes 0 (ext/random/random.c random_bytes; #19054).
+     *
+     * Unlike {@see parseIntBuiltinArg}, does not apply 8.4 forward-profile strict null TypeError.
+     */
+    public static function parseZParamLongBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): int {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return 0;
+        }
+
+        return self::parseIntBuiltinArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
      * int builtin args with strict_types TypeError on float (#10468, zend_verify_arg_type).
      */
     public static function parseIntBuiltinArgForFrame(

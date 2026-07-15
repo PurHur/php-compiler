@@ -46,6 +46,6 @@ final class random_bytes extends Internal
      */
     private static function parseLength(Variable $var): int
     {
-        return VmMath::parseIntBuiltinArg($var, 'random_bytes', 1, 'length');
+        return VmMath::parseZParamLongBuiltinArg($var, 'random_bytes', 1, 'length');
     }
 }
