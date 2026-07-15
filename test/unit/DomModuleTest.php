@@ -393,6 +393,7 @@ PHP;
         $code = <<<'PHP'
 <?php
 $doc = new DOMDocument();
+$doc->loadXML('<root/>');
 $attr = $doc->createAttributeNS('http://example.com', 'ex:foo');
 echo get_class($attr), "\n";
 echo $attr->localName, "\n";
