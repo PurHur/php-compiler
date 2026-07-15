@@ -56,20 +56,17 @@ final class MultipartRuntime
         } catch (\Throwable) {
         }
 
-        // Nested JIT rebinds functionScope["strlen"] to PHP strlen; keep libc for cstr bridges (#5965).
+        // RPB user-script AOT uses LLVM fixture populate — do not Nested-JIT
+        // MultipartNativeJitHelper here (#5965). ParseStr Nested link rebinds
+        // strlen to PHP __string__strlen; restore libc before cstr LLVM emit.
         LibcExtern::register($context);
         $libcStrlen = $context->lookupFunction('strlen');
         ParseStrRuntime::ensureUserScriptLinked($context);
-        self::ensureFilesystemPrerequisites($context);
-        self::ensureNativeHtInternalProxies($context);
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            [self::POPULATE_POST_BODY_NATIVE, self::POPULATE_MULTIPART_INTO_NATIVE],
-            '#5965'
-        );
+        $context->registerFunction('strlen', $libcStrlen);
+        MultipartRuntimeUserScriptLlvm::ensureLinked($context);
         $context->registerFunction('strlen', $libcStrlen);
         self::implementRpbMultipartBridge($context);
+        $context->registerFunction('strlen', $libcStrlen);
 
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
@@ -104,7 +101,8 @@ final class MultipartRuntime
 
         $entry = $fn->appendBasicBlock('rpb_multipart_entry');
         $early = $fn->appendBasicBlock('rpb_multipart_early');
-        $work = $fn->appendBasicBlock('rpb_multipart_work');
+        // Distinct from Nested-helper bridges so rpbBridgeBodyComplete rebuilds (#5965).
+        $work = $fn->appendBasicBlock('rpb_multipart_llvm_work');
         $context->builder->positionAtEnd($entry);
 
         $post = $fn->getParam(0);
@@ -119,17 +117,14 @@ final class MultipartRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::POPULATE_MULTIPART_INTO_NATIVE, '#5965');
-        $contentTypeStr = self::cstrDirectToPhpcString($context, $contentTypeCstr);
-        $bodyStr = self::cstrDirectToPhpcString($context, $bodyCstr);
-        $context->builder->call(
-            $helperFn,
-            JitNestedHelperCoerce::ptrToI64($context, $post),
-            JitNestedHelperCoerce::ptrToI64($context, $files),
-            JitNestedHelperCoerce::coerceArgForHelper($context, $contentTypeStr, $helperFn->getParam(2)->typeOf()),
-            JitNestedHelperCoerce::coerceArgForHelper($context, $bodyStr, $helperFn->getParam(3)->typeOf())
+        // LLVM fixture populate — Nested MultipartNativeJitHelper cannot fpc/tempnam (#5965).
+        MultipartRuntimeUserScriptLlvm::emitCallFromBridge(
+            $context,
+            $post,
+            $files,
+            $contentTypeCstr,
+            $bodyCstr
         );
-        $context->builder->returnVoid();
 
         $context->registerFunction(self::RPB_MULTIPART_RUNTIME_FUNCTION, $fn);
         $context->builder->clearInsertionPosition();
@@ -138,7 +133,7 @@ final class MultipartRuntime
     private static function rpbBridgeBodyComplete(LlvmFunction $fn): bool
     {
         foreach ($fn->getBasicBlocks() as $block) {
-            if ('rpb_multipart_work' === $block->getName() && null !== $block->getTerminator()) {
+            if ('rpb_multipart_llvm_work' === $block->getName() && null !== $block->getTerminator()) {
                 return true;
             }
         }

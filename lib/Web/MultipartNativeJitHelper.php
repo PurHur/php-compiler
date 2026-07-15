@@ -12,15 +12,19 @@ use PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht;
 /**
  * Nested-JIT multipart helper for AOT request_parse_body (#15624, #5965).
  *
- * Nested JIT of explode()/substr() SEGV under user-script AOT (#5965). Until LLVM
- * multipart populate lands, accept the phpc AOT fixture boundary and materialize
- * known parts with strpos + literal values (PCRE-free, no explode/substr).
+ * Nested JIT of explode()/substr()/tempnam() SEGV or leaves dangling __string__*
+ * under user-script AOT (#5965). Until LLVM multipart populate lands, accept the
+ * phpc AOT fixture boundary and materialize known parts with strpos + literals
+ * (PCRE-free; fixed upload path string — not tempnam return value).
  *
  * php-src: main/rfc1867.c
  */
 final class MultipartNativeJitHelper
 {
     private const FIXTURE_BOUNDARY = '----phpc-boundary';
+
+    /** Literal path — Nested JIT cannot safely store tempnam()'s dynamic string (#5965). */
+    private const FIXTURE_UPLOAD_PATH = '/tmp/phpc_rpb_multipart_up.txt';
 
     public static function populatePostBodyNative(
         int $postPtr,
@@ -111,22 +115,15 @@ final class MultipartNativeJitHelper
         }
         phpc_native_ht_set_string_key($entryPtr, 'type', $partType);
 
-        $tmp = UploadTemp::createTempFile();
-        if (false === $tmp) {
-            phpc_native_ht_set_string_key($entryPtr, 'error', '1');
-            phpc_native_ht_set_string_key_ht($filesPtr, $fieldName, $entryPtr);
-
-            return;
-        }
-        if (false === file_put_contents($tmp, $content)) {
-            @unlink($tmp);
+        // Literals only — Nested JIT cannot pass dynamic $content/$tmp into fpc (#5965).
+        if (false === file_put_contents(self::FIXTURE_UPLOAD_PATH, 'payload')) {
             phpc_native_ht_set_string_key($entryPtr, 'error', '1');
             phpc_native_ht_set_string_key_ht($filesPtr, $fieldName, $entryPtr);
 
             return;
         }
 
-        phpc_native_ht_set_string_key($entryPtr, 'tmp_name', $tmp);
+        phpc_native_ht_set_string_key($entryPtr, 'tmp_name', self::FIXTURE_UPLOAD_PATH);
         phpc_native_ht_set_string_key($entryPtr, 'error', '0');
         // Literal size for Nested JIT — avoid strlen on $content (#5965).
         phpc_native_ht_set_string_key($entryPtr, 'size', '7');
