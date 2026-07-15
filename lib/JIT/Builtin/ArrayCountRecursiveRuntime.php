@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for count(COUNT_RECURSIVE) via ArrayCountRecursiveJitHelper PHP (#13274).
  *
- * Standalone AOT compiles {@see ArrayCountRecursiveJitHelper} via JitVmHelperLink bridge (#14487); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::countRecursive()}.
+ * Native literal arrays materialize via {@see ArrayBuiltinHelper::nativeListToHashTable()} then route through PHP (#19013).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::countRecursiveForCompiled()}
  * php-src: ext/standard/array.c — php_count_recursive
  */
@@ -32,12 +32,10 @@ final class ArrayCountRecursiveRuntime
 
     public static function countRecursive(Context $context, JITVariable $array): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            return ArrayBuiltinHelper::countRecursive($context, $array);
-        }
-
         self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $ht = ArrayBuiltinHelper::isNativeArray($array->type)
+            ? ArrayBuiltinHelper::nativeListToHashTable($context, $array)
+            : ArrayBuiltinHelper::loadHashTable($context, $array);
         $count = $context->builder->call(
             $context->lookupFunction(self::ABI_COUNT),
             $ht
@@ -59,7 +57,7 @@ final class ArrayCountRecursiveRuntime
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_COUNT);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, 'array_count_recursive_bridge_entry')) {
             self::registerLinkedRuntime($context);
 
             return;

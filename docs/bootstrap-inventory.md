@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4880 |
-| Phase A inventory files (M2 ratio SSOT) | 4880 |
+| PHP files on vm.php path | 4879 |
+| Phase A inventory files (M2 ratio SSOT) | 4879 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13086 |
+| Source constructs flagged (warnings) | 13085 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1142,7 +1142,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/IsNanJitHelper.php` | 0 | 1 |
 | `ext/standard/JitAddcslashes.php` | 0 | 1 |
 | `ext/standard/JitArrayChunk.php` | 0 | 1 |
-| `ext/standard/JitArrayCountRecursive.php` | 0 | 1 |
 | `ext/standard/JitArrayElem.php` | 0 | 1 |
 | `ext/standard/JitArrayFill.php` | 0 | 1 |
 | `ext/standard/JitArrayIsList.php` | 0 | 1 |
@@ -12527,11 +12526,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
-
-### `ext/standard/JitArrayCountRecursive.php`
-
-**Warnings** (review for bootstrap subset):
-- 8 class method(s)
 
 ### `ext/standard/JitArrayElem.php`
 
@@ -26806,10 +26800,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ArrayBuiltinHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 103)
-- new Variable (line 197)
-- new Variable (line 199)
-- 10 class method(s)
+- new Variable (line 90)
+- new Variable (line 184)
+- new Variable (line 186)
+- 9 class method(s)
 
 ### `lib/JIT/ArrayFilterCallbackPolicy.php`
 

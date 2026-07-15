@@ -1194,7 +1194,6 @@ require_once __DIR__.'/../../../ext/standard/IsInfiniteJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/IsNanJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitAddcslashes.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayChunk.php';
-require_once __DIR__.'/../../../ext/standard/JitArrayCountRecursive.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayElem.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayFill.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayIsList.php';

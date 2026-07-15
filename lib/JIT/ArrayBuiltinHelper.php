@@ -10,7 +10,6 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\array_combine;
-use PHPCompiler\ext\standard\JitArrayCountRecursive;
 use PHPCompiler\ext\standard\lcfirst;
 use PHPCompiler\JIT\Builtin\ArrayMapRuntime;
 use PHPCompiler\JIT\Builtin\SortRuntime;
@@ -61,18 +60,6 @@ final class ArrayBuiltinHelper
         );
 
         return $context->builder->zExt($num, $context->getTypeFromString('int64'));
-    }
-
-    /**
-     * count($array, COUNT_RECURSIVE) — mirrors VmArray::countRecursive (#3511, #4584).
-     */
-    public static function countRecursive(Context $context, Variable $array): Value
-    {
-        $ht = self::isNativeArray($array->type)
-            ? self::nativeListToHashTable($context, $array)
-            : self::loadHashTable($context, $array);
-
-        return JitArrayCountRecursive::invoke($context, $ht);
     }
 
     public static function appendElement(Context $context, Value $ht, Variable $element): void
