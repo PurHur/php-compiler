@@ -5,15 +5,42 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for DOMElement AttributeNodeNS + DOMDocument::createAttributeNS (#19265). */
+/**
+ * LLVM lowering for DOMElement AttributeNodeNS + DOMDocument::createAttributeNS (#19265, #19268).
+ *
+ * User-script AOT materializes DOMAttr in LLVM (DomRegistry helpers segfault standalone).
+ */
 final class JitDomAttributeNodeNS
 {
+    private const CLASS_ATTR = 'DOMAttr';
+
+    private const PROP_NODE_NAME = 'nodeName';
+
+    private const PROP_NAME = 'name';
+
+    private const PROP_VALUE = 'value';
+
+    private const PROP_NODE_VALUE = 'nodeValue';
+
+    private const PROP_OWNER_ELEMENT = 'ownerElement';
+
+    private const PROP_NAMESPACE_URI = 'namespaceURI';
+
+    private const PROP_LOCAL_NAME = 'localName';
+
+    private const PROP_PREFIX = 'prefix';
+
+    private static int $boxSeq = 0;
+
     public static function invokeGet(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) < 3) {
@@ -21,6 +48,11 @@ final class JitDomAttributeNodeNS
         }
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_getattrnodens_cont');
+
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            return self::invokeGetUserScript($context, ...$args);
+        }
+
         DomImportNodeRuntime::ensureGetAttributeNodeNSLinked($context);
 
         $element = self::loadObjectArg($context, $args[0], 'DOMElement::getAttributeNodeNS() receiver');
@@ -33,7 +65,7 @@ final class JitDomAttributeNodeNS
             $localName
         );
 
-        return self::boxObjectResult($context, $attr);
+        return self::boxNullableObjectResult($context, $attr);
     }
 
     public static function invokeSet(Context $context, JITVariable ...$args): Value
@@ -43,6 +75,11 @@ final class JitDomAttributeNodeNS
         }
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattrnodens_cont');
+
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            return self::invokeSetUserScript($context, ...$args);
+        }
+
         DomImportNodeRuntime::ensureSetAttributeNodeNSLinked($context);
 
         $element = self::loadObjectArg($context, $args[0], 'DOMElement::setAttributeNodeNS() receiver');
@@ -53,7 +90,7 @@ final class JitDomAttributeNodeNS
             $attr
         );
 
-        return self::boxObjectResult($context, $replaced);
+        return self::boxNullableObjectResult($context, $replaced);
     }
 
     public static function invokeCreate(Context $context, JITVariable ...$args): Value
@@ -63,6 +100,11 @@ final class JitDomAttributeNodeNS
         }
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_createattrns_cont');
+
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            return self::invokeCreateUserScript($context, ...$args);
+        }
+
         DomImportNodeRuntime::ensureCreateAttributeNSLinked($context);
 
         $document = self::loadObjectArg($context, $args[0], 'DOMDocument::createAttributeNS() receiver');
@@ -76,6 +118,226 @@ final class JitDomAttributeNodeNS
         );
 
         return self::boxObjectResult($context, $attr);
+    }
+
+    private static function invokeCreateUserScript(Context $context, JITVariable ...$args): Value
+    {
+        $nsLit = self::compileTimeStringArg($args[1]);
+        $qLit = self::compileTimeStringArg($args[2]);
+        if (null !== $nsLit && null !== $qLit) {
+            DomUserScriptAttributeCacheLlvm::rememberCreate($nsLit, $qLit);
+
+            return self::boxObjectResult(
+                $context,
+                self::materializeAttrFromLiterals($context, $nsLit, $qLit, '')
+            );
+        }
+
+        $namespace = self::loadStringArg($context, $args[1]);
+        $qualifiedName = self::loadStringArg($context, $args[2]);
+
+        return self::boxObjectResult(
+            $context,
+            self::materializeAttrFromRuntime($context, $namespace, $qualifiedName, null)
+        );
+    }
+
+    private static function invokeGetUserScript(Context $context, JITVariable ...$args): Value
+    {
+        $nsLit = self::compileTimeStringArg($args[1]);
+        $localLit = self::compileTimeStringArg($args[2]);
+        $xml = JitDomLoadXMLUserScript::lastCompileTimeXml();
+        if (null !== $nsLit && null !== $localLit && null !== $xml) {
+            $parsed = DomParseSimpleXmlJitHelper::findAttributeNSArgv($xml, $nsLit, $localLit);
+            if (null !== $parsed) {
+                $attr = self::materializeAttrFromLiterals(
+                    $context,
+                    $parsed['namespace'],
+                    $parsed['qname'],
+                    $parsed['value']
+                );
+                DomUserScriptAttributeCacheLlvm::storeLiteral($context, $nsLit, $localLit, $attr);
+
+                return self::boxObjectResult($context, $attr);
+            }
+
+            // Not found in compile-time XML — php-src returns null.
+            return self::boxNullResult($context);
+        }
+
+        if (null !== $nsLit && null !== $localLit) {
+            return self::boxNullableObjectResult(
+                $context,
+                DomUserScriptAttributeCacheLlvm::lookupLiteral($context, $nsLit, $localLit)
+            );
+        }
+
+        return self::boxNullResult($context);
+    }
+
+    private static function invokeSetUserScript(Context $context, JITVariable ...$args): Value
+    {
+        $attr = self::loadObjectArg($context, $args[1], 'DOMElement::setAttributeNodeNS() attr');
+        $ns = DomUserScriptAttributeCacheLlvm::lastCreateNamespace();
+        $local = DomUserScriptAttributeCacheLlvm::lastCreateLocalName();
+        if (null === $ns || null === $local) {
+            return self::boxNullResult($context);
+        }
+        $prev = DomUserScriptAttributeCacheLlvm::storeLiteral($context, $ns, $local, $attr);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $prev,
+            $objPtr->constNull()
+        );
+        $nullRes = self::boxNullResult($context);
+        // Only box the previous attr when non-null (avoid writeObject(null)).
+        $tag = (string) (self::$boxSeq++);
+        $nullBlock = BasicBlockHelper::append($context, 'dom_setattr_prev_null_'.$tag);
+        $objBlock = BasicBlockHelper::append($context, 'dom_setattr_prev_obj_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'dom_setattr_prev_done_'.$tag);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->store($nullRes, $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        $context->builder->store(self::boxObjectResult($context, $prev), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    public static function materializeAttrFromLiterals(
+        Context $context,
+        string $namespace,
+        string $qualifiedName,
+        string $value
+    ): Value {
+        [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_ATTR);
+        self::ensureAttrPropertyLayout($objectType, $classId);
+
+        $obj = $objectType->allocate($classId);
+        $objectType->markObjectConstructed($obj);
+
+        self::storeStringProperty($context, $obj, self::PROP_NODE_NAME, $qualifiedName);
+        self::storeStringProperty($context, $obj, self::PROP_NAME, $qualifiedName);
+        self::storeStringProperty($context, $obj, self::PROP_VALUE, $value);
+        self::storeStringProperty($context, $obj, self::PROP_NODE_VALUE, $value);
+        self::storeStringProperty($context, $obj, self::PROP_NAMESPACE_URI, $namespace);
+        self::storeStringProperty($context, $obj, self::PROP_LOCAL_NAME, $localName);
+        self::storeStringProperty($context, $obj, self::PROP_PREFIX, $prefix);
+        self::storeNullProperty($context, $obj, self::PROP_OWNER_ELEMENT);
+
+        return $obj;
+    }
+
+    private static function materializeAttrFromRuntime(
+        Context $context,
+        Value $namespace,
+        Value $qualifiedName,
+        ?Value $value
+    ): Value {
+        $objectType = $context->type->object;
+        $classId = $objectType->lookup(self::CLASS_ATTR);
+        self::ensureAttrPropertyLayout($objectType, $classId);
+
+        $obj = $objectType->allocate($classId);
+        $objectType->markObjectConstructed($obj);
+
+        self::storeStringPropertyValue($context, $obj, self::PROP_NODE_NAME, $qualifiedName);
+        self::storeStringPropertyValue($context, $obj, self::PROP_NAME, $qualifiedName);
+        $valueStr = $value ?? $context->builder->load($context->constantStringFromString(''));
+        self::storeStringPropertyValue($context, $obj, self::PROP_VALUE, $valueStr);
+        self::storeStringPropertyValue($context, $obj, self::PROP_NODE_VALUE, $valueStr);
+        self::storeStringPropertyValue($context, $obj, self::PROP_NAMESPACE_URI, $namespace);
+        self::storeStringPropertyValue($context, $obj, self::PROP_LOCAL_NAME, $qualifiedName);
+        self::storeStringProperty($context, $obj, self::PROP_PREFIX, '');
+        self::storeNullProperty($context, $obj, self::PROP_OWNER_ELEMENT);
+
+        return $obj;
+    }
+
+    /** @return array{0: string, 1: string} */
+    private static function splitQualifiedName(string $qualifiedName): array
+    {
+        $pos = strpos($qualifiedName, ':');
+        if (false === $pos) {
+            return ['', $qualifiedName];
+        }
+
+        return [substr($qualifiedName, 0, $pos), substr($qualifiedName, $pos + 1)];
+    }
+
+    private static function ensureAttrPropertyLayout(
+        \PHPCompiler\JIT\Builtin\Type\Object_ $objectType,
+        int $classId
+    ): void {
+        foreach ([
+            self::PROP_NODE_NAME,
+            self::PROP_NAME,
+            self::PROP_VALUE,
+            self::PROP_NODE_VALUE,
+            self::PROP_NAMESPACE_URI,
+            self::PROP_LOCAL_NAME,
+            self::PROP_PREFIX,
+        ] as $prop) {
+            if (!$objectType->hasProperty($classId, $prop)) {
+                $objectType->defineProperty($classId, $prop, JITVariable::TYPE_STRING);
+            }
+        }
+        if (!$objectType->hasProperty($classId, self::PROP_OWNER_ELEMENT)) {
+            $objectType->defineProperty($classId, self::PROP_OWNER_ELEMENT, JITVariable::TYPE_VALUE);
+        }
+    }
+
+    private static function storeStringProperty(
+        Context $context,
+        Value $obj,
+        string $prop,
+        string $lit
+    ): void {
+        $str = $context->builder->load($context->constantStringFromString($lit));
+        self::storeStringPropertyValue($context, $obj, $prop, $str);
+    }
+
+    private static function storeStringPropertyValue(
+        Context $context,
+        Value $obj,
+        string $prop,
+        Value $str
+    ): void {
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $propVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $owned);
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($obj, self::CLASS_ATTR, $prop),
+            $propVar,
+            JITVariable::TYPE_STRING
+        );
+    }
+
+    private static function storeNullProperty(Context $context, Value $obj, string $prop): void
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+        $propVar = new JITVariable($context, JITVariable::TYPE_VALUE, JITVariable::KIND_VARIABLE, $slot);
+        $context->type->object->propertyStore(
+            $context->type->object->propertySlotFor($obj, self::CLASS_ATTR, $prop),
+            $propVar,
+            JITVariable::TYPE_NULL
+        );
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg, string $label): Value
@@ -111,6 +373,16 @@ final class JitDomAttributeNodeNS
         throw new \LogicException('AttributeNodeNS string argument must be string or null');
     }
 
+    private static function compileTimeStringArg(JITVariable $arg): ?string
+    {
+        $lit = JitStringBuiltinArg::compileTimeLiteral($arg);
+        if (null !== $lit) {
+            return $lit;
+        }
+
+        return $arg->compileTimeString;
+    }
+
     private static function boxObjectResult(Context $context, Value $object): Value
     {
         $slot = JitValueBox::alloc($context);
@@ -124,4 +396,46 @@ final class JitDomAttributeNodeNS
         return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 
+    private static function boxNullResult(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
+    }
+
+    private static function boxNullableObjectResult(Context $context, Value $object): Value
+    {
+        $tag = (string) (self::$boxSeq++);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $object,
+            $objPtr->constNull()
+        );
+        $nullBlock = BasicBlockHelper::append($context, 'dom_attr_box_null_'.$tag);
+        $objBlock = BasicBlockHelper::append($context, 'dom_attr_box_obj_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'dom_attr_box_done_'.$tag);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->store(
+            JitValueBox::normalizeValuePtr($context, self::boxNullResult($context)),
+            $resultSlot
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        $context->builder->store(
+            JitValueBox::normalizeValuePtr($context, self::boxObjectResult($context, $object)),
+            $resultSlot
+        );
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
 }

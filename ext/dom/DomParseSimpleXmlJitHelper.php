@@ -84,4 +84,71 @@ final class DomParseSimpleXmlJitHelper
 
         return 'root';
     }
+
+    /** First element child tag under the document element (#19268). */
+    public static function firstChildTagArgv(string $xml): ?string
+    {
+        if (!preg_match('/<([a-zA-Z_][\w:.-]*)(?:\s[^>]*)?>/', $xml, $root, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+        $afterRoot = (int) $root[0][1] + \strlen($root[0][0]);
+        $rest = substr($xml, $afterRoot);
+        if (preg_match('/<([a-zA-Z_][\w:.-]*)(?:\s|\/|>)/', $rest, $child)) {
+            return $child[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * Find an NS attribute on any element open-tag in compile-time XML (#19268).
+     *
+     * @return null|array{namespace: string, qname: string, value: string}
+     */
+    public static function findAttributeNSArgv(string $xml, string $namespace, string $localName): ?array
+    {
+        $nsDecl = [];
+        if (preg_match_all('/xmlns:([A-Za-z_][\w.-]*)\s*=\s*"([^"]*)"/', $xml, $decls, PREG_SET_ORDER)) {
+            foreach ($decls as $d) {
+                $nsDecl[$d[1]] = $d[2];
+            }
+        }
+        if (preg_match('/xmlns\s*=\s*"([^"]*)"/', $xml, $def)) {
+            $nsDecl[''] = $def[1];
+        }
+
+        if (!preg_match_all('/<([a-zA-Z_][\w:.-]*)((?:\s[^>]*)?)\/?>/', $xml, $tags, PREG_SET_ORDER)) {
+            return null;
+        }
+        foreach ($tags as $tag) {
+            $attrs = $tag[2] ?? '';
+            if (!preg_match_all('/([A-Za-z_][\w:.-]*)\s*=\s*"([^"]*)"/', $attrs, $pairs, PREG_SET_ORDER)) {
+                continue;
+            }
+            foreach ($pairs as $pair) {
+                $qname = $pair[1];
+                if (0 === stripos($qname, 'xmlns')) {
+                    continue;
+                }
+                $pos = strpos($qname, ':');
+                $prefix = false === $pos ? '' : substr($qname, 0, $pos);
+                $local = false === $pos ? $qname : substr($qname, $pos + 1);
+                if (strtolower($local) !== strtolower($localName)) {
+                    continue;
+                }
+                $uri = $nsDecl[$prefix] ?? '';
+                if ($uri !== $namespace) {
+                    continue;
+                }
+
+                return [
+                    'namespace' => $uri,
+                    'qname' => $qname,
+                    'value' => $pair[2],
+                ];
+            }
+        }
+
+        return null;
+    }
 }
