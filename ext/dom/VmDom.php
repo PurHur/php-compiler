@@ -2243,6 +2243,7 @@ final class VmDom
         self::propagateDocumentId($root, $document->id);
         self::syncSubtree($ctx, $document);
         self::reindexDocumentIds($document, $root);
+        self::syncElementIdMapProperty($document);
         $state->documentUri = self::defaultDocumentUri();
         $state->loadedViaXml = true;
         $state->sourceXml = $trimmed;
@@ -2362,6 +2363,9 @@ final class VmDom
         }
     }
 
+    /** php-src ext/dom/node.c — xml:id namespace URI. */
+    private const XML_NAMESPACE_URI = 'http://www.w3.org/XML/1998/namespace';
+
     private static function indexElementIdsRecursive(ObjectEntry $document, ObjectEntry $node): void
     {
         if (!self::isElement($node)) {
@@ -2369,16 +2373,7 @@ final class VmDom
         }
         $docState = DomRegistry::state($document);
         $nodeState = DomRegistry::state($node);
-        $idAttr = null;
-        if (self::documentValidateOnParse($document)) {
-            $idAttr = $docState->idAttrByElement[$nodeState->nodeName] ?? null;
-        }
-        if (null === $idAttr && null !== $nodeState->idAttributeName) {
-            $idAttr = $nodeState->idAttributeName;
-        }
-        if (null === $idAttr && $docState->isHtmlDocument && isset($nodeState->attributes['id'])) {
-            $idAttr = 'id';
-        }
+        $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
         if (null !== $idAttr) {
             $value = $nodeState->attributes[$idAttr] ?? null;
             if (null !== $value && '' !== $value) {
@@ -2391,6 +2386,36 @@ final class VmDom
                 self::indexElementIdsRecursive($document, $child);
             }
         }
+    }
+
+    /**
+     * Resolve which attribute qName holds this element's document-wide ID (php-src ext/dom/node.c; #19211).
+     */
+    private static function resolveElementIdAttributeName(
+        ObjectEntry $document,
+        DomNodeState $docState,
+        DomNodeState $nodeState
+    ): ?string {
+        $idAttr = null;
+        if (!$docState->isHtmlDocument || self::documentValidateOnParse($document)) {
+            $idAttr = $docState->idAttrByElement[$nodeState->nodeName] ?? null;
+        }
+        if (null === $idAttr && null !== $nodeState->idAttributeName) {
+            $idAttr = $nodeState->idAttributeName;
+        }
+        if (null === $idAttr && $docState->isHtmlDocument && isset($nodeState->attributes['id'])) {
+            $idAttr = 'id';
+        }
+        if (null === $idAttr && !$docState->isHtmlDocument) {
+            if (isset($nodeState->attributes['xml:id'])) {
+                $idAttr = 'xml:id';
+            } elseif (isset($nodeState->attributes['id'])
+                && self::XML_NAMESPACE_URI === ($nodeState->attributeNamespaces['id'] ?? '')) {
+                $idAttr = 'id';
+            }
+        }
+
+        return $idAttr;
     }
 
     /**

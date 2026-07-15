@@ -96,7 +96,7 @@ final class DomDocumentMethodUserScriptLlvm
 
     public static function ensureGetElementByIdBridge(Context $context): void
     {
-        self::ensureNullableObjectValueBridge(
+        self::ensureContextNullableObjectValueBridge(
             $context,
             DomGetElementByIdRuntime::ABI_NAME,
             'dom_get_element_by_id_user_script',
@@ -727,6 +727,92 @@ final class DomDocumentMethodUserScriptLlvm
             $destPtr,
             $foundObj
         );
+        $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
+        $context->registerFunction($abi, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /**
+     * @param list<\PHPLLVM\Type> $paramTypes
+     */
+    private static function ensureContextNullableObjectValueBridge(
+        Context $context,
+        string $abi,
+        string $entryBlock,
+        array $paramTypes,
+        string $helperLogical,
+        string $helperPath
+    ): void {
+        $probe = $context->module->getNamedFunction($abi);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entryBlock)) {
+            $context->registerFunction($abi, $probe);
+
+            return;
+        }
+
+        self::ensureNestedHelperProxies($context);
+        self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $objPtr = $context->getTypeFromString('__object__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#17954');
+        $ft = $context->context->functionType($valuePtr, false, ...$paramTypes);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abi, $ft);
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, $entryBlock);
+        $context->builder->positionAtEnd($entry);
+        $vmCtx = $context->builder->call(VmActiveContextLlvm::lookupAbi($context));
+        $args = [
+            JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $vmCtx,
+                $helperFn->getParam(0)->typeOf()
+            ),
+        ];
+        for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $fn->getParam($i),
+                $helperFn->getParam($i + 1)->typeOf()
+            );
+        }
+        $foundObj = $context->builder->call($helperFn, ...$args);
+        $foundObj = JitNestedHelperCoerce::coerceBridgeResult($context, $foundObj, $objPtr);
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $foundObj,
+            $objPtr->constNull()
+        );
+        $nullBlock = $fn->appendBasicBlock('dom_gei_bridge_null');
+        $objBlock = $fn->appendBasicBlock('dom_gei_bridge_obj');
+        $doneBlock = $fn->appendBasicBlock('dom_gei_bridge_done');
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $destPtr);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($objBlock);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeObject'),
+            $destPtr,
+            $foundObj
+        );
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
