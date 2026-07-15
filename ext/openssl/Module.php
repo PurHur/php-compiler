@@ -23,7 +23,7 @@ class Module extends ModuleAbstract
         foreach (array_merge([
             'OPENSSL_RAW_DATA' => OpensslConstants::OPENSSL_RAW_DATA,
             'OPENSSL_ZERO_PADDING' => OpensslConstants::OPENSSL_ZERO_PADDING,
-        ], OpensslConstants::algorithmConstants()) as $name => $value) {
+        ], OpensslConstants::algorithmConstants(), OpensslConstants::pkcs7Constants(), OpensslConstants::cipherConstants()) as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
@@ -60,6 +60,10 @@ class Module extends ModuleAbstract
             new openssl_pkcs12_read(),
             new openssl_pkcs12_export(),
             new openssl_pkcs12_export_to_file(),
+            new openssl_pkcs7_sign(),
+            new openssl_pkcs7_verify(),
+            new openssl_pkcs7_encrypt(),
+            new openssl_pkcs7_decrypt(),
             new openssl_x509_verify(),
             new openssl_free_key(),
             new openssl_spki_new(),

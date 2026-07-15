@@ -1147,6 +1147,259 @@ final class VmOpenssl
         ));
     }
 
+    /**
+     * openssl_pkcs7_sign() — S/MIME sign (php-src ext/openssl/openssl.c; #6804).
+     *
+     * @return bool
+     */
+    public static function pkcs7Sign(
+        string $inputFilename,
+        string $outputFilename,
+        Variable $certArg,
+        Variable $keyArg,
+        ?Variable $headersVar,
+        int $flags,
+        ?Frame $frame = null
+    ): bool {
+        if (!VmOpensslPkcs7Native::available()) {
+            self::userWarning('openssl_pkcs7_sign(): OpenSSL PKCS#7 is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $certPem = self::resolvePemMaterial(
+            self::coerceCertificatePem($certArg, 'openssl_pkcs7_sign', 2, 'certificate'),
+            'openssl_pkcs7_sign',
+            $frame
+        );
+        $keyPem = self::resolvePemMaterial(
+            self::coercePkeyPem($keyArg, 'openssl_pkcs7_sign', 3, 'private_key'),
+            'openssl_pkcs7_sign',
+            $frame
+        );
+        if (false === $certPem || false === $keyPem) {
+            return false;
+        }
+
+        $headers = self::coercePkcs7Headers($headersVar, 'openssl_pkcs7_sign');
+        if (false === VmOpensslPkcs7Native::sign(
+            $inputFilename,
+            $outputFilename,
+            $certPem,
+            $keyPem,
+            $headers,
+            $flags
+        )) {
+            self::userWarning('openssl_pkcs7_sign(): Error creating PKCS7 structure!', $frame);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * openssl_pkcs7_verify() — S/MIME verify (php-src ext/openssl/openssl.c; #6804).
+     *
+     * @return bool|int
+     */
+    public static function pkcs7Verify(
+        string $inputFilename,
+        int $flags,
+        ?string $signersCertificatesFilename,
+        ?string $contentOutputFilename,
+        ?Frame $frame = null
+    ): bool|int {
+        if (!VmOpensslPkcs7Native::available()) {
+            self::userWarning('openssl_pkcs7_verify(): OpenSSL PKCS#7 is unavailable in this compiler build', $frame);
+
+            return -1;
+        }
+
+        return VmOpensslPkcs7Native::verify(
+            $inputFilename,
+            $flags,
+            $signersCertificatesFilename,
+            $contentOutputFilename
+        );
+    }
+
+    /**
+     * openssl_pkcs7_encrypt() — S/MIME encrypt (php-src ext/openssl/openssl.c; #6804).
+     *
+     * @return bool
+     */
+    public static function pkcs7Encrypt(
+        string $inputFilename,
+        string $outputFilename,
+        Variable $certsArg,
+        ?Variable $headersVar,
+        int $flags,
+        int $cipherId,
+        ?Frame $frame = null
+    ): bool {
+        if (!VmOpensslPkcs7Native::available()) {
+            self::userWarning('openssl_pkcs7_encrypt(): OpenSSL PKCS#7 is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $certPems = self::coerceRecipientCertPems($certsArg, 'openssl_pkcs7_encrypt', 2, 'certificate');
+        if ([] === $certPems) {
+            return false;
+        }
+        $resolved = [];
+        foreach ($certPems as $pem) {
+            $material = self::resolvePemMaterial($pem, 'openssl_pkcs7_encrypt', $frame);
+            if (false === $material) {
+                return false;
+            }
+            $resolved[] = $material;
+        }
+
+        $headers = self::coercePkcs7Headers($headersVar, 'openssl_pkcs7_encrypt');
+        if (false === VmOpensslPkcs7Native::encrypt(
+            $inputFilename,
+            $outputFilename,
+            $resolved,
+            $headers,
+            $flags,
+            $cipherId
+        )) {
+            self::userWarning('openssl_pkcs7_encrypt(): Error encrypting message!', $frame);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * openssl_pkcs7_decrypt() — S/MIME decrypt (php-src ext/openssl/openssl.c; #6804).
+     */
+    public static function pkcs7Decrypt(
+        string $inputFilename,
+        string $outputFilename,
+        Variable $certArg,
+        Variable $keyArg,
+        ?Frame $frame = null
+    ): bool {
+        if (!VmOpensslPkcs7Native::available()) {
+            self::userWarning('openssl_pkcs7_decrypt(): OpenSSL PKCS#7 is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $certPem = self::resolvePemMaterial(
+            self::coerceCertificatePem($certArg, 'openssl_pkcs7_decrypt', 2, 'certificate'),
+            'openssl_pkcs7_decrypt',
+            $frame
+        );
+        $keyPem = self::resolvePemMaterial(
+            self::coercePkeyPem($keyArg, 'openssl_pkcs7_decrypt', 3, 'private_key'),
+            'openssl_pkcs7_decrypt',
+            $frame
+        );
+        if (false === $certPem || false === $keyPem) {
+            return false;
+        }
+
+        if (false === VmOpensslPkcs7Native::decrypt($inputFilename, $outputFilename, $certPem, $keyPem)) {
+            self::userWarning('openssl_pkcs7_decrypt(): Error decrypting PKCS7 message', $frame);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Load PEM from inline string, filesystem path, or file:// URI.
+     *
+     * @return string|false
+     */
+    public static function resolvePemMaterial(string $material, string $function, ?Frame $frame = null): string|false
+    {
+        if (str_starts_with($material, 'file://')) {
+            $material = substr($material, 7);
+        }
+        if ('' !== $material && @\is_file($material)) {
+            $contents = VmFsReadNative::read($material);
+            if (false === $contents) {
+                self::userWarning($function.': Unable to read certificate/key file', $frame);
+
+                return false;
+            }
+
+            return $contents;
+        }
+
+        return $material;
+    }
+
+    /**
+     * @return list<array{0: ?string, 1: string}>
+     */
+    private static function coercePkcs7Headers(?Variable $headersVar, string $function): array
+    {
+        if (null === $headersVar) {
+            return [];
+        }
+        $headersVar = $headersVar->resolveIndirect();
+        if (Variable::TYPE_NULL === $headersVar->type) {
+            return [];
+        }
+        if (Variable::TYPE_ARRAY !== $headersVar->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #5 ($headers) must be of type ?array, %s given',
+                $function,
+                match ($headersVar->type) {
+                    Variable::TYPE_BOOLEAN => 'bool',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_FLOAT => 'float',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_OBJECT => 'object',
+                    default => 'mixed',
+                }
+            ));
+        }
+
+        $headers = [];
+        foreach ($headersVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $valueVar = $valueVar->resolveIndirect();
+            $value = $valueVar->toString();
+            if (Variable::TYPE_STRING === $keyVar->type) {
+                $headers[] = [$keyVar->toString(), $value];
+            } else {
+                $headers[] = [null, $value];
+            }
+        }
+
+        return $headers;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function coerceRecipientCertPems(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): array {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $var->type) {
+            $pems = [];
+            foreach ($var->toArray()->iterateKeyed(true) as [, $certVar]) {
+                $pems[] = self::coerceCertificatePem($certVar, $function, $argIndex, $paramName);
+            }
+
+            return $pems;
+        }
+
+        return [self::coerceCertificatePem($var, $function, $argIndex, $paramName)];
+    }
+
     /** @param list<string> $items */
     private static function stringListToHashTable(array $items): HashTable
     {
