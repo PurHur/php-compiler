@@ -126,11 +126,36 @@ final class VmMime
         if ('' === $payload) {
             return 'application/x-empty';
         }
+        if (self::looksLikeHtml($payload)) {
+            return 'text/html';
+        }
         if (self::looksLikePlainText($payload)) {
             return 'text/plain';
         }
 
         return 'application/octet-stream';
+    }
+
+    /** libmagic HTML heuristic (php-src ext/fileinfo; #19247). */
+    private static function looksLikeHtml(string $data): bool
+    {
+        $trim = \ltrim($data);
+        if ('' === $trim) {
+            return false;
+        }
+        if (0 === \strncasecmp($trim, '<!DOCTYPE', 9)) {
+            return false !== \stripos(\substr($trim, 0, 256), 'html');
+        }
+        if ('<' !== $trim[0]) {
+            return false;
+        }
+        $head = \strtolower(\substr($trim, 0, 64));
+
+        return 0 === \strpos($head, '<html')
+            || 0 === \strpos($head, '<head')
+            || 0 === \strpos($head, '<body')
+            || 0 === \strpos($head, '<script')
+            || 0 === \strpos($head, '<table');
     }
 
     /** libmagic ASCII/UTF-8 text heuristic (php-src ext/fileinfo; #12116). */
