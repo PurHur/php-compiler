@@ -657,6 +657,8 @@ class Module extends ModuleAbstract
             new phpc_rename_kernel(),
             new phpc_stat_mode_kernel(),
             new phpc_access_kernel(),
+            new phpc_fpow_kernel(),
+            new phpc_nextafter_kernel(),
             new sys_get_temp_dir(),
             new sys_getloadavg(),
             new openlog(),

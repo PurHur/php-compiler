@@ -5,10 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\NextafterJitHelper;
-use PHPCompiler\ext\standard\VmMath;
 use PHPUnit\Framework\TestCase;
 
-/** nextafter() JIT routes through NextafterJitHelper PHP not libc LLVM (#15062). */
+/** nextafter() JIT routes through NextafterJitHelper PHP + JitNextafterKernel (#15062, #19259). */
 final class NextafterRuntimeShrinkTest extends TestCase
 {
     public function testNextafterUsesJitHelperNotLibcLookup(): void
@@ -16,18 +15,35 @@ final class NextafterRuntimeShrinkTest extends TestCase
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/nextafter.php');
         $this->assertStringContainsString('MathNextafter::invoke', $builtin);
         $this->assertStringNotContainsString("lookupFunction('nextafter')", $builtin);
-
-        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathNextafter.php');
-        $this->assertStringContainsString('NextafterJitHelper', $bridge);
-        $this->assertStringContainsString('phpc_nextafter', $bridge);
+        $this->assertStringNotContainsString('invokeLibc', $builtin);
     }
 
-    public function testNextafterJitHelperDelegatesToLibc(): void
+    public function testMathNextafterUserScriptKernelAndEmbedHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathNextafter.php');
+        $this->assertStringContainsString('JitNextafterKernel', $source);
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('NextafterJitHelper', $source);
+        $this->assertStringNotContainsString('invokeLibcNextafter', $source);
+        $this->assertStringNotContainsString("lookupFunction('nextafter')", $source);
+        $this->assertStringNotContainsString("addFunction('nextafter'", $source);
+        $this->assertStringNotContainsString('addFunction($abiName', $source);
+    }
+
+    public function testNextafterJitHelperDelegatesToKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/NextafterJitHelper.php');
-        $this->assertStringContainsString('\\nextafter(', $source);
+        $this->assertStringContainsString('phpc_nextafter_kernel', $source);
+        $this->assertStringNotContainsString('\\nextafter(', $source);
         $this->assertStringNotContainsString('return VmMath::nextafter', $source);
 
+        if (!\function_exists('phpc_nextafter_kernel')) {
+            $this->markTestSkipped('phpc_nextafter_kernel requires compiler runtime');
+        }
+        if (!\function_exists('nextafter')) {
+            $this->markTestSkipped('host PHP lacks nextafter() (needs 8.4+)');
+        }
         $this->assertSame(
             \nextafter(1.0, 2.0),
             NextafterJitHelper::nextafterArgv(1.0, 2.0)
@@ -38,10 +54,12 @@ final class NextafterRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testSpineBundleIncludesNextafterJitHelper(): void
+    public function testSpineBundleIncludesNextafterJitHelperAndKernel(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('NextafterJitHelper.php', $spine);
         $this->assertStringContainsString('MathNextafter.php', $spine);
+        $this->assertStringContainsString('JitNextafterKernel.php', $spine);
+        $this->assertStringContainsString('phpc_nextafter_kernel.php', $spine);
     }
 }
