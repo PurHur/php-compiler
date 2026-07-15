@@ -9,6 +9,7 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\VariableFunctionCall;
+use PHPCompiler\Web\Superglobals;
 
 /**
  * compact() / extract() / get_defined_vars() helpers for compiled JIT/AOT modules (#10184, #14499, #14507, php-in-PHP).
@@ -176,38 +177,155 @@ final class ScopeBuiltinJitHelper
     }
 
     /**
-     * compact() array arg — collect string names into $dest keys (#14507).
+     * compact() array arg — collect string names into indexed $dest list (#14507, #19035).
      *
      * @see VmScope::collectCompactNames()
      */
     public static function collectCompactNamesFromHashtable(HashTable $src, HashTable $dest, int $argNum): void
     {
+        $index = 0;
         foreach ($src->iterateKeyed(true) as [, $valueVar]) {
-            self::collectCompactNamesFromVariable($dest, $valueVar->resolveIndirect(), $argNum);
+            $index = self::collectCompactNamesFromVariable($dest, $valueVar->resolveIndirect(), $argNum, $index);
         }
     }
 
-    private static function collectCompactNamesFromVariable(HashTable $dest, Variable $var, int $argNum): void
+    private static function collectCompactNamesFromVariable(HashTable $dest, Variable $var, int $argNum, int $index): int
     {
         if (Variable::TYPE_STRING === $var->type) {
             $name = $var->toString();
             if ('' !== $name) {
                 $entry = new Variable();
                 $entry->string($name);
-                $dest->add($name, $entry);
+                $dest->addIndex($index, $entry);
+                ++$index;
             }
 
-            return;
+            return $index;
         }
         if (Variable::TYPE_ARRAY === $var->type) {
             foreach ($var->toArray()->iterateKeyed(true) as [, $child]) {
-                self::collectCompactNamesFromVariable($dest, $child->resolveIndirect(), $argNum);
+                $index = self::collectCompactNamesFromVariable($dest, $child->resolveIndirect(), $argNum, $index);
             }
 
-            return;
+            return $index;
         }
 
         self::emitCompactInvalidArgumentWarningFromVariable($argNum, $var);
+
+        return $index;
+    }
+
+    /** php-src zend_hash string-key walk SSOT — parity guard for LLVM walks (#19035). */
+    public static function foreachNonEmptyStringKey(HashTable $ht, callable $body): void
+    {
+        foreach ($ht->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $name = $keyVar->resolveIndirect()->toString();
+            if ('' !== $name) {
+                $body($name, $valueVar->resolveIndirect());
+            }
+        }
+    }
+
+    public static function callerVarIsSet(Variable $var): bool
+    {
+        $resolved = $var->resolveIndirect();
+        if ($resolved->isUndefined()) {
+            return false;
+        }
+
+        return Variable::TYPE_NULL !== $resolved->type;
+    }
+
+    /**
+     * get_defined_vars() snapshot — caller locals + file-scope auto globals (#3135).
+     *
+     * @param list<array{0: string, 1: int}> $namedSlots from Frame::block->eachNamedScopeSlot()
+     * @param array<string, Variable> $dynamicLocals
+     * @param list<string> $autoGlobalNames
+     */
+    public static function buildDefinedVarsSnapshot(
+        array $namedSlots,
+        array $scopeBySlot,
+        array $dynamicLocals,
+        array $autoGlobalNames,
+        ?callable $resolveAutoGlobal = null,
+    ): HashTable {
+        $result = new HashTable();
+        foreach ($namedSlots as [$name, $slot]) {
+            if ('this' === $name || !isset($scopeBySlot[$slot])) {
+                continue;
+            }
+            $value = $scopeBySlot[$slot];
+            if (!self::callerVarIsSet($value)) {
+                continue;
+            }
+            self::storeVarSnapshotAtStringKey($result, $name, $value);
+        }
+
+        $present = [];
+        foreach ($result->iterateKeyed(true) as [$keyVar]) {
+            $present[$keyVar->resolveIndirect()->toString()] = true;
+        }
+        foreach ($dynamicLocals as $name => $var) {
+            if ('this' === $name || isset($present[$name]) || !self::callerVarIsSet($var)) {
+                continue;
+            }
+            self::storeVarSnapshotAtStringKey($result, $name, $var);
+        }
+
+        if (null !== $resolveAutoGlobal) {
+            foreach ($autoGlobalNames as $name) {
+                if (isset($present[$name])) {
+                    continue;
+                }
+                $source = $resolveAutoGlobal($name);
+                if (null === $source || !self::callerVarIsSet($source)) {
+                    continue;
+                }
+                self::storeVarSnapshotAtStringKey($result, $name, $source);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * get_declared_variables() — caller local names only (#4780).
+     *
+     * @param list<array{0: string, 1: int}> $namedSlots
+     * @param array<string, Variable> $dynamicLocals
+     */
+    public static function buildDeclaredVariablesSnapshot(
+        array $namedSlots,
+        array $scopeBySlot,
+        array $dynamicLocals,
+    ): HashTable {
+        $result = new HashTable();
+        $index = 0;
+        foreach ($namedSlots as [$name, $slot]) {
+            if ('this' === $name || Superglobals::isSuperglobalName($name) || !isset($scopeBySlot[$slot])) {
+                continue;
+            }
+            if (!self::callerVarIsSet($scopeBySlot[$slot])) {
+                continue;
+            }
+            $entry = new Variable();
+            $entry->string($name);
+            $result->addIndex($index, $entry);
+            ++$index;
+        }
+
+        foreach ($dynamicLocals as $name => $var) {
+            if ('this' === $name || Superglobals::isSuperglobalName($name) || !self::callerVarIsSet($var)) {
+                continue;
+            }
+            $entry = new Variable();
+            $entry->string($name);
+            $result->addIndex($index, $entry);
+            ++$index;
+        }
+
+        return $result;
     }
 
     public static function emitCompactInvalidArgumentWarningFromVariable(int $argNum, Variable $var): void
