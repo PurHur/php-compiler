@@ -31,7 +31,7 @@ final class getimagesizefromstring extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'getimagesizefromstring', 0, 'data');
+        $data = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'getimagesizefromstring', 0, 'string');
         $imageinfo = null;
         if (2 === $argc) {
             $imageinfo = [];
