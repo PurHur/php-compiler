@@ -4135,6 +4135,7 @@ final class VmDom
 
         $state = DomRegistry::state($document);
         $state->isHtmlDocument = true;
+        $noDefDtd = 0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_HTML_NODEFDTD);
         if (null !== $doctypeDecl) {
             $childIds = array_merge(
                 [self::attachDoctypeChild(
@@ -4146,7 +4147,7 @@ final class VmDom
                 )->id],
                 $childIds
             );
-        } else {
+        } elseif (!$noDefDtd) {
             $childIds = array_merge(
                 [self::attachDoctypeChild(
                     $ctx,

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
@@ -21,18 +22,38 @@ final class JitDomSaveHTMLUserScript
     public static function invoke(Context $context): Value
     {
         $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+        $options = JitDomLoadHTMLUserScript::lastCompileTimeOptions() ?? 0;
         if (null !== $parsed) {
             $body = '<'.$parsed['tag'].'>'.$parsed['text'].'</'.$parsed['tag'].'>';
 
-            return self::boxConstantString($context, self::DOCTYPE."\n<html><body>".$body."</body></html>\n");
+            return self::boxConstantString($context, self::formatSaveHtmlCompileTimeLiteral($body, $options));
         }
 
         $htmlLit = JitDomLoadHTMLUserScript::lastCompileTimeParsedHtml();
         if (null !== $htmlLit && '' !== trim($htmlLit)) {
-            return self::boxConstantString($context, self::DOCTYPE."\n<html><body>".$htmlLit."</body></html>\n");
+            return self::boxConstantString($context, self::formatSaveHtmlCompileTimeLiteral($htmlLit, $options));
         }
 
-        return self::boxConstantString($context, self::DOCTYPE."\n<html><body></body></html>\n");
+        return self::boxConstantString($context, self::formatSaveHtmlCompileTimeLiteral('', $options));
+    }
+
+    private static function formatSaveHtmlCompileTimeLiteral(string $htmlLit, int $options): string
+    {
+        $trimmed = trim($htmlLit);
+        $noDefDtd = 0 !== ($options & LibxmlConstants::LIBXML_HTML_NODEFDTD);
+        $noImplied = 0 !== ($options & LibxmlConstants::LIBXML_HTML_NOIMPLIED);
+
+        if ($noImplied && $noDefDtd) {
+            return ('' === $trimmed ? '' : $trimmed)."\n";
+        }
+        if ($noImplied) {
+            return self::DOCTYPE."\n".('' === $trimmed ? '' : $trimmed)."\n";
+        }
+        if ($noDefDtd) {
+            return '<html><body>'.$trimmed."</body></html>\n";
+        }
+
+        return self::DOCTYPE."\n<html><body>".$trimmed."</body></html>\n";
     }
 
     private static function boxConstantString(Context $context, string $lit): Value

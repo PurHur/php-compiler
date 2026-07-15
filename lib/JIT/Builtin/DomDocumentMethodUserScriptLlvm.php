@@ -29,7 +29,7 @@ final class DomDocumentMethodUserScriptLlvm
 
     public static function ensureLoadHTMLBridge(Context $context): void
     {
-        self::ensureBridge(
+        self::ensureContextBridge(
             $context,
             DomLoadHTMLRuntime::ABI_NAME,
             'dom_load_html_user_script',
