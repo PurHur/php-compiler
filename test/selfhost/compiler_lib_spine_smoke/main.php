@@ -399,6 +399,7 @@ require_once __DIR__.'/../../../ext/ftp/VmFtpConnection.php';
 require_once __DIR__.'/../../../ext/ftp/VmFtpCore.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_close.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_connect.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_ssl_connect.php';
 require_once __DIR__.'/../../../ext/gd/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/gd/GdExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/gd/GdFunction.php';
