@@ -5025,4 +5025,8 @@ require_once __DIR__.'/../../../lib/JIT/Call/ObjectCompareSpaceship.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ObjectNestedReceiver.php';
 require_once __DIR__.'/../../../lib/JIT/NestedVmObjectMethodLlvm.php';
 require_once __DIR__.'/../../../ext/session/SessionHandlerBuiltin.php';
+require_once __DIR__.'/../../../ext/standard/EnvLocalJitHelperVm.php';
+require_once __DIR__.'/../../../ext/standard/RequestParseBodyNativeJitHelper.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/RequestParseBodyUserScriptLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarExportUserScriptLlvm.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

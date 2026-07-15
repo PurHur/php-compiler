@@ -1119,6 +1119,7 @@
         "ext/standard/EmbedObJitHelper.php",
         "ext/standard/EnumExistsJitHelper.php",
         "ext/standard/EnvLocalJitHelper.php",
+        "ext/standard/EnvLocalJitHelperVm.php",
         "ext/standard/EnvironMirrorNativeJitHelper.php",
         "ext/standard/ErrorHandlerJitHelper.php",
         "ext/standard/ErrorLastJitHelper.php",
@@ -1774,6 +1775,7 @@
         "ext/standard/RequestMethodEnumData.php",
         "ext/standard/RequestParseBodyEngine.php",
         "ext/standard/RequestParseBodyJitHelper.php",
+        "ext/standard/RequestParseBodyNativeJitHelper.php",
         "ext/standard/ResolveSidecarJitHelper.php",
         "ext/standard/ReturnPendingJitHelper.php",
         "ext/standard/RmdirJitHelper.php",
@@ -3711,6 +3713,7 @@
         "lib/JIT/Builtin/ReflectionRuntime.php",
         "lib/JIT/Builtin/ReflectionSetup.php",
         "lib/JIT/Builtin/RequestParseBodyRuntime.php",
+        "lib/JIT/Builtin/RequestParseBodyUserScriptLlvm.php",
         "lib/JIT/Builtin/ResolveSidecarRuntime.php",
         "lib/JIT/Builtin/ReturnPendingRuntime.php",
         "lib/JIT/Builtin/RewriteVarsRuntime.php",
@@ -3989,6 +3992,7 @@
         "lib/JIT/Builtin/StringUtf8Runtime.php",
         "lib/JIT/Builtin/StringVarDump.php",
         "lib/JIT/Builtin/StringVarExport.php",
+        "lib/JIT/Builtin/StringVarExportUserScriptLlvm.php",
         "lib/JIT/Builtin/StringVersionCompare.php",
         "lib/JIT/Builtin/StringVersionCompareJit.php",
         "lib/JIT/Builtin/StringVfscanf.php",
@@ -5196,9 +5200,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4962,
+        "inventory_files": 4966,
         "excluded": 0,
-        "eligible": 4962,
+        "eligible": 4966,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
