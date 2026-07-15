@@ -193,17 +193,18 @@ final class TypeCheck
         Variable $value,
         bool $strict,
         int $constraint,
-        ?string $literalBoolType = null
+        ?string $literalBoolType = null,
+        ?string $callableName = null
     ): void {
         if (null !== $literalBoolType) {
             $probe = new Variable();
             $probe->copyFrom($value);
             $probe->resolveIndirect()->literalBoolType = $literalBoolType;
-            self::coerceTypedSlot($probe, true, 'Return value', $constraint);
+            self::coerceTypedSlot($probe, true, 'Return value', $constraint, false, $callableName);
 
             return;
         }
-        self::coerceTypedSlot($value, $strict, 'Return value', $constraint);
+        self::coerceTypedSlot($value, $strict, 'Return value', $constraint, false, $callableName);
     }
 
     /**
@@ -414,7 +415,8 @@ final class TypeCheck
         bool $strict,
         string $kind,
         ?int $constraint = null,
-        bool $propertyWrite = false
+        bool $propertyWrite = false,
+        ?string $returnCallableName = null
     ): void {
         $target = $dest->resolveIndirect();
         $constraint ??= $target->typeConstraint;
@@ -436,11 +438,11 @@ final class TypeCheck
                 throw self::propertyTypeError($target, $expected, $value);
             }
 
-            throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, $expected);
+            throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, $expected, $returnCallableName);
         }
         if ($strict) {
             if (!self::isExactType($value, $constraint)) {
-                throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite);
+                throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, null, $returnCallableName);
             }
 
             return;
@@ -451,7 +453,7 @@ final class TypeCheck
         try {
             self::weakCoerceInPlace($target, $constraint, $value, $kind, $propertyWrite);
         } catch (\TypeError $e) {
-            throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite);
+            throw self::typedSlotError($target, $constraint, $value, $kind, $propertyWrite, null, null, $returnCallableName);
         }
     }
 
@@ -755,7 +757,8 @@ final class TypeCheck
         string $kind,
         bool $propertyWrite,
         ?string $literalBoolType = null,
-        ?string $expectedOverride = null
+        ?string $expectedOverride = null,
+        ?string $returnCallableName = null
     ): \TypeError {
         $expected = $expectedOverride
             ?? (null !== $literalBoolType
@@ -792,6 +795,16 @@ final class TypeCheck
                     $ctx->omitParamName
                 );
             }
+        }
+
+        if ('Return value' === $kind) {
+            $given = self::valueTypeLabel($value);
+            $message = "Return value must be of type {$expected}, {$given} returned";
+            if (null !== $returnCallableName && '' !== $returnCallableName) {
+                $message = "{$returnCallableName}(): {$message}";
+            }
+
+            return new \TypeError($message);
         }
 
         return new \TypeError(self::strictMessage($constraint, $value, $kind, $expected));

@@ -39,6 +39,15 @@ final class InstancePropertyVisibilityJitGuard
         $declaringClass = $meta['declaringClassName'];
         $declaringLc = strtolower(ltrim($declaringClass, '\\'));
         $callerLc = self::callerClassLc($context, $block);
+        if (PropertyVisibility::isParentPrivatePropertyInvisibleFromChildScope(
+            $meta['visibility'],
+            $callerLc,
+            $declaringLc,
+            static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
+            $getVisibility
+        )) {
+            return;
+        }
         try {
             PropertyVisibility::assertAccessible(
                 $meta['visibility'],
@@ -53,6 +62,29 @@ final class InstancePropertyVisibilityJitGuard
         } catch (\LogicException $e) {
             self::emitViolation($context, $jit, $e->getMessage());
         }
+    }
+
+    public static function isInvisibleParentPrivateFetch(
+        Object_ $objectType,
+        int $classId,
+        string $propName,
+        ?Block $enclosingBlock
+    ): bool {
+        $meta = $objectType->instancePropertyVisibilityMeta($classId, $propName);
+        if (null === $meta) {
+            return false;
+        }
+        $getVisibility = $meta['getVisibility'] ?? 0;
+        $declaringLc = strtolower(ltrim($meta['declaringClassName'], '\\'));
+        $callerLc = self::callerClassLc($objectType->jitContext(), $enclosingBlock);
+
+        return PropertyVisibility::isParentPrivatePropertyInvisibleFromChildScope(
+            $meta['visibility'],
+            $callerLc,
+            $declaringLc,
+            static fn (string $child, string $parent): bool => self::isSubclassOf($objectType, $child, $parent),
+            $getVisibility
+        );
     }
 
     private static function callerClassLc(Context $context, ?Block $enclosingBlock): ?string

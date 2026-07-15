@@ -6517,6 +6517,28 @@ restart:
                             goto restart;
                         }
                     }
+                    if (!$magicGetForRead && !$forWrite) {
+                        $invisibleParentPrivateMeta = $this->classPropertyMeta($propertyObject, $name);
+                        if (
+                            null !== $invisibleParentPrivateMeta
+                            && $this->isParentPrivatePropertyInvisibleFromCaller($invisibleParentPrivateMeta, $frame)
+                        ) {
+                            if ($op->nullsafeFetchPropertyRead) {
+                                $result->null();
+                                break;
+                            }
+                            $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                            $this->context->errors->undefinedPropertyRead(
+                                $propertyObject->class->name,
+                                $name,
+                                $this->context,
+                                $frame,
+                                $scriptFile
+                            );
+                            $result->null();
+                            break;
+                        }
+                    }
                     if ($op->propertyHookCoalesceRead && !$forWrite) {
                         $this->fetchObjectPropertyForCoalesce($propertyObject, $name, $result);
                         break;
@@ -11596,10 +11618,24 @@ restart:
         return $this->enforcePropertyReadVisibility($object, $propName, $frame);
     }
 
+    private function isParentPrivatePropertyInvisibleFromCaller(VM\ClassProperty $meta, Frame $frame): bool
+    {
+        return PropertyVisibility::isParentPrivatePropertyInvisibleFromChildScope(
+            $meta->visibility,
+            $this->callerClassLc($frame),
+            $meta->declaringClassLc,
+            fn (string $classLc, string $ancestorLc): bool => $this->isClassSameOrSubclassOf($classLc, $ancestorLc),
+            $meta->getVisibility
+        );
+    }
+
     private function enforcePropertyReadVisibility(ObjectEntry $object, string $propName, Frame $frame): ?Frame
     {
         $meta = $this->classPropertyMeta($object, $propName);
         if (null === $meta) {
+            return null;
+        }
+        if ($this->isParentPrivatePropertyInvisibleFromCaller($meta, $frame)) {
             return null;
         }
         $readVis = PropertyVisibility::effectiveGetVisibility($meta->visibility, $meta->getVisibility);
@@ -16234,12 +16270,13 @@ restart:
                 return;
             }
         }
-        $strict = $block->strictTypes;
+        $strict = true;
         TypeCheck::coerceReturn(
             $value,
             $strict,
             $block->returnTypeConstraint,
-            $block->returnLiteralBoolType
+            $block->returnLiteralBoolType,
+            $this->returnTypeCallableName($block->func)
         );
     }
 
