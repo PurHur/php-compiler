@@ -201,6 +201,8 @@ final class VmDom
         }
         $node->methods['clonenode'] = new NodeCloneNode();
         $node->methodVisibility['clonenode'] = $pub;
+        $node->methods['appendchild'] = new NodeAppendChild();
+        $node->methodVisibility['appendchild'] = $pub;
         $node->methods['replacechild'] = new NodeReplaceChild();
         $node->methodVisibility['replacechild'] = $pub;
         $node->methods['insertbefore'] = new NodeInsertBefore();
