@@ -1,5 +1,5 @@
 --TEST--
-Language: try/catch/else user-script AOT (#19148, Zend/zend_compile.c)
+Language: try/catch/else catch path skips else user-script AOT (#19148)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -12,13 +12,6 @@ if (!PHPCompiler\CompilerVersion::supportsTryCatchElse()) {
 --FILE--
 <?php
 try {
-    echo "try";
-} catch (Throwable) {
-    echo "catch";
-} else {
-    echo "else";
-}
-try {
     throw new Exception('x');
 } catch (Throwable) {
     echo "catch";
@@ -26,4 +19,4 @@ try {
     echo "else";
 }
 --EXPECT--
-tryelsecatch
+catch

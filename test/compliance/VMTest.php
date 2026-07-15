@@ -1221,6 +1221,10 @@ class VMTest extends BaseTest {
             if (str_contains(strtolower($case[0]), 'preg_last_error') && str_contains(strtolower($case[0]), 'jit')) {
                 continue;
             }
+            // AOT-only compliance fixtures — guarded by AotTest / TryCatchElseAotCompileTest (#19148).
+            if (str_ends_with($name, '_aot')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

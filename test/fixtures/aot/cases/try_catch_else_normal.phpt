@@ -1,5 +1,5 @@
 --TEST--
-Language: try/catch/else user-script AOT (#19148, Zend/zend_compile.c)
+Language: try/catch/else normal completion user-script AOT (#19148)
 --SKIPIF--
 <?php
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
@@ -18,12 +18,5 @@ try {
 } else {
     echo "else";
 }
-try {
-    throw new Exception('x');
-} catch (Throwable) {
-    echo "catch";
-} else {
-    echo "else";
-}
 --EXPECT--
-tryelsecatch
+tryelse
