@@ -72,7 +72,7 @@ final class JitJsonDecode
     {
         return self::decodeRuntimeString(
             $context,
-            JitStringBuiltinArg::lowerCoercible($context, $json, 'json_decode', 0, 'json')
+            JsonStringOperandArg::jitJson($context, $json, 'json_decode')
         );
     }
 

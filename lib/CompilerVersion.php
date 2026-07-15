@@ -729,6 +729,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ json_decode()/json_validate() typed string $json — null operand TypeError (#18852).
+     *
+     * Distinct from general Z_PARAM_STR null coerce (#19161): ext/json/json.stub.php declares `string $json`.
+     */
+    public static function jsonStringOperandRequiresStrictType(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * fpow()/fmin()/fmax()/fadd()/fsub()/fmul() visible to function_exists() — stable runtime or forward 8.4+ (#16677).
      *
      * Callable under forward profile via {@see supportsFpow()}; withheld from introspection on 8.4.0-dev

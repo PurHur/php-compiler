@@ -41,12 +41,7 @@ final class json_decode extends Internal
                 ));
             }
         }
-        $json = InternalStrictArg::resolveCoercibleStringArg(
-            $frame,
-            0,
-            'json_decode',
-            'json'
-        );
+        $json = JsonStringOperandArg::vmJson($frame, 'json_decode');
         $depth = 512;
         if (isset($frame->calledArgs[2])) {
             $depth = VmMath::parseIntBuiltinArgForFrame(
@@ -109,8 +104,8 @@ final class json_decode extends Internal
             return JitJsonDecode::decodeRuntime($context, $args[0]);
         }
 
-        // assoc=false runtime path is unsupported; still reject enum/null operands first (#5907, #18665).
-        JitStringBuiltinArg::lowerCoercible($context, $args[0], 'json_decode', 0, 'json');
+        // assoc=false runtime path is unsupported; still reject enum/null operands first (#5907, #18665, #18852).
+        JsonStringOperandArg::jitJson($context, $args[0], 'json_decode');
 
         return JitJsonDecode::decodeRuntimeObjectMode($context, $args[0]);
     }

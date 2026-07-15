@@ -35,12 +35,7 @@ final class json_validate extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $json = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'json_validate',
-            0,
-            'json'
-        );
+        $json = JsonStringOperandArg::vmJson($frame, 'json_validate');
         $depth = 512;
         if ($argc > 1) {
             $depthVar = $frame->calledArgs[1]->resolveIndirect();
@@ -97,7 +92,7 @@ final class json_validate extends Internal
             throw new \LogicException('json_validate() flags not supported in this compiler build');
         }
 
-        $jsonPtr = JitStringBuiltinArg::lower($context, $args[0], 'json_validate', 0, 'json');
+        $jsonPtr = JsonStringOperandArg::jitJson($context, $args[0], 'json_validate');
         $depthConst = $context->getTypeFromString('int64')->constInt($depth, false);
 
         return JitJsonValidate::invokeWithDepth($context, $jsonPtr, $depthConst);
