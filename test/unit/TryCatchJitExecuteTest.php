@@ -23,6 +23,11 @@ final class TryCatchJitExecuteTest extends TestCase
     protected function setUp(): void
     {
         $this->repoRoot = dirname(__DIR__, 2);
+        if (CompilerVersion::supportsTryCatchElse()) {
+            putenv('PHP_COMPILER_PROFILE=8.4');
+            $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+            $_SERVER['PHP_COMPILER_PROFILE'] = '8.4';
+        }
         LlvmToolchain::applyCurrentProcessEnv($this->repoRoot);
         if (!LlvmToolchain::isReady($this->repoRoot)) {
             $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
@@ -58,6 +63,25 @@ try {
 }
 PHP
             , "ok\n");
+    }
+
+    public function testTryCatchElseExecutesViaMcjit(): void
+    {
+        if (!CompilerVersion::supportsTryCatchElse()) {
+            self::markTestSkipped('try/catch/else requires PHP_COMPILER_PROFILE=8.4');
+        }
+
+        $this->assertMcjitOutput(<<<'PHP'
+<?php
+try {
+    echo 'try';
+} catch (Throwable) {
+    echo 'catch';
+} else {
+    echo 'else';
+}
+PHP
+            , 'tryelse');
     }
 
     public function testBareThrowRethrowNestedCatchExecutesViaMcjit(): void
