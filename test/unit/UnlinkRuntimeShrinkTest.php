@@ -22,7 +22,10 @@ final class UnlinkRuntimeShrinkTest extends TestCase
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUnlink.php');
         $this->assertStringContainsString('UnlinkJitHelper', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
         $this->assertStringNotContainsString("lookupFunction('unlink')", $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('implementLibcBridge', $bridge);
     }
 
     public function testUnlinkJitHelperDelegatesToVmFs(): void
