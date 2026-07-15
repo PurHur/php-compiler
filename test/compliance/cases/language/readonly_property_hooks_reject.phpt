@@ -1,5 +1,5 @@
 --TEST--
-Language: readonly property with hooks must compile-error (#19172, re-#9835, Zend/zend_compile.c)
+Language: readonly class / readonly property with hooks must compile-error (#19172, Zend/zend_compile.c)
 --SKIPIF--
 <?php
 die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI');
@@ -8,10 +8,10 @@ die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI');
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-class C {
-    public readonly int $x {
-        get => $this->x;
-        set { $this->x = $value; }
+readonly class R {
+    public int $x {
+        get => 1;
+        set => $value;
     }
 }
 --EXPECT_EXIT--

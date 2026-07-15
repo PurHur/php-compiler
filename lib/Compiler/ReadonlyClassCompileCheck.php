@@ -22,33 +22,41 @@ use PHPCompiler\VM\ClassReadonly;
  * per-property MODIFIER_READONLY cannot have default initializer (#3149, #3551);
  * PHP 8.2+ readonly class (ZEND_ACC_READONLY) inherits readonly on instance props — defaults rejected (#18090, re-#18074);
  * PHP 8.3+ anonymous classes may use per-property `readonly` with defaults (#6724);
- * PHP 8.3+ `new readonly class` sets ZEND_ACC_READONLY on the anonymous class (#6991).
+ * PHP 8.3+ `new readonly class` sets ZEND_ACC_READONLY on the anonymous class (#6991);
+ * PHP 8.4+ hooked properties cannot be readonly (#19172, zend_compile_property_hooks).
  */
 final class ReadonlyClassCompileCheck
 {
+    /** php-src: zend_compile_property_hooks — readonly flag on hooked property (#19172). */
+    public const HOOKED_PROPERTY_READONLY_COMPILE_ERROR = 'Hooked properties cannot be readonly';
     /** @var array<string, array{display: string, readonly: bool, extends: ?string, properties: array<string, array{readonly: bool, display: string}>}> */
     private array $classes = [];
 
     /**
      * @param array<string, array{display: string, readonly: bool, extends: ?string}> $knownClasses
      *        Already-registered user classes (eval parent lookup, #7170).
+     * @param array<string, array<string, array<string, mixed>>> $propertyHookRegistry
      */
-    public static function validate(Script $script, array $knownClasses = []): void
+    public static function validate(Script $script, array $knownClasses = [], array $propertyHookRegistry = []): void
     {
-        $check = new self($knownClasses);
+        $check = new self($knownClasses, $propertyHookRegistry);
         $check->collect($script);
         // Inheritance before per-property defaults so MCJIT readonly pads do not mask extends errors (#8967).
         $check->verifyInheritance();
         $check->verifyPropertyReadonlyOverrides();
         $check->verifyReadonlyPropertyRequiresType();
+        $check->verifyNoHookedReadonlyProperties();
         $check->verifyAllPropertyDefaults();
     }
 
     /**
      * @param array<string, array{display: string, readonly: bool, extends: ?string}> $knownClasses
+     * @param array<string, array<string, array<string, mixed>>> $propertyHookRegistry
      */
-    private function __construct(private array $knownClasses = [])
-    {
+    private function __construct(
+        private array $knownClasses = [],
+        private array $propertyHookRegistry = [],
+    ) {
     }
 
     private function collect(Script $script): void
@@ -189,6 +197,55 @@ final class ReadonlyClassCompileCheck
     private function propertyHasDeclaredType(?Op\Type $declaredType): bool
     {
         return null !== $declaredType && !$declaredType instanceof Op\Type\Mixed_;
+    }
+
+    private function verifyNoHookedReadonlyProperties(): void
+    {
+        foreach ($this->classes as $lc => $meta) {
+            $hooks = $this->propertyHookRegistry[$lc] ?? [];
+            if ([] === $hooks) {
+                continue;
+            }
+            foreach (array_keys($hooks) as $propLc) {
+                if ($this->hookedPropertyIsReadonly($lc, $propLc, $meta)) {
+                    throw new \CompileError(self::HOOKED_PROPERTY_READONLY_COMPILE_ERROR);
+                }
+            }
+        }
+    }
+
+    /**
+     * @param array{display: string, readonly: bool, extends: ?string, properties: array<string, array{readonly: bool, display: string}>} $meta
+     */
+    private function hookedPropertyIsReadonly(string $classLc, string $propLc, array $meta): bool
+    {
+        if ($meta['readonly']) {
+            return true;
+        }
+        if ($meta['properties'][$propLc]['readonly'] ?? false) {
+            return true;
+        }
+        foreach ($this->scriptClasses[$classLc] ?? [] as $class) {
+            foreach ($class->stmts->children as $member) {
+                if (!$member instanceof Op\Stmt\ClassMethod || !$this->isConstructor($member)) {
+                    continue;
+                }
+                foreach ($member->func->params as $param) {
+                    if (!$this->isPromotedParam($param)) {
+                        continue;
+                    }
+                    $paramLc = strtolower($this->propertyDisplayName($param->name));
+                    if ($paramLc !== $propLc) {
+                        continue;
+                    }
+                    if ($this->isPromotedParamReadonly($param)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
     }
 
     private function verifyAllPropertyDefaults(): void
