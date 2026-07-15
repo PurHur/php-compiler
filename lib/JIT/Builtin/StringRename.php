@@ -5,13 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPCompiler\ext\standard\JitRenameKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for rename() via RenameJitHelper PHP or libc for user-script AOT (#16734).
+ * JIT/AOT link for rename() (#15533, #19215).
  *
- * SSOT: {@see \PHPCompiler\ext\standard\VmFs::rename()}.
+ * Embed / non-user-script: {@see RenameJitHelper} via {@see JitVmHelperLink}.
+ * User-script standalone AOT: thin {@see JitRenameKernel} libc rename(2) — nested
+ * helper TUs poison string/echo constants when ensureCompiled mid-bridge (#19215).
  * php-src: ext/standard/filestat.c — php_rename
  */
 final class StringRename
@@ -31,9 +37,6 @@ final class StringRename
 
     public static function ensureLinked(Context $context): void
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            return;
-        }
         self::implement($context);
     }
 
@@ -51,6 +54,33 @@ final class StringRename
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            self::implementUserScriptKernel($context);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i1 = $context->getTypeFromString('int1');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI,
+            self::BRIDGE_ENTRY,
+            [$strPtr, $strPtr],
+            $i1,
+            self::INVOKE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#19215'
+        );
+    }
+
+    private static function implementUserScriptKernel(Context $context): void
+    {
         $probe = $context->module->getNamedFunction(self::ABI);
         if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
@@ -58,7 +88,13 @@ final class StringRename
             return;
         }
 
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#15533');
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        LibcExtern::register($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i1 = $context->getTypeFromString('int1');
@@ -69,15 +105,16 @@ final class StringRename
                 $context->context->functionType($i1, false, $strPtr, $strPtr)
             );
 
-        $entry = $fn->appendBasicBlock(self::BRIDGE_ENTRY);
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
-
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::INVOKE_HELPER, '#15533');
-        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$fn->getParam(0), $fn->getParam(1)]);
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $i1)
-        );
+        $ok = JitRenameKernel::invoke($context, $fn->getParam(0), $fn->getParam(1));
+        $context->builder->returnValue($ok);
         $context->registerFunction(self::ABI, $fn);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

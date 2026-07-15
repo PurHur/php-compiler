@@ -15548,6 +15548,12 @@ class JIT {
             } elseif ('replacechildren' === $methodLc && $this->context->functionIsRegistered('domnode::replacechildren')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
+            } elseif ('removechild' === $methodLc && $this->context->functionIsRegistered('domnode::removechild')) {
+                $className = 'DOMNode';
+                $declaringClassLc = 'domnode';
+            } elseif ('replacechild' === $methodLc && $this->context->functionIsRegistered('domnode::replacechild')) {
+                $className = 'DOMNode';
+                $declaringClassLc = 'domnode';
             } elseif ('comparedocumentposition' === $methodLc && $this->context->functionIsRegistered('domnode::comparedocumentposition')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';

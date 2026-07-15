@@ -31,9 +31,27 @@ final class OpensslConstants
     public const OPENSSL_KEYTYPE_DH = 2;
     public const OPENSSL_KEYTYPE_EC = 3;
 
-    /**
-     * @return array<string, int>
-     */
+    /** php-src OPENSSL_CIPHER_* — PKCS7 encrypt cipher ids (openssl.stub.php). */
+    public const OPENSSL_CIPHER_RC2_40 = 0;
+    public const OPENSSL_CIPHER_RC2_128 = 1;
+    public const OPENSSL_CIPHER_RC2_64 = 2;
+    public const OPENSSL_CIPHER_DES = 3;
+    public const OPENSSL_CIPHER_3DES = 4;
+    public const OPENSSL_CIPHER_AES_128_CBC = 5;
+    public const OPENSSL_CIPHER_AES_192_CBC = 6;
+    public const OPENSSL_CIPHER_AES_256_CBC = 7;
+
+    /** php-src PKCS7_* flags (openssl/pkcs7.h). */
+    public const PKCS7_TEXT = 1;
+    public const PKCS7_NOCERTS = 2;
+    public const PKCS7_NOSIGS = 4;
+    public const PKCS7_NOCHAIN = 8;
+    public const PKCS7_NOINTERN = 16;
+    public const PKCS7_NOVERIFY = 32;
+    public const PKCS7_DETACHED = 64;
+    public const PKCS7_BINARY = 128;
+    public const PKCS7_NOATTR = 256;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
@@ -43,7 +61,7 @@ final class OpensslConstants
             'OPENSSL_PKCS1_PADDING' => self::OPENSSL_PKCS1_PADDING,
             'OPENSSL_NO_PADDING' => self::OPENSSL_NO_PADDING,
             'OPENSSL_PKCS1_OAEP_PADDING' => self::OPENSSL_PKCS1_OAEP_PADDING,
-        ] + self::algorithmConstants();
+        ] + self::algorithmConstants() + self::pkcs7Constants() + self::cipherConstants();
     }
 
     public static function algorithmConstants(): array
@@ -61,6 +79,37 @@ final class OpensslConstants
             'OPENSSL_KEYTYPE_DSA' => self::OPENSSL_KEYTYPE_DSA,
             'OPENSSL_KEYTYPE_DH' => self::OPENSSL_KEYTYPE_DH,
             'OPENSSL_KEYTYPE_EC' => self::OPENSSL_KEYTYPE_EC,
+        ];
+    }
+
+    /** @return array<string, int> */
+    public static function pkcs7Constants(): array
+    {
+        return [
+            'PKCS7_TEXT' => self::PKCS7_TEXT,
+            'PKCS7_NOCERTS' => self::PKCS7_NOCERTS,
+            'PKCS7_NOSIGS' => self::PKCS7_NOSIGS,
+            'PKCS7_NOCHAIN' => self::PKCS7_NOCHAIN,
+            'PKCS7_NOINTERN' => self::PKCS7_NOINTERN,
+            'PKCS7_NOVERIFY' => self::PKCS7_NOVERIFY,
+            'PKCS7_DETACHED' => self::PKCS7_DETACHED,
+            'PKCS7_BINARY' => self::PKCS7_BINARY,
+            'PKCS7_NOATTR' => self::PKCS7_NOATTR,
+        ];
+    }
+
+    /** @return array<string, int> */
+    public static function cipherConstants(): array
+    {
+        return [
+            'OPENSSL_CIPHER_RC2_40' => self::OPENSSL_CIPHER_RC2_40,
+            'OPENSSL_CIPHER_RC2_128' => self::OPENSSL_CIPHER_RC2_128,
+            'OPENSSL_CIPHER_RC2_64' => self::OPENSSL_CIPHER_RC2_64,
+            'OPENSSL_CIPHER_DES' => self::OPENSSL_CIPHER_DES,
+            'OPENSSL_CIPHER_3DES' => self::OPENSSL_CIPHER_3DES,
+            'OPENSSL_CIPHER_AES_128_CBC' => self::OPENSSL_CIPHER_AES_128_CBC,
+            'OPENSSL_CIPHER_AES_192_CBC' => self::OPENSSL_CIPHER_AES_192_CBC,
+            'OPENSSL_CIPHER_AES_256_CBC' => self::OPENSSL_CIPHER_AES_256_CBC,
         ];
     }
 }

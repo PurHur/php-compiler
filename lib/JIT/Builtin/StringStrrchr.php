@@ -77,7 +77,7 @@ final class StringStrrchr
         $needle = $fn->getParam(1);
         $nullHay = $context->builder->icmp(Builder::INT_EQ, $haystack, $strPtr->constNull());
         $nullNeedle = $context->builder->icmp(Builder::INT_EQ, $needle, $strPtr->constNull());
-        $anyNull = $context->builder->or_($nullHay, $nullNeedle);
+        $anyNull = $context->builder->or($nullHay, $nullNeedle);
         $context->builder->branchIf($anyNull, $failBb, $okBb);
 
         $context->builder->positionAtEnd($okBb);

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4927 |
-| Phase A inventory files (M2 ratio SSOT) | 4927 |
+| PHP files on vm.php path | 4961 |
+| Phase A inventory files (M2 ratio SSOT) | 4961 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13199 |
+| Source constructs flagged (warnings) | 13299 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -185,6 +185,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomGetElementByIdJitHelper.php` | 0 | 1 |
 | `ext/dom/DomGetElementsByTagNameJitHelper.php` | 0 | 1 |
 | `ext/dom/DomHtmlDocumentPropertySupport.php` | 0 | 2 |
+| `ext/dom/DomImportNodeJitHelper.php` | 0 | 2 |
 | `ext/dom/DomLivingBuiltinClasses.php` | 0 | 18 |
 | `ext/dom/DomLoadHTMLFileJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadHTMLJitHelper.php` | 0 | 1 |
@@ -212,6 +213,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ElementGetAttributeNS.php` | 0 | 1 |
 | `ext/dom/ElementGetAttributeNames.php` | 0 | 1 |
 | `ext/dom/ElementGetAttributeNode.php` | 0 | 1 |
+| `ext/dom/ElementGetAttributeNodeNS.php` | 0 | 2 |
 | `ext/dom/ElementGetElementsByTagName.php` | 0 | 1 |
 | `ext/dom/ElementGetElementsByTagNameNS.php` | 0 | 1 |
 | `ext/dom/ElementGetInnerHTML.php` | 0 | 1 |
@@ -227,6 +229,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ElementSetAttribute.php` | 0 | 1 |
 | `ext/dom/ElementSetAttributeNS.php` | 0 | 1 |
 | `ext/dom/ElementSetAttributeNode.php` | 0 | 1 |
+| `ext/dom/ElementSetAttributeNodeNS.php` | 0 | 2 |
 | `ext/dom/ElementSetIdAttribute.php` | 0 | 1 |
 | `ext/dom/ElementSetIdAttributeNS.php` | 0 | 1 |
 | `ext/dom/ElementToggleAttribute.php` | 0 | 1 |
@@ -241,6 +244,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ImplementationHasFeature.php` | 0 | 1 |
 | `ext/dom/JitDomAppendChild.php` | 0 | 1 |
 | `ext/dom/JitDomAppendChildUserScript.php` | 0 | 2 |
+| `ext/dom/JitDomAttributeNodeNS.php` | 0 | 1 |
 | `ext/dom/JitDomCreateElement.php` | 0 | 5 |
 | `ext/dom/JitDomCreateElementNS.php` | 0 | 1 |
 | `ext/dom/JitDomCreateTextNode.php` | 0 | 2 |
@@ -249,6 +253,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomGetElementById.php` | 0 | 5 |
 | `ext/dom/JitDomGetElementsByTagName.php` | 0 | 1 |
 | `ext/dom/JitDomGetElementsByTagNameUserScript.php` | 0 | 2 |
+| `ext/dom/JitDomImportNode.php` | 0 | 3 |
 | `ext/dom/JitDomLoad.php` | 0 | 1 |
 | `ext/dom/JitDomLoadHTML.php` | 0 | 1 |
 | `ext/dom/JitDomLoadHTMLFile.php` | 0 | 1 |
@@ -260,6 +265,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomNodeListItem.php` | 0 | 1 |
 | `ext/dom/JitDomNodeListItemUserScript.php` | 0 | 1 |
 | `ext/dom/JitDomNodeListLength.php` | 0 | 2 |
+| `ext/dom/JitDomRemoveChild.php` | 0 | 2 |
+| `ext/dom/JitDomReplaceChild.php` | 0 | 2 |
 | `ext/dom/JitDomSaveHTML.php` | 0 | 1 |
 | `ext/dom/JitDomSaveHTMLFile.php` | 0 | 1 |
 | `ext/dom/JitDomSaveHTMLUserScript.php` | 0 | 1 |
@@ -325,7 +332,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListReplace.php` | 0 | 1 |
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 333 |
+| `ext/dom/VmDom.php` | 0 | 339 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 18 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
@@ -651,7 +658,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 38 |
+| `ext/openssl/Module.php` | 0 | 42 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
@@ -663,6 +670,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/VmOpensslErrorNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslObjects.php` | 0 | 19 |
 | `ext/openssl/VmOpensslPkcs12Native.php` | 0 | 1 |
+| `ext/openssl/VmOpensslPkcs7Native.php` | 0 | 1 |
 | `ext/openssl/VmOpensslPkeyDeriveNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslPkeyNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslSealNative.php` | 0 | 1 |
@@ -686,6 +694,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_pkcs12_export.php` | 0 | 3 |
 | `ext/openssl/openssl_pkcs12_export_to_file.php` | 0 | 2 |
 | `ext/openssl/openssl_pkcs12_read.php` | 0 | 5 |
+| `ext/openssl/openssl_pkcs7_decrypt.php` | 0 | 2 |
+| `ext/openssl/openssl_pkcs7_encrypt.php` | 0 | 2 |
+| `ext/openssl/openssl_pkcs7_sign.php` | 0 | 2 |
+| `ext/openssl/openssl_pkcs7_verify.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_derive.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_export.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_get_private.php` | 0 | 2 |
@@ -724,8 +736,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pcntl/pcntl_wifexited.php` | 0 | 4 |
 | `ext/phar/BuiltinClasses.php` | 0 | 3 |
 | `ext/phar/Module.php` | 0 | 1 |
+| `ext/phar/PharDataBuiltin.php` | 0 | 9 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 1 |
+| `ext/phar/VmPharData.php` | 0 | 13 |
+| `ext/phar/VmPharTar.php` | 0 | 1 |
 | `ext/posix/JitPosix.php` | 0 | 1 |
 | `ext/posix/JitPosixTimes.php` | 0 | 1 |
 | `ext/posix/Module.php` | 0 | 29 |
@@ -787,6 +802,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/session/Module.php` | 0 | 25 |
 | `ext/session/SessionConstants.php` | 0 | 1 |
 | `ext/session/SessionFileStorage.php` | 0 | 1 |
+| `ext/session/SessionHandlerBuiltin.php` | 0 | 14 |
 | `ext/session/SessionUserHandler.php` | 0 | 9 |
 | `ext/session/session_register_shutdown.php` | 0 | 1 |
 | `ext/session/session_set_save_handler.php` | 0 | 3 |
@@ -1278,6 +1294,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitFopen.php` | 0 | 1 |
 | `ext/standard/JitForwardStaticCall.php` | 0 | 1 |
 | `ext/standard/JitFpassthru.php` | 0 | 1 |
+| `ext/standard/JitFpowKernel.php` | 0 | 1 |
 | `ext/standard/JitFprintf.php` | 0 | 1 |
 | `ext/standard/JitFputcsv.php` | 0 | 1 |
 | `ext/standard/JitFread.php` | 0 | 1 |
@@ -1403,6 +1420,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitMoveUploadedFile.php` | 0 | 1 |
 | `ext/standard/JitNetGetInterfaces.php` | 0 | 1 |
 | `ext/standard/JitNetworkServices.php` | 0 | 1 |
+| `ext/standard/JitNextafterKernel.php` | 0 | 1 |
 | `ext/standard/JitNlLanginfo.php` | 0 | 1 |
 | `ext/standard/JitNumberFormat.php` | 0 | 3 |
 | `ext/standard/JitObClean.php` | 0 | 1 |
@@ -1484,6 +1502,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitRealpathCache.php` | 0 | 1 |
 | `ext/standard/JitRegisterShutdown.php` | 0 | 1 |
 | `ext/standard/JitRename.php` | 0 | 1 |
+| `ext/standard/JitRenameKernel.php` | 0 | 1 |
 | `ext/standard/JitRequestBody.php` | 0 | 1 |
 | `ext/standard/JitResolveIncludePath.php` | 0 | 1 |
 | `ext/standard/JitRewind.php` | 0 | 1 |
@@ -1523,6 +1542,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitSscanf.php` | 0 | 3 |
 | `ext/standard/JitStat.php` | 0 | 1 |
 | `ext/standard/JitStatArray.php` | 0 | 1 |
+| `ext/standard/JitStatKernel.php` | 0 | 1 |
 | `ext/standard/JitStrGetcsv.php` | 0 | 1 |
 | `ext/standard/JitStrIreplace.php` | 0 | 1 |
 | `ext/standard/JitStrIreplaceMulti.php` | 0 | 1 |
@@ -1641,7 +1661,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/MkdirJitHelper.php` | 0 | 1 |
 | `ext/standard/MktimeJitHelper.php` | 0 | 1 |
 | `ext/standard/ModfJitHelper.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 826 |
+| `ext/standard/Module.php` | 0 | 831 |
 | `ext/standard/ModuleRegistry.php` | 0 | 2 |
 | `ext/standard/MultisortJitHelper.php` | 0 | 2 |
 | `ext/standard/NCompareJitHelper.php` | 0 | 1 |
@@ -2680,11 +2700,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/php_sapi_name.php` | 0 | 2 |
 | `ext/standard/php_strip_whitespace.php` | 0 | 2 |
 | `ext/standard/php_uname.php` | 0 | 1 |
+| `ext/standard/phpc_access_kernel.php` | 0 | 1 |
 | `ext/standard/phpc_clone_with_begin.php` | 0 | 1 |
 | `ext/standard/phpc_clone_with_end.php` | 0 | 1 |
 | `ext/standard/phpc_clone_with_reinit.php` | 0 | 1 |
 | `ext/standard/phpc_deploy_path.php` | 0 | 1 |
 | `ext/standard/phpc_destruct_try_invoke_native.php` | 0 | 1 |
+| `ext/standard/phpc_fpow_kernel.php` | 0 | 1 |
 | `ext/standard/phpc_gc_native_child_at.php` | 0 | 1 |
 | `ext/standard/phpc_gc_native_free_object.php` | 0 | 1 |
 | `ext/standard/phpc_gc_native_object_refcount.php` | 0 | 1 |
@@ -2698,10 +2720,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/phpc_native_ht_set_string_key.php` | 0 | 1 |
 | `ext/standard/phpc_native_ht_set_string_key_ht.php` | 0 | 1 |
 | `ext/standard/phpc_native_ht_set_string_key_long.php` | 0 | 1 |
+| `ext/standard/phpc_nextafter_kernel.php` | 0 | 1 |
 | `ext/standard/phpc_object_invoke_destructor_native.php` | 0 | 1 |
 | `ext/standard/phpc_object_is_constructed_native.php` | 0 | 1 |
 | `ext/standard/phpc_object_release_storage_native.php` | 0 | 1 |
+| `ext/standard/phpc_rename_kernel.php` | 0 | 1 |
 | `ext/standard/phpc_run_command.php` | 0 | 5 |
+| `ext/standard/phpc_stat_mode_kernel.php` | 0 | 1 |
 | `ext/standard/phpc_weakref_null_slot.php` | 0 | 1 |
 | `ext/standard/phpc_weakref_unset_map_key.php` | 0 | 1 |
 | `ext/standard/phpcredits.php` | 0 | 1 |
@@ -3408,6 +3433,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DomElementTextContentRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomGetElementByIdRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomGetElementsByTagNameRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/DomImportNodeRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomInstanceMethodRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomInstanceMethodUserScriptLlvm.php` | 0 | 3 |
 | `lib/JIT/Builtin/DomLoadHTMLFileRuntime.php` | 0 | 1 |
@@ -3417,6 +3443,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DomNodeChildPropertyRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomNodeListItemRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomNodeLiveMutationRuntime.php` | 0 | 6 |
+| `lib/JIT/Builtin/DomNodeTreeMutationRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomSaveHTMLFileRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomSaveHTMLRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomSaveXMLRuntime.php` | 0 | 1 |
@@ -3962,11 +3989,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DatePeriodIteratorMethod.php` | 0 | 1 |
 | `lib/JIT/Call/DateTimeFormat.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentAppendChild.php` | 0 | 1 |
+| `lib/JIT/Call/DomDocumentCreateAttributeNS.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentCreateDocumentFragment.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentCreateElement.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentCreateElementNS.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentGetElementById.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentGetElementsByTagName.php` | 0 | 1 |
+| `lib/JIT/Call/DomDocumentImportNode.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentLoad.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentLoadHTML.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentLoadHTMLFile.php` | 0 | 1 |
@@ -3974,11 +4003,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DomDocumentSaveHTML.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentSaveHTMLFile.php` | 0 | 1 |
 | `lib/JIT/Call/DomDocumentSaveXML.php` | 0 | 1 |
+| `lib/JIT/Call/DomElementGetAttribute.php` | 0 | 1 |
+| `lib/JIT/Call/DomElementGetAttributeNodeNS.php` | 0 | 1 |
+| `lib/JIT/Call/DomElementSetAttributeNodeNS.php` | 0 | 1 |
 | `lib/JIT/Call/DomInstanceMethod.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeAppend.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeAppendChild.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeListItem.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodePrepend.php` | 0 | 1 |
+| `lib/JIT/Call/DomNodeRemoveChild.php` | 0 | 1 |
+| `lib/JIT/Call/DomNodeReplaceChild.php` | 0 | 1 |
 | `lib/JIT/Call/DomNodeReplaceChildren.php` | 0 | 1 |
 | `lib/JIT/Call/DomXPathEvaluate.php` | 0 | 1 |
 | `lib/JIT/Call/DomXPathQuery.php` | 0 | 1 |
@@ -4085,7 +4119,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
 | `lib/JIT/Context.php` | 0 | 76 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 19 |
-| `lib/JIT/DomInstanceMethodJit.php` | 0 | 24 |
+| `lib/JIT/DomInstanceMethodJit.php` | 0 | 31 |
 | `lib/JIT/DynamicObjectReadonlyGuard.php` | 0 | 1 |
 | `lib/JIT/DynamicPropertyDeprecationGuard.php` | 0 | 1 |
 | `lib/JIT/EmitTuMode.php` | 0 | 1 |
@@ -5797,8 +5831,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomCreateElementJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new DOMException (line 295)
-- 31 class method(s)
+- new DOMException (line 323)
+- 33 class method(s)
 
 ### `ext/dom/DomCreateElementNSJitHelper.php`
 
@@ -5839,6 +5873,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 31)
 - 2 class method(s)
+
+### `ext/dom/DomImportNodeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new DOMException (line 73)
+- 5 class method(s)
 
 ### `ext/dom/DomLivingBuiltinClasses.php`
 
@@ -5885,7 +5925,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomNodeChildPropertyJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 9 class method(s)
 
 ### `ext/dom/DomNodeListItemJitHelper.php`
 
@@ -5994,6 +6034,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/dom/ElementGetAttributeNodeNS.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/dom/ElementGetElementsByTagName.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6067,6 +6113,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/ElementSetAttributeNode.php`
 
 **Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/ElementSetAttributeNodeNS.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
 - 1 class method(s)
 
 ### `ext/dom/ElementSetIdAttribute.php`
@@ -6144,6 +6196,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 31)
 - 3 class method(s)
 
+### `ext/dom/JitDomAttributeNodeNS.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `ext/dom/JitDomCreateElement.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6181,10 +6238,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomGetElementById.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 111)
-- new JITVariable (line 128)
-- new JITVariable (line 245)
-- new JITVariable (line 262)
+- new JITVariable (line 118)
+- new JITVariable (line 135)
+- new JITVariable (line 254)
+- new JITVariable (line 271)
 - 11 class method(s)
 
 ### `ext/dom/JitDomGetElementsByTagName.php`
@@ -6197,6 +6254,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 51)
 - 3 class method(s)
+
+### `ext/dom/JitDomImportNode.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 137)
+- new JITVariable (line 183)
+- 9 class method(s)
 
 ### `ext/dom/JitDomLoad.php`
 
@@ -6216,10 +6280,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomLoadHTMLUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 186)
-- new JITVariable (line 252)
-- new JITVariable (line 269)
-- 16 class method(s)
+- new JITVariable (line 202)
+- new JITVariable (line 268)
+- new JITVariable (line 285)
+- 18 class method(s)
 
 ### `ext/dom/JitDomLoadUserScript.php`
 
@@ -6259,6 +6323,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 31)
 - 2 class method(s)
+
+### `ext/dom/JitDomRemoveChild.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 55)
+- 4 class method(s)
+
+### `ext/dom/JitDomReplaceChild.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 57)
+- 4 class method(s)
 
 ### `ext/dom/JitDomSaveHTML.php`
 
@@ -6782,154 +6858,160 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ElementAppendChild (line 608)
 - new ElementGetAttribute (line 610)
 - new ElementGetAttributeNode (line 612)
-- new ElementGetAttributeNS (line 614)
-- new ElementHasAttribute (line 616)
-- new ElementHasAttributeNS (line 618)
-- new ElementRemoveAttribute (line 620)
-- new ElementRemoveAttributeNode (line 622)
-- new ElementSetAttribute (line 624)
-- new ElementSetAttributeNode (line 626)
-- new ElementSetAttributeNS (line 628)
-- new ElementRemoveAttributeNS (line 630)
-- new ElementSetIdAttribute (line 632)
-- new ElementSetIdAttributeNS (line 635)
-- new ElementGetElementsByTagName (line 638)
-- new ElementGetElementsByTagNameNS (line 640)
-- new ElementGetAttributeNames (line 644)
-- new ElementInsertAdjacentHTML (line 649)
-- new ElementInsertAdjacentElement (line 654)
-- new ElementInsertAdjacentText (line 659)
-- new ElementToggleAttribute (line 664)
-- new ElementGetInnerHTML (line 669)
-- new ElementGetOuterHTML (line 672)
-- new ClassProperty (line 677)
-- new ClassEntry (line 681)
-- new FragmentConstruct (line 684)
-- new ClassProperty (line 688)
-- new FragmentAppendChild (line 689)
-- new FragmentAppendXML (line 691)
-- new ObjectEntry (line 705)
-- new DomNodeState (line 707)
-- new Variable (line 721)
-- new ObjectEntry (line 744)
-- new DomNodeState (line 749)
-- new Variable (line 775)
-- new ObjectEntry (line 803)
-- new DomNodeState (line 824)
-- new Variable (line 864)
-- new HashTable (line 875)
-- new Variable (line 876)
-- new HashTable (line 888)
-- new Variable (line 895)
-- new DomNodeState (line 918)
-- new DomNodeState (line 967)
-- new ObjectEntry (line 991)
-- new DomNodeState (line 999)
-- new Variable (line 1017)
-- new ObjectEntry (line 1033)
-- new DomNodeState (line 1041)
-- new Variable (line 1060)
-- new Variable (line 1081)
-- new ObjectEntry (line 1099)
-- new DomNodeState (line 1107)
-- new Variable (line 1119)
-- new DOMException (line 1136)
-- new Variable (line 1140)
+- new ElementGetAttributeNodeNS (line 614)
+- new ElementGetAttributeNS (line 617)
+- new ElementHasAttribute (line 619)
+- new ElementHasAttributeNS (line 621)
+- new ElementRemoveAttribute (line 623)
+- new ElementRemoveAttributeNode (line 625)
+- new ElementSetAttribute (line 627)
+- new ElementSetAttributeNode (line 629)
+- new ElementSetAttributeNodeNS (line 631)
+- new ElementSetAttributeNS (line 634)
+- new ElementRemoveAttributeNS (line 636)
+- new ElementSetIdAttribute (line 638)
+- new ElementSetIdAttributeNS (line 641)
+- new ElementGetElementsByTagName (line 644)
+- new ElementGetElementsByTagNameNS (line 646)
+- new ElementGetAttributeNames (line 650)
+- new ElementInsertAdjacentHTML (line 655)
+- new ElementInsertAdjacentElement (line 660)
+- new ElementInsertAdjacentText (line 665)
+- new ElementToggleAttribute (line 670)
+- new ElementGetInnerHTML (line 675)
+- new ElementGetOuterHTML (line 678)
+- new ClassProperty (line 683)
+- new ClassEntry (line 687)
+- new FragmentConstruct (line 690)
+- new ClassProperty (line 694)
+- new FragmentAppendChild (line 695)
+- new FragmentAppendXML (line 697)
+- new ObjectEntry (line 711)
+- new DomNodeState (line 713)
+- new Variable (line 727)
+- new ObjectEntry (line 750)
+- new DomNodeState (line 755)
+- new Variable (line 781)
+- new ObjectEntry (line 809)
+- new DomNodeState (line 830)
+- new Variable (line 870)
+- new HashTable (line 881)
+- new Variable (line 882)
+- new HashTable (line 894)
+- new Variable (line 901)
+- new DomNodeState (line 924)
+- new DomNodeState (line 973)
+- new ObjectEntry (line 997)
+- new DomNodeState (line 1005)
+- new Variable (line 1023)
+- new ObjectEntry (line 1039)
+- new DomNodeState (line 1047)
+- new Variable (line 1066)
+- new Variable (line 1087)
+- new ObjectEntry (line 1105)
+- new DomNodeState (line 1113)
+- new Variable (line 1125)
+- new DOMException (line 1142)
 - new Variable (line 1146)
-- new DOMException (line 1155)
-- new Variable (line 1184)
-- new DOMException (line 1197)
+- new Variable (line 1152)
+- new DOMException (line 1161)
+- new Variable (line 1190)
 - new DOMException (line 1210)
-- new Variable (line 1222)
-- new DOMException (line 1288)
-- new DOMException (line 1340)
-- new DOMException (line 1353)
-- new DOMException (line 1376)
-- new DOMException (line 1390)
-- new DOMException (line 1416)
-- new DOMException (line 1471)
-- new DOMException (line 1498)
-- new DOMException (line 1502)
-- new DOMException (line 1515)
-- new DOMException (line 1519)
-- new DOMException (line 1529)
-- new ObjectEntry (line 1900)
-- new DomNodeState (line 1905)
-- new ObjectEntry (line 1921)
-- new DomNodeState (line 1926)
-- new ObjectEntry (line 1942)
-- new DomNodeState (line 1947)
-- new DOMException (line 1986)
-- new DOMException (line 1996)
-- new DOMException (line 2009)
-- new DOMException (line 2028)
-- new ObjectEntry (line 2116)
-- new DomNodeState (line 2121)
-- new Variable (line 2130)
-- new ObjectEntry (line 2140)
-- new DomNodeState (line 2145)
-- new Variable (line 2151)
-- new ObjectEntry (line 2710)
-- new DomNodeState (line 2712)
-- new ObjectEntry (line 2908)
-- new DomNodeState (line 2910)
-- new ObjectEntry (line 2938)
-- new DomNodeState (line 2940)
-- new ObjectEntry (line 3069)
-- new DomNodeState (line 3074)
-- new DOMException (line 3268)
-- new DOMException (line 3282)
-- new Variable (line 3298)
-- new DOMException (line 3312)
-- new DOMException (line 3315)
-- new DOMException (line 3323)
-- new DOMException (line 3349)
-- new DOMException (line 3362)
-- new DOMException (line 3558)
-- new DOMException (line 3755)
-- new DOMException (line 3759)
-- new DOMException (line 3848)
-- new DOMException (line 3852)
-- new DOMException (line 3910)
-- new DOMException (line 3927)
-- new DOMException (line 3956)
-- new DOMException (line 3997)
-- new DOMException (line 4022)
-- new DOMException (line 4691)
-- new Variable (line 4719)
-- new DOMException (line 4949)
-- new DOMException (line 5032)
-- new DOMException (line 5074)
-- new ObjectEntry (line 5159)
-- new DomNodeState (line 5163)
-- new Variable (line 5170)
-- new ObjectEntry (line 5370)
-- new DomNodeState (line 5374)
-- new Variable (line 5381)
-- new ObjectEntry (line 5401)
-- new DomNodeState (line 5404)
-- new Variable (line 5412)
-- new Variable (line 5560)
-- new DOMException (line 5644)
-- new DOMException (line 5651)
-- new DOMException (line 5658)
-- new DOMException (line 5662)
-- new DOMException (line 5665)
-- new DOMException (line 5674)
-- new Variable (line 6477)
-- new Variable (line 6490)
-- new DOMException (line 6572)
-- new DOMException (line 6583)
-- new DOMException (line 6649)
-- new DOMException (line 6657)
-- new DOMException (line 6666)
-- 319 class method(s)
+- new Variable (line 1213)
+- new DOMException (line 1232)
+- new Variable (line 1264)
+- new DOMException (line 1276)
+- new DOMException (line 1289)
+- new Variable (line 1301)
+- new DOMException (line 1367)
+- new DOMException (line 1419)
+- new DOMException (line 1432)
+- new DOMException (line 1455)
+- new DOMException (line 1469)
+- new DOMException (line 1495)
+- new DOMException (line 1550)
+- new DOMException (line 1577)
+- new DOMException (line 1581)
+- new DOMException (line 1594)
+- new DOMException (line 1598)
+- new DOMException (line 1608)
+- new ObjectEntry (line 1979)
+- new DomNodeState (line 1984)
+- new ObjectEntry (line 2000)
+- new DomNodeState (line 2005)
+- new ObjectEntry (line 2021)
+- new DomNodeState (line 2026)
+- new DOMException (line 2065)
+- new DOMException (line 2075)
+- new DOMException (line 2088)
+- new DOMException (line 2107)
+- new ObjectEntry (line 2195)
+- new DomNodeState (line 2200)
+- new Variable (line 2209)
+- new ObjectEntry (line 2219)
+- new DomNodeState (line 2224)
+- new Variable (line 2230)
+- new ObjectEntry (line 2895)
+- new DomNodeState (line 2897)
+- new ObjectEntry (line 3093)
+- new DomNodeState (line 3095)
+- new ObjectEntry (line 3123)
+- new DomNodeState (line 3125)
+- new ObjectEntry (line 3254)
+- new DomNodeState (line 3259)
+- new DOMException (line 3453)
+- new DOMException (line 3468)
+- new Variable (line 3485)
+- new DOMException (line 3499)
+- new DOMException (line 3502)
+- new DOMException (line 3511)
+- new DOMException (line 3538)
+- new DOMException (line 3551)
+- new DOMException (line 3749)
+- new DOMException (line 3946)
+- new DOMException (line 3950)
+- new DOMException (line 4039)
+- new DOMException (line 4043)
+- new DOMException (line 4101)
+- new DOMException (line 4118)
+- new DOMException (line 4149)
+- new DOMException (line 4191)
+- new DOMException (line 4217)
+- new DOMException (line 4887)
+- new Variable (line 4915)
+- new DOMException (line 5145)
+- new DOMException (line 5228)
+- new DOMException (line 5270)
+- new ObjectEntry (line 5355)
+- new DomNodeState (line 5359)
+- new Variable (line 5366)
+- new ObjectEntry (line 5566)
+- new DomNodeState (line 5570)
+- new Variable (line 5577)
+- new ObjectEntry (line 5597)
+- new DomNodeState (line 5600)
+- new Variable (line 5608)
+- new Variable (line 5756)
+- new DOMException (line 5857)
+- new DOMException (line 5864)
+- new DOMException (line 5871)
+- new DOMException (line 5875)
+- new DOMException (line 5878)
+- new DOMException (line 5887)
+- new Variable (line 6693)
+- new Variable (line 6706)
+- new DOMException (line 6789)
+- new DOMException (line 6800)
+- new DOMException (line 6867)
+- new DOMException (line 6875)
+- new DOMException (line 6884)
+- 326 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomInstanceInvoke.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 82)
+- new Error (line 86)
 - 6 class method(s)
 
 ### `ext/dom/VmDomJitDispatch.php`
@@ -6940,19 +7022,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 83)
 - new Variable (line 95)
 - new Variable (line 107)
-- new Variable (line 128)
-- new Variable (line 142)
-- new Variable (line 154)
-- new Variable (line 166)
-- new Variable (line 178)
-- new Error (line 192)
-- new Variable (line 209)
-- new Variable (line 232)
-- new Variable (line 253)
-- new Variable (line 290)
-- new Variable (line 315)
-- new ArgumentCountError (line 350)
-- 26 class method(s)
+- new Variable (line 149)
+- new Variable (line 163)
+- new Variable (line 203)
+- new Variable (line 215)
+- new Variable (line 227)
+- new Error (line 241)
+- new Variable (line 258)
+- new Variable (line 281)
+- new Variable (line 302)
+- new Variable (line 339)
+- new Variable (line 364)
+- new ArgumentCountError (line 409)
+- 30 class method(s)
 
 ### `ext/dom/VmDomJitFrame.php`
 
@@ -7114,7 +7196,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 35)
 - new ObjectEntry (line 36)
-- 16 class method(s)
+- 29 class method(s)
 
 ### `ext/fileinfo/finfo_buffer.php`
 
@@ -9158,15 +9240,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_pkcs12_read (line 60)
 - new openssl_pkcs12_export (line 61)
 - new openssl_pkcs12_export_to_file (line 62)
-- new openssl_x509_verify (line 63)
-- new openssl_free_key (line 64)
-- new openssl_spki_new (line 65)
-- new openssl_spki_verify (line 66)
-- new openssl_spki_export (line 67)
-- new openssl_spki_export_challenge (line 68)
-- new openssl_seal (line 69)
-- new openssl_open (line 70)
-- new openssl_error_string (line 71)
+- new openssl_pkcs7_sign (line 63)
+- new openssl_pkcs7_verify (line 64)
+- new openssl_pkcs7_encrypt (line 65)
+- new openssl_pkcs7_decrypt (line 66)
+- new openssl_x509_verify (line 67)
+- new openssl_free_key (line 68)
+- new openssl_spki_new (line 69)
+- new openssl_spki_verify (line 70)
+- new openssl_spki_export (line 71)
+- new openssl_spki_export_challenge (line 72)
+- new openssl_seal (line 73)
+- new openssl_open (line 74)
+- new openssl_error_string (line 75)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -9177,7 +9263,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/OpensslConstants.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/openssl/OpensslExtensionPolicy.php`
 
@@ -9198,11 +9284,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 92)
-- new HashTable (line 1153)
-- new Variable (line 1155)
-- new HashTable (line 1166)
-- new Variable (line 1168)
-- 41 class method(s)
+- new HashTable (line 1406)
+- new Variable (line 1408)
+- new HashTable (line 1419)
+- new Variable (line 1421)
+- 48 class method(s)
 
 ### `ext/openssl/VmOpensslCipherNative.php`
 
@@ -9246,6 +9332,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
+
+### `ext/openssl/VmOpensslPkcs7Native.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
 
 ### `ext/openssl/VmOpensslPkeyDeriveNative.php`
 
@@ -9382,6 +9473,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 49)
 - new Variable (line 53)
 - 2 class method(s)
+
+### `ext/openssl/openssl_pkcs7_decrypt.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/openssl/openssl_pkcs7_encrypt.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+
+### `ext/openssl/openssl_pkcs7_sign.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+
+### `ext/openssl/openssl_pkcs7_verify.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 3 class method(s)
 
 ### `ext/openssl/openssl_pkey_derive.php`
 
@@ -9647,14 +9762,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 22)
-- new PharRunning (line 23)
-- 1 class method(s)
+- new ClassEntry (line 28)
+- new PharRunning (line 29)
+- 2 class method(s)
 
 ### `ext/phar/Module.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/phar/PharDataBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 31)
+- new PharDataConstruct (line 43)
+- new ArgumentCountError (line 80)
+- new ArgumentCountError (line 100)
+- new ArgumentCountError (line 126)
+- new ArgumentCountError (line 151)
+- new ArgumentCountError (line 171)
+- new ArgumentCountError (line 194)
+- 9 class method(s)
 
 ### `ext/phar/PharExtensionPolicy.php`
 
@@ -9665,6 +9793,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/phar/VmPharData.php`
+
+**Warnings** (review for bootstrap subset):
+- new UnexpectedValueException (line 46)
+- new UnexpectedValueException (line 59)
+- new UnexpectedValueException (line 71)
+- new BadMethodCallException (line 117)
+- new Variable (line 120)
+- new ObjectEntry (line 121)
+- new Error (line 135)
+- new Error (line 144)
+- new UnexpectedValueException (line 171)
+- new Error (line 182)
+- new ClassEntry (line 193)
+- new PharFileInfoGetContent (line 195)
+- 13 class method(s)
+
+### `ext/phar/VmPharTar.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
 
 ### `ext/posix/JitPosix.php`
 
@@ -10118,30 +10268,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/session/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 26)
-- new session_start (line 35)
-- new session_id (line 36)
-- new session_name (line 37)
-- new session_module_name (line 38)
-- new session_save_path (line 39)
-- new session_status (line 40)
-- new session_destroy (line 41)
-- new session_write_close (line 42)
-- new session_commit (line 43)
-- new session_regenerate_id (line 44)
-- new session_abort (line 45)
-- new session_reset (line 46)
-- new session_create_id (line 47)
-- new session_encode (line 48)
-- new session_decode (line 49)
-- new session_unset (line 50)
-- new session_gc (line 51)
-- new session_cache_expire (line 52)
-- new session_cache_limiter (line 53)
-- new session_set_cookie_params (line 54)
-- new session_get_cookie_params (line 55)
-- new session_set_save_handler (line 56)
-- new session_register_shutdown (line 57)
+- new VM\Variable (line 27)
+- new session_start (line 36)
+- new session_id (line 37)
+- new session_name (line 38)
+- new session_module_name (line 39)
+- new session_save_path (line 40)
+- new session_status (line 41)
+- new session_destroy (line 42)
+- new session_write_close (line 43)
+- new session_commit (line 44)
+- new session_regenerate_id (line 45)
+- new session_abort (line 46)
+- new session_reset (line 47)
+- new session_create_id (line 48)
+- new session_encode (line 49)
+- new session_decode (line 50)
+- new session_unset (line 51)
+- new session_gc (line 52)
+- new session_cache_expire (line 53)
+- new session_cache_limiter (line 54)
+- new session_set_cookie_params (line 55)
+- new session_get_cookie_params (line 56)
+- new session_set_save_handler (line 57)
+- new session_register_shutdown (line 58)
 - 2 class method(s)
 
 ### `ext/session/SessionConstants.php`
@@ -10153,6 +10303,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/session/SessionHandlerBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 44)
+- new Error (line 90)
+- new ArgumentCountError (line 220)
+- new ArgumentCountError (line 226)
+- new ArgumentCountError (line 276)
+- new ArgumentCountError (line 279)
+- new ArgumentCountError (line 315)
+- new ArgumentCountError (line 321)
+- new ArgumentCountError (line 353)
+- new ArgumentCountError (line 356)
+- new ArgumentCountError (line 387)
+- new ArgumentCountError (line 390)
+- 20 class method(s)
+- 12 closure(s)
 
 ### `ext/session/SessionUserHandler.php`
 
@@ -13356,6 +13524,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/JitFpowKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/JitFprintf.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14016,6 +14189,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
+### `ext/standard/JitNextafterKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/JitNlLanginfo.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14425,7 +14603,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitRename.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
+
+### `ext/standard/JitRenameKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/JitRequestBody.php`
 
@@ -14630,6 +14813,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitStatKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/JitStrGetcsv.php`
 
@@ -15835,263 +16023,268 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new phpc_native_ht_set_hashtable_at (line 654)
 - new phpc_native_ht_set_string_key_long (line 655)
 - new phpc_native_environ_mirror_into_ht (line 656)
-- new sys_get_temp_dir (line 657)
-- new sys_getloadavg (line 658)
-- new openlog (line 659)
-- new syslog (line 660)
-- new closelog (line 661)
-- new tempnam (line 662)
-- new tmpfile (line 663)
-- new getcwd_ (line 664)
-- new get_include_path (line 665)
-- new set_include_path (line 666)
-- new stream_resolve_include_path (line 667)
-- new gethostname (line 668)
-- new net_get_interfaces (line 669)
-- new gethostbynamel (line 670)
-- new gethostbyname (line 671)
-- new gethostbyaddr (line 672)
-- new checkdnsrr (line 673)
-- new checkdnsrr (line 674)
-- new dns_get_mx (line 675)
-- new dns_get_record (line 676)
-- new getmxrr (line 677)
-- new long2ip (line 678)
-- new ip2long (line 679)
-- new inet_ntop (line 680)
-- new inet_pton (line 681)
-- new getprotobyname (line 682)
-- new getprotobynumber (line 683)
-- new getservbyname (line 684)
-- new getservbyport (line 685)
-- new chdir_ (line 686)
-- new chroot_ (line 687)
-- new putenv_ (line 688)
-- new ini_set_ (line 689)
-- new ini_set_ (line 690)
-- new ini_get_ (line 691)
-- new ini_get_all (line 692)
-- new ini_restore (line 693)
-- new ini_parse_quantity (line 694)
-- new parse_ini_string (line 695)
-- new parse_ini_file (line 696)
-- new error_reporting (line 697)
-- new error_log (line 698)
-- new define_ (line 699)
-- new defined_ (line 700)
-- new constant_ (line 701)
-- new class_constants_ (line 702)
-- new get_defined_constants_ (line 703)
-- new get_defined_vars_ (line 704)
-- new get_declared_variables_ (line 705)
-- new get_declared_interfaces_ (line 706)
-- new get_declared_classes_ (line 707)
-- new get_declared_traits_ (line 708)
-- new get_declared_attributes_ (line 709)
-- new get_declared_functions_ (line 710)
-- new get_defined_functions_ (line 711)
-- new get_included_files_ (line 712)
-- new get_included_files_ (line 713)
-- new debug_backtrace (line 714)
-- new debug_print_backtrace (line 715)
-- new get_debug_backtrace (line 716)
-- new class_exists_ (line 717)
-- new class_alias (line 718)
-- new create_lazy_ghost (line 720)
-- new create_lazy_proxy (line 721)
-- new class_has_lazy_object_initializer (line 722)
-- new class_has_lazy_object_uninitializer (line 723)
-- new enum_exists_ (line 725)
-- new unitenum_exists_ (line 726)
-- new interface_exists_ (line 727)
-- new trait_exists_ (line 728)
-- new class_uses_ (line 729)
-- new class_uses_recursive (line 730)
-- new class_implements_ (line 731)
-- new class_parents_ (line 732)
-- new function_exists (line 733)
-- new is_callable (line 734)
-- new call_user_func (line 735)
-- new call_user_func_array (line 736)
-- new func_get_arg (line 737)
-- new func_get_args (line 738)
-- new func_num_args (line 739)
-- new method_exists_ (line 740)
-- new class_meth_exists_ (line 741)
-- new class_has_method_ (line 743)
-- new class_has_property_ (line 744)
-- new class_has_constant_ (line 745)
-- new property_exists_ (line 747)
-- new attribute_exists_ (line 748)
-- new get_object_vars_ (line 749)
-- new get_mangled_object_vars_ (line 750)
-- new get_object_id (line 751)
-- new spl_object_id (line 752)
-- new spl_object_hash (line 753)
-- new get_class_ (line 754)
-- new get_called_class_ (line 755)
-- new get_class_vars_ (line 756)
-- new get_class_methods_ (line 757)
-- new get_parent_class_ (line 758)
-- new is_a_ (line 759)
-- new is_subclass_of_ (line 760)
-- new assert_ (line 761)
-- new assert_options (line 762)
-- new trigger_error_ (line 763)
-- new user_error (line 764)
-- new compiler_language_warning_ (line 765)
-- new set_error_handler_ (line 766)
-- new restore_error_handler_ (line 767)
-- new get_error_handler_ (line 769)
-- new set_exception_handler (line 771)
-- new restore_exception_handler (line 772)
-- new get_exception_handler (line 774)
-- new error_get_last (line 776)
-- new error_clear_last (line 777)
-- new exif_tagname (line 778)
-- new eval_ (line 779)
-- new phpc_deploy_path (line 780)
-- new compiler_is_superglobal_name (line 781)
-- new __compiler_libcrypt (line 782)
-- new __compiler_password_random_bytes (line 783)
-- new phpc_match_unhandled_operand_is_object (line 784)
-- new phpc_clone_with_begin (line 785)
-- new phpc_clone_with_end (line 786)
-- new phpc_clone_with_reinit (line 787)
-- new extract_ (line 788)
-- new compact_ (line 789)
-- new scandir (line 790)
-- new opendir (line 791)
-- new dir_ (line 792)
-- new readdir (line 793)
-- new closedir (line 794)
-- new rewinddir (line 795)
-- new glob_ (line 796)
-- new gzcompress (line 797)
-- new gzdecode (line 798)
-- new gzdeflate (line 799)
-- new gzencode (line 800)
-- new gzinflate (line 801)
-- new gzuncompress (line 802)
-- new gzopen (line 803)
-- new gzwrite (line 804)
-- new gzputs (line 805)
-- new gzread (line 806)
-- new gzgets (line 807)
-- new gzseek (line 808)
-- new gztell (line 809)
-- new gzrewind (line 810)
-- new gzeof (line 811)
-- new gzclose (line 812)
-- new readgzfile (line 813)
-- new gzfile (line 814)
-- new gzpassthru (line 815)
-- new zlib_encode (line 816)
-- new zlib_decode (line 817)
-- new deflate_init (line 818)
-- new deflate_add (line 819)
-- new inflate_init (line 820)
-- new inflate_add (line 821)
-- new zlib_get_coding_type (line 822)
-- new fnmatch (line 823)
-- new time (line 824)
-- new getmypid (line 825)
-- new getmyuid (line 826)
-- new getmygid (line 827)
-- new get_current_user (line 828)
-- new get_cfg_var (line 829)
-- new php_ini_loaded_file (line 830)
-- new php_ini_scanned_files (line 831)
-- new zend_thread_id (line 832)
-- new getmygrgid (line 833)
-- new getmyinode (line 834)
-- new getlastmod (line 835)
-- new getrusage (line 836)
-- new cli_get_process_title (line 837)
-- new cli_set_process_title (line 838)
-- new proc_nice (line 839)
-- new memory_get_peak_usage (line 840)
-- new memory_get_usage (line 841)
-- new memory_reset_peak_usage (line 842)
-- new microtime (line 843)
-- new gettimeofday (line 844)
-- new hrtime (line 845)
-- new clock_gettime (line 846)
-- new phpversion (line 847)
-- new php_sapi_name (line 848)
-- new getopt (line 849)
-- new php_uname (line 850)
-- new phpinfo (line 851)
-- new phpcredits (line 852)
-- new zend_version (line 853)
-- new version_compare (line 854)
-- new extension_loaded (line 855)
-- new get_loaded_extensions (line 856)
-- new get_extension_funcs (line 857)
-- new date (line 858)
-- new timezone_version_get (line 859)
-- new timezone_identifiers_list (line 860)
-- new timezone_abbreviations_list (line 861)
-- new timezone_name_from_abbr (line 862)
-- new timezone_open (line 863)
-- new timezone_name_get (line 864)
-- new timezone_offset_get (line 865)
-- new date_offset_get (line 866)
-- new date_format (line 867)
-- new date_timestamp_get (line 868)
-- new date_timestamp_set (line 869)
-- new date_date_set (line 870)
-- new date_time_set (line 871)
-- new date_timezone_get (line 872)
-- new date_timezone_set (line 873)
-- new date_get_last_errors (line 874)
-- new timezone_location_get (line 875)
-- new timezone_transitions_get (line 876)
-- new gmdate (line 877)
-- new strftime (line 878)
-- new gmstrftime (line 879)
-- new strptime (line 880)
-- new getdate (line 881)
-- new gmgetdate (line 882)
-- new gmmktime (line 883)
-- new mktime (line 884)
-- new strtotime (line 885)
-- new checkdate (line 886)
-- new date_default_timezone_get (line 887)
-- new date_default_timezone_set (line 888)
-- new localtime (line 889)
-- new localeconv (line 890)
-- new idate (line 891)
-- new date_sun_info (line 892)
-- new date_interval_format (line 893)
-- new date_interval_create_from_date_string (line 894)
-- new date_create (line 895)
-- new date_create_immutable (line 896)
-- new date_create_from_format (line 897)
-- new date_create_immutable_from_format (line 898)
-- new date_parse (line 899)
-- new date_parse_from_format (line 900)
-- new date_add (line 901)
-- new date_sub (line 902)
-- new date_modify (line 903)
-- new date_diff (line 904)
-- new date_sunrise (line 905)
-- new date_sunset (line 906)
-- new sleep (line 907)
-- new set_time_limit (line 908)
-- new setlocale (line 909)
-- new nl_langinfo (line 910)
-- new ignore_user_abort (line 911)
-- new connection_aborted (line 912)
-- new spl_autoload (line 913)
-- new spl_autoload_extensions (line 914)
-- new spl_autoload_functions (line 915)
-- new spl_autoload_register (line 916)
-- new spl_autoload_unregister (line 917)
-- new spl_autoload_call (line 918)
-- new time_nanosleep (line 919)
-- new time_sleep_until (line 920)
-- new usleep (line 921)
+- new phpc_rename_kernel (line 657)
+- new phpc_stat_mode_kernel (line 658)
+- new phpc_access_kernel (line 659)
+- new phpc_fpow_kernel (line 660)
+- new phpc_nextafter_kernel (line 661)
+- new sys_get_temp_dir (line 662)
+- new sys_getloadavg (line 663)
+- new openlog (line 664)
+- new syslog (line 665)
+- new closelog (line 666)
+- new tempnam (line 667)
+- new tmpfile (line 668)
+- new getcwd_ (line 669)
+- new get_include_path (line 670)
+- new set_include_path (line 671)
+- new stream_resolve_include_path (line 672)
+- new gethostname (line 673)
+- new net_get_interfaces (line 674)
+- new gethostbynamel (line 675)
+- new gethostbyname (line 676)
+- new gethostbyaddr (line 677)
+- new checkdnsrr (line 678)
+- new checkdnsrr (line 679)
+- new dns_get_mx (line 680)
+- new dns_get_record (line 681)
+- new getmxrr (line 682)
+- new long2ip (line 683)
+- new ip2long (line 684)
+- new inet_ntop (line 685)
+- new inet_pton (line 686)
+- new getprotobyname (line 687)
+- new getprotobynumber (line 688)
+- new getservbyname (line 689)
+- new getservbyport (line 690)
+- new chdir_ (line 691)
+- new chroot_ (line 692)
+- new putenv_ (line 693)
+- new ini_set_ (line 694)
+- new ini_set_ (line 695)
+- new ini_get_ (line 696)
+- new ini_get_all (line 697)
+- new ini_restore (line 698)
+- new ini_parse_quantity (line 699)
+- new parse_ini_string (line 700)
+- new parse_ini_file (line 701)
+- new error_reporting (line 702)
+- new error_log (line 703)
+- new define_ (line 704)
+- new defined_ (line 705)
+- new constant_ (line 706)
+- new class_constants_ (line 707)
+- new get_defined_constants_ (line 708)
+- new get_defined_vars_ (line 709)
+- new get_declared_variables_ (line 710)
+- new get_declared_interfaces_ (line 711)
+- new get_declared_classes_ (line 712)
+- new get_declared_traits_ (line 713)
+- new get_declared_attributes_ (line 714)
+- new get_declared_functions_ (line 715)
+- new get_defined_functions_ (line 716)
+- new get_included_files_ (line 717)
+- new get_included_files_ (line 718)
+- new debug_backtrace (line 719)
+- new debug_print_backtrace (line 720)
+- new get_debug_backtrace (line 721)
+- new class_exists_ (line 722)
+- new class_alias (line 723)
+- new create_lazy_ghost (line 725)
+- new create_lazy_proxy (line 726)
+- new class_has_lazy_object_initializer (line 727)
+- new class_has_lazy_object_uninitializer (line 728)
+- new enum_exists_ (line 730)
+- new unitenum_exists_ (line 731)
+- new interface_exists_ (line 732)
+- new trait_exists_ (line 733)
+- new class_uses_ (line 734)
+- new class_uses_recursive (line 735)
+- new class_implements_ (line 736)
+- new class_parents_ (line 737)
+- new function_exists (line 738)
+- new is_callable (line 739)
+- new call_user_func (line 740)
+- new call_user_func_array (line 741)
+- new func_get_arg (line 742)
+- new func_get_args (line 743)
+- new func_num_args (line 744)
+- new method_exists_ (line 745)
+- new class_meth_exists_ (line 746)
+- new class_has_method_ (line 748)
+- new class_has_property_ (line 749)
+- new class_has_constant_ (line 750)
+- new property_exists_ (line 752)
+- new attribute_exists_ (line 753)
+- new get_object_vars_ (line 754)
+- new get_mangled_object_vars_ (line 755)
+- new get_object_id (line 756)
+- new spl_object_id (line 757)
+- new spl_object_hash (line 758)
+- new get_class_ (line 759)
+- new get_called_class_ (line 760)
+- new get_class_vars_ (line 761)
+- new get_class_methods_ (line 762)
+- new get_parent_class_ (line 763)
+- new is_a_ (line 764)
+- new is_subclass_of_ (line 765)
+- new assert_ (line 766)
+- new assert_options (line 767)
+- new trigger_error_ (line 768)
+- new user_error (line 769)
+- new compiler_language_warning_ (line 770)
+- new set_error_handler_ (line 771)
+- new restore_error_handler_ (line 772)
+- new get_error_handler_ (line 774)
+- new set_exception_handler (line 776)
+- new restore_exception_handler (line 777)
+- new get_exception_handler (line 779)
+- new error_get_last (line 781)
+- new error_clear_last (line 782)
+- new exif_tagname (line 783)
+- new eval_ (line 784)
+- new phpc_deploy_path (line 785)
+- new compiler_is_superglobal_name (line 786)
+- new __compiler_libcrypt (line 787)
+- new __compiler_password_random_bytes (line 788)
+- new phpc_match_unhandled_operand_is_object (line 789)
+- new phpc_clone_with_begin (line 790)
+- new phpc_clone_with_end (line 791)
+- new phpc_clone_with_reinit (line 792)
+- new extract_ (line 793)
+- new compact_ (line 794)
+- new scandir (line 795)
+- new opendir (line 796)
+- new dir_ (line 797)
+- new readdir (line 798)
+- new closedir (line 799)
+- new rewinddir (line 800)
+- new glob_ (line 801)
+- new gzcompress (line 802)
+- new gzdecode (line 803)
+- new gzdeflate (line 804)
+- new gzencode (line 805)
+- new gzinflate (line 806)
+- new gzuncompress (line 807)
+- new gzopen (line 808)
+- new gzwrite (line 809)
+- new gzputs (line 810)
+- new gzread (line 811)
+- new gzgets (line 812)
+- new gzseek (line 813)
+- new gztell (line 814)
+- new gzrewind (line 815)
+- new gzeof (line 816)
+- new gzclose (line 817)
+- new readgzfile (line 818)
+- new gzfile (line 819)
+- new gzpassthru (line 820)
+- new zlib_encode (line 821)
+- new zlib_decode (line 822)
+- new deflate_init (line 823)
+- new deflate_add (line 824)
+- new inflate_init (line 825)
+- new inflate_add (line 826)
+- new zlib_get_coding_type (line 827)
+- new fnmatch (line 828)
+- new time (line 829)
+- new getmypid (line 830)
+- new getmyuid (line 831)
+- new getmygid (line 832)
+- new get_current_user (line 833)
+- new get_cfg_var (line 834)
+- new php_ini_loaded_file (line 835)
+- new php_ini_scanned_files (line 836)
+- new zend_thread_id (line 837)
+- new getmygrgid (line 838)
+- new getmyinode (line 839)
+- new getlastmod (line 840)
+- new getrusage (line 841)
+- new cli_get_process_title (line 842)
+- new cli_set_process_title (line 843)
+- new proc_nice (line 844)
+- new memory_get_peak_usage (line 845)
+- new memory_get_usage (line 846)
+- new memory_reset_peak_usage (line 847)
+- new microtime (line 848)
+- new gettimeofday (line 849)
+- new hrtime (line 850)
+- new clock_gettime (line 851)
+- new phpversion (line 852)
+- new php_sapi_name (line 853)
+- new getopt (line 854)
+- new php_uname (line 855)
+- new phpinfo (line 856)
+- new phpcredits (line 857)
+- new zend_version (line 858)
+- new version_compare (line 859)
+- new extension_loaded (line 860)
+- new get_loaded_extensions (line 861)
+- new get_extension_funcs (line 862)
+- new date (line 863)
+- new timezone_version_get (line 864)
+- new timezone_identifiers_list (line 865)
+- new timezone_abbreviations_list (line 866)
+- new timezone_name_from_abbr (line 867)
+- new timezone_open (line 868)
+- new timezone_name_get (line 869)
+- new timezone_offset_get (line 870)
+- new date_offset_get (line 871)
+- new date_format (line 872)
+- new date_timestamp_get (line 873)
+- new date_timestamp_set (line 874)
+- new date_date_set (line 875)
+- new date_time_set (line 876)
+- new date_timezone_get (line 877)
+- new date_timezone_set (line 878)
+- new date_get_last_errors (line 879)
+- new timezone_location_get (line 880)
+- new timezone_transitions_get (line 881)
+- new gmdate (line 882)
+- new strftime (line 883)
+- new gmstrftime (line 884)
+- new strptime (line 885)
+- new getdate (line 886)
+- new gmgetdate (line 887)
+- new gmmktime (line 888)
+- new mktime (line 889)
+- new strtotime (line 890)
+- new checkdate (line 891)
+- new date_default_timezone_get (line 892)
+- new date_default_timezone_set (line 893)
+- new localtime (line 894)
+- new localeconv (line 895)
+- new idate (line 896)
+- new date_sun_info (line 897)
+- new date_interval_format (line 898)
+- new date_interval_create_from_date_string (line 899)
+- new date_create (line 900)
+- new date_create_immutable (line 901)
+- new date_create_from_format (line 902)
+- new date_create_immutable_from_format (line 903)
+- new date_parse (line 904)
+- new date_parse_from_format (line 905)
+- new date_add (line 906)
+- new date_sub (line 907)
+- new date_modify (line 908)
+- new date_diff (line 909)
+- new date_sunrise (line 910)
+- new date_sunset (line 911)
+- new sleep (line 912)
+- new set_time_limit (line 913)
+- new setlocale (line 914)
+- new nl_langinfo (line 915)
+- new ignore_user_abort (line 916)
+- new connection_aborted (line 917)
+- new spl_autoload (line 918)
+- new spl_autoload_extensions (line 919)
+- new spl_autoload_functions (line 920)
+- new spl_autoload_register (line 921)
+- new spl_autoload_unregister (line 922)
+- new spl_autoload_call (line 923)
+- new time_nanosleep (line 924)
+- new time_sleep_until (line 925)
+- new usleep (line 926)
 - 6 class method(s)
 - 1 closure(s)
 
@@ -18345,7 +18538,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/VmMinMax.php`
 
@@ -18978,22 +19171,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSession.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 145)
-- new Variable (line 147)
-- new Variable (line 150)
-- new Variable (line 153)
-- new Variable (line 156)
-- new Variable (line 159)
-- new Variable (line 162)
-- new Variable (line 284)
-- new HashTable (line 549)
-- new HashTable (line 615)
-- new HashTable (line 637)
-- new HashTable (line 787)
-- new HashTable (line 794)
-- new HashTable (line 801)
+- new HashTable (line 147)
+- new Variable (line 149)
+- new Variable (line 152)
+- new Variable (line 155)
+- new Variable (line 158)
+- new Variable (line 161)
+- new Variable (line 164)
+- new Variable (line 286)
+- new HashTable (line 555)
+- new HashTable (line 621)
+- new HashTable (line 643)
+- new HashTable (line 793)
+- new HashTable (line 800)
 - new HashTable (line 807)
-- new HashTable (line 812)
+- new HashTable (line 813)
+- new HashTable (line 818)
 - 53 class method(s)
 
 ### `ext/standard/VmSessionSerializer.php`
@@ -22231,7 +22424,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/md5.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/md5_file.php`
@@ -22598,6 +22791,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `ext/standard/phpc_access_kernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/phpc_clone_with_begin.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22619,6 +22817,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/phpc_destruct_try_invoke_native.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/standard/phpc_fpow_kernel.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -22688,6 +22891,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/phpc_nextafter_kernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/phpc_object_invoke_destructor_native.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22703,6 +22911,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/phpc_rename_kernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/phpc_run_command.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22711,6 +22924,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 68)
 - new Variable (line 71)
 - 2 class method(s)
+
+### `ext/standard/phpc_stat_mode_kernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/phpc_weakref_null_slot.php`
 
@@ -23333,7 +23551,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/sha1.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/sha1_file.php`
 
@@ -27026,16 +27244,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 15346)
 - new VM\PropertyIsInitializedHandler (line 15428)
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15468)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15555)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15631)
-- new JIT\Call\VmCoerceVariableToString (line 15721)
-- new JIT\Call\IncludePathResolverResolve (line 15975)
-- new Variable (line 17031)
-- new VM (line 17075)
-- new VM\Variable (line 17084)
-- new Variable (line 17105)
-- new Variable (line 17151)
-- new Variable (line 17645)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15561)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15637)
+- new JIT\Call\VmCoerceVariableToString (line 15727)
+- new JIT\Call\IncludePathResolverResolve (line 15981)
+- new Variable (line 17037)
+- new VM (line 17081)
+- new VM\Variable (line 17090)
+- new Variable (line 17111)
+- new Variable (line 17157)
+- new Variable (line 17651)
 - 369 class method(s)
 - 7 closure(s)
 
@@ -27626,8 +27844,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 954)
-- 44 class method(s)
+- new JIT (line 1102)
+- 54 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/DomElementTextContentRuntime.php`
@@ -27644,6 +27862,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `lib/JIT/Builtin/DomImportNodeRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/DomInstanceMethodRuntime.php`
 
@@ -27680,7 +27903,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DomNodeChildPropertyRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/DomNodeListItemRuntime.php`
 
@@ -27696,6 +27919,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 364)
 - new Variable (line 403)
 - 32 class method(s)
+
+### `lib/JIT/Builtin/DomNodeTreeMutationRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/DomSaveHTMLFileRuntime.php`
 
@@ -29124,8 +29352,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StatPathRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 317)
-- 10 class method(s)
+- new JIT (line 368)
+- 12 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/Stats.php`
@@ -30108,7 +30336,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringRename.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringRmdir.php`
 
@@ -30701,32 +30929,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 886)
 - new Variable (line 925)
 - new Variable (line 962)
-- new Variable (line 1787)
-- new Variable (line 2215)
-- new Variable (line 2277)
-- new Variable (line 2301)
-- new Variable (line 2313)
-- new Variable (line 2326)
-- new Variable (line 2485)
-- new VMVariable (line 3187)
-- new VMVariable (line 3205)
-- new VMVariable (line 3213)
-- new VMVariable (line 3231)
-- new ReflectionClassConstant (line 4396)
-- new Variable (line 4757)
-- new Variable (line 4783)
-- new Variable (line 4791)
-- new Variable (line 4814)
-- new Variable (line 4840)
-- new Variable (line 4848)
-- new Variable (line 4922)
-- new Literal (line 4939)
-- new Literal (line 4944)
-- new Literal (line 4949)
-- new Variable (line 4960)
-- new Variable (line 4993)
-- new Variable (line 5016)
-- new Variable (line 5380)
+- new Variable (line 1788)
+- new Variable (line 2216)
+- new Variable (line 2278)
+- new Variable (line 2302)
+- new Variable (line 2314)
+- new Variable (line 2327)
+- new Variable (line 2486)
+- new VMVariable (line 3188)
+- new VMVariable (line 3206)
+- new VMVariable (line 3214)
+- new VMVariable (line 3232)
+- new ReflectionClassConstant (line 4397)
+- new Variable (line 4758)
+- new Variable (line 4784)
+- new Variable (line 4792)
+- new Variable (line 4815)
+- new Variable (line 4841)
+- new Variable (line 4849)
+- new Variable (line 4923)
+- new Literal (line 4940)
+- new Literal (line 4945)
+- new Literal (line 4950)
+- new Variable (line 4961)
+- new Variable (line 4994)
+- new Variable (line 5017)
+- new Variable (line 5381)
 - 257 class method(s)
 - 8 closure(s)
 
@@ -30896,6 +31124,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/DomDocumentCreateAttributeNS.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/DomDocumentCreateDocumentFragment.php`
 
 **Warnings** (review for bootstrap subset):
@@ -30917,6 +31150,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Call/DomDocumentGetElementsByTagName.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DomDocumentImportNode.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -30956,6 +31194,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/DomElementGetAttribute.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DomElementGetAttributeNodeNS.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DomElementSetAttributeNodeNS.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/DomInstanceMethod.php`
 
 **Warnings** (review for bootstrap subset):
@@ -30977,6 +31230,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Call/DomNodePrepend.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DomNodeRemoveChild.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/DomNodeReplaceChild.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -31669,29 +31932,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DomInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\DomDocumentCreateElement (line 85)
-- new Call\DomDocumentCreateElementNS (line 90)
-- new Call\DomDocumentLoad (line 95)
-- new Call\DomDocumentLoadHTML (line 100)
-- new Call\DomDocumentLoadHTMLFile (line 105)
-- new Call\DomDocumentGetElementById (line 110)
-- new Call\DomDocumentLoadXML (line 115)
-- new Call\DomDocumentSaveXML (line 120)
-- new Call\DomDocumentSaveHTML (line 125)
-- new Call\DomDocumentSaveHTMLFile (line 130)
-- new Call\DomDocumentGetElementsByTagName (line 135)
-- new Call\DomDocumentAppendChild (line 140)
-- new Call\DomNodeAppendChild (line 145)
-- new Call\DomNodeAppendChild (line 150)
-- new Call\DomNodeAppendChild (line 155)
-- new Call\DomNodeAppend (line 160)
-- new Call\DomNodePrepend (line 165)
-- new Call\DomNodeReplaceChildren (line 170)
-- new Call\DomDocumentCreateDocumentFragment (line 175)
-- new Call\DomXPathQuery (line 180)
-- new Call\DomXPathEvaluate (line 185)
-- new Call\DomNodeListItem (line 190)
-- new Call\DomInstanceMethod (line 208)
+- new Call\DomDocumentCreateElement (line 95)
+- new Call\DomDocumentCreateElementNS (line 100)
+- new Call\DomDocumentLoad (line 105)
+- new Call\DomDocumentLoadHTML (line 110)
+- new Call\DomDocumentLoadHTMLFile (line 115)
+- new Call\DomDocumentGetElementById (line 120)
+- new Call\DomDocumentImportNode (line 125)
+- new Call\DomElementGetAttribute (line 130)
+- new Call\DomElementGetAttributeNodeNS (line 135)
+- new Call\DomElementSetAttributeNodeNS (line 140)
+- new Call\DomDocumentCreateAttributeNS (line 145)
+- new Call\DomDocumentLoadXML (line 150)
+- new Call\DomDocumentSaveXML (line 155)
+- new Call\DomDocumentSaveHTML (line 160)
+- new Call\DomDocumentSaveHTMLFile (line 165)
+- new Call\DomDocumentGetElementsByTagName (line 170)
+- new Call\DomDocumentAppendChild (line 175)
+- new Call\DomNodeAppendChild (line 180)
+- new Call\DomNodeAppendChild (line 185)
+- new Call\DomNodeAppendChild (line 190)
+- new Call\DomNodeAppend (line 195)
+- new Call\DomNodePrepend (line 200)
+- new Call\DomNodeReplaceChildren (line 205)
+- new Call\DomNodeRemoveChild (line 210)
+- new Call\DomNodeReplaceChild (line 215)
+- new Call\DomDocumentCreateDocumentFragment (line 220)
+- new Call\DomXPathQuery (line 225)
+- new Call\DomXPathEvaluate (line 230)
+- new Call\DomNodeListItem (line 235)
+- new Call\DomInstanceMethod (line 253)
 - 7 class method(s)
 
 ### `lib/JIT/DynamicObjectReadonlyGuard.php`

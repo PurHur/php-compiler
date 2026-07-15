@@ -611,6 +611,9 @@ final class VmDom
         $element->methodVisibility['getattribute'] = $pub;
         $element->methods['getattributenode'] = new ElementGetAttributeNode();
         $element->methodVisibility['getattributenode'] = $pub;
+        $element->methods['getattributenodens'] = new ElementGetAttributeNodeNS();
+        $element->methodVisibility['getattributenodens'] = $pub;
+        $element->methodNames['getattributenodens'] = 'getAttributeNodeNS';
         $element->methods['getattributens'] = new ElementGetAttributeNS();
         $element->methodVisibility['getattributens'] = $pub;
         $element->methods['hasattribute'] = new ElementHasAttribute();
@@ -625,6 +628,9 @@ final class VmDom
         $element->methodVisibility['setattribute'] = $pub;
         $element->methods['setattributenode'] = new ElementSetAttributeNode();
         $element->methodVisibility['setattributenode'] = $pub;
+        $element->methods['setattributenodens'] = new ElementSetAttributeNodeNS();
+        $element->methodVisibility['setattributenodens'] = $pub;
+        $element->methodNames['setattributenodens'] = 'setAttributeNodeNS';
         $element->methods['setattributens'] = new ElementSetAttributeNS();
         $element->methodVisibility['setattributens'] = $pub;
         $element->methods['removeattributens'] = new ElementRemoveAttributeNS();
@@ -1189,6 +1195,79 @@ final class VmDom
         }
 
         return $var;
+    }
+
+    /**
+     * DOMElement::getAttributeNodeNS() — null when missing (php-src ext/dom/element.c; #19265).
+     */
+    public static function getAttributeNodeNS(
+        Context $ctx,
+        ObjectEntry $element,
+        ?string $namespace,
+        string $localName
+    ): Variable {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $qName = self::findAttributeQNameByNsAndLocal($element, $namespace, $localName);
+        $var = new Variable();
+        if (null === $qName) {
+            $var->null();
+
+            return $var;
+        }
+        $state = DomRegistry::state($element);
+        $attr = self::attributeNodeForElement($ctx, $element, $qName, $state->attributes[$qName]);
+        $var->object($attr);
+
+        return $var;
+    }
+
+    /**
+     * DOMElement::setAttributeNodeNS() — replace by namespaceURI + localName (php-src ext/dom/element.c; #19265).
+     */
+    public static function setAttributeNodeNS(Context $ctx, ObjectEntry $element, ObjectEntry $attr): Variable
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        if (!self::isAttr($attr)) {
+            throw new \TypeError('DOMElement::setAttributeNodeNS(): Argument #1 ($attr) must be of type DOMAttr');
+        }
+        $attrState = DomRegistry::state($attr);
+        $localName = $attrState->localName ?? $attrState->nodeName;
+        $namespace = $attrState->namespaceUri;
+        $nsArg = (null === $namespace || '' === $namespace) ? null : $namespace;
+        $existingQName = self::findAttributeQNameByNsAndLocal($element, $nsArg, $localName);
+        $crossNameReplaced = null;
+        if (null !== $existingQName && $existingQName !== $attrState->nodeName) {
+            $elementState = DomRegistry::state($element);
+            $cachedId = $elementState->attributeNodeIds[$existingQName] ?? null;
+            if (null !== $cachedId) {
+                $cached = DomRegistry::entry($cachedId);
+                if (null !== $cached && $cached->id !== $attr->id) {
+                    $crossNameReplaced = $cached;
+                    self::detachAttributeNode($cached);
+                }
+            }
+            unset(
+                $elementState->attributes[$existingQName],
+                $elementState->attributeNamespaces[$existingQName],
+                $elementState->attributeNodeIds[$existingQName]
+            );
+            if (null !== $elementState->idAttributeName && $existingQName === $elementState->idAttributeName) {
+                $elementState->idAttributeName = $attrState->nodeName;
+            }
+        }
+        $result = self::setAttributeNode($ctx, $element, $attr);
+        if (null !== $crossNameReplaced) {
+            $var = new Variable();
+            $var->object($crossNameReplaced);
+
+            return $var;
+        }
+
+        return $result;
     }
 
     public static function removeAttributeNode(Context $ctx, ObjectEntry $element, ObjectEntry $attr): Variable
@@ -2368,24 +2447,130 @@ final class VmDom
 
     private static function indexElementIdsRecursive(ObjectEntry $document, ObjectEntry $node): void
     {
-        if (!self::isElement($node)) {
+        if (self::isElement($node)) {
+            $docState = DomRegistry::state($document);
+            $nodeState = DomRegistry::state($node);
+            $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
+            if (null !== $idAttr) {
+                $value = $nodeState->attributes[$idAttr] ?? null;
+                if (null !== $value && '' !== $value) {
+                    $docState->elementIds[$value] = $node->id;
+                }
+            }
+            foreach ($nodeState->childIds as $childId) {
+                $child = DomRegistry::entry($childId);
+                if (null !== $child) {
+                    self::indexElementIdsRecursive($document, $child);
+                }
+            }
+
             return;
         }
-        $docState = DomRegistry::state($document);
-        $nodeState = DomRegistry::state($node);
-        $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
-        if (null !== $idAttr) {
-            $value = $nodeState->attributes[$idAttr] ?? null;
-            if (null !== $value && '' !== $value) {
-                $docState->elementIds[$value] = $node->id;
-            }
+        if (!DomRegistry::has($node)) {
+            return;
         }
-        foreach ($nodeState->childIds as $childId) {
+        // Document fragments / non-element containers: walk children only.
+        foreach (DomRegistry::state($node)->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
                 self::indexElementIdsRecursive($document, $child);
             }
         }
+    }
+
+    /**
+     * Drop subtree ID map entries (php-src ext/dom/node.c — remove from ID hash; #19212).
+     */
+    private static function unregisterElementIdsRecursive(ObjectEntry $document, ObjectEntry $node): void
+    {
+        if (self::isElement($node)) {
+            $docState = DomRegistry::state($document);
+            $nodeState = DomRegistry::state($node);
+            $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
+            if (null !== $idAttr) {
+                $value = $nodeState->attributes[$idAttr] ?? null;
+                if (null !== $value && '' !== $value
+                    && ($docState->elementIds[$value] ?? null) === $node->id
+                ) {
+                    unset($docState->elementIds[$value]);
+                }
+            }
+            foreach ($nodeState->childIds as $childId) {
+                $child = DomRegistry::entry($childId);
+                if (null !== $child) {
+                    self::unregisterElementIdsRecursive($document, $child);
+                }
+            }
+
+            return;
+        }
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::unregisterElementIdsRecursive($document, $child);
+            }
+        }
+    }
+
+    /** True when $node has the document as an ancestor (live tree, not orphan/fragment-only). */
+    private static function isConnectedToDocument(ObjectEntry $node): bool
+    {
+        if (!DomRegistry::has($node)) {
+            return false;
+        }
+        if (self::isDocument($node)) {
+            return true;
+        }
+        $current = $node;
+        while (true) {
+            $parentId = DomRegistry::state($current)->parentId;
+            if (null === $parentId) {
+                return false;
+            }
+            $parent = DomRegistry::entry($parentId);
+            if (null === $parent) {
+                return false;
+            }
+            if (self::isDocument($parent)) {
+                return true;
+            }
+            $current = $parent;
+        }
+    }
+
+    /**
+     * After insert/append/import into the live tree — index ID attrs (php-src ext/dom/node.c; #19212).
+     */
+    private static function registerSubtreeElementIdsIfConnected(ObjectEntry $node): void
+    {
+        if (!self::isConnectedToDocument($node)) {
+            return;
+        }
+        $document = self::ownerDocumentEntry($node);
+        if (null === $document) {
+            return;
+        }
+        self::indexElementIdsRecursive($document, $node);
+        self::syncElementIdMapProperty($document);
+    }
+
+    /**
+     * Before remove/detach from the live tree — drop ID attrs (php-src ext/dom/node.c; #19212).
+     */
+    private static function unregisterSubtreeElementIdsIfConnected(ObjectEntry $node): void
+    {
+        if (!self::isConnectedToDocument($node)) {
+            return;
+        }
+        $document = self::ownerDocumentEntry($node);
+        if (null === $document) {
+            return;
+        }
+        self::unregisterElementIdsRecursive($document, $node);
+        self::syncElementIdMapProperty($document);
     }
 
     /**
@@ -3272,6 +3457,7 @@ final class VmDom
         if (DomConstants::XML_DOCUMENT_NODE === $parentState->nodeType) {
             self::appendDocumentChild($ctx, $parent, $child);
             self::syncSubtree($ctx, $parent);
+            self::registerSubtreeElementIdsIfConnected($child);
 
             return $child;
         }
@@ -3287,6 +3473,7 @@ final class VmDom
         $parentState->childIds[] = $child->id;
         self::linkChildToParent($child, $parent);
         self::syncSubtree($ctx, $parent);
+        self::registerSubtreeElementIdsIfConnected($child);
 
         return $child;
     }
@@ -3316,6 +3503,7 @@ final class VmDom
         }
         self::assertChildOfParent($parent, $oldChild, 'DOMNode::replaceChild()');
         self::assertSameDocument($parent, $newChild);
+        self::unregisterSubtreeElementIdsIfConnected($oldChild);
         self::detachNodeIfAttached($ctx, $newChild);
         $parentState = DomRegistry::state($parent);
         $index = self::childIndex($parentState->childIds, $oldChild->id);
@@ -3331,6 +3519,7 @@ final class VmDom
             self::propagateDocumentId($newChild, $parent->id);
         }
         self::syncSubtree($ctx, $parent);
+        self::registerSubtreeElementIdsIfConnected($newChild);
 
         return $oldChild;
     }
@@ -3373,6 +3562,7 @@ final class VmDom
             self::propagateDocumentId($newChild, $parent->id);
         }
         self::syncSubtree($ctx, $parent);
+        self::registerSubtreeElementIdsIfConnected($newChild);
 
         return $newChild;
     }
@@ -3381,6 +3571,7 @@ final class VmDom
     {
         self::assertMutationParent($parent);
         self::assertChildOfParent($parent, $child, 'DOMNode::removeChild()');
+        self::unregisterSubtreeElementIdsIfConnected($child);
         $parentState = DomRegistry::state($parent);
         $parentState->childIds = \array_values(\array_filter(
             $parentState->childIds,
@@ -3938,6 +4129,7 @@ final class VmDom
                 $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($child);
                 self::linkChildToParent($child, $parent);
                 self::propagateDocumentId($child, $parent->id);
+                self::registerSubtreeElementIdsIfConnected($child);
 
                 return;
             }
@@ -3946,6 +4138,7 @@ final class VmDom
             if (self::isElement($child)) {
                 self::propagateDocumentId($child, $parent->id);
             }
+            self::registerSubtreeElementIdsIfConnected($child);
 
             return;
         }
@@ -3958,6 +4151,7 @@ final class VmDom
 
         $parentState->childIds[] = $child->id;
         self::linkChildToParent($child, $parent);
+        self::registerSubtreeElementIdsIfConnected($child);
     }
 
     public static function prependLiveStandardChild(Context $ctx, ObjectEntry $parent, ObjectEntry $child): void
@@ -4011,6 +4205,7 @@ final class VmDom
                     $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($newChild);
                     self::linkChildToParent($newChild, $parent);
                     self::propagateDocumentId($newChild, $parent->id);
+                    self::registerSubtreeElementIdsIfConnected($newChild);
 
                     return;
                 }
@@ -4038,6 +4233,7 @@ final class VmDom
             }
             self::propagateDocumentId($newChild, $parent->id);
         }
+        self::registerSubtreeElementIdsIfConnected($newChild);
     }
 
     private static function resolveLiveStandardAppendArg(
@@ -5635,7 +5831,24 @@ final class VmDom
             } elseif (null !== $parentState->documentId) {
                 $childState->documentId = $parentState->documentId;
             }
+
+            return;
         }
+        // Detached nodes clear parent/sibling slots (php-src php_dom_unlink_node; #19240).
+        // syncSubtree(parent) only walks remaining childIds — it never refreshes the unlinked node.
+        self::clearDetachedNodeLinkProperties($child);
+    }
+
+    /** Clear live parent/sibling props after unlink (ext/dom/node.c; #19240). */
+    private static function clearDetachedNodeLinkProperties(ObjectEntry $node): void
+    {
+        self::initNodePropertySlots($node);
+        $node->getProperty(self::PROP_PARENT_NODE)->null();
+        if (CompilerVersion::supportsDomParentElement() && $node->hasProperty(self::PROP_PARENT_ELEMENT)) {
+            $node->getProperty(self::PROP_PARENT_ELEMENT)->null();
+        }
+        $node->getProperty(self::PROP_NEXT_SIBLING)->null();
+        $node->getProperty(self::PROP_PREVIOUS_SIBLING)->null();
     }
 
     private static function assertMutationParent(ObjectEntry $parent): void
@@ -6445,6 +6658,7 @@ final class VmDom
         if (Variable::TYPE_NULL !== $existing->type) {
             $parentState->childIds[] = $child->id;
             self::linkChildToParent($child, $document);
+            self::registerSubtreeElementIdsIfConnected($child);
 
             return;
         }
@@ -6454,12 +6668,14 @@ final class VmDom
             $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($child);
             self::linkChildToParent($child, $document);
             self::propagateDocumentId($child, $document->id);
+            self::registerSubtreeElementIdsIfConnected($child);
 
             return;
         }
         $parentState->childIds[] = $child->id;
         self::linkChildToParent($child, $document);
         self::propagateDocumentId($child, $document->id);
+        self::registerSubtreeElementIdsIfConnected($child);
     }
 
     public static function isCloneableNode(ObjectEntry $entry): bool
@@ -6530,6 +6746,7 @@ final class VmDom
             $importedState->localName = $sourceState->localName;
             $importedState->prefix = $sourceState->prefix;
             $importedState->namespaceUri = $sourceState->namespaceUri;
+            $importedState->idAttributeName = $sourceState->idAttributeName;
             if ($deep) {
                 foreach ($sourceState->childIds as $childId) {
                     $child = DomRegistry::entry($childId);
@@ -6593,6 +6810,7 @@ final class VmDom
             $clonedState->localName = $sourceState->localName;
             $clonedState->prefix = $sourceState->prefix;
             $clonedState->namespaceUri = $sourceState->namespaceUri;
+            $clonedState->idAttributeName = $sourceState->idAttributeName;
         }
         if ($deep) {
             $cloneState = DomRegistry::state($cloned);

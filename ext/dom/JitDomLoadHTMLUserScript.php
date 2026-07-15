@@ -51,6 +51,22 @@ final class JitDomLoadHTMLUserScript
         return self::$lastCompileTimeOptions;
     }
 
+    /** @var array{tag: string, id: string, text: string}|null Last compile-time getElementById hit (#19212). */
+    private static ?array $lastGetElementByIdHit = null;
+
+    public static function rememberLastGetElementByIdHit(array $parsed): void
+    {
+        self::$lastGetElementByIdHit = $parsed;
+    }
+
+    /**
+     * @return array{tag: string, id: string, text: string}|null
+     */
+    public static function lastGetElementByIdHit(): ?array
+    {
+        return self::$lastGetElementByIdHit;
+    }
+
     /**
      * @return array{tag: string, id: string, text: string}|null
      */

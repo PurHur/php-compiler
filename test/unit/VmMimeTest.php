@@ -52,6 +52,12 @@ final class VmMimeTest extends TestCase
         $this->assertSame('text/plain', VmMime::detectFromBytes("127.0.0.1 localhost\n"));
     }
 
+    public function testDetectFromBytesHtml(): void
+    {
+        $this->assertSame('text/html', VmMime::detectFromBytes("<html><body></body></html>\n"));
+        $this->assertSame('text/html', VmMime::detectFromBytes("<!DOCTYPE html>\n<html></html>\n"));
+    }
+
     public function testDetectFromBytesBinary(): void
     {
         $this->assertSame('application/octet-stream', VmMime::detectFromBytes("\x00binary"));

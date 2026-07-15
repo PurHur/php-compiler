@@ -10,8 +10,7 @@ foreach ([
     'str_shuffle' => static fn () => str_shuffle(null),
     'str_rot13' => static fn () => str_rot13(null),
     'crc32' => static fn () => crc32(null),
-    'soundex' => static fn () => soundex(null),
-    'metaphone' => static fn () => metaphone(null),
+    // soundex/metaphone: TypeError on 8.4 — see phonetic_null_typeerror_84.phpt (#19243)
     'convert_uuencode' => static fn () => convert_uuencode(null),
     'bin2hex' => static fn () => bin2hex(null),
     'hebrev' => static fn () => hebrev(null),
@@ -28,8 +27,6 @@ nl2br: ''
 str_shuffle: ''
 str_rot13: ''
 crc32: 0
-soundex: '0000'
-metaphone: ''
 convert_uuencode: '`
 '
 bin2hex: ''

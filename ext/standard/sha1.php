@@ -10,10 +10,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** sha1() — hex digest via native __compiler_hash (issue #2160). */
+/** sha1() — hex digest via native __compiler_hash (issue #2160; #19255 null TypeError). */
 final class sha1 extends Internal
 {
     public function __construct()
@@ -30,7 +31,7 @@ final class sha1 extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'sha1', 0, 'string');
+        $data = self::vmStringArg($frame);
         $raw = false;
         if (2 === $argc) {
             $rawArg = $frame->calledArgs[1]->resolveIndirect();
@@ -60,8 +61,44 @@ final class sha1 extends Internal
 
         return JitSha1::digest(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'sha1', 0, 'string'),
+            self::jitStringArg($context, $args[0]),
             $raw
+        );
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19255, ext/standard/sha1.c). */
+    private static function vmStringArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, 0, 'sha1', 'string')->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'sha1',
+            0,
+            'string'
+        );
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'sha1',
+                0,
+                'string'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'sha1',
+            0,
+            'string'
         );
     }
 }

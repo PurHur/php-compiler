@@ -50,15 +50,27 @@ final class strtok extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('strtok() accepts one or two arguments in this compiler build');
         }
-        StringStrtok::ensureLinked($context);
         if (1 === $argc) {
+            StringStrtok::ensureLinked($context);
+
             return JitStrtok::tokenize(
                 $context,
                 null,
-                JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'string', 'string', 'string')
+                JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'token', 'string', 'string')
             );
         }
 
+        // Early TypeError return before StringStrtok::ensureLinked (AOT helper IR gap; #19242).
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strtok', 0, 'string', 'string', 'string');
+
+            return JitStrtok::deadFalseResult($context);
+        }
+
+        StringStrtok::ensureLinked($context);
         $tok = JitStringBuiltinArg::lower(
             $context,
             $args[1],
@@ -70,7 +82,7 @@ final class strtok extends Internal
         );
         return JitStrtok::tokenize(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'strtok', 0, 'string', 'string', 'string'),
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strtok', 0, 'string', 'string', 'string'),
             $tok
         );
     }

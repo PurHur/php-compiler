@@ -8,13 +8,14 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPCompiler\ext\standard\JitFpowKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for fpow() / float pow() via FpowJitHelper PHP (#15189).
+ * JIT/AOT link for fpow() / float pow() via FpowJitHelper PHP (#15189, #19259).
  *
- * Replaces libc `pow` LLVM lookup in ext/standard/fpow.php and JitPow.php.
- * SSOT: {@see \PHPCompiler\ext\standard\FpowJitHelper}.
+ * Embed / non-user-script: {@see FpowJitHelper} via {@see JitVmHelperLink}.
+ * User-script standalone AOT + nested leaf: thin {@see JitFpowKernel} libc pow(3).
  * php-src: ext/standard/math.c — PHP_FUNCTION(fpow)
  */
 final class MathFpow
@@ -30,6 +31,8 @@ final class MathFpow
         self::FPOW_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'fpow_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -42,10 +45,10 @@ final class MathFpow
 
     public static function invoke(Context $context, Value $num, Value $exponent): Value
     {
-        // User-script AOT: nested php-in-PHP helpers truncate float params (#17279, #15407).
-        // Nested helper compile: FpowJitHelper → pow() → here; use libc leaf (#15189).
-        if (UserScriptAotDeferNestedJit::shouldDefer($context) || NestedJitCompileScope::isActive()) {
-            return self::invokeLibcPow($context, $num, $exponent);
+        // Nested helper compile of unrelated units that still call pow(): libc leaf
+        // without re-entering FpowJitHelper (#17279, #19259).
+        if (NestedJitCompileScope::isActive()) {
+            return JitFpowKernel::invoke($context, $num, $exponent);
         }
 
         self::ensureLinked($context);
@@ -57,27 +60,15 @@ final class MathFpow
         );
     }
 
-    private static function invokeLibcPow(Context $context, Value $num, Value $exponent): Value
-    {
-        $double = $context->getTypeFromString('double');
-        $abiName = 'pow';
-        $fn = $context->module->getNamedFunction($abiName);
-        if (null === $fn) {
-            try {
-                $fn = $context->lookupFunction($abiName);
-            } catch (\Throwable) {
-                $ft = $context->context->functionType($double, false, $double, $double);
-                $fn = $context->module->addFunction($abiName, $ft);
-                $context->registerFunction($abiName, $fn);
-            }
-        }
-
-        return $context->builder->call($fn, $num, $exponent);
-    }
-
     private static function implement(Context $context): void
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context) || NestedJitCompileScope::isActive()) {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            self::implementUserScriptKernel($context);
+
             return;
         }
 
@@ -85,13 +76,49 @@ final class MathFpow
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_FPOW,
-            'fpow_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double, $double],
             $double,
             self::FPOW_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15189'
+            '#19259'
         );
+    }
+
+    private static function implementUserScriptKernel(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_FPOW);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_FPOW, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $double = $context->getTypeFromString('double');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_FPOW,
+                $context->context->functionType($double, false, $double, $double)
+            );
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $result = JitFpowKernel::invoke($context, $fn->getParam(0), $fn->getParam(1));
+        $context->builder->returnValue($result);
+        $context->registerFunction(self::ABI_FPOW, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

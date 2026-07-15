@@ -18,6 +18,7 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        SessionHandlerBuiltin::register($runtime->vmContext);
         foreach ([
             'PHP_SESSION_DISABLED' => SessionConstants::PHP_SESSION_DISABLED,
             'PHP_SESSION_NONE' => SessionConstants::PHP_SESSION_NONE,

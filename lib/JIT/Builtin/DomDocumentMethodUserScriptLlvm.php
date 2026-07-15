@@ -109,6 +109,87 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureImportNodeBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomImportNodeRuntime::ABI_NAME,
+            'dom_import_node_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::importNodeArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureGetAttributeBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomImportNodeRuntime::ABI_GET_ATTRIBUTE,
+            'dom_get_attribute_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('__string__*'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::getAttributeArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureGetAttributeNodeNSBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomImportNodeRuntime::ABI_GET_ATTRIBUTE_NODE_NS,
+            'dom_get_attribute_node_ns_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::getAttributeNodeNSArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureSetAttributeNodeNSBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        self::ensureBridge(
+            $context,
+            DomImportNodeRuntime::ABI_SET_ATTRIBUTE_NODE_NS,
+            'dom_set_attribute_node_ns_user_script',
+            [$objPtr, $objPtr],
+            $objPtr,
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::setAttributeNodeNSArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureCreateAttributeNSBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomImportNodeRuntime::ABI_CREATE_ATTRIBUTE_NS,
+            'dom_create_attribute_ns_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::createAttributeNSArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
     public static function ensureFirstChildBridge(Context $context): void
     {
         self::ensureBridge(
@@ -458,6 +539,73 @@ final class DomDocumentMethodUserScriptLlvm
             $context->context->voidType(),
             'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildrenStringArgv1',
             '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensureRemoveChildBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        self::ensureBridge(
+            $context,
+            DomNodeTreeMutationRuntime::ABI_REMOVE_CHILD,
+            'dom_remove_child_user_script',
+            [$objPtr, $objPtr],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::removeChildObjectArgv1',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensureReplaceChildBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        self::ensureBridge(
+            $context,
+            DomNodeTreeMutationRuntime::ABI_REPLACE_CHILD,
+            'dom_replace_child_user_script',
+            [$objPtr, $objPtr, $objPtr],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildObjectArgv2',
+            '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensureParentNodeBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_PARENT_NODE,
+            'dom_parent_node_user_script',
+            [$context->getTypeFromString('__object__*')],
+            $context->getTypeFromString('__object__*'),
+            DomNodeChildPropertyRuntime::HELPER_PARENT,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
+        );
+    }
+
+    public static function ensureNextSiblingBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_NEXT_SIBLING,
+            'dom_next_sibling_user_script',
+            [$context->getTypeFromString('__object__*')],
+            $context->getTypeFromString('__object__*'),
+            DomNodeChildPropertyRuntime::HELPER_NEXT,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
+        );
+    }
+
+    public static function ensurePreviousSiblingBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_PREVIOUS_SIBLING,
+            'dom_previous_sibling_user_script',
+            [$context->getTypeFromString('__object__*')],
+            $context->getTypeFromString('__object__*'),
+            DomNodeChildPropertyRuntime::HELPER_PREV,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
         );
     }
 

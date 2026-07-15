@@ -20,7 +20,7 @@ final class strrchr extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('strrchr() requires exactly two arguments in this compiler build');
         }
-        $haystackStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strrchr', 0, 'haystack');
+        $haystackStr = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'strrchr', 0, 'haystack');
         $needleStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strrchr', 1, 'needle');
         if (null === $frame->returnVar) {
             return;
@@ -39,9 +39,19 @@ final class strrchr extends Internal
             throw new \LogicException('strrchr() requires exactly two arguments in this compiler build');
         }
 
+        // Early TypeError — skip StringStrrchr ensureLinked on null haystack (#19242).
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strrchr', 0, 'haystack');
+
+            return JitStrtok::deadFalseResult($context);
+        }
+
         return JitStrrchr::find(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'strrchr', 0, 'haystack'),
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strrchr', 0, 'haystack'),
             JitStringBuiltinArg::lower($context, $args[1], 'strrchr', 1, 'needle')
         );
     }

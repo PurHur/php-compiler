@@ -5,45 +5,54 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * File path predicates for compiled JIT/AOT modules (#9112, php-in-PHP).
+ * File path predicates for compiled JIT/AOT modules (#9112, #19215, php-in-PHP).
  *
- * VM SSOT: {@see VmStatPath}
+ * User-script AOT: thin {@see phpc_stat_mode_kernel} / {@see phpc_access_kernel}
+ * (libc) — VmStatPath is an external stub in nested helper TUs so `@\\stat` is unused.
+ * VM SSOT for non-compiled paths remains {@see VmStatPath}.
  * php-src: ext/standard/filestat.c
  */
 final class StatPathJitHelper
 {
     public static function exists(string $path): bool
     {
-        return VmStatPath::exists($path);
+        return \phpc_stat_mode_kernel($path, 0) >= 0;
     }
 
     public static function isFile(string $path): bool
     {
-        return VmStatPath::isFile($path);
+        $mode = \phpc_stat_mode_kernel($path, 0);
+
+        // S_IFMT=0xF000, S_IFREG=0x8000 — literals so nested JIT folds cleanly (#19215).
+        return $mode >= 0 && ($mode & 0xF000) === 0x8000;
     }
 
     public static function isDir(string $path): bool
     {
-        return VmStatPath::isDir($path);
+        $mode = \phpc_stat_mode_kernel($path, 0);
+
+        return $mode >= 0 && ($mode & 0xF000) === 0x4000;
     }
 
     public static function isLink(string $path): bool
     {
-        return VmStatPath::isLink($path);
+        $mode = \phpc_stat_mode_kernel($path, 1);
+
+        return $mode >= 0 && ($mode & 0xF000) === 0xA000;
     }
 
     public static function isReadable(string $path): bool
     {
-        return VmStatPath::isReadable($path);
+        return \phpc_access_kernel($path, 4);
     }
 
     public static function isWritable(string $path): bool
     {
-        return VmStatPath::isWritable($path);
+        return \phpc_access_kernel($path, 2);
     }
 
     public static function isExecutable(string $path): bool
     {
-        return VmStatPath::isExecutable($path);
+        return \phpc_access_kernel($path, 1);
     }
 }

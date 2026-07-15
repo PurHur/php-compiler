@@ -11,10 +11,11 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** md5() — hex digest via native __compiler_hash (issue #179 follow-up). */
+/** md5() — hex digest via native __compiler_hash (issue #179 follow-up; #19255 null TypeError). */
 final class md5 extends Internal
 {
     public function __construct()
@@ -28,7 +29,7 @@ final class md5 extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('md5() requires one or two arguments in this compiler build');
         }
-        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'md5', 0, 'string');
+        $data = self::vmStringArg($frame);
         $raw = false;
         if (2 === $argc) {
             $rawArg = $frame->calledArgs[1]->resolveIndirect();
@@ -60,8 +61,44 @@ final class md5 extends Internal
 
         return JitMd5::digest(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'md5', 0, 'string'),
+            self::jitStringArg($context, $args[0]),
             $raw
+        );
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19255, ext/standard/md5.c). */
+    private static function vmStringArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, 0, 'md5', 'string')->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'md5',
+            0,
+            'string'
+        );
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'md5',
+                0,
+                'string'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'md5',
+            0,
+            'string'
         );
     }
 }

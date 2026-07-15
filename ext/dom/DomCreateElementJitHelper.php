@@ -30,6 +30,34 @@ final class DomCreateElementJitHelper
         }
     }
 
+    /** DOMNode::removeChild() — user-script AOT (#19240, php-src ext/dom/node.c). */
+    public static function removeChildObjectArgv1(ObjectEntry $parent, ObjectEntry $child): void
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        $childCanon = DomRegistry::entry($child->id) ?? $child;
+        VmDom::removeChild($ctx, $canonical, $childCanon);
+        if ($canonical !== $parent) {
+            VmDom::mirrorNodeLinkProperties($parent, $canonical);
+        }
+    }
+
+    /** DOMNode::replaceChild() — user-script AOT (#19240, php-src ext/dom/node.c). */
+    public static function replaceChildObjectArgv2(
+        ObjectEntry $parent,
+        ObjectEntry $newChild,
+        ObjectEntry $oldChild
+    ): void {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($parent->id) ?? $parent;
+        $newCanon = DomRegistry::entry($newChild->id) ?? $newChild;
+        $oldCanon = DomRegistry::entry($oldChild->id) ?? $oldChild;
+        VmDom::replaceChild($ctx, $canonical, $newCanon, $oldCanon);
+        if ($canonical !== $parent) {
+            VmDom::mirrorNodeLinkProperties($parent, $canonical);
+        }
+    }
+
     public static function appendObjectArgv2(ObjectEntry $parent, ObjectEntry $a1, ObjectEntry $a2): void
     {
         self::appendObjectArgv1($parent, $a1);

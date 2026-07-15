@@ -110,7 +110,7 @@ function analyzeInternal(PHPCompiler\Func\Internal $fn): array
         $notes[] = 'file MIME sniff (VM host fileinfo + AOT byte sniff) (#6196)';
     }
     if (str_starts_with($fn->getName(), 'finfo_') && preg_match('/VmFinfo|VmMime/i', $source)) {
-        $notes[] = 'ext/fileinfo VM sniff via VmMime (JIT deferred) (#3366)';
+        $notes[] = 'ext/fileinfo VM sniff via VmMime + FILEINFO_NONE/RAW human desc (#3366,#19247; JIT deferred)';
     }
     if ('openssl_cipher_key_length' === $fn->getName()
         && preg_match('/JitOpensslCipherKeyLength/i', $source)) {

@@ -8,13 +8,14 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPCompiler\ext\standard\JitNextafterKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for nextafter() via NextafterJitHelper PHP (#15062).
+ * JIT/AOT link for nextafter() via NextafterJitHelper PHP (#15062, #19259).
  *
- * Replaces libc `nextafter` LLVM lookup in ext/standard/nextafter.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Embed / non-user-script: {@see NextafterJitHelper} via {@see JitVmHelperLink}.
+ * User-script standalone AOT + nested leaf: thin {@see JitNextafterKernel} libc.
  * php-src: ext/standard/math.c — PHP_FUNCTION(nextafter)
  */
 final class MathNextafter
@@ -30,6 +31,8 @@ final class MathNextafter
         self::NEXTAFTER_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'nextafter_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -42,8 +45,8 @@ final class MathNextafter
 
     public static function invoke(Context $context, Value $num, Value $next): Value
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context) || NestedJitCompileScope::isActive()) {
-            return self::invokeLibcNextafter($context, $num, $next);
+        if (NestedJitCompileScope::isActive()) {
+            return JitNextafterKernel::invoke($context, $num, $next);
         }
 
         self::ensureLinked($context);
@@ -55,27 +58,15 @@ final class MathNextafter
         );
     }
 
-    private static function invokeLibcNextafter(Context $context, Value $num, Value $next): Value
-    {
-        $double = $context->getTypeFromString('double');
-        $abiName = 'nextafter';
-        $fn = $context->module->getNamedFunction($abiName);
-        if (null === $fn) {
-            try {
-                $fn = $context->lookupFunction($abiName);
-            } catch (\Throwable) {
-                $ft = $context->context->functionType($double, false, $double, $double);
-                $fn = $context->module->addFunction($abiName, $ft);
-                $context->registerFunction($abiName, $fn);
-            }
-        }
-
-        return $context->builder->call($fn, $num, $next);
-    }
-
     private static function implement(Context $context): void
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context) || NestedJitCompileScope::isActive()) {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            self::implementUserScriptKernel($context);
+
             return;
         }
 
@@ -83,13 +74,49 @@ final class MathNextafter
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_NEXTAFTER,
-            'nextafter_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double, $double],
             $double,
             self::NEXTAFTER_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15062'
+            '#19259'
         );
+    }
+
+    private static function implementUserScriptKernel(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_NEXTAFTER);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_NEXTAFTER, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $double = $context->getTypeFromString('double');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI_NEXTAFTER,
+                $context->context->functionType($double, false, $double, $double)
+            );
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $result = JitNextafterKernel::invoke($context, $fn->getParam(0), $fn->getParam(1));
+        $context->builder->returnValue($result);
+        $context->registerFunction(self::ABI_NEXTAFTER, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

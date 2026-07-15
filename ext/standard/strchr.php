@@ -21,7 +21,7 @@ final class strchr extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strchr() requires two or three arguments in this compiler build');
         }
-        $haystackStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strchr', 0, 'haystack');
+        $haystackStr = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'strchr', 0, 'haystack');
         $needleStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strchr', 1, 'needle');
         $beforeNeedle = false;
         if (3 === $argc) {
@@ -55,7 +55,7 @@ final class strchr extends Internal
 
         return JitStrstr::find(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'strchr', 0, 'haystack'),
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strchr', 0, 'haystack'),
             JitStringBuiltinArg::lower($context, $args[1], 'strchr', 1, 'needle'),
             $before
         );

@@ -45,6 +45,7 @@ final class DomInstanceMethodJit
     private const USER_SCRIPT_DIRECT_METHODS = [
         'domdocument::createelement' => true,
         'domdocument::createelementns' => true,
+        'domdocument::createattributens' => true,
         'domdocument::load' => true,
         'domdocument::loadhtml' => true,
         'domdocument::loadhtmlfile' => true,
@@ -60,7 +61,16 @@ final class DomInstanceMethodJit
         'domnode::append' => true,
         'domnode::prepend' => true,
         'domnode::replacechildren' => true,
+        'domnode::removechild' => true,
+        'domelement::removechild' => true,
+        'domnode::replacechild' => true,
+        'domelement::replacechild' => true,
         'domdocument::createdocumentfragment' => true,
+        'domdocument::importnode' => true,
+        'domelement::getattribute' => true,
+        'domnode::getattribute' => true,
+        'domelement::getattributenodens' => true,
+        'domelement::setattributenodens' => true,
         'domxpath::query' => true,
         'domxpath::evaluate' => true,
         'domnodelist::item' => true,
@@ -108,6 +118,31 @@ final class DomInstanceMethodJit
             }
             if ('domdocument::getelementbyid' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentGetElementById();
+
+                return;
+            }
+            if ('domdocument::importnode' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentImportNode();
+
+                return;
+            }
+            if ('domelement::getattribute' === $lc || 'domnode::getattribute' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementGetAttribute();
+
+                return;
+            }
+            if ('domelement::getattributenodens' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementGetAttributeNodeNS();
+
+                return;
+            }
+            if ('domelement::setattributenodens' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementSetAttributeNodeNS();
+
+                return;
+            }
+            if ('domdocument::createattributens' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentCreateAttributeNS();
 
                 return;
             }
@@ -168,6 +203,16 @@ final class DomInstanceMethodJit
             }
             if ('domnode::replacechildren' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomNodeReplaceChildren();
+
+                return;
+            }
+            if ('domelement::removechild' === $lc || 'domnode::removechild' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeRemoveChild();
+
+                return;
+            }
+            if ('domelement::replacechild' === $lc || 'domnode::replacechild' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeReplaceChild();
 
                 return;
             }
@@ -232,10 +277,22 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domnode::append');
             self::ensureProxy($context, 'domnode::prepend');
             self::ensureProxy($context, 'domnode::replacechildren');
+            self::ensureProxy($context, 'domnode::removechild');
+            self::ensureProxy($context, 'domelement::removechild');
+            self::ensureProxy($context, 'domnode::replacechild');
+            self::ensureProxy($context, 'domelement::replacechild');
             self::ensureProxy($context, 'domdocument::createdocumentfragment');
             self::ensureProxy($context, 'domxpath::query');
             self::ensureProxy($context, 'domxpath::evaluate');
             self::ensureProxy($context, 'domnodelist::item');
+            self::ensureProxy($context, 'domdocument::importnode');
+            self::ensureProxy($context, 'domelement::getattribute');
+            self::ensureProxy($context, 'domnode::getattribute');
+            self::ensureProxy($context, 'domelement::getattributenodens');
+            self::ensureProxy($context, 'domelement::setattributenodens');
+            self::ensureProxy($context, 'domdocument::createattributens');
+            self::ensureProxy($context, 'domnode::comparedocumentposition');
+            self::ensureProxy($context, 'domxpath::registernamespace');
 
             return;
         }
@@ -273,7 +330,13 @@ final class DomInstanceMethodJit
         }
         foreach (['DOMNode', 'DOMElement', 'DOMDocument'] as $nodeClass) {
             $nodeId = $object->lookup($nodeClass);
-            foreach ([VmDom::PROP_FIRST_CHILD, VmDom::PROP_LAST_CHILD] as $prop) {
+            foreach ([
+                VmDom::PROP_FIRST_CHILD,
+                VmDom::PROP_LAST_CHILD,
+                VmDom::PROP_PARENT_NODE,
+                VmDom::PROP_NEXT_SIBLING,
+                VmDom::PROP_PREVIOUS_SIBLING,
+            ] as $prop) {
                 if (!$object->hasProperty($nodeId, $prop)) {
                     $object->defineProperty($nodeId, $prop, Variable::TYPE_VALUE);
                 }
