@@ -4941,4 +4941,5 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateElementNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/HashTableUnshiftPrepend.php';
 require_once __DIR__.'/../../../lib/JIT/Call/IncludePathResolverResolve.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/PharRunning.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_ssl_connect.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
