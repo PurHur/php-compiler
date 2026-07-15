@@ -36,6 +36,15 @@ final class putenv_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('putenv() requires exactly one argument');
         }
+        // Compile-time concat/literal assignments: libc setenv from a C string constant.
+        // Slot-backed concat temps carry compileTimeString for echo/folds but __string__
+        // length/value GEPs (even after __string__separate) still misfire under thin AOT
+        // user-script defer (#17316, #15642) — seen as empty getenv after putenv concat
+        // in multipart request_parse_body fixtures (#5965).
+        $literal = \PHPCompiler\JIT\JitStringArg::compileTimeLiteral($args[0]);
+        if (null !== $literal) {
+            return JitEnv::putenvFromCStringLiteral($context, $literal);
+        }
         $assignment = JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,
             $args[0],

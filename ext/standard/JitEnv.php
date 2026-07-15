@@ -86,6 +86,45 @@ final class JitEnv
         return $result;
     }
 
+    /**
+     * putenv from a compile-time "NAME=value" literal — avoid __string__ GEPs (#5965).
+     */
+    public static function putenvFromCStringLiteral(Context $context, string $assignment): Value
+    {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'putenv_lit_emit_cont');
+        LibcExtern::register($context);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $eqPos = strpos($assignment, '=');
+        if (false === $eqPos || 0 === $eqPos) {
+            // Match VmEnv::putenv invalid syntax / no-op for deferred mirror skips.
+            return $i8->constInt(0, false);
+        }
+        $name = substr($assignment, 0, $eqPos);
+        $value = substr($assignment, $eqPos + 1);
+        $context->builder->call(
+            $context->lookupFunction('setenv'),
+            $context->pointerFromStringConstant($name),
+            $context->pointerFromStringConstant($value),
+            $i32->constInt(1, false)
+        );
+        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            // Keep PHP overlay in sync when nested helper putenv is available.
+            $str = $context->builder->load($context->constantStringFromString($assignment));
+            StringGetenv::ensurePutenvLinked($context);
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                StringGetenv::helperFunction(
+                    $context,
+                    'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv'
+                ),
+                [$str]
+            );
+        }
+
+        return $i8->constInt(1, false);
+    }
+
     public static function apacheSetenv(Context $context, Value $variableStr, Value $valueStr): Value
     {
         StringGetenv::ensureLinked($context);

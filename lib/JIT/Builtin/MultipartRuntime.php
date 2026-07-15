@@ -10,6 +10,7 @@ use PHPCompiler\ext\standard\phpc_native_ht_set_string_at;
 use PHPCompiler\ext\standard\phpc_native_ht_set_string_key;
 use PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht;
 use PHPCompiler\JIT\Call;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -55,6 +56,9 @@ final class MultipartRuntime
         } catch (\Throwable) {
         }
 
+        // Nested JIT rebinds functionScope["strlen"] to PHP strlen; keep libc for cstr bridges (#5965).
+        LibcExtern::register($context);
+        $libcStrlen = $context->lookupFunction('strlen');
         ParseStrRuntime::ensureUserScriptLinked($context);
         self::ensureFilesystemPrerequisites($context);
         self::ensureNativeHtInternalProxies($context);
@@ -64,6 +68,7 @@ final class MultipartRuntime
             [self::POPULATE_POST_BODY_NATIVE, self::POPULATE_MULTIPART_INTO_NATIVE],
             '#5965'
         );
+        $context->registerFunction('strlen', $libcStrlen);
         self::implementRpbMultipartBridge($context);
 
         if (null !== $savedBlock) {
@@ -167,6 +172,8 @@ final class MultipartRuntime
         } catch (\Throwable) {
         }
 
+        LibcExtern::register($context);
+        $libcStrlen = $context->lookupFunction('strlen');
         ParseStrRuntime::ensureUserScriptLinked($context);
         self::ensureFilesystemPrerequisites($context);
         self::ensureNativeHtInternalProxies($context);
@@ -176,6 +183,7 @@ final class MultipartRuntime
             [self::POPULATE_POST_BODY_NATIVE],
             '#15624'
         );
+        $context->registerFunction('strlen', $libcStrlen);
         self::implementLegacyIfNeeded($context);
         self::registerLinkedRuntime($context);
 

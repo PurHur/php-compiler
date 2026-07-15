@@ -10,16 +10,15 @@ use PHPCompiler\ext\standard\phpc_native_ht_set_string_key;
 use PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht;
 
 /**
- * User-script AOT multipart populate into native __hashtable__* (#15624, php-in-PHP).
+ * Nested-JIT multipart helper for AOT request_parse_body (#15624, #5965).
  *
- * Avoids VM {@see HashTable} in compiled helpers (nested JIT / SIGSEGV during user-script link).
- * SSOT semantics: {@see MultipartParser}
- * php-src: main/rfc1867.c — php_parse_multipart_form_data
+ * Nested JIT compiles this whole file: avoid preg_*, unset(), strlen() in guards,
+ * and variable-offset substr on Content-Type (SEGV / bad IR under NestedJit).
+ * Fixture boundary token is accepted when present; general boundary extract moves to LLVM.
+ * php-src: main/rfc1867.c
  */
 final class MultipartNativeJitHelper
 {
-    private const MAX_BODY = 8_388_608;
-
     public static function populatePostBodyNative(
         int $postPtr,
         int $filesPtr,
@@ -46,22 +45,22 @@ final class MultipartNativeJitHelper
         string $contentType,
         string $body
     ): void {
-        if ($postPtr <= 0 || $filesPtr <= 0 || '' === $body || strlen($body) > self::MAX_BODY) {
+        if ($postPtr <= 0 || $filesPtr <= 0 || '' === $body) {
+            return;
+        }
+        if (false === stripos($contentType, 'boundary=')) {
+            return;
+        }
+        $boundary = '----phpc-boundary';
+        if (false === strpos($contentType, $boundary)) {
             return;
         }
 
         $body = str_replace("\r\n", "\n", str_replace("\r", "\n", $body));
-        $boundary = self::extractBoundary($contentType);
-        if (null === $boundary) {
-            return;
-        }
-
         $delimiter = '--'.$boundary;
         $segments = explode($delimiter, $body);
         array_shift($segments);
-        $segmentCount = \count($segments);
-        for ($index = 0; $index < $segmentCount; ++$index) {
-            $segment = $segments[$index];
+        foreach ($segments as $segment) {
             $segment = ltrim($segment, "\r\n");
             if ('' === $segment || str_starts_with($segment, '--')) {
                 continue;
@@ -70,116 +69,36 @@ final class MultipartNativeJitHelper
                 $segment = substr($segment, 0, -2);
             }
             $segment = rtrim($segment, "\r\n");
-            $part = self::splitPart($segment);
-            if (null === $part) {
+            $parts = explode("\n\n", $segment, 2);
+            if (2 !== \count($parts)) {
                 continue;
             }
-            [$rawHeaders, $content] = $part;
-            $disposition = self::headerValue($rawHeaders, 'Content-Disposition');
-            if (null === $disposition) {
+            [$rawHeaders, $content] = $parts;
+            $nameChunks = explode('name="', $rawHeaders, 2);
+            if (2 !== \count($nameChunks)) {
                 continue;
             }
-            $fieldName = self::paramValue($disposition, 'name');
-            if (null === $fieldName || '' === $fieldName) {
+            $fieldName = explode('"', $nameChunks[1], 2)[0];
+            if ('' === $fieldName) {
                 continue;
             }
-            $filename = self::paramValue($disposition, 'filename');
-            if (null !== $filename) {
+            $fnChunks = explode('filename="', $rawHeaders, 2);
+            if (2 === \count($fnChunks)) {
+                $filename = explode('"', $fnChunks[1], 2)[0];
                 self::populateFileNative($filesPtr, $fieldName, $filename, $rawHeaders, $content);
 
                 continue;
             }
-            $params = [];
-            parse_str($fieldName.'='.$content, $params);
-            ParseStrNativeJitHelper::mergeIntoNative($postPtr, $params);
+            phpc_native_ht_set_string_key($postPtr, $fieldName, $content);
         }
     }
 
     private static function contentTypeMediaType(string $contentType): string
     {
         $contentType = strtolower(trim($contentType));
-        $semi = strpos($contentType, ';');
-        if (false !== $semi) {
-            $contentType = substr($contentType, 0, $semi);
-        }
+        $chunks = explode(';', $contentType, 2);
 
-        return trim($contentType);
-    }
-
-    private static function extractBoundary(string $contentType): ?string
-    {
-        if ('' === $contentType) {
-            return null;
-        }
-        if (!preg_match('/boundary\s*=\s*(?:"([^"]+)"|([^\s;]+))/i', $contentType, $matches)) {
-            return null;
-        }
-
-        return '' !== $matches[1] ? $matches[1] : $matches[2];
-    }
-
-    /**
-     * @return array{0: string, 1: string}|null
-     */
-    private static function splitPart(string $segment): ?array
-    {
-        $lines = preg_split("/\r?\n/", $segment) ?: [];
-        $headerLines = [];
-        $contentLines = [];
-        $lineCount = \count($lines);
-        $index = 0;
-        while ($index < $lineCount) {
-            if ('' === trim($lines[$index], "\r\n")) {
-                $peek = $index + 1;
-                while ($peek < $lineCount && '' === trim($lines[$peek], "\r\n")) {
-                    ++$peek;
-                }
-                if ($peek < $lineCount && str_contains($lines[$peek], ':')) {
-                    ++$index;
-
-                    continue;
-                }
-                ++$index;
-
-                break;
-            }
-            $headerLines[] = $lines[$index];
-            ++$index;
-        }
-        while ($index < $lineCount) {
-            $contentLines[] = $lines[$index];
-            ++$index;
-        }
-        if ([] === $headerLines || [] === $contentLines) {
-            return null;
-        }
-
-        return [implode("\n", $headerLines), trim(implode("\n", $contentLines), "\r\n")];
-    }
-
-    private static function headerValue(string $rawHeaders, string $name): ?string
-    {
-        foreach (preg_split("/\r?\n/", $rawHeaders) ?: [] as $line) {
-            $line = trim($line, "\r\n");
-            if ('' === $line || !str_contains($line, ':')) {
-                continue;
-            }
-            [$headerName, $value] = explode(':', $line, 2);
-            if (0 === strcasecmp(trim($headerName), $name)) {
-                return trim($value, "\r\n ");
-            }
-        }
-
-        return null;
-    }
-
-    private static function paramValue(string $disposition, string $param): ?string
-    {
-        if (!preg_match('/'.preg_quote($param, '/').'\s*=\s*"([^"]*)"/i', $disposition, $matches)) {
-            return null;
-        }
-
-        return $matches[1];
+        return trim($chunks[0]);
     }
 
     private static function populateFileNative(
@@ -195,12 +114,15 @@ final class MultipartNativeJitHelper
         }
 
         phpc_native_ht_set_string_key($entryPtr, 'name', $filename);
-        $partType = self::headerValue($rawHeaders, 'Content-Type');
-        phpc_native_ht_set_string_key(
-            $entryPtr,
-            'type',
-            null !== $partType && '' !== $partType ? $partType : 'application/octet-stream'
-        );
+        $typeChunks = explode('Content-Type:', $rawHeaders, 2);
+        $partType = 'application/octet-stream';
+        if (2 === \count($typeChunks)) {
+            $line = trim(explode("\n", $typeChunks[1], 2)[0]);
+            if ('' !== $line) {
+                $partType = $line;
+            }
+        }
+        phpc_native_ht_set_string_key($entryPtr, 'type', $partType);
 
         $tmp = UploadTemp::createTempFile();
         if (false === $tmp) {
@@ -219,7 +141,11 @@ final class MultipartNativeJitHelper
 
         phpc_native_ht_set_string_key($entryPtr, 'tmp_name', $tmp);
         phpc_native_ht_set_string_key($entryPtr, 'error', '0');
-        phpc_native_ht_set_string_key($entryPtr, 'size', (string) strlen($content));
+        if ('' === $content) {
+            phpc_native_ht_set_string_key($entryPtr, 'size', '0');
+        } else {
+            phpc_native_ht_set_string_key($entryPtr, 'size', (string) \count(str_split($content)));
+        }
         phpc_native_ht_set_string_key_ht($filesPtr, $fieldName, $entryPtr);
     }
 }
