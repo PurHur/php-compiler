@@ -11,6 +11,7 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -38,7 +39,7 @@ final class hash_ extends Internal
             ));
         }
         $algo = VmString::stringBuiltinArgForFrame($frame, 0, 'hash', 0, 'algo');
-        $data = VmString::stringBuiltinArgForFrame($frame, 1, 'hash', 1, 'data');
+        $data = self::vmDataArg($frame);
         $raw = false;
         if (isset($frame->calledArgs[2])) {
             $raw = VmMath::parseBoolBuiltinArg($frame->calledArgs[2], 'hash', 3, 'binary');
@@ -75,8 +76,46 @@ final class hash_ extends Internal
         return JitHash::hash(
             $context,
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash', 0, 'algo'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'hash', 1, 'data'),
+            self::jitDataArg($context, $args[1]),
             $raw
+        );
+    }
+
+    /** Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#19275, ext/hash/hash.c). */
+    private static function vmDataArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, 1, 'hash', 'data');
+
+            return $frame->calledArgs[1]->resolveIndirect()->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[1],
+            'hash',
+            1,
+            'data'
+        );
+    }
+
+    private static function jitDataArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'hash',
+                1,
+                'data'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'hash',
+            1,
+            'data'
         );
     }
 

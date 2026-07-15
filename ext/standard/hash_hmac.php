@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** hash_hmac() — sha256, sha1, md5 (VM + JIT/AOT via __compiler_hash_hmac). */
@@ -34,7 +35,7 @@ final class hash_hmac extends Internal
             return;
         }
         $algo = VmString::stringBuiltinArgForFrame($frame, 0, 'hash_hmac', 0, 'algo');
-        $data = VmString::stringBuiltinArgForFrame($frame, 1, 'hash_hmac', 1, 'data');
+        $data = self::vmDataArg($frame);
         $key = VmString::stringBuiltinArgForFrame($frame, 2, 'hash_hmac', 2, 'key');
         $raw = false;
         if (4 === $argc) {
@@ -65,9 +66,47 @@ final class hash_hmac extends Internal
         return JitHash::hashHmac(
             $context,
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_hmac', 0, 'algo'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'hash_hmac', 1, 'data'),
+            self::jitDataArg($context, $args[1]),
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'hash_hmac', 2, 'key'),
             $raw
+        );
+    }
+
+    /** Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#19275, ext/hash/hash.c). */
+    private static function vmDataArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, 1, 'hash_hmac', 'data');
+
+            return $frame->calledArgs[1]->resolveIndirect()->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[1],
+            'hash_hmac',
+            1,
+            'data'
+        );
+    }
+
+    private static function jitDataArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'hash_hmac',
+                1,
+                'data'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'hash_hmac',
+            1,
+            'data'
         );
     }
 }

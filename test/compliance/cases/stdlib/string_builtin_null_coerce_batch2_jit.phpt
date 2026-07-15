@@ -13,7 +13,7 @@ foreach ([
     'crc32' => static fn () => crc32(null),
     // soundex/metaphone: TypeError on 8.4 — see phonetic_null_typeerror_84_jit.phpt (#19243)
     'convert_uuencode' => static fn () => convert_uuencode(null),
-    'bin2hex' => static fn () => bin2hex(null),
+    // bin2hex: TypeError on 8.4 — see hash_encode_null_forward84_jit.phpt (#19275)
     'hebrev' => static fn () => hebrev(null),
     'quoted_printable_encode' => static fn () => quoted_printable_encode(null),
 ] as $label => $factory) {
@@ -30,6 +30,5 @@ str_rot13: ''
 crc32: 0
 convert_uuencode: '`
 '
-bin2hex: ''
 hebrev: ''
 quoted_printable_encode: ''

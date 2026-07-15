@@ -12,6 +12,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** base64_encode() — RFC 4648 standard alphabet (subset of PHP). */
@@ -27,7 +28,7 @@ final class base64_encode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('base64_encode() requires exactly one argument in this compiler build');
         }
-        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'base64_encode', 0, 'string');
+        $data = self::vmStringArg($frame);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($data): void {
             $ret->string(VmString::base64_encode($data));
         });
@@ -49,7 +50,43 @@ final class base64_encode extends Internal
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_base64_encode'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'base64_encode', 0, 'string')
+            self::jitStringArg($context, $args[0])
+        );
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19275, ext/standard/base64.c). */
+    private static function vmStringArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, 0, 'base64_encode', 'string')->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'base64_encode',
+            0,
+            'string'
+        );
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'base64_encode',
+                0,
+                'string'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'base64_encode',
+            0,
+            'string'
         );
     }
 }
