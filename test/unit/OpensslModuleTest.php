@@ -124,6 +124,49 @@ PHP;
         self::assertSame('data', $decryptFrame->returnVar->toString());
     }
 
+    public function test_openssl_encrypt_null_coerces_to_empty_string_when_ffi_available(): void
+    {
+        if (!\PHPCompiler\ext\openssl\VmOpensslCipherNative::available()) {
+            self::markTestSkipped('libcrypto FFI unavailable');
+        }
+
+        $runtime = new Runtime();
+        $encryptFn = new \PHPCompiler\ext\openssl\openssl_encrypt();
+        $key = str_repeat('k', 32);
+        $iv = str_repeat('i', 16);
+
+        $makeFrame = static function (?\PHPCompiler\VM\Variable $dataVar) use ($runtime, $encryptFn, $key, $iv) {
+            $frame = $encryptFn->getFrame($runtime->vmContext);
+            $cipherVar = new \PHPCompiler\VM\Variable();
+            $cipherVar->string('aes-256-cbc');
+            $keyVar = new \PHPCompiler\VM\Variable();
+            $keyVar->string($key);
+            $optionsVar = new \PHPCompiler\VM\Variable();
+            $optionsVar->int(0);
+            $ivVar = new \PHPCompiler\VM\Variable();
+            $ivVar->string($iv);
+            $frame->calledArgs = [$dataVar, $cipherVar, $keyVar, $optionsVar, $ivVar];
+            $frame->returnVar = new \PHPCompiler\VM\Variable();
+
+            return $frame;
+        };
+
+        $emptyVar = new \PHPCompiler\VM\Variable();
+        $emptyVar->string('');
+        $emptyFrame = $makeFrame($emptyVar);
+        $encryptFn->execute($emptyFrame);
+
+        $nullVar = new \PHPCompiler\VM\Variable();
+        $nullVar->null();
+        $nullFrame = $makeFrame($nullVar);
+        $encryptFn->execute($nullFrame);
+
+        self::assertSame(\PHPCompiler\VM\Variable::TYPE_STRING, $emptyFrame->returnVar->type);
+        self::assertSame(\PHPCompiler\VM\Variable::TYPE_STRING, $nullFrame->returnVar->type);
+        self::assertNotSame('', $emptyFrame->returnVar->toString());
+        self::assertSame($emptyFrame->returnVar->toString(), $nullFrame->returnVar->toString());
+    }
+
     public function test_openssl_sign_verify_roundtrip_when_ffi_available(): void
     {
         if (!\PHPCompiler\ext\openssl\VmOpensslSignNative::available()) {
