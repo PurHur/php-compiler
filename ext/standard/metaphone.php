@@ -79,16 +79,7 @@ final class metaphone extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'metaphone', $paramName)->toString();
-        }
-
-        return VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[$argIndex],
-            'metaphone',
-            $argIndex,
-            $paramName
-        );
+        return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, 'metaphone', $paramName);
     }
 
     private static function jitStringArg(

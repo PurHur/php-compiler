@@ -46,15 +46,6 @@ final class convert_uuencode extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'convert_uuencode', $paramName)->toString();
-        }
-
-        return VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[$argIndex],
-            'convert_uuencode',
-            $argIndex,
-            $paramName
-        );
+        return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, 'convert_uuencode', $paramName);
     }
 }
