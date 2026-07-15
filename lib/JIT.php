@@ -8158,27 +8158,64 @@ class JIT {
                     );
                     break;
                 case OpCode::TYPE_CLONE:
+                    $destOp = $block->getOperand($op->arg1);
                     $srcVar = $this->context->getVariableFromOp($block->getOperand($op->arg2));
+                    $cloneNonObjectMessage = '__clone method called on non-object';
                     if (Variable::TYPE_OBJECT === $srcVar->type) {
                         $srcObj = $this->context->helper->loadValue($srcVar);
-                    } elseif (Variable::TYPE_VALUE === $srcVar->type) {
+                        $cloned = $this->context->type->object->cloneObject($srcObj);
+                        $this->context->type->object->invokeCloneMagicIfPresent($block, $cloned);
+                        $objVar = new JIT\Variable(
+                            $this->context,
+                            Variable::TYPE_OBJECT,
+                            Variable::KIND_VALUE,
+                            $cloned
+                        );
+                        $this->assignOperand($destOp, $objVar);
+                        break;
+                    }
+                    if (Variable::TYPE_VALUE === $srcVar->type) {
+                        JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+                        JIT\Builtin\ErrorRaise::ensureLinked($this->context);
                         $valuePtr = JIT\JitValueBox::valuePtrFromVariable($this->context, $srcVar);
+                        $valueMap = $this->context->structFieldMap['__value__'];
+                        $typeByte = $this->context->builder->load(
+                            $this->context->builder->structGep($valuePtr, $valueMap['type'])
+                        );
+                        $fn = $this->context->builder->getInsertBlock()->getParent();
+                        assert($fn instanceof \PHPLLVM\Value\Function_);
+                        $isObjectBlock = $fn->appendBasicBlock('clone_src_is_object');
+                        $notObjectBlock = $fn->appendBasicBlock('clone_src_not_object');
+                        $cloneDoneBlock = $fn->appendBasicBlock('clone_value_done');
+                        $i8 = $this->context->getTypeFromString('int8');
+                        $isObject = $this->context->builder->icmp(
+                            \PHPLLVM\Builder::INT_EQ,
+                            $typeByte,
+                            $i8->constInt(Variable::TYPE_OBJECT, false)
+                        );
+                        $this->context->builder->branchIf($isObject, $isObjectBlock, $notObjectBlock);
+                        $this->context->builder->positionAtEnd($notObjectBlock);
+                        $this->emitCatchableCloneNonObjectError($cloneNonObjectMessage);
+                        $this->context->builder->branch($cloneDoneBlock);
+                        $this->context->builder->positionAtEnd($isObjectBlock);
                         $srcObj = $this->context->builder->call(
                             $this->context->lookupFunction('__value__readObject'),
                             $valuePtr
                         );
-                    } else {
-                        throw new \LogicException('clone requires an object');
+                        $cloned = $this->context->type->object->cloneObject($srcObj);
+                        $this->context->type->object->invokeCloneMagicIfPresent($block, $cloned);
+                        $objVar = new JIT\Variable(
+                            $this->context,
+                            Variable::TYPE_OBJECT,
+                            Variable::KIND_VALUE,
+                            $cloned
+                        );
+                        $this->assignOperand($destOp, $objVar);
+                        $this->context->builder->branch($cloneDoneBlock);
+                        $this->context->builder->positionAtEnd($cloneDoneBlock);
+                        break;
                     }
-                    $cloned = $this->context->type->object->cloneObject($srcObj);
-                    $this->context->type->object->invokeCloneMagicIfPresent($block, $cloned);
-                    $objVar = new JIT\Variable(
-                        $this->context,
-                        Variable::TYPE_OBJECT,
-                        Variable::KIND_VALUE,
-                        $cloned
-                    );
-                    $this->assignOperand($block->getOperand($op->arg1), $objVar);
+                    $this->emitCatchableCloneNonObjectError($cloneNonObjectMessage);
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $from = $this->context->getVariableFromOp($block->getOperand($op->arg2));
@@ -17661,6 +17698,20 @@ class JIT {
     private static function compareOperandsForSlotResolution(\PHPCfg\Operand $a, \PHPCfg\Operand $b): int
     {
         return self::operandSlotRank($b) <=> self::operandSlotRank($a);
+    }
+
+    /** Zend zend_clone() — catchable Error when operand is not object (#19097). */
+    private function emitCatchableCloneNonObjectError(string $message): void
+    {
+        JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+        JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+        if ([] !== $this->context->tryCatch->handlerStack) {
+            JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
+        } else {
+            JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
+            $this->context->builder->call($this->context->lookupFunction('abort'));
+            $this->context->builder->clearInsertionPosition();
+        }
     }
 
 }
