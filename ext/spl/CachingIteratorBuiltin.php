@@ -115,13 +115,21 @@ final class SplCachingIteratorStorage
 
     public static function init(ObjectEntry $object, ObjectEntry $inner, int $flags): void
     {
+        $pinKey = 'caching:'.$object->id.':inner';
+        if (isset(self::$store[$object->id]['innerPinKey'])) {
+            SplIteratorSupport::unpinObject(
+                self::$store[$object->id]['inner'],
+                self::$store[$object->id]['innerPinKey']
+            );
+        }
         self::$store[$object->id] = [
-            'inner' => $inner,
+            'inner' => SplIteratorSupport::pinObject($inner, $pinKey),
             'flags' => $flags,
             'index' => -1,
             'cached' => null,
             'cachedKey' => null,
             'fullCache' => [],
+            'innerPinKey' => $pinKey,
         ];
     }
 

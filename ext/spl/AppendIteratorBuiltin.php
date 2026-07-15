@@ -79,7 +79,11 @@ final class AppendIteratorBuiltin
     public static function appendIterator(ObjectEntry $object, ObjectEntry $inner): void
     {
         self::ensureState($object);
+        $index = \count(self::$store[$object->id]['iterators']);
+        $pinKey = 'append:'.$object->id.':'.$index.':'.$inner->id;
+        SplIteratorSupport::pinObject($inner, $pinKey);
         self::$store[$object->id]['iterators'][] = $inner;
+        self::$store[$object->id]['pinKeys'][$index] = $pinKey;
     }
 
     public static function currentIterator(ObjectEntry $object): ?ObjectEntry

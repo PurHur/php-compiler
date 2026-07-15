@@ -7,7 +7,9 @@ namespace PHPCompiler\ext\spl;
 use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClosureState;
+use PHPCompiler\VM\GeneratorState;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\VM\Variable;
 
 /** Shared helpers for SPL iterator VM builtins (#6593). */
@@ -115,6 +117,89 @@ final class SplIteratorSupport
         }
 
         return $resolved->toArray();
+    }
+
+    /**
+     * Strong roots for ObjectEntry pointers held in SPL sidecars (#6138).
+     *
+     * Frame teardown uses {@see \PHPCompiler\VM\ObjectLifetime::releaseDirectObject}, which
+     * can destroy a temporary Generator even while a Variable pin remains in this bag
+     * (refcount vs direct-release skew). Preserve {@see GeneratorState} / ClosureState
+     * separately and reattach in {@see ensurePinnedObjectAlive()} before inner calls.
+     *
+     * @var array<string, Variable>
+     */
+    private static array $objectPins = [];
+
+    /** @var array<int, GeneratorState> */
+    private static array $generatorStatePins = [];
+
+    /** @var array<int, ClosureState> */
+    private static array $closureStatePins = [];
+
+    /**
+     * Keep an iterator ObjectEntry alive across temporary call-arg release (#6138).
+     *
+     * @param string $pinKey Stable key for this ownership edge (wrapper id + role)
+     */
+    public static function pinObject(ObjectEntry $object, string $pinKey = ''): ObjectEntry
+    {
+        $key = '' !== $pinKey ? $pinKey : 'obj:'.$object->id;
+        if (isset(self::$objectPins[$key])) {
+            self::$objectPins[$key]->null();
+        }
+        $slot = new Variable();
+        $slot->object($object);
+        self::$objectPins[$key] = $slot;
+        if (null !== $object->generatorState) {
+            self::$generatorStatePins[$object->id] = $object->generatorState;
+        }
+        if (null !== $object->closureState) {
+            self::$closureStatePins[$object->id] = $object->closureState;
+        }
+
+        return $object;
+    }
+
+    public static function unpinObject(ObjectEntry $object, string $pinKey = ''): void
+    {
+        $key = '' !== $pinKey ? $pinKey : 'obj:'.$object->id;
+        if (isset(self::$objectPins[$key])) {
+            self::$objectPins[$key]->null();
+            unset(self::$objectPins[$key]);
+        } elseif ('' === $pinKey) {
+            foreach (array_keys(self::$objectPins) as $storedKey) {
+                if (!str_ends_with($storedKey, ':'.$object->id) && $storedKey !== 'obj:'.$object->id) {
+                    continue;
+                }
+                self::$objectPins[$storedKey]->null();
+                unset(self::$objectPins[$storedKey]);
+            }
+        }
+        // Drop sidecar state only when no pin keys still reference this object id.
+        foreach (self::$objectPins as $storedKey => $_) {
+            if (str_ends_with($storedKey, ':'.$object->id) || $storedKey === 'obj:'.$object->id) {
+                return;
+            }
+        }
+        unset(self::$generatorStatePins[$object->id], self::$closureStatePins[$object->id]);
+    }
+
+    /**
+     * Reattach Generator/Closure payload cleared by premature ObjectLifetime GC (#6138).
+     */
+    public static function ensurePinnedObjectAlive(ObjectEntry $object): void
+    {
+        if (null === $object->generatorState && isset(self::$generatorStatePins[$object->id])) {
+            $object->generatorState = self::$generatorStatePins[$object->id];
+        }
+        if (null === $object->closureState && isset(self::$closureStatePins[$object->id])) {
+            $object->closureState = self::$closureStatePins[$object->id];
+        }
+        if (!ObjectRegistry::isRegistered($object->id)
+            && (isset(self::$generatorStatePins[$object->id]) || isset(self::$closureStatePins[$object->id]))) {
+            ObjectRegistry::register($object);
+        }
     }
 
     private static function typeLabel(Variable $var): string

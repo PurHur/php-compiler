@@ -74,12 +74,20 @@ final class SplLimitIteratorStorage
 
     public static function init(ObjectEntry $object, ObjectEntry $inner, int $offset, int $limit): void
     {
+        $pinKey = 'limit:'.$object->id.':inner';
+        if (isset(self::$store[$object->id]['innerPinKey'])) {
+            SplIteratorSupport::unpinObject(
+                self::$store[$object->id]['inner'],
+                self::$store[$object->id]['innerPinKey']
+            );
+        }
         self::$store[$object->id] = [
-            'inner' => $inner,
+            'inner' => SplIteratorSupport::pinObject($inner, $pinKey),
             'offset' => $offset,
             'limit' => $limit,
             'pos' => 0,
             'rewound' => false,
+            'innerPinKey' => $pinKey,
         ];
     }
 
@@ -474,6 +482,7 @@ final class LimitIteratorGetInnerIterator extends VmClassMethod
             return;
         }
         $inner = SplLimitIteratorStorage::inner($object);
+        SplIteratorSupport::ensurePinnedObjectAlive($inner);
         $frame->returnVar->object($inner);
     }
 }
