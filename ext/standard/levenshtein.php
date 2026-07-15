@@ -112,7 +112,7 @@ final class levenshtein extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'levenshtein', $paramName)->toString();
         }
 
-        return VmString::coerceTypedStringBuiltinArg(
+        return VmString::coerceStringBuiltinArg(
             $frame->calledArgs[$argIndex],
             'levenshtein',
             $argIndex,
@@ -140,9 +140,7 @@ final class levenshtein extends Internal
         int $argNumber,
         string $paramName
     ): Value {
-        JitInternalStrictArg::requireString($context, $arg, 'levenshtein', $paramName, $argNumber);
-
-        return JitStringBuiltinArg::lowerTypedString(
+        return JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,
             $arg,
             'levenshtein',

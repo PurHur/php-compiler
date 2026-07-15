@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** convert_uuencode() — Unix-to-Unix encoding (VmString; JIT via ConvertUuJitHelper, #13227). */
@@ -27,7 +28,7 @@ final class convert_uuencode extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'convert_uuencode', 0, 'string');
+        $data = self::vmStringArg($frame, 0, 'string');
         $frame->returnVar->string(VmString::convert_uuencode($data));
     }
 
@@ -39,7 +40,21 @@ final class convert_uuencode extends Internal
 
         return JitConvertUuencode::encode(
             $context,
-            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'convert_uuencode', 0, 'string')
+            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'convert_uuencode', 0, 'string')
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'convert_uuencode', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'convert_uuencode',
+            $argIndex,
+            $paramName
         );
     }
 }

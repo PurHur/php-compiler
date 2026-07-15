@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringMetaphone;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
@@ -84,7 +83,7 @@ final class metaphone extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'metaphone', $paramName)->toString();
         }
 
-        return VmString::coerceTypedStringBuiltinArg(
+        return VmString::coerceStringBuiltinArg(
             $frame->calledArgs[$argIndex],
             'metaphone',
             $argIndex,
@@ -98,9 +97,7 @@ final class metaphone extends Internal
         int $argNumber,
         string $paramName
     ): Value {
-        JitInternalStrictArg::requireString($context, $arg, 'metaphone', $paramName, $argNumber);
-
-        return JitStringBuiltinArg::lowerTypedString(
+        return JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,
             $arg,
             'metaphone',

@@ -1,5 +1,5 @@
 --TEST--
-stdlib Z_PARAM_STR null TypeError on default profile — phonetic/encoding (#18931, #18932, ext/standard)
+stdlib Z_PARAM_STR null coerce on default profile — phonetic/encoding (#18957, ext/standard/string.c)
 --FILE--
 <?php
 foreach ([
@@ -19,10 +19,10 @@ foreach ([
     }
 }
 --EXPECT--
-levenshtein: levenshtein(): Argument #1 ($string1) must be of type string, null given
-metaphone: metaphone(): Argument #1 ($string) must be of type string, null given
-soundex: soundex(): Argument #1 ($string) must be of type string, null given
-similar_text: similar_text(): Argument #1 ($string1) must be of type string, null given
-hebrev: hebrev(): Argument #1 ($string) must be of type string, null given
-convert_uuencode: convert_uuencode(): Argument #1 ($string) must be of type string, null given
-quoted_printable_encode: quoted_printable_encode(): Argument #1 ($string) must be of type string, null given
+levenshtein: uncaught
+metaphone: uncaught
+soundex: uncaught
+similar_text: uncaught
+hebrev: uncaught
+convert_uuencode: uncaught
+quoted_printable_encode: uncaught
