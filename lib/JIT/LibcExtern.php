@@ -86,6 +86,8 @@ final class LibcExtern
             '__phpc_resolve_stream' => [$i8p, false, [$i64]],
             'fileno' => [$i32, false, [$i8p]],
             'flock' => [$i32, false, [$i32, $i32]],
+            'pow' => [$dbl, false, [$dbl, $dbl]],
+            'nextafter' => [$dbl, false, [$dbl, $dbl]],
         ];
 
         foreach ($specs as $name => [$ret, $vararg, $params]) {
