@@ -506,6 +506,24 @@ final class PropertyHookDispatchLlvm
         if (null !== $getProxy && (!$staticProperty || !self::proxyIsStatic($context, $getProxy))) {
             return false;
         }
+        $classPropertyVirtual = false;
+        $staticHookVirtual = false;
+        if (isset($context->runtime->vmContext->classes[$lcClass])) {
+            $entry = $context->runtime->vmContext->classes[$lcClass];
+            if ($staticProperty) {
+                $staticHooks = $entry->staticPropertyHooks[$propLc] ?? [];
+                $staticHookVirtual = !empty($staticHooks['virtual']);
+            } else {
+                $propMeta = $entry->properties[$propLc] ?? $entry->properties[$propertyName] ?? null;
+                $classPropertyVirtual = null !== $propMeta && $propMeta->propertyHookVirtual;
+            }
+        }
+        if (!\PHPCompiler\VM\AbstractPropertyHookCheck::isWriteOnlyVirtualHook(
+            is_array($meta) ? $meta : null,
+            $classPropertyVirtual || $staticHookVirtual
+        )) {
+            return false;
+        }
 
         $message = sprintf('Cannot read property %s::$%s without get hook', $className, $propertyName);
         if (null !== $jit && [] !== $context->tryCatch->handlerStack) {

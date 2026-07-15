@@ -199,6 +199,23 @@ final class AbstractPropertyHookCheck
     }
 
     /**
+     * Set-only hook with virtual modifier, short `set =>` backing, or explicit separate backing — external reads forbidden (#6484, #19163).
+     *
+     * @param array<string, mixed>|null $registryMeta
+     */
+    public static function isWriteOnlyVirtualHook(?array $registryMeta, bool $classPropertyVirtual = false): bool
+    {
+        if ($classPropertyVirtual) {
+            return true;
+        }
+        if (!is_array($registryMeta)) {
+            return false;
+        }
+
+        return !empty($registryMeta['virtual']) || !empty($registryMeta['setBacking']);
+    }
+
+    /**
      * @param array<string, mixed> $meta
      */
     private static function metaHasUnimplementedRequiredHooks(array $meta): bool
