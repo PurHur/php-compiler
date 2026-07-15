@@ -5059,4 +5059,5 @@ require_once __DIR__.'/../../../ext/standard/RequestParseBodyNativeJitHelper.php
 require_once __DIR__.'/../../../lib/JIT/Builtin/RequestParseBodyUserScriptLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarExportUserScriptLlvm.php';
 require_once __DIR__.'/../../../ext/sockets/socket_create_pair.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/MultipartRuntimeUserScriptLlvm.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
