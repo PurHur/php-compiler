@@ -857,4 +857,48 @@ final class HashTableReadLlvm
         $context->builder->positionAtEnd($doneBb);
     }
 
+    /**
+     * Walk packed list indices 0..count-1 reading string elements (#19035).
+     *
+     * @param callable(Context, Value, Value): void $body  ($index, $str)
+     */
+    public static function forEachIndexedStringAt(
+        Context $context,
+        Value $ht,
+        Value $count,
+        string $tagPrefix,
+        callable $body
+    ): void {
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $tag = $tagPrefix.'_'.(string) self::nextSeq();
+        $idxSlot = $context->builder->alloca($sizeT, 1, $tag.'_idx');
+        $context->builder->store($zero, $idxSlot);
+
+        $headBb = BasicBlockHelper::append($context, $tag.'_head');
+        $bodyBb = BasicBlockHelper::append($context, $tag.'_body');
+        $advanceBb = BasicBlockHelper::append($context, $tag.'_advance');
+        $doneBb = BasicBlockHelper::append($context, $tag.'_done');
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($headBb);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $doneBb, $bodyBb);
+
+        $context->builder->positionAtEnd($bodyBb);
+        $str = self::readStringAt($context, $ht, $idx);
+        $body($context, $idx, $str);
+        if (null === $context->builder->getInsertBlock()?->getTerminator()) {
+            $context->builder->branch($advanceBb);
+        }
+
+        $context->builder->positionAtEnd($advanceBb);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($doneBb);
+    }
+
 }

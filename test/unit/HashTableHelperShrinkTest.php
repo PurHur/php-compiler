@@ -194,5 +194,6 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertStringContainsString('public static function loadHashtablePointer', $read);
         $this->assertStringContainsString('public static function listEntryPointer', $read);
         $this->assertStringContainsString('public static function forEachStringKeyNode', $read);
+        $this->assertStringContainsString('public static function forEachIndexedStringAt', $read);
     }
 }

@@ -373,69 +373,35 @@ final class VmScope
 
     private static function callerVarIsSet(Variable $var): bool
     {
-        $v = $var->resolveIndirect();
-        if ($v->isUndefined()) {
-            return false;
-        }
-
-        return Variable::TYPE_NULL !== $v->type;
+        return ScopeBuiltinJitHelper::callerVarIsSet($var);
     }
 
     /** get_defined_vars() — snapshot of caller locals (php-src: zend_get_defined_vars). */
     public static function getDefinedVars(Frame $frame): HashTable
     {
         $caller = self::requireCaller($frame);
-        $result = new HashTable();
-        foreach ($caller->block->eachNamedScopeSlot() as [$name, $slot]) {
-            if ('this' === $name) {
-                continue;
-            }
-            if (!isset($caller->scope[$slot])) {
-                continue;
-            }
-            $value = $caller->scope[$slot];
-            if (!self::callerVarIsSet($value)) {
-                continue;
-            }
-            $copy = new Variable();
-            $copy->copyFrom($value->resolveIndirect());
-            $result->add($name, $copy);
+        $namedSlots = [];
+        foreach ($caller->block->eachNamedScopeSlot() as $pair) {
+            $namedSlots[] = $pair;
         }
 
-        self::appendCallerDynamicLocals($caller, $result);
+        return ScopeBuiltinJitHelper::buildDefinedVarsSnapshot(
+            $namedSlots,
+            $caller->scope,
+            $caller->dynamicLocals,
+            self::FILE_SCOPE_DEFINED_VAR_AUTO_NAMES,
+            $caller->block->isMainScript()
+                ? static function (string $name) use ($frame): ?Variable {
+                    if (Superglobals::isSuperglobalName($name)) {
+                        return null !== $frame->vmContext
+                            ? $frame->vmContext->ensureSuperglobal($name)
+                            : null;
+                    }
 
-        if ($caller->block->isMainScript()) {
-            self::appendFileScopeAutoGlobals($frame->vmContext, $result);
-        }
-
-        return $result;
-    }
-
-    /**
-     * extract() / variable-variables may allocate runtime-only locals (#4517, #4826).
-     *
-     * @see php/php-src Zend/zend_builtin_functions.c — zend_get_defined_vars symbol table
-     */
-    private static function appendCallerDynamicLocals(Frame $caller, HashTable $result): void
-    {
-        if ([] === $caller->dynamicLocals) {
-            return;
-        }
-        $present = [];
-        foreach ($result->iterateKeyed(true) as [$keyVar]) {
-            $present[$keyVar->resolveIndirect()->toString()] = true;
-        }
-        foreach ($caller->dynamicLocals as $name => $var) {
-            if ('this' === $name || isset($present[$name])) {
-                continue;
-            }
-            if (!self::callerVarIsSet($var)) {
-                continue;
-            }
-            $copy = new Variable();
-            $copy->copyFrom($var->resolveIndirect());
-            $result->add($name, $copy);
-        }
+                    return self::scriptGlobalForDefinedVars($frame->vmContext, $name);
+                }
+                : null
+        );
     }
 
     /**
@@ -450,31 +416,6 @@ final class VmScope
         'argv',
         'argc',
     ];
-
-    private static function appendFileScopeAutoGlobals(?Context $ctx, HashTable $result): void
-    {
-        if (null === $ctx) {
-            return;
-        }
-        $present = [];
-        foreach ($result->iterateKeyed(true) as [$keyVar]) {
-            $present[$keyVar->resolveIndirect()->toString()] = true;
-        }
-        foreach (self::FILE_SCOPE_DEFINED_VAR_AUTO_NAMES as $name) {
-            if (isset($present[$name])) {
-                continue;
-            }
-            $source = Superglobals::isSuperglobalName($name)
-                ? $ctx->ensureSuperglobal($name)
-                : self::scriptGlobalForDefinedVars($ctx, $name);
-            if (null === $source || !self::callerVarIsSet($source)) {
-                continue;
-            }
-            $copy = new Variable();
-            $copy->copyFrom($source->resolveIndirect());
-            $result->add($name, $copy);
-        }
-    }
 
     private static function scriptGlobalForDefinedVars(Context $ctx, string $name): ?Variable
     {
@@ -491,38 +432,16 @@ final class VmScope
     public static function getDeclaredVariables(Frame $frame): HashTable
     {
         $caller = self::requireCaller($frame);
-        $result = new HashTable();
-        $index = 0;
-        foreach ($caller->block->eachNamedScopeSlot() as [$name, $slot]) {
-            if ('this' === $name || Superglobals::isSuperglobalName($name)) {
-                continue;
-            }
-            if (!isset($caller->scope[$slot])) {
-                continue;
-            }
-            if (!self::callerVarIsSet($caller->scope[$slot])) {
-                continue;
-            }
-            $entry = new Variable();
-            $entry->string($name);
-            $result->addIndex($index, $entry);
-            ++$index;
+        $namedSlots = [];
+        foreach ($caller->block->eachNamedScopeSlot() as $pair) {
+            $namedSlots[] = $pair;
         }
 
-        foreach ($caller->dynamicLocals as $name => $var) {
-            if ('this' === $name || Superglobals::isSuperglobalName($name)) {
-                continue;
-            }
-            if (!self::callerVarIsSet($var)) {
-                continue;
-            }
-            $entry = new Variable();
-            $entry->string($name);
-            $result->addIndex($index, $entry);
-            ++$index;
-        }
-
-        return $result;
+        return ScopeBuiltinJitHelper::buildDeclaredVariablesSnapshot(
+            $namedSlots,
+            $caller->scope,
+            $caller->dynamicLocals
+        );
     }
 
 }
