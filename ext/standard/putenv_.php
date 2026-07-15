@@ -36,14 +36,19 @@ final class putenv_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('putenv() requires exactly one argument');
         }
-        // Compile-time concat/literal assignments: libc setenv from a C string constant.
-        // Slot-backed concat temps carry compileTimeString for echo/folds but __string__
-        // length/value GEPs (even after __string__separate) still misfire under thin AOT
-        // user-script defer (#17316, #15642) — seen as empty getenv after putenv concat
-        // in multipart request_parse_body fixtures (#5965).
+        // Compile-time "NAME=value" when CTS is trustworthy. Slot-backed concat temps may
+        // carry partial CTS like "REQUEST_BODY=" (empty value) after `$body = …; putenv(…)`,
+        // which setenv's an empty REQUEST_BODY and breaks multipart AOT (#5965).
         $literal = \PHPCompiler\JIT\JitStringArg::compileTimeLiteral($args[0]);
-        if (null !== $literal) {
-            return JitEnv::putenvFromCStringLiteral($context, $literal);
+        if (null !== $literal && '' !== $literal) {
+            $eqPos = strpos($literal, '=');
+            if (false !== $eqPos && 0 !== $eqPos) {
+                $valueLen = \strlen($literal) - $eqPos - 1;
+                $slotPartial = JITVariable::KIND_VARIABLE === $args[0]->kind && 0 === $valueLen;
+                if (!$slotPartial) {
+                    return JitEnv::putenvFromCStringLiteral($context, $literal);
+                }
+            }
         }
         $assignment = JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,
