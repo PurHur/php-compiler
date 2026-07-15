@@ -42,7 +42,7 @@ final class JitIconv
 
         $from = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv', 0, 'from_encoding');
         $to = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'iconv', 1, 'to_encoding');
-        $input = JitStringBuiltinArg::lowerRequiredString($context, $args[2], 'iconv', 2, 'string');
+        $input = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'iconv', 2, 'string');
 
         $result = $context->builder->call(
             $context->lookupFunction('__compiler_iconv'),

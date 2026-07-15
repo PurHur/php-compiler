@@ -768,7 +768,13 @@ final class VmSimpleXml
     private static function warn(Context $ctx, string $message, ?Frame $frame): void
     {
         if (null !== $frame && null !== $frame->vmContext) {
-            $frame->vmContext->errors->triggerError($message, ErrorReporter::E_WARNING, $frame);
+            $frame->vmContext->errors->triggerError(
+                $message,
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
         }
     }
 }
