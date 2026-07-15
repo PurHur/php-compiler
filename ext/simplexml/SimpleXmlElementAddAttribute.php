@@ -1,0 +1,64 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\simplexml;
+
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\Variable;
+
+/** SimpleXMLElement::addAttribute — add element attribute (php-src ext/simplexml/sxe.c; #19307). */
+final class SimpleXmlElementAddAttribute extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('addAttribute');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            throw new \LogicException('SimpleXMLElement::addAttribute() requires VM context');
+        }
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'SimpleXMLElement::addAttribute() expects at least 2 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $entry = VmSimpleXml::requireElement(
+            $frame->calledArgs[0]->resolveIndirect()->toObject(),
+            'SimpleXMLElement::addAttribute()'
+        );
+        $nameVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_STRING !== $nameVar->type) {
+            throw new \TypeError('SimpleXMLElement::addAttribute(): Argument #1 ($qualifiedName) must be of type string');
+        }
+        $valueVar = $frame->calledArgs[2]->resolveIndirect();
+        if (Variable::TYPE_STRING !== $valueVar->type) {
+            throw new \TypeError('SimpleXMLElement::addAttribute(): Argument #2 ($value) must be of type string');
+        }
+        $namespace = null;
+        if (\count($frame->calledArgs) >= 4) {
+            $nsVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $nsVar->type) {
+                if (Variable::TYPE_STRING !== $nsVar->type) {
+                    throw new \TypeError('SimpleXMLElement::addAttribute(): Argument #3 ($namespace) must be of type ?string');
+                }
+                $namespace = $nsVar->toString();
+            }
+        }
+        VmSimpleXml::addAttribute(
+            $frame->vmContext,
+            $entry,
+            $nameVar->toString(),
+            $valueVar->toString(),
+            $namespace,
+            $frame
+        );
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->null();
+        }
+    }
+}
