@@ -14,18 +14,34 @@ final class RenameRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitRename.php');
         $this->assertStringContainsString('StringRename::invoke', $source);
+        $this->assertStringNotContainsString('invokeLibc', $source);
         $this->assertStringNotContainsString("lookupFunction('rename')", $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+    }
+
+    public function testStringRenameUserScriptKernelAndEmbedHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringRename.php');
+        $this->assertStringContainsString('JitRenameKernel', $source);
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('RenameJitHelper', $source);
+        $this->assertStringNotContainsString("lookupFunction('rename')", $source);
+        $this->assertStringNotContainsString('StatCacheRuntime', $source);
     }
 
     public function testStringRenameBridgeUsesRenameJitHelper(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringRename.php');
         $this->assertStringContainsString('RenameJitHelper', $bridge);
-        $this->assertStringNotContainsString("lookupFunction('rename')", $bridge);
+        $this->assertStringContainsString('INVOKE_HELPER', $bridge);
     }
 
     public function testRenameJitHelperDelegatesToVmFs(): void
     {
+        if (!\function_exists('phpc_rename_kernel')) {
+            $this->markTestSkipped('phpc_rename_kernel requires compiler runtime');
+        }
         $dir = sys_get_temp_dir().'/phpc-rename-'.bin2hex(random_bytes(4));
         $this->assertTrue(mkdir($dir, 0700));
         $from = $dir.'/from.txt';

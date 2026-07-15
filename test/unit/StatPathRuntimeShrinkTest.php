@@ -28,16 +28,22 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StatPathJitHelper', $source);
         $this->assertStringContainsString('StatFieldsJitHelper', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('JitStatKernel', $source);
         $this->assertStringNotContainsString('StatPathRuntimeLibc', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StatPathRuntimeLibc.php');
     }
 
-    public function testStatPathJitHelperDelegatesToVmStatPath(): void
+    public function testStatPathJitHelperUsesStatModeKernelNotExternalVmStatPath(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/StatPathJitHelper.php');
-        $this->assertStringContainsString('VmStatPath::exists', $source);
-        $this->assertStringContainsString('VmStatPath::isFile', $source);
-        $this->assertStringContainsString('VmStatPath::isReadable', $source);
+        $this->assertStringContainsString('phpc_stat_mode_kernel', $source);
+        $this->assertStringContainsString('phpc_access_kernel', $source);
+        $this->assertStringNotContainsString('VmStatPath::', $source);
+        $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStatKernel.php');
+        $this->assertStringContainsString("lookupFunction(\$statFn)", $kernel);
+        $this->assertStringContainsString("lookupFunction('access')", $kernel);
+        $this->assertStringContainsString('STAT_MODE_OFFSET', $kernel);
     }
 
     public function testStatFieldsJitHelperDelegatesToVmStatCache(): void
