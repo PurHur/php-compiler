@@ -360,8 +360,8 @@ final class VmMath
     }
 
     /**
-     * Z_PARAM_LONG builtin args — null coerces to 0 even on forward 8.4 profile and with caller strict_types
-     * (php-src basic_functions.c sleep/usleep/time_nanosleep; #19077).
+     * Z_PARAM_LONG builtin args — null coerces to 0 without caller strict_types (php-src basic_functions.c
+     * sleep/usleep/time_nanosleep; #19077). With strict_types, null/non-int operands TypeError like chr() (#19079).
      */
     public static function parseZParamLongBuiltinArgForFrame(
         Frame $frame,
@@ -370,6 +370,9 @@ final class VmMath
         int $userArgIndex,
         string $paramName
     ): int {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return self::parseIntBuiltinArgForFrame($frame, $argIndex, $function, $userArgIndex, $paramName);
+        }
         $var = $frame->calledArgs[$argIndex];
         $resolved = $var->resolveIndirect();
         if (Variable::TYPE_FLOAT === $resolved->type && null !== $frame->vmContext) {
