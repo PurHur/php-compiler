@@ -110,17 +110,20 @@ final class TypeErrorRaise
         string $okSuffix = 'ok',
         string $failSuffix = 'fail'
     ): void {
-        self::emitBranchOrAbortOnErrorFailure(
-            $context,
-            $successCondition,
-            $blockPrefix,
-            $errorMessage,
-            static function (Context $ctx, string $msg): void {
-                self::emitValueError($ctx, $msg);
-            },
-            $okSuffix,
-            $failSuffix
-        );
+        self::registerDeclarations($context);
+        self::ensureLinked($context);
+        $failBb = BasicBlockHelper::append($context, $blockPrefix.'_'.$failSuffix);
+        $okBb = BasicBlockHelper::append($context, $blockPrefix.'_'.$okSuffix);
+        $context->builder->branchIf($successCondition, $okBb, $failBb);
+        $context->builder->positionAtEnd($failBb);
+        self::emitValueError($context, $errorMessage);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
+        } else {
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->llvm->lib->LLVMBuildUnreachable($context->builder->builder);
+        }
+        $context->builder->positionAtEnd($okBb);
     }
 
     /**

@@ -1,16 +1,22 @@
 --TEST--
-stdlib Z_PARAM_PATH null JIT — ValueError Path cannot be empty (#19146, ext/standard/md5.c, file.c)
+stdlib fopen/copy/readfile/file null path JIT — ValueError Path cannot be empty (#19162, ext/standard/file.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
 --FILE--
 <?php
-foreach (['md5_file', 'sha1_file', 'file_get_contents'] as $fn) {
+foreach (['md5_file', 'sha1_file', 'file_get_contents', 'fopen', 'copy', 'readfile', 'file'] as $label) {
     try {
-        $fn(null);
-        echo $fn, ": miss\n";
+        match ($label) {
+            'fopen' => fopen(null, 'r'),
+            'copy' => copy(null, 'x'),
+            'readfile' => readfile(null),
+            'file' => file(null),
+            default => $label(null),
+        };
+        echo $label, ": miss\n";
     } catch (ValueError $e) {
-        echo $fn, ':', $e->getMessage(), "\n";
+        echo $label, ':', $e->getMessage(), "\n";
     }
 }
 ?>
@@ -18,3 +24,7 @@ foreach (['md5_file', 'sha1_file', 'file_get_contents'] as $fn) {
 md5_file:Path cannot be empty
 sha1_file:Path cannot be empty
 file_get_contents:Path cannot be empty
+fopen:Path cannot be empty
+copy:Path cannot be empty
+readfile:Path cannot be empty
+file:Path cannot be empty
