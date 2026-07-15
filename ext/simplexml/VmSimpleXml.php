@@ -109,6 +109,11 @@ final class VmSimpleXml
 
     public static function loadFile(Context $ctx, string $filename, ?Frame $frame = null): ?ObjectEntry
     {
+        if ('' === $filename) {
+            self::warn($ctx, 'simplexml_load_file(): failed to load external entity ""', $frame);
+
+            return null;
+        }
         $contents = VmFsReadNative::read($filename);
         if (false === $contents) {
             self::warn($ctx, 'simplexml_load_file(): Failed to open stream: No such file or directory', $frame);
