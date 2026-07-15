@@ -33,7 +33,7 @@ final class number_format extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $num = VmNumberFormat::coerceFloat($frame->calledArgs[0]->resolveIndirect());
+        $num = VmNumberFormat::coerceFloat($frame->calledArgs[0]->resolveIndirect(), $frame);
         $decimals = isset($frame->calledArgs[1])
             ? VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[1],

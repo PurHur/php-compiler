@@ -30,7 +30,7 @@ final class gethostbyname extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('gethostbyname() requires exactly one argument in this compiler build');
         }
-        $hostname = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'gethostbyname', 0, 'hostname');
+        $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gethostbyname', 0, 'hostname');
         if (null === $frame->returnVar) {
             return;
         }
@@ -45,7 +45,7 @@ final class gethostbyname extends Internal
 
         return JitGethostbyname::invoke(
             $context,
-            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'gethostbyname', 0, 'hostname')
+            JitStringBuiltinArg::lower($context, $args[0], 'gethostbyname', 0, 'hostname')
         );
     }
 }

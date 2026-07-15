@@ -9,7 +9,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 final class VmNumberFormat
@@ -51,7 +53,7 @@ final class VmNumberFormat
      *
      * @throws \TypeError when the value is not int, float, or a numeric string
      */
-    public static function coerceFloat(Variable $value): float
+    public static function coerceFloat(Variable $value, ?Frame $frame = null): float
     {
         $value = $value->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($value)) {
@@ -62,7 +64,14 @@ final class VmNumberFormat
         }
         switch ($value->type) {
             case Variable::TYPE_NULL:
-                throw new \TypeError(self::numTypeError('null'));
+                if (VmMath::requiresForwardProfileStrictLongNull()) {
+                    throw new \TypeError(self::numTypeError('null'));
+                }
+                if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                    throw new \TypeError(self::numTypeError('null'));
+                }
+
+                return 0.0;
             case Variable::TYPE_INTEGER:
                 return (float) $value->toInt();
             case Variable::TYPE_FLOAT:

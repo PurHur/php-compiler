@@ -1,13 +1,8 @@
 --TEST--
-stdlib gethostbyname(null) — TypeError (#18787, ext/standard/dns.c)
+stdlib gethostbyname(null) — null coerces to empty string on default profile (#19069, ext/standard/dns.c)
 --FILE--
 <?php
-try {
-    gethostbyname(null);
-} catch (Throwable $e) {
-    echo get_class($e), "\n";
-    echo $e->getMessage(), "\n";
-}
+echo var_export(@gethostbyname(null), true), "\n";
+?>
 --EXPECT--
-TypeError
-gethostbyname(): Argument #1 ($hostname) must be of type string, null given
+''
