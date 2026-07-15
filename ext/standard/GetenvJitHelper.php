@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
-
 /**
  * Lowered into JIT/AOT modules for getenv()/putenv() overlay (#9092, #8992 php-in-PHP).
  *
@@ -86,29 +83,37 @@ final class GetenvJitHelper
         return self::putenv($variable.'='.$value);
     }
 
-    /** Merge process-local putenv overlay into a hashtable (JIT getenv argc==0, #13431). */
-    public static function mergeLocalOverlayInto(HashTable $ht): void
+    /** Merge process-local putenv overlay into a native hashtable (JIT/AOT edge, #13431, #5965). */
+    public static function mergeLocalOverlayIntoNative(int $htPtr): void
     {
         foreach (self::$local as $name => $value) {
             if ('' === $name) {
                 continue;
             }
-            $var = new Variable();
-            $var->string($value);
-            $ht->update($name, $var);
+            phpc_native_ht_set_string_key($htPtr, $name, $value);
         }
     }
 
-    /** Populate a hashtable with inherited environ + local putenv overlay (JIT getenv argc==0, #5075). */
-    public static function fillAllEnvironmentHashtable(HashTable $ht): void
+    /** Populate a native hashtable with inherited environ + local putenv overlay (JIT getenv argc==0, #5075). */
+    public static function fillAllEnvironmentHashtable(int $htPtr): void
     {
         foreach (self::getAllEnvironmentMap() as $name => $value) {
             if ('' === $name) {
                 continue;
             }
-            $var = new Variable();
-            $var->string($value);
-            $ht->update($name, $var);
+            phpc_native_ht_set_string_key($htPtr, $name, $value);
         }
+    }
+
+    /** @return array<string, string> VM overlay map for interpreter-side merge helpers. */
+    public static function localOverlayEntries(): array
+    {
+        return self::$local;
+    }
+
+    /** Merge process-local putenv overlay into a VM hashtable (interpreter path, #9814). */
+    public static function mergeLocalOverlayInto(\PHPCompiler\VM\HashTable $ht): void
+    {
+        EnvLocalJitHelperVm::mergeLocalOverlayInto($ht);
     }
 }

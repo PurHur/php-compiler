@@ -110,8 +110,13 @@ final class BasicBlockHelper
         $context->builder->positionAtEnd($next);
     }
 
-    public static function restoreInsertBlock(Context $context, BasicBlock $block): void
+    public static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
     {
+        if (null === $block) {
+            $context->builder->clearInsertionPosition();
+
+            return;
+        }
         if (null === $block->getTerminator()) {
             $context->builder->positionAtEnd($block);
 

@@ -36,9 +36,16 @@ final class putenv_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('putenv() requires exactly one argument');
         }
-        return JitEnv::putenv(
+        $assignment = JitStringBuiltinArg::lowerStrictOrCoercible(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'putenv', 0, 'assignment')
+            $args[0],
+            'putenv',
+            0,
+            'assignment'
         );
+        // Dominating __string__* for concat/slot temps (syntax guard + setenv mirror) (#17316).
+        $assignment = \PHPCompiler\JIT\JitStringArg::materializeStringDominating($context, $assignment);
+
+        return JitEnv::putenv($context, $assignment);
     }
 }

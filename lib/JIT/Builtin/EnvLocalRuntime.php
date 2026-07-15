@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -128,9 +129,12 @@ final class EnvLocalRuntime
 
     public static function implement(Context $context): void
     {
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
         $probe = $context->module->getNamedFunction('__compiler_env_local_lookup');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
 
             return;
         }
@@ -140,7 +144,7 @@ final class EnvLocalRuntime
         self::implementLookupBridge($context);
         self::implementRegisterBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
     }
 
     private static function implementLookupBridge(Context $context): void

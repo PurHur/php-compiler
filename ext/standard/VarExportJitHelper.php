@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VmActiveContextJitHelper;
 use PHPCompiler\Web\Superglobals;
 
 /**
@@ -19,18 +21,14 @@ final class VarExportJitHelper
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
-            throw new \LogicException('var_export() JIT helper requires active VM context (#9189)');
+            $ctx = VmActiveContextJitHelper::resolve();
         }
         $vm = $ctx->runtime->vm;
         if (null === $vm) {
-            throw new \LogicException('var_export() JIT helper requires active VM (#9189)');
-        }
-        $frames = $ctx->runStackFrames();
-        $frame = isset($frames[0]) ? $frames[0] : null;
-        if (null === $frame) {
-            throw new \LogicException('var_export() JIT helper requires an active frame (#9189)');
+            $ctx->runtime->vm = new VM($ctx);
+            $vm = $ctx->runtime->vm;
         }
 
-        return VmVarExport::formatVariable($vm, $value->resolveIndirect(), 0, $frame);
+        return VmVarExport::formatVariable($vm, $value->resolveIndirect(), 0, null);
     }
 }

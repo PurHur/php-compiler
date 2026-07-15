@@ -12900,6 +12900,28 @@ class JIT {
             }
         }
         $result = $this->resolveAssignLvalue($resultOp);
+        if (
+            null !== $this->context->listUnpackAssignRootBlock
+            && Variable::TYPE_VALUE === $result->type
+            && Variable::KIND_VARIABLE !== $result->kind
+            && null === $result->objectPropertySlot
+            && !$result->functionStaticGlobal
+        ) {
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $promoted = new Variable(
+                $this->context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                $slot
+            );
+            $this->context->setVariableOp($resultOp, $promoted);
+            $resolved = JIT\OperandName::resolve($resultOp);
+            if (null !== $resolved && '' !== $resolved) {
+                $this->context->bindVariableByName($resolved, $promoted);
+            }
+            $result = $promoted;
+            $this->recordListUnpackAssignSlot($resultOp, $result);
+        }
         $globalTarget = $this->resolveScriptGlobalAssignTarget($resultOp, $result);
         if (null !== $globalTarget) {
             JIT\JitValueBox::assignToPointer(
@@ -13609,6 +13631,21 @@ class JIT {
 
             return;
         } elseif (Variable::TYPE_VALUE === $result->type && Variable::TYPE_VALUE === $value->type) {
+            if (Variable::KIND_VARIABLE !== $result->kind) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $boxed = new Variable(
+                    $this->context,
+                    Variable::TYPE_VALUE,
+                    Variable::KIND_VARIABLE,
+                    $slot
+                );
+                $this->context->setVariableOp($resultOp, $boxed);
+                $resolved = JIT\OperandName::resolve($resultOp);
+                if (null !== $resolved && '' !== $resolved) {
+                    $this->context->bindVariableByName($resolved, $boxed);
+                }
+                $result = $boxed;
+            }
             JIT\JitValueBox::copyFromPointer(
                 $this->context,
                 $result->value,

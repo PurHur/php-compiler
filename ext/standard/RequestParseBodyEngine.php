@@ -218,11 +218,21 @@ final class RequestParseBodyEngine
         return [implode("\n", $headerLines), trim(implode("\n", $contentLines), "\r\n")];
     }
 
+    private static function overlayGetenv(string $name): string|false
+    {
+        $jit = GetenvJitHelper::getenv($name, 0);
+        if (false !== $jit) {
+            return $jit;
+        }
+
+        return VmEnv::getenv($name);
+    }
+
     private static function extractBoundaryFromEnvironment(): ?string
     {
-        $contentType = VmEnv::getenv('CONTENT_TYPE');
+        $contentType = self::overlayGetenv('CONTENT_TYPE');
         if (false === $contentType || '' === $contentType) {
-            $contentType = VmEnv::getenv('HTTP_CONTENT_TYPE');
+            $contentType = self::overlayGetenv('HTTP_CONTENT_TYPE');
         }
         if (false === $contentType || '' === $contentType) {
             return null;
@@ -236,9 +246,9 @@ final class RequestParseBodyEngine
 
     private static function contentTypeMediaType(): string
     {
-        $contentType = VmEnv::getenv('CONTENT_TYPE');
+        $contentType = self::overlayGetenv('CONTENT_TYPE');
         if (false === $contentType || '' === $contentType) {
-            $contentType = VmEnv::getenv('HTTP_CONTENT_TYPE');
+            $contentType = self::overlayGetenv('HTTP_CONTENT_TYPE');
         }
         if (false === $contentType || '' === $contentType) {
             return '';
@@ -254,13 +264,13 @@ final class RequestParseBodyEngine
 
     private static function readRequestBody(): string
     {
-        $fromFile = VmEnv::getenv('REQUEST_BODY_FILE');
+        $fromFile = self::overlayGetenv('REQUEST_BODY_FILE');
         if (false !== $fromFile && '' !== $fromFile && is_readable($fromFile)) {
             $contents = file_get_contents($fromFile);
 
             return false === $contents ? '' : $contents;
         }
-        $fromEnv = VmEnv::getenv('REQUEST_BODY');
+        $fromEnv = self::overlayGetenv('REQUEST_BODY');
 
         return false === $fromEnv ? '' : $fromEnv;
     }
