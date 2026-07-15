@@ -8888,6 +8888,10 @@ restart:
             return $this->dispatchVmBadMethodCallException($e, $callerFrame);
         } catch (\OutOfBoundsException $e) {
             return $this->dispatchVmOutOfBoundsException($e, $callerFrame);
+        } catch (\UnexpectedValueException $e) {
+            return $this->dispatchVmUnexpectedValueException($e, $callerFrame);
+        } catch (\RuntimeException $e) {
+            return $this->dispatchVmRuntimeException($e, $callerFrame);
         } catch (\InvalidArgumentException $e) {
             return $this->dispatchVmInvalidArgumentException($e, $callerFrame);
         } catch (\LogicException $e) {
@@ -9012,6 +9016,34 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeOutOfBoundsException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native RuntimeException from SPL file builtins (#6393, ext/spl/spl_directory.c). */
+    private function dispatchVmRuntimeException(\RuntimeException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeRuntimeException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native UnexpectedValueException from DirectoryIterator (#3635 family). */
+    private function dispatchVmUnexpectedValueException(\UnexpectedValueException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeUnexpectedValueException(
             $this->context,
             $error->getMessage(),
             $file,

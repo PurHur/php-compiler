@@ -47,14 +47,11 @@ final class SplFileObjectBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SplFileObject');
         $entry->parentLc = SplFileInfoBuiltin::CLASS_LC;
-        if (isset($ctx->classes['stringable'])
-            && !\in_array('Stringable', $entry->interfaces, true)) {
-            $entry->interfaces[] = 'Stringable';
-        }
-        foreach (['RecursiveIterator', 'Traversable', 'Iterator', 'SeekableIterator'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
-                && !\in_array($iface, $entry->interfaces, true)) {
-                $entry->interfaces[] = $iface;
+        // Store lowercase interface keys so class_implements() resolves $ctx->classes (#6393).
+        foreach (['stringable', 'recursiveiterator', 'traversable', 'iterator', 'seekableiterator'] as $ifaceLc) {
+            if (isset($ctx->classes[$ifaceLc])
+                && !\in_array($ifaceLc, $entry->interfaces, true)) {
+                $entry->interfaces[] = $ifaceLc;
             }
         }
 
@@ -86,6 +83,8 @@ final class SplFileObjectBuiltin
             'getcsvcontrol' => SplFileObjectGetCsvControl::class,
             'setflags' => SplFileObjectSetFlags::class,
             'getflags' => SplFileObjectGetFlags::class,
+            'haschildren' => SplFileObjectHasChildren::class,
+            'getchildren' => SplFileObjectGetChildren::class,
             '__tostring' => SplFileObjectToString::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
@@ -96,6 +95,8 @@ final class SplFileObjectBuiltin
         $entry->methodNames['setflags'] = 'setFlags';
         $entry->methodNames['getflags'] = 'getFlags';
         $entry->methodNames['getcurrentline'] = 'getCurrentLine';
+        $entry->methodNames['haschildren'] = 'hasChildren';
+        $entry->methodNames['getchildren'] = 'getChildren';
         $entry->methodNames['__tostring'] = '__toString';
 
         $entry->isInternal = true;
@@ -118,6 +119,8 @@ final class SplFileObjectBuiltin
             $entry->methods['fputcsv'],
             $entry->methods['setflags'],
             $entry->methods['getflags'],
+            $entry->methods['haschildren'],
+            $entry->methods['getchildren'],
         );
     }
 }
@@ -169,11 +172,33 @@ final class SplFileObjectConstruct extends VmClassMethod
         $handle = VmFs::fopen($pathname, $mode, $frame->vmContext);
         if (false === $handle) {
             throw new \RuntimeException(
-                'SplFileObject::__construct('.$pathname.'): Failed to open stream: No such file or directory'
+                'SplFileObject::__construct('.$pathname.'): Failed to open stream: '
+                .self::fopenFailureDetail($pathname, $mode)
             );
         }
         SplFileInfoStorage::init($object, $pathname);
         SplFileObjectStorage::setHandle($object, $handle);
+    }
+
+    /** php-src streams.c — prefer host fopen reason (invalid mode vs missing path). */
+    private static function fopenFailureDetail(string $pathname, string $mode): string
+    {
+        $last = \error_get_last();
+        $detail = 'No such file or directory';
+        if (\is_array($last) && isset($last['message']) && \is_string($last['message'])) {
+            $prefix = 'fopen('.$pathname.'): Failed to open stream: ';
+            if (str_starts_with($last['message'], $prefix)) {
+                $detail = substr($last['message'], \strlen($prefix));
+            } elseif (preg_match('/Failed to open stream: (.+)$/', $last['message'], $m)) {
+                $detail = $m[1];
+            }
+        }
+        // VmFsOpenPure appends "b" before host fopen; Zend quotes the user mode (#6393).
+        if (!str_contains($mode, 'b')) {
+            $detail = str_replace('`'.$mode.'b\'', '`'.$mode.'\'', $detail);
+        }
+
+        return $detail;
     }
 }
 
@@ -755,6 +780,47 @@ final class SplFileObjectSetFlags extends VmClassMethod
         }
         $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
         SplFileObjectStorage::setFlags($object, $flags);
+    }
+}
+
+/** php-src spl_directory.c — SplFileObject::hasChildren always false. */
+final class SplFileObjectHasChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('hasChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::hasChildren()'
+        );
+        SplIteratorSupport::setReturnBool($frame, false);
+    }
+}
+
+/** php-src spl_directory.c — SplFileObject::getChildren returns null. */
+final class SplFileObjectGetChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::getChildren()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->null();
     }
 }
 
