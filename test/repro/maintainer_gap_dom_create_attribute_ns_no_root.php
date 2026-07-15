@@ -1,7 +1,5 @@
 <?php
 
-declare(strict_types=1);
-
 $doc = new DOMDocument();
 $warnings = [];
 set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
