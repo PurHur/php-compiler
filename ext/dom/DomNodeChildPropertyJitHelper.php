@@ -11,12 +11,12 @@ final class DomNodeChildPropertyJitHelper
 {
     public static function firstChildArgv(ObjectEntry $node): ?ObjectEntry
     {
-        return null;
+        return self::childArgv($node, true);
     }
 
     public static function lastChildArgv(ObjectEntry $node): ?ObjectEntry
     {
-        return null;
+        return self::childArgv($node, false);
     }
 
     public static function firstChildByIdArgv(int $nodeId): ?ObjectEntry

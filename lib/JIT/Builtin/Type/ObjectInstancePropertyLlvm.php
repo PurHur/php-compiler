@@ -37,6 +37,17 @@ final class ObjectInstancePropertyLlvm
             return \PHPCompiler\ext\dom\JitDomDocumentElement::fetch($object, $obj);
         }
 
+        return self::propertyFetchDeclaredSlot($object, $obj, $class, $name, $classId);
+    }
+
+    /** Slot read without ext/dom live-bridge re-dispatch (#18951). */
+    public static function propertyFetchDeclaredSlot(
+        Object_ $object,
+        Value $obj,
+        string $class,
+        string $name,
+        int $classId
+    ): Variable {
         $context = $object->jitContext();
         $className = $object->classNameForId($classId);
         $nameId = $object->propNameIdFor($name);

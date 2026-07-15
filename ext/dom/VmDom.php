@@ -5700,6 +5700,23 @@ final class VmDom
         }
     }
 
+    /** Mirror live child links onto a user-script handle that aliases DomRegistry (#18951). */
+    public static function mirrorNodeLinkProperties(ObjectEntry $dest, ObjectEntry $source): void
+    {
+        if ($dest->id !== $source->id) {
+            return;
+        }
+        self::initNodePropertySlots($dest);
+        self::initNodePropertySlots($source);
+        foreach ([
+            self::PROP_FIRST_CHILD,
+            self::PROP_LAST_CHILD,
+            self::PROP_CHILD_NODES,
+        ] as $prop) {
+            $dest->getProperty($prop)->copyFrom($source->getProperty($prop));
+        }
+    }
+
     private static function syncNodeLinks(Context $ctx, ObjectEntry $node): void
     {
         if (!DomRegistry::has($node)) {
