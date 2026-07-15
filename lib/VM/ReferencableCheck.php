@@ -187,6 +187,14 @@ final class ReferencableCheck
             }
             if (
                 0 === $paramIdx
+                && self::defersByRefForNullStreamContextSetter($fn)
+                && Variable::TYPE_NULL === $calledArgs[$paramIdx]->resolveIndirect()->type
+            ) {
+                // php-src ext/standard/streams.c — Z_PARAM_RESOURCE TypeError before by-ref bind.
+                continue;
+            }
+            if (
+                0 === $paramIdx
                 && self::skipsByRefWhenNotArray($fn)
                 && !self::isArrayOperand($calledArgs[$paramIdx])
             ) {
@@ -348,6 +356,25 @@ final class ReferencableCheck
         return \in_array($lc, self::arraySortMutatorFunctions(), true)
             || \in_array($lc, self::arrayStackMutatorFunctions(), true)
             || 'array_splice' === $lc;
+    }
+
+    /**
+     * stream_context_set_* mutators — null context TypeError in VmStreamContext::requireRepresentation (#19213).
+     *
+     * @return list<string>
+     */
+    public static function streamContextSetterFunctions(): array
+    {
+        return [
+            'stream_context_set_option',
+            'stream_context_set_options',
+            'stream_context_set_params',
+        ];
+    }
+
+    public static function defersByRefForNullStreamContextSetter(string $fn): bool
+    {
+        return \in_array(strtolower($fn), self::streamContextSetterFunctions(), true);
     }
 
     /** array_walk* accepts object operands — empty non-lvalue objects get E_NOTICE only (ext/standard/array.c, #13237). */
