@@ -34,7 +34,7 @@ final class str_word_count extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('str_word_count() accepts one to three arguments in this compiler build');
         }
-        $string = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'str_word_count', 'string');
+        $string = self::vmStringArg($frame, 0, 'string');
         $format = 0;
         if ($argc >= 2) {
             $formatArg = $frame->calledArgs[1]->resolveIndirect();
@@ -104,11 +104,10 @@ final class str_word_count extends Internal
             return StringStrWordCount::hashTableFromVmResult($context, $result, $format);
         }
 
-        StringStrWordCount::ensureLinked($context);
-
         $str = null !== $literal
             ? $context->builder->load($context->constantStringFromString($literal))
-            : JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'str_word_count', 0, 'string');
+            : self::jitStringArg($context, $args[0], 0, 'string');
+        StringStrWordCount::ensureLinked($context);
 
         $formatVal = 1 === $argc
             ? $context->getTypeFromString('int64')->constInt(0, false)
@@ -134,6 +133,45 @@ final class str_word_count extends Internal
             $str,
             $formatVal,
             $charsArg
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'str_word_count', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'str_word_count',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'str_word_count',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'str_word_count',
+            $argIndex,
+            $paramName
         );
     }
 }

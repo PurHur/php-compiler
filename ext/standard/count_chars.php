@@ -34,7 +34,7 @@ final class count_chars extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('count_chars() accepts one or two arguments in this compiler build');
         }
-        $string = VmString::stringBuiltinArgForFrame($frame, 0, 'count_chars', 0, 'string');
+        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'count_chars', 0, 'string');
         $mode = 0;
         if (2 === $argc) {
             $mode = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'count_chars', 2, 'mode');
@@ -89,7 +89,9 @@ final class count_chars extends Internal
             return JitCountChars::materializeHistogram($context, $result);
         }
 
-        $str = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'count_chars', 0, 'string');
+        $str = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'count_chars', 0, 'string')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'count_chars', 0, 'string');
 
         return StringCountChars::invoke($context, $str, $mode);
     }

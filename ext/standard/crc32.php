@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
@@ -42,7 +43,9 @@ final class crc32 extends Internal
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('crc32() requires one or two arguments in this compiler build');
         }
-        $subject = JitCrc32::lowerStringSubject($context, $args[0]);
+        $subject = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'crc32', 0, 'string')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'crc32', 0, 'string');
         $seed = $context->getTypeFromString('int64')->constInt(0, false);
         if (isset($args[1])) {
             $seed = JitLongArg::lower($context, $args[1], 'crc32() seed');
@@ -57,7 +60,7 @@ final class crc32 extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'crc32', 'string')->toString();
         }
 
-        return VmString::coerceStringBuiltinArg(
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[$argIndex],
             'crc32',
             $argIndex,
