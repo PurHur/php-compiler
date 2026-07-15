@@ -120,6 +120,21 @@ final class DomNodeState
     public array $xpathNamespaces = [];
 
     /**
+     * PHP function allowlist mode for {@see DomConstants::XML_XPATH} (#19331).
+     *
+     * php-src: ext/dom/xpath_callbacks.c — PHP_DOM_REG_FUNC_MODE_{NONE,ALL,SET}
+     * 0 = none, 1 = all, 2 = explicit set in {@see $xpathPhpFunctions}.
+     */
+    public int $xpathPhpFunctionsMode = 0;
+
+    /**
+     * Explicit php:function() handler names when mode is SET (#19331).
+     *
+     * @var array<string, true>
+     */
+    public array $xpathPhpFunctions = [];
+
+    /**
      * Ordered unique tokens for {@see DomConstants::XML_TOKENLIST} (#16876).
      *
      * @var list<string>

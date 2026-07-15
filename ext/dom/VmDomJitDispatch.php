@@ -345,6 +345,18 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function xpathRegisterPhpFunctions(ObjectEntry $xpath, array $extra): Variable
+    {
+        VmDomXPath::registerPhpFunctions($xpath, $extra[0] ?? null);
+        $result = new Variable(Variable::TYPE_NULL);
+        $result->null();
+
+        return $result;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function compareDocumentPosition(ObjectEntry $node, array $extra): Variable
     {
         $otherVar = ($extra[0] ?? self::missingArg('compareDocumentPosition', 0))->resolveIndirect();
