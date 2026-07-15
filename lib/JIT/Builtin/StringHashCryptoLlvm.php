@@ -13,11 +13,15 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Thin libcrypto EVP bridge for user-script standalone AOT (#3357, #16734).
+ * Thin libcrypto EVP bridge for user-script standalone AOT (#3357, #16734, #19274).
  *
  * Nested HashCryptoJitHelper does not run reliably in minimal standalone init
  * (helper unit __init__ skipped under PHP_COMPILER_AOT_USER_SCRIPT). OpenSSL
  * EVP_Digest/HMAC match php-src ext/hash without nested PHP lowering.
+ *
+ * Digest buffers must use {@see allocaI8Bytes()} / {@see arrayAlloca} — PHPLLVM
+ * {@see \PHPLLVM\Builder::alloca()} takes only a Type; bare `alloca($i8, N)`
+ * ignores N and emits a 1-byte frame (AOT hash always-raw, #19274).
  * php-src: ext/standard/hash.c, ext/hash/hash.c
  */
 final class StringHashCryptoLlvm
@@ -152,10 +156,9 @@ final class StringHashCryptoLlvm
         $context->builder->returnValue($nullStr);
 
         $context->builder->positionAtEnd($body);
-        $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');
-        $mdBuf = $context->builder->alloca($i8, self::MAX_DIGEST_BYTES, 'hc_hash_md');
-        $mdLenSlot = $context->builder->alloca($i32, 1, 'hc_hash_md_len');
+        $mdBuf = self::allocaI8Bytes($context, self::MAX_DIGEST_BYTES);
+        $mdLenSlot = $context->builder->alloca($i32);
         $context->builder->store($i32->constInt(self::MAX_DIGEST_BYTES, false), $mdLenSlot);
         $dataPtr = self::stringData($context, $data);
         $dataLen = self::stringLenSizeT($context, $data);
@@ -224,8 +227,8 @@ final class StringHashCryptoLlvm
         $context->builder->positionAtEnd($body);
         $context->builder->call($context->lookupFunction('free'), $algoCstr);
 
-        $mdBuf = $context->builder->alloca($i8, self::MAX_DIGEST_BYTES, 'hc_hmac_md');
-        $mdLenSlot = $context->builder->alloca($i32, 1, 'hc_hmac_md_len');
+        $mdBuf = self::allocaI8Bytes($context, self::MAX_DIGEST_BYTES);
+        $mdLenSlot = $context->builder->alloca($i32);
         $keyPtr = self::stringData($context, $key);
         $keyLen = self::stringLenI32($context, $key);
         $dataPtr = self::stringData($context, $data);
@@ -327,7 +330,7 @@ final class StringHashCryptoLlvm
         $keylenPhi->addIncoming($defaultKeyLen, $useDigestLen);
         $keylenPhi->addIncoming($argKeyLen, $useArgLen);
 
-        $outBuf = $context->builder->alloca($i8, $keylenPhi, 'hc_pbkdf2_out');
+        $outBuf = $context->builder->arrayAlloca($i8, $keylenPhi);
         $passPtr = self::stringData($context, $password);
         $passLen = self::stringLenI32($context, $password);
         $saltPtr = self::stringData($context, $salt);
@@ -430,8 +433,8 @@ final class StringHashCryptoLlvm
         $okmLenPhi->addIncoming($hlenI64, $useDigestLen);
         $okmLenPhi->addIncoming($length64, $useArgLen);
 
-        $saltWork = $context->builder->alloca($i8, self::MAX_DIGEST_BYTES, 'hc_hkdf_salt_work');
-        $saltUseLenSlot = $context->builder->alloca($i64, 1, 'hc_hkdf_salt_use_len');
+        $saltWork = self::allocaI8Bytes($context, self::MAX_DIGEST_BYTES);
+        $saltUseLenSlot = $context->builder->alloca($i64);
         $saltLenI32 = self::stringLenI32($context, $salt);
         $saltEmpty = $context->builder->icmp(Builder::INT_EQ, $saltLenI32, $i32->constInt(0, false));
         $saltZeroFill = $fn->appendBasicBlock('hc_llvm_hkdf_salt_zero');
@@ -466,8 +469,8 @@ final class StringHashCryptoLlvm
         $saltPtr = $context->builder->pointerCast($saltWork, $i8p);
         $saltLenUse = $context->builder->load($saltUseLenSlot);
 
-        $prkBuf = $context->builder->alloca($i8, self::MAX_DIGEST_BYTES, 'hc_hkdf_prk');
-        $prkLenSlot = $context->builder->alloca($i32, 1, 'hc_hkdf_prk_len');
+        $prkBuf = self::allocaI8Bytes($context, self::MAX_DIGEST_BYTES);
+        $prkLenSlot = $context->builder->alloca($i32);
         $context->builder->store($i32->constInt(self::MAX_DIGEST_BYTES, false), $prkLenSlot);
         $keyPtr = self::stringData($context, $key);
         $hmacResult = $context->builder->call(
@@ -510,10 +513,10 @@ final class StringHashCryptoLlvm
             $context->lookupFunction('malloc'),
             $context->builder->truncOrBitCast($maxInputLen, $sizeT)
         );
-        $tBuf = $context->builder->alloca($i8, self::MAX_DIGEST_BYTES, 'hc_hkdf_t');
-        $tLenSlot = $context->builder->alloca($i64, 1, 'hc_hkdf_t_len');
-        $okmPosSlot = $context->builder->alloca($i64, 1, 'hc_hkdf_okm_pos');
-        $blockSlot = $context->builder->alloca($i64, 1, 'hc_hkdf_block');
+        $tBuf = self::allocaI8Bytes($context, self::MAX_DIGEST_BYTES);
+        $tLenSlot = $context->builder->alloca($i64);
+        $okmPosSlot = $context->builder->alloca($i64);
+        $blockSlot = $context->builder->alloca($i64);
         $context->builder->store($i64->constInt(0, false), $tLenSlot);
         $context->builder->store($i64->constInt(0, false), $okmPosSlot);
         $context->builder->store($i64->constInt(1, false), $blockSlot);
@@ -562,7 +565,7 @@ final class StringHashCryptoLlvm
             $counterPtr
         );
 
-        $tLenOutSlot = $context->builder->alloca($i32, 1, 'hc_hkdf_t_out_len');
+        $tLenOutSlot = $context->builder->alloca($i32);
         $context->builder->store($i32->constInt(self::MAX_DIGEST_BYTES, false), $tLenOutSlot);
         $expandResult = $context->builder->call(
             $context->lookupFunction('HMAC'),
@@ -631,7 +634,7 @@ final class StringHashCryptoLlvm
     private static function pbkdf2DefaultKeyLenFromAlgo(Context $context, LlvmFunction $fn, Value $algo): Value
     {
         $i32 = $context->getTypeFromString('int32');
-        $slot = $context->builder->alloca($i32, 1, 'hc_pbkdf2_default_keylen');
+        $slot = $context->builder->alloca($i32);
         $context->builder->store($i32->constInt(0, false), $slot);
 
         $algoCstr = self::stringToCstr($context, $algo, 'hc_pbkdf2_keylen_algo');
@@ -730,7 +733,7 @@ final class StringHashCryptoLlvm
             $charPtr
         );
 
-        $idxSlot = $context->builder->alloca($i64, 1, 'hc_hex_idx');
+        $idxSlot = $context->builder->alloca($i64);
         $context->builder->store($i64->constInt(0, false), $idxSlot);
         $loopHead = $fn->appendBasicBlock('hc_llvm_hex_head');
         $loopBody = $fn->appendBasicBlock('hc_llvm_hex_body');
@@ -762,6 +765,21 @@ final class StringHashCryptoLlvm
 
         $context->builder->positionAtEnd($loopDone);
         $context->builder->returnValue($hexStr);
+    }
+
+    /**
+     * Fixed-size i8 stack buffer as i8* (#19274).
+     *
+     * PHPLLVM {@see \PHPLLVM\Builder::alloca()} allocates a single `Type` —
+     * use {@see Type::arrayType()} then pointerCast so digests are not 1-byte frames.
+     */
+    private static function allocaI8Bytes(Context $context, int $nbytes): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $buf = $context->builder->alloca($i8->arrayType($nbytes));
+
+        return $context->builder->pointerCast($buf, $i8p);
     }
 
     private static function stringData(Context $context, Value $strPtr): Value
