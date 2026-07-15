@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** crc32c() — CRC32C (Castagnoli), signed 32-bit int (VM + JIT/AOT via ext/standard/VmCrc32c.php). */
@@ -22,11 +21,13 @@ final class crc32c extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $subject = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $subject->type) {
-            throw new \LogicException('crc32c() only supports strings in this compiler build');
-        }
-        $frame->returnVar->int(VmCrc32c::compute($subject->toString()));
+        $subject = VmString::coerceTypedStringBuiltinArg(
+            $frame->calledArgs[0],
+            'crc32c',
+            0,
+            'string'
+        );
+        $frame->returnVar->int(VmCrc32c::compute($subject));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -34,7 +35,7 @@ final class crc32c extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('crc32c() requires exactly one argument in this compiler build');
         }
-        $subject = $this->jitString($context, $args[0], 'crc32c() argument #1');
+        $subject = JitCrc32c::lowerStringSubject($context, $args[0]);
 
         return JitCrc32c::compute($context, $subject);
     }
