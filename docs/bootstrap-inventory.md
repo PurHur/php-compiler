@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4878 |
-| Phase A inventory files (M2 ratio SSOT) | 4878 |
+| PHP files on vm.php path | 4879 |
+| Phase A inventory files (M2 ratio SSOT) | 4879 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13082 |
+| Source constructs flagged (warnings) | 13085 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -367,12 +367,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/filter/filter_var_array.php` | 0 | 1 |
 | `ext/ftp/BuiltinClasses.php` | 0 | 1 |
 | `ext/ftp/FtpExtensionPolicy.php` | 0 | 1 |
-| `ext/ftp/Module.php` | 0 | 3 |
+| `ext/ftp/Module.php` | 0 | 4 |
 | `ext/ftp/VmFtpArg.php` | 0 | 1 |
 | `ext/ftp/VmFtpConnection.php` | 0 | 2 |
 | `ext/ftp/VmFtpCore.php` | 0 | 3 |
 | `ext/ftp/ftp_close.php` | 0 | 2 |
 | `ext/ftp/ftp_connect.php` | 0 | 2 |
+| `ext/ftp/ftp_ssl_connect.php` | 0 | 2 |
 | `ext/gd/BuiltinClasses.php` | 0 | 2 |
 | `ext/gd/GdExtensionPolicy.php` | 0 | 1 |
 | `ext/gd/GdFunction.php` | 0 | 3 |
@@ -7185,7 +7186,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ftp_connect (line 52)
-- new ftp_close (line 53)
+- new ftp_ssl_connect (line 53)
+- new ftp_close (line 54)
 - 4 class method(s)
 
 ### `ext/ftp/VmFtpArg.php`
@@ -7202,9 +7204,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ftp/VmFtpCore.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 46)
-- new ObjectEntry (line 47)
-- 11 class method(s)
+- new Variable (line 63)
+- new ObjectEntry (line 64)
+- 14 class method(s)
 
 ### `ext/ftp/ftp_close.php`
 
@@ -7216,6 +7218,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
+- 2 class method(s)
+
+### `ext/ftp/ftp_ssl_connect.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/gd/BuiltinClasses.php`

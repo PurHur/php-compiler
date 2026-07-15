@@ -50,6 +50,7 @@ class Module extends ModuleAbstract
 
         return [
             new ftp_connect(),
+            new ftp_ssl_connect(),
             new ftp_close(),
         ];
     }

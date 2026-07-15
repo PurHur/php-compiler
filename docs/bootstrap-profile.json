@@ -377,6 +377,7 @@
         "ext/ftp/VmFtpCore.php",
         "ext/ftp/ftp_close.php",
         "ext/ftp/ftp_connect.php",
+        "ext/ftp/ftp_ssl_connect.php",
         "ext/gd/BuiltinClasses.php",
         "ext/gd/GdExtensionPolicy.php",
         "ext/gd/GdFunction.php",
@@ -5112,9 +5113,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 4878,
+        "inventory_files": 4879,
         "excluded": 0,
-        "eligible": 4878,
+        "eligible": 4879,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
