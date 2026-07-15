@@ -1,4 +1,5 @@
 <?php
+
 echo ob_start() ? '' : '';
 echo ob_get_clean() === '' ? '' : '';
 

@@ -1183,8 +1183,12 @@ class Compiler {
     }
 
     /** Explicit null literal in a call arg list — not a hoisted inline closure temp (#14893). */
-    private function callArgIsNullLiteral(?Operand $arg): bool
-    {
+    private function callArgIsNullLiteral(
+        ?Operand $arg,
+        ?Op $cfgCallOp = null,
+        ?int $argIndex = null,
+        ?Block $block = null
+    ): bool {
         if (null === $arg) {
             return false;
         }
@@ -1196,6 +1200,16 @@ class Compiler {
         }
         if ($arg instanceof Op\Expr\ConstFetch && $this->constFetchIsNull($arg)) {
             return true;
+        }
+        if (
+            null !== $cfgCallOp
+            && null !== $block
+            && null !== $argIndex
+            && $this->callArgIsDeadInlineTemporary($arg)
+        ) {
+            $prelude = $this->hoistedDeadInlinePreludeProducerForCallArgIndex($cfgCallOp, $argIndex, $block);
+
+            return $prelude instanceof Op\Expr\ConstFetch && $this->constFetchIsNull($prelude);
         }
 
         return false;
@@ -40154,6 +40168,26 @@ class Compiler {
         foreach ($args as $argIndex => $arg) {
             $nameSlot = $this->callArgNameSlot($arg, $block);
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            if (
+                null !== $cfgCallOp
+                && $this->callArgIsNullLiteral(
+                    $cfgCallOp->args[(int) $argIndex] ?? $arg,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $block
+                )
+            ) {
+                $nullArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                if ($nullArg instanceof Operand) {
+                    $sends[] = new OpCode(
+                        OpCode::TYPE_ARG_SEND,
+                        (string) $this->registerNullConstantSlot($block, $nullArg),
+                        $nameSlot,
+                        $unpackFlag
+                    );
+                    continue;
+                }
+            }
             $mergeFamilyNamedCallArg = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
             if (
                 null !== $cfgCallOp
@@ -40434,15 +40468,25 @@ class Compiler {
                     $block
                 );
                 if ($deadInlinePrelude instanceof Op\Expr) {
-                    $preludeSlot = $block->slotForOperand($deadInlinePrelude->result);
-                    if (null === $preludeSlot) {
-                        if ($deadInlinePrelude instanceof Op\Expr\ConstFetch) {
-                            $preludeSlot = $this->slotForHoistedScalarConstFetchCallArg($deadInlinePrelude, $block);
-                        } else {
-                            foreach ($this->compileExpr($deadInlinePrelude, $block) as $op) {
-                                $sends[] = $op;
+                    if (
+                        $deadInlinePrelude instanceof Op\Expr\ConstFetch
+                        && $this->constFetchIsNull($deadInlinePrelude)
+                    ) {
+                        $preludeSlot = $this->registerNullConstantSlot(
+                            $block,
+                            $deadInlinePrelude->result ?? new Operand\Temporary()
+                        );
+                    } else {
+                        $preludeSlot = $block->slotForOperand($deadInlinePrelude->result);
+                        if (null === $preludeSlot) {
+                            if ($deadInlinePrelude instanceof Op\Expr\ConstFetch) {
+                                $preludeSlot = $this->slotForHoistedScalarConstFetchCallArg($deadInlinePrelude, $block);
+                            } else {
+                                foreach ($this->compileExpr($deadInlinePrelude, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                                $preludeSlot = $block->slotForOperand($deadInlinePrelude->result);
                             }
-                            $preludeSlot = $block->slotForOperand($deadInlinePrelude->result);
                         }
                     }
                     if (null !== $preludeSlot) {
@@ -40480,33 +40524,27 @@ class Compiler {
                 if ($preludeProducer instanceof Op\Expr\ConstFetch) {
                     $constName = $this->staticNameFromOperand($preludeProducer->name);
                     if (null !== $constName && 'null' === strtolower($constName)) {
-                        $nullSlot = $block->slotForOperand($preludeProducer->result);
-                        if (null === $nullSlot) {
-                            foreach ($this->compileExpr($preludeProducer, $block) as $op) {
-                                $sends[] = $op;
-                            }
-                            $nullSlot = $block->slotForOperand($preludeProducer->result);
-                        }
-                        if (null !== $nullSlot) {
-                            $callArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
-                            if (
-                                $callArg instanceof Operand
-                                && $this->callArgOperandExpectsArrayProducer($callArg)
-                            ) {
-                                // array_column([...], null, 'x') — haystack must not steal trailing null prelude (#15914, #16324).
-                            } elseif ($this->arraySpliceUnaryOffsetReplacementUsesDedicatedProducerWiring($cfgCallOp, (int) $argIndex, $block)) {
-                                // array_splice($a, -N, $len, null) — offset is UnaryMinus, not hoisted null (#16328).
-                            } elseif ($this->mbstringUnaryOffsetNullLengthUsesDedicatedProducerWiring($cfgCallOp, (int) $argIndex, $block)) {
-                                // mb_substr($s, -N, null) — offset is UnaryMinus, not hoisted null (#16481).
-                            } else {
-                                $sends[] = new OpCode(
-                                    OpCode::TYPE_ARG_SEND,
-                                    $nullSlot,
-                                    $nameSlot,
-                                    $unpackFlag
-                                );
-                                continue;
-                            }
+                        $callArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                        if (
+                            $callArg instanceof Operand
+                            && $this->callArgOperandExpectsArrayProducer($callArg)
+                        ) {
+                            // array_column([...], null, 'x') — haystack must not steal trailing null prelude (#15914, #16324).
+                        } elseif ($this->arraySpliceUnaryOffsetReplacementUsesDedicatedProducerWiring($cfgCallOp, (int) $argIndex, $block)) {
+                            // array_splice($a, -N, $len, null) — offset is UnaryMinus, not hoisted null (#16328).
+                        } elseif ($this->mbstringUnaryOffsetNullLengthUsesDedicatedProducerWiring($cfgCallOp, (int) $argIndex, $block)) {
+                            // mb_substr($s, -N, null) — offset is UnaryMinus, not hoisted null (#16481).
+                        } else {
+                            $sends[] = new OpCode(
+                                OpCode::TYPE_ARG_SEND,
+                                (string) $this->registerNullConstantSlot(
+                                    $block,
+                                    $preludeProducer->result ?? new Operand\Temporary()
+                                ),
+                                $nameSlot,
+                                $unpackFlag
+                            );
+                            continue;
                         }
                     } elseif (
                         ($preludeProducer = $this->hoistedConstPreludeProducerForCallArgIndex(
@@ -40621,13 +40659,18 @@ class Compiler {
             }
             if (
                 null !== $cfgCallOp
-                && $this->callArgIsNullLiteral($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                && $this->callArgIsNullLiteral(
+                    $cfgCallOp->args[(int) $argIndex] ?? $arg,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $block
+                )
             ) {
                 $nullArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                 if ($nullArg instanceof Operand) {
                     $sends[] = new OpCode(
                         OpCode::TYPE_ARG_SEND,
-                        $this->registerNullConstantSlot($block, $nullArg),
+                        (string) $this->registerNullConstantSlot($block, $nullArg),
                         $nameSlot,
                         $unpackFlag
                     );
@@ -41595,6 +41638,22 @@ class Compiler {
             $prefetchOps = [];
             $assignedNamedLocal = null;
             $valueSlot = null;
+            $nullLiteralCallArgSlot = null;
+            if (null !== $cfgCallOp) {
+                $nullLiteralArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                if (
+                    $nullLiteralArg instanceof Operand
+                    && $this->callArgIsNullLiteral(
+                        $nullLiteralArg,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $block
+                    )
+                ) {
+                    $nullLiteralCallArgSlot = (string) $this->registerNullConstantSlot($block, $nullLiteralArg);
+                    $valueSlot = $nullLiteralCallArgSlot;
+                }
+            }
             $hoistedEnumPropertyCallArgSlotWired = false;
             if (null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
                 $valueSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
@@ -41677,7 +41736,7 @@ class Compiler {
             if (null === $syncedCoalesceSlot) {
                 $syncedCoalesceSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($arg);
             }
-            if (null !== $syncedCoalesceSlot) {
+            if (null !== $syncedCoalesceSlot && null === $valueSlot) {
                 $valueSlot = (string) $syncedCoalesceSlot;
             }
             if (null === $valueSlot) {
@@ -41700,7 +41759,7 @@ class Compiler {
                 }
             }
             $callArgConstRoot = $this->unwrapOperandChain($callArgOperand);
-            if ($callArgConstRoot instanceof Op\Expr\ConstFetch) {
+            if ($callArgConstRoot instanceof Op\Expr\ConstFetch && null === $valueSlot) {
                 $foldedGlobalConst = $this->tryFoldGlobalConstFetch($callArgConstRoot);
                 if (null !== $foldedGlobalConst) {
                     $valueSlot = (string) $block->registerConstant($callArgOperand, $foldedGlobalConst);
@@ -41714,7 +41773,8 @@ class Compiler {
             ) {
                 $valueSlot = $dimFetchSlot;
             } elseif (
-                null !== $inlineArray
+                null === $valueSlot
+                && null !== $inlineArray
                 && (
                     $inlineArray instanceof Op\Expr\FuncCall
                     || $inlineArray instanceof Op\Expr\NsFuncCall
@@ -42388,7 +42448,12 @@ class Compiler {
                     null !== $closureSlot
                     && null === $assignedNamedLocal
                     && !$this->isNamedVariableOperand($arg)
-                    && !$this->callArgIsNullLiteral($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                    && !$this->callArgIsNullLiteral(
+                        $cfgCallOp->args[(int) $argIndex] ?? $arg,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $block
+                    )
                     && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
                     && (
                         null !== $precedingClosureSlot
@@ -43371,7 +43436,12 @@ class Compiler {
                 null !== $cfgCallOp
                 && null === $valueSlot
                 && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
-                && !$this->callArgIsNullLiteral($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                && !$this->callArgIsNullLiteral(
+                    $cfgCallOp->args[(int) $argIndex] ?? $arg,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $block
+                )
                 && $this->callArgOperandIsClosureValue($arg, $block, $calleeName)
                 && !$this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block) instanceof Op\Expr\Array_
                 && $this->inlineClosureArrayPairCallbackArgIndex($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp)) === (int) $argIndex
@@ -43384,7 +43454,12 @@ class Compiler {
             if (
                 null === $valueSlot
                 && null !== $cfgCallOp
-                && $this->callArgIsNullLiteral($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                && $this->callArgIsNullLiteral(
+                    $cfgCallOp->args[(int) $argIndex] ?? $arg,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $block
+                )
             ) {
                 $nullArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                 if ($nullArg instanceof Operand) {
@@ -43863,6 +43938,12 @@ class Compiler {
             } elseif (
                 null !== $cfgCallOp
                 && $this->callArgIsDeadInlineTemporary($arg)
+                && !$this->callArgIsNullLiteral(
+                    $cfgCallOp->args[(int) $argIndex] ?? $arg,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $block
+                )
                 && !$this->shouldSkipFinalAdjacentNestedFuncCallArgProbe($cfgCallOp, (int) $argIndex, $block)
             ) {
                 $adjacentArgSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
@@ -45637,6 +45718,9 @@ class Compiler {
                 ) {
                     $valueSlot = (string) $bitmaskSlot;
                 }
+            }
+            if (null !== $nullLiteralCallArgSlot) {
+                $valueSlot = $nullLiteralCallArgSlot;
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
@@ -49013,6 +49097,9 @@ class Compiler {
             || !$this->callArgIsDeadInlineTemporary($callArg)
             || $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block) instanceof Op\Expr\Array_
         ) {
+            return;
+        }
+        if ($this->callArgIsNullLiteral($callArg, $cfgCallOp, 0, $block)) {
             return;
         }
         $pendingDimFetchSlot = $this->lastPendingCallArgArrayDimFetchSlot(
