@@ -43,7 +43,7 @@ final class base_convert_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $numStr = VmString::stringBuiltinArgForFrame($frame, 0, 'base_convert', 0, 'num');
+        $numStr = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'base_convert', 0, 'num');
         if (Variable::TYPE_INTEGER !== $fromVar->type || Variable::TYPE_INTEGER !== $toVar->type) {
             throw new \LogicException('base_convert() base arguments must be integers in this compiler build');
         }
@@ -60,14 +60,14 @@ final class base_convert_ extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        MathBaseConvert::ensureLinked($context);
         if (3 !== \count($args)) {
             throw new \LogicException('base_convert() requires exactly three arguments in this compiler build');
         }
-        $ptr = $this->stringDataPtr(
-            $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'base_convert', 0, 'num')
-        );
+        $num = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'base_convert', 0, 'num')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'base_convert', 0, 'num');
+        MathBaseConvert::ensureLinked($context);
+        $ptr = $this->stringDataPtr($context, $num);
         $fromBase = $this->jitLong($context, $args[1], 'base_convert() argument #2');
         $toBase = $this->jitLong($context, $args[2], 'base_convert() argument #3');
         $fn = $context->lookupFunction('phpc_base_convert');

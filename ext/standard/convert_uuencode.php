@@ -40,12 +40,46 @@ final class convert_uuencode extends Internal
 
         return JitConvertUuencode::encode(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'convert_uuencode', 0, 'string')
+            self::jitStringArg($context, $args[0], 0, 'string')
         );
     }
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, 'convert_uuencode', $paramName);
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'convert_uuencode', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'convert_uuencode',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'convert_uuencode',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'convert_uuencode',
+            $argIndex,
+            $paramName
+        );
     }
 }

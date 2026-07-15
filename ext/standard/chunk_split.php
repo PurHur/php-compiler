@@ -29,7 +29,7 @@ final class chunk_split extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('chunk_split() requires one to three arguments in this compiler build');
         }
-        $string = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'chunk_split', 'string');
+        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'chunk_split', 0, 'string');
         $length = 76;
         if ($argc >= 2) {
             $length = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'chunk_split', 2, 'length');
@@ -51,12 +51,12 @@ final class chunk_split extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('chunk_split() requires one to three arguments in this compiler build');
         }
+        $input = self::jitStringArg($context, $args[0], 0, 'string');
         $workBlock = BasicBlockHelper::append($context, 'chunksplit_call_work');
         $context->builder->branch($workBlock);
         $context->builder->positionAtEnd($workBlock);
         StringChunkSplit::ensureLinked($context);
         $context->builder->positionAtEnd($workBlock);
-        $input = JitChunkSplit::lowerStringSubject($context, $args[0]);
         $i64 = $context->getTypeFromString('int64');
         $chunkLen = $i64->constInt(76, false);
         if ($argc >= 2) {
@@ -75,6 +75,31 @@ final class chunk_split extends Internal
             $input,
             $chunkLen,
             $separator
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'chunk_split',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'chunk_split',
+            $argIndex,
+            $paramName
         );
     }
 }

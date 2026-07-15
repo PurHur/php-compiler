@@ -27,12 +27,7 @@ final class addslashes extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('addslashes() requires exactly one argument in this compiler build');
         }
-        $subject = InternalStrictArg::resolveCoercibleStringArg(
-            $frame,
-            0,
-            'addslashes',
-            'string'
-        );
+        $subject = self::vmStringArg($frame, 0, 'string');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::addslashes($subject))
@@ -44,11 +39,51 @@ final class addslashes extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('addslashes() requires exactly one argument in this compiler build');
         }
+        $subject = self::jitStringArg($context, $args[0], 0, 'string');
         StringAddslashes::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__string__addslashes'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'addslashes', 0, 'string')
+            $subject
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'addslashes', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'addslashes',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'addslashes',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'addslashes',
+            $argIndex,
+            $paramName
         );
     }
 }

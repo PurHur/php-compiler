@@ -34,7 +34,7 @@ final class str_rot13 extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('str_rot13() requires exactly one argument');
         }
-        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'str_rot13', 'string');
+        $subject = self::vmStringArg($frame, 0, 'string');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::strRot13($subject))
@@ -50,12 +50,51 @@ final class str_rot13 extends Internal
             throw new \LogicException('str_rot13() requires exactly one argument');
         }
 
-        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'str_rot13', 0, 'string');
+        $str = self::jitStringArg($context, $args[0], 0, 'string');
         StringStrRot13::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_str_rot13'),
             $str
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'str_rot13', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'str_rot13',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'str_rot13',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'str_rot13',
+            $argIndex,
+            $paramName
         );
     }
 }
