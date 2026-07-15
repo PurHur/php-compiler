@@ -113,15 +113,20 @@ final class VmOpensslCipherNative
 
             $len1 = $ffi->new('int');
             $len1->cdata = 0;
-            $inBuf = $ffi->new("unsigned char[{$dataLen}]");
-            \FFI::memcpy($inBuf, $data, $dataLen);
+            // php-src EVP_*Update accepts null in when inl=0; FFI cannot allocate zero-size CData (#19016).
+            $inPtr = null;
+            if ($dataLen > 0) {
+                $inBuf = $ffi->new("unsigned char[{$dataLen}]");
+                \FFI::memcpy($inBuf, $data, $dataLen);
+                $inPtr = $inBuf;
+            }
 
             if ($encrypt) {
-                if (1 !== (int) $ffi->EVP_EncryptUpdate($ctx, $outBuf, \FFI::addr($len1), $inBuf, $dataLen)) {
+                if (1 !== (int) $ffi->EVP_EncryptUpdate($ctx, $outBuf, \FFI::addr($len1), $inPtr, $dataLen)) {
                     return false;
                 }
             } else {
-                if (1 !== (int) $ffi->EVP_DecryptUpdate($ctx, $outBuf, \FFI::addr($len1), $inBuf, $dataLen)) {
+                if (1 !== (int) $ffi->EVP_DecryptUpdate($ctx, $outBuf, \FFI::addr($len1), $inPtr, $dataLen)) {
                     return false;
                 }
             }
