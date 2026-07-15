@@ -59,11 +59,19 @@ final class GcCollectCyclesRuntime
 
     private const SHUTDOWN_HELPER_PATH = '/ext/standard/GcDestructShutdownJitHelper.php';
 
+    private const TRY_INVOKE_HELPER_PATH = '/ext/standard/GcDestructTryInvokeJitHelper.php';
+
+    private const RELEASE_STORAGE_HELPER_PATH = '/ext/standard/GcObjectReleaseStorageJitHelper.php';
+
     private const SET_ALLOW_DELREF = 'PHPCompiler\\ext\\standard\\GcDestructAllowDelrefJitHelper::setAllowDelref';
 
     private const DELREF_ALLOWED = 'PHPCompiler\\ext\\standard\\GcDestructAllowDelrefJitHelper::delrefAllowed';
 
     private const RUN_SHUTDOWN_DESTRUCTORS = 'PHPCompiler\\ext\\standard\\GcDestructShutdownJitHelper::runShutdownDestructors';
+
+    private const TRY_INVOKE = 'PHPCompiler\\ext\\standard\\GcDestructTryInvokeJitHelper::tryInvoke';
+
+    private const RELEASE_STORAGE = 'PHPCompiler\\ext\\standard\\GcObjectReleaseStorageJitHelper::release';
 
     /** @var list<string> */
     private const DESTRUCT_COMPILED_HELPERS = [
@@ -74,6 +82,16 @@ final class GcCollectCyclesRuntime
     /** @var list<string> */
     private const SHUTDOWN_COMPILED_HELPERS = [
         self::RUN_SHUTDOWN_DESTRUCTORS,
+    ];
+
+    /** @var list<string> */
+    private const TRY_INVOKE_COMPILED_HELPERS = [
+        self::TRY_INVOKE,
+    ];
+
+    /** @var list<string> */
+    private const RELEASE_STORAGE_COMPILED_HELPERS = [
+        self::RELEASE_STORAGE,
     ];
 
     private const REG_APPEND = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::appendObject';
@@ -176,6 +194,8 @@ final class GcCollectCyclesRuntime
         if (self::usesPhpRegistry($context)) {
             self::ensureRegistryJitHelperCompiled($context);
             self::ensureShutdownJitHelperCompiled($context);
+            self::ensureTryInvokeJitHelperCompiled($context);
+            self::ensureReleaseStorageJitHelperCompiled($context);
         }
         self::ensureDestructAllowDelrefJitHelperCompiled($context);
         self::ensureGlobals($context);
@@ -372,6 +392,12 @@ final class GcCollectCyclesRuntime
 
     private static function implementDestructTryInvoke(Context $context): void
     {
+        if (self::usesPhpRegistry($context)) {
+            self::implementDestructTryInvokePhpBridge($context);
+
+            return;
+        }
+
         $voidTy = $context->getTypeFromString('void');
         $i32 = $context->getTypeFromString('int32');
         $i8 = $context->getTypeFromString('int8');
@@ -647,6 +673,12 @@ final class GcCollectCyclesRuntime
 
     private static function implementObjectReleaseStorage(Context $context): void
     {
+        if (self::usesPhpRegistry($context)) {
+            self::implementObjectReleaseStoragePhpBridge($context);
+
+            return;
+        }
+
         $fn = $context->lookupFunction('phpc_object_release_storage');
         if ($fn->countBasicBlocks() > 0) {
             return;
@@ -1260,6 +1292,126 @@ final class GcCollectCyclesRuntime
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
         $context->registerFunction('phpc_gc_run_shutdown_destructors', $fn);
+    }
+
+    private static function implementDestructTryInvokePhpBridge(Context $context): void
+    {
+        $voidTy = $context->getTypeFromString('void');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $ft = $context->context->functionType($voidTy, false, $i8p);
+        $fn = self::functionOrCreate($context, 'phpc_destruct_try_invoke', $ft);
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $entry = $fn->appendBasicBlock('destruct_try_php_entry');
+        $context->builder->positionAtEnd($entry);
+        $objI64 = $context->builder->ptrToInt($fn->getParam(0), $i64);
+        $context->builder->call(self::tryInvokeHelperFunction($context, self::TRY_INVOKE), $objI64);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+        $context->registerFunction('phpc_destruct_try_invoke', $fn);
+    }
+
+    private static function implementObjectReleaseStoragePhpBridge(Context $context): void
+    {
+        $fn = $context->lookupFunction('phpc_object_release_storage');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $i64 = $context->getTypeFromString('int64');
+        $entry = $fn->appendBasicBlock('release_storage_php_entry');
+        $context->builder->positionAtEnd($entry);
+        $objI64 = $context->builder->ptrToInt($fn->getParam(0), $i64);
+        $context->builder->call(self::releaseStorageHelperFunction($context, self::RELEASE_STORAGE), $objI64);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function ensureTryInvokeJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::TRY_INVOKE_COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::TRY_INVOKE_HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcDestructTryInvokeJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('GcDestructTryInvokeJitHelper.php parseAndCompile failed (#18660)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::TRY_INVOKE_COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT GC destruct try-invoke (#18660)');
+            }
+        }
+    }
+
+    private static function ensureReleaseStorageJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::RELEASE_STORAGE_COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::RELEASE_STORAGE_HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcObjectReleaseStorageJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('GcObjectReleaseStorageJitHelper.php parseAndCompile failed (#18660)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::RELEASE_STORAGE_COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT GC object release (#18660)');
+            }
+        }
+    }
+
+    private static function tryInvokeHelperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureTryInvokeJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after GcDestructTryInvokeJitHelper compile (#18660)');
+        }
+
+        return $fn;
+    }
+
+    private static function releaseStorageHelperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureReleaseStorageJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after GcObjectReleaseStorageJitHelper compile (#18660)');
+        }
+
+        return $fn;
     }
 
     private static function collectEmbedHelperFunction(Context $context): LlvmFunction
