@@ -146,6 +146,10 @@ final class VmFinfo
         $mime = VmMime::detectFromBytes($data);
         $encoding = self::guessEncoding($data, $mime);
 
+        if (0 !== ($flags & FileinfoConstants::FILEINFO_EXTENSION)) {
+            return self::extensionList($data, $mime);
+        }
+
         $wantType = 0 !== ($flags & FileinfoConstants::FILEINFO_MIME_TYPE)
             || FileinfoConstants::FILEINFO_MIME === ($flags & FileinfoConstants::FILEINFO_MIME);
         $wantEncoding = 0 !== ($flags & FileinfoConstants::FILEINFO_MIME_ENCODING);
@@ -163,6 +167,78 @@ final class VmFinfo
         // FILEINFO_NONE / FILEINFO_RAW — libmagic-shaped human descriptions (#19247).
         return self::humanDescription($mime, $data);
     }
+
+    /**
+     * FILEINFO_EXTENSION — slash/comma-separated extension candidates (#19287).
+     *
+     * php-src: ext/fileinfo/fileinfo.c + libmagic `file_extension`. Unrecognized → `???`.
+     */
+    private static function extensionList(string $data, string $mime): string
+    {
+        $fromMagic = self::extensionListFromMagic($data);
+        if (null !== $fromMagic) {
+            return $fromMagic;
+        }
+        // Bare PNG signature: VmMime says image/png but Zend/libmagic FILEINFO_EXTENSION is ??? (#19287).
+        if ('image/png' === $mime
+            && \strlen($data) >= 8
+            && 0 === \strncmp($data, "\x89PNG\r\n\x1a\n", 8)) {
+            return '???';
+        }
+
+        return self::MIME_EXTENSION_MAP[$mime] ?? '???';
+    }
+
+    /**
+     * Prefer byte-structure sniffers so short/incomplete blobs match Zend (`???` vs typed).
+     */
+    private static function extensionListFromMagic(string $data): ?string
+    {
+        if ('' === $data) {
+            return '???';
+        }
+        if (\strlen($data) >= 3 && 0 === \strncmp($data, "\xff\xd8\xff", 3)) {
+            return 'jpeg/jpg/jpe/jfif';
+        }
+        // Full PNG (IHDR present) only — bare signature is ??? on Zend (mime octet-stream).
+        if (null !== self::describePng($data)) {
+            return 'png';
+        }
+        if (\strlen($data) >= 6
+            && (0 === \strncmp($data, 'GIF87a', 6) || 0 === \strncmp($data, 'GIF89a', 6))) {
+            return 'gif';
+        }
+        if (\strlen($data) >= 4 && 0 === \strncmp($data, '%PDF', 4)) {
+            return 'pdf';
+        }
+        if (\strlen($data) >= 12
+            && 0 === \strncmp($data, 'RIFF', 4)
+            && 0 === \strncmp(\substr($data, 8, 4), 'WAVE', 4)) {
+            return 'wav/wave';
+        }
+        if (\strlen($data) >= 12
+            && 0 === \strncmp($data, 'RIFF', 4)
+            && 0 === \strncmp(\substr($data, 8, 4), 'WEBP', 4)) {
+            return 'webp';
+        }
+        if (\strlen($data) >= 4
+            && (0 === \strncmp($data, "II*\x00", 4) || 0 === \strncmp($data, "MM\x00*", 4))) {
+            return 'tif,tiff';
+        }
+        if (\strlen($data) >= 15 && 0 === \strncmp($data, 'SQLite format 3', 15)) {
+            return 'sqlite/sqlite3/db/dbe';
+        }
+
+        return null;
+    }
+
+    /** @var array<string, string> libmagic MIME → FILEINFO_EXTENSION string */
+    private const MIME_EXTENSION_MAP = [
+        'image/jpeg' => 'jpeg/jpg/jpe/jfif',
+        'image/png' => 'png',
+        'image/gif' => 'gif',
+        'application/pdf' => 'pdf',
+    ];
 
     private static function guessEncoding(string $data, string $mime): string
     {

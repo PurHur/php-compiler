@@ -68,4 +68,14 @@ final class VmSocketArg
     {
         return 'object('.$object->class->name.')';
     }
+
+    public static function requireIntArg(Variable $var, string $functionName, int $argNum, string $paramName): int
+    {
+        return \PHPCompiler\ext\standard\VmMath::parseIntBuiltinArg(
+            $var,
+            $functionName,
+            $argNum,
+            $paramName
+        );
+    }
 }

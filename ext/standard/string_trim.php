@@ -19,6 +19,7 @@ use PHPCompiler\JIT\Builtin\StringTrimModeJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -42,7 +43,7 @@ final class string_trim extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('trim() requires one to three arguments');
         }
-        $string = VmString::stringBuiltinArgForFrame($frame, 0, 'trim', 0, 'string');
+        $string = self::vmStringArg($frame, 0, 'string');
         [$mask, $mode] = VmString::resolveTrimMaskAndMode(
             \array_slice($frame->calledArgs, 1),
             'trim',
@@ -104,7 +105,7 @@ final class string_trim extends Internal
                 $mode = $modeLiteral;
             }
         }
-        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'trim', 0, 'string');
+        $str = self::jitStringArg($context, $args[0], 0, 'string');
         $str = $context->builder->call($context->lookupFunction('__string__separate'), $str);
         if (null !== $maskStr) {
             $maskStr = $context->builder->call($context->lookupFunction('__string__separate'), $maskStr);
@@ -256,5 +257,45 @@ final class string_trim extends Internal
         );
 
         return $context->builder->icmp(Builder::INT_NE, $inMask, $i32->constInt(0, false));
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19254, ext/standard/string.c). */
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'trim', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'trim',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'trim',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'trim',
+            $argIndex,
+            $paramName
+        );
     }
 }

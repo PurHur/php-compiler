@@ -38,6 +38,9 @@ final class VmSocket
     /** @var array<int, int> object id => dup(2) socket fd */
     private static array $hostSocketFds = [];
 
+    /** @var array<int, true> object ids whose fd is owned by socket_create() (#19286) */
+    private static array $ownedFds = [];
+
     /** @var array<int, int> JIT object handle (ptrToInt) => socket fd */
     private static array $jitHandleFds = [];
 
@@ -65,7 +68,42 @@ final class VmSocket
 
     public static function isValidSocketObject(ObjectEntry $object): bool
     {
-        return isset(self::$streamResources[$object->id]);
+        return isset(self::$streamResources[$object->id])
+            || isset(self::$hostSocketFds[$object->id]);
+    }
+
+    /**
+     * socket_create() — wrap an owned BSD socket fd as Socket (#19286).
+     */
+    public static function wrapOwnedFd(int $fd, Context $ctx): ObjectEntry
+    {
+        self::registerClass($ctx);
+        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        $object->constructed = true;
+        self::$hostSocketFds[$object->id] = $fd;
+        self::$ownedFds[$object->id] = true;
+
+        return $object;
+    }
+
+    public static function ownedFdForObject(ObjectEntry $object): ?int
+    {
+        if (!isset(self::$ownedFds[$object->id])) {
+            return null;
+        }
+
+        return self::$hostSocketFds[$object->id] ?? null;
+    }
+
+    public static function release(ObjectEntry $object): void
+    {
+        unset(
+            self::$streamResources[$object->id],
+            self::$streamHandles[$object->id],
+            self::$hostSocketFds[$object->id],
+            self::$ownedFds[$object->id],
+            self::$jitHandleFds[$object->id]
+        );
     }
 
     /**

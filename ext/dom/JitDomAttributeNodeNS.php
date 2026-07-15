@@ -190,7 +190,6 @@ final class JitDomAttributeNodeNS
             $prev,
             $objPtr->constNull()
         );
-        $nullRes = self::boxNullResult($context);
         // Only box the previous attr when non-null (avoid writeObject(null)).
         $tag = (string) (self::$boxSeq++);
         $nullBlock = BasicBlockHelper::append($context, 'dom_setattr_prev_null_'.$tag);
@@ -200,7 +199,7 @@ final class JitDomAttributeNodeNS
         $context->builder->branchIf($isNull, $nullBlock, $objBlock);
 
         $context->builder->positionAtEnd($nullBlock);
-        $context->builder->store($nullRes, $resultSlot);
+        $context->builder->store(self::boxNullResult($context), $resultSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($objBlock);
@@ -420,22 +419,131 @@ final class JitDomAttributeNodeNS
         $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
         $context->builder->branchIf($isNull, $nullBlock, $objBlock);
 
+        // boxNull/ObjectResult already return normalized __value__* — do not wrap again (#19281).
         $context->builder->positionAtEnd($nullBlock);
-        $context->builder->store(
-            JitValueBox::normalizeValuePtr($context, self::boxNullResult($context)),
-            $resultSlot
-        );
+        $context->builder->store(self::boxNullResult($context), $resultSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($objBlock);
-        $context->builder->store(
-            JitValueBox::normalizeValuePtr($context, self::boxObjectResult($context, $object)),
-            $resultSlot
-        );
+        $context->builder->store(self::boxObjectResult($context, $object), $resultSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
 
         return $context->builder->load($resultSlot);
+    }
+
+    /**
+     * True when compile-time name is (or will be) keyed in the live Attr cache (#19281).
+     */
+    public static function userScriptAttrCacheHasName(Context $context, ?JITVariable $nameArg): bool
+    {
+        if (null === $nameArg) {
+            return false;
+        }
+        $nameLit = self::compileTimeStringArg($nameArg);
+        if (null === $nameLit) {
+            return false;
+        }
+        // Force slot creation check against keys already stored this module, or setAttribute
+        // that registered via rememberCreate / storeLiteral earlier in this compile.
+        return DomUserScriptAttributeCacheLlvm::hasLiteralKey('', $nameLit);
+    }
+
+    /**
+     * DOMElement::setAttribute() — user-script AOT live Attr cache (#19281).
+     */
+    public static function invokeSetAttribute(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 3) {
+            throw new \LogicException('DOMElement::setAttribute() expects receiver, name, and value');
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattr_cont');
+        $nameLit = self::compileTimeStringArg($args[1]);
+        $valueLit = self::compileTimeStringArg($args[2]);
+        if (null !== $nameLit && null !== $valueLit) {
+            $attr = self::materializeAttrFromLiterals($context, '', $nameLit, $valueLit);
+            DomUserScriptAttributeCacheLlvm::rememberCreate('', $nameLit);
+            DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $nameLit, $attr);
+
+            return self::boxNullResult($context);
+        }
+        $name = self::loadStringArg($context, $args[1]);
+        $value = self::loadStringArg($context, $args[2]);
+        $attr = self::materializeAttrFromRuntime($context, $context->builder->load($context->constantStringFromString('')), $name, $value);
+        // Runtime name: cannot key the compile-time cache; still materialize Attr for property writes.
+        return self::boxNullResult($context);
+    }
+
+    /**
+     * DOMElement::getAttributeNode() — user-script AOT live Attr cache (#19281).
+     */
+    public static function invokeGetAttributeNode(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2) {
+            throw new \LogicException('DOMElement::getAttributeNode() expects receiver and name');
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_getattrnode_cont');
+        $nameLit = self::compileTimeStringArg($args[1]);
+        if (null !== $nameLit) {
+            return self::boxNullableObjectResult(
+                $context,
+                DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit)
+            );
+        }
+
+        return self::boxNullResult($context);
+    }
+
+    /**
+     * DOMElement::getAttribute() — read live Attr::$value from user-script cache (#19281).
+     */
+    public static function invokeGetAttributeLive(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2) {
+            throw new \LogicException('DOMElement::getAttribute() expects receiver and name');
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_getattr_live_cont');
+        $nameLit = self::compileTimeStringArg($args[1]);
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        if (null === $nameLit) {
+            return self::boxStringResult($context, $empty);
+        }
+        $attr = DomUserScriptAttributeCacheLlvm::lookupLiteral($context, '', $nameLit);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $attr, $objPtr->constNull());
+        $tag = (string) (self::$boxSeq++);
+        $nullBlock = BasicBlockHelper::append($context, 'dom_getattr_live_null_'.$tag);
+        $objBlock = BasicBlockHelper::append($context, 'dom_getattr_live_obj_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'dom_getattr_live_done_'.$tag);
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($isNull, $nullBlock, $objBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->store(self::boxStringResult($context, $empty), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        $valueVar = $context->type->object->propertyFetch($attr, self::CLASS_ATTR, self::PROP_VALUE);
+        $str = $context->helper->loadValue($valueVar);
+        $context->builder->store(self::boxStringResult($context, $str), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function boxStringResult(Context $context, Value $str): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $str
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 }

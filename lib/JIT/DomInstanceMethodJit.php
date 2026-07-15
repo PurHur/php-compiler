@@ -69,6 +69,8 @@ final class DomInstanceMethodJit
         'domdocument::importnode' => true,
         'domelement::getattribute' => true,
         'domnode::getattribute' => true,
+        'domelement::setattribute' => true,
+        'domelement::getattributenode' => true,
         'domelement::getattributenodens' => true,
         'domelement::setattributenodens' => true,
         'domxpath::query' => true,
@@ -128,6 +130,16 @@ final class DomInstanceMethodJit
             }
             if ('domelement::getattribute' === $lc || 'domnode::getattribute' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomElementGetAttribute();
+
+                return;
+            }
+            if ('domelement::setattribute' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementSetAttribute();
+
+                return;
+            }
+            if ('domelement::getattributenode' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementGetAttributeNode();
 
                 return;
             }
@@ -288,6 +300,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::importnode');
             self::ensureProxy($context, 'domelement::getattribute');
             self::ensureProxy($context, 'domnode::getattribute');
+            self::ensureProxy($context, 'domelement::setattribute');
+            self::ensureProxy($context, 'domelement::getattributenode');
             self::ensureProxy($context, 'domelement::getattributenodens');
             self::ensureProxy($context, 'domelement::setattributenodens');
             self::ensureProxy($context, 'domdocument::createattributens');
