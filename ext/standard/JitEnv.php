@@ -57,10 +57,22 @@ final class JitEnv
 
     public static function putenv(Context $context, Value $assignmentStr): Value
     {
-        StringGetenv::ensurePutenvLinked($context);
         BasicBlockHelper::ensureOpenInsertBlock($context, 'putenv_emit_cont');
-        self::emitPutenvSyntaxGuard($context, $assignmentStr);
 
+        // Deferred user-script AOT: libc setenv only. Nested GetenvJitHelper::putenv
+        // aborts on concat/slot temps (#17316). putenv_.php materializes via
+        // __string__separate so the setenv mirror strdup sees a NUL-terminated buffer.
+        // Skip syntax guard here: first-byte/length GEPs on some concat temps still
+        // misfire under thin AOT even after separate (seen as SIGABRT in guard abort).
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::emitLibcPutenvMirror($context, $assignmentStr);
+            $i8 = $context->getTypeFromString('int8');
+
+            return $i8->constInt(1, false);
+        }
+
+        self::emitPutenvSyntaxGuard($context, $assignmentStr);
+        StringGetenv::ensurePutenvLinked($context);
         $result = JitNestedHelperCoerce::callHelper(
             $context,
             StringGetenv::helperFunction(
@@ -69,9 +81,7 @@ final class JitEnv
             ),
             [$assignmentStr]
         );
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::emitLibcPutenvMirror($context, $assignmentStr);
-        }
+        self::emitLibcPutenvMirror($context, $assignmentStr);
 
         return $result;
     }
@@ -125,6 +135,7 @@ final class JitEnv
      *
      * Uses POSIX setenv() (copies name/value) — not putenv(malloc'd "NAME=value"), which
      * heap-corrupts when parse_str/strtok later touch getenv buffers under ≥2 mirrors.
+     * Callers must pass a NUL-terminated `__string__` (via `__string__separate` / literal).
      */
     private static function emitLibcPutenvMirror(Context $context, Value $assignmentStr): void
     {
