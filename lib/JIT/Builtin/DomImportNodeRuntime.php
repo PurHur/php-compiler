@@ -14,16 +14,31 @@ final class DomImportNodeRuntime
 
     public const ABI_GET_ATTRIBUTE = '__phpc_dom_get_attribute';
 
+    public const ABI_GET_ATTRIBUTE_NODE_NS = '__phpc_dom_get_attribute_node_ns';
+
+    public const ABI_SET_ATTRIBUTE_NODE_NS = '__phpc_dom_set_attribute_node_ns';
+
+    public const ABI_CREATE_ATTRIBUTE_NS = '__phpc_dom_create_attribute_ns';
+
     private const HELPER_PATH = '/ext/dom/DomImportNodeJitHelper.php';
 
     private const HELPER = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::importNodeArgv';
 
     private const HELPER_GET_ATTR = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::getAttributeArgv';
 
+    private const HELPER_GET_ATTR_NODE_NS = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::getAttributeNodeNSArgv';
+
+    private const HELPER_SET_ATTR_NODE_NS = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::setAttributeNodeNSArgv';
+
+    private const HELPER_CREATE_ATTR_NS = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::createAttributeNSArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::HELPER,
         self::HELPER_GET_ATTR,
+        self::HELPER_GET_ATTR_NODE_NS,
+        self::HELPER_SET_ATTR_NODE_NS,
+        self::HELPER_CREATE_ATTR_NS,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -69,6 +84,74 @@ final class DomImportNodeRuntime
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#19212'
+        );
+    }
+
+    public static function ensureGetAttributeNodeNSLinked(Context $context): void
+    {
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            DomDocumentMethodUserScriptLlvm::ensureGetAttributeNodeNSBridge($context);
+
+            return;
+        }
+
+        $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_GET_ATTRIBUTE_NODE_NS,
+            'dom_get_attribute_node_ns_bridge',
+            [$objPtr, $strPtr, $strPtr],
+            $objPtr,
+            self::HELPER_GET_ATTR_NODE_NS,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#19265'
+        );
+    }
+
+    public static function ensureSetAttributeNodeNSLinked(Context $context): void
+    {
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            DomDocumentMethodUserScriptLlvm::ensureSetAttributeNodeNSBridge($context);
+
+            return;
+        }
+
+        $objPtr = $context->getTypeFromString('__object__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_SET_ATTRIBUTE_NODE_NS,
+            'dom_set_attribute_node_ns_bridge',
+            [$objPtr, $objPtr],
+            $objPtr,
+            self::HELPER_SET_ATTR_NODE_NS,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#19265'
+        );
+    }
+
+    public static function ensureCreateAttributeNSLinked(Context $context): void
+    {
+        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+            DomDocumentMethodUserScriptLlvm::ensureCreateAttributeNSBridge($context);
+
+            return;
+        }
+
+        $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_CREATE_ATTRIBUTE_NS,
+            'dom_create_attribute_ns_bridge',
+            [$objPtr, $strPtr, $strPtr],
+            $objPtr,
+            self::HELPER_CREATE_ATTR_NS,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#19265'
         );
     }
 }

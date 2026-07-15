@@ -169,6 +169,34 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function getAttributeNodeNS(VmContext $ctx, ObjectEntry $element, array $extra): Variable
+    {
+        $namespace = self::nullableStringArg($extra[0] ?? self::missingArg('getAttributeNodeNS', 0), 'getAttributeNodeNS', 0);
+        $localName = self::stringArg($extra[1] ?? self::missingArg('getAttributeNodeNS', 1), 'getAttributeNodeNS', 1);
+
+        return VmDom::getAttributeNodeNS($ctx, $element, $namespace, $localName);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function setAttributeNodeNS(VmContext $ctx, ObjectEntry $element, array $extra): Variable
+    {
+        $attrVar = ($extra[0] ?? self::missingArg('setAttributeNodeNS', 0))->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $attrVar->type) {
+            throw new \TypeError('DOMElement::setAttributeNodeNS(): Argument #1 ($attr) must be of type DOMAttr');
+        }
+        $attr = VariableObject::entry($attrVar);
+        if (!VmDom::isAttr($attr)) {
+            throw new \TypeError('DOMElement::setAttributeNodeNS(): Argument #1 ($attr) must be of type DOMAttr');
+        }
+
+        return VmDom::setAttributeNodeNS($ctx, $element, $attr);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function tokenListAdd(VmContext $ctx, ObjectEntry $tokenList, array $extra): Variable
     {
         VmDomTokenList::add($ctx, $tokenList, $extra);
@@ -364,6 +392,16 @@ final class VmDomJitDispatch
     private static function stringArg(Variable $var, string $label, int $index): string
     {
         return VmString::coerceStringBuiltinArg($var->resolveIndirect(), $label, $index, 'value');
+    }
+
+    private static function nullableStringArg(Variable $var, string $label, int $index): ?string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+
+        return VmString::coerceStringBuiltinArg($var, $label, $index, 'value');
     }
 
     private static function missingArg(string $method, int $index): Variable

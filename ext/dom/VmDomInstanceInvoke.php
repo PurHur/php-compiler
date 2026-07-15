@@ -72,6 +72,8 @@ final class VmDomInstanceInvoke
             'importnode' => VmDomJitDispatch::importNode($ctx, $self, $extra),
             'getattribute' => VmDomJitDispatch::getAttribute($self, $extra),
             'setattribute' => VmDomJitDispatch::setAttribute($ctx, $self, $extra),
+            'getattributenodens' => VmDomJitDispatch::getAttributeNodeNS($ctx, $self, $extra),
+            'setattributenodens' => VmDomJitDispatch::setAttributeNodeNS($ctx, $self, $extra),
             'add' => VmDomJitDispatch::tokenListAdd($ctx, $self, $extra),
             'remove' => VmDomJitDispatch::tokenListRemove($ctx, $self, $extra),
             'contains' => VmDomJitDispatch::tokenListContains($self, $extra),

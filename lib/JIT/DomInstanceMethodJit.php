@@ -45,6 +45,7 @@ final class DomInstanceMethodJit
     private const USER_SCRIPT_DIRECT_METHODS = [
         'domdocument::createelement' => true,
         'domdocument::createelementns' => true,
+        'domdocument::createattributens' => true,
         'domdocument::load' => true,
         'domdocument::loadhtml' => true,
         'domdocument::loadhtmlfile' => true,
@@ -68,6 +69,8 @@ final class DomInstanceMethodJit
         'domdocument::importnode' => true,
         'domelement::getattribute' => true,
         'domnode::getattribute' => true,
+        'domelement::getattributenodens' => true,
+        'domelement::setattributenodens' => true,
         'domxpath::query' => true,
         'domxpath::evaluate' => true,
         'domnodelist::item' => true,
@@ -125,6 +128,21 @@ final class DomInstanceMethodJit
             }
             if ('domelement::getattribute' === $lc || 'domnode::getattribute' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomElementGetAttribute();
+
+                return;
+            }
+            if ('domelement::getattributenodens' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementGetAttributeNodeNS();
+
+                return;
+            }
+            if ('domelement::setattributenodens' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementSetAttributeNodeNS();
+
+                return;
+            }
+            if ('domdocument::createattributens' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentCreateAttributeNS();
 
                 return;
             }
@@ -270,6 +288,11 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::importnode');
             self::ensureProxy($context, 'domelement::getattribute');
             self::ensureProxy($context, 'domnode::getattribute');
+            self::ensureProxy($context, 'domelement::getattributenodens');
+            self::ensureProxy($context, 'domelement::setattributenodens');
+            self::ensureProxy($context, 'domdocument::createattributens');
+            self::ensureProxy($context, 'domnode::comparedocumentposition');
+            self::ensureProxy($context, 'domxpath::registernamespace');
 
             return;
         }
