@@ -14,20 +14,20 @@ final class IntlExtensionPolicyTest extends TestCase
     {
         self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
         self::assertTrue(IntlExtensionPolicy::advertisesNormalizer());
-        self::assertFalse(IntlExtensionPolicy::advertisesLocale());
+        self::assertTrue(IntlExtensionPolicy::advertisesLocale());
         // locale_get_primary_language/region/script are forward-profile parsers on 8.4.0-dev (#17117).
         self::assertTrue(IntlExtensionPolicy::advertisesLocaleParsers());
         $runtime = new Runtime();
         self::assertFalse(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'grapheme_strlen')
         );
-        self::assertFalse(
+        self::assertTrue(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_default')
         );
         self::assertTrue(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_primary_language')
         );
-        self::assertFalse(
+        self::assertTrue(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'Locale')
         );
     }
@@ -37,10 +37,10 @@ final class IntlExtensionPolicyTest extends TestCase
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            self::assertTrue(CompilerVersion::supportsLocaleParserForwardProfile());
-            self::assertTrue(CompilerVersion::advertisesLocaleParserForwardProfile());
+            // 8.4.0-dev without PHP_COMPILER_PROFILE=8.4 withholds the forward-profile gate,
+            // but Locale advertisement (#6696) still exposes the BCP-47 parsers.
+            self::assertTrue(IntlExtensionPolicy::advertisesLocale());
             self::assertTrue(IntlExtensionPolicy::advertisesLocaleParsers());
-            self::assertFalse(IntlExtensionPolicy::advertisesLocale());
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
@@ -48,10 +48,10 @@ final class IntlExtensionPolicyTest extends TestCase
                 self::assertTrue(isset($ctx->functions[$fn]));
                 self::assertTrue(
                     ext\standard\VmReflection::functionExists($ctx, $fn),
-                    $fn.' must be visible on default 8.4.0-dev profile'
+                    $fn.' must be visible via Locale surface (#6696)'
                 );
             }
-            self::assertFalse(
+            self::assertTrue(
                 ext\standard\VmReflection::functionExists($ctx, 'locale_get_default')
             );
         } finally {
@@ -71,7 +71,7 @@ final class IntlExtensionPolicyTest extends TestCase
             self::assertTrue(CompilerVersion::supportsLocaleParserForwardProfile());
             self::assertTrue(CompilerVersion::advertisesLocaleParserForwardProfile());
             self::assertTrue(IntlExtensionPolicy::advertisesLocaleParsers());
-            self::assertFalse(IntlExtensionPolicy::advertisesLocale());
+            self::assertTrue(IntlExtensionPolicy::advertisesLocale());
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
@@ -82,7 +82,7 @@ final class IntlExtensionPolicyTest extends TestCase
                     $fn.' must be visible on forward 8.4 profile'
                 );
             }
-            self::assertFalse(
+            self::assertTrue(
                 ext\standard\VmReflection::functionExists($ctx, 'locale_get_default')
             );
         } finally {

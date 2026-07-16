@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5098 |
-| Phase A inventory files (M2 ratio SSOT) | 5098 |
+| PHP files on vm.php path | 5102 |
+| Phase A inventory files (M2 ratio SSOT) | 5102 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13842 |
+| Source constructs flagged (warnings) | 13855 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -535,7 +535,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_init.php` | 0 | 2 |
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
-| `ext/intl/BuiltinClasses.php` | 0 | 10 |
+| `ext/intl/BuiltinClasses.php` | 0 | 14 |
 | `ext/intl/CollatorCreate.php` | 0 | 1 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
@@ -546,6 +546,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/JitGrapheme.php` | 0 | 2 |
 | `ext/intl/JitLocaleParser.php` | 0 | 1 |
 | `ext/intl/LocaleGetDefault.php` | 0 | 2 |
+| `ext/intl/LocaleGetDisplayName.php` | 0 | 3 |
+| `ext/intl/LocaleGetPrimaryLanguage.php` | 0 | 2 |
+| `ext/intl/LocaleGetRegion.php` | 0 | 2 |
+| `ext/intl/LocaleGetScript.php` | 0 | 2 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
 | `ext/intl/Module.php` | 0 | 26 |
@@ -8534,14 +8538,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 41)
-- new ClassEntry (line 55)
-- new LocaleGetDefault (line 57)
-- new LocaleSetDefault (line 60)
-- new ClassEntry (line 68)
-- new IntlDateFormatterCreate (line 70)
-- new ClassEntry (line 78)
-- new CollatorCreate (line 80)
-- new ClassEntry (line 88)
+- new ClassEntry (line 59)
+- new LocaleGetDefault (line 62)
+- new LocaleSetDefault (line 63)
+- new LocaleGetPrimaryLanguage (line 64)
+- new LocaleGetRegion (line 65)
+- new LocaleGetScript (line 66)
+- new LocaleGetDisplayName (line 67)
+- new ClassEntry (line 79)
+- new IntlDateFormatterCreate (line 81)
+- new ClassEntry (line 89)
+- new CollatorCreate (line 91)
+- new ClassEntry (line 99)
 - 7 class method(s)
 
 ### `ext/intl/CollatorCreate.php`
@@ -8581,9 +8589,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 87)
-- new locale_get_region (line 88)
-- new locale_get_script (line 89)
+- new locale_get_primary_language (line 92)
+- new locale_get_region (line 93)
+- new locale_get_script (line 94)
 - 11 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
@@ -8601,6 +8609,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/intl/LocaleGetDisplayName.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 29)
+- 1 class method(s)
+
+### `ext/intl/LocaleGetPrimaryLanguage.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/intl/LocaleGetRegion.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/intl/LocaleGetScript.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
 - 1 class method(s)
 
 ### `ext/intl/LocaleParserJitHelper.php`
@@ -8666,7 +8699,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmLocale.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 15 class method(s)
 
 ### `ext/intl/VmNormalizer.php`
 

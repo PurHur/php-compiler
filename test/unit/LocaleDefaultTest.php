@@ -8,7 +8,7 @@ use PHPCompiler\ext\intl\VmLocale;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
-/** locale_get_default()/Locale gated on ext/intl like php-src (#9576, #16214). */
+/** locale_get_default()/Locale partial surface without extension_loaded('intl') (#6696, #9576). */
 final class LocaleDefaultTest extends TestCase
 {
     protected function tearDown(): void
@@ -16,14 +16,14 @@ final class LocaleDefaultTest extends TestCase
         VmLocale::resetDefaultForTests();
     }
 
-    public function test_locale_default_withheld_without_intl_extension(): void
+    public function test_locale_default_advertised_without_intl_extension(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        self::assertFalse(VmReflection::functionExists($ctx, 'locale_get_default'));
-        self::assertFalse(VmReflection::functionExists($ctx, 'locale_set_default'));
-        self::assertFalse(VmReflection::classExists($ctx, 'Locale'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'locale_get_default'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'locale_set_default'));
+        self::assertTrue(VmReflection::classExists($ctx, 'Locale'));
         self::assertFalse(VmReflection::functionExists($ctx, 'grapheme_str_contains'));
         self::assertFalse(\PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl'));
 
@@ -37,15 +37,11 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'locale_default.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('0000', ob_get_clean());
+        self::assertSame('0110', ob_get_clean());
     }
 
     public function test_locale_set_default_repro(): void
     {
-        if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesLocale()) {
-            self::markTestSkipped('locale API requires loaded ext/intl (#16214)');
-        }
-
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -63,5 +59,21 @@ PHP;
             "bool(true)\nen_US\nen_US\nbool(true)\nde_DE\n",
             ob_get_clean()
         );
+    }
+
+    public function test_locale_get_primary_language_and_display_name(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+echo Locale::getPrimaryLanguage('en_US'), "\n";
+echo Locale::getRegion('en_US'), "\n";
+echo Locale::getDisplayName('en_US'), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'locale_parts_oop.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("en\nUS\nEnglish (United States)\n", ob_get_clean());
     }
 }
