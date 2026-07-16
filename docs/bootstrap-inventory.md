@@ -1598,6 +1598,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitRename.php` | 0 | 1 |
 | `ext/standard/JitRenameKernel.php` | 0 | 1 |
 | `ext/standard/JitRequestBody.php` | 0 | 1 |
+| `ext/standard/JitRequestParseBodyKernel.php` | 0 | 1 |
 | `ext/standard/JitResolveIncludePath.php` | 0 | 1 |
 | `ext/standard/JitRewind.php` | 0 | 1 |
 | `ext/standard/JitRmdir.php` | 0 | 1 |
@@ -3743,7 +3744,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ReflectionRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ReflectionSetup.php` | 0 | 1 |
 | `lib/JIT/Builtin/RequestParseBodyRuntime.php` | 0 | 7 |
-| `lib/JIT/Builtin/RequestParseBodyUserScriptLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ResolveSidecarRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ReturnPendingRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/RewriteVarsRuntime.php` | 0 | 3 |
@@ -15472,6 +15472,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/JitRequestParseBodyKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+
 ### `ext/standard/JitResolveIncludePath.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19611,14 +19616,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPreg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 111)
-- new Variable (line 139)
-- new Variable (line 177)
-- new HashTable (line 481)
-- new Variable (line 494)
-- new HashTable (line 501)
-- new Variable (line 502)
-- new Variable (line 505)
+- new Variable (line 117)
+- new Variable (line 145)
+- new Variable (line 183)
+- new HashTable (line 487)
+- new Variable (line 500)
+- new HashTable (line 507)
+- new Variable (line 508)
+- new Variable (line 511)
 - 22 class method(s)
 
 ### `ext/standard/VmPregCompileWarn.php`
@@ -24184,14 +24189,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/request_parse_body.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 39)
+- new ArgumentCountError (line 38)
+- new HashTable (line 56)
 - new HashTable (line 57)
-- new HashTable (line 58)
-- new HashTable (line 65)
-- new Variable (line 66)
-- new Variable (line 68)
+- new HashTable (line 64)
+- new Variable (line 65)
+- new Variable (line 67)
+- new JITVariable (line 119)
 - new JITVariable (line 120)
-- new JITVariable (line 121)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -25103,14 +25108,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/substr_count.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/substr_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 230)
-- new Variable (line 274)
-- 10 class method(s)
+- new HashTable (line 275)
+- new Variable (line 319)
+- 11 class method(s)
 
 ### `ext/standard/symlink_.php`
 
@@ -29975,18 +29980,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/RequestParseBodyRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 261)
-- new phpc_native_ht_set_string_key (line 262)
-- new phpc_native_ht_set_string_key_ht (line 263)
-- new phpc_native_ht_set_string_at (line 264)
-- new phpc_native_ht_set_hashtable_at (line 265)
+- new phpc_native_ht_alloc (line 260)
+- new phpc_native_ht_set_string_key (line 261)
+- new phpc_native_ht_set_string_key_ht (line 262)
+- new phpc_native_ht_set_string_at (line 263)
+- new phpc_native_ht_set_hashtable_at (line 264)
 - 12 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/RequestParseBodyUserScriptLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 8 class method(s)
 
 ### `lib/JIT/Builtin/ResolveSidecarRuntime.php`
 
