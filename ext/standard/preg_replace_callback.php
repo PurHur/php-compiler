@@ -59,6 +59,7 @@ final class preg_replace_callback extends Internal
             $limit = $limitVar->toInt();
         }
         $hasCount = $argc >= 5;
+        $flags = 0;
         if ($argc >= 6) {
             $flagsVar = $frame->calledArgs[5]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsVar->type) {
@@ -68,11 +69,6 @@ final class preg_replace_callback extends Internal
                 );
             }
             $flags = $flagsVar->toInt();
-            if (0 !== $flags) {
-                throw new \LogicException(
-                    'preg_replace_callback() flags must be 0 in this compiler build'
-                );
-            }
         }
 
         if (Variable::TYPE_STRING === $subjectVar->type) {
@@ -83,7 +79,8 @@ final class preg_replace_callback extends Internal
                 $callbackVar,
                 $subjectVar->toString(),
                 $limit,
-                $count
+                $count,
+                $flags
             );
             if ($hasCount) {
                 $frame->calledArgs[4]->resolveIndirect()->int($count);
@@ -109,7 +106,8 @@ final class preg_replace_callback extends Internal
                 $callbackVar,
                 $value->toString(),
                 $limit,
-                $elemCount
+                $elemCount,
+                $flags
             );
             $totalCount += $elemCount;
             if (false === $result) {

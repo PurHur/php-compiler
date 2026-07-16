@@ -439,9 +439,10 @@ final class VmPreg
     {
         $out = [];
         foreach ($offsetMatches as $key => $match) {
-            if (\is_array($match) && isset($match[0]) && \is_string($match[0])) {
+            if (\is_array($match) && \array_key_exists(0, $match)) {
+                // PREG_UNMATCHED_AS_NULL → [null, -1]; otherwise [string, offset]
                 $out[$key] = $match[0];
-            } elseif (\is_string($match)) {
+            } elseif (\is_string($match) || null === $match) {
                 $out[$key] = $match;
             } else {
                 throw new \LogicException(
@@ -451,6 +452,29 @@ final class VmPreg
         }
 
         return $out;
+    }
+
+    /**
+     * User-visible flags for preg_replace_callback{,_array} (#19638).
+     * Unknown bits are ignored (php-src), matching Zend rather than ValueError.
+     */
+    public static function normalizeReplaceCallbackFlags(int $flags): int
+    {
+        return $flags & self::PREG_MATCH_ALLOWED_FLAGS;
+    }
+
+    /**
+     * Build the $matches array passed to a replace-callback (#19638).
+     *
+     * @param array $offsetMatches host preg_match(..., PREG_OFFSET_CAPTURE [| PREG_UNMATCHED_AS_NULL])
+     */
+    public static function callbackMatchesFromOffsetCapture(array $offsetMatches, int $flags): Variable
+    {
+        if (0 !== ($flags & StdlibConstants::PREG_OFFSET_CAPTURE)) {
+            return VmJson::import($offsetMatches);
+        }
+
+        return VmJson::import(self::stripMatchOffsets($offsetMatches));
     }
 
     /**

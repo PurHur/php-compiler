@@ -21,7 +21,8 @@ final class VmPregReplaceCallback
         Variable $callback,
         string $subject,
         int $limit = -1,
-        ?int &$count = null
+        ?int &$count = null,
+        int $flags = 0
     ) {
         if (strlen($pattern) > VmPreg::MAX_PATTERN_BYTES) {
             return false;
@@ -30,6 +31,12 @@ final class VmPregReplaceCallback
             throw new \TypeError(
                 'preg_replace_callback(): Argument #2 ($callback) must be a valid callback, no array or string given'
             );
+        }
+
+        $flags = VmPreg::normalizeReplaceCallbackFlags($flags);
+        $matchFlags = \PREG_OFFSET_CAPTURE;
+        if (0 !== ($flags & StdlibConstants::PREG_UNMATCHED_AS_NULL)) {
+            $matchFlags |= \PREG_UNMATCHED_AS_NULL;
         }
 
         $result = '';
@@ -45,7 +52,7 @@ final class VmPregReplaceCallback
             }
 
             $matches = [];
-            $matchCount = \preg_match($pattern, $subject, $matches, \PREG_OFFSET_CAPTURE, $offset);
+            $matchCount = \preg_match($pattern, $subject, $matches, $matchFlags, $offset);
             if (false === $matchCount) {
                 return false;
             }
@@ -56,12 +63,12 @@ final class VmPregReplaceCallback
             }
 
             $full = $matches[0];
-            $matchStart = $full[1];
-            $matchText = $full[0];
+            $matchStart = (int) $full[1];
+            $matchText = (string) $full[0];
             $matchLen = \strlen($matchText);
             $result .= \substr($subject, $offset, $matchStart - $offset);
 
-            $vmMatches = VmJson::import(VmPreg::stripMatchOffsets($matches));
+            $vmMatches = VmPreg::callbackMatchesFromOffsetCapture($matches, $flags);
             $replacement = VmCallableInvoke::invokeOne($vmContext, $callback, $vmMatches);
             $replacement = $replacement->resolveIndirect();
             $result .= $vmContext->runtime->vm->coerceVariableToString($replacement);
