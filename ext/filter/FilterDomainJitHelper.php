@@ -13,13 +13,12 @@ namespace PHPCompiler\ext\filter;
  */
 final class FilterDomainJitHelper
 {
-    public static function validate(string $s): ?string
+    public static function validate(string $s, int $flags = 0): ?string
     {
-        if (!VmFilter::isValidDomain($s)) {
+        if (!VmFilter::isValidDomain($s, $flags)) {
             return null;
         }
 
         return $s;
     }
 }
-

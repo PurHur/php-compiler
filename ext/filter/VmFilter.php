@@ -1029,17 +1029,67 @@ final class VmFilter
         return true;
     }
 
-    /** SSOT used by JIT/AOT helper bridge. */
+    /**
+     * SSOT used by JIT/AOT helper bridge.
+     *
+     * php-src ext/filter/logical_filters.c — php_filter_validate_domain_ex.
+     * Plain mode is permissive (allows `_`, leading/trailing `-` in labels, etc.);
+     * FILTER_FLAG_HOSTNAME applies hostname label rules.
+     */
     public static function isValidDomain(string $host, int $flags = 0): bool
     {
-        if ('' === $host) {
-            return false;
-        }
-        if (0 !== ($flags & self::FILTER_FLAG_HOSTNAME)) {
-            return self::isValidDomainHostname($host);
+        $hostname = 0 !== ($flags & self::FILTER_FLAG_HOSTNAME);
+        $len = \strlen($host);
+        $end = $len;
+
+        // Ignore trailing dot for length / scan bound (char still peekable past $end).
+        if ($len > 0 && '.' === $host[$len - 1]) {
+            $end = $len - 1;
+            $len = $end;
         }
 
-        return self::isValidDomainHostname($host);
+        if ($len > 253) {
+            return false;
+        }
+
+        // "" → success in loose mode; "." (stripped to empty) → fail via first-char '.'.
+        if (0 === $len) {
+            return 0 === \strlen($host) && !$hostname;
+        }
+
+        $first = $host[0];
+        if ('.' === $first || ($hostname && !self::isAlnumByte($first))) {
+            return false;
+        }
+
+        $labelLen = 1;
+        for ($s = 0; $s < $end; ++$s) {
+            $ch = $host[$s];
+            $next = ($s + 1 < \strlen($host)) ? $host[$s + 1] : "\0";
+            if ('.' === $ch) {
+                // Reject ".." and (HOSTNAME) labels that do not start/end alnum.
+                if ('.' === $next
+                    || ($hostname && (
+                        !self::isAlnumByte($host[$s - 1])
+                        || !self::isAlnumByte($next)
+                    ))) {
+                    return false;
+                }
+                $labelLen = 1;
+                continue;
+            }
+
+            // Label length > 63, or (HOSTNAME) char not alnum/`-` (hyphen not at NUL).
+            if ($labelLen > 63
+                || ($hostname
+                    && ('-' !== $ch || "\0" === $next)
+                    && !self::isAlnumByte($ch))) {
+                return false;
+            }
+            ++$labelLen;
+        }
+
+        return true;
     }
 
     /**
@@ -1295,7 +1345,7 @@ final class VmFilter
             return true;
         }
 
-        return self::isValidDomainHostname($host);
+        return self::isValidDomain($host, self::FILTER_FLAG_HOSTNAME);
     }
 
     private static function isValidIpv4Hostname(string $host): bool
@@ -1323,37 +1373,12 @@ final class VmFilter
         return (bool) preg_match('/^[0-9a-fA-F:.]+$/', $inner);
     }
 
-    /** Loose hostname check aligned with php_filter_validate_domain_ex FILTER_FLAG_HOSTNAME subset. */
-    private static function isValidDomainHostname(string $host): bool
-    {
-        if (strlen($host) > 253) {
-            return false;
-        }
-        if ('.' === $host || str_starts_with($host, '.') || str_ends_with($host, '.')) {
-            return false;
-        }
-        $labels = explode('.', $host);
-        foreach ($labels as $label) {
-            if ('' === $label || strlen($label) > 63) {
-                return false;
-            }
-            if ('-' === $label[0] || '-' === $label[strlen($label) - 1]) {
-                return false;
-            }
-            if (!self::charsMatch($label, [self::class, 'isUrlDomainLabelChar'])) {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static function isUrlDomainLabelChar(string $ch): bool
+    /** php-src isalnum((unsigned char)ch) for domain label checks. */
+    private static function isAlnumByte(string $ch): bool
     {
         return ($ch >= 'a' && $ch <= 'z')
             || ($ch >= 'A' && $ch <= 'Z')
-            || ($ch >= '0' && $ch <= '9')
-            || '-' === $ch;
+            || ($ch >= '0' && $ch <= '9');
     }
 
     public static function isIntegerString(string $s): bool
