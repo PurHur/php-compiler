@@ -515,6 +515,12 @@ final class VmIteratorForeach
             return ObjectPropertyForeachHelper::compileValueByRef($context, $slotKey, $containerUserType);
         }
         if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $array, $containerUserType)) {
+            // Zend FE_RESET_RW allow-list: ArrayIterator / ArrayObject / RecursiveArrayIterator (#19444).
+            // Pure LLVM write-through needs a backing HT on the object; until then, fetch via
+            // iterator current() (by-value). VM opcode path in lib/VM.php binds live storage.
+            if (self::isArrayBackedSplIteratorUserType($containerUserType)) {
+                return IteratorProtocolHelper::compileForeachValue($context, $slotKey, $containerUserType);
+            }
             self::emitForeachIteratorByRefError($context, $jit);
             $slot = JitValueBox::alloc($context);
 
@@ -526,6 +532,21 @@ final class VmIteratorForeach
         }
 
         return self::compileValueByRefHashtable($context, $array, $slotKey);
+    }
+
+    /**
+     * php-src zend_execute.c FE_RESET_RW — array-backed SPL containers (#19444).
+     */
+    private static function isArrayBackedSplIteratorUserType(?string $containerUserType): bool
+    {
+        if (null === $containerUserType || '' === $containerUserType) {
+            return false;
+        }
+        $lc = strtolower(ltrim($containerUserType, '\\'));
+
+        return 'arrayiterator' === $lc
+            || 'arrayobject' === $lc
+            || 'recursivearrayiterator' === $lc;
     }
 
     private static function emitForeachIteratorByRefError(Context $context, ?JIT $jit): void

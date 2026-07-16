@@ -21,6 +21,7 @@ use PHPCompiler\ext\standard\VmForwardStaticCall;
 use PHPCompiler\ext\standard\VmIteratorWalk;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\spl\ArrayObjectBuiltin;
+use PHPCompiler\ext\spl\RecursiveArrayIteratorBuiltin;
 use PHPCompiler\ext\spl\SplArrayStorage;
 use PHPCompiler\VM\ForeachIterator;
 use PHPCompiler\VM\Context;
@@ -7471,6 +7472,24 @@ restart:
                     $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
                     if ($this->isForeachObjectIteratorSlot((int) $op->arg2)) {
                         if ((bool) $op->arg3) {
+                            // Zend FE_RESET_RW allow-list: array-backed SPL iterators (#19444).
+                            $iterObj = $container->toObject();
+                            if (SplArrayStorage::allowsForeachByRef($iterObj)) {
+                                $frame->scope[$op->arg1]->indirect(
+                                    SplArrayStorage::foreachCurrentByRef($iterObj)
+                                );
+                                $this->markScopeSlotInitialized($frame, (int) $op->arg1);
+                                $this->context->foreachObjectAdvance[$op->arg2] = true;
+                                break;
+                            }
+                            if (RecursiveArrayIteratorBuiltin::allowsForeachByRef($iterObj)) {
+                                $frame->scope[$op->arg1]->indirect(
+                                    RecursiveArrayIteratorBuiltin::foreachCurrentByRef($iterObj)
+                                );
+                                $this->markScopeSlotInitialized($frame, (int) $op->arg1);
+                                $this->context->foreachObjectAdvance[$op->arg2] = true;
+                                break;
+                            }
                             $catchFrame = $this->dispatchVmError(
                                 'An iterator cannot be used with foreach by reference',
                                 $frame
