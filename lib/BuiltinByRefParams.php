@@ -100,6 +100,7 @@ final class BuiltinByRefParams
             case 'openssl_csr_new':
                 return [1];
             case 'openssl_pkcs12_read':
+            case 'openssl_cms_read':
                 return [1];
             case 'openssl_seal':
                 return [1, 2, 5];

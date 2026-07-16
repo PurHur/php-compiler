@@ -52,6 +52,21 @@ final class OpensslConstants
     public const PKCS7_BINARY = 128;
     public const PKCS7_NOATTR = 256;
 
+    /** php-src OPENSSL_CMS_* ← openssl/cms.h CMS_* flags (#6592). */
+    public const OPENSSL_CMS_TEXT = 1;
+    public const OPENSSL_CMS_NOCERTS = 2;
+    public const OPENSSL_CMS_NOSIGS = 12;
+    public const OPENSSL_CMS_NOINTERN = 16;
+    public const OPENSSL_CMS_NOVERIFY = 32;
+    public const OPENSSL_CMS_DETACHED = 64;
+    public const OPENSSL_CMS_BINARY = 128;
+    public const OPENSSL_CMS_NOATTR = 256;
+
+    /** php-src OPENSSL_ENCODING_* (ext/openssl/openssl.c ENCODING_*). */
+    public const OPENSSL_ENCODING_DER = 0;
+    public const OPENSSL_ENCODING_SMIME = 1;
+    public const OPENSSL_ENCODING_PEM = 2;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
@@ -61,7 +76,7 @@ final class OpensslConstants
             'OPENSSL_PKCS1_PADDING' => self::OPENSSL_PKCS1_PADDING,
             'OPENSSL_NO_PADDING' => self::OPENSSL_NO_PADDING,
             'OPENSSL_PKCS1_OAEP_PADDING' => self::OPENSSL_PKCS1_OAEP_PADDING,
-        ] + self::algorithmConstants() + self::pkcs7Constants() + self::cipherConstants();
+        ] + self::algorithmConstants() + self::pkcs7Constants() + self::cmsConstants() + self::cipherConstants();
     }
 
     public static function algorithmConstants(): array
@@ -95,6 +110,24 @@ final class OpensslConstants
             'PKCS7_DETACHED' => self::PKCS7_DETACHED,
             'PKCS7_BINARY' => self::PKCS7_BINARY,
             'PKCS7_NOATTR' => self::PKCS7_NOATTR,
+        ];
+    }
+
+    /** @return array<string, int> */
+    public static function cmsConstants(): array
+    {
+        return [
+            'OPENSSL_CMS_TEXT' => self::OPENSSL_CMS_TEXT,
+            'OPENSSL_CMS_NOCERTS' => self::OPENSSL_CMS_NOCERTS,
+            'OPENSSL_CMS_NOSIGS' => self::OPENSSL_CMS_NOSIGS,
+            'OPENSSL_CMS_NOINTERN' => self::OPENSSL_CMS_NOINTERN,
+            'OPENSSL_CMS_NOVERIFY' => self::OPENSSL_CMS_NOVERIFY,
+            'OPENSSL_CMS_DETACHED' => self::OPENSSL_CMS_DETACHED,
+            'OPENSSL_CMS_BINARY' => self::OPENSSL_CMS_BINARY,
+            'OPENSSL_CMS_NOATTR' => self::OPENSSL_CMS_NOATTR,
+            'OPENSSL_ENCODING_DER' => self::OPENSSL_ENCODING_DER,
+            'OPENSSL_ENCODING_SMIME' => self::OPENSSL_ENCODING_SMIME,
+            'OPENSSL_ENCODING_PEM' => self::OPENSSL_ENCODING_PEM,
         ];
     }
 
