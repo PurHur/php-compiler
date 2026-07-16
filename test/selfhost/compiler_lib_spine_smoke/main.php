@@ -932,6 +932,7 @@ require_once __DIR__.'/../../../ext/sockets/socket_close.php';
 require_once __DIR__.'/../../../ext/sockets/socket_connect.php';
 require_once __DIR__.'/../../../ext/sockets/socket_create.php';
 require_once __DIR__.'/../../../ext/sockets/socket_create_pair.php';
+require_once __DIR__.'/../../../ext/sockets/socket_create_listen.php';
 require_once __DIR__.'/../../../ext/sockets/socket_bind.php';
 require_once __DIR__.'/../../../ext/sockets/socket_listen.php';
 require_once __DIR__.'/../../../ext/sockets/socket_accept.php';

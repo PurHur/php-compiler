@@ -167,6 +167,75 @@ final class VmSockets
         return [$a, $b];
     }
 
+    /**
+     * php-src: PHP_FUNCTION(socket_create_listen) / php_open_listen_sock (#6212).
+     *
+     * AF_INET stream socket bound to INADDR_ANY, listening. Default backlog 128 on PHP 8.2.
+     *
+     * @return ObjectEntry|false
+     */
+    public static function createListen(int $port, int $backlog, \PHPCompiler\VM\Context $ctx, Frame $frame): ObjectEntry|false
+    {
+        // php-src ≤8.4: zend_long cast to unsigned short (PHP 8.5+ ValueError on range).
+        $port = $port & 0xffff;
+        if (!SocketsLibcThinAbi::available()) {
+            return false;
+        }
+
+        $fd = SocketsLibcThinAbi::socket(self::AF_INET, SocketConstants::SOCK_STREAM, 0);
+        if ($fd < 0) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError(null, $errno);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_create_listen(): unable to create listening socket [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
+
+            return false;
+        }
+
+        if (0 !== SocketsLibcThinAbi::bindInet($fd, '0.0.0.0', $port)) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError(null, $errno);
+            SocketsLibcThinAbi::close($fd);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_create_listen(): unable to bind to given address [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
+
+            return false;
+        }
+
+        if (0 !== SocketsLibcThinAbi::listen($fd, $backlog)) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError(null, $errno);
+            SocketsLibcThinAbi::close($fd);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_create_listen(): unable to listen on socket [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
+
+            return false;
+        }
+
+        $object = VmSocket::wrapOwnedFd($fd, $ctx);
+        self::$socketErrors[$object->id] = 0;
+
+        return $object;
+    }
+
     public static function connect(ObjectEntry $object, string $addr, int $port, Frame $frame): bool
     {
         $fd = VmSocket::fdForObject($object);
