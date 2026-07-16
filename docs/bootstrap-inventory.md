@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5051 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13662 |
+| Source constructs flagged (warnings) | 13664 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2844,8 +2844,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/proc_terminate.php` | 0 | 3 |
 | `ext/standard/property_exists_.php` | 0 | 3 |
 | `ext/standard/putenv_.php` | 0 | 1 |
-| `ext/standard/quoted_printable_decode.php` | 0 | 1 |
-| `ext/standard/quoted_printable_encode.php` | 0 | 1 |
+| `ext/standard/quoted_printable_decode.php` | 0 | 2 |
+| `ext/standard/quoted_printable_encode.php` | 0 | 2 |
 | `ext/standard/quotemeta.php` | 0 | 1 |
 | `ext/standard/rad2deg.php` | 0 | 1 |
 | `ext/standard/rand_.php` | 0 | 2 |
@@ -7094,14 +7094,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 6161)
 - new DOMException (line 6164)
 - new DOMException (line 6173)
-- new Variable (line 7011)
-- new Variable (line 7024)
-- new DOMException (line 7107)
-- new DOMException (line 7134)
-- new DOMException (line 7165)
-- new DOMException (line 7229)
-- new DOMException (line 7237)
-- new DOMException (line 7246)
+- new Variable (line 7017)
+- new Variable (line 7030)
+- new DOMException (line 7113)
+- new DOMException (line 7140)
+- new DOMException (line 7171)
+- new DOMException (line 7235)
+- new DOMException (line 7243)
+- new DOMException (line 7252)
 - 334 class method(s)
 - 2 closure(s)
 
@@ -11858,13 +11858,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/CachingIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 48)
-- new CachingIteratorConstruct (line 65)
-- new Variable (line 178)
-- new Variable (line 191)
-- new BadMethodCallException (line 247)
-- new ArgumentCountError (line 319)
-- new ArgumentCountError (line 547)
+- new ClassEntry (line 51)
+- new CachingIteratorConstruct (line 69)
+- new Variable (line 182)
+- new Variable (line 195)
+- new BadMethodCallException (line 251)
+- new ArgumentCountError (line 323)
+- new ArgumentCountError (line 551)
 - 32 class method(s)
 
 ### `ext/spl/CallbackFilterIteratorBuiltin.php`
@@ -12071,9 +12071,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 39)
 - new RecursiveTreeIteratorConstruct (line 59)
-- new ArgumentCountError (line 215)
-- new ArgumentCountError (line 413)
-- new ArgumentCountError (line 478)
+- new ArgumentCountError (line 225)
+- new ArgumentCountError (line 443)
+- new ArgumentCountError (line 508)
 - 24 class method(s)
 
 ### `ext/spl/RegexIteratorBuiltin.php`
@@ -21110,7 +21110,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/base64_decode.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/base64_encode.php`
@@ -22742,11 +22742,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/hex2bin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 37)
-- new ArgumentCountError (line 40)
-- new Error (line 56)
-- new Error (line 76)
-- 2 class method(s)
+- new ArgumentCountError (line 36)
+- new ArgumentCountError (line 39)
+- new Error (line 55)
+- new Error (line 75)
+- 3 class method(s)
 - 3 closure(s)
 
 ### `ext/standard/hexdec.php`
@@ -23904,12 +23904,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/quoted_printable_decode.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/quoted_printable_encode.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/quotemeta.php`
 
@@ -31082,7 +31084,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringQuotPrint.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 101)
+- new JIT (line 109)
 - 5 class method(s)
 
 ### `lib/JIT/Builtin/StringQuotemeta.php`
