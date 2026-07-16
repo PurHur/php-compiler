@@ -9026,6 +9026,8 @@ restart:
             return $this->dispatchVmInvalidArgumentException($e, $callerFrame);
         } catch (\LogicException $e) {
             return $this->dispatchVmLogicException($e, $callerFrame);
+        } catch (VM\NativeRequestParseBodyException $e) {
+            return $this->dispatchVmRequestParseBodyException($e, $callerFrame);
         } catch (VM\MagicMethodInvocationAborted) {
             $this->clearTryCatchUnwindState();
             $callerFrame->call = null;
@@ -9095,6 +9097,24 @@ restart:
     private function dispatchVmEngineException(string $message, Frame $frame): ?Frame
     {
         $thrown = $this->makeEngineError($message, 'Exception');
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /**
+     * Bridge host RequestParseBodyException into the VM RequestParseBodyException class (#5965).
+     *
+     * php-src: ext/standard/http.c — PHP_FUNCTION(request_parse_body).
+     */
+    private function dispatchVmRequestParseBodyException(\Throwable $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeRequestParseBodyException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
