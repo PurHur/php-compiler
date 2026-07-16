@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5234 |
-| Phase A inventory files (M2 ratio SSOT) | 5234 |
+| PHP files on vm.php path | 5235 |
+| Phase A inventory files (M2 ratio SSOT) | 5235 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14427 |
+| Source constructs flagged (warnings) | 14428 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1763,6 +1763,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrSplit.php` | 0 | 1 |
 | `ext/standard/JitStreamBucket.php` | 0 | 3 |
 | `ext/standard/JitStreamBucketKernel.php` | 0 | 3 |
+| `ext/standard/JitStreamCapsKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamContextCreate.php` | 0 | 1 |
 | `ext/standard/JitStreamContextGetDefault.php` | 0 | 1 |
 | `ext/standard/JitStreamContextGetOptions.php` | 0 | 1 |
@@ -3959,7 +3960,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamBufferRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamCaps.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCapsJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StreamCapsRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StreamCapsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamContextRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamEnableCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamFilter.php` | 0 | 1 |
@@ -15994,7 +15995,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitIntdiv.php`
 
 **Warnings** (review for bootstrap subset):
-- 18 class method(s)
+- 19 class method(s)
 
 ### `ext/standard/JitInterfaceExists.php`
 
@@ -16889,6 +16890,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JIT (line 302)
 - 23 class method(s)
+- 1 closure(s)
+
+### `ext/standard/JitStreamCapsKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 306)
+- 14 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/JitStreamContextCreate.php`
@@ -31819,9 +31827,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamCapsRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 303)
-- 14 class method(s)
-- 1 closure(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StreamContextRuntime.php`
 

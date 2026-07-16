@@ -11,7 +11,9 @@ use PHPCompiler\ext\standard\VmStreamMeta;
 use PHPCompiler\ext\standard\VmStreamSupports;
 use PHPUnit\Framework\TestCase;
 
-/** stream caps JIT routes through StreamCapsJitHelper PHP (#11413). */
+/**
+ * Stream caps NestedJIT ABI bridges quarantined in ext/standard (#11413, #19772).
+ */
 final class StreamCapsRuntimeShrinkTest extends TestCase
 {
     public function testStreamCapsJitDelegatesToRuntime(): void
@@ -24,19 +26,47 @@ final class StreamCapsRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitSupports', $source);
     }
 
+    public function testBuiltinStreamCapsRuntimeIsThinOrchestrator(): void
+    {
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamCapsKernel.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StreamCapsRuntime.php');
+
+        $orchestrator = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamCapsRuntime.php');
+        $this->assertStringContainsString('JitStreamCapsKernel', $orchestrator);
+        $this->assertStringContainsString('JitStreamCapsKernel::ensureLinked', $orchestrator);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $orchestrator);
+        $this->assertStringNotContainsString('__compiler_stream_isatty', $orchestrator);
+        $this->assertLessThan(55, \substr_count($orchestrator, "\n") + 1);
+    }
+
+    public function testKernelPresent(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamCapsKernel.php');
+        $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
+        $this->assertStringContainsString('final class JitStreamCapsKernel', $source);
+        $this->assertStringContainsString('__compiler_stream_isatty', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertStringContainsString('StreamCapsJitHelper', $source);
+        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
+        $this->assertLessThan(340, \substr_count($source, "\n") + 1);
+    }
+
+    public function testSpineBundleIncludesKernelAndOrchestrator(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitStreamCapsKernel.php', $spine);
+        $this->assertStringContainsString('StreamCapsRuntime.php', $spine);
+        $kernelPos = strpos($spine, 'JitStreamCapsKernel.php');
+        $orchPos = strpos($spine, 'lib/JIT/Builtin/StreamCapsRuntime.php');
+        $this->assertNotFalse($kernelPos);
+        $this->assertNotFalse($orchPos);
+        $this->assertLessThan($orchPos, $kernelPos, 'kernel must load before thin orchestrator');
+    }
+
     public function testStreamCapsStandaloneLlvmDeleted(): void
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamCapsStandaloneLlvm.php');
-    }
-
-    public function testStreamCapsRuntimeUsesJitHelper(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamCapsRuntime.php');
-        $this->assertStringContainsString('StreamCapsJitHelper::isLocalUriArgv', $source);
-        $this->assertStringContainsString('StreamCapsJitHelper::isattyArgv', $source);
-        $this->assertStringContainsString('StreamCapsJitHelper::isLocalArgv', $source);
-        $this->assertStringContainsString('StreamIoRuntime::ensureSupportsBridgeLinked', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
     }
 
     public function testStreamCapsJitHelperMatchesVmStreamMeta(): void
