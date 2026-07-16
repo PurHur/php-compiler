@@ -12441,15 +12441,49 @@ class Compiler {
         if ([] === $fetches) {
             return null;
         }
+        // Chained $obj->a->b hoists intermediate PropertyFetches that feed the next
+        // fetch's receiver, not call args. Keep only leaf fetches (#19719, #18860).
+        $leafFetches = [];
+        foreach ($fetches as $i => $fetch) {
+            $feedsNearerFetch = false;
+            for ($j = 0; $j < $i; ++$j) {
+                $nearer = $fetches[$j];
+                if (
+                    null !== $fetch->result
+                    && property_exists($nearer, 'var')
+                    && null !== $nearer->var
+                    && $this->operandsReferToSameVariable($fetch->result, $nearer->var)
+                ) {
+                    $feedsNearerFetch = true;
+                    break;
+                }
+            }
+            if (!$feedsNearerFetch) {
+                $leafFetches[] = $fetch;
+            }
+        }
+        $fetches = $leafFetches;
+        if ([] === $fetches) {
+            return null;
+        }
         if (\count($fetches) > $propertyArgCount) {
+            // Extra leaf is usually the MethodCall receiver (documentElement->C14NFile($tmp)).
             if (0 !== $argIndex) {
                 return null;
             }
 
             return $fetches[0];
         }
-        $ordinal = \count($fetches) - 1 - $argIndex;
-        if ($ordinal < 0 || $ordinal >= \count($fetches)) {
+        // MethodCall/FuncCall producers fill leading dead-temp args; PropertyFetch
+        // leaves map to the trailing propertyArgCount slots (#19719):
+        // insertBefore($d->createElement('x'), $r->lastChild).
+        $fetchCount = \count($fetches);
+        $firstPropertyArgIndex = $propertyArgCount - $fetchCount;
+        if ($argIndex < $firstPropertyArgIndex) {
+            return null;
+        }
+        $ordinal = $fetchCount - 1 - ($argIndex - $firstPropertyArgIndex);
+        if ($ordinal < 0 || $ordinal >= $fetchCount) {
             return null;
         }
 
@@ -26635,21 +26669,17 @@ class Compiler {
             if ($mid instanceof Op\Expr\New_ || $mid instanceof Op\Expr\Clone_) {
                 continue;
             }
+            // insertBefore($d->createElement('x'), $r->lastChild) — PropertyFetch sibling arg (#19719).
             if (
                 $mid instanceof Op\Expr\PropertyFetch
-                && $this->isPropertyFetchOnlyIssetVar($mid, $cfgChildren[$j + 1] ?? null)
+                || $mid instanceof Op\Expr\NullsafePropertyFetch
+                || $mid instanceof Op\Expr\StaticPropertyFetch
             ) {
                 continue;
             }
             if (
                 $mid instanceof Op\Expr\ArrayDimFetch
                 && $this->isArrayDimFetchOnlyIssetVar($mid, $cfgChildren[$j + 1] ?? null)
-            ) {
-                continue;
-            }
-            if (
-                $mid instanceof Op\Expr\StaticPropertyFetch
-                && $this->isStaticPropertyFetchOnlyIssetVar($mid, $cfgChildren[$j + 1] ?? null)
             ) {
                 continue;
             }
@@ -26736,21 +26766,17 @@ class Compiler {
             if ($sib instanceof Op\Expr\New_ || $sib instanceof Op\Expr\Clone_) {
                 continue;
             }
+            // insertBefore($d->createElement('x'), $r->lastChild) — PropertyFetch sibling arg (#19719).
             if (
                 $sib instanceof Op\Expr\PropertyFetch
-                && $this->isPropertyFetchOnlyIssetVar($sib, $cfgChildren[$j + 1] ?? null)
+                || $sib instanceof Op\Expr\NullsafePropertyFetch
+                || $sib instanceof Op\Expr\StaticPropertyFetch
             ) {
                 continue;
             }
             if (
                 $sib instanceof Op\Expr\ArrayDimFetch
                 && $this->isArrayDimFetchOnlyIssetVar($sib, $cfgChildren[$j + 1] ?? null)
-            ) {
-                continue;
-            }
-            if (
-                $sib instanceof Op\Expr\StaticPropertyFetch
-                && $this->isStaticPropertyFetchOnlyIssetVar($sib, $cfgChildren[$j + 1] ?? null)
             ) {
                 continue;
             }
@@ -27242,6 +27268,15 @@ class Compiler {
                 continue;
             }
             if ($mid instanceof Op\Expr\New_ || $mid instanceof Op\Expr\Clone_) {
+                continue;
+            }
+            // take($r->lastChild, $d->createElement('y')) after prior take(...) — PropertyFetch
+            // between statement call and next call is a hoisted arg, not a chain break (#19719).
+            if (
+                $mid instanceof Op\Expr\PropertyFetch
+                || $mid instanceof Op\Expr\NullsafePropertyFetch
+                || $mid instanceof Op\Expr\StaticPropertyFetch
+            ) {
                 continue;
             }
             if ($this->isSiblingInlineCallProducerExpr($mid)) {
@@ -27775,6 +27810,12 @@ class Compiler {
                     --$i;
                     continue;
                 }
+                // Prior $d->loadXML(...) (inferred:unknown) before insertBefore(createElement, …) (#19719).
+                // Do not use empty(result->usages): php-cfg dead arg temps leave producer usages empty.
+                if (!$this->methodCallInlineProducerSuppliesCallArgValue($child)) {
+                    --$i;
+                    continue;
+                }
             }
             if ($this->isSiblingInlineCallProducerExpr($child)) {
                 if (
@@ -27850,9 +27891,11 @@ class Compiler {
                 --$i;
                 continue;
             }
+            // insertBefore($d->createElement('x'), $r->lastChild) — PropertyFetch is a sibling arg (#19719).
             if (
                 $child instanceof Op\Expr\PropertyFetch
-                && $this->isPropertyFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+                || $child instanceof Op\Expr\NullsafePropertyFetch
+                || $child instanceof Op\Expr\StaticPropertyFetch
             ) {
                 --$i;
                 continue;
@@ -27860,13 +27903,6 @@ class Compiler {
             if (
                 $child instanceof Op\Expr\ArrayDimFetch
                 && $this->isArrayDimFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
-            ) {
-                --$i;
-                continue;
-            }
-            if (
-                $child instanceof Op\Expr\StaticPropertyFetch
-                && $this->isStaticPropertyFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
             ) {
                 --$i;
                 continue;
@@ -27912,6 +27948,12 @@ class Compiler {
                     ++$first;
                     continue;
                 }
+                // $d->loadXML(...); $d->documentElement->insertBefore($d->createElement(...), …)
+                // — loadXML is a prior stmt (inferred:unknown), not a hoisted arg producer (#19719).
+                if (!$this->methodCallInlineProducerSuppliesCallArgValue($skip)) {
+                    ++$first;
+                    continue;
+                }
             }
             if ($skip instanceof Op\Expr\ConstFetch || $skip instanceof Op\Expr\ClassConstFetch) {
                 ++$first;
@@ -27942,6 +27984,15 @@ class Compiler {
             if (
                 $skip instanceof Op\Expr\PropertyFetch
                 && $this->isPropertyFetchOnlyIssetVar($skip, $cfgChildren[$first + 1] ?? null)
+            ) {
+                ++$first;
+                continue;
+            }
+            // Call-arg PropertyFetch between Assign and MethodCall (#19719): $r->lastChild before createElement.
+            if (
+                $skip instanceof Op\Expr\PropertyFetch
+                || $skip instanceof Op\Expr\NullsafePropertyFetch
+                || $skip instanceof Op\Expr\StaticPropertyFetch
             ) {
                 ++$first;
                 continue;
@@ -40530,6 +40581,187 @@ class Compiler {
         foreach ($args as $argIndex => $arg) {
             $nameSlot = $this->callArgNameSlot($arg, $block);
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            // #19719: MethodCall/FuncCall + trailing PropertyFetch call args (insertBefore(
+            // $d->createElement('x'), $r->lastChild)) — wire via producer match before
+            // legacy immediate-PropertyFetch paths clobber every dead-temp arg.
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && null === $unpackFlag
+                && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                && \is_array($cfgCallOp->args)
+                && \count($cfgCallOp->args) >= 2
+            ) {
+                $mixedDeadTempCount = 0;
+                foreach ($cfgCallOp->args as $mixedArg) {
+                    if (
+                        $this->callArgIsDeadInlineTemporary($mixedArg)
+                        && !$this->isEmbeddedCallLiteralArg($mixedArg)
+                    ) {
+                        ++$mixedDeadTempCount;
+                    }
+                }
+                if ($mixedDeadTempCount >= 2) {
+                    $mixedProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    $hasCallProducer = false;
+                    $hasPropertyProducer = false;
+                    foreach ($mixedProducers as $mixedProducer) {
+                        if (
+                            $mixedProducer instanceof Op\Expr\MethodCall
+                            || $mixedProducer instanceof Op\Expr\FuncCall
+                            || $mixedProducer instanceof Op\Expr\NsFuncCall
+                            || $mixedProducer instanceof Op\Expr\StaticCall
+                        ) {
+                            $hasCallProducer = true;
+                        }
+                        if (
+                            $mixedProducer instanceof Op\Expr\PropertyFetch
+                            || $mixedProducer instanceof Op\Expr\NullsafePropertyFetch
+                        ) {
+                            $hasPropertyProducer = true;
+                        }
+                    }
+                    if ($hasCallProducer && $hasPropertyProducer) {
+                        // Build ordered producers: non-void calls + leaf PropertyFetches only
+                        // (skip chain intermediates and stmt-level void MethodCalls like loadXML).
+                        $rawFetches = [];
+                        foreach ($mixedProducers as $mixedProducer) {
+                            if (
+                                $mixedProducer instanceof Op\Expr\PropertyFetch
+                                || $mixedProducer instanceof Op\Expr\NullsafePropertyFetch
+                            ) {
+                                $rawFetches[] = $mixedProducer;
+                            }
+                        }
+                        // Drop PropertyFetches that feed a later PropertyFetch receiver (chains).
+                        $leafFetches = [];
+                        foreach ($rawFetches as $fi => $fetch) {
+                            $feedsNearer = false;
+                            // precedingInlineCallArgProducers returns oldest-first; chain
+                            // intermediates appear before their leaf. A fetch feeds a later fetch
+                            // when a later fetch's var equals this result.
+                            for ($fj = $fi + 1, $fn = \count($rawFetches); $fj < $fn; ++$fj) {
+                                $later = $rawFetches[$fj];
+                                if (
+                                    null !== $fetch->result
+                                    && property_exists($later, 'var')
+                                    && null !== $later->var
+                                    && $this->operandsReferToSameVariable($fetch->result, $later->var)
+                                ) {
+                                    $feedsNearer = true;
+                                    break;
+                                }
+                            }
+                            // Also skip MethodCall receiver: PropertyFetch whose result is the
+                            // insertBefore receiver (cfgCallOp->var).
+                            if (
+                                !$feedsNearer
+                                && $cfgCallOp instanceof Op\Expr\MethodCall
+                                && null !== $cfgCallOp->var
+                                && null !== $fetch->result
+                                && $this->operandsReferToSameVariable($cfgCallOp->var, $fetch->result)
+                            ) {
+                                $feedsNearer = true;
+                            }
+                            // Skip PropertyFetch that is only the receiver of a MethodCall producer
+                            // in this list (documentElement before createElement on $d) (#19719).
+                            if (!$feedsNearer) {
+                                foreach ($mixedProducers as $maybeCall) {
+                                    if (
+                                        $maybeCall instanceof Op\Expr\MethodCall
+                                        && null !== $maybeCall->var
+                                        && null !== $fetch->result
+                                        && $this->operandsReferToSameVariable($maybeCall->var, $fetch->result)
+                                    ) {
+                                        $feedsNearer = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            if (!$feedsNearer) {
+                                $leafFetches[] = $fetch;
+                            }
+                        }
+                        // Merge call producers + leaf fetches in original CFG producer order.
+                        $orderedMixed = [];
+                        foreach ($mixedProducers as $mixedProducer) {
+                            if (
+                                $mixedProducer instanceof Op\Expr\MethodCall
+                                || $mixedProducer instanceof Op\Expr\FuncCall
+                                || $mixedProducer instanceof Op\Expr\NsFuncCall
+                                || $mixedProducer instanceof Op\Expr\StaticCall
+                            ) {
+                                if (
+                                    $mixedProducer instanceof Op\Expr\MethodCall
+                                    && (
+                                        $this->methodCallIsStmtLevelDiscardPrelude($mixedProducer)
+                                        || !$this->methodCallInlineProducerSuppliesCallArgValue($mixedProducer)
+                                        || (
+                                            null !== ($mn = $this->staticNameFromOperand($mixedProducer->name))
+                                            && $this->methodCallIsKnownVoidReturn($mn)
+                                        )
+                                    )
+                                ) {
+                                    // loadXML() / discard preludes — not call-arg values (#19719 hang).
+                                    continue;
+                                }
+                                $orderedMixed[] = $mixedProducer;
+                                continue;
+                            }
+                            foreach ($leafFetches as $leaf) {
+                                if ($leaf === $mixedProducer) {
+                                    $orderedMixed[] = $mixedProducer;
+                                    break;
+                                }
+                            }
+                        }
+                        $mixedMatched = null;
+                        if (\count($orderedMixed) === $mixedDeadTempCount) {
+                            $mixedMatched = $orderedMixed[(int) $argIndex] ?? null;
+                        } else {
+                            $mixedMatched = $this->matchInlineCallArgProducer(
+                                $orderedMixed,
+                                $cfgCallOp->args,
+                                (int) $argIndex,
+                                $cfgCallOp,
+                                $block,
+                                $calleeName
+                            );
+                        }
+                        if ($mixedMatched instanceof Op\Expr) {
+                            $mixedSlot = $this->slotForInlineCallArgProducerResult(
+                                $block,
+                                $mixedMatched,
+                                $cfgCallOp,
+                                $block->orig->children
+                            ) ?? $block->slotForOperand($mixedMatched->result);
+                            if (null === $mixedSlot) {
+                                foreach ($this->compileExpr($mixedMatched, $block) as $op) {
+                                    $block->addOpCode($op);
+                                }
+                                $mixedSlot = $this->slotForInlineCallArgProducerResult(
+                                    $block,
+                                    $mixedMatched,
+                                    $cfgCallOp,
+                                    $block->orig->children
+                                ) ?? $block->slotForOperand($mixedMatched->result);
+                            }
+                            if (null !== $mixedSlot) {
+                                $sends[] = new OpCode(
+                                    OpCode::TYPE_ARG_SEND,
+                                    (string) $mixedSlot,
+                                    $nameSlot,
+                                    $unpackFlag
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                }
+            }
             if (
                 null !== $cfgCallOp
                 && $this->callArgIsNullLiteral(
@@ -48430,6 +48662,9 @@ class Compiler {
                 $child instanceof Op\Expr\ConstFetch
                 || $child instanceof Op\Expr\ClassConstFetch
                 || $child instanceof Op\Expr\Array_
+                // insertBefore($d->createElement('x'), $r->lastChild) — PropertyFetch between (#19719).
+                || $child instanceof Op\Expr\PropertyFetch
+                || $child instanceof Op\Expr\NullsafePropertyFetch
             ) {
                 continue;
             }
