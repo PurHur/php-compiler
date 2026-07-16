@@ -1,5 +1,5 @@
 --TEST--
-stdlib intl OOP + locale_* withheld without ext/intl (#19670, re-#16214)
+stdlib intl OOP + locale_* withheld without ext/intl (#19670, re-#16214, #6171, #6366)
 --FILE--
 <?php
 echo 'intl_loaded=', (int) extension_loaded('intl'), "\n";
@@ -10,6 +10,9 @@ echo 'calendar=', (int) class_exists('IntlCalendar', false), "\n";
 echo 'timezone=', (int) class_exists('IntlTimeZone', false), "\n";
 echo 'collator=', (int) class_exists('Collator', false), "\n";
 echo 'messageformatter=', (int) class_exists('MessageFormatter', false), "\n";
+echo 'intlchar=', (int) class_exists('IntlChar', false), "\n";
+echo 'uconverter=', (int) class_exists('UConverter', false), "\n";
+echo 'spoofchecker=', (int) class_exists('Spoofchecker', false), "\n";
 echo 'locale_get_default=', (int) function_exists('locale_get_default'), "\n";
 try {
     Collator::create('en_US');
@@ -39,6 +42,9 @@ calendar=0
 timezone=0
 collator=0
 messageformatter=0
+intlchar=0
+uconverter=0
+spoofchecker=0
 locale_get_default=0
 Error: Class "Collator" not found
 msgfmt_err=Error
