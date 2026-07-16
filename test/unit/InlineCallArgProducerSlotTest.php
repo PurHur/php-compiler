@@ -1627,6 +1627,55 @@ PHP;
         self::assertSame("2020-01-01,2020-01-02,2020-01-03\n", ob_get_clean());
     }
 
+    /**
+     * Issue #19735 — EXCLUDE_START_DATE|INCLUDE_END_DATE must not steal arg #0 onto BitwiseOr slot.
+     */
+    public function testDatePeriodInlineSiblingNewWithBitwiseOrOptionsUsesPositionalProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$p = new DatePeriod(
+    new DateTime('2020-01-01'),
+    new DateInterval('P1D'),
+    new DateTime('2020-01-04'),
+    DatePeriod::EXCLUDE_START_DATE | DatePeriod::INCLUDE_END_DATE
+);
+$out = [];
+foreach ($p as $d) {
+    $out[] = $d->format('Y-m-d');
+}
+echo implode(',', $out), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dateperiod_inline_bitwise_options.php');
+
+        $newSlots = [];
+        $periodSends = [];
+        $inPeriodCtor = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_NEW === $op->type && 4 === \count($newSlots)) {
+                $inPeriodCtor = true;
+            }
+            if ($inPeriodCtor && OpCode::TYPE_ARG_SEND === $op->type) {
+                $periodSends[] = $op->arg1;
+            }
+            if ($inPeriodCtor && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertSame([0, 4, 8], \array_slice($periodSends, 0, 3), 'DatePeriod New_ arg sends='.json_encode($periodSends));
+        self::assertCount(4, $periodSends);
+        self::assertNotSame($periodSends[0], $periodSends[3], 'start New_ must not share BitwiseOr options slot');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("2020-01-02,2020-01-03,2020-01-04\n", ob_get_clean());
+    }
+
     /** Issue #14483 — iterator_count(new DatePeriod(...)) wires outer sibling New_, not inner hoists. */
     public function testIteratorCountInlineDatePeriodUsesSiblingNewProducerSlot(): void
     {
