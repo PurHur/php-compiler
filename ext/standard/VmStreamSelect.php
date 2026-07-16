@@ -32,7 +32,12 @@ final class VmStreamSelect
         int $seconds,
         int $microseconds,
     ): int|false {
-        return VmStreamSelectPure::multiplex($read, $write, $except, $seconds, $microseconds);
+        $ephemeral = self::collectEphemeralCasts($read, $write, $except);
+        try {
+            return VmStreamSelectPure::multiplex($read, $write, $except, $seconds, $microseconds);
+        } finally {
+            self::releaseEphemeralPairList($ephemeral);
+        }
     }
 
     /**
@@ -67,11 +72,17 @@ final class VmStreamSelect
 
                 continue;
             }
-            // php://temp casts to a selectable tempfile fd; php://memory stays omitted (#19688).
+            // php://temp: prefer Pure/FFI mkstemp fd; host tmpfile() only as fallback (#19688/#19691).
             if (VmPhpMemoryStream::isValidHandle($handle)) {
+                $castFd = VmPhpMemoryStream::castFdForSelect($handle);
+                if (null !== $castFd) {
+                    $pairs[] = new StreamSelectPair($handle, $castFd, null, true);
+
+                    continue;
+                }
                 $castHost = VmPhpMemoryStream::castHostResourceForSelect($handle);
                 if (\is_resource($castHost)) {
-                    $pairs[] = new StreamSelectPair($handle, null, $castHost);
+                    $pairs[] = new StreamSelectPair($handle, null, $castHost, true);
                 }
 
                 continue;
@@ -104,6 +115,55 @@ final class VmStreamSelect
         $replacement->array($ht);
         $targetVar->copyFrom($replacement);
     }
+
+    /**
+     * @param list<StreamSelectPair> $read
+     * @param list<StreamSelectPair>|null $write
+     * @param list<StreamSelectPair>|null $except
+     *
+     * @return list<StreamSelectPair>
+     */
+    private static function collectEphemeralCasts(array $read, ?array $write, ?array $except): array
+    {
+        $out = [];
+        foreach ($read as $pair) {
+            if ($pair->ephemeralCast) {
+                $out[] = $pair;
+            }
+        }
+        if (null !== $write) {
+            foreach ($write as $pair) {
+                if ($pair->ephemeralCast) {
+                    $out[] = $pair;
+                }
+            }
+        }
+        if (null !== $except) {
+            foreach ($except as $pair) {
+                if ($pair->ephemeralCast) {
+                    $out[] = $pair;
+                }
+            }
+        }
+
+        return $out;
+    }
+
+    /** @param list<StreamSelectPair> $pairs */
+    private static function releaseEphemeralPairList(array $pairs): void
+    {
+        foreach ($pairs as $pair) {
+            if (!$pair->ephemeralCast) {
+                continue;
+            }
+            if (null !== $pair->fd) {
+                VmPhpFdStream::closeRawFd($pair->fd);
+            }
+            if (\is_resource($pair->host)) {
+                @\fclose($pair->host);
+            }
+        }
+    }
 }
 
 /**
@@ -115,6 +175,7 @@ final class StreamSelectPair
         public readonly int $handle,
         public readonly ?int $fd,
         public readonly mixed $host,
+        public readonly bool $ephemeralCast = false,
     ) {
     }
 }

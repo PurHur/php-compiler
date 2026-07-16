@@ -46,4 +46,20 @@ final class VmStreamSelectRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('get_resource_id', $source);
         $this->assertStringNotContainsString('spl_object_id', $source);
     }
+
+    public function testPhpTempSelectPrefersFdCastOverHostTmpfile(): void
+    {
+        $select = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSelect.php');
+        $this->assertStringContainsString('castFdForSelect', $select);
+        $this->assertStringContainsString('ephemeralCast', $select);
+        $this->assertStringContainsString('releaseEphemeralPairList', $select);
+
+        $memory = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPhpMemoryStream.php');
+        $this->assertStringContainsString('castFdForSelect', $memory);
+        $this->assertStringContainsString('VmPhpFdStream::openUnlinkedTempFd', $memory);
+
+        $fd = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPhpFdStream.php');
+        $this->assertStringContainsString('int mkstemp(char *template);', $fd);
+        $this->assertStringContainsString('openUnlinkedTempFd', $fd);
+    }
 }
