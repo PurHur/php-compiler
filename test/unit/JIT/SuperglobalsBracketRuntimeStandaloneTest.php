@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\JitSuperglobalRefreshKernel;
 use PHPCompiler\JIT\Builtin\ParseStrRuntime;
-use PHPCompiler\JIT\Builtin\SuperglobalRefreshUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\StringParseStr;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -32,7 +32,7 @@ final class SuperglobalsBracketRuntimeStandaloneTest extends TestCase
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        SuperglobalRefreshUserScriptLlvm::ensurePrerequisites($ctx);
+        JitSuperglobalRefreshKernel::ensurePrerequisites($ctx);
 
         foreach (['__compiler_parse_str', '__compiler_parse_cookie_header'] as $name) {
             $bridge = $ctx->module->getNamedFunction($name);
@@ -75,7 +75,7 @@ final class SuperglobalsBracketRuntimeStandaloneTest extends TestCase
             $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
             // Simulate nested helper compile installing the embed bridge first (#18832).
             ParseStrRuntime::ensureLinked($ctx);
-            SuperglobalRefreshUserScriptLlvm::ensurePrerequisites($ctx);
+            JitSuperglobalRefreshKernel::ensurePrerequisites($ctx);
 
             $fn = $ctx->module->getNamedFunction('__compiler_parse_str');
             $this->assertNotNull($fn);

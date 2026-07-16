@@ -26,7 +26,7 @@ final class EnvironMirrorRuntimeShrinkTest extends TestCase
 
     public function testSuperglobalRefreshUserScriptRoutesEnvironMirrorRuntime(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSuperglobalRefreshKernel.php');
         $this->assertStringContainsString('EnvironMirrorRuntime::ensureLinked', $source);
         $this->assertStringContainsString('EnvironMirrorRuntime::emitFillCall', $source);
         $this->assertStringNotContainsString('EnvironMirrorUserScriptLlvm', $source);

@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\EnvironMirrorRuntime;
+use PHPCompiler\JIT\Builtin\MultipartRuntime;
+use PHPCompiler\JIT\Builtin\ParseStrRuntime;
+use PHPCompiler\JIT\Builtin\PendingHeadersRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
@@ -12,16 +15,17 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * User-script standalone AOT: native LLVM CGI superglobal refresh (#13717).
+ * User-script standalone AOT: native LLVM CGI superglobal refresh (#13717, #19512).
  *
  * Nested {@see SuperglobalRefreshJitHelper} JIT during init segfaults (#13571); the PHP
  * bridge returns VM {@see __object__*} handles that cannot populate native sg_* (#12039).
  * Process environ mirror routes through {@see EnvironMirrorRuntime} + {@see EnvironMirrorNativeJitHelper} (#18984).
  * Form/cookie parsing routes through {@see ParseStrRuntime} + {@see __compiler_parse_str}
  * ({@see ParseStrJitHelper::parseIntoNative} streaming materializer — #13900).
+ * Housed in ext/standard (not lib/JIT/Builtin) — same kernel-move pattern as #19500 / #19466.
  * php-src: main/php_variables.c
  */
-final class SuperglobalRefreshUserScriptLlvm
+final class JitSuperglobalRefreshKernel
 {
     private const DEFAULT_SCRIPT_NAME = '/index.php';
 
@@ -468,7 +472,7 @@ final class SuperglobalRefreshUserScriptLlvm
     {
         $global = $context->module->getNamedGlobal($name);
         if (null === $global) {
-            throw new \LogicException('SuperglobalRefreshUserScriptLlvm global missing: '.$name);
+            throw new \LogicException('JitSuperglobalRefreshKernel global missing: '.$name);
         }
         $htPtr = $context->getTypeFromString('__hashtable__*');
 
@@ -507,7 +511,7 @@ final class SuperglobalRefreshUserScriptLlvm
     }
 
     /** preg prelink defers user init — link refresh deps without nested Multipart JIT (#16075). */
-    private static function ensureDeferredEmitPrerequisites(Context $context): void
+    public static function ensureDeferredEmitPrerequisites(Context $context): void
     {
         LibcExtern::register($context);
         ParseStrRuntime::ensureUserScriptLinked($context);

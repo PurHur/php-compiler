@@ -61,7 +61,7 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeOpsJit.php');
 
         // User-script refresh: libc C strings → __compiler_parse_str / cookie bridge (#18855).
-        $userScript = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
+        $userScript = (string) file_get_contents($this->repoRoot.'/ext/standard/JitSuperglobalRefreshKernel.php');
         $this->assertStringContainsString('ParseStrRuntime::ensureUserScriptLinked', $userScript);
         $this->assertStringContainsString('__compiler_parse_str', $userScript);
         $this->assertStringContainsString('__compiler_parse_cookie_header', $userScript);
