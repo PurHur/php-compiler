@@ -76,6 +76,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_create_attribute_ns_no_root.phpt',
             'dom_create_attribute_ns_no_root.phpt'
         );
+        yield 'dom_create_attribute_ns_xmlns.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_create_attribute_ns_xmlns.phpt',
+            'dom_create_attribute_ns_xmlns.phpt'
+        );
         yield 'element_remove_attribute_ns.phpt' => self::parsePHPT(
             __DIR__.'/cases/dom/element_remove_attribute_ns.phpt',
             'element_remove_attribute_ns.phpt'
