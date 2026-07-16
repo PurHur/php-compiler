@@ -25,12 +25,7 @@ final class stripslashes extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('stripslashes() requires exactly one argument in this compiler build');
         }
-        $subject = InternalStrictArg::resolveCoercibleStringArg(
-            $frame,
-            0,
-            'stripslashes',
-            'string'
-        );
+        $subject = self::vmStringArg($frame, 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -47,7 +42,46 @@ final class stripslashes extends Internal
 
         return $context->builder->call(
             $context->lookupFunction('__string__stripslashes'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'stripslashes', 0, 'string')
+            self::jitStringArg($context, $args[0], 0, 'string')
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'stripslashes', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'stripslashes',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'stripslashes',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'stripslashes',
+            $argIndex,
+            $paramName
         );
     }
 }

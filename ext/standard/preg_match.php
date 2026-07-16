@@ -23,7 +23,17 @@ final class preg_match extends Internal
             throw new \LogicException('preg_match() requires 2 to 5 arguments in this compiler build');
         }
         $pattern = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'preg_match', 'pattern');
-        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 1, 'preg_match', 'subject');
+        // Z_PARAM_STR $subject — null TypeError on 8.4 forward profile (#19320, ext/pcre/php_pcre.c).
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            $subject = InternalStrictArg::requireString($frame, 1, 'preg_match', 'subject')->toString();
+        } else {
+            $subject = VmString::coerceZparamStrBuiltinArg(
+                $frame->calledArgs[1],
+                'preg_match',
+                1,
+                'subject'
+            );
+        }
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_match', $pattern);
 
         $flags = 0;

@@ -27,7 +27,7 @@ final class ord extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'ord', 1);
-        $s = VmString::stringBuiltinArgForFrame($frame, 0, 'ord', 0, 'character');
+        $s = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'ord', 0, 'character');
         if (null === $frame->returnVar) {
             return;
         }
@@ -43,13 +43,7 @@ final class ord extends Internal
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
 
-        $strPtr = JitStringBuiltinArg::lowerStrictOrCoercible(
-            $context,
-            $args[0],
-            'ord',
-            0,
-            'character'
-        );
+        $strPtr = self::jitStringArg($context, $args[0]);
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $lenPtr = $context->builder->structGep($strPtr, $map['length']);
@@ -64,5 +58,26 @@ final class ord extends Internal
         $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->zExt($byte, $i64);
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'ord',
+                0,
+                'character'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'ord',
+            0,
+            'character'
+        );
     }
 }

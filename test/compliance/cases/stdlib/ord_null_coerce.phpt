@@ -1,10 +1,15 @@
 --TEST--
-stdlib ord(null) — coerces to 0 on 8.4 forward profile (#19161, ext/standard/string.c)
+stdlib ord(null) — TypeError on 8.4 forward profile (#19319, was #19161 coerce)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-echo ord(null), "\n";
+try {
+    echo ord(null), "\n";
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
 ?>
 --EXPECT--
-0
+ord(): Argument #1 ($character) must be of type string, null given
