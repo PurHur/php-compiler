@@ -457,16 +457,17 @@ final class JitFilter
         return $ptr;
     }
 
-    public static function validateDomain(Context $context, JITVariable $value): Value
+    public static function validateDomain(Context $context, JITVariable $value, ?Value $flags = null): Value
     {
         StringFilterDomain::ensureLinked($context);
         if (JITVariable::TYPE_VALUE === $value->type) {
-            return self::boxValueValidateDomain($context, $value);
+            return self::boxValueValidateDomain($context, $value, $flags);
         }
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $falseVal = $context->constantFromBool(false);
+        $flagsVal = $flags ?? $context->getTypeFromString('int64')->constInt(0, false);
 
         if (JITVariable::TYPE_NULL === $value->type
             || JITVariable::TYPE_STRING !== $value->type) {
@@ -478,7 +479,8 @@ final class JitFilter
         $str = $context->helper->loadValue($value);
         $validated = $context->builder->call(
             $context->lookupFunction('__compiler_filter_validate_domain'),
-            $str
+            $str,
+            $flagsVal
         );
         $null = $context->getTypeFromString('__string__*')->constNull();
         $isNull = $context->builder->icmp(Builder::INT_EQ, $validated, $null);
@@ -559,12 +561,13 @@ final class JitFilter
         return $ptr;
     }
 
-    private static function boxValueValidateDomain(Context $context, JITVariable $arg): Value
+    private static function boxValueValidateDomain(Context $context, JITVariable $arg, ?Value $flags = null): Value
     {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
         $null = $context->getTypeFromString('__string__*')->constNull();
         $isNull = $context->builder->icmp(Builder::INT_EQ, $strVal, $null);
+        $flagsVal = $flags ?? $context->getTypeFromString('int64')->constInt(0, false);
 
         $id = (string) (++self::$blockSerial);
         $failBlock = BasicBlockHelper::append($context, 'fvd_box_fail_'.$id);
@@ -583,7 +586,8 @@ final class JitFilter
         $context->builder->positionAtEnd($okBlock);
         $validated = $context->builder->call(
             $context->lookupFunction('__compiler_filter_validate_domain'),
-            $strVal
+            $strVal,
+            $flagsVal
         );
         $validatedNull = $context->builder->icmp(Builder::INT_EQ, $validated, $null);
         $invalidBlock = BasicBlockHelper::append($context, 'fvd_box_invalid_'.$id);

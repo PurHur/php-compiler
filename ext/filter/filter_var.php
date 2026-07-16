@@ -176,7 +176,7 @@ final class filter_var extends Internal
         $context->builder->branchIf($isDomain, $domainBlock, $domainOtherBlock);
 
         $context->builder->positionAtEnd($domainBlock);
-        $domainResult = JitFilter::validateDomain($context, $value);
+        $domainResult = JitFilter::validateDomain($context, $value, $flags);
         if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
             $domainResult = JitFilter::applyNullOnFailure($context, $domainResult, $nullOnFailure);
         }

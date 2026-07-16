@@ -9,9 +9,10 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_filter_validate_domain via FilterDomainJitHelper PHP (#17407).
+ * JIT/AOT link for __compiler_filter_validate_domain via FilterDomainJitHelper PHP (#17407, #19370).
  *
  * php-src: ext/filter/logical_filters.c — php_filter_validate_domain[_ex]
+ * ABI: (string*, int64 flags) — flags include FILTER_FLAG_HOSTNAME.
  */
 final class StringFilterDomain
 {
@@ -69,7 +70,8 @@ final class StringFilterDomain
         }
 
         $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr);
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $i64);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
@@ -78,7 +80,8 @@ final class StringFilterDomain
         $context->builder->positionAtEnd($entry);
         $result = $context->builder->call(
             self::helperFunction($context, self::VALIDATE_HELPER),
-            $fn->getParam(0)
+            $fn->getParam(0),
+            $fn->getParam(1)
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
