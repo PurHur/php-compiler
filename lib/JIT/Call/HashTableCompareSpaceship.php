@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\JIT\Builtin\SpaceshipCompareJit;
+use PHPCompiler\ext\standard\JitSpaceshipCompareKernel;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -18,7 +18,7 @@ final class HashTableCompareSpaceship implements Call
         if (\count($args) < 2) {
             throw new \LogicException('compareSpaceship() requires receiver and other hashtable');
         }
-        SpaceshipCompareJit::declareAbiFunctions($context);
+        JitSpaceshipCompareKernel::declareAbiFunctions($context);
         $left = HashTableNestedReceiver::hashtableFromReceiver($context, $args[0]);
         $right = HashTableNestedReceiver::hashtableFromReceiver($context, $args[1]);
 

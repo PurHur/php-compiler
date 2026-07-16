@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitSpaceshipCompareKernel;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -94,9 +95,9 @@ final class SpaceshipRuntime
         } catch (\Throwable) {
         }
 
-        SpaceshipCompareJit::declareAbiFunctions($context);
+        JitSpaceshipCompareKernel::declareAbiFunctions($context);
         self::ensureCompareJitHelperCompiled($context);
-        SpaceshipCompareJit::implement($context);
+        JitSpaceshipCompareKernel::implement($context);
 
         if (null !== $resume) {
             $context->builder->positionAtEnd($resume);
@@ -118,7 +119,7 @@ final class SpaceshipRuntime
             return;
         }
 
-        SpaceshipCompareJit::declareAbiFunctions($context);
+        JitSpaceshipCompareKernel::declareAbiFunctions($context);
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;

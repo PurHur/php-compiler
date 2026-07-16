@@ -3973,7 +3973,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/SocketAtmarkRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SocketExportStreamRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SocketImportStreamRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SortRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/SpaceshipCompareJit.php';
+require_once __DIR__.'/../../../ext/standard/JitSpaceshipCompareKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SpaceshipRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SplAutoloadDefaultRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SplAutoloadOutput.php';

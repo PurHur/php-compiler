@@ -1720,6 +1720,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitSha1.php` | 0 | 1 |
 | `ext/standard/JitShellExec.php` | 0 | 1 |
 | `ext/standard/JitSleep.php` | 0 | 1 |
+| `ext/standard/JitSpaceshipCompareKernel.php` | 0 | 2 |
 | `ext/standard/JitSplAutoload.php` | 0 | 2 |
 | `ext/standard/JitSplAutoloadDefault.php` | 0 | 3 |
 | `ext/standard/JitSplObjectHash.php` | 0 | 2 |
@@ -3882,7 +3883,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SocketExportStreamRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SocketImportStreamRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SortRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/SpaceshipCompareJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/SpaceshipRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SplAutoloadDefaultRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SplAutoloadOutput.php` | 0 | 3 |
@@ -16433,6 +16433,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 25 class method(s)
+
+### `ext/standard/JitSpaceshipCompareKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 36 class method(s)
+- 29 closure(s)
 
 ### `ext/standard/JitSplAutoload.php`
 
@@ -31095,16 +31101,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
 
-### `lib/JIT/Builtin/SpaceshipCompareJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 36 class method(s)
-- 29 closure(s)
-
 ### `lib/JIT/Builtin/SpaceshipRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 130)
+- new JIT (line 131)
 - 6 class method(s)
 - 1 closure(s)
 
