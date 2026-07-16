@@ -37242,6 +37242,23 @@ class Compiler {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
             }
+            // Multi-op const-expr (e.g. E::A->value / ->name): php-cfg lowers ClassConstFetch
+            // then PropertyFetch; fold like param/property defaults (#19567, zend_compile.c).
+            // Global consts emit before DECLARE_ENUM, so runtime CLASS_CONST_FETCH would miss E.
+            foreach ($children as $child) {
+                if (!$child instanceof Op\Expr) {
+                    continue;
+                }
+                if (!property_exists($child, 'result')
+                    || !$this->operandsReferToSameVariable($child->result, $terminal->value)
+                ) {
+                    continue;
+                }
+                $vm = $this->tryFoldCompileTimeExprDefault($child, $block, $children, true);
+                if (null !== $vm) {
+                    return $block->registerConstant(new Operand\Temporary(), $vm);
+                }
+            }
         }
         $vm = $this->vmVariableFromCfgLiteralOperand($terminal->value);
         if (null === $vm) {
