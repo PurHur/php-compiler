@@ -161,6 +161,27 @@ final class BuiltinParamNames
             case 'sem_get':
                 // php-src ext/sysvsem/sysvsem.stub.php (#19515)
                 return ['key', 'max_acquire', 'permissions', 'auto_release'];
+            case 'msg_get_queue':
+                // php-src ext/sysvmsg/sysvmsg.stub.php (#3666)
+                return ['key', 'permissions'];
+            case 'msg_send':
+                return ['queue', 'message_type', 'message', 'serialize', 'blocking', 'error_code'];
+            case 'msg_receive':
+                return [
+                    'queue',
+                    'desired_message_type',
+                    'received_message_type',
+                    'max_message_size',
+                    'message',
+                    'unserialize',
+                    'flags',
+                    'error_code',
+                ];
+            case 'msg_remove_queue':
+            case 'msg_stat_queue':
+                return ['queue'];
+            case 'msg_queue_exists':
+                return ['key'];
             case 'spl_autoload_register':
                 return ['callback', 'throw', 'prepend'];
             case 'touch':
