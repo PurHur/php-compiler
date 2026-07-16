@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5159 |
-| Phase A inventory files (M2 ratio SSOT) | 5159 |
+| PHP files on vm.php path | 5168 |
+| Phase A inventory files (M2 ratio SSOT) | 5168 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14040 |
+| Source constructs flagged (warnings) | 14055 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -358,7 +358,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/VmDomLiving.php` | 0 | 4 |
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
 | `ext/dom/VmDomTokenList.php` | 0 | 4 |
-| `ext/dom/VmDomValidationNative.php` | 0 | 1 |
+| `ext/dom/VmDomValidationNative.php` | 0 | 2 |
 | `ext/dom/VmDomXPath.php` | 0 | 28 |
 | `ext/dom/XPathConstruct.php` | 0 | 2 |
 | `ext/dom/XPathEvaluate.php` | 0 | 1 |
@@ -905,13 +905,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/random/BuiltinClasses.php` | 0 | 4 |
 | `ext/random/BuiltinEnums.php` | 0 | 3 |
 | `ext/random/GammaSection.php` | 0 | 1 |
+| `ext/random/JitRandomizerConstruct.php` | 0 | 1 |
+| `ext/random/JitRandomizerGetBytesFromString.php` | 0 | 1 |
+| `ext/random/JitRandomizerMt19937Construct.php` | 0 | 1 |
+| `ext/random/JitRandomizerUserScript.php` | 0 | 2 |
 | `ext/random/Module.php` | 0 | 1 |
 | `ext/random/Mt19937Instance.php` | 0 | 1 |
 | `ext/random/PcgOneseq128XslRr64Instance.php` | 0 | 1 |
 | `ext/random/RandomConstants.php` | 0 | 1 |
 | `ext/random/RandomU64.php` | 0 | 15 |
 | `ext/random/RandomUint128.php` | 0 | 6 |
-| `ext/random/RandomizerBuiltin.php` | 0 | 28 |
+| `ext/random/RandomizerBuiltin.php` | 0 | 27 |
+| `ext/random/RandomizerGetBytesFromStringAlgo.php` | 0 | 3 |
 | `ext/random/SecureInstance.php` | 0 | 1 |
 | `ext/random/Xoshiro256StarStarInstance.php` | 0 | 1 |
 | `ext/session/Module.php` | 0 | 25 |
@@ -4243,6 +4248,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/Native.php` | 0 | 4 |
 | `lib/JIT/Call/ObjectCompareSpaceship.php` | 0 | 1 |
 | `lib/JIT/Call/ObjectNestedReceiver.php` | 0 | 1 |
+| `lib/JIT/Call/RandomizerConstruct.php` | 0 | 1 |
+| `lib/JIT/Call/RandomizerGetBytesFromString.php` | 0 | 1 |
+| `lib/JIT/Call/RandomizerMt19937Construct.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionAttributeGetName.php` | 0 | 1 |
 | `lib/JIT/Call/ReflectionAttributeNewInstance.php` | 0 | 2 |
 | `lib/JIT/Call/ReflectionClassConstruct.php` | 0 | 1 |
@@ -4412,6 +4420,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/PropertyHookDispatchLlvm.php` | 0 | 4 |
 | `lib/JIT/PropertyIsInitializedHelper.php` | 0 | 1 |
 | `lib/JIT/PropertyIsInitializedLlvm.php` | 0 | 2 |
+| `lib/JIT/RandomizerInstanceMethodJit.php` | 0 | 4 |
 | `lib/JIT/ReadonlyBridge.php` | 0 | 1 |
 | `lib/JIT/ReadonlyClassGuard.php` | 0 | 1 |
 | `lib/JIT/ReflectionBuiltinHelper.php` | 0 | 1 |
@@ -7404,7 +7413,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomValidationNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 9 class method(s)
+- 2 closure(s)
 
 ### `ext/dom/VmDomXPath.php`
 
@@ -11226,6 +11236,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
 
+### `ext/random/JitRandomizerConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/random/JitRandomizerGetBytesFromString.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/random/JitRandomizerMt19937Construct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/random/JitRandomizerUserScript.php`
+
+**Warnings** (review for bootstrap subset):
+- new Mt19937Instance (line 57)
+- 9 class method(s)
+
 ### `ext/random/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11295,16 +11326,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 649)
 - new ArgumentCountError (line 686)
 - new ArgumentCountError (line 712)
-- new ArgumentCountError (line 749)
-- new Random\BrokenRandomEngineError (line 801)
-- new ArgumentCountError (line 830)
-- new ArgumentCountError (line 860)
-- new ArgumentCountError (line 901)
-- new Variable (line 945)
-- new HashTable (line 947)
-- new ArgumentCountError (line 964)
-- new ArgumentCountError (line 1028)
+- new ArgumentCountError (line 747)
+- new ArgumentCountError (line 788)
+- new ArgumentCountError (line 818)
+- new ArgumentCountError (line 859)
+- new Variable (line 903)
+- new HashTable (line 905)
+- new ArgumentCountError (line 922)
+- new ArgumentCountError (line 986)
 - 57 class method(s)
+- 4 closure(s)
+
+### `ext/random/RandomizerGetBytesFromStringAlgo.php`
+
+**Warnings** (review for bootstrap subset):
+- new Random\BrokenRandomEngineError (line 57)
+- 2 class method(s)
 - 2 closure(s)
 
 ### `ext/random/SecureInstance.php`
@@ -24320,8 +24357,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
 - new ArgumentCountError (line 33)
-- new ArgumentCountError (line 64)
-- new ArgumentCountError (line 70)
+- new ArgumentCountError (line 71)
+- new ArgumentCountError (line 77)
 - 2 class method(s)
 
 ### `ext/standard/password_verify.php`
@@ -28912,68 +28949,68 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Type (line 10272)
 - new Variable (line 10294)
 - new Type (line 10302)
-- new Variable (line 10419)
-- new Variable (line 10440)
-- new Variable (line 11547)
-- new Variable (line 11572)
-- new Variable (line 11593)
-- new CompileError (line 12340)
-- new CompileError (line 12444)
-- new Variable (line 12495)
-- new Variable (line 12878)
-- new Variable (line 12898)
-- new Variable (line 12919)
-- new Variable (line 12953)
-- new Variable (line 12987)
-- new Variable (line 13079)
-- new Variable (line 13101)
-- new Variable (line 13111)
-- new Variable (line 13263)
-- new Variable (line 13281)
-- new Variable (line 13331)
-- new Variable (line 13358)
-- new Variable (line 13383)
-- new Variable (line 13712)
-- new Variable (line 14080)
-- new Variable (line 14110)
-- new Variable (line 14129)
-- new Variable (line 14159)
-- new Variable (line 14196)
-- new Variable (line 14244)
-- new Variable (line 14287)
-- new VM\Variable (line 14632)
-- new Variable (line 14666)
-- new Variable (line 14717)
-- new Variable (line 14733)
-- new Variable (line 14752)
-- new Variable (line 14759)
-- new OpCode (line 14779)
-- new Variable (line 14780)
-- new Variable (line 14952)
-- new Variable (line 14990)
-- new OpCode (line 15004)
-- new Variable (line 15005)
-- new Variable (line 15064)
-- new OpCode (line 15085)
-- new Variable (line 15086)
-- new Variable (line 15183)
-- new Variable (line 15205)
-- new Variable (line 15273)
-- new Operand\Literal (line 15282)
-- new Variable (line 15297)
-- new Variable (line 15461)
-- new VM\PropertyIsInitializedHandler (line 15543)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15583)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15698)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15774)
-- new JIT\Call\VmCoerceVariableToString (line 15864)
-- new JIT\Call\IncludePathResolverResolve (line 16118)
-- new Variable (line 17174)
-- new VM (line 17218)
-- new VM\Variable (line 17227)
-- new Variable (line 17248)
-- new Variable (line 17294)
-- new Variable (line 17788)
+- new Variable (line 10430)
+- new Variable (line 10451)
+- new Variable (line 11558)
+- new Variable (line 11583)
+- new Variable (line 11604)
+- new CompileError (line 12351)
+- new CompileError (line 12455)
+- new Variable (line 12506)
+- new Variable (line 12889)
+- new Variable (line 12909)
+- new Variable (line 12930)
+- new Variable (line 12964)
+- new Variable (line 12998)
+- new Variable (line 13090)
+- new Variable (line 13112)
+- new Variable (line 13122)
+- new Variable (line 13274)
+- new Variable (line 13292)
+- new Variable (line 13342)
+- new Variable (line 13369)
+- new Variable (line 13394)
+- new Variable (line 13723)
+- new Variable (line 14091)
+- new Variable (line 14121)
+- new Variable (line 14140)
+- new Variable (line 14170)
+- new Variable (line 14207)
+- new Variable (line 14255)
+- new Variable (line 14298)
+- new VM\Variable (line 14643)
+- new Variable (line 14677)
+- new Variable (line 14728)
+- new Variable (line 14744)
+- new Variable (line 14763)
+- new Variable (line 14770)
+- new OpCode (line 14790)
+- new Variable (line 14791)
+- new Variable (line 14963)
+- new Variable (line 15001)
+- new OpCode (line 15015)
+- new Variable (line 15016)
+- new Variable (line 15075)
+- new OpCode (line 15096)
+- new Variable (line 15097)
+- new Variable (line 15194)
+- new Variable (line 15216)
+- new Variable (line 15284)
+- new Operand\Literal (line 15293)
+- new Variable (line 15308)
+- new Variable (line 15472)
+- new VM\PropertyIsInitializedHandler (line 15554)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15594)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15715)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15802)
+- new JIT\Call\VmCoerceVariableToString (line 15892)
+- new JIT\Call\IncludePathResolverResolve (line 16146)
+- new Variable (line 17202)
+- new VM (line 17246)
+- new VM\Variable (line 17255)
+- new Variable (line 17276)
+- new Variable (line 17322)
+- new Variable (line 17816)
 - 369 class method(s)
 - 7 closure(s)
 
@@ -32578,25 +32615,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2314)
 - new Variable (line 2327)
 - new Variable (line 2486)
-- new VMVariable (line 3188)
-- new VMVariable (line 3206)
-- new VMVariable (line 3214)
-- new VMVariable (line 3232)
-- new ReflectionClassConstant (line 4397)
-- new Variable (line 4758)
-- new Variable (line 4784)
-- new Variable (line 4792)
+- new VMVariable (line 3211)
+- new VMVariable (line 3229)
+- new VMVariable (line 3237)
+- new VMVariable (line 3255)
+- new ReflectionClassConstant (line 4420)
+- new Variable (line 4781)
+- new Variable (line 4807)
 - new Variable (line 4815)
-- new Variable (line 4841)
-- new Variable (line 4849)
-- new Variable (line 4923)
-- new Literal (line 4940)
-- new Literal (line 4945)
-- new Literal (line 4950)
-- new Variable (line 4961)
-- new Variable (line 4994)
+- new Variable (line 4838)
+- new Variable (line 4864)
+- new Variable (line 4872)
+- new Variable (line 4946)
+- new Literal (line 4963)
+- new Literal (line 4968)
+- new Literal (line 4973)
+- new Variable (line 4984)
 - new Variable (line 5017)
-- new Variable (line 5381)
+- new Variable (line 5040)
+- new Variable (line 5404)
 - 257 class method(s)
 - 8 closure(s)
 
@@ -33132,6 +33169,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `lib/JIT/Call/ObjectNestedReceiver.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/RandomizerConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/RandomizerGetBytesFromString.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Call/RandomizerMt19937Construct.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -34274,6 +34326,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 11 class method(s)
 - 2 closure(s)
+
+### `lib/JIT/RandomizerInstanceMethodJit.php`
+
+**Warnings** (review for bootstrap subset):
+- new Call\RandomizerMt19937Construct (line 44)
+- new Call\RandomizerConstruct (line 49)
+- new Call\RandomizerGetBytesFromString (line 54)
+- 3 class method(s)
 
 ### `lib/JIT/ReadonlyBridge.php`
 
