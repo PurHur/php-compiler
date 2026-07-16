@@ -9027,6 +9027,11 @@ class Compiler {
         if (null === $constName || null === $className) {
             return null;
         }
+        // static::CONST / static::class need the called class at runtime (LSB).
+        // Folding via the declaring class is self::-equivalent and wrong (#19614, zend_execute.c).
+        if ('static' === strtolower($className)) {
+            return null;
+        }
         $lcClass = $this->resolveDefaultClassConstScope($className, $block);
         if (null === $lcClass) {
             return null;

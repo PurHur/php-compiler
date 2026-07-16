@@ -72,4 +72,56 @@ PHP;
         }
         $this->assertTrue($echoUsesConstSlot, 'echo must reference folded constant slot');
     }
+
+    public function testStaticClassConstFetchIsNotFolded(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    const X = 1;
+    static function f() { return static::X; }
+}
+class B extends A {
+    const X = 2;
+}
+echo B::f();
+PHP;
+        $block = $runtime->parseAndCompile($code, 'static_class_const_lsb.php');
+        $this->assertNotNull($block);
+        $foundRuntimeFetch = false;
+        $seen = new \SplObjectStorage();
+        $walk = function (\PHPCompiler\Block $b) use (&$walk, &$foundRuntimeFetch, $seen): void {
+            if ($seen->contains($b)) {
+                return;
+            }
+            $seen[$b] = true;
+            foreach ($b->opCodes as $op) {
+                if (\PHPCompiler\OpCode::TYPE_CLASS_CONST_FETCH === $op->type) {
+                    $classOperand = $b->constants[$op->arg2] ?? null;
+                    if (null === $classOperand) {
+                        $operand = $b->getOperand($op->arg2);
+                        if ($operand instanceof \PHPCfg\Operand\Literal) {
+                            $this->assertSame('static', strtolower((string) $operand->value));
+                            $foundRuntimeFetch = true;
+                        }
+                    } elseif ($classOperand->is(\PHPCompiler\VM\Variable::TYPE_STRING)) {
+                        $this->assertSame('static', strtolower($classOperand->toString()));
+                        $foundRuntimeFetch = true;
+                    }
+                }
+                if (null !== $op->block1) {
+                    $walk($op->block1);
+                }
+                if (null !== $op->block2) {
+                    $walk($op->block2);
+                }
+            }
+        };
+        $walk($block);
+        $this->assertTrue(
+            $foundRuntimeFetch,
+            'static::X must emit CLASS_CONST_FETCH (not fold to declaring-class value) (#19614)'
+        );
+    }
 }
