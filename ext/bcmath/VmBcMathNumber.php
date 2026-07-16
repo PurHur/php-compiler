@@ -27,6 +27,9 @@ final class VmBcMathNumber
 
     public const PROP_SCALE = 'scale';
 
+    /** php-src BC_MATH_NUMBER_EXPAND_SCALE (ext/bcmath/php_bcmath.h). */
+    public const EXPAND_SCALE = 10;
+
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC])) {
@@ -56,6 +59,12 @@ final class VmBcMathNumber
             'sub' => new NumberSub(),
             'mul' => new NumberMul(),
             'div' => new NumberDiv(),
+            'mod' => new NumberMod(),
+            'pow' => new NumberPow(),
+            'sqrt' => new NumberSqrt(),
+            'floor' => new NumberFloor(),
+            'ceil' => new NumberCeil(),
+            'round' => new NumberRound(),
             'compare' => new NumberCompare(),
             '__tostring' => new NumberToString(),
         ];
