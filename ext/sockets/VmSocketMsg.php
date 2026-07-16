@@ -146,16 +146,67 @@ final class VmSocketMsg
         }
         VmSockets::recordError($object, 0);
         $name = self::unmarshalName($got[4] ?? '');
+        $control = self::parseControlBuffer($got[2] ?? '', $frame);
 
         return [
             'bytes' => $got[0],
             'message' => [
                 'name' => $name,
-                'control' => [],
+                'control' => $control,
                 'iov' => [$got[1]],
                 'flags' => $got[3],
             ],
         ];
+    }
+
+    /**
+     * Parse ancillary control buffer from recvmsg into PHP control array (#19407).
+     *
+     * @return list<array{level: int, type: int, data: list<ObjectEntry>}>
+     */
+    private static function parseControlBuffer(string $control, Frame $frame): array
+    {
+        if ('' === $control) {
+            return [];
+        }
+        $out = [];
+        $len = \strlen($control);
+        $offset = 0;
+        while ($offset + 16 <= $len) {
+            $hdr = \unpack('Pcmsg_len/llevel/ltype', \substr($control, $offset, 16));
+            if (!\is_array($hdr)) {
+                break;
+            }
+            $cmsgLen = (int) ($hdr['cmsg_len'] ?? 0);
+            if ($cmsgLen < 16) {
+                break;
+            }
+            $level = (int) ($hdr['level'] ?? 0);
+            $type = (int) ($hdr['type'] ?? 0);
+            $dataOffset = $offset + 16;
+            $dataLen = $cmsgLen - 16;
+            if ($dataOffset + $dataLen > $len) {
+                break;
+            }
+            if (1 === $level && 1 === $type && $dataLen >= 4) {
+                $socks = [];
+                for ($i = 0; $i + 4 <= $dataLen; $i += 4) {
+                    $fd = \unpack('l', \substr($control, $dataOffset + $i, 4));
+                    if (!\is_array($fd)) {
+                        continue;
+                    }
+                    $fdVal = (int) ($fd[1] ?? -1);
+                    if ($fdVal < 0) {
+                        continue;
+                    }
+                    $socks[] = VmSocket::wrapOwnedFd($fdVal, $frame->vmContext);
+                }
+                $out[] = ['level' => $level, 'type' => $type, 'data' => $socks];
+            }
+            $offset += SocketsLibcThinAbi::cmsgAlign($cmsgLen);
+        }
+
+        return $out;
     }
 
     /**
