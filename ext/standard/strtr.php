@@ -38,13 +38,13 @@ final class strtr extends Internal
         }
         if (3 === $argc) {
             $string = self::vmStringArg($frame, 0, 'string');
-            $from = VmString::coerceStringBuiltinArg(
+            $from = VmString::coerceZparamStrBuiltinArg(
                 $frame->calledArgs[1],
                 'strtr',
                 1,
                 'from'
             );
-            $to = VmString::coerceStringBuiltinArg(
+            $to = VmString::coerceZparamStrBuiltinArg(
                 $frame->calledArgs[2],
                 'strtr',
                 2,
@@ -66,9 +66,9 @@ final class strtr extends Internal
         if (3 === \count($args)) {
             return JitStrtr::translate(
                 $context,
-                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strtr', 0, 'string'),
-                JitStringBuiltinArg::lower($context, $args[1], 'strtr', 1, 'from'),
-                JitStringBuiltinArg::lower($context, $args[2], 'strtr', 2, 'to'),
+                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strtr', 0, 'string'),
+                JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strtr', 1, 'from'),
+                JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'strtr', 2, 'to'),
                 $args[0],
                 $args[1],
                 $args[2]
@@ -101,13 +101,14 @@ final class strtr extends Internal
         return new \TypeError('strtr(): Argument #2 ($from) must be of type array, string given');
     }
 
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19284, ext/standard/string.c). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'strtr', $paramName)->toString();
         }
 
-        return VmString::coerceStringBuiltinArg(
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[$argIndex],
             'strtr',
             $argIndex,

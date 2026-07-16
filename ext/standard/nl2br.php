@@ -34,7 +34,7 @@ final class nl2br extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('nl2br() requires one or two arguments');
         }
-        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'nl2br', 'string');
+        $subject = self::vmStringArg($frame, 0, 'string');
         $useXhtml = true;
         if (2 === $argc) {
             $useXhtml = self::resolveUseXhtmlBool($frame, 1);
@@ -65,7 +65,7 @@ final class nl2br extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'nl2br', 0, 'string');
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'nl2br', 0, 'string');
         $i8 = $context->getTypeFromString('int8');
         $useXhtmlI8 = $i8->constInt(1, false);
         if (2 === $argc) {
@@ -81,6 +81,21 @@ final class nl2br extends Internal
             $context->lookupFunction('__string__nl2br'),
             $str,
             $useXhtmlI8
+        );
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19284, ext/standard/string.c). */
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'nl2br', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'nl2br',
+            $argIndex,
+            $paramName
         );
     }
 
