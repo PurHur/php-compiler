@@ -2,9 +2,13 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin\LastErrorRuntime;
+use PHPCompiler\JIT\Builtin\SilenceRuntime;
+use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
+use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -12,12 +16,14 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_fsync / __compiler_fdatasync via StreamSyncJitHelper PHP (#9815).
+ * JIT/AOT ABI bridges for __compiler_fsync / __compiler_fdatasync via StreamSyncJitHelper PHP (#9815, #19660).
  *
- * JIT embed and AOT standalone compile {@see StreamSyncJitHelper} into the module; thin LLVM
- * bridges forward __compiler_fsync/__compiler_fdatasync ABI. php-src: ext/standard/file.c
+ * Quarantined from lib/JIT/Builtin/StreamSyncJit — {@see \PHPCompiler\JIT\Builtin\StreamSync}
+ * stays the thin orchestrator.
+ *
+ * php-src: ext/standard/file.c — PHP_FUNCTION(fsync) / fdatasync
  */
-final class StreamSyncJit
+final class JitStreamSyncKernel
 {
     private const HELPER_PATH = '/ext/standard/StreamSyncJitHelper.php';
 
@@ -130,7 +136,6 @@ final class StreamSyncJit
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $zero = $i32->constInt(0, false);
-        $one = $i32->constInt(1, false);
         $nullFile = $i8p->constNull();
 
         $supportedRaw = $context->builder->call(
@@ -215,7 +220,7 @@ final class StreamSyncJit
         StringTriggerError::ensureLinked($context);
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamSyncJitHelper.php');
             if (null === $block) {
@@ -237,7 +242,7 @@ final class StreamSyncJit
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StreamSyncJit implement (#9815)');
+                throw new \LogicException($name.' missing after JitStreamSyncKernel implement (#9815)');
             }
             $context->registerFunction($name, $fn);
         }
