@@ -27,7 +27,7 @@ final class strip_tags extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('strip_tags() requires one or two arguments in this compiler build');
         }
-        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'strip_tags', 'string');
+        $subject = self::vmStringArg($frame, 0, 'string');
         $allowed = null;
         if (2 === $argc) {
             $allowed = self::resolveAllowedTagsVm($frame->calledArgs[1]);
@@ -57,7 +57,7 @@ final class strip_tags extends Internal
             }
         }
 
-        $subject = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strip_tags', 0, 'string');
+        $subject = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strip_tags', 0, 'string');
         if (null === $allowed) {
             $allowPtr = $context->builder->load($context->constantStringFromString(''));
         } elseif (self::isAllowedTagsArrayArg($allowed)) {
@@ -66,7 +66,7 @@ final class strip_tags extends Internal
                 ArrayBuiltinHelper::loadHashTable($context, $allowed)
             );
         } else {
-            $allowPtr = JitStringBuiltinArg::lower($context, $allowed, 'strip_tags', 1, 'allowed_tags');
+            $allowPtr = JitStringBuiltinArg::lowerZparamStr($context, $allowed, 'strip_tags', 1, 'allowed_tags');
         }
         StringStripTags::ensureLinked($context);
 
@@ -74,6 +74,21 @@ final class strip_tags extends Internal
             $context->lookupFunction('__compiler_strip_tags'),
             $subject,
             $allowPtr
+        );
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19284, ext/standard/string.c). */
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strip_tags', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'strip_tags',
+            $argIndex,
+            $paramName
         );
     }
 

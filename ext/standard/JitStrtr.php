@@ -60,7 +60,7 @@ final class JitStrtr
             }
         }
 
-        $subject = JitStringBuiltinArg::lowerStrictOrCoercible($context, $subjectArg, 'strtr', 0, 'string');
+        $subject = JitStringBuiltinArg::lowerZparamStr($context, $subjectArg, 'strtr', 0, 'string');
         BasicBlockHelper::ensureOpenInsertBlock($context, 'strtr_array_subject_cont');
         $replacePairs = ArrayBuiltinHelper::loadHashTable($context, $pairsArg);
         StringStrtr::ensureLinked($context);

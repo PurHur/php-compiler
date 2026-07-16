@@ -23,8 +23,8 @@ final class strspn extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('strspn() requires two to four arguments in this compiler build');
         }
-        $str = VmString::stringBuiltinArgForFrame($frame, 0, 'strspn', 0, 'string');
-        $mask = VmString::stringBuiltinArgForFrame($frame, 1, 'strspn', 1, 'characters');
+        $str = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'strspn', 0, 'string');
+        $mask = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'strspn', 1, 'characters');
         $offset = 0;
         if ($argc >= 3) {
             $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'strspn', 3, 'offset');

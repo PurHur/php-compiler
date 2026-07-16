@@ -1,0 +1,26 @@
+--TEST--
+JIT: stdlib strtr/strcspn/strspn/strip_tags/nl2br null TypeError on 8.4 forward profile (#19284)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
+--FILE--
+<?php
+foreach ([
+    'strtr' => static fn () => strtr(null, 'a', 'b'),
+    'strcspn' => static fn () => strcspn(null, 'a'),
+    'strspn' => static fn () => strspn(null, 'a'),
+    'strip_tags' => static fn () => strip_tags(null),
+    'nl2br' => static fn () => nl2br(null),
+] as $label => $factory) {
+    try {
+        $factory();
+        echo "$label: uncaught\n";
+    } catch (TypeError $e) {
+        echo $label.': '.$e->getMessage()."\n";
+    }
+}
+--EXPECT--
+strtr: strtr(): Argument #1 ($string) must be of type string, null given
+strcspn: strcspn(): Argument #1 ($string) must be of type string, null given
+strspn: strspn(): Argument #1 ($string) must be of type string, null given
+strip_tags: strip_tags(): Argument #1 ($string) must be of type string, null given
+nl2br: nl2br(): Argument #1 ($string) must be of type string, null given

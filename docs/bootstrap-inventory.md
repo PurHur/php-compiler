@@ -23282,7 +23282,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/nl2br.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/nl_langinfo.php`
@@ -24816,7 +24816,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/strip_tags.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/stripcslashes.php`
