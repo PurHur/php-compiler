@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmCsv;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\VM\ObjectEntry;
 
@@ -12,7 +13,21 @@ final class SplFileObjectStorage
 {
     private const FLAG_READ_AHEAD = SplFileObjectBuiltin::READ_AHEAD;
 
-    /** @var array<int, array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int, separator: string, enclosure: string, escape: string}> */
+    private const FLAG_READ_CSV = SplFileObjectBuiltin::READ_CSV;
+
+    /**
+     * @var array<int, array{
+     *     handle: int,
+     *     currentLine: string|null,
+     *     currentCsv: list<string|null>|null,
+     *     lineNum: int,
+     *     flags: int,
+     *     maxLineLen: int,
+     *     separator: string,
+     *     enclosure: string,
+     *     escape: string
+     * }>
+     */
     private static array $state = [];
 
     public static function setHandle(ObjectEntry $object, int $handle): void
@@ -20,6 +35,7 @@ final class SplFileObjectStorage
         self::$state[$object->id] = [
             'handle' => $handle,
             'currentLine' => null,
+            'currentCsv' => null,
             'lineNum' => 0,
             'flags' => 0,
             'maxLineLen' => 0,
@@ -55,7 +71,7 @@ final class SplFileObjectStorage
     public static function next(ObjectEntry $object): void
     {
         $state = &self::$state[$object->id];
-        if (null === $state['currentLine']) {
+        if (null === $state['currentLine'] && null === $state['currentCsv']) {
             if (!self::readLineForIterator($object, true)) {
                 return;
             }
@@ -71,7 +87,7 @@ final class SplFileObjectStorage
     {
         $state = self::state($object);
         if (self::hasFlag($state, self::FLAG_READ_AHEAD)) {
-            return null !== $state['currentLine'];
+            return null !== $state['currentLine'] || null !== $state['currentCsv'];
         }
 
         return !VmFs::feof($state['handle']);
@@ -82,10 +98,28 @@ final class SplFileObjectStorage
         return self::state($object)['lineNum'];
     }
 
-    /** @return string|false */
+    /**
+     * Iterator current — string lines, or CSV field arrays when READ_CSV (#19663).
+     *
+     * @return string|list<string|null>|false
+     */
     public static function current(ObjectEntry $object)
     {
         $state = &self::$state[$object->id];
+        if (self::hasFlag($state, self::FLAG_READ_CSV)) {
+            if (null === $state['currentCsv']) {
+                if (!self::readLineForIterator($object, true)) {
+                    // php-src spl_filesystem_file_read_line — BOF before first line is '' not false (#18429).
+                    if (0 === $state['lineNum']) {
+                        return '';
+                    }
+
+                    return false;
+                }
+            }
+
+            return $state['currentCsv'] ?? false;
+        }
         if (null === $state['currentLine']) {
             if (!self::readLineForIterator($object, true)) {
                 // php-src spl_filesystem_file_read_line — BOF before first line is '' not false (#18429).
@@ -208,12 +242,13 @@ final class SplFileObjectStorage
     public static function fgets(ObjectEntry $object, ?int $length = null)
     {
         $state = &self::$state[$object->id];
-        $lineAdd = null !== $state['currentLine'] ? 1 : 0;
+        $lineAdd = (null !== $state['currentLine'] || null !== $state['currentCsv']) ? 1 : 0;
         self::freeLine($state);
         if (VmFs::feof($state['handle'])) {
             return '';
         }
-        if (!self::readLineEx($object, true, $lineAdd, $length)) {
+        // php-src SplFileObject::fgets — always line-oriented; READ_CSV only affects iterator current (#19663).
+        if (!self::readPlainLineEx($object, true, $lineAdd, $length)) {
             if (VmFs::feof($state['handle'])) {
                 return '';
             }
@@ -232,7 +267,7 @@ final class SplFileObjectStorage
     private static function readLine(ObjectEntry $object, bool $silent): bool
     {
         $state = &self::$state[$object->id];
-        $lineAdd = null !== $state['currentLine'] ? 1 : 0;
+        $lineAdd = (null !== $state['currentLine'] || null !== $state['currentCsv']) ? 1 : 0;
 
         return self::readLineEx($object, $silent, $lineAdd, null);
     }
@@ -245,11 +280,21 @@ final class SplFileObjectStorage
             return false;
         }
         $readLen = $length ?? ($state['maxLineLen'] > 0 ? $state['maxLineLen'] : null);
+        if (self::hasFlag($state, self::FLAG_READ_CSV)) {
+            return self::readCsvLineEx($object, $lineAdd, $readLen);
+        }
+
+        return self::readPlainLineEx($object, $silent, $lineAdd, $readLen);
+    }
+
+    private static function readPlainLineEx(ObjectEntry $object, bool $silent, int $lineAdd, ?int $length): bool
+    {
+        $state = &self::$state[$object->id];
         do {
             if (VmFs::feof($state['handle'])) {
                 return false;
             }
-            $line = VmFs::fgets($state['handle'], $readLen);
+            $line = VmFs::fgets($state['handle'], $length);
             if (false === $line) {
                 return false;
             }
@@ -262,6 +307,54 @@ final class SplFileObjectStorage
 
             return true;
         } while (true);
+    }
+
+    /**
+     * php-src spl_filesystem_file_read_csv — read line then php_fgetcsv on buffer (#19663).
+     *
+     * @param ?int $length max line length (0 / null = unlimited)
+     */
+    private static function readCsvLineEx(ObjectEntry $object, int $lineAdd, ?int $length): bool
+    {
+        $state = &self::$state[$object->id];
+        do {
+            // php-src spl_filesystem_file_read_ex — fail only when already at EOF.
+            if (VmFs::feof($state['handle'])) {
+                return false;
+            }
+            $line = VmFs::fgets($state['handle'], $length);
+            // get_line NULL while !eof → empty current_line (still SUCCESS), then empty CSV row.
+            if (false === $line) {
+                $line = '';
+            }
+            // php_fgetcsv_lookup_trailing_spaces — strip line terminators before field parse.
+            $line = \rtrim($line, "\r\n");
+            // csv=true path does not DROP_NEW_LINE on the buffer before parse (php-src).
+            $row = VmCsv::parseLine(
+                $line,
+                $state['separator'],
+                $state['enclosure'],
+                $state['escape']
+            );
+            if (self::shouldSkipEmptyCsvRow($state['flags'], $row)) {
+                continue;
+            }
+            $state['currentCsv'] = $row;
+            $state['currentLine'] = null;
+            $state['lineNum'] += $lineAdd;
+
+            return true;
+        } while (true);
+    }
+
+    /** @param list<string|null> $row */
+    private static function shouldSkipEmptyCsvRow(int $flags, array $row): bool
+    {
+        if (0 === ($flags & SplFileObjectBuiltin::SKIP_EMPTY)) {
+            return false;
+        }
+        // php-src: empty CSV line is a single null field — skip when SKIP_EMPTY.
+        return 1 === \count($row) && null === $row[0];
     }
 
     private static function applyDropNewLine(string $line, int $flags): string
@@ -313,19 +406,56 @@ final class SplFileObjectStorage
         VmFs::fseek($state['handle'], $saved, \SEEK_SET);
     }
 
-    /** @param array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int} $state */
+    /**
+     * @param array{
+     *     handle: int,
+     *     currentLine: string|null,
+     *     currentCsv: list<string|null>|null,
+     *     lineNum: int,
+     *     flags: int,
+     *     maxLineLen: int,
+     *     separator: string,
+     *     enclosure: string,
+     *     escape: string
+     * } $state
+     */
     private static function freeLine(array &$state): void
     {
         $state['currentLine'] = null;
+        $state['currentCsv'] = null;
     }
 
-    /** @param array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int, separator: string, enclosure: string, escape: string} $state */
+    /**
+     * @param array{
+     *     handle: int,
+     *     currentLine: string|null,
+     *     currentCsv: list<string|null>|null,
+     *     lineNum: int,
+     *     flags: int,
+     *     maxLineLen: int,
+     *     separator: string,
+     *     enclosure: string,
+     *     escape: string
+     * } $state
+     */
     private static function hasFlag(array $state, int $flag): bool
     {
         return 0 !== ($state['flags'] & $flag);
     }
 
-    /** @return array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int, separator: string, enclosure: string, escape: string} */
+    /**
+     * @return array{
+     *     handle: int,
+     *     currentLine: string|null,
+     *     currentCsv: list<string|null>|null,
+     *     lineNum: int,
+     *     flags: int,
+     *     maxLineLen: int,
+     *     separator: string,
+     *     enclosure: string,
+     *     escape: string
+     * }
+     */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$state[$object->id])) {
