@@ -1,34 +1,36 @@
 <?php
 
-// #19161 — Z_PARAM_STR/Z_PARAM_LONG null coerces on PHP_COMPILER_PROFILE=8.4 (ext/standard/string.c).
-// trim()/ltrim()/rtrim()/chop() now TypeError on 8.4 (#19254); covered separately.
+// #19318 — chr(null) TypeError on 8.4; dirname/parse_url still coerce (#19161 leftovers).
+// trim()/ltrim()/rtrim()/chop() TypeError on 8.4 (#19254); covered separately.
 
 $checks = [
-    ['dirname(null)', dirname(null)],
-    ['explode(",", null)', explode(',', null)],
-    ['ord(null)', ord(null)],
-    ['chr(null)', chr(null)],
-    ['parse_url(null)', parse_url(null)],
+    ['dirname(null)', static fn () => dirname(null)],
+    ['explode(",", null)', static fn () => explode(',', null)],
+    ['ord(null)', static fn () => ord(null)],
+    ['chr(null)', static fn () => chr(null)],
+    ['parse_url(null)', static fn () => parse_url(null)],
 ];
 $failed = 0;
-foreach ($checks as [$label, $result]) {
-    echo $label, ' => ';
-    var_export($result);
-    echo "\n";
-    if ('dirname(null)' === $label && '' !== $result) {
-        ++$failed;
-    }
-    if ('explode(",", null)' === $label && [''] !== $result) {
-        ++$failed;
-    }
-    if ('ord(null)' === $label && 0 !== $result) {
-        ++$failed;
-    }
-    if ('chr(null)' === $label && "\0" !== $result) {
-        ++$failed;
-    }
-    if ('parse_url(null)' === $label && !\is_array($result)) {
-        ++$failed;
+foreach ($checks as [$label, $factory]) {
+    try {
+        $result = $factory();
+        echo $label, ' => ';
+        var_export($result);
+        echo "\n";
+        if ('dirname(null)' === $label && '' !== $result) {
+            ++$failed;
+        }
+        if ('parse_url(null)' === $label && !\is_array($result)) {
+            ++$failed;
+        }
+        if (\in_array($label, ['explode(",", null)', 'ord(null)', 'chr(null)'], true)) {
+            ++$failed; // expected TypeError
+        }
+    } catch (TypeError $e) {
+        echo $label, ' => TypeError: ', $e->getMessage(), "\n";
+        if (!\in_array($label, ['explode(",", null)', 'ord(null)', 'chr(null)'], true)) {
+            ++$failed;
+        }
     }
 }
 exit($failed > 0 ? 1 : 0);

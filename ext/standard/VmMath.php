@@ -18,11 +18,14 @@ final class VmMath
     private const DIGITS = '0123456789abcdefghijklmnopqrstuvwxyz';
 
     /**
-     * Z_PARAM_LONG null coercion — php-src coerces to 0 outside caller strict_types (#19161, chr/ord).
+     * PHP 8.4+ forward profile: Z_PARAM_LONG null is TypeError (ext/standard/math.c / string.c; #18850, #19318).
+     *
+     * PHP 8.2 reference profile keeps coerce to 0. Call sites that must still coerce on 8.4
+     * (sleep/usleep, etc.) use {@see parseZParamLongBuiltinArg} which short-circuits null.
      */
     public static function requiresForwardProfileStrictLongNull(): bool
     {
-        return false;
+        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
