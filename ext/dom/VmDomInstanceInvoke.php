@@ -87,6 +87,7 @@ final class VmDomInstanceInvoke
             'registernamespace' => VmDomJitDispatch::xpathRegisterNamespace($self, $extra),
             'registerphpfunctions' => VmDomJitDispatch::xpathRegisterPhpFunctions($self, $extra),
             'comparedocumentposition' => VmDomJitDispatch::compareDocumentPosition($self, $extra),
+            'c14n' => VmDomJitDispatch::c14n($ctx, $self, $extra),
             default => throw new \Error('Call to undefined method '.$self->class->name.'::'.$methodLc.'()'),
         };
     }

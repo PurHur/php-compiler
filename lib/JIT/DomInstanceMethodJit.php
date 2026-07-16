@@ -78,6 +78,9 @@ final class DomInstanceMethodJit
         'domnode::contains' => true,
         'domnode::getrootnode' => true,
         'domnode::isequalnode' => true,
+        'domnode::c14n' => true,
+        'domelement::c14n' => true,
+        'domdocument::c14n' => true,
         'domxpath::query' => true,
         'domxpath::evaluate' => true,
         'domnodelist::item' => true,
@@ -248,6 +251,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::c14n' === $lc || 'domelement::c14n' === $lc || 'domdocument::c14n' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeC14N();
+
+                return;
+            }
             if ('domelement::removechild' === $lc || 'domnode::removechild' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomNodeRemoveChild();
 
@@ -324,6 +332,9 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domnode::contains');
             self::ensureProxy($context, 'domnode::getrootnode');
             self::ensureProxy($context, 'domnode::isequalnode');
+            self::ensureProxy($context, 'domnode::c14n');
+            self::ensureProxy($context, 'domelement::c14n');
+            self::ensureProxy($context, 'domdocument::c14n');
             self::ensureProxy($context, 'domnode::removechild');
             self::ensureProxy($context, 'domelement::removechild');
             self::ensureProxy($context, 'domnode::replacechild');
