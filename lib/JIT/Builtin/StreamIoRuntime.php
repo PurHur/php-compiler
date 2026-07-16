@@ -162,6 +162,12 @@ final class StreamIoRuntime
         return true;
     }
 
+    /** True when $name has a real bridge body (not inventory defer stub or empty declare). */
+    public static function isStreamIoBridgeLinked(Context $context, string $name): bool
+    {
+        return self::isRealBridgeLinked($context, $name);
+    }
+
     /** Inventory defer stubs use a single `entry` block — user-script AOT must upgrade (#19462). */
     public static function isDeferStub(LlvmFunction $fn): bool
     {

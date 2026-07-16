@@ -51,8 +51,7 @@ final class StreamIoJit
     private static function allRuntimeFunctionsLinked(Context $context): bool
     {
         foreach (self::RUNTIME_FUNCTIONS as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+            if (!StreamIoRuntime::isStreamIoBridgeLinked($context, $name)) {
                 return false;
             }
         }
