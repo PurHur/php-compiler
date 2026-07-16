@@ -705,6 +705,15 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'extension_loaded_wddx')) {
                 continue;
             }
+            if (!CompilerVersion::supportsYaml()
+                && str_contains($name, 'yaml')
+                && !str_contains($name, 'yaml_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsYaml()
+                && str_contains($name, 'yaml_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZip()
                 && (str_contains($name, 'zip')
                     || str_contains($name, 'ziparchive'))
