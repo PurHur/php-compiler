@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitSuperglobalRefreshKernel;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
@@ -72,7 +73,7 @@ final class SuperglobalRefreshRuntime
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        SuperglobalRefreshUserScriptLlvm::implement($context);
+        JitSuperglobalRefreshKernel::implement($context);
     }
 
     public static function ensureUserScriptRefreshPrerequisites(Context $context): void
@@ -80,7 +81,7 @@ final class SuperglobalRefreshRuntime
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        SuperglobalRefreshUserScriptLlvm::ensurePrerequisites($context);
+        JitSuperglobalRefreshKernel::ensurePrerequisites($context);
     }
 
     /** After preg prelink on a temporary full-init Context — no nested Multipart JIT (#16075). */
@@ -89,7 +90,7 @@ final class SuperglobalRefreshRuntime
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        SuperglobalRefreshUserScriptLlvm::ensureDeferredEmitPrerequisites($context);
+        JitSuperglobalRefreshKernel::ensureDeferredEmitPrerequisites($context);
     }
 
     public static function ensureUserScriptRefreshEmit(Context $context): void
@@ -97,7 +98,7 @@ final class SuperglobalRefreshRuntime
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        SuperglobalRefreshUserScriptLlvm::emitRefresh($context);
+        JitSuperglobalRefreshKernel::emitRefresh($context);
     }
 
     public static function implement(Context $context): void

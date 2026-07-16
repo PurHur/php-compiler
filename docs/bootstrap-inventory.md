@@ -1721,6 +1721,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrtr.php` | 0 | 1 |
 | `ext/standard/JitSubstrReplace.php` | 0 | 1 |
 | `ext/standard/JitSuperglobalName.php` | 0 | 1 |
+| `ext/standard/JitSuperglobalRefreshKernel.php` | 0 | 1 |
 | `ext/standard/JitSymlink.php` | 0 | 1 |
 | `ext/standard/JitSysGetTempDir.php` | 0 | 1 |
 | `ext/standard/JitSysGetloadavg.php` | 0 | 1 |
@@ -4050,7 +4051,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StripWhitespace.php` | 0 | 2 |
 | `lib/JIT/Builtin/SuperglobalNameRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SuperglobalRefreshRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/SysGetTempDirRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SysGetloadavgRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/TimeSleepRuntime.php` | 0 | 2 |
@@ -16183,6 +16183,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitSuperglobalRefreshKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 31 class method(s)
 
 ### `ext/standard/JitSymlink.php`
 
@@ -31826,14 +31831,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SuperglobalRefreshRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 237)
+- new JIT (line 238)
 - 17 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 31 class method(s)
 
 ### `lib/JIT/Builtin/SysGetTempDirRuntime.php`
 

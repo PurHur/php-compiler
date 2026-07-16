@@ -23,11 +23,12 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
         $refresh = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/SuperglobalRefreshRuntime.php');
         $this->assertStringContainsString('ensureUserScriptRefreshPrerequisites', $refresh);
         $this->assertStringContainsString('ensureUserScriptRefreshEmit', $refresh);
-        $this->assertStringContainsString('SuperglobalRefreshUserScriptLlvm::implement', $refresh);
+        $this->assertStringContainsString('JitSuperglobalRefreshKernel::implement', $refresh);
         $this->assertStringContainsString('StringHtmlspecialchars::ensureStandaloneBodies', $source);
         $this->assertStringContainsString('StringHtmlspecialcharsDecode::ensureStandaloneBodies', $source);
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
-        $userScript = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
+        $this->assertStringNotContainsString('SuperglobalRefreshUserScriptLlvm', $refresh);
+        $userScript = (string) file_get_contents(dirname(__DIR__, 2).'/ext/standard/JitSuperglobalRefreshKernel.php');
         $this->assertStringContainsString('EnvironMirrorRuntime::ensureLinked', $userScript);
         $runtime = (string) file_get_contents(dirname(__DIR__, 2).'/lib/Runtime.php');
         $this->assertStringContainsString('ensureUserScriptRefreshPrerequisites', $runtime);

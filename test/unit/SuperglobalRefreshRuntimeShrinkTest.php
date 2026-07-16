@@ -34,7 +34,7 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
 
     public function testUserScriptRefreshRoutesThroughParseStrRuntimeBridge(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSuperglobalRefreshKernel.php');
         $this->assertStringContainsString('ParseStrRuntime::ensureUserScriptLinked', $source);
         $this->assertStringContainsString('MultipartRuntime::ensureUserScriptLinked', $source);
         $this->assertStringContainsString('EnvironMirrorRuntime::ensureLinked', $source);
@@ -48,5 +48,30 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringGetenvAll::ensureLinked', $source);
         $this->assertStringNotContainsString('GetenvJitHelper::fillAllEnvironmentHashtable', $source);
         $this->assertStringNotContainsString('ParseStrNativeLlvm::ensureSubhelpers', $source);
+    }
+
+    public function testUserScriptLlvmMovedToExtKernel(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitSuperglobalRefreshKernel.php');
+
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshRuntime.php');
+        $this->assertStringContainsString('JitSuperglobalRefreshKernel::implement', $runtime);
+        $this->assertStringContainsString('JitSuperglobalRefreshKernel::ensurePrerequisites', $runtime);
+        $this->assertStringContainsString('JitSuperglobalRefreshKernel::emitRefresh', $runtime);
+        $this->assertStringNotContainsString('SuperglobalRefreshUserScriptLlvm', $runtime);
+
+        $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSuperglobalRefreshKernel.php');
+        $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $kernel);
+        $this->assertStringContainsString('final class JitSuperglobalRefreshKernel', $kernel);
+        $this->assertStringContainsString('__superglobals__refresh', $kernel);
+    }
+
+    public function testSpineBundleIncludesSuperglobalRefreshKernelNotBuiltinUserScriptLlvm(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitSuperglobalRefreshKernel.php', $spine);
+        $this->assertStringContainsString('SuperglobalRefreshRuntime.php', $spine);
+        $this->assertStringNotContainsString('SuperglobalRefreshUserScriptLlvm.php', $spine);
     }
 }
