@@ -12,8 +12,8 @@ use PHPCompiler\VM\Context;
  * Register intl builtin classes (php-src ext/intl/php_intl.c; issues #5774, #6696, #19549, #6151, #19670).
  *
  * Locale / IntlDateFormatter / IntlCalendar / IntlTimeZone / NumberFormatter / Normalizer / Collator /
- * MessageFormatter / IntlChar / UConverter / IntlException all gate on {@see IntlExtensionPolicy}
- * advertisement (no phantom class_exists; #6366, #6171).
+ * MessageFormatter / IntlChar / UConverter / Transliterator / IntlException all gate on
+ * {@see IntlExtensionPolicy} advertisement (no phantom class_exists; #6366, #6171, #6139).
  */
 final class BuiltinClasses
 {
@@ -63,6 +63,7 @@ final class BuiltinClasses
         VmNumberFormatter::registerClass($ctx);
         VmCollator::registerClass($ctx);
         VmMessageFormatter::registerClass($ctx);
+        VmTransliterator::registerClass($ctx);
         VmIntlChar::registerClass($ctx);
         VmUConverter::registerClass($ctx);
         self::registerIntlException($ctx);
@@ -159,6 +160,15 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         VmMessageFormatter::registerClass($ctx);
+        foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
+            $ctx->classes[$lc]->isInternal = true;
+        }
+    }
+
+    public static function registerTransliterator(Context $ctx): void
+    {
+        $before = array_keys($ctx->classes);
+        VmTransliterator::registerClass($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }

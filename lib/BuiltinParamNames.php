@@ -34,6 +34,8 @@ final class BuiltinParamNames
             'messageformatter::setpattern' => ['pattern'],
             'messageformatter::getpattern' => [],
             'messageformatter::formatmessage' => ['locale', 'pattern', 'args'],
+            'transliterator::create' => ['id', 'direction'],
+            'transliterator::transliterate' => ['string', 'start', 'end'],
             default => null,
         };
     }
@@ -495,6 +497,10 @@ final class BuiltinParamNames
                 return ['formatter', 'args'];
             case 'msgfmt_format_message':
                 return ['locale', 'pattern', 'args'];
+            case 'transliterator_create':
+                return ['id', 'direction'];
+            case 'transliterator_transliterate':
+                return ['transliterator', 'string', 'start', 'end'];
         }
 
         return null;

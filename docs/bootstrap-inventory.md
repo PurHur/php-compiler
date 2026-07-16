@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5217 |
-| Phase A inventory files (M2 ratio SSOT) | 5217 |
+| PHP files on vm.php path | 5220 |
+| Phase A inventory files (M2 ratio SSOT) | 5220 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14316 |
+| Source constructs flagged (warnings) | 14334 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -601,7 +601,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleGetScript.php` | 0 | 2 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 31 |
+| `ext/intl/Module.php` | 0 | 33 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -617,6 +617,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmMessageFormatter.php` | 0 | 18 |
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/VmNumberFormatter.php` | 0 | 11 |
+| `ext/intl/VmTransliterator.php` | 0 | 10 |
 | `ext/intl/VmUConverter.php` | 0 | 13 |
 | `ext/intl/collator_create.php` | 0 | 3 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
@@ -647,6 +648,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/normalizer_get_raw_decomposition.php` | 0 | 2 |
 | `ext/intl/normalizer_is_normalized.php` | 0 | 2 |
 | `ext/intl/normalizer_normalize.php` | 0 | 2 |
+| `ext/intl/transliterator_create.php` | 0 | 3 |
+| `ext/intl/transliterator_transliterate.php` | 0 | 3 |
 | `ext/ldap/JitLdapEscape.php` | 0 | 2 |
 | `ext/ldap/LdapConstants.php` | 0 | 1 |
 | `ext/ldap/LdapEscapeJitHelper.php` | 0 | 1 |
@@ -9007,22 +9010,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 76)
-- new NormalizerNormalize (line 87)
-- new NormalizerIsNormalized (line 88)
-- new NormalizerGetRawDecomposition (line 89)
-- new ClassEntry (line 105)
-- new LocaleGetDefault (line 108)
-- new LocaleSetDefault (line 109)
-- new LocaleGetPrimaryLanguage (line 110)
-- new LocaleGetRegion (line 111)
-- new LocaleGetScript (line 112)
-- new LocaleGetDisplayName (line 113)
-- new ClassEntry (line 129)
-- new IntlDateFormatterCreate (line 140)
-- new IntlDateFormatterFormat (line 143)
-- new ClassEntry (line 189)
-- 13 class method(s)
+- new ClassEntry (line 77)
+- new NormalizerNormalize (line 88)
+- new NormalizerIsNormalized (line 89)
+- new NormalizerGetRawDecomposition (line 90)
+- new ClassEntry (line 106)
+- new LocaleGetDefault (line 109)
+- new LocaleSetDefault (line 110)
+- new LocaleGetPrimaryLanguage (line 111)
+- new LocaleGetRegion (line 112)
+- new LocaleGetScript (line 113)
+- new LocaleGetDisplayName (line 114)
+- new ClassEntry (line 130)
+- new IntlDateFormatterCreate (line 141)
+- new IntlDateFormatterFormat (line 144)
+- new ClassEntry (line 199)
+- 14 class method(s)
 
 ### `ext/intl/IdnFunction.php`
 
@@ -9063,10 +9066,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 191)
-- new locale_get_region (line 192)
-- new locale_get_script (line 193)
-- 20 class method(s)
+- new locale_get_primary_language (line 199)
+- new locale_get_region (line 200)
+- new locale_get_script (line 201)
+- 21 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
 
@@ -9124,36 +9127,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 57)
-- new locale_get_default (line 67)
-- new locale_set_default (line 68)
-- new locale_get_primary_language (line 69)
-- new locale_get_region (line 70)
-- new locale_get_script (line 71)
-- new normalizer_normalize (line 75)
-- new normalizer_is_normalized (line 76)
-- new normalizer_get_raw_decomposition (line 77)
-- new idn_to_ascii (line 81)
-- new idn_to_utf8 (line 81)
-- new collator_create (line 85)
-- new msgfmt_create (line 90)
-- new msgfmt_format (line 91)
-- new msgfmt_format_message (line 92)
-- new grapheme_strlen (line 113)
-- new grapheme_substr (line 114)
-- new grapheme_strpos (line 115)
-- new grapheme_str_contains (line 116)
-- new grapheme_strstr (line 117)
-- new grapheme_stristr (line 118)
-- new grapheme_stripos (line 119)
-- new grapheme_strrpos (line 120)
-- new grapheme_extract (line 121)
-- new grapheme_levenshtein (line 122)
-- new grapheme_str_split (line 123)
-- new grapheme_strimwidth (line 124)
-- new intl_get_error_code (line 125)
-- new intl_get_error_message (line 126)
-- new intl_is_failure (line 127)
+- new VM\Variable (line 60)
+- new locale_get_default (line 70)
+- new locale_set_default (line 71)
+- new locale_get_primary_language (line 72)
+- new locale_get_region (line 73)
+- new locale_get_script (line 74)
+- new normalizer_normalize (line 78)
+- new normalizer_is_normalized (line 79)
+- new normalizer_get_raw_decomposition (line 80)
+- new idn_to_ascii (line 84)
+- new idn_to_utf8 (line 84)
+- new collator_create (line 88)
+- new msgfmt_create (line 93)
+- new msgfmt_format (line 94)
+- new msgfmt_format_message (line 95)
+- new transliterator_create (line 101)
+- new transliterator_transliterate (line 102)
+- new grapheme_strlen (line 125)
+- new grapheme_substr (line 126)
+- new grapheme_strpos (line 127)
+- new grapheme_str_contains (line 128)
+- new grapheme_strstr (line 129)
+- new grapheme_stristr (line 130)
+- new grapheme_stripos (line 131)
+- new grapheme_strrpos (line 132)
+- new grapheme_extract (line 133)
+- new grapheme_levenshtein (line 134)
+- new grapheme_str_split (line 135)
+- new grapheme_strimwidth (line 136)
+- new intl_get_error_code (line 137)
+- new intl_get_error_message (line 138)
+- new intl_is_failure (line 139)
 - 3 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -9323,6 +9328,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 286)
 - new Error (line 294)
 - 12 class method(s)
+
+### `ext/intl/VmTransliterator.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 53)
+- new Variable (line 57)
+- new TransliteratorCreate (line 64)
+- new TransliteratorTransliterate (line 67)
+- new Error (line 84)
+- new ObjectEntry (line 104)
+- new ArgumentCountError (line 477)
+- new ArgumentCountError (line 512)
+- new Error (line 520)
+- 20 class method(s)
 
 ### `ext/intl/VmUConverter.php`
 
@@ -9531,6 +9550,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/intl/transliterator_create.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 49)
+- 2 class method(s)
+
+### `ext/intl/transliterator_transliterate.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 63)
 - 2 class method(s)
 
 ### `ext/ldap/JitLdapEscape.php`
@@ -28407,7 +28440,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 613)
+- new ArgumentCountError (line 619)
 - 14 class method(s)
 - 1 closure(s)
 

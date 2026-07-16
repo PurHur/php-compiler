@@ -130,4 +130,24 @@ PHP;
         $runtime->run($block);
         self::assertSame("3 files\ndoc uploaded\n1 x\n", ob_get_clean());
     }
+
+    public function test_transliterator_latin_ascii_via_forced_registration(): void
+    {
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerTransliterator($runtime->vmContext);
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\transliterator_create());
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\transliterator_transliterate());
+        $code = <<<'PHP'
+<?php
+$tr = transliterator_create('Any-Latin; Latin-ASCII');
+echo $tr === false || $tr === null ? 'null' : 'obj', "\n";
+echo transliterator_transliterate($tr, 'café'), "\n";
+$bad = transliterator_create('Not-A-Real-ID-XYZ');
+echo $bad === false || $bad === null ? 'bad_null' : 'bad_obj', "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_transliterator_forced.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("obj\ncafe\nbad_null\n", ob_get_clean());
+    }
 }
