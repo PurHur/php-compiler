@@ -13,6 +13,7 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable as VmVariable;
@@ -161,6 +162,9 @@ final class JitIntdiv
         if (JITVariable::TYPE_NULL === $arg->type) {
             if (!$nullable && VmMath::requiresForwardProfileStrictLongNull()) {
                 self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $nullable);
+            } elseif (!$nullable) {
+                // Z_PARAM_LONG null coerce (chr/dechex; #19756).
+                self::emitNullIntDeprecation($context, $function, $argIndex, $paramName);
             }
 
             return $context->getTypeFromString('int64')->constInt(0, false);
@@ -257,6 +261,8 @@ final class JitIntdiv
         $context->builder->positionAtEnd($nullBlock);
         if (!$nullable && VmMath::requiresForwardProfileStrictLongNull()) {
             self::emitIntTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $nullable);
+        } elseif (!$nullable) {
+            self::emitNullIntDeprecation($context, $function, $argIndex, $paramName);
         }
         $context->builder->branch($mergeBlock);
 
@@ -526,5 +532,24 @@ final class JitIntdiv
             self::intTypeError($function, $argIndex, $paramName, $given, $nullable)
         );
         $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    /** Z_PARAM_LONG null coerce E_DEPRECATED (#19756). */
+    private static function emitNullIntDeprecation(
+        Context $context,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+        if ($context->callerStrictTypes) {
+            return;
+        }
+        JitBuiltinWarning::emitDeprecated(
+            $context,
+            VmNullNumberParamDeprecation::message($function, $argIndex, $paramName, 'int')
+        );
     }
 }

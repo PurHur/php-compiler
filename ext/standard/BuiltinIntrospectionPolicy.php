@@ -171,6 +171,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['wddx_serialize_value', 'wddx_serialize_vars', 'wddx_deserialize'], true)) {
             return \PHPCompiler\ext\wddx\WddxExtensionPolicy::advertisesExtension();
         }
+        if (\in_array($lc, ['yaml_parse', 'yaml_parse_file', 'yaml_emit', 'yaml_emit_file'], true)) {
+            return \PHPCompiler\ext\yaml\YamlExtensionPolicy::advertisesExtension();
+        }
         if ('ldap_escape' === $lc) {
             return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins();
         }
@@ -210,6 +213,9 @@ final class BuiltinIntrospectionPolicy
         }
         if ('wddx' === $ext) {
             return \PHPCompiler\ext\wddx\WddxExtensionPolicy::advertisesExtension();
+        }
+        if ('yaml' === $ext) {
+            return \PHPCompiler\ext\yaml\YamlExtensionPolicy::advertisesExtension();
         }
         if ('uri' === $ext) {
             return \PHPCompiler\ext\uri\UriExtensionPolicy::advertisesExtension();
