@@ -8,7 +8,7 @@ namespace PHPCompiler\ext\standard;
  * Stream metadata for VM — zend stream meta without host stream_get_meta_data() (#6007, #7908).
  *
  * php-src: ext/standard/streams.c — PHP_FUNCTION(stream_get_meta_data)
- * JIT/AOT: lib/JIT/Builtin/StreamMetaJit.php (__compiler_stream_get_meta_data)
+ * JIT/AOT: ext/standard/JitStreamMetaKernel.php (__compiler_stream_get_meta_data)
  */
 final class VmStreamMeta
 {
