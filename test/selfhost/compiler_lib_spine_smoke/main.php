@@ -1028,6 +1028,9 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20_xor.ph
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20_xor_ic.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xor.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_memcmp.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_bin2hex.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_hex2bin.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_memzero.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_pad.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_unpad.php';
 require_once __DIR__.'/../../../ext/spl/AppendIteratorBuiltin.php';

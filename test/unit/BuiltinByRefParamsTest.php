@@ -170,4 +170,10 @@ final class BuiltinByRefParamsTest extends TestCase
             $this->assertSame([0], BuiltinByRefParams::forFunction($fn), $fn);
         }
     }
+
+    public function testSodiumMemzeroFirstArgByRef(): void
+    {
+        $this->assertSame([0], BuiltinByRefParams::forFunction('sodium_memzero'));
+        $this->assertSame([0], BuiltinByRefParams::forFunction('SODIUM_MEMZERO'));
+    }
 }
