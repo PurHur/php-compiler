@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitObOutputExecCaptureKernel;
 use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -17,6 +18,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Lazy minimal ob stack for user-script AOT exec stdout capture (#10492, #19136).
  *
  * SSOT: {@see \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper} via {@see JitVmHelperLink}.
+ * User-script defer path: {@see \PHPCompiler\ext\standard\JitObOutputExecCaptureKernel}.
  * php-src: ext/standard/output.c
  */
 final class ObOutputExecCaptureRuntime
@@ -59,7 +61,7 @@ final class ObOutputExecCaptureRuntime
 
         if (UserScriptAotDeferNestedJit::shouldDefer($context)
             || StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            ObOutputExecCaptureLlvm::ensureLinked($context);
+            JitObOutputExecCaptureKernel::ensureLinked($context);
 
             return;
         }
@@ -89,7 +91,7 @@ final class ObOutputExecCaptureRuntime
 
         if (UserScriptAotDeferNestedJit::shouldDefer($context)
             || StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            ObOutputExecCaptureLlvm::ensureReadApiLinked($context);
+            JitObOutputExecCaptureKernel::ensureReadApiLinked($context);
 
             return;
         }

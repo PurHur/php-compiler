@@ -2,9 +2,12 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\ext\standard\ob_end_clean;
+use PHPCompiler\JIT\Builtin\ObOutputEchoJitEmit;
+use PHPCompiler\JIT\Builtin\ObOutputJitBridge;
+use PHPCompiler\JIT\Builtin\ObStorageGlobals;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ObStackLimits;
 use PHPLLVM\BasicBlock;
@@ -13,14 +16,15 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * User-script AOT ob stack via ObStorageGlobals LLVM (#10492, #15407).
+ * User-script AOT ob stack via ObStorageGlobals LLVM (#10492, #15407, #19576).
  *
- * Nested-JIT {@see ObOutputExecCaptureJitHelper} segfaults under
+ * Moved out of lib/JIT/Builtin/ — {@see \PHPCompiler\JIT\Builtin\ObOutputExecCaptureRuntime}
+ * stays the thin orchestrator. Nested-JIT {@see ObOutputExecCaptureJitHelper} segfaults under
  * {@see \PHPCompiler\JIT\UserScriptAotDeferNestedJit}; this path keeps exec
  * stdout capture + ob read/discard API on fixed char buffers (#4914).
  * php-src: ext/standard/output.c
  */
-final class ObOutputExecCaptureLlvm
+final class JitObOutputExecCaptureKernel
 {
     public static function ensureLinked(Context $context): void
     {
@@ -440,7 +444,7 @@ final class ObOutputExecCaptureLlvm
         }
         $fn = $probe;
         if (null === $fn) {
-            throw new \LogicException($name.' not declared before ObOutputExecCaptureLlvm (#10492)');
+            throw new \LogicException($name.' not declared before JitObOutputExecCaptureKernel (#10492)');
         }
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
