@@ -1,5 +1,5 @@
 --TEST--
-stdlib Z_PARAM_STR builtins — null coerces on 8.4 forward profile JIT (#19161 regression, was #18837)
+stdlib Z_PARAM_STR builtins — null TypeError/coerce mix on 8.4 JIT (#19161/#19309/#19319)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --JIT--
@@ -11,24 +11,25 @@ foreach ([
     'str_shuffle' => static fn () => str_shuffle(null),
     'str_rot13' => static fn () => str_rot13(null),
     'crc32' => static fn () => crc32(null),
-    // soundex/metaphone: TypeError on 8.4 — see phonetic_null_typeerror_84_jit.phpt (#19243)
     'convert_uuencode' => static fn () => convert_uuencode(null),
-    // bin2hex: TypeError on 8.4 — see hash_encode_null_forward84_jit.phpt (#19275)
     'hebrev' => static fn () => hebrev(null),
     'quoted_printable_encode' => static fn () => quoted_printable_encode(null),
 ] as $label => $factory) {
-    $result = $factory();
-    echo "$label: ";
-    var_export($result);
-    echo "\n";
+    try {
+        $result = $factory();
+        echo "$label: ";
+        var_export($result);
+        echo "\n";
+    } catch (TypeError $e) {
+        echo "$label: ", $e->getMessage(), "\n";
+    }
 }
 ?>
 --EXPECT--
 nl2br: ''
 str_shuffle: ''
-str_rot13: ''
-crc32: 0
-convert_uuencode: '`
-'
-hebrev: ''
+str_rot13: str_rot13(): Argument #1 ($string) must be of type string, null given
+crc32: crc32(): Argument #1 ($string) must be of type string, null given
+convert_uuencode: convert_uuencode(): Argument #1 ($string) must be of type string, null given
+hebrev: hebrev(): Argument #1 ($string) must be of type string, null given
 quoted_printable_encode: ''

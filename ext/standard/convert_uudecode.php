@@ -31,7 +31,7 @@ final class convert_uudecode extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'convert_uudecode', 'string');
+        $data = self::vmStringArg($frame, 0, 'string');
         $result = VmString::convert_uudecode($data);
         if (false === $result) {
             if (null !== $frame->vmContext) {
@@ -58,7 +58,46 @@ final class convert_uudecode extends Internal
 
         return JitConvertUudecode::decode(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'convert_uudecode', 0, 'string')
+            self::jitStringArg($context, $args[0], 0, 'string')
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'convert_uudecode', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'convert_uudecode',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'convert_uudecode',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'convert_uudecode',
+            $argIndex,
+            $paramName
         );
     }
 }

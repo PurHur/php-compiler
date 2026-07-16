@@ -53,6 +53,15 @@ final class hebrev extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, 'hebrev', $paramName);
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'hebrev', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'hebrev',
+            $argIndex,
+            $paramName
+        );
     }
 }
