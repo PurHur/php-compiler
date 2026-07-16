@@ -1508,6 +1508,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitMkdir.php` | 0 | 1 |
 | `ext/standard/JitMktime.php` | 0 | 1 |
 | `ext/standard/JitMoveUploadedFile.php` | 0 | 1 |
+| `ext/standard/JitMultipartKernel.php` | 0 | 1 |
 | `ext/standard/JitNetGetInterfaces.php` | 0 | 1 |
 | `ext/standard/JitNetworkServices.php` | 0 | 1 |
 | `ext/standard/JitNextafterKernel.php` | 0 | 1 |
@@ -3681,7 +3682,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MetaTagsRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/MimeContentTypeRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/MultipartRuntime.php` | 0 | 6 |
-| `lib/JIT/Builtin/MultipartRuntimeUserScriptLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/MultisortRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/NaturalSortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php` | 0 | 3 |
@@ -15013,6 +15013,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitMultipartKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `ext/standard/JitNetGetInterfaces.php`
 
@@ -29607,17 +29612,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MultipartRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 326)
-- new phpc_native_ht_set_string_key (line 327)
-- new phpc_native_ht_set_string_key_ht (line 328)
-- new phpc_native_ht_set_string_at (line 329)
-- new phpc_native_ht_set_hashtable_at (line 330)
+- new phpc_native_ht_alloc (line 328)
+- new phpc_native_ht_set_string_key (line 329)
+- new phpc_native_ht_set_string_key_ht (line 330)
+- new phpc_native_ht_set_string_at (line 331)
+- new phpc_native_ht_set_hashtable_at (line 332)
 - 16 class method(s)
-
-### `lib/JIT/Builtin/MultipartRuntimeUserScriptLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 7 class method(s)
 
 ### `lib/JIT/Builtin/MultisortRuntime.php`
 
