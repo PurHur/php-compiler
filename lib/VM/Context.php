@@ -887,7 +887,7 @@ class Context {
     public function globalsTableOffsetFetch(Variable $index, bool $forWrite): Variable
     {
         if (Variable::TYPE_STRING !== $index->type) {
-            return $this->ensureGlobalsTable()->toArray()->findVariable($index, $forWrite);
+            return $this->ensureGlobalsTable()->toArray()->findVariable($index, $forWrite, $this, null);
         }
         $name = $index->toString();
         $global = $this->ensureGlobal($name);

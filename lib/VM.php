@@ -3887,7 +3887,7 @@ restart:
                                     '' !== $frame->scriptPath ? $frame->scriptPath : null
                                 );
                             }
-                            $arg1->indirect($table->findVariable($arg3, $forWrite));
+                            $arg1->indirect($table->findVariable($arg3, $forWrite, $this->context, $frame));
                             if ($forWrite) {
                                 $this->tagHookedPropertyDimWriteLvalue($arg1, $containerSlot);
                             }
@@ -6856,7 +6856,13 @@ restart:
                         }
                         VM\EnumCaseSupport::rejectIllegalArrayOffset($key);
                         if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
-                            $ht->updateIndex($key->toInt(), $value);
+                            VM\HashTable::warnFloatKeyWriteIfNeeded($key, $this->context, $frame);
+                            $ht->updateIndex(
+                                $key->is(Variable::TYPE_FLOAT)
+                                    ? \PHPCompiler\ext\standard\VmMath::floatToZendLong($key->toFloat())
+                                    : $key->toInt(),
+                                $value
+                            );
                         } elseif ($key->is(Variable::TYPE_STRING)) {
                             $ht->update($key->toString(), $value);
                         } elseif ($key->is(Variable::TYPE_BOOLEAN)) {
@@ -16449,9 +16455,13 @@ restart:
                 VM\EnumCaseSupport::rejectIllegalArrayOffset($key);
                 $storeIndirect = $value->isIndirect();
                 if ($key->is(Variable::TYPE_INTEGER) || $key->is(Variable::TYPE_FLOAT)) {
+                    VM\HashTable::warnFloatKeyWriteIfNeeded($key, $this->context, $frame);
+                    $intKey = $key->is(Variable::TYPE_FLOAT)
+                        ? \PHPCompiler\ext\standard\VmMath::floatToZendLong($key->toFloat())
+                        : $key->toInt();
                     $storeIndirect
-                        ? $ht->updateIndirectIndex($key->toInt(), $value)
-                        : $ht->updateIndex($key->toInt(), $value);
+                        ? $ht->updateIndirectIndex($intKey, $value)
+                        : $ht->updateIndex($intKey, $value);
                 } elseif ($key->is(Variable::TYPE_STRING)) {
                     $storeIndirect
                         ? $ht->updateIndirect($key->toString(), $value)

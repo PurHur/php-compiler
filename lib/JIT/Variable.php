@@ -997,7 +997,7 @@ final class Variable {
 
                     return $boxed;
                 }
-                $index = self::materializePackedIndex($this->context, $dim);
+                $index = self::materializePackedIndex($this->context, $dim, $forWrite);
                 if ($forWrite) {
                     return HashTableHelper::prepareIndexWrite($this->context, $ht, $index);
                 }
@@ -1070,10 +1070,21 @@ final class Variable {
     /**
      * Load a packed-list index as size_t. Literal long dims are stored to a stack slot
      * first so later LLVM blocks still see a stable index (#AOT array_fill reads).
+     * Float dims on write emit Zend precision-loss E_DEPRECATED (#19730).
      */
-    private static function materializePackedIndex(Context $context, self $dim): \PHPLLVM\Value
+    private static function materializePackedIndex(Context $context, self $dim, bool $forWrite = false): \PHPLLVM\Value
     {
         $sizeT = $context->getTypeFromString('size_t');
+        if (self::TYPE_NATIVE_DOUBLE === $dim->type) {
+            $doubleVal = $context->helper->loadValue($dim);
+            if ($forWrite) {
+                $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning($context, $doubleVal);
+            } else {
+                $truncated = $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
+            }
+
+            return $context->builder->truncOrBitCast($truncated, $sizeT);
+        }
         $indexVal = $context->builder->truncOrBitCast(
             $context->helper->loadValue($dim),
             $sizeT
