@@ -188,6 +188,21 @@ final class SplArrayStorage
         return ArrayObjectBuiltin::CLASS_LC === strtolower(ltrim($object->class->name, '\\'));
     }
 
+    /**
+     * Zend FE_RESET_RW allow-list: array-backed ArrayIterator (not ArrayObject itself —
+     * foreach resolves IteratorAggregate::getIterator() first) (#19444, zend_execute.c).
+     */
+    public static function allowsForeachByRef(ObjectEntry $object): bool
+    {
+        return self::hasState($object) && !self::isArrayObject($object);
+    }
+
+    /** Live HashTable entry for foreach by-ref write-through (#19444). */
+    public static function foreachCurrentByRef(ObjectEntry $object): Variable
+    {
+        return self::iteratorCurrent($object);
+    }
+
     /** php-src SPL_ARRAY_AS_PROPS — backing array keys as object properties (spl_array.c). */
     public static function hasArrayAsProps(ObjectEntry $object): bool
     {
@@ -243,9 +258,12 @@ final class SplArrayStorage
         }
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
-        $table = self::getArrayCopy($object);
+        // Share the live backing HashTable (php-src spl_array_get_iterator) so
+        // foreach-by-ref / offset writes on the iterator mutate the ArrayObject (#19444).
+        $state = self::state($object);
+        $table = $state['table'];
         if (ArrayIteratorBuiltin::CLASS_LC === $lc) {
-            ArrayIteratorBuiltin::init($entry, $table);
+            SplArrayStorage::init($entry, $table, $state['flags'], null, []);
         } else {
             SplArrayStorage::init($entry, $table, 0, null, []);
         }
