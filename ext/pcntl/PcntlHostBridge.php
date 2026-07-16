@@ -136,11 +136,13 @@ final class PcntlHostBridge
      */
     public static function exec(string $path, array $args, array $env): bool
     {
+        // Suppress host Warning on failure so @pcntl_exec in user code matches Zend
+        // (errno message would otherwise leak from this bridge call site).
         if ([] === $env) {
-            return (bool) \pcntl_exec($path, $args);
+            return (bool) @\pcntl_exec($path, $args);
         }
 
-        return (bool) \pcntl_exec($path, $args, $env);
+        return (bool) @\pcntl_exec($path, $args, $env);
     }
 
     public static function wifexited(int $status): bool
