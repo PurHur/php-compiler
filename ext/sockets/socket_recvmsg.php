@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmStreamArg;
 use PHPLLVM\Value;
@@ -101,6 +102,29 @@ final class socket_recvmsg extends Internal
         $ht->add('name', $name);
 
         $controlHt = new HashTable();
+        foreach ($message['control'] as $i => $entry) {
+            $entryHt = new HashTable();
+            $level = new Variable();
+            $level->int((int) ($entry['level'] ?? 0));
+            $entryHt->add('level', $level);
+            $type = new Variable();
+            $type->int((int) ($entry['type'] ?? 0));
+            $entryHt->add('type', $type);
+            $dataHt = new HashTable();
+            foreach ($entry['data'] ?? [] as $j => $sock) {
+                if ($sock instanceof ObjectEntry) {
+                    $slot = new Variable();
+                    $slot->object($sock);
+                    $dataHt->addIndex($j, $slot);
+                }
+            }
+            $data = new Variable();
+            $data->array($dataHt);
+            $entryHt->add('data', $data);
+            $entryVar = new Variable();
+            $entryVar->array($entryHt);
+            $controlHt->addIndex($i, $entryVar);
+        }
         $control = new Variable();
         $control->array($controlHt);
         $ht->add('control', $control);
