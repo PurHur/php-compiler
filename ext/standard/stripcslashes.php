@@ -16,7 +16,11 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** stripcslashes() — unescape C-style byte sequences (php-src ext/standard/string.c; issue #3356). */
+/**
+ * stripcslashes() — unescape C-style byte sequences (php-src ext/standard/string.c; issue #3356).
+ *
+ * Z_PARAM_STR: null TypeError on PHP_COMPILER_PROFILE=8.4 (#19432).
+ */
 final class stripcslashes extends Internal
 {
     public function execute(Frame $frame): void
@@ -24,12 +28,7 @@ final class stripcslashes extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('stripcslashes() requires exactly one argument in this compiler build');
         }
-        $subject = InternalStrictArg::resolveCoercibleStringArg(
-            $frame,
-            0,
-            'stripcslashes',
-            'string'
-        );
+        $subject = self::vmStringArg($frame, 0, 'string');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::stripcslashes($subject))
@@ -52,7 +51,46 @@ final class stripcslashes extends Internal
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_stripcslashes'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'stripcslashes', 0, 'string')
+            self::jitStringArg($context, $args[0], 0, 'string')
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'stripcslashes', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'stripcslashes',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'stripcslashes',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'stripcslashes',
+            $argIndex,
+            $paramName
         );
     }
 }
