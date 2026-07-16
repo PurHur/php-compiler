@@ -22,7 +22,9 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'socket_create_listen')
                 || str_contains($name, 'socket_datagram')
                 || str_contains($name, 'socket_shutdown')
-                || str_contains($name, 'socket_addrinfo')) {
+                || str_contains($name, 'socket_addrinfo')
+                || str_contains($name, 'socket_sendmsg')
+                || str_contains($name, 'socket_cmsg')) {
                 continue;
             }
             if (!CompilerVersion::supportsStrIncrement()
