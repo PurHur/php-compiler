@@ -7,13 +7,14 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitStreamReadBridgeKernel;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #12937, #18672).
+ * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #12937, #18672, #19559).
  *
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\StreamReadJitHelper}; LLVM bridges
- * live in {@see StreamReadBridgeLlvm}. SSOT: {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
+ * live in {@see JitStreamReadBridgeKernel}. SSOT: {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
  * php-src: ext/standard/flock.c, ext/standard/streams.c
  */
 final class StreamReadRuntime
@@ -109,17 +110,17 @@ final class StreamReadRuntime
             ObOutputRuntime::ensureLinked($context);
         }
         self::ensureJitHelperCompiled($context);
-        StreamReadBridgeLlvm::implementI32Bridge($context, '__compiler_flock', self::FLOCK, 2);
-        StreamReadBridgeLlvm::implementI64Bridge($context, '__compiler_fpassthru', self::FPASSTHRU, 1);
-        StreamReadBridgeLlvm::implementI32Bridge($context, '__compiler_ftruncate', self::FTRUNCATE, 2);
-        StreamReadBridgeLlvm::implementI64Bridge($context, '__compiler_ftell', self::FTELL, 1);
-        StreamReadBridgeLlvm::implementNullableStringBridge($context, '__compiler_fgetc', self::FGETC, 1);
-        StreamReadBridgeLlvm::implementNullableStringBridge($context, '__compiler_fgets', self::FGETS, 2);
-        StreamReadBridgeLlvm::implementStreamGetLineBridge($context);
-        StreamReadBridgeLlvm::implementI64Bridge($context, '__compiler_fseek', self::FSEEK, 3);
-        StreamReadBridgeLlvm::implementNullableStringBridge($context, '__compiler_stream_get_contents', self::STREAM_GET_CONTENTS, 3);
-        StreamReadBridgeLlvm::implementI64Bridge($context, '__compiler_stream_copy_to_stream', self::STREAM_COPY_TO_STREAM, 4);
-        StreamReadBridgeLlvm::implementNullableStringBridge($context, '__compiler_stream_copy_to_string', self::STREAM_COPY_TO_STRING, 3);
+        JitStreamReadBridgeKernel::implementI32Bridge($context, '__compiler_flock', self::FLOCK, 2);
+        JitStreamReadBridgeKernel::implementI64Bridge($context, '__compiler_fpassthru', self::FPASSTHRU, 1);
+        JitStreamReadBridgeKernel::implementI32Bridge($context, '__compiler_ftruncate', self::FTRUNCATE, 2);
+        JitStreamReadBridgeKernel::implementI64Bridge($context, '__compiler_ftell', self::FTELL, 1);
+        JitStreamReadBridgeKernel::implementNullableStringBridge($context, '__compiler_fgetc', self::FGETC, 1);
+        JitStreamReadBridgeKernel::implementNullableStringBridge($context, '__compiler_fgets', self::FGETS, 2);
+        JitStreamReadBridgeKernel::implementStreamGetLineBridge($context);
+        JitStreamReadBridgeKernel::implementI64Bridge($context, '__compiler_fseek', self::FSEEK, 3);
+        JitStreamReadBridgeKernel::implementNullableStringBridge($context, '__compiler_stream_get_contents', self::STREAM_GET_CONTENTS, 3);
+        JitStreamReadBridgeKernel::implementI64Bridge($context, '__compiler_stream_copy_to_stream', self::STREAM_COPY_TO_STREAM, 4);
+        JitStreamReadBridgeKernel::implementNullableStringBridge($context, '__compiler_stream_copy_to_string', self::STREAM_COPY_TO_STRING, 3);
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -193,6 +194,6 @@ final class StreamReadRuntime
         if (!self::shouldDeferInventoryEmitStubs($context)) {
             return;
         }
-        StreamReadBridgeLlvm::implementDeferredStubs($context);
+        JitStreamReadBridgeKernel::implementDeferredStubs($context);
     }
 }

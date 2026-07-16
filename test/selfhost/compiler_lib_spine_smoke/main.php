@@ -621,6 +621,9 @@ require_once __DIR__.'/../../../ext/intl/LocaleGetScript.php';
 require_once __DIR__.'/../../../ext/intl/LocaleParserJitHelper.php';
 require_once __DIR__.'/../../../ext/intl/LocaleSetDefault.php';
 require_once __DIR__.'/../../../ext/intl/Module.php';
+require_once __DIR__.'/../../../ext/intl/NormalizerGetRawDecomposition.php';
+require_once __DIR__.'/../../../ext/intl/NormalizerIsNormalized.php';
+require_once __DIR__.'/../../../ext/intl/NormalizerNormalize.php';
 require_once __DIR__.'/../../../ext/intl/UnicodeCanonical.php';
 require_once __DIR__.'/../../../ext/intl/VmGrapheme.php';
 require_once __DIR__.'/../../../ext/intl/VmLocale.php';
@@ -649,6 +652,7 @@ require_once __DIR__.'/../../../ext/intl/locale_get_primary_language.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_region.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_script.php';
 require_once __DIR__.'/../../../ext/intl/locale_set_default.php';
+require_once __DIR__.'/../../../ext/intl/normalizer_get_raw_decomposition.php';
 require_once __DIR__.'/../../../ext/intl/normalizer_is_normalized.php';
 require_once __DIR__.'/../../../ext/intl/normalizer_normalize.php';
 require_once __DIR__.'/../../../ext/ldap/JitLdapEscape.php';
@@ -3979,7 +3983,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StreamModeRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamNotificationRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamPathRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamRead.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StreamReadBridgeLlvm.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamReadBridgeKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamReadJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamReadRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamResource.php';
@@ -5170,10 +5174,6 @@ require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/llvm_env_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
-require_once __DIR__.'/../../../ext/intl/NormalizerGetRawDecomposition.php';
-require_once __DIR__.'/../../../ext/intl/NormalizerIsNormalized.php';
-require_once __DIR__.'/../../../ext/intl/NormalizerNormalize.php';
-require_once __DIR__.'/../../../ext/intl/normalizer_get_raw_decomposition.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 

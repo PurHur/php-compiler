@@ -2,19 +2,21 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPLLVM\Value;
 
 /**
- * LLVM ABI bridges + deferred inventory stubs for stream read runtime (#18672).
+ * LLVM ABI bridges + deferred inventory stubs for stream read runtime (#18672, #19559).
  *
- * Split from {@see StreamReadRuntime} so the runtime file stays a thin PHP-helper orchestrator.
- * SSOT semantics: {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
+ * Moved out of lib/JIT/Builtin/ — {@see StreamReadRuntime} stays the thin PHP-helper
+ * orchestrator. SSOT semantics: {@see StreamReadJitHelper}
+ * php-src: ext/standard/file.c, ext/standard/flock_compat.c
  */
-final class StreamReadBridgeLlvm
+final class JitStreamReadBridgeKernel
 {
     public static function implementI32Bridge(
         Context $context,
