@@ -1,0 +1,160 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\simplexml;
+
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/**
+ * User-script standalone AOT: compile-time SimpleXMLElement via host php-src (#19306).
+ */
+final class JitSimpleXmlUserScript
+{
+    /** @var \SplObjectStorage<JITVariable, \SimpleXMLElement>|null */
+    private static ?\SplObjectStorage $trees = null;
+
+    /** @var array<string, \SimpleXMLElement> */
+    private static array $treesByToken = [];
+
+    private static ?\SimpleXMLElement $lastTree = null;
+
+    private static int $tokenSeq = 0;
+
+    public static function tryConstruct(Context $context, JITVariable ...$args): ?Value
+    {
+        if (\count($args) < 2 || !\extension_loaded('simplexml')) {
+            return null;
+        }
+        $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $lit) {
+            return null;
+        }
+        try {
+            $tree = new \SimpleXMLElement($lit);
+        } catch (\Throwable) {
+            return null;
+        }
+        self::store($args[0], $tree);
+
+        return self::nullValue($context);
+    }
+
+    public static function tryAddChild(Context $context, JITVariable ...$args): ?Value
+    {
+        if (\count($args) < 2) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $name) {
+            return null;
+        }
+        $value = null;
+        if (isset($args[2])) {
+            if (JITVariable::TYPE_NULL === $args[2]->type) {
+                $value = null;
+            } else {
+                $value = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+                if (null === $value) {
+                    return null;
+                }
+            }
+        }
+        $namespace = null;
+        if (isset($args[3])) {
+            if (JITVariable::TYPE_NULL === $args[3]->type) {
+                $namespace = null;
+            } else {
+                $namespace = JitStringBuiltinArg::compileTimeLiteral($args[3]) ?? $args[3]->compileTimeString;
+                if (null === $namespace) {
+                    return null;
+                }
+            }
+        }
+        try {
+            if (null !== $namespace && '' !== $namespace) {
+                $tree->addChild($name, $value ?? '', $namespace);
+            } else {
+                $tree->addChild($name, $value);
+            }
+        } catch (\Throwable) {
+            return null;
+        }
+
+        return self::nullValue($context);
+    }
+
+    public static function tryAsXml(Context $context, JITVariable ...$args): ?Value
+    {
+        if ([] === $args) {
+            return null;
+        }
+        $tree = self::lookup($args[0]);
+        if (null === $tree) {
+            return null;
+        }
+        $xml = $tree->asXML();
+        if (false === $xml) {
+            return null;
+        }
+
+        // Match JitDomSaveXMLUserScript::boxConstantString (#18268 / #19306).
+        $str = $context->builder->load($context->constantStringFromString($xml));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $owned
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    private static function store(JITVariable $receiver, \SimpleXMLElement $tree): void
+    {
+        if (null === self::$trees) {
+            self::$trees = new \SplObjectStorage();
+        }
+        self::$trees[$receiver] = $tree;
+        $token = '__phpc_sxml_'.(++self::$tokenSeq);
+        $receiver->compileTimeString = $token;
+        self::$treesByToken[$token] = $tree;
+        self::$lastTree = $tree;
+    }
+
+    private static function lookup(JITVariable $receiver): ?\SimpleXMLElement
+    {
+        if (null !== self::$trees && isset(self::$trees[$receiver])) {
+            return self::$trees[$receiver];
+        }
+        $token = $receiver->compileTimeString;
+        if (null !== $token && isset(self::$treesByToken[$token])) {
+            return self::$treesByToken[$token];
+        }
+
+        return self::$lastTree;
+    }
+
+    private static function nullValue(Context $context): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+}

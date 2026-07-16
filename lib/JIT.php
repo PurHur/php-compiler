@@ -10286,6 +10286,17 @@ class JIT {
                             ) {
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('reflectionclass::__construct');
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                            } elseif ($classOp instanceof Operand\Literal
+                                && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'SimpleXMLElement')
+                                && ('1' === getenv('PHP_COMPILER_AOT_USER_SCRIPT')
+                                    || 'true' === strtolower((string) getenv('PHP_COMPILER_AOT_USER_SCRIPT')))
+                            ) {
+                                JIT\SimpleXmlInstanceMethodJit::ensureProxy(
+                                    $this->context,
+                                    'simplexmlelement::__construct'
+                                );
+                                $this->context->scope->toCall = $this->context->functionProxies['simplexmlelement::__construct'];
+                                $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
                             } elseif ($this->context->type->object->hasConstructor($classId)) {
                                 $proxyName = strtolower($resolvedName).'::'.'__construct';
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
@@ -14488,6 +14499,8 @@ class JIT {
             $name = strtolower($toCall->name);
         } elseif ($toCall instanceof JIT\Call\ExternalMethod) {
             $name = strtolower($toCall->proxyName);
+        } elseif ($toCall instanceof JIT\Call\SimpleXMLElementConstruct) {
+            $name = 'simplexmlelement::__construct';
         } else {
             return;
         }
@@ -15578,6 +15591,13 @@ class JIT {
         ) {
             $proxyName = 'domnode::append';
         }
+        // Register SimpleXML user-script AOT proxies before functionIsRegistered (#19306).
+        if (str_starts_with(strtolower($proxyName), 'simplexmlelement::')
+            && ('1' === getenv('PHP_COMPILER_AOT_USER_SCRIPT')
+                || 'true' === strtolower((string) getenv('PHP_COMPILER_AOT_USER_SCRIPT')))
+        ) {
+            JIT\SimpleXmlInstanceMethodJit::ensureProxy($this->context, $proxyName);
+        }
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
         $receiverVar = $this->resolveUserScriptDomDocumentReceiver(
             $block,
@@ -15588,7 +15608,10 @@ class JIT {
         );
         $dispatchReceiver = $this->jitInstanceMethodReceiverVariable($receiverVar);
         $splObjectStorageMethod = str_starts_with(strtolower($proxyName), 'splobjectstorage::');
-        if (Type::TYPE_OBJECT === $receiverOp->type?->type && !$splObjectStorageMethod) {
+        $simpleXmlUserScript = str_starts_with(strtolower($proxyName), 'simplexmlelement::')
+            && ('1' === getenv('PHP_COMPILER_AOT_USER_SCRIPT')
+                || 'true' === strtolower((string) getenv('PHP_COMPILER_AOT_USER_SCRIPT')));
+        if (Type::TYPE_OBJECT === $receiverOp->type?->type && !$splObjectStorageMethod && !$simpleXmlUserScript) {
             JIT\LazyObjectHelper::emitEnsureInitialized(
                 $this->context,
                 $this->context->helper->loadValue($dispatchReceiver)

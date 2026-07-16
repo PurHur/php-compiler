@@ -1,0 +1,42 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\simplexml;
+
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/** LLVM lowering for SimpleXMLElement::__construct() — user-script AOT (#19306). */
+final class JitSimpleXmlConstruct
+{
+    public static function invoke(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2) {
+            throw new \LogicException('SimpleXMLElement::__construct() expects receiver and data');
+        }
+        $stored = JitSimpleXmlUserScript::tryConstruct($context, ...$args);
+        if (null === $stored) {
+            throw new \LogicException(
+                'SimpleXMLElement::__construct() user-script AOT requires a compile-time string literal (#19306)'
+            );
+        }
+        // Return $this (not null): FUNCCALL_EXEC_RETURN must not clobber the new object (#19306).
+        if (JITVariable::TYPE_OBJECT === $args[0]->type) {
+            $obj = $context->helper->loadValue($args[0]);
+            $context->type->object->markObjectConstructed($obj);
+            $slot = JitValueBox::alloc($context);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeObject'),
+                JitValueBox::pointer($context, $slot),
+                $obj
+            );
+
+            return JitValueBox::normalizeValuePtr($context, $slot);
+        }
+
+        return $stored;
+    }
+}
