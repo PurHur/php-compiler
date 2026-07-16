@@ -6703,9 +6703,19 @@ final class VmDom
         self::registerSubtreeElementIdsIfConnected($child);
     }
 
+    /**
+     * Nodes php-src can clone via xmlDocCopyNode (ext/dom/node.c dom_node_clone_node).
+     * Documents/doctypes stay unsupported in this build.
+     */
     public static function isCloneableNode(ObjectEntry $entry): bool
     {
-        return self::isElement($entry) || self::isDocumentFragment($entry);
+        return self::isElement($entry)
+            || self::isDocumentFragment($entry)
+            || self::isTextOrCdataNode($entry)
+            || self::isCommentNode($entry)
+            || self::isProcessingInstruction($entry)
+            || self::isEntityReference($entry)
+            || self::isAttr($entry);
     }
 
     public static function cloneNode(Context $ctx, ObjectEntry $source, bool $deep): Variable
@@ -6817,10 +6827,57 @@ final class VmDom
     private static function cloneNodeEntry(Context $ctx, ObjectEntry $source, bool $deep): ObjectEntry
     {
         $sourceState = DomRegistry::state($source);
+        $ownerDocument = self::ownerDocumentEntry($source);
+
+        // Character data / leaf nodes — copy content; deep has no effect (php-src xmlDocCopyNode).
+        if (self::isTextOrCdataNode($source)) {
+            if (self::isCdataNode($source)) {
+                $cloned = self::createCdataSection($ctx, $sourceState->textContent ?? '', $ownerDocument);
+            } else {
+                $cloned = self::createTextNode($ctx, $sourceState->textContent ?? '', $ownerDocument);
+            }
+            self::linkChildToParent($cloned, null);
+
+            return $cloned;
+        }
+        if (self::isCommentNode($source)) {
+            $cloned = self::createComment($ctx, $sourceState->textContent ?? '', $ownerDocument);
+            self::linkChildToParent($cloned, null);
+
+            return $cloned;
+        }
+        if (self::isProcessingInstruction($source)) {
+            if (null === $ownerDocument) {
+                throw new \DOMException('Not supported cloneNode for this node type in this compiler build');
+            }
+            $cloned = self::createProcessingInstruction(
+                $ctx,
+                $sourceState->nodeName,
+                $sourceState->textContent ?? '',
+                $ownerDocument
+            );
+            self::linkChildToParent($cloned, null);
+
+            return $cloned;
+        }
+        if (self::isEntityReference($source)) {
+            $cloned = self::createEntityReference($ctx, $sourceState->nodeName, $ownerDocument)->toObject();
+            self::linkChildToParent($cloned, null);
+
+            return $cloned;
+        }
+        if (self::isAttr($source)) {
+            $cloned = self::createAttributeNS($ctx, $sourceState->namespaceUri, $sourceState->nodeName, $ownerDocument)->toObject();
+            self::syncAttributeNodeValue($cloned, $sourceState->textContent ?? '');
+            self::linkChildToParent($cloned, null);
+
+            return $cloned;
+        }
+
         if (self::isElement($source)) {
             $cloned = self::createElement($ctx, $sourceState->nodeName)->toObject();
         } elseif (self::isDocumentFragment($source)) {
-            $cloned = self::createDocumentFragment($ctx)->toObject();
+            $cloned = self::createDocumentFragment($ctx, $ownerDocument)->toObject();
         } else {
             throw new \DOMException('Not supported cloneNode for this node type in this compiler build');
         }
@@ -6838,20 +6895,17 @@ final class VmDom
             $clonedState->idAttributeName = $sourceState->idAttributeName;
         }
         if ($deep) {
-            $cloneState = DomRegistry::state($cloned);
             foreach ($sourceState->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
                 if (null === $child || !self::isCloneableNode($child)) {
                     continue;
                 }
                 $clonedChild = self::cloneNodeEntry($ctx, $child, true);
-                $cloneState->childIds[] = $clonedChild->id;
+                $clonedState->childIds[] = $clonedChild->id;
                 self::linkChildToParent($clonedChild, $cloned);
             }
-            self::syncSubtree($ctx, $cloned);
-        } else {
-            self::syncSubtree($ctx, $cloned);
         }
+        self::syncSubtree($ctx, $cloned);
 
         return $cloned;
     }
