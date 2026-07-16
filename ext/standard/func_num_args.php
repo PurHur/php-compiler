@@ -26,7 +26,12 @@ final class func_num_args extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $args = VmReflection::userCallArgs($frame);
+        try {
+            $args = VmReflection::userCallArgs($frame);
+        } catch (\LogicException) {
+            // php-src: "func_num_args() must be called from a function context"
+            throw new \Error('func_num_args() must be called from a function context');
+        }
         $frame->returnVar->int(\count($args));
     }
 
