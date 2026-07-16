@@ -981,7 +981,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/SimpleXmlJsonExport.php` | 0 | 3 |
 | `ext/simplexml/SimpleXmlNodeState.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlRegistry.php` | 0 | 1 |
-| `ext/simplexml/VmSimpleXml.php` | 0 | 43 |
+| `ext/simplexml/VmSimpleXml.php` | 0 | 44 |
 | `ext/simplexml/VmSimpleXmlIterator.php` | 0 | 4 |
 | `ext/simplexml/simplexml_import_dom.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
@@ -11961,36 +11961,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SimpleXmlElementGetName (line 63)
 - new SimpleXmlElementChildren (line 66)
 - new SimpleXmlElementAsXml (line 68)
-- new SimpleXmlElementAddChild (line 71)
-- new SimpleXmlElementAddAttribute (line 74)
-- new SimpleXmlElementXpath (line 77)
-- new SimpleXmlElementAttributes (line 80)
-- new SimpleXmlElementGetDocNamespaces (line 82)
-- new SimpleXmlElementGetNamespaces (line 85)
-- new SimpleXmlElementRegisterXPathNamespace (line 88)
-- new Exception (line 137)
+- new SimpleXmlElementAsXml (line 72)
+- new SimpleXmlElementAddChild (line 75)
+- new SimpleXmlElementAddAttribute (line 78)
+- new SimpleXmlElementXpath (line 81)
+- new SimpleXmlElementAttributes (line 84)
+- new SimpleXmlElementGetDocNamespaces (line 86)
+- new SimpleXmlElementGetNamespaces (line 89)
+- new SimpleXmlElementRegisterXPathNamespace (line 92)
 - new Exception (line 141)
-- new Exception (line 148)
-- new Variable (line 206)
-- new Variable (line 211)
-- new Variable (line 218)
-- new Variable (line 224)
-- new Variable (line 233)
-- new SimpleXmlNodeState (line 447)
-- new SimpleXmlNodeState (line 453)
-- new SimpleXmlNodeState (line 499)
-- new HashTable (line 554)
-- new Variable (line 566)
-- new Variable (line 576)
-- new ObjectEntry (line 621)
-- new ObjectEntry (line 663)
-- new ObjectEntry (line 674)
-- new SimpleXmlNodeState (line 678)
-- new ObjectEntry (line 694)
-- new HashTable (line 814)
-- new Variable (line 816)
-- new SimpleXmlNodeState (line 875)
-- new SimpleXmlNodeState (line 884)
+- new Exception (line 145)
+- new Exception (line 152)
+- new Variable (line 210)
+- new Variable (line 215)
+- new Variable (line 222)
+- new Variable (line 228)
+- new Variable (line 237)
+- new SimpleXmlNodeState (line 451)
+- new SimpleXmlNodeState (line 457)
+- new SimpleXmlNodeState (line 503)
+- new HashTable (line 558)
+- new Variable (line 570)
+- new Variable (line 580)
+- new ObjectEntry (line 625)
+- new ObjectEntry (line 667)
+- new ObjectEntry (line 678)
+- new SimpleXmlNodeState (line 682)
+- new ObjectEntry (line 698)
+- new HashTable (line 818)
+- new Variable (line 820)
+- new SimpleXmlNodeState (line 879)
+- new SimpleXmlNodeState (line 888)
 - 43 class method(s)
 
 ### `ext/simplexml/VmSimpleXmlIterator.php`
@@ -34993,9 +34994,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/SimpleXmlInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\SimpleXMLElementConstruct (line 30)
-- new Call\SimpleXMLElementAddChild (line 35)
-- new Call\SimpleXMLElementAsXml (line 40)
+- new Call\SimpleXMLElementConstruct (line 31)
+- new Call\SimpleXMLElementAddChild (line 36)
+- new Call\SimpleXMLElementAsXml (line 42)
 - 1 class method(s)
 
 ### `lib/JIT/SplAutoloadCallbackPolicy.php`

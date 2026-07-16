@@ -7,22 +7,26 @@ namespace PHPCompiler\ext\simplexml;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 
-/** SimpleXMLElement::asXML — serialize node tree (php-src ext/simplexml/sxe.c; #18038). */
+/**
+ * SimpleXMLElement::asXML / saveXML — serialize node tree
+ * (php-src ext/simplexml/sxe.c zim_SimpleXMLElement_asXML + saveXML FALIAS; #18038, #19413).
+ */
 final class SimpleXmlElementAsXml extends VmClassMethod
 {
-    public function __construct()
+    public function __construct(string $name = 'asXML')
     {
-        parent::__construct('asXML');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
     {
+        $label = 'SimpleXMLElement::'.$this->name.'()';
         if (\count($frame->calledArgs) < 1) {
-            throw new \LogicException('SimpleXMLElement::asXML() called without $this');
+            throw new \LogicException($label.' called without $this');
         }
         $entry = VmSimpleXml::requireElement(
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
-            'SimpleXMLElement::asXML()'
+            $label
         );
         if (null === $frame->returnVar) {
             return;
