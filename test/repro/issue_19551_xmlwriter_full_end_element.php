@@ -1,0 +1,23 @@
+<?php
+$w = new XMLWriter();
+$w->openMemory();
+$w->startDocument('1.0');
+$w->startElement('root');
+$w->startElement('child');
+$w->text('x');
+$w->fullEndElement();
+$w->endElement();
+$w->endDocument();
+echo $w->outputMemory();
+$empty = new XMLWriter();
+$empty->openMemory();
+$empty->startElement('a');
+$empty->fullEndElement();
+echo $empty->outputMemory();
+echo "\n";
+$self = new XMLWriter();
+$self->openMemory();
+$self->startElement('a');
+$self->endElement();
+echo $self->outputMemory();
+echo "\n";
