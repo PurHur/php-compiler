@@ -380,6 +380,9 @@ final class VmDateTimeNative
         if (1 === preg_match('/^(last|next|this) year$/i', $time, $matches)) {
             return self::yearOffsetParseResult(strtolower($matches[1]), $base, $tzName);
         }
+        if (1 === preg_match('/^(next|last|this) week$/i', $time, $matches)) {
+            return self::weekOffsetParseResult(strtolower($matches[1]), $base, $tzName);
+        }
         if (1 === preg_match('/^(.+?) (last|next|this) year$/i', $time, $matches)) {
             $yearRelative = self::yearRelativeMonthDayParseResult(
                 strtolower($matches[2]),
@@ -460,7 +463,7 @@ final class VmDateTimeNative
             '/^(.+?)\s+((?:next|last|previous|this)\s+(?:'.$weekday.'))$/i',
             '/^(.+?)\s+((?:'.$weekday.'))$/i',
             '/^(.+?)\s+((?:first|last)\s+day\s+of\s+(?:next|this|last)\s+month)$/i',
-            '/^(.+?)\s+((?:next|last|this)\s+(?:month|year))$/i',
+            '/^(.+?)\s+((?:next|last|this)\s+(?:month|year|week))$/i',
             '/^(.+?)\s+((?:today|tomorrow|yesterday)(?:\s+.+)?)$/i',
             '/^(.+?)\s+(midnight|noon)$/i',
         ];
@@ -2086,6 +2089,44 @@ final class VmDateTimeNative
             'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
             'microsecond' => 0,
         ];
+    }
+
+    /**
+     * php-src parse_date.re — next|last|this week → Monday of target ISO week (#19547).
+     *
+     * Preserves hour/minute/second from $base (unlike weekday tokens which snap to midnight).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function weekOffsetParseResult(string $when, int $base, string $tzName): ?array
+    {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $wday = self::tmInt($tm, 'tm_wday'); // 0=Sun … 6=Sat
+        $daysFromMonday = ($wday + 6) % 7;
+        $weekDelta = match ($when) {
+            'next' => 1,
+            'last' => -1,
+            'this' => 0,
+            default => 999,
+        };
+        if (999 === $weekDelta) {
+            return null;
+        }
+        $dayDelta = -$daysFromMonday + (7 * $weekDelta);
+        if (0 === $dayDelta) {
+            return ['timestamp' => $base, 'microsecond' => 0];
+        }
+        $sign = $dayDelta < 0 ? '-' : '+';
+        try {
+            $timestamp = self::modifyRelative($base, $sign.\abs($dayDelta).' day', $tzName);
+        } catch (NativeDateMalformedStringException) {
+            return null;
+        }
+
+        return ['timestamp' => $timestamp, 'microsecond' => 0];
     }
 
     /**
