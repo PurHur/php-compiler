@@ -31,8 +31,8 @@ final class CurlModuleTest extends TestCase
         foreach (['curl_escape', 'curl_unescape'] as $fn) {
             self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
-        self::assertTrue(VmReflection::classExists($ctx, 'CURLFile'));
-        self::assertTrue(VmReflection::classExists($ctx, 'CURLStringFile'));
+        self::assertFalse(VmReflection::classExists($ctx, 'CURLFile'));
+        self::assertFalse(VmReflection::classExists($ctx, 'CURLStringFile'));
 
         $code = <<<'PHP'
 <?php
@@ -56,6 +56,6 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'curl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('00000000011011000210', ob_get_clean());
+        self::assertSame('00000000000011000210', ob_get_clean());
     }
 }
