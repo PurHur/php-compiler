@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 final class VmFilestatArg
 {
     /**
-     * Z_PARAM_PATH filename — null coerces to "" (deprecated) + reject embedded NUL (php-src filestat.c; #14597).
+     * Z_PARAM_PATH filename — null TypeError on 8.4 forward (#19256); else "" + deprecation (#14597).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
