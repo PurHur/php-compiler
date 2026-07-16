@@ -108,6 +108,24 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, (bool) $ok);
     }
 
+    public static function tryWriteAttribute(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1], $args[2])) {
+            return null;
+        }
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        $value = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        if (null === $name || str_starts_with($name, '__phpc_xw_')
+            || null === $value || str_starts_with($value, '__phpc_xw_')
+        ) {
+            return null;
+        }
+        $ok = $writer->writeAttribute($name, $value);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
     public static function tryText(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);
@@ -187,6 +205,160 @@ final class JitXmlWriterUserScript
         }
 
         return self::intValue($context, (int) $out);
+    }
+
+    /**
+     * Procedural xmlwriter_* folding for user-script AOT (#19514).
+     *
+     * open_memory / open_uri create a host writer tracked via lastWriter so
+     * subsequent procedural calls (writer as arg0) fold like OOP methods.
+     */
+    public static function tryProcedural(Context $context, string $function, JITVariable ...$args): ?Value
+    {
+        if (!\extension_loaded('xmlwriter') || !\class_exists(\XMLWriter::class, false)) {
+            return null;
+        }
+        $fn = strtolower($function);
+
+        return match ($fn) {
+            'xmlwriter_open_memory' => self::tryProceduralOpenMemory($context),
+            'xmlwriter_open_uri' => self::tryProceduralOpenUri($context, ...$args),
+            'xmlwriter_set_indent' => self::tryProceduralSetIndent($context, ...$args),
+            'xmlwriter_set_indent_string' => self::tryProceduralSetIndentString($context, ...$args),
+            'xmlwriter_start_document' => self::tryStartDocument($context, ...$args),
+            'xmlwriter_end_document' => self::tryEndDocument($context, ...$args),
+            'xmlwriter_start_element' => self::tryStartElement($context, ...$args),
+            'xmlwriter_end_element' => self::tryEndElement($context, ...$args),
+            'xmlwriter_full_end_element' => self::tryFullEndElement($context, ...$args),
+            'xmlwriter_write_attribute' => self::tryWriteAttribute($context, ...$args),
+            'xmlwriter_write_element' => self::tryProceduralWriteElement($context, ...$args),
+            'xmlwriter_write_cdata' => self::tryProceduralWriteCData($context, ...$args),
+            'xmlwriter_write_comment' => self::tryProceduralWriteComment($context, ...$args),
+            'xmlwriter_text' => self::tryText($context, ...$args),
+            'xmlwriter_output_memory' => self::tryOutputMemory($context, ...$args),
+            'xmlwriter_flush' => self::tryFlush($context, ...$args),
+            default => null,
+        };
+    }
+
+    private static function tryProceduralOpenMemory(Context $context): ?Value
+    {
+        $writer = new \XMLWriter();
+        $ok = $writer->openMemory();
+        if (!$ok) {
+            return null;
+        }
+        // No destination JITVariable here — track via lastWriter for subsequent calls.
+        self::$lastWriter = $writer;
+
+        return self::nullValue($context);
+    }
+
+    private static function tryProceduralOpenUri(Context $context, JITVariable ...$args): ?Value
+    {
+        if (!isset($args[0])) {
+            return null;
+        }
+        $uri = JitStringBuiltinArg::compileTimeLiteral($args[0]) ?? $args[0]->compileTimeString;
+        if (null === $uri || str_starts_with($uri, '__phpc_xw_')) {
+            return null;
+        }
+        $writer = new \XMLWriter();
+        $ok = @$writer->openUri($uri);
+        if (!$ok) {
+            return self::boolValue($context, false);
+        }
+        self::$lastWriter = $writer;
+
+        return self::nullValue($context);
+    }
+
+    private static function tryProceduralSetIndent(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $enable = self::compileTimeEmptyFlag($args[1]);
+        if (null === $enable) {
+            return null;
+        }
+        $ok = $writer->setIndent($enable);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    private static function tryProceduralSetIndentString(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $indentation = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $indentation || str_starts_with($indentation, '__phpc_xw_')) {
+            return null;
+        }
+        $ok = $writer->setIndentString($indentation);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    private static function tryProceduralWriteElement(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $name || str_starts_with($name, '__phpc_xw_')) {
+            return null;
+        }
+        $content = null;
+        if (isset($args[2])) {
+            if (JITVariable::TYPE_NULL === $args[2]->type) {
+                $content = null;
+            } else {
+                $content = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+                if (null === $content || str_starts_with($content, '__phpc_xw_')) {
+                    return null;
+                }
+            }
+            $ok = $writer->writeElement($name, $content);
+        } else {
+            $ok = $writer->writeElement($name);
+        }
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    private static function tryProceduralWriteCData(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $content = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $content || str_starts_with($content, '__phpc_xw_')) {
+            return null;
+        }
+        $ok = $writer->writeCData($content);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    private static function tryProceduralWriteComment(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $content = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $content || str_starts_with($content, '__phpc_xw_')) {
+            return null;
+        }
+        $ok = $writer->writeComment($content);
+
+        return self::boolValue($context, (bool) $ok);
     }
 
     /** @return ?bool null = dynamic / unknown (cannot fold) */
