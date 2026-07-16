@@ -240,6 +240,7 @@ final class DomDocumentMethodUserScriptLlvm
     {
         self::ensureXPathEvaluateBoolBridge($context);
         self::ensureXPathEvaluateDoubleBridge($context);
+        self::ensureXPathEvaluateStringBridge($context);
     }
 
     public static function ensureXPathEvaluateBoolBridge(Context $context): void
@@ -272,9 +273,26 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureXPathEvaluateStringBridge(Context $context): void
+    {
+        self::ensureContextStringValueBridge(
+            $context,
+            DomXPathEvaluateRuntime::ABI_STRING,
+            'dom_xpath_evaluate_string_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            self::STRING_HELPER,
+            '/ext/dom/DomXPathEvaluateJitHelper.php'
+        );
+    }
+
     private const BOOL_HELPER = 'PHPCompiler\\ext\\dom\\DomXPathEvaluateJitHelper::evaluateBoolArgv';
 
     private const DOUBLE_HELPER = 'PHPCompiler\\ext\\dom\\DomXPathEvaluateJitHelper::evaluateDoubleArgv';
+
+    private const STRING_HELPER = 'PHPCompiler\\ext\\dom\\DomXPathEvaluateJitHelper::evaluateStringArgv';
 
     public static function ensureNodeListItemBridge(Context $context): void
     {
@@ -1242,6 +1260,77 @@ final class DomDocumentMethodUserScriptLlvm
             $context->lookupFunction('__value__writeDouble'),
             $destPtr,
             $number
+        );
+        $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
+        $context->registerFunction($abi, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    /**
+     * @param list<\PHPLLVM\Type> $paramTypes
+     */
+    private static function ensureContextStringValueBridge(
+        Context $context,
+        string $abi,
+        string $entryBlock,
+        array $paramTypes,
+        string $helperLogical,
+        string $helperPath
+    ): void {
+        $probe = $context->module->getNamedFunction($abi);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, $entryBlock)) {
+            $context->registerFunction($abi, $probe);
+
+            return;
+        }
+
+        self::ensureNestedHelperProxies($context);
+        self::ensureMainModuleHelperCompiled($context, $helperPath, [$helperLogical]);
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#19352');
+        $ft = $context->context->functionType($valuePtr, false, ...$paramTypes);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abi, $ft);
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, $entryBlock);
+        $context->builder->positionAtEnd($entry);
+        $vmCtx = $context->builder->call(VmActiveContextLlvm::lookupAbi($context));
+        $args = [
+            JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $vmCtx,
+                $helperFn->getParam(0)->typeOf()
+            ),
+        ];
+        for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper(
+                $context,
+                $fn->getParam($i),
+                $helperFn->getParam($i + 1)->typeOf()
+            );
+        }
+        $string = $context->builder->call($helperFn, ...$args);
+        $string = JitNestedHelperCoerce::coerceBridgeResult($context, $string, $strPtr);
+        $slot = JitValueBox::alloc($context);
+        $destPtr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $destPtr,
+            $string
         );
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);

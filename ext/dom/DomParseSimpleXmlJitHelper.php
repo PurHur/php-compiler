@@ -76,6 +76,104 @@ final class DomParseSimpleXmlJitHelper
         return [$count, (string) $firstText];
     }
 
+    /** First attribute value for //@attr document order (#19352). */
+    public static function firstAttributeValueArgv(string $xml, string $attr): ?string
+    {
+        $attr = strtolower($attr);
+        if (!preg_match_all('/<[^>]+>/', $xml, $tags)) {
+            return null;
+        }
+        foreach ($tags[0] as $openTag) {
+            if (preg_match('/\b'.preg_quote($attr, '/').'\s*=\s*"([^"]*)"/i', $openTag, $m)
+                || preg_match("/\b".preg_quote($attr, '/')."\s*=\s*'([^']*)'/i", $openTag, $m)
+            ) {
+                return $m[1];
+            }
+        }
+
+        return null;
+    }
+
+    /** Nth (1-based) matching tag's attribute value for //tag[n]/@attr (#19352). */
+    public static function nthTagAttributeValueArgv(
+        string $xml,
+        string $tag,
+        string $attr,
+        int $position
+    ): ?string {
+        if ($position < 1) {
+            return null;
+        }
+        $tag = strtolower($tag);
+        $attr = strtolower($attr);
+        $needle = '<'.$tag;
+        $seen = 0;
+        $offset = 0;
+        while (false !== ($pos = stripos($xml, $needle, $offset))) {
+            $after = $pos + \strlen($needle);
+            if ($after >= \strlen($xml)) {
+                break;
+            }
+            $next = $xml[$after];
+            if ('>' !== $next && '/' !== $next && ' ' !== $next) {
+                $offset = $pos + 1;
+                continue;
+            }
+            $gt = strpos($xml, '>', $pos);
+            if (false === $gt) {
+                break;
+            }
+            ++$seen;
+            if ($seen === $position) {
+                $openTag = substr($xml, $pos, $gt - $pos + 1);
+                if (preg_match('/\b'.preg_quote($attr, '/').'\s*=\s*"([^"]*)"/i', $openTag, $m)
+                    || preg_match("/\b".preg_quote($attr, '/')."\s*=\s*'([^']*)'/i", $openTag, $m)
+                ) {
+                    return $m[1];
+                }
+
+                return null;
+            }
+            $offset = $pos + 1;
+        }
+
+        return null;
+    }
+
+    /** First descendant element's concatenated text for //tag (#19352). */
+    public static function firstTagTextArgv(string $xml, string $tag): ?string
+    {
+        $tag = strtolower($tag);
+        $needle = '<'.$tag;
+        $offset = 0;
+        while (false !== ($pos = stripos($xml, $needle, $offset))) {
+            $after = $pos + \strlen($needle);
+            if ($after >= \strlen($xml)) {
+                break;
+            }
+            $next = $xml[$after];
+            if ('>' !== $next && '/' !== $next && ' ' !== $next) {
+                $offset = $pos + 1;
+                continue;
+            }
+            $gt = strpos($xml, '>', $pos);
+            if (false === $gt) {
+                break;
+            }
+            if ($gt > $pos && '/' === $xml[$gt - 1]) {
+                return '';
+            }
+            $close = stripos($xml, '</'.$tag.'>', $gt + 1);
+            if (false === $close) {
+                return '';
+            }
+
+            return substr($xml, $gt + 1, $close - $gt - 1);
+        }
+
+        return null;
+    }
+
     public static function rootTagArgv(string $xml): string
     {
         if (preg_match('/<([a-zA-Z_][\w:.-]*)/', $xml, $matches)) {

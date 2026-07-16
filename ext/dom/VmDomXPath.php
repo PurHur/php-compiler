@@ -117,7 +117,7 @@ final class VmDomXPath
         ?ObjectEntry $contextNode = null,
         bool $registerNodeNS = false
     ): Variable {
-        $nodeIds = self::evaluateNodeSet($xpath, $expression, $contextNode, $registerNodeNS);
+        $nodeIds = self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
 
         return VmDom::createNodeList($ctx, $nodeIds);
     }
@@ -136,19 +136,19 @@ final class VmDomXPath
         }
         if (self::isBooleanExpression($expression)) {
             $var = new Variable(Variable::TYPE_BOOLEAN);
-            $var->bool(self::evaluateBoolean($xpath, $expression, $contextNode));
+            $var->bool(self::evaluateBoolean($ctx, $xpath, $expression, $contextNode));
 
             return $var;
         }
         if (self::isNumericExpression($expression)) {
             $var = new Variable(Variable::TYPE_FLOAT);
-            $var->float(self::evaluateNumber($xpath, $expression, $contextNode));
+            $var->float(self::evaluateNumber($ctx, $xpath, $expression, $contextNode));
 
             return $var;
         }
         if (self::isStringExpression($expression)) {
             $var = new Variable(Variable::TYPE_STRING);
-            $var->string(self::evaluateString($xpath, $expression, $contextNode));
+            $var->string(self::evaluateString($ctx, $xpath, $expression, $contextNode));
 
             return $var;
         }
@@ -160,6 +160,7 @@ final class VmDomXPath
      * @return list<int>
      */
     private static function evaluateNodeSet(
+        Context $ctx,
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode,
@@ -183,6 +184,12 @@ final class VmDomXPath
         }
         if ($registerNodeNS) {
             self::registerContextNodeNamespaces($xpath, $context);
+        }
+
+        // Attribute axis: //@id, //a/@id, //a[1]/@id (php-src/libxml string-value of Attr; #19352).
+        $attrIds = self::tryEvaluateAttributeAxis($ctx, $context, $expression, $state->xpathNamespaces);
+        if (null !== $attrIds) {
+            return $attrIds;
         }
 
         if (preg_match(
@@ -218,6 +225,106 @@ final class VmDomXPath
         }
 
         throw new \DOMException('Invalid expression');
+    }
+
+    /**
+     * Resolve //@attr / //tag/@attr / //tag[n]/@attr to Attr node ids (document order).
+     *
+     * @param array<string, string> $namespaces
+     *
+     * @return list<int>|null null when expression is not an attribute-axis path
+     */
+    private static function tryEvaluateAttributeAxis(
+        Context $ctx,
+        ObjectEntry $context,
+        string $expression,
+        array $namespaces
+    ): ?array {
+        // //@attr — every attribute with that name under context
+        if (preg_match('~^//@([\w.-]+)$~', $expression, $matches)) {
+            return self::collectDescendantAttributeNodes($ctx, $context, $matches[1], $namespaces, null, null);
+        }
+        // //tag/@attr or //tag[n]/@attr
+        if (preg_match('~^//([*\w][\w:-]*)(?:\[(\d+)\])?/@([\w.-]+)$~', $expression, $matches)) {
+            $position = isset($matches[2]) && '' !== $matches[2] ? (int) $matches[2] : null;
+
+            return self::collectDescendantAttributeNodes(
+                $ctx,
+                $context,
+                $matches[3],
+                $namespaces,
+                $matches[1],
+                $position
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, string> $namespaces
+     *
+     * @return list<int>
+     */
+    private static function collectDescendantAttributeNodes(
+        Context $ctx,
+        ObjectEntry $context,
+        string $attrName,
+        array $namespaces,
+        ?string $elementTag,
+        ?int $position
+    ): array {
+        $elements = null === $elementTag
+            ? self::collectDescendantElements($context, '*', $namespaces)
+            : self::collectDescendantElements($context, $elementTag, $namespaces);
+        if (null !== $position) {
+            if ($position < 1 || $position > \count($elements)) {
+                return [];
+            }
+            $elements = [$elements[$position - 1]];
+        }
+        $attrIds = [];
+        foreach ($elements as $elementId) {
+            $element = DomRegistry::entry($elementId);
+            if (null === $element || !VmDom::isElement($element)) {
+                continue;
+            }
+            $attrVar = self::attributeNodeFromElement($ctx, $element, $attrName, $namespaces);
+            if (null === $attrVar) {
+                continue;
+            }
+            $attrIds[] = $attrVar->id;
+        }
+
+        return $attrIds;
+    }
+
+    /**
+     * @param array<string, string> $namespaces
+     */
+    private static function attributeNodeFromElement(
+        Context $ctx,
+        ObjectEntry $element,
+        string $attrName,
+        array $namespaces
+    ): ?ObjectEntry {
+        if (str_contains($attrName, ':')) {
+            [$prefix, $local] = explode(':', $attrName, 2);
+            $namespace = $namespaces[$prefix] ?? null;
+            if (null === $namespace) {
+                return null;
+            }
+            $attrVar = VmDom::getAttributeNodeNS($ctx, $element, $namespace, $local);
+        } else {
+            $attrVar = VmDom::getAttributeNode($ctx, $element, $attrName);
+        }
+        $attrVar = $attrVar->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $attrVar->type) {
+            return null;
+        }
+        $attr = $attrVar->toObject();
+
+        return VmDom::isAttr($attr) ? $attr : null;
     }
 
     private static function ensureXPath(ObjectEntry $xpath): void
@@ -405,6 +512,7 @@ final class VmDomXPath
     }
 
     private static function evaluateBoolean(
+        Context $ctx,
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode
@@ -418,24 +526,24 @@ final class VmDomXPath
         if (preg_match('~^boolean\((.+)\)$~i', $expression, $matches)) {
             $inner = trim($matches[1]);
             if (preg_match('~^count\((.+)\)$~i', $inner)) {
-                return 0.0 !== self::evaluateNumber($xpath, $inner, $contextNode);
+                return 0.0 !== self::evaluateNumber($ctx, $xpath, $inner, $contextNode);
             }
             if (preg_match('~^string\((.+)\)$~i', $inner)) {
-                return '' !== self::evaluateString($xpath, $inner, $contextNode);
+                return '' !== self::evaluateString($ctx, $xpath, $inner, $contextNode);
             }
             if (preg_match('~^number\((.+)\)$~i', $inner)) {
-                $number = self::evaluateNumber($xpath, $inner, $contextNode);
+                $number = self::evaluateNumber($ctx, $xpath, $inner, $contextNode);
 
                 return 0.0 !== $number && !is_nan($number);
             }
             try {
-                $nodeIds = self::evaluateNodeSet($xpath, $inner, $contextNode, false);
+                $nodeIds = self::evaluateNodeSet($ctx, $xpath, $inner, $contextNode, false);
 
                 return [] !== $nodeIds;
             } catch (\DOMException) {
                 // Fall through to string-value coercion for unsupported inner shapes.
             }
-            $value = self::evaluateScalar($xpath, $inner, $contextNode);
+            $value = self::evaluateScalar($ctx, $xpath, $inner, $contextNode);
 
             return self::booleanize($value);
         }
@@ -444,15 +552,16 @@ final class VmDomXPath
     }
 
     private static function evaluateNumber(
+        Context $ctx,
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode
     ): float {
         if (preg_match('~^count\((.+)\)$~i', $expression, $matches)) {
-            return (float) \count(self::evaluateNodeSet($xpath, trim($matches[1]), $contextNode, false));
+            return (float) \count(self::evaluateNodeSet($ctx, $xpath, trim($matches[1]), $contextNode, false));
         }
         if (preg_match('~^number\((.+)\)$~i', $expression, $matches)) {
-            $value = self::evaluateScalar($xpath, trim($matches[1]), $contextNode);
+            $value = self::evaluateScalar($ctx, $xpath, trim($matches[1]), $contextNode);
             if (is_numeric($value)) {
                 return (float) $value;
             }
@@ -464,6 +573,7 @@ final class VmDomXPath
     }
 
     private static function evaluateString(
+        Context $ctx,
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode
@@ -471,7 +581,7 @@ final class VmDomXPath
         if (!preg_match('~^string\((.+)\)$~i', $expression, $matches)) {
             throw new \DOMException('Invalid expression');
         }
-        $value = self::evaluateScalar($xpath, trim($matches[1]), $contextNode);
+        $value = self::evaluateScalar($ctx, $xpath, trim($matches[1]), $contextNode);
         if (is_string($value)) {
             return $value;
         }
@@ -486,11 +596,12 @@ final class VmDomXPath
     }
 
     private static function evaluateScalar(
+        Context $ctx,
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode
     ): mixed {
-        $nodeIds = self::evaluateNodeSet($xpath, $expression, $contextNode, false);
+        $nodeIds = self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, false);
         if ([] === $nodeIds) {
             return '';
         }
@@ -498,7 +609,8 @@ final class VmDomXPath
         if (null === $node) {
             return '';
         }
-        if (VmDom::isElement($node) || VmDom::isTextNode($node)) {
+        // Attr string-value is the attribute value (XPath 1.0 / php-src xpath.c; #19352).
+        if (VmDom::isElement($node) || VmDom::isTextNode($node) || VmDom::isAttr($node)) {
             return VmDom::readNodeValue($node) ?? '';
         }
 
@@ -567,7 +679,7 @@ final class VmDomXPath
         if ([] === $argExprs) {
             throw new \Error('Function name must be passed as the first argument');
         }
-        $handlerName = self::resolvePhpFunctionHandlerName($xpath, trim($argExprs[0]), $contextNode);
+        $handlerName = self::resolvePhpFunctionHandlerName($ctx, $xpath, trim($argExprs[0]), $contextNode);
         if (!self::assertPhpFunctionAllowed($state, $handlerName)) {
             $var = new Variable(Variable::TYPE_BOOLEAN);
             $var->bool(false);
@@ -577,7 +689,7 @@ final class VmDomXPath
         $asString = 'functionstring' === $callName;
         $callArgs = [];
         for ($i = 1, $n = \count($argExprs); $i < $n; ++$i) {
-            $callArgs[] = self::evaluatePhpFunctionArg($xpath, trim($argExprs[$i]), $contextNode, $asString);
+            $callArgs[] = self::evaluatePhpFunctionArg($ctx, $xpath, trim($argExprs[$i]), $contextNode, $asString);
         }
         $callback = new Variable(Variable::TYPE_STRING);
         $callback->string($handlerName);
@@ -612,6 +724,7 @@ final class VmDomXPath
     }
 
     private static function resolvePhpFunctionHandlerName(
+        Context $ctx,
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode
@@ -620,7 +733,7 @@ final class VmDomXPath
             return $m[1];
         }
         try {
-            $value = self::evaluateScalar($xpath, $expression, $contextNode);
+            $value = self::evaluateScalar($ctx, $xpath, $expression, $contextNode);
         } catch (\DOMException) {
             throw new \TypeError('Handler name must be a string');
         }
@@ -632,6 +745,7 @@ final class VmDomXPath
     }
 
     private static function evaluatePhpFunctionArg(
+        Context $ctx,
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode,
@@ -645,24 +759,24 @@ final class VmDomXPath
         }
         if (self::isBooleanExpression($expression)) {
             $var = new Variable(Variable::TYPE_BOOLEAN);
-            $var->bool(self::evaluateBoolean($xpath, $expression, $contextNode));
+            $var->bool(self::evaluateBoolean($ctx, $xpath, $expression, $contextNode));
 
             return $var;
         }
         if (self::isNumericExpression($expression)) {
             $var = new Variable(Variable::TYPE_FLOAT);
-            $var->float(self::evaluateNumber($xpath, $expression, $contextNode));
+            $var->float(self::evaluateNumber($ctx, $xpath, $expression, $contextNode));
 
             return $var;
         }
         if (self::isStringExpression($expression)) {
             $var = new Variable(Variable::TYPE_STRING);
-            $var->string(self::evaluateString($xpath, $expression, $contextNode));
+            $var->string(self::evaluateString($ctx, $xpath, $expression, $contextNode));
 
             return $var;
         }
         // Node-set argument — php:function passes DOMNode arrays; functionString coerces to string.
-        $nodeIds = self::evaluateNodeSet($xpath, $expression, $contextNode, false);
+        $nodeIds = self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, false);
         if ($nodesetToString) {
             $var = new Variable(Variable::TYPE_STRING);
             if ([] === $nodeIds) {
