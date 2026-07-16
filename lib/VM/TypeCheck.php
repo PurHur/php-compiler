@@ -63,6 +63,7 @@ final class TypeCheck
      * @param list<Variable> $elements
      * @param list<string>|null $intersection
      * @param list<list<array{kind: string, interfaces?: list<string>, display?: string, name?: string}>>|null $dnfArms
+     * @param list<int>|null $callArgIndexes 0-based call-site argument indexes (Zend Argument #N, #19695)
      */
     public static function verifyVariadicElements(
         array $elements,
@@ -74,36 +75,64 @@ final class TypeCheck
         Context $context,
         bool $iterableElement = false,
         bool $neverElement = false,
-        ?string $intersectionDisplay = null
+        ?string $intersectionDisplay = null,
+        ?array $callArgIndexes = null
     ): void {
-        foreach ($elements as $element) {
-            $probe = new Variable();
-            $probe->copyFrom($element);
-            $resolved = $probe->resolveIndirect();
-            if ($neverElement) {
-                self::assertNeverParameter($probe);
+        $baseCtx = self::$paramErrorContext;
+        foreach ($elements as $i => $element) {
+            $check = static function () use (
+                $element,
+                $strict,
+                $typeConstraint,
+                $arraySpec,
+                $intersection,
+                $dnfArms,
+                $context,
+                $iterableElement,
+                $neverElement,
+                $intersectionDisplay
+            ): void {
+                $probe = new Variable();
+                $probe->copyFrom($element);
+                $resolved = $probe->resolveIndirect();
+                if ($neverElement) {
+                    self::assertNeverParameter($probe);
 
-                continue;
-            }
-            if ($iterableElement) {
-                IterableCheck::assertParameter($probe, $context);
+                    return;
+                }
+                if ($iterableElement) {
+                    IterableCheck::assertParameter($probe, $context);
 
-                continue;
-            }
-            if (null !== $dnfArms) {
-                DnfCheck::assertMatches($probe, $dnfArms, $context, 'Argument', null, $strict);
+                    return;
+                }
+                if (null !== $dnfArms) {
+                    DnfCheck::assertMatches($probe, $dnfArms, $context, 'Argument', null, $strict);
 
-                continue;
-            }
-            if (null !== $intersection) {
-                self::assertParamIntersection($probe, $intersection, $context, $intersectionDisplay);
+                    return;
+                }
+                if (null !== $intersection) {
+                    self::assertParamIntersection($probe, $intersection, $context, $intersectionDisplay);
 
-                continue;
+                    return;
+                }
+                if (null !== $typeConstraint) {
+                    $resolved->typeConstraint = $typeConstraint;
+                }
+                self::coerceParameter($probe, $strict, $arraySpec);
+            };
+            if (null !== $baseCtx && null !== $callArgIndexes && isset($callArgIndexes[$i])) {
+                $ctx = new UserParamErrorContext(
+                    $baseCtx->functionName,
+                    $callArgIndexes[$i],
+                    $baseCtx->paramName,
+                    $baseCtx->scriptPath,
+                    $baseCtx->callSiteLine,
+                    $baseCtx->omitParamName,
+                );
+                self::withParamErrorContext($ctx, $check);
+            } else {
+                $check();
             }
-            if (null !== $typeConstraint) {
-                $resolved->typeConstraint = $typeConstraint;
-            }
-            self::coerceParameter($probe, $strict, $arraySpec);
         }
     }
 
@@ -667,7 +696,13 @@ final class TypeCheck
                 $dest->bool(self::coerceToBool($value, $kind));
                 return;
             case Variable::TYPE_STRING:
-                if (Variable::TYPE_ARRAY === $value->type || Variable::TYPE_OBJECT === $value->type) {
+                // Zend weak mode: null is not a valid string (zend_API.c / zend_execute.c, #19695).
+                // int/float/bool still coerce via toString(); arrays/objects stay TypeError.
+                if (
+                    Variable::TYPE_NULL === $value->type
+                    || Variable::TYPE_ARRAY === $value->type
+                    || Variable::TYPE_OBJECT === $value->type
+                ) {
                     throw new \TypeError(self::strictMessage($constraint, $value, $kind));
                 }
                 $dest->string($value->toString());
