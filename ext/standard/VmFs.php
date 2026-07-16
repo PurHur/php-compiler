@@ -1752,15 +1752,7 @@ final class VmFs
         }
         switch ($feature) {
             case VmStreamSupports::STREAM_LOCK:
-                if (VmPhpFdStream::isValidHandle($handle)) {
-                    return VmPhpFdStream::available();
-                }
-                $fp = self::lookup($handle);
-                if (null === $fp) {
-                    return false;
-                }
-
-                return \stream_supports_lock($fp);
+                return self::streamSupportsLock($handle);
             case VmStreamSupports::STREAM_META_SEEKABLE:
             case VmStreamSupports::STREAM_FILTER:
                 return self::streamSupportsSeekable($handle);
@@ -1785,6 +1777,36 @@ final class VmFs
     private static function streamSupportsFilter(int $handle): bool
     {
         return VmStreamMeta::supportsFilter(self::handleUri($handle));
+    }
+
+    /** stream_supports_lock() / STREAM_LOCK — php-src ext/standard/streams.c (#6039, #19462). */
+    private static function streamSupportsLock(int $handle): bool
+    {
+        if (!self::isValidHandle($handle)) {
+            return false;
+        }
+        if (VmPhpMemoryStream::isValidHandle($handle)
+            || VmPhpInputOutputStream::isValidHandle($handle)) {
+            return false;
+        }
+        if (VmPhpFdStream::isValidHandle($handle)) {
+            return true;
+        }
+        $uri = self::handleUri($handle);
+        if (VmStreamMeta::supportsLock($uri, self::handleMode($handle))) {
+            return true;
+        }
+        $fp = self::lookup($handle);
+        if (null === $fp) {
+            return false;
+        }
+        if (\function_exists('stream_supports_lock')) {
+            return \stream_supports_lock($fp);
+        }
+        // Nested JIT/AOT helpers: adopted host FILE* streams are flockable (php-src stdio).
+        $adoptedUri = self::handleUri($handle);
+
+        return '' === $adoptedUri || VmStreamMeta::supportsLock($adoptedUri, self::handleMode($handle));
     }
 
     private static function streamSupportsSeekable(int $handle): bool
