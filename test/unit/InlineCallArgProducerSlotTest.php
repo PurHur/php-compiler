@@ -3610,6 +3610,60 @@ PHP;
         self::assertSame("array (\n  1 => 2,\n)", ob_get_clean());
     }
 
+    /**
+     * Issue #19771 — new CallbackFilterIterator(new ArrayIterator([...]), fn() => …)
+     * must send Closure slot for arg #1, not the inner New_ object.
+     */
+    public function testNestedNewConstructorInlineArrowCallbackUsesClosureSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$it = new CallbackFilterIterator(new ArrayIterator([1, 2, 3, 4]), fn($v) => $v % 2 === 0);
+echo implode(',', iterator_to_array($it, false));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'callback_filter_nested_arrow.php');
+
+        $innerNewSlot = null;
+        $closureSlot = null;
+        $outerArgSends = [];
+        $seenOuterNew = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CLOSURE === $op->type) {
+                $closureSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_NEW === $op->type) {
+                $classSlot = $op->arg2;
+                if (null !== $classSlot && isset($block->constants[$classSlot])) {
+                    $className = $block->constants[$classSlot]->toString();
+                    if ('ArrayIterator' === $className) {
+                        $innerNewSlot = $op->arg1;
+                    }
+                    if ('CallbackFilterIterator' === $className) {
+                        $seenOuterNew = true;
+                        $outerArgSends = [];
+                    }
+                }
+            }
+            if ($seenOuterNew && OpCode::TYPE_ARG_SEND === $op->type) {
+                $outerArgSends[] = $op->arg1;
+            }
+            if ($seenOuterNew && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertNotNull($innerNewSlot, 'ArrayIterator New_ slot');
+        self::assertNotNull($closureSlot, 'ArrowFunction CLOSURE slot');
+        self::assertCount(2, $outerArgSends, 'CallbackFilterIterator ctor arg sends='.json_encode($outerArgSends));
+        self::assertSame($innerNewSlot, $outerArgSends[0], 'arg #0 must be ArrayIterator New_ slot');
+        self::assertSame($closureSlot, $outerArgSends[1], 'arg #1 must be Closure slot, not inner New_');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('2,4', ob_get_clean());
+    }
+
     /** Issue #9904 — invokeArgs(new C(), [...]) must send New_ object slot, not sibling Array_ producer. */
     public function testInvokeArgsNewObjectThenArrayUsesDistinctProducerSlots(): void
     {
