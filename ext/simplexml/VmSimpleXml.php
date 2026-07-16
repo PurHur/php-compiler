@@ -895,6 +895,21 @@ final class VmSimpleXml
 
                 continue;
             }
+            // CDATA coalesces into element text (php-src sxe.c / libxml; #19710).
+            $cdata = VmXml::parseCdataSectionAt($inner, $pos);
+            if (null !== $cdata) {
+                $textBuffer .= $cdata['data'];
+                $pos = $cdata['end'];
+
+                continue;
+            }
+            // Comments are skipped (not part of SimpleXML text content).
+            $comment = VmXml::parseCommentAt($inner, $pos);
+            if (null !== $comment) {
+                $pos = $comment['end'];
+
+                continue;
+            }
             if ('' !== $textBuffer) {
                 $node->text .= $textBuffer;
                 $textBuffer = '';
@@ -934,6 +949,22 @@ final class VmSimpleXml
         $scan = $pos + \strlen($open[0]);
         $len = \strlen($content);
         while ($scan < $len && [] !== $stack) {
+            if ('<' === $content[$scan]) {
+                // Skip CDATA / comments so nested markup inside them is not
+                // mistaken for element boundaries (php-src libxml; #19710).
+                $cdata = VmXml::parseCdataSectionAt($content, $scan);
+                if (null !== $cdata) {
+                    $scan = $cdata['end'];
+
+                    continue;
+                }
+                $comment = VmXml::parseCommentAt($content, $scan);
+                if (null !== $comment) {
+                    $scan = $comment['end'];
+
+                    continue;
+                }
+            }
             if (preg_match('/\G<\/([A-Za-z_][\w:.-]*)>/s', $content, $close, 0, $scan)) {
                 $name = $close[1];
                 if ([] === $stack || end($stack) !== $name) {
