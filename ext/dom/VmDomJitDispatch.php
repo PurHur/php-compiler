@@ -134,6 +134,16 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function adoptNode(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        $node = VariableObject::entry($extra[0] ?? self::missingArg('adoptNode', 0));
+
+        return VmDom::adoptNode($ctx, $document, $node);
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function createDocumentFragment(VmContext $ctx, ObjectEntry $document, array $extra): Variable
     {
         return VmDom::createDocumentFragment($ctx, $document);

@@ -1,18 +1,32 @@
 --TEST--
-DOMDocument::adoptNode() registered — Zend 8.2 stub throws Not yet implemented (#17494, ext/dom/document.c)
+DOMDocument::adoptNode() moves node across documents (#19654, ext/dom/document.c)
 --FILE--
 <?php
-$doc = new DOMDocument();
-$doc->loadXML('<root><a/></root>');
-$node = $doc->documentElement->firstChild;
-echo (int) method_exists($doc, 'adoptNode'), "\n";
+$d1 = new DOMDocument();
+$d1->loadXML('<a><n>t</n></a>');
+$d2 = new DOMDocument();
+$d2->loadXML('<b/>');
+$n = $d1->documentElement->firstChild;
+$a = $d2->adoptNode($n);
+echo $a->nodeName, "\n";
+echo $d1->saveXML($d1->documentElement), "\n";
+echo ($n === $a) ? "same\n" : "clone\n";
+echo ($a->ownerDocument === $d2) ? "owner-d2\n" : "owner-other\n";
+echo (null === $a->parentNode) ? "detached\n" : "attached\n";
+$d2->documentElement->appendChild($a);
+echo $d2->saveXML($d2->documentElement), "\n";
 try {
-    $doc->adoptNode($node);
-    echo "no_throw\n";
-} catch (Error $e) {
-    echo $e->getMessage(), "\n";
+    $d2->adoptNode($d1);
+    echo "adopted-doc\n";
+} catch (DOMException $e) {
+    echo $e->getCode() === DOMException::NOT_SUPPORTED_ERR ? "reject-doc\n" : ("other:".$e->getMessage()."\n");
 }
 ?>
 --EXPECT--
-1
-Not yet implemented
+n
+<a/>
+same
+owner-d2
+detached
+<b><n>t</n></b>
+reject-doc

@@ -68,6 +68,7 @@ final class DomInstanceMethodJit
         'domelement::replacechild' => true,
         'domdocument::createdocumentfragment' => true,
         'domdocument::importnode' => true,
+        'domdocument::adoptnode' => true,
         'domelement::getattribute' => true,
         'domnode::getattribute' => true,
         'domelement::setattribute' => true,
@@ -344,6 +345,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domxpath::evaluate');
             self::ensureProxy($context, 'domnodelist::item');
             self::ensureProxy($context, 'domdocument::importnode');
+            self::ensureProxy($context, 'domdocument::adoptnode');
             self::ensureProxy($context, 'domelement::getattribute');
             self::ensureProxy($context, 'domnode::getattribute');
             self::ensureProxy($context, 'domelement::setattribute');
