@@ -83,7 +83,13 @@ final class BuiltinByRefParams
             case 'mb_eregi':
                 return [2];
             case 'preg_replace':
+            case 'preg_filter':
+            case 'preg_replace_callback':
+                // php-src ext/pcre/php_pcre.c — &$count (#19637, #4442, #12904)
                 return [4];
+            case 'preg_replace_callback_array':
+                // pattern, subject, limit, &$count — index 3 (#19637)
+                return [3];
             case 'str_replace':
             case 'str_ireplace':
                 return [3];
