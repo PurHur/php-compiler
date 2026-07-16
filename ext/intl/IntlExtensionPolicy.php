@@ -10,19 +10,19 @@ use PHPCompiler\ext\standard\ModuleRegistry;
 /**
  * ext/intl builtin advertisement — php-src ext/intl/php_intl.c module registration (#11768, #11825).
  *
- * Grapheme helpers, IDN converters, and intl_* error functions require a loaded intl extension on
- * Zend; they stay withheld from function_exists()/class_exists() until
- * {@see ModuleRegistry::extensionLoaded}('intl') (#11472, #17694, #19593). Locale + Normalizer +
+ * Grapheme helpers, IDN converters, Normalizer / normalizer_*, and intl_* error functions require a
+ * loaded intl extension on Zend; they stay withheld from function_exists()/class_exists() until
+ * {@see ModuleRegistry::extensionLoaded}('intl') (#11472, #17694, #19593, #19594). Locale +
  * IntlDateFormatter + IntlCalendar / IntlTimeZone + NumberFormatter are partial surfaces that
- * advertise without loading intl (#6696, #5153, #19549, #6151, #5154).
+ * advertise without loading intl (#6696, #19549, #6151, #5154).
  */
 final class IntlExtensionPolicy
 {
     /**
      * locale_get_default()/Locale — partial PHP surface without extension_loaded('intl') (#6696, #9576).
      *
-     * Mirrors {@see advertisesNormalizer()}: BCP-47 default/parser OOP is available while grapheme_*
-     * and full ICU classes stay gated on loaded ext/intl (#16214/#11472/#17694).
+     * BCP-47 default/parser OOP is available while grapheme_*, Normalizer, and full ICU classes stay
+     * gated on loaded ext/intl (#16214/#11472/#17694/#19594).
      */
     public static function advertisesLocale(): bool
     {
@@ -44,16 +44,31 @@ final class IntlExtensionPolicy
         return ModuleRegistry::extensionLoaded('intl');
     }
 
-    /** normalizer_* + Normalizer — partial ext/intl surface (#5153). */
+    /**
+     * normalizer_* + Normalizer — require loaded ext/intl (php-src ext/intl/normalizer; #19594).
+     *
+     * Implementation stays in-tree (#5153 / #19535) but must not phantom-advertise when
+     * extension_loaded('intl') is false (Zend 8.2 reference without intl).
+     */
     public static function advertisesNormalizer(): bool
     {
-        return true;
+        return self::advertisesBuiltins();
+    }
+
+    /** Run Normalizer compliance when ext/intl is loaded or a phantom-registration guard matches (#19594). */
+    public static function runsNormalizerCompliance(string $testFileName): bool
+    {
+        if (self::advertisesNormalizer()) {
+            return true;
+        }
+
+        return str_contains($testFileName, 'normalizer_phantom');
     }
 
     /**
      * IntlDateFormatter::create()/format() — partial ICU pattern surface without extension_loaded('intl') (#19549).
      *
-     * Mirrors {@see advertisesNormalizer()}: class_exists without full grapheme/Collator ICU.
+     * class_exists without full grapheme/Collator/Normalizer ICU (#11472/#19594).
      */
     public static function advertisesIntlDateFormatter(): bool
     {

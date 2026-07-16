@@ -596,6 +596,11 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'idn_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsNormalizerCompliance($name)
+                && str_contains($name, 'normalizer_')
+                && !str_contains($name, 'normalizer_phantom')) {
+                continue;
+            }
             if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesLocale()
                 && str_contains($name, 'locale_get_default')
                 && !str_contains($name, 'locale_gated')) {
