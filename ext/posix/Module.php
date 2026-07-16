@@ -79,6 +79,7 @@ class Module extends ModuleAbstract
             new posix_getpgid(),
             new posix_getpgrp(),
             new posix_setpgid(),
+            new posix_initgroups(),
             new posix_kill(),
             new posix_getlogin(),
             new posix_ttyname(),
