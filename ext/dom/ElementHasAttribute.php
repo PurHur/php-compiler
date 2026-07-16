@@ -24,6 +24,6 @@ final class ElementHasAttribute extends DomClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(VmDom::hasAttributeNS($element, null, $name));
+        $frame->returnVar->bool(VmDom::hasAttribute($element, $name));
     }
 }
