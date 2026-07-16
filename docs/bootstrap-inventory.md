@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5206 |
-| Phase A inventory files (M2 ratio SSOT) | 5206 |
+| PHP files on vm.php path | 5211 |
+| Phase A inventory files (M2 ratio SSOT) | 5211 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14236 |
+| Source constructs flagged (warnings) | 14263 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -198,7 +198,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomImportNodeJitHelper.php` | 0 | 2 |
 | `ext/dom/DomIsConnectedJitHelper.php` | 0 | 1 |
 | `ext/dom/DomIsEqualNodeJitHelper.php` | 0 | 1 |
-| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 22 |
+| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 27 |
 | `ext/dom/DomLoadHTMLFileJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadHTMLJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadJitHelper.php` | 0 | 1 |
@@ -251,7 +251,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/FragmentAppendXML.php` | 0 | 1 |
 | `ext/dom/FragmentConstruct.php` | 0 | 1 |
 | `ext/dom/HtmlDocumentCreateEmpty.php` | 0 | 2 |
+| `ext/dom/HtmlDocumentCreateFromFile.php` | 0 | 3 |
 | `ext/dom/HtmlDocumentCreateFromString.php` | 0 | 3 |
+| `ext/dom/HtmlDocumentGetElementById.php` | 0 | 3 |
+| `ext/dom/HtmlDocumentQuerySelector.php` | 0 | 3 |
+| `ext/dom/HtmlDocumentQuerySelectorAll.php` | 0 | 3 |
+| `ext/dom/HtmlDocumentSaveHtml.php` | 0 | 2 |
 | `ext/dom/ImplementationCreateDocument.php` | 0 | 1 |
 | `ext/dom/ImplementationCreateDocumentType.php` | 0 | 1 |
 | `ext/dom/ImplementationGetFeature.php` | 0 | 2 |
@@ -355,9 +360,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
 | `ext/dom/VmDom.php` | 0 | 360 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
-| `ext/dom/VmDomJitDispatch.php` | 0 | 24 |
+| `ext/dom/VmDomJitDispatch.php` | 0 | 26 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
-| `ext/dom/VmDomLiving.php` | 0 | 8 |
+| `ext/dom/VmDomLiving.php` | 0 | 13 |
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
 | `ext/dom/VmDomTokenList.php` | 0 | 4 |
 | `ext/dom/VmDomValidationNative.php` | 0 | 2 |
@@ -4355,7 +4360,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
 | `lib/JIT/Context.php` | 0 | 76 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 19 |
-| `lib/JIT/DomInstanceMethodJit.php` | 0 | 39 |
+| `lib/JIT/DomInstanceMethodJit.php` | 0 | 40 |
 | `lib/JIT/DynamicObjectReadonlyGuard.php` | 0 | 1 |
 | `lib/JIT/DynamicPropertyDeprecationGuard.php` | 0 | 1 |
 | `lib/JIT/EmitTuMode.php` | 0 | 1 |
@@ -6172,8 +6177,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomHtmlDocumentPropertySupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 31)
-- 2 class method(s)
+- new Variable (line 33)
+- 3 class method(s)
 
 ### `ext/dom/DomImportNodeJitHelper.php`
 
@@ -6211,10 +6216,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 58)
 - new HtmlDocumentCreateFromString (line 59)
 - new HtmlDocumentCreateEmpty (line 62)
-- new ClassEntry (line 67)
-- new ClassProperty (line 70)
-- new XmlDocumentCreateFromString (line 71)
-- new XmlDocumentCreateEmpty (line 74)
+- new HtmlDocumentCreateFromFile (line 65)
+- new HtmlDocumentGetElementById (line 68)
+- new HtmlDocumentQuerySelector (line 71)
+- new HtmlDocumentQuerySelectorAll (line 74)
+- new HtmlDocumentSaveHtml (line 77)
+- new ClassEntry (line 82)
+- new ClassProperty (line 85)
+- new XmlDocumentCreateFromString (line 86)
+- new XmlDocumentCreateEmpty (line 89)
 - 1 class method(s)
 
 ### `ext/dom/DomLoadHTMLFileJitHelper.php`
@@ -6482,10 +6492,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 - 1 closure(s)
 
+### `ext/dom/HtmlDocumentCreateFromFile.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 2 class method(s)
+- 1 closure(s)
+
 ### `ext/dom/HtmlDocumentCreateFromString.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/dom/HtmlDocumentGetElementById.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 3 class method(s)
+- 1 closure(s)
+
+### `ext/dom/HtmlDocumentQuerySelector.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 3 class method(s)
+- 1 closure(s)
+
+### `ext/dom/HtmlDocumentQuerySelectorAll.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 3 class method(s)
+- 1 closure(s)
+
+### `ext/dom/HtmlDocumentSaveHtml.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s)
 - 1 closure(s)
 
@@ -7405,7 +7449,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomInstanceInvoke.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 92)
+- new Error (line 95)
 - 6 class method(s)
 
 ### `ext/dom/VmDomJitDispatch.php`
@@ -7413,28 +7457,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 33)
 - new Variable (line 46)
-- new Variable (line 83)
-- new Variable (line 95)
-- new Variable (line 107)
-- new Variable (line 159)
-- new Variable (line 173)
-- new Variable (line 213)
-- new Variable (line 225)
-- new Variable (line 237)
-- new Error (line 251)
+- new Variable (line 65)
+- new Variable (line 105)
+- new Variable (line 138)
+- new Variable (line 150)
+- new Variable (line 162)
+- new Variable (line 214)
+- new Variable (line 228)
 - new Variable (line 268)
-- new Variable (line 291)
-- new Variable (line 312)
-- new Variable (line 339)
-- new Variable (line 365)
-- new Variable (line 377)
-- new Variable (line 389)
-- new Variable (line 426)
-- new Variable (line 438)
-- new Variable (line 463)
-- new Variable (line 505)
-- new ArgumentCountError (line 554)
-- 38 class method(s)
+- new Variable (line 280)
+- new Variable (line 292)
+- new Error (line 306)
+- new Variable (line 323)
+- new Variable (line 346)
+- new Variable (line 367)
+- new Variable (line 394)
+- new Variable (line 420)
+- new Variable (line 432)
+- new Variable (line 444)
+- new Variable (line 481)
+- new Variable (line 493)
+- new Variable (line 518)
+- new Variable (line 560)
+- new ArgumentCountError (line 609)
+- 41 class method(s)
 
 ### `ext/dom/VmDomJitFrame.php`
 
@@ -7444,14 +7490,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomLiving.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 60)
-- new ObjectEntry (line 78)
-- new DOMException (line 107)
-- new Variable (line 110)
-- new DOMException (line 159)
-- new Variable (line 165)
-- new Variable (line 199)
-- 17 class method(s)
+- new ObjectEntry (line 63)
+- new ObjectEntry (line 81)
+- new DOMException (line 110)
+- new Variable (line 113)
+- new DOMException (line 153)
+- new DOMException (line 235)
+- new DOMException (line 239)
+- new DOMException (line 251)
+- new DOMException (line 324)
+- new Variable (line 330)
+- new Variable (line 364)
+- 31 class method(s)
+- 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`
 
@@ -29373,16 +29424,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 15526)
 - new VM\PropertyIsInitializedHandler (line 15608)
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15648)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15777)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15864)
-- new JIT\Call\VmCoerceVariableToString (line 15954)
-- new JIT\Call\IncludePathResolverResolve (line 16208)
-- new Variable (line 17264)
-- new VM (line 17308)
-- new VM\Variable (line 17317)
-- new Variable (line 17338)
-- new Variable (line 17384)
-- new Variable (line 17878)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15783)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15870)
+- new JIT\Call\VmCoerceVariableToString (line 15960)
+- new JIT\Call\IncludePathResolverResolve (line 16221)
+- new Variable (line 17277)
+- new VM (line 17321)
+- new VM\Variable (line 17330)
+- new Variable (line 17351)
+- new Variable (line 17397)
+- new Variable (line 17891)
 - 369 class method(s)
 - 7 closure(s)
 
@@ -34026,44 +34077,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DomInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\DomDocumentCreateElement (line 106)
-- new Call\DomDocumentCreateElementNS (line 111)
-- new Call\DomDocumentCreateComment (line 116)
-- new Call\DomDocumentLoad (line 121)
-- new Call\DomDocumentLoadHTML (line 126)
-- new Call\DomDocumentLoadHTMLFile (line 131)
-- new Call\DomDocumentGetElementById (line 136)
-- new Call\DomDocumentImportNode (line 141)
-- new Call\DomElementGetAttribute (line 146)
-- new Call\DomElementSetAttribute (line 151)
-- new Call\DomElementGetAttributeNode (line 156)
-- new Call\DomElementGetAttributeNodeNS (line 161)
-- new Call\DomElementSetAttributeNodeNS (line 166)
-- new Call\DomDocumentCreateAttributeNS (line 171)
-- new Call\DomDocumentLoadXML (line 176)
-- new Call\DomDocumentSaveXML (line 181)
-- new Call\DomDocumentSaveHTML (line 186)
-- new Call\DomDocumentSaveHTMLFile (line 191)
-- new Call\DomDocumentGetElementsByTagName (line 196)
-- new Call\DomDocumentAppendChild (line 201)
-- new Call\DomNodeAppendChild (line 206)
-- new Call\DomNodeAppendChild (line 211)
-- new Call\DomNodeAppendChild (line 216)
-- new Call\DomNodeAppend (line 221)
-- new Call\DomNodePrepend (line 226)
-- new Call\DomNodeReplaceChildren (line 231)
-- new Call\DomElementToggleAttribute (line 236)
-- new Call\DomNodeContains (line 241)
-- new Call\DomNodeGetRootNode (line 246)
-- new Call\DomNodeIsEqualNode (line 251)
-- new Call\DomNodeC14N (line 256)
-- new Call\DomNodeRemoveChild (line 261)
-- new Call\DomNodeReplaceChild (line 266)
-- new Call\DomDocumentCreateDocumentFragment (line 271)
-- new Call\DomXPathQuery (line 276)
-- new Call\DomXPathEvaluate (line 281)
-- new Call\DomNodeListItem (line 286)
-- new Call\DomInstanceMethod (line 304)
+- new Call\DomDocumentCreateElement (line 110)
+- new Call\DomDocumentCreateElementNS (line 115)
+- new Call\DomDocumentCreateComment (line 120)
+- new Call\DomDocumentLoad (line 125)
+- new Call\DomDocumentLoadHTML (line 130)
+- new Call\DomDocumentLoadHTMLFile (line 135)
+- new Call\DomDocumentGetElementById (line 140)
+- new Call\DomDocumentImportNode (line 145)
+- new Call\DomElementGetAttribute (line 150)
+- new Call\DomElementSetAttribute (line 155)
+- new Call\DomElementGetAttributeNode (line 160)
+- new Call\DomElementGetAttributeNodeNS (line 165)
+- new Call\DomElementSetAttributeNodeNS (line 170)
+- new Call\DomDocumentCreateAttributeNS (line 175)
+- new Call\DomDocumentLoadXML (line 180)
+- new Call\DomDocumentSaveXML (line 185)
+- new Call\DomDocumentSaveHTML (line 190)
+- new Call\DomDocumentSaveHTMLFile (line 195)
+- new Call\DomDocumentGetElementsByTagName (line 200)
+- new Call\DomDocumentAppendChild (line 205)
+- new Call\DomNodeAppendChild (line 210)
+- new Call\DomNodeAppendChild (line 215)
+- new Call\DomNodeAppendChild (line 220)
+- new Call\DomNodeAppend (line 225)
+- new Call\DomNodePrepend (line 230)
+- new Call\DomNodeReplaceChildren (line 235)
+- new Call\DomElementToggleAttribute (line 240)
+- new Call\DomNodeContains (line 245)
+- new Call\DomNodeGetRootNode (line 250)
+- new Call\DomNodeIsEqualNode (line 255)
+- new Call\DomNodeC14N (line 260)
+- new Call\DomNodeRemoveChild (line 265)
+- new Call\DomNodeReplaceChild (line 270)
+- new Call\DomDocumentCreateDocumentFragment (line 275)
+- new Call\DomXPathQuery (line 280)
+- new Call\DomXPathEvaluate (line 285)
+- new Call\DomNodeListItem (line 290)
+- new Call\DomInstanceMethod (line 302)
+- new Call\DomInstanceMethod (line 320)
 - 7 class method(s)
 
 ### `lib/JIT/DynamicObjectReadonlyGuard.php`
@@ -35460,109 +35512,109 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 8893)
 - new Variable (line 8900)
 - new Variable (line 8917)
-- new VM\NativeFiberStackOverflow (line 9633)
-- new VM\BuiltinCallbackCatchRedirect (line 9684)
-- new VM\BuiltinCallbackCatchRedirect (line 9702)
-- new Variable (line 9805)
-- new Variable (line 9913)
-- new Variable (line 10046)
-- new ScriptExit (line 10202)
-- new Exception (line 10219)
-- new ScriptExit (line 10227)
-- new Error (line 10490)
-- new VM\PropertyHookRefWriteSignal (line 10538)
-- new Variable (line 10562)
-- new VM\PropertyHookRefWriteSignal (line 10567)
-- new VM\PropertyHookFiberSuspendSignal (line 10570)
-- new VM\PropertyHookRefWriteSignal (line 10689)
-- new Variable (line 10706)
-- new VM\PropertyHookRefWriteSignal (line 10720)
-- new VM\PropertyHookRefWriteSignal (line 10732)
-- new Variable (line 10963)
-- new Variable (line 10986)
-- new Variable (line 10996)
-- new Variable (line 11006)
-- new VM\PropertyHookRefWriteSignal (line 11012)
+- new VM\NativeFiberStackOverflow (line 9641)
+- new VM\BuiltinCallbackCatchRedirect (line 9692)
+- new VM\BuiltinCallbackCatchRedirect (line 9710)
+- new Variable (line 9813)
+- new Variable (line 9921)
+- new Variable (line 10054)
+- new ScriptExit (line 10210)
+- new Exception (line 10227)
+- new ScriptExit (line 10235)
+- new Error (line 10498)
+- new VM\PropertyHookRefWriteSignal (line 10546)
+- new Variable (line 10570)
+- new VM\PropertyHookRefWriteSignal (line 10575)
+- new VM\PropertyHookFiberSuspendSignal (line 10578)
+- new VM\PropertyHookRefWriteSignal (line 10697)
+- new Variable (line 10714)
+- new VM\PropertyHookRefWriteSignal (line 10728)
+- new VM\PropertyHookRefWriteSignal (line 10740)
+- new Variable (line 10971)
+- new Variable (line 10994)
+- new Variable (line 11004)
+- new Variable (line 11014)
 - new VM\PropertyHookRefWriteSignal (line 11020)
-- new VM\PropertyHookRefWriteSignal (line 11023)
-- new Variable (line 11035)
-- new Variable (line 11049)
-- new VM\PropertyHookRefWriteSignal (line 11055)
-- new Variable (line 11086)
-- new VM\PropertyHookRefWriteSignal (line 11091)
-- new VM\PropertyHookFiberSuspendSignal (line 11094)
-- new Error (line 11593)
-- new Error (line 11603)
-- new Error (line 11613)
-- new Error (line 11623)
-- new ClassEntry (line 12393)
-- new Variable (line 12394)
-- new VM\ClassProperty (line 12395)
-- new ObjectEntry (line 12398)
-- new Variable (line 12401)
-- new Variable (line 12482)
-- new Error (line 12568)
-- new Variable (line 12660)
-- new VM\GeneratorUncaughtThrow (line 12662)
-- new Variable (line 12687)
-- new VM\GeneratorUncaughtThrow (line 12701)
-- new Variable (line 12790)
-- new VM\GeneratorUncaughtThrow (line 12810)
-- new Variable (line 12878)
-- new Variable (line 12880)
-- new Variable (line 12884)
-- new Variable (line 13014)
-- new Variable (line 13056)
-- new Variable (line 13227)
-- new Variable (line 13243)
-- new Variable (line 13288)
-- new Variable (line 13429)
-- new Variable (line 13501)
-- new Variable (line 13665)
-- new VM\PropertyIsInitializedHandler (line 13674)
-- new Error (line 13789)
-- new VM\EnumFromHandler (line 13814)
-- new CompileError (line 14540)
-- new VM\ClassProperty (line 14705)
-- new Variable (line 15012)
-- new Variable (line 15207)
-- new Variable (line 15209)
-- new ClassEntry (line 15252)
-- new Func\PHP (line 15259)
-- new VM\ClassProperty (line 15387)
-- new Func\PHP (line 15534)
-- new Variable (line 15610)
-- new Variable (line 15617)
-- new Variable (line 15623)
-- new Variable (line 15660)
-- new Variable (line 15689)
-- new Variable (line 15874)
-- new Variable (line 15920)
-- new VM\ClassProperty (line 15985)
-- new Error (line 16031)
-- new Error (line 16066)
-- new Error (line 16069)
-- new Error (line 16072)
-- new Error (line 16075)
-- new ObjectEntry (line 16077)
-- new Error (line 16090)
-- new Error (line 16093)
-- new Error (line 16096)
-- new Error (line 16115)
-- new ObjectEntry (line 16119)
-- new Variable (line 16121)
-- new Variable (line 16135)
-- new Variable (line 16162)
-- new Variable (line 16175)
-- new Error (line 16305)
-- new Error (line 16310)
-- new VM\ObjectEntry (line 16314)
-- new Variable (line 16454)
-- new Variable (line 16472)
-- new NoDiscardMetadata (line 16641)
-- new Variable (line 16810)
-- new Variable (line 16812)
-- new Variable (line 16904)
+- new VM\PropertyHookRefWriteSignal (line 11028)
+- new VM\PropertyHookRefWriteSignal (line 11031)
+- new Variable (line 11043)
+- new Variable (line 11057)
+- new VM\PropertyHookRefWriteSignal (line 11063)
+- new Variable (line 11094)
+- new VM\PropertyHookRefWriteSignal (line 11099)
+- new VM\PropertyHookFiberSuspendSignal (line 11102)
+- new Error (line 11601)
+- new Error (line 11611)
+- new Error (line 11621)
+- new Error (line 11631)
+- new ClassEntry (line 12401)
+- new Variable (line 12402)
+- new VM\ClassProperty (line 12403)
+- new ObjectEntry (line 12406)
+- new Variable (line 12409)
+- new Variable (line 12490)
+- new Error (line 12576)
+- new Variable (line 12668)
+- new VM\GeneratorUncaughtThrow (line 12670)
+- new Variable (line 12695)
+- new VM\GeneratorUncaughtThrow (line 12709)
+- new Variable (line 12798)
+- new VM\GeneratorUncaughtThrow (line 12818)
+- new Variable (line 12886)
+- new Variable (line 12888)
+- new Variable (line 12892)
+- new Variable (line 13022)
+- new Variable (line 13064)
+- new Variable (line 13235)
+- new Variable (line 13251)
+- new Variable (line 13296)
+- new Variable (line 13437)
+- new Variable (line 13509)
+- new Variable (line 13673)
+- new VM\PropertyIsInitializedHandler (line 13682)
+- new Error (line 13797)
+- new VM\EnumFromHandler (line 13822)
+- new CompileError (line 14548)
+- new VM\ClassProperty (line 14713)
+- new Variable (line 15020)
+- new Variable (line 15215)
+- new Variable (line 15217)
+- new ClassEntry (line 15260)
+- new Func\PHP (line 15267)
+- new VM\ClassProperty (line 15395)
+- new Func\PHP (line 15542)
+- new Variable (line 15618)
+- new Variable (line 15625)
+- new Variable (line 15631)
+- new Variable (line 15668)
+- new Variable (line 15697)
+- new Variable (line 15882)
+- new Variable (line 15928)
+- new VM\ClassProperty (line 15993)
+- new Error (line 16039)
+- new Error (line 16074)
+- new Error (line 16077)
+- new Error (line 16080)
+- new Error (line 16083)
+- new ObjectEntry (line 16085)
+- new Error (line 16098)
+- new Error (line 16101)
+- new Error (line 16104)
+- new Error (line 16123)
+- new ObjectEntry (line 16127)
+- new Variable (line 16129)
+- new Variable (line 16143)
+- new Variable (line 16170)
+- new Variable (line 16183)
+- new Error (line 16313)
+- new Error (line 16318)
+- new VM\ObjectEntry (line 16322)
+- new Variable (line 16462)
+- new Variable (line 16480)
+- new NoDiscardMetadata (line 16649)
+- new Variable (line 16818)
+- new Variable (line 16820)
+- new Variable (line 16912)
 - 479 class method(s)
 - 25 closure(s)
 

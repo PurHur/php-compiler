@@ -15712,6 +15712,12 @@ class JIT {
             } elseif ('toggleattribute' === $methodLc && $this->context->functionIsRegistered('domelement::toggleattribute')) {
                 $className = 'DOMElement';
                 $declaringClassLc = 'domelement';
+            } elseif (\in_array($methodLc, ['queryselector', 'queryselectorall', 'savehtml', 'getelementbyid'], true)) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmldocument::'.$methodLc);
+                if ($this->context->functionIsRegistered('dom\\htmldocument::'.$methodLc)) {
+                    $className = 'Dom\\HTMLDocument';
+                    $declaringClassLc = 'dom\\htmldocument';
+                }
             }
         }
 
@@ -16104,6 +16110,13 @@ class JIT {
             return $proxyName;
         }
         $classLc = strtolower(ltrim($classLc, '\\'));
+        if ('dom\\htmldocument' === $classLc || str_ends_with($classLc, '\\htmldocument')) {
+            $livingProxy = 'dom\\htmldocument::'.strtolower($methodLc);
+            JIT\DomInstanceMethodJit::ensureProxy($this->context, $livingProxy);
+            if ($this->context->functionIsRegistered($livingProxy)) {
+                return $livingProxy;
+            }
+        }
         if (!str_starts_with($classLc, 'dom') || 'domnode' === $classLc) {
             return $proxyName;
         }
