@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5144 |
-| Phase A inventory files (M2 ratio SSOT) | 5144 |
+| PHP files on vm.php path | 5151 |
+| Phase A inventory files (M2 ratio SSOT) | 5151 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13983 |
+| Source constructs flagged (warnings) | 14022 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -804,23 +804,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_x509_parse.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_verify.php` | 0 | 2 |
-| `ext/pcntl/Module.php` | 0 | 13 |
+| `ext/pcntl/Module.php` | 0 | 20 |
 | `ext/pcntl/PcntlConstants.php` | 0 | 1 |
 | `ext/pcntl/PcntlHostBridge.php` | 0 | 2 |
 | `ext/pcntl/PcntlLibcThinAbi.php` | 0 | 2 |
-| `ext/pcntl/VmPcntl.php` | 0 | 13 |
+| `ext/pcntl/VmPcntl.php` | 0 | 19 |
 | `ext/pcntl/VmPcntlArg.php` | 0 | 3 |
+| `ext/pcntl/pcntl_alarm.php` | 0 | 3 |
 | `ext/pcntl/pcntl_async_signals.php` | 0 | 3 |
+| `ext/pcntl/pcntl_exec.php` | 0 | 3 |
 | `ext/pcntl/pcntl_fork.php` | 0 | 4 |
 | `ext/pcntl/pcntl_signal.php` | 0 | 3 |
 | `ext/pcntl/pcntl_signal_dispatch.php` | 0 | 3 |
 | `ext/pcntl/pcntl_signal_get_handler.php` | 0 | 4 |
 | `ext/pcntl/pcntl_sigprocmask.php` | 0 | 4 |
 | `ext/pcntl/pcntl_sigtimedwait.php` | 0 | 4 |
+| `ext/pcntl/pcntl_wait.php` | 0 | 4 |
 | `ext/pcntl/pcntl_waitid.php` | 0 | 4 |
 | `ext/pcntl/pcntl_waitpid.php` | 0 | 4 |
 | `ext/pcntl/pcntl_wexitstatus.php` | 0 | 4 |
 | `ext/pcntl/pcntl_wifexited.php` | 0 | 4 |
+| `ext/pcntl/pcntl_wifsignaled.php` | 0 | 4 |
+| `ext/pcntl/pcntl_wifstopped.php` | 0 | 4 |
+| `ext/pcntl/pcntl_wstopsig.php` | 0 | 4 |
+| `ext/pcntl/pcntl_wtermsig.php` | 0 | 4 |
 | `ext/phar/BuiltinClasses.php` | 0 | 3 |
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 9 |
@@ -10437,16 +10444,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 18)
 - new pcntl_fork (line 27)
-- new pcntl_waitpid (line 28)
-- new pcntl_wifexited (line 29)
-- new pcntl_wexitstatus (line 30)
-- new pcntl_signal (line 31)
-- new pcntl_signal_dispatch (line 32)
-- new pcntl_async_signals (line 33)
-- new pcntl_signal_get_handler (line 34)
-- new pcntl_sigprocmask (line 35)
-- new pcntl_sigtimedwait (line 36)
-- new pcntl_waitid (line 37)
+- new pcntl_wait (line 28)
+- new pcntl_waitpid (line 29)
+- new pcntl_wifexited (line 30)
+- new pcntl_wexitstatus (line 31)
+- new pcntl_wifsignaled (line 32)
+- new pcntl_wifstopped (line 33)
+- new pcntl_wtermsig (line 34)
+- new pcntl_wstopsig (line 35)
+- new pcntl_alarm (line 36)
+- new pcntl_exec (line 37)
+- new pcntl_signal (line 38)
+- new pcntl_signal_dispatch (line 39)
+- new pcntl_async_signals (line 40)
+- new pcntl_signal_get_handler (line 41)
+- new pcntl_sigprocmask (line 42)
+- new pcntl_sigtimedwait (line 43)
+- new pcntl_waitid (line 44)
 - 2 class method(s)
 
 ### `ext/pcntl/PcntlConstants.php`
@@ -10457,13 +10471,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pcntl/PcntlHostBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 23 class method(s)
 - 1 closure(s)
 
 ### `ext/pcntl/PcntlLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 24 class method(s)
 - 1 closure(s)
 
 ### `ext/pcntl/VmPcntl.php`
@@ -10471,30 +10485,50 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 50)
 - new Error (line 62)
-- new Error (line 74)
-- new Error (line 86)
-- new Variable (line 122)
-- new Variable (line 130)
-- new Variable (line 144)
-- new Error (line 225)
-- new Error (line 240)
-- new Variable (line 268)
-- new HashTable (line 350)
-- new Variable (line 352)
-- 21 class method(s)
+- new Error (line 80)
+- new Error (line 96)
+- new Error (line 108)
+- new Error (line 120)
+- new Error (line 132)
+- new Error (line 144)
+- new Error (line 156)
+- new Error (line 168)
+- new Variable (line 204)
+- new Variable (line 212)
+- new Variable (line 226)
+- new Error (line 307)
+- new Error (line 322)
+- new Variable (line 350)
+- new HashTable (line 432)
+- new Variable (line 434)
+- 28 class method(s)
 
 ### `ext/pcntl/VmPcntlArg.php`
 
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 45)
 - new Variable (line 48)
-- 5 class method(s)
+- 7 class method(s)
+
+### `ext/pcntl/pcntl_alarm.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 36)
+- 2 class method(s)
 
 ### `ext/pcntl/pcntl_async_signals.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
 - new Error (line 44)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_exec.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 48)
 - 2 class method(s)
 
 ### `ext/pcntl/pcntl_fork.php`
@@ -10543,6 +10577,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 54)
 - 2 class method(s)
 
+### `ext/pcntl/pcntl_wait.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 33)
+- new Error (line 47)
+- 2 class method(s)
+
 ### `ext/pcntl/pcntl_waitid.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10573,6 +10615,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 24)
 - new Error (line 30)
 - new Error (line 38)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_wifsignaled.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 31)
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_wifstopped.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 31)
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_wstopsig.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 31)
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_wtermsig.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 31)
+- new Error (line 39)
 - 2 class method(s)
 
 ### `ext/phar/BuiltinClasses.php`
