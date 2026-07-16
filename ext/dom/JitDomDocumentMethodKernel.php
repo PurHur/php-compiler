@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DomC14NRuntime;
 use PHPCompiler\JIT\Builtin\DomCreateElementNSRuntime;
 use PHPCompiler\JIT\Builtin\DomCreateElementRuntime;
 use PHPCompiler\JIT\Builtin\DomElementTextContentRuntime;
@@ -642,6 +643,22 @@ final class JitDomDocumentMethodKernel
             $context->getTypeFromString('int1'),
             'PHPCompiler\\ext\\dom\\DomIsEqualNodeJitHelper::isEqualNodeArgv',
             '/ext/dom/DomIsEqualNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureC14NBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomC14NRuntime::ABI_NAME,
+            'dom_node_c14n_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('__string__*'),
+            'PHPCompiler\\ext\\dom\\DomC14NJitHelper::c14nArgv',
+            '/ext/dom/DomC14NJitHelper.php'
         );
     }
 

@@ -457,6 +457,52 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMNode::C14N() — inclusive/exclusive canonical XML (#19467).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function c14n(VmContext $ctx, ObjectEntry $node, array $extra): Variable
+    {
+        $exclusive = self::optionalBoolArg($extra[0] ?? null, 'C14N', 0);
+        $withComments = self::optionalBoolArg($extra[1] ?? null, 'C14N', 1);
+        $xpath = null;
+        if (isset($extra[2])) {
+            $xpathVar = $extra[2]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $xpathVar->type) {
+                if (Variable::TYPE_ARRAY !== $xpathVar->type && Variable::TYPE_HASHTABLE !== $xpathVar->type) {
+                    throw new \TypeError(
+                        'DOMNode::C14N(): Argument #3 ($xpath) must be of type ?array, '
+                        .VmDom::typeLabel($xpathVar).' given'
+                    );
+                }
+                $xpath = $xpathVar->toArray();
+            }
+        }
+        $nsPrefixes = null;
+        if (isset($extra[3])) {
+            $nsVar = $extra[3]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $nsVar->type) {
+                if (Variable::TYPE_ARRAY !== $nsVar->type && Variable::TYPE_HASHTABLE !== $nsVar->type) {
+                    throw new \TypeError(
+                        'DOMNode::C14N(): Argument #4 ($ns_prefixes) must be of type ?array, '
+                        .VmDom::typeLabel($nsVar).' given'
+                    );
+                }
+                $nsPrefixes = $nsVar->toArray();
+            }
+        }
+        $payload = VmDom::c14n($ctx, $node, $exclusive, $withComments, $xpath, $nsPrefixes);
+        $result = new Variable();
+        if (false === $payload) {
+            $result->bool(false);
+        } else {
+            $result->string($payload);
+        }
+
+        return $result;
+    }
+
+    /**
      * @return list<Variable>
      */
     public static function unpackArgs(Variable $argsTable): array
@@ -534,15 +580,15 @@ final class VmDomJitDispatch
             return false;
         }
         $var = $var->resolveIndirect();
-        if (Variable::TYPE_BOOL !== $var->type) {
+        if (Variable::TYPE_BOOLEAN !== $var->type) {
             throw new \TypeError(sprintf(
-                'DOMXPath::%s(): Argument #%d ($registerNodeNS) must be of type bool, %s given',
-                $label,
+                'Argument #%d of %s() must be of type bool, %s given',
                 $index + 1,
+                $label,
                 VmDom::typeLabel($var)
             ));
         }
 
-        return $var->bool;
+        return $var->toBool();
     }
 }

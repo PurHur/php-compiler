@@ -2182,6 +2182,24 @@ final class VmDom
         }
     }
 
+    /** Depth-first namespaceURI refresh once ancestors are linked (php-src/libxml; #19467). */
+    private static function resolveSubtreeNamespaceUris(ObjectEntry $entry): void
+    {
+        if (!DomRegistry::has($entry)) {
+            return;
+        }
+        if (self::isElement($entry)) {
+            self::resolveElementNamespaceUri($entry);
+        }
+        $state = DomRegistry::state($entry);
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::resolveSubtreeNamespaceUris($child);
+            }
+        }
+    }
+
     public static function createTextNode(Context $ctx, string $data, ?ObjectEntry $ownerDocument = null): ObjectEntry
     {
         $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_TEXT);
@@ -2546,6 +2564,8 @@ final class VmDom
         $state->documentElementName = DomRegistry::state($root)->nodeName;
         $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
         self::linkChildToParent($root, $document);
+        // Resolve after the full parent chain exists — nested parse only sees local parents (#19467).
+        self::resolveSubtreeNamespaceUris($root);
         self::propagateDocumentId($root, $document->id);
         self::syncSubtree($ctx, $document);
         self::reindexDocumentIds($document, $root);
@@ -8149,7 +8169,8 @@ final class VmDom
         ?array $nsPrefixes
     ): string|false {
         unset($ctx);
-        if ($exclusive || null !== $xpath || null !== $nsPrefixes) {
+        // XPath node-set / prefix list filters are not implemented yet (php-src uses libxml C14N).
+        if (null !== $xpath || null !== $nsPrefixes) {
             return false;
         }
         if (!DomRegistry::has($node)) {
@@ -8162,10 +8183,10 @@ final class VmDom
                 return '';
             }
 
-            return self::c14nSerializeNode($rootVar->toObject(), $withComments);
+            return self::c14nSerializeNode($rootVar->toObject(), $withComments, $exclusive, []);
         }
 
-        return self::c14nSerializeNode($node, $withComments);
+        return self::c14nSerializeNode($node, $withComments, $exclusive, []);
     }
 
     /**
@@ -8197,13 +8218,20 @@ final class VmDom
         return $written;
     }
 
-    private static function c14nSerializeNode(ObjectEntry $entry, bool $withComments): string|false
-    {
+    /**
+     * @param array<string, string> $renderedNamespaces prefix => uri already emitted by ancestors in the node-set
+     */
+    private static function c14nSerializeNode(
+        ObjectEntry $entry,
+        bool $withComments,
+        bool $exclusive,
+        array $renderedNamespaces
+    ): string|false {
         if (!DomRegistry::has($entry)) {
             return false;
         }
         if (self::isElement($entry)) {
-            return self::c14nSerializeElement($entry, $withComments);
+            return self::c14nSerializeElement($entry, $withComments, $exclusive, $renderedNamespaces);
         }
         if (self::isTextNode($entry)) {
             return self::escapeText(DomRegistry::state($entry)->textContent ?? '');
@@ -8225,11 +8253,23 @@ final class VmDom
         return false;
     }
 
-    private static function c14nSerializeElement(ObjectEntry $entry, bool $withComments): string
-    {
+    /**
+     * @param array<string, string> $renderedNamespaces
+     */
+    private static function c14nSerializeElement(
+        ObjectEntry $entry,
+        bool $withComments,
+        bool $exclusive,
+        array $renderedNamespaces
+    ): string {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
-        $attrPart = self::c14nSerializeAttributes($state);
+        $nsToEmit = self::c14nNamespacesToEmit($entry, $exclusive, $renderedNamespaces);
+        $attrPart = self::c14nSerializeAttributes($entry, $nsToEmit);
+        $childRendered = $renderedNamespaces;
+        foreach ($nsToEmit as $prefix => $uri) {
+            $childRendered[$prefix] = $uri;
+        }
         if ([] === $state->childIds) {
             return '<'.$name.$attrPart.'></'.$name.'>';
         }
@@ -8239,7 +8279,7 @@ final class VmDom
             if (null === $child) {
                 continue;
             }
-            $chunk = self::c14nSerializeNode($child, $withComments);
+            $chunk = self::c14nSerializeNode($child, $withComments, $exclusive, $childRendered);
             if (false === $chunk) {
                 continue;
             }
@@ -8249,57 +8289,189 @@ final class VmDom
         return '<'.$name.$attrPart.'>'.implode('', $parts).'</'.$name.'>';
     }
 
-    /** @return non-empty-string */
-    private static function c14nSerializeAttributes(DomNodeState $state): string
-    {
-        if ([] === $state->attributes) {
-            return '';
+    /**
+     * Namespaces to render on this element (Inclusive/Exclusive C14N; php-src/libxml xmlC14NDocDumpMemory).
+     *
+     * @param array<string, string> $renderedNamespaces
+     *
+     * @return array<string, string> prefix => uri
+     */
+    private static function c14nNamespacesToEmit(
+        ObjectEntry $entry,
+        bool $exclusive,
+        array $renderedNamespaces
+    ): array {
+        $inScope = self::c14nCollectInScopeNamespaces($entry);
+        if ($exclusive) {
+            $utilized = self::c14nUtilizedPrefixes($entry);
+            $candidates = [];
+            foreach ($utilized as $prefix => $_) {
+                if (\array_key_exists($prefix, $inScope)) {
+                    $candidates[$prefix] = $inScope[$prefix];
+                }
+            }
+        } else {
+            $candidates = $inScope;
         }
-        $entries = [];
+        $toEmit = [];
+        foreach ($candidates as $prefix => $uri) {
+            // xml prefix is never emitted (http://www.w3.org/TR/xml-c14n).
+            if ('xml' === $prefix) {
+                continue;
+            }
+            if (\array_key_exists($prefix, $renderedNamespaces) && $renderedNamespaces[$prefix] === $uri) {
+                continue;
+            }
+            $toEmit[$prefix] = $uri;
+        }
+
+        return $toEmit;
+    }
+
+    /**
+     * In-scope prefix→URI map at $entry (ancestor declarations; nearer wins).
+     *
+     * @return array<string, string>
+     */
+    private static function c14nCollectInScopeNamespaces(ObjectEntry $entry): array
+    {
+        $chain = [];
+        $current = $entry;
+        while (DomRegistry::has($current)) {
+            if (self::isElement($current)) {
+                $chain[] = $current;
+            }
+            $state = DomRegistry::state($current);
+            if (null === $state->parentId) {
+                break;
+            }
+            $parent = DomRegistry::entry($state->parentId);
+            if (null === $parent || self::isDocument($parent)) {
+                break;
+            }
+            $current = $parent;
+        }
+        $inScope = [];
+        for ($i = \count($chain) - 1; $i >= 0; --$i) {
+            $state = DomRegistry::state($chain[$i]);
+            foreach ($state->namespaceDeclarations as $prefix => $uri) {
+                $inScope[$prefix] = $uri;
+            }
+        }
+
+        return $inScope;
+    }
+
+    /**
+     * Prefixes visibly utilized by this element (exclusive C14N).
+     *
+     * @return array<string, true>
+     */
+    private static function c14nUtilizedPrefixes(ObjectEntry $entry): array
+    {
+        $state = DomRegistry::state($entry);
+        $used = [];
+        $prefix = $state->prefix ?? '';
+        if (null !== $state->namespaceUri && '' !== $state->namespaceUri) {
+            $used[$prefix] = true;
+        } elseif ('' !== $prefix) {
+            // Prefixed QName still utilizes the prefix when URI resolution lagged (#19467).
+            $used[$prefix] = true;
+        }
         foreach ($state->attributes as $aname => $avalue) {
+            unset($avalue);
+            if (self::isXmlnsAttributeName($aname)) {
+                continue;
+            }
+            [$attrPrefix] = self::splitQualifiedName($aname);
+            if ('' !== $attrPrefix) {
+                $used[$attrPrefix] = true;
+            }
+        }
+
+        return $used;
+    }
+
+    /**
+     * @param array<string, string> $nsToEmit prefix => uri
+     *
+     * @return non-empty-string|''
+     */
+    private static function c14nSerializeAttributes(ObjectEntry $entry, array $nsToEmit): string
+    {
+        $state = DomRegistry::state($entry);
+        $entries = [];
+        foreach ($nsToEmit as $prefix => $uri) {
+            $attrName = '' === $prefix ? 'xmlns' : 'xmlns:'.$prefix;
+            $entries[] = [
+                'name' => $attrName,
+                'value' => $uri,
+                'ns' => 'http://www.w3.org/2000/xmlns/',
+                'nsDecl' => true,
+            ];
+        }
+        foreach ($state->attributes as $aname => $avalue) {
+            if (self::isXmlnsAttributeName($aname)) {
+                // Already represented via $nsToEmit / in-scope map.
+                continue;
+            }
             $entries[] = [
                 'name' => $aname,
                 'value' => $avalue,
-                'ns' => $state->attributeNamespaces[$aname] ?? null,
+                'ns' => $state->attributeNamespaces[$aname] ?? '',
+                'nsDecl' => false,
             ];
         }
-        usort(
-            $entries,
-            static function (array $a, array $b): int {
-                $aNsDecl = self::isNamespaceDeclarationAttribute($a['name']);
-                $bNsDecl = self::isNamespaceDeclarationAttribute($b['name']);
-                if ($aNsDecl && !$bNsDecl) {
-                    return -1;
-                }
-                if (!$aNsDecl && $bNsDecl) {
-                    return 1;
-                }
-                if ($aNsDecl && $bNsDecl) {
-                    if ('xmlns' === $a['name']) {
-                        return 'xmlns' === $b['name'] ? 0 : -1;
-                    }
-                    if ('xmlns' === $b['name']) {
-                        return 1;
-                    }
-
-                    return strcmp($a['name'], $b['name']);
-                }
-                $aNs = $a['ns'] ?? '';
-                $bNs = $b['ns'] ?? '';
-                $cmp = strcmp($aNs, $bNs);
-                if (0 !== $cmp) {
-                    return $cmp;
-                }
-
-                return strcmp(self::attributeLocalName($a['name']), self::attributeLocalName($b['name']));
+        if ([] === $entries) {
+            return '';
+        }
+        // Insertion sort — no closures (nested AOT helpers cannot compile usort callbacks; #19467).
+        $n = \count($entries);
+        for ($i = 1; $i < $n; ++$i) {
+            $key = $entries[$i];
+            $j = $i - 1;
+            while ($j >= 0 && self::c14nAttrCompare($entries[$j], $key) > 0) {
+                $entries[$j + 1] = $entries[$j];
+                --$j;
             }
-        );
+            $entries[$j + 1] = $key;
+        }
         $parts = [];
-        foreach ($entries as $entry) {
-            $parts[] = self::escapeName($entry['name']).'="'.self::escapeAttr($entry['value']).'"';
+        foreach ($entries as $attr) {
+            $parts[] = self::escapeName($attr['name']).'="'.self::escapeAttr($attr['value']).'"';
         }
 
         return ' '.implode(' ', $parts);
+    }
+
+    /**
+     * @param array{name: string, value: string, ns: string, nsDecl: bool} $a
+     * @param array{name: string, value: string, ns: string, nsDecl: bool} $b
+     */
+    private static function c14nAttrCompare(array $a, array $b): int
+    {
+        if ($a['nsDecl'] && !$b['nsDecl']) {
+            return -1;
+        }
+        if (!$a['nsDecl'] && $b['nsDecl']) {
+            return 1;
+        }
+        if ($a['nsDecl'] && $b['nsDecl']) {
+            if ('xmlns' === $a['name']) {
+                return 'xmlns' === $b['name'] ? 0 : -1;
+            }
+            if ('xmlns' === $b['name']) {
+                return 1;
+            }
+
+            return strcmp($a['name'], $b['name']);
+        }
+        $cmp = strcmp($a['ns'], $b['ns']);
+        if (0 !== $cmp) {
+            return $cmp;
+        }
+
+        return strcmp(self::attributeLocalName($a['name']), self::attributeLocalName($b['name']));
     }
 
     private static function attributeLocalName(string $qName): string
