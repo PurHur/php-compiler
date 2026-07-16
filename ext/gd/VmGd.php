@@ -93,6 +93,61 @@ final class VmGd
         return ($red << 16) | ($green << 8) | $blue;
     }
 
+    /**
+     * imagecolorallocatealpha() — GD truecolor ARGB (alpha 0 opaque .. 127 transparent; #6535).
+     */
+    public static function colorAllocateAlpha(
+        ObjectEntry $image,
+        int $red,
+        int $green,
+        int $blue,
+        int $alpha
+    ): int|false {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster() || !$state->truecolor) {
+            return false;
+        }
+        if ($red < 0 || $red > 255 || $green < 0 || $green > 255 || $blue < 0 || $blue > 255) {
+            return false;
+        }
+        if ($alpha < 0) {
+            $alpha = 0;
+        }
+        if ($alpha > 127) {
+            $alpha = 127;
+        }
+
+        return (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+    }
+
+    /**
+     * imagealphablending() — always true like php-src RETURN_TRUE (#6535).
+     */
+    public static function setAlphaBlending(ObjectEntry $image, bool $enable): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        $state->alphaBlending = $enable;
+
+        return true;
+    }
+
+    /**
+     * imagesavealpha() — always true like php-src RETURN_TRUE (#6535).
+     */
+    public static function setSaveAlpha(ObjectEntry $image, bool $enable): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        $state->saveAlpha = $enable;
+
+        return true;
+    }
+
     public static function fill(ObjectEntry $image, int $x, int $y, int $color): bool
     {
         $state = GdRegistry::state($image);
@@ -209,7 +264,7 @@ final class VmGd
         if ($x < 0 || $y < 0 || $x >= $state->width || $y >= $state->height) {
             return false;
         }
-        $state->pixels[$y * $state->width + $x] = $color;
+        self::putPixel($state, $x, $y, $color);
 
         return true;
     }
@@ -366,9 +421,8 @@ final class VmGd
         }
         $width = $state->width;
         for ($y = $y1; $y <= $y2; ++$y) {
-            $row = $y * $width;
             for ($x = $x1; $x <= $x2; ++$x) {
-                $state->pixels[$row + $x] = $color;
+                self::putPixel($state, $x, $y, $color);
             }
         }
 
@@ -629,6 +683,10 @@ final class VmGd
             return $state->encoded;
         }
         if ($state->hasRaster()) {
+            if ($state->saveAlpha) {
+                return VmGdPng::encodeRgba($state->width, $state->height, $state->pixels);
+            }
+
             return VmGdPng::encodeRgb($state->width, $state->height, $state->pixels);
         }
 
@@ -1275,6 +1333,19 @@ final class VmGd
             'imagecreatefromstring' => 'image',
             'imagecreatefromwebp', 'imagecreatefromavif' => 'filename',
             'imagesx', 'imagesy' => 'image',
+            'imagealphablending', 'imagesavealpha' => match ($position) {
+                1 => 'image',
+                2 => 'enable',
+                default => 'arg',
+            },
+            'imagecolorallocatealpha' => match ($position) {
+                1 => 'image',
+                2 => 'red',
+                3 => 'green',
+                4 => 'blue',
+                5 => 'alpha',
+                default => 'arg',
+            },
             'imagecolorat' => match ($position) {
                 1 => 'image',
                 2 => 'x',
@@ -1308,7 +1379,41 @@ final class VmGd
         if ($x < 0 || $y < 0 || $x >= $state->width || $y >= $state->height) {
             return;
         }
-        $state->pixels[$y * $state->width + $x] = $color;
+        $index = $y * $state->width + $x;
+        if ($state->truecolor && $state->alphaBlending) {
+            $state->pixels[$index] = self::gdAlphaBlend($state->pixels[$index], $color);
+        } else {
+            $state->pixels[$index] = $color;
+        }
+    }
+
+    /**
+     * libgd gdAlphaBlend — GD alpha 0 opaque .. 127 transparent (php-src ext/gd/libgd/gd.c).
+     */
+    private static function gdAlphaBlend(int $dst, int $src): int
+    {
+        $srcAlpha = ($src >> 24) & 0x7F;
+        if (0 === $srcAlpha) {
+            return $src;
+        }
+        if (127 === $srcAlpha) {
+            return $dst;
+        }
+
+        $dstAlpha = ($dst >> 24) & 0x7F;
+        $srcWeight = 127 - $srcAlpha;
+        $dstWeight = ((127 - $dstAlpha) * $srcAlpha) / 127;
+        $weightSum = $srcWeight + $dstWeight;
+        if ($weightSum <= 0) {
+            return $dst & 0x7FFFFFFF;
+        }
+
+        $red = (int) (((($src >> 16) & 0xFF) * $srcWeight + (($dst >> 16) & 0xFF) * $dstWeight) / $weightSum);
+        $green = (int) (((($src >> 8) & 0xFF) * $srcWeight + (($dst >> 8) & 0xFF) * $dstWeight) / $weightSum);
+        $blue = (int) ((($src & 0xFF) * $srcWeight + ($dst & 0xFF) * $dstWeight) / $weightSum);
+        $alpha = 127 - (int) $weightSum;
+
+        return (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
     }
 
     private static function hLine(GdImageState $state, int $y, int $x1, int $x2, int $color): void

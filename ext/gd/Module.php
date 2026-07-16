@@ -58,6 +58,9 @@ class Module extends ModuleAbstract
         ];
         if (GdExtensionPolicy::advertisesDrawing()) {
             $functions[] = new imagecolorallocate();
+            $functions[] = new imagecolorallocatealpha();
+            $functions[] = new imagealphablending();
+            $functions[] = new imagesavealpha();
             $functions[] = new imagefill();
             $functions[] = new imagedestroy();
             $functions[] = new imagesx();

@@ -27,6 +27,16 @@ final class GdImageState
     public bool $truecolor;
 
     /**
+     * libgd alphaBlendingFlag — default on for truecolor (php-src ext/gd/libgd/gd.c; #6535).
+     */
+    public bool $alphaBlending;
+
+    /**
+     * libgd saveAlphaFlag — default off (php-src ext/gd/libgd/gd.c; #6535).
+     */
+    public bool $saveAlpha;
+
+    /**
      * @param list<int> $pixels
      */
     private function __construct(
@@ -35,7 +45,9 @@ final class GdImageState
         int $width,
         int $height,
         array $pixels,
-        bool $truecolor
+        bool $truecolor,
+        bool $alphaBlending = true,
+        bool $saveAlpha = false
     ) {
         $this->encoded = $encoded;
         $this->imageType = $imageType;
@@ -43,18 +55,20 @@ final class GdImageState
         $this->height = $height;
         $this->pixels = $pixels;
         $this->truecolor = $truecolor;
+        $this->alphaBlending = $alphaBlending;
+        $this->saveAlpha = $saveAlpha;
     }
 
     public static function fromEncoded(string $encoded, int $imageType): self
     {
-        return new self($encoded, $imageType, 0, 0, [], false);
+        return new self($encoded, $imageType, 0, 0, [], false, true, false);
     }
 
     public static function createTruecolor(int $width, int $height): self
     {
         $pixels = array_fill(0, $width * $height, 0);
 
-        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true);
+        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true, true, false);
     }
 
     /**
@@ -62,7 +76,7 @@ final class GdImageState
      */
     public static function fromRaster(int $width, int $height, array $pixels): self
     {
-        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true);
+        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true, true, false);
     }
 
     public function hasRaster(): bool

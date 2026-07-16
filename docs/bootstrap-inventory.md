@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5176 |
-| Phase A inventory files (M2 ratio SSOT) | 5176 |
+| PHP files on vm.php path | 5179 |
+| Phase A inventory files (M2 ratio SSOT) | 5179 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14112 |
+| Source constructs flagged (warnings) | 14119 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -431,14 +431,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 4 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 28 |
+| `ext/gd/Module.php` | 0 | 31 |
 | `ext/gd/VmGd.php` | 0 | 6 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
 | `ext/gd/VmGdPng.php` | 0 | 1 |
 | `ext/gd/VmGdWebp.php` | 0 | 1 |
+| `ext/gd/imagealphablending.php` | 0 | 1 |
 | `ext/gd/imageavif.php` | 0 | 1 |
 | `ext/gd/imagechar.php` | 0 | 1 |
 | `ext/gd/imagecolorallocate.php` | 0 | 1 |
+| `ext/gd/imagecolorallocatealpha.php` | 0 | 1 |
 | `ext/gd/imagecolorat.php` | 0 | 1 |
 | `ext/gd/imagecopy.php` | 0 | 1 |
 | `ext/gd/imagecopymerge.php` | 0 | 1 |
@@ -456,6 +458,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imageflip.php` | 0 | 1 |
 | `ext/gd/imageline.php` | 0 | 1 |
 | `ext/gd/imagepng.php` | 0 | 1 |
+| `ext/gd/imagesavealpha.php` | 0 | 1 |
 | `ext/gd/imagesetpixel.php` | 0 | 1 |
 | `ext/gd/imagestring.php` | 0 | 1 |
 | `ext/gd/imagesx.php` | 0 | 1 |
@@ -3537,7 +3540,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 124 |
+| `lib/JIT.php` | 0 | 125 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 1 |
@@ -7927,9 +7930,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gd/GdImageState.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 50)
-- new self (line 57)
-- new self (line 65)
+- new self (line 64)
+- new self (line 71)
+- new self (line 79)
 - 5 class method(s)
 
 ### `ext/gd/GdRegistry.php`
@@ -7944,29 +7947,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagecreate (line 56)
 - new imagecreatetruecolor (line 57)
 - new imagecolorallocate (line 60)
-- new imagefill (line 61)
-- new imagedestroy (line 62)
-- new imagesx (line 63)
-- new imagesy (line 64)
-- new imagecolorat (line 65)
-- new imagecopy (line 66)
-- new imagecopymerge (line 67)
-- new imagecopyresampled (line 68)
-- new imagesetpixel (line 69)
-- new imageline (line 70)
-- new imagefilledrectangle (line 71)
-- new imagestring (line 72)
-- new imagechar (line 73)
-- new imagefilter (line 74)
-- new imageflip (line 75)
-- new imagecrop (line 76)
-- new imagecropauto (line 77)
-- new imagecreatefromstring (line 80)
-- new imagepng (line 81)
-- new imagewebp (line 82)
-- new imageavif (line 83)
-- new imagecreatefromwebp (line 84)
-- new imagecreatefromavif (line 85)
+- new imagecolorallocatealpha (line 61)
+- new imagealphablending (line 62)
+- new imagesavealpha (line 63)
+- new imagefill (line 64)
+- new imagedestroy (line 65)
+- new imagesx (line 66)
+- new imagesy (line 67)
+- new imagecolorat (line 68)
+- new imagecopy (line 69)
+- new imagecopymerge (line 70)
+- new imagecopyresampled (line 71)
+- new imagesetpixel (line 72)
+- new imageline (line 73)
+- new imagefilledrectangle (line 74)
+- new imagestring (line 75)
+- new imagechar (line 76)
+- new imagefilter (line 77)
+- new imageflip (line 78)
+- new imagecrop (line 79)
+- new imagecropauto (line 80)
+- new imagecreatefromstring (line 83)
+- new imagepng (line 84)
+- new imagewebp (line 85)
+- new imageavif (line 86)
+- new imagecreatefromwebp (line 87)
+- new imagecreatefromavif (line 88)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -7974,10 +7980,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 53)
 - new ObjectEntry (line 76)
-- new ObjectEntry (line 708)
-- new ObjectEntry (line 732)
-- new ObjectEntry (line 958)
-- 57 class method(s)
+- new ObjectEntry (line 766)
+- new ObjectEntry (line 790)
+- new ObjectEntry (line 1016)
+- 61 class method(s)
 
 ### `ext/gd/VmGdAvif.php`
 
@@ -7987,9 +7993,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gd/VmGdPng.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 5 class method(s)
 
 ### `ext/gd/VmGdWebp.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagealphablending.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -8005,6 +8016,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imagecolorallocate.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecolorallocatealpha.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -8090,6 +8106,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imagepng.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagesavealpha.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -29032,86 +29053,87 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Literal (line 8140)
 - new Variable (line 8200)
 - new Operand\Literal (line 8297)
-- new Variable (line 8662)
-- new Variable (line 8780)
-- new VM\Variable (line 8840)
-- new OpCode (line 8924)
-- new Variable (line 9451)
-- new Variable (line 9512)
-- new JIT\Call\ClosureWithBinding (line 9541)
-- new JIT\Call\RuntimeVariableFunction (line 9596)
-- new Variable (line 9741)
-- new VM\Variable (line 9999)
-- new VM (line 10005)
+- new Operand\Literal (line 8376)
+- new Variable (line 8681)
+- new Variable (line 8799)
+- new VM\Variable (line 8859)
+- new OpCode (line 8943)
+- new Variable (line 9470)
+- new Variable (line 9531)
+- new JIT\Call\ClosureWithBinding (line 9560)
+- new JIT\Call\RuntimeVariableFunction (line 9615)
+- new Variable (line 9760)
 - new VM\Variable (line 10018)
-- new Variable (line 10236)
-- new Type (line 10243)
-- new Variable (line 10264)
-- new Type (line 10272)
-- new Variable (line 10294)
-- new Type (line 10302)
-- new Variable (line 10446)
-- new Variable (line 10467)
-- new Variable (line 11574)
-- new Variable (line 11599)
-- new Variable (line 11620)
-- new CompileError (line 12367)
-- new CompileError (line 12471)
-- new Variable (line 12522)
-- new Variable (line 12905)
-- new Variable (line 12925)
-- new Variable (line 12946)
-- new Variable (line 12980)
-- new Variable (line 13014)
-- new Variable (line 13106)
-- new Variable (line 13128)
-- new Variable (line 13138)
-- new Variable (line 13290)
-- new Variable (line 13308)
-- new Variable (line 13358)
-- new Variable (line 13385)
-- new Variable (line 13410)
-- new Variable (line 13739)
-- new Variable (line 14107)
-- new Variable (line 14137)
+- new VM (line 10024)
+- new VM\Variable (line 10037)
+- new Variable (line 10255)
+- new Type (line 10262)
+- new Variable (line 10283)
+- new Type (line 10291)
+- new Variable (line 10313)
+- new Type (line 10321)
+- new Variable (line 10465)
+- new Variable (line 10486)
+- new Variable (line 11593)
+- new Variable (line 11618)
+- new Variable (line 11639)
+- new CompileError (line 12386)
+- new CompileError (line 12490)
+- new Variable (line 12541)
+- new Variable (line 12924)
+- new Variable (line 12944)
+- new Variable (line 12965)
+- new Variable (line 12999)
+- new Variable (line 13033)
+- new Variable (line 13125)
+- new Variable (line 13147)
+- new Variable (line 13157)
+- new Variable (line 13309)
+- new Variable (line 13327)
+- new Variable (line 13377)
+- new Variable (line 13404)
+- new Variable (line 13429)
+- new Variable (line 13758)
+- new Variable (line 14126)
 - new Variable (line 14156)
-- new Variable (line 14186)
-- new Variable (line 14223)
-- new Variable (line 14271)
-- new Variable (line 14314)
-- new VM\Variable (line 14659)
-- new Variable (line 14693)
-- new Variable (line 14744)
-- new Variable (line 14760)
+- new Variable (line 14175)
+- new Variable (line 14205)
+- new Variable (line 14242)
+- new Variable (line 14290)
+- new Variable (line 14333)
+- new VM\Variable (line 14678)
+- new Variable (line 14712)
+- new Variable (line 14763)
 - new Variable (line 14779)
-- new Variable (line 14786)
-- new OpCode (line 14806)
-- new Variable (line 14807)
-- new Variable (line 14979)
-- new Variable (line 15017)
-- new OpCode (line 15031)
-- new Variable (line 15032)
-- new Variable (line 15091)
-- new OpCode (line 15112)
-- new Variable (line 15113)
-- new Variable (line 15210)
-- new Variable (line 15232)
-- new Variable (line 15300)
-- new Operand\Literal (line 15309)
-- new Variable (line 15324)
-- new Variable (line 15488)
-- new VM\PropertyIsInitializedHandler (line 15570)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15610)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15739)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15826)
-- new JIT\Call\VmCoerceVariableToString (line 15916)
-- new JIT\Call\IncludePathResolverResolve (line 16170)
-- new Variable (line 17226)
-- new VM (line 17270)
-- new VM\Variable (line 17279)
-- new Variable (line 17300)
-- new Variable (line 17346)
-- new Variable (line 17840)
+- new Variable (line 14798)
+- new Variable (line 14805)
+- new OpCode (line 14825)
+- new Variable (line 14826)
+- new Variable (line 14998)
+- new Variable (line 15036)
+- new OpCode (line 15050)
+- new Variable (line 15051)
+- new Variable (line 15110)
+- new OpCode (line 15131)
+- new Variable (line 15132)
+- new Variable (line 15229)
+- new Variable (line 15251)
+- new Variable (line 15319)
+- new Operand\Literal (line 15328)
+- new Variable (line 15343)
+- new Variable (line 15507)
+- new VM\PropertyIsInitializedHandler (line 15589)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15629)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15758)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15845)
+- new JIT\Call\VmCoerceVariableToString (line 15935)
+- new JIT\Call\IncludePathResolverResolve (line 16189)
+- new Variable (line 17245)
+- new VM (line 17289)
+- new VM\Variable (line 17298)
+- new Variable (line 17319)
+- new Variable (line 17365)
+- new Variable (line 17859)
 - 369 class method(s)
 - 7 closure(s)
 
@@ -32704,22 +32726,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VMVariable (line 3229)
 - new VMVariable (line 3237)
 - new VMVariable (line 3255)
-- new ReflectionClassConstant (line 4420)
-- new Variable (line 4781)
-- new Variable (line 4807)
-- new Variable (line 4815)
-- new Variable (line 4838)
-- new Variable (line 4864)
-- new Variable (line 4872)
-- new Variable (line 4946)
-- new Literal (line 4963)
-- new Literal (line 4968)
-- new Literal (line 4973)
+- new ReflectionClassConstant (line 4451)
+- new Variable (line 4819)
+- new Variable (line 4845)
+- new Variable (line 4853)
+- new Variable (line 4876)
+- new Variable (line 4902)
+- new Variable (line 4910)
 - new Variable (line 4984)
-- new Variable (line 5017)
-- new Variable (line 5040)
-- new Variable (line 5404)
-- 257 class method(s)
+- new Literal (line 5001)
+- new Literal (line 5006)
+- new Literal (line 5011)
+- new Variable (line 5022)
+- new Variable (line 5055)
+- new Variable (line 5078)
+- new Variable (line 5442)
+- 258 class method(s)
 - 8 closure(s)
 
 ### `lib/JIT/Builtin/Type/String_.php`
@@ -33591,13 +33613,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - trait ClassConstFetchHelperTrait (line 27)
 - new Variable (line 163)
-- new Operand\Literal (line 299)
+- new Operand\Literal (line 312)
 - 28 class method(s)
 
 ### `lib/JIT/ClassConstVisibilityJitGuard.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/ClassParamCheck.php`
@@ -35263,45 +35285,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\EnumFromHandler (line 13715)
 - new CompileError (line 14448)
 - new VM\ClassProperty (line 14613)
-- new Variable (line 14912)
-- new Variable (line 15100)
-- new Variable (line 15102)
-- new ClassEntry (line 15145)
-- new Func\PHP (line 15152)
-- new VM\ClassProperty (line 15280)
-- new Func\PHP (line 15427)
-- new Variable (line 15503)
-- new Variable (line 15510)
-- new Variable (line 15516)
-- new Variable (line 15553)
-- new Variable (line 15582)
-- new Variable (line 15767)
-- new Variable (line 15813)
-- new VM\ClassProperty (line 15878)
-- new Error (line 15924)
-- new Error (line 15959)
-- new Error (line 15962)
-- new Error (line 15965)
-- new Error (line 15968)
-- new ObjectEntry (line 15970)
+- new Variable (line 14920)
+- new Variable (line 15115)
+- new Variable (line 15117)
+- new ClassEntry (line 15160)
+- new Func\PHP (line 15167)
+- new VM\ClassProperty (line 15295)
+- new Func\PHP (line 15442)
+- new Variable (line 15518)
+- new Variable (line 15525)
+- new Variable (line 15531)
+- new Variable (line 15568)
+- new Variable (line 15597)
+- new Variable (line 15782)
+- new Variable (line 15828)
+- new VM\ClassProperty (line 15893)
+- new Error (line 15939)
+- new Error (line 15974)
+- new Error (line 15977)
+- new Error (line 15980)
 - new Error (line 15983)
-- new Error (line 15986)
-- new Error (line 15989)
-- new Error (line 16008)
-- new ObjectEntry (line 16012)
-- new Variable (line 16014)
-- new Variable (line 16028)
-- new Variable (line 16055)
-- new Variable (line 16068)
-- new Error (line 16198)
-- new Error (line 16203)
-- new VM\ObjectEntry (line 16207)
-- new Variable (line 16347)
-- new Variable (line 16365)
-- new NoDiscardMetadata (line 16534)
-- new Variable (line 16703)
-- new Variable (line 16705)
-- new Variable (line 16797)
+- new ObjectEntry (line 15985)
+- new Error (line 15998)
+- new Error (line 16001)
+- new Error (line 16004)
+- new Error (line 16023)
+- new ObjectEntry (line 16027)
+- new Variable (line 16029)
+- new Variable (line 16043)
+- new Variable (line 16070)
+- new Variable (line 16083)
+- new Error (line 16213)
+- new Error (line 16218)
+- new VM\ObjectEntry (line 16222)
+- new Variable (line 16362)
+- new Variable (line 16380)
+- new NoDiscardMetadata (line 16549)
+- new Variable (line 16718)
+- new Variable (line 16720)
+- new Variable (line 16812)
 - 479 class method(s)
 - 19 closure(s)
 
