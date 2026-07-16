@@ -79,6 +79,10 @@ class Module extends ModuleAbstract
         if (GdExtensionPolicy::advertisesDecodeFromString()) {
             $functions[] = new imagecreatefromstring();
             $functions[] = new imagepng();
+            $functions[] = new imagewebp();
+            $functions[] = new imageavif();
+            $functions[] = new imagecreatefromwebp();
+            $functions[] = new imagecreatefromavif();
         }
 
         return $functions;

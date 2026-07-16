@@ -283,6 +283,9 @@ final class VmImage
         if ($len >= 30 && 'RIFF' === \substr($data, 0, 4) && 'WEBP' === \substr($data, 8, 4)) {
             return self::parseWebp($data);
         }
+        if ($len >= 12 && 'ftyp' === \substr($data, 4, 4)) {
+            return self::parseAvif($data);
+        }
 
         return false;
     }
@@ -426,6 +429,19 @@ final class VmImage
         }
 
         return false;
+    }
+
+    /**
+     * @return array<int|string, int|string>|false
+     */
+    private static function parseAvif(string $data)
+    {
+        $dims = \PHPCompiler\ext\gd\VmGdAvif::readDimensions($data);
+        if (false === $dims) {
+            return false;
+        }
+
+        return self::buildImageSizeResult($dims[0], $dims[1], self::IMAGETYPE_AVIF, 8, 3);
     }
 
     /**

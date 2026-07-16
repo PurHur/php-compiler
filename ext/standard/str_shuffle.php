@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -24,7 +23,7 @@ final class str_shuffle extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('str_shuffle() requires exactly one argument');
         }
-        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'str_shuffle', 'string');
+        $subject = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'str_shuffle', 0, 'string');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::strShuffle($subject))
@@ -39,7 +38,17 @@ final class str_shuffle extends Internal
 
         return JitStrShuffle::shuffle(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'str_shuffle', 0, 'string')
+            self::jitStringArg($context, $args[0])
         );
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19257, ext/standard/string.c). */
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'str_shuffle', 0, 'string');
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'str_shuffle', 0, 'string');
     }
 }

@@ -125,4 +125,32 @@ final class AttributeRegistry
             ReflectionSupport::filterEntriesByName($ctx, $entries, $filter, $flags)
         );
     }
+
+    public static function functionAttributes(
+        Frame $frame,
+        ObjectEntry $reflection,
+        ?string $filter,
+        int $flags = 0
+    ): Variable {
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('AttributeRegistry requires active VM context');
+        }
+        if ($reflection->reflectionIsInternalFunction ?? false) {
+            return ReflectionSupport::attributesArray($frame, []);
+        }
+        $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $reflection);
+        if (!$func instanceof \PHPCompiler\Func\PHP) {
+            return ReflectionSupport::attributesArray($frame, []);
+        }
+        $entries = ReflectionSupport::filterEntriesByName($ctx, $func->attributeEntries, $filter, $flags);
+        if ([] !== $entries) {
+            return ReflectionSupport::attributesArrayFromEntries($frame, $entries);
+        }
+
+        return ReflectionSupport::attributesArray(
+            $frame,
+            ReflectionSupport::filterByName($ctx, $func->attributeNames, $filter, $flags)
+        );
+    }
 }

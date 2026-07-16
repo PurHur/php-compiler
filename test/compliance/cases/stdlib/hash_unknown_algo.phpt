@@ -9,8 +9,8 @@ try {
     echo $e->getMessage(), "\n";
 }
 try {
-    hash('fnv164', 'data');
-    echo "fnv164 uncaught\n";
+    hash('fnv999', 'data');
+    echo "fnv999 uncaught\n";
 } catch (ValueError $e) {
     echo $e->getMessage(), "\n";
 }

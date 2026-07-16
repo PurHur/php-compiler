@@ -9,6 +9,7 @@
 
 namespace PHPCompiler\Func;
 
+use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\DeprecatedMetadata;
 use PHPCompiler\Func;
 use PHPCompiler\Frame;
@@ -22,6 +23,10 @@ final class PHP extends Func {
     public ?DeprecatedMetadata $deprecated = null;
     /** @var list<\PHPCompiler\Compiler\ParameterMetadata> */
     public array $parameterMetadata = [];
+    /** @var list<string> */
+    public array $attributeNames = [];
+    /** @var list<AttributeEntry> */
+    public array $attributeEntries = [];
 
     public function __construct(string $name, Block $block) {
         parent::__construct($name);

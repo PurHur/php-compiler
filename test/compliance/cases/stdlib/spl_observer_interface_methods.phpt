@@ -10,9 +10,10 @@ var_export(method_exists('SplSubject', 'detach'));
 echo "\n";
 var_export(method_exists('SplSubject', 'notify'));
 echo "\n";
+$observer = new ReflectionClass('SplObserver');
 $names = array_map(
     static fn (ReflectionMethod $m): string => $m->getName(),
-    (new ReflectionClass('SplObserver'))->getMethods()
+    $observer->getMethods()
 );
 var_export($names);
 echo "\n";
