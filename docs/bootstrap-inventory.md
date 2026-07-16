@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5151 |
-| Phase A inventory files (M2 ratio SSOT) | 5151 |
+| PHP files on vm.php path | 5157 |
+| Phase A inventory files (M2 ratio SSOT) | 5157 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14022 |
+| Source constructs flagged (warnings) | 14038 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -33,14 +33,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/JitBcmath.php` | 0 | 4 |
 | `ext/bcmath/Module.php` | 0 | 15 |
 | `ext/bcmath/NumberAdd.php` | 0 | 2 |
+| `ext/bcmath/NumberCeil.php` | 0 | 2 |
 | `ext/bcmath/NumberCompare.php` | 0 | 2 |
 | `ext/bcmath/NumberConstruct.php` | 0 | 2 |
 | `ext/bcmath/NumberDiv.php` | 0 | 2 |
+| `ext/bcmath/NumberFloor.php` | 0 | 2 |
 | `ext/bcmath/NumberFrom.php` | 0 | 2 |
+| `ext/bcmath/NumberMod.php` | 0 | 2 |
 | `ext/bcmath/NumberMul.php` | 0 | 2 |
+| `ext/bcmath/NumberPow.php` | 0 | 2 |
+| `ext/bcmath/NumberRound.php` | 0 | 1 |
+| `ext/bcmath/NumberSqrt.php` | 0 | 1 |
 | `ext/bcmath/NumberSub.php` | 0 | 2 |
 | `ext/bcmath/NumberToString.php` | 0 | 1 |
-| `ext/bcmath/VmBcMathNumber.php` | 0 | 16 |
+| `ext/bcmath/VmBcMathNumber.php` | 0 | 22 |
 | `ext/bcmath/VmBcmath.php` | 0 | 5 |
 | `ext/bcmath/bcadd.php` | 0 | 1 |
 | `ext/bcmath/bcceil.php` | 0 | 1 |
@@ -5079,7 +5085,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bcmath/BcMathNumberMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 12 class method(s)
 
 ### `ext/bcmath/BcmathFunction.php`
 
@@ -5129,6 +5135,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/bcmath/NumberCeil.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
 ### `ext/bcmath/NumberCompare.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5147,16 +5159,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/bcmath/NumberFloor.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
 ### `ext/bcmath/NumberFrom.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 22)
 - 1 class method(s)
 
+### `ext/bcmath/NumberMod.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
 ### `ext/bcmath/NumberMul.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/bcmath/NumberPow.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
+### `ext/bcmath/NumberRound.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/bcmath/NumberSqrt.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `ext/bcmath/NumberSub.php`
@@ -5173,21 +5213,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bcmath/VmBcMathNumber.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 36)
-- new Variable (line 37)
-- new ClassEntry (line 41)
-- new ClassProperty (line 44)
-- new ClassProperty (line 45)
-- new NumberConstruct (line 47)
-- new NumberFrom (line 51)
-- new NumberAdd (line 55)
-- new NumberSub (line 56)
-- new NumberMul (line 57)
-- new NumberDiv (line 58)
-- new NumberCompare (line 59)
-- new NumberToString (line 60)
-- new ObjectEntry (line 84)
-- new Variable (line 86)
+- new Variable (line 39)
+- new Variable (line 40)
+- new ClassEntry (line 44)
+- new ClassProperty (line 47)
+- new ClassProperty (line 48)
+- new NumberConstruct (line 50)
+- new NumberFrom (line 54)
+- new NumberAdd (line 58)
+- new NumberSub (line 59)
+- new NumberMul (line 60)
+- new NumberDiv (line 61)
+- new NumberMod (line 62)
+- new NumberPow (line 63)
+- new NumberSqrt (line 64)
+- new NumberFloor (line 65)
+- new NumberCeil (line 66)
+- new NumberRound (line 67)
+- new NumberCompare (line 68)
+- new NumberToString (line 69)
+- new ObjectEntry (line 93)
+- new Variable (line 95)
 - 9 class method(s)
 
 ### `ext/bcmath/VmBcmath.php`
