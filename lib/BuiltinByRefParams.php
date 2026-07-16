@@ -143,6 +143,18 @@ final class BuiltinByRefParams
             case 'msg_receive':
                 // &$received_message_type, &$message, &$error_code (#3666)
                 return [2, 4, 7];
+            case 'pcntl_waitpid':
+                // php-src ext/pcntl/pcntl.stub.php — &$status (#19564)
+                return [1];
+            case 'pcntl_sigprocmask':
+                // &$old_signals
+                return [2];
+            case 'pcntl_sigtimedwait':
+                // &$info
+                return [1];
+            case 'pcntl_waitid':
+                // &$info
+                return [2];
         }
 
         return [];

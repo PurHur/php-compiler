@@ -38,7 +38,8 @@ final class pcntl_waitpid extends Internal
         }
         $status = 0;
         $waitRc = VmPcntl::waitpid($pid, $status, $options);
-        $frame->calledArgs[1]->resolveIndirect()->int($status);
+        // ZEND_SEND_REF — write through byRefTarget so caller $status updates (#19564)
+        $frame->calledArgs[1]->byRefTarget()->int($status);
         $frame->returnVar->int($waitRc);
     }
 
