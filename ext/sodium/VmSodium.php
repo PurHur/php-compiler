@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\sodium;
 
+use PHPCompiler\VM\Variable;
+
 /**
  * libsodium secretbox via host ext/sodium or FFI (issue #13078, #3438).
  *
@@ -622,6 +624,56 @@ final class VmSodium
         return self::ffiMemcmp($string1, $string2);
     }
 
+    /**
+     * sodium_bin2hex() — constant-time binary→hex (php-src ext/sodium/libsodium.c; #3438).
+     */
+    public static function bin2hex(string $string): string
+    {
+        if (\function_exists('sodium_bin2hex')) {
+            return \sodium_bin2hex($string);
+        }
+        if (null !== self::ffi()) {
+            return self::ffiBin2hex($string);
+        }
+
+        return \bin2hex($string);
+    }
+
+    /**
+     * sodium_hex2bin() — hex→binary with optional ignore set (php-src ext/sodium/libsodium.c; #3438).
+     */
+    public static function hex2bin(string $string, string $ignore = ''): string
+    {
+        if (\function_exists('sodium_hex2bin')) {
+            return \sodium_hex2bin($string, $ignore);
+        }
+
+        return self::pureHex2bin($string, $ignore);
+    }
+
+    /**
+     * sodium_memzero() — wipe buffer then null the PHP string (php-src ext/sodium/libsodium.c; #3438).
+     */
+    public static function memzero(Variable $var): void
+    {
+        $target = $var->resolveIndirect();
+        if (Variable::TYPE_STRING !== $target->type) {
+            self::throwSodium('a PHP string is required');
+        }
+        $buf = $target->toString();
+        $len = \strlen($buf);
+        if ($len > 0) {
+            if (\function_exists('sodium_memzero')) {
+                // Host zeros a copy; observable result is still NULL (php-src convert_to_null).
+                $tmp = $buf;
+                \sodium_memzero($tmp);
+            } elseif (null !== self::ffi()) {
+                self::ffiMemzero($buf);
+            }
+        }
+        $target->null();
+    }
+
     public static function secretbox(string $message, string $nonce, string $key): string
     {
         if (\function_exists('sodium_crypto_secretbox')) {
@@ -729,6 +781,65 @@ final class VmSodium
         $s2 = self::stringToUnsignedCharArray($ffi, $string2);
 
         return $ffi->sodium_memcmp($s1, $s2, $len);
+    }
+
+    private static function ffiBin2hex(string $string): string
+    {
+        $ffi = self::requireFfi();
+        $binLen = \strlen($string);
+        $hexLen = $binLen * 2;
+        $hexBuf = $ffi->new('char['.($hexLen + 1).']');
+        $binBuf = self::stringToUnsignedCharArray($ffi, $string);
+        $ffi->sodium_bin2hex($hexBuf, $hexLen + 1, $binBuf, $binLen);
+        $out = '';
+        for ($i = 0; $i < $hexLen; ++$i) {
+            $out .= $hexBuf[$i];
+        }
+
+        return $out;
+    }
+
+    private static function ffiMemzero(string $buf): void
+    {
+        $ffi = self::requireFfi();
+        $len = \strlen($buf);
+        if ($len <= 0) {
+            return;
+        }
+        $cBuf = self::stringToUnsignedCharArray($ffi, $buf);
+        $ffi->sodium_memzero($cBuf, $len);
+    }
+
+    private static function pureHex2bin(string $hex, string $ignore): string
+    {
+        if ('' !== $ignore) {
+            $ignoreSet = [];
+            $ignoreLen = \strlen($ignore);
+            for ($i = 0; $i < $ignoreLen; ++$i) {
+                $ignoreSet[$ignore[$i]] = true;
+            }
+            $filtered = '';
+            $hexLen = \strlen($hex);
+            for ($i = 0; $i < $hexLen; ++$i) {
+                $ch = $hex[$i];
+                if (!isset($ignoreSet[$ch])) {
+                    $filtered .= $ch;
+                }
+            }
+            $hex = $filtered;
+        }
+        if ('' === $hex) {
+            return '';
+        }
+        if (0 !== (\strlen($hex) % 2) || 1 !== \preg_match('/^[0-9a-fA-F]+$/', $hex)) {
+            self::throwSodium('sodium_hex2bin(): Argument #1 ($string) must be a valid hexadecimal string');
+        }
+        $bin = \hex2bin($hex);
+        if (false === $bin) {
+            self::throwSodium('sodium_hex2bin(): Argument #1 ($string) must be a valid hexadecimal string');
+        }
+
+        return $bin;
     }
 
     private static function ffiPad(string $string, int $blockSize): string
@@ -1554,6 +1665,8 @@ final class VmSodium
                     int crypto_aead_xchacha20poly1305_ietf_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k);
                     int crypto_aead_xchacha20poly1305_ietf_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);
                     int sodium_memcmp(const unsigned char *s1, const unsigned char *s2, size_t len);
+                    char *sodium_bin2hex(char *hex, size_t hex_maxlen, const unsigned char *bin, size_t bin_len);
+                    void sodium_memzero(void *pnt, size_t len);
                     int sodium_pad(size_t *unpadded_buf_len_p, unsigned char *buf, size_t unpadded_buf_len, size_t blocksize);
                     int sodium_unpad(size_t *unpadded_buf_len_p, const unsigned char *buf, size_t padded_buf_len, size_t blocksize);
                     int crypto_generichash(unsigned char *out, size_t outlen, const unsigned char *in, unsigned long long inlen, const unsigned char *key, size_t keylen);
