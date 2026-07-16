@@ -4608,6 +4608,7 @@ require_once __DIR__.'/../../../lib/ListSpreadAssignSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/MethodVisibility.php';
 require_once __DIR__.'/../../../lib/Module.php';
 require_once __DIR__.'/../../../lib/ModuleAbstract.php';
+require_once __DIR__.'/../../../lib/NewDereferenceableSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/NullSafeLivenessDetector.php';
 require_once __DIR__.'/../../../lib/OpCodeNames.php';
 require_once __DIR__.'/../../../lib/PHPTypes/CompilerTypeReconstructor.php';

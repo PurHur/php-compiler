@@ -4,17 +4,94 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * Desugar PHP 8.4+ dereferencable `new` without outer parentheses before nikic/php-parser (#6974).
  *
  * Rewrites `new Class()->m()` to `(new Class())->m()` so php-parser v4 accepts the source.
  * Only `new` with constructor parentheses (or anonymous class) is dereferencable per RFC.
+ * Withheld on 8.4.0-dev reference profile (#19684) — see {@see referenceProfileSyntaxError()}.
  * php-src: Zend/zend_language_parser.y — new_dereferenceable / new_non_dereferenceable.
  */
 final class NewDereferenceableDesugar
 {
+    /** Zend 8.2 profile message for `new Class()->…` (#19684). */
+    public const REFERENCE_PROFILE_UNEXPECTED_OBJECT_OPERATOR = 'syntax error, unexpected token "->", expecting "," or ";"';
+
+    /** Zend 8.2 profile message for `new Class()?->…`. */
+    public const REFERENCE_PROFILE_UNEXPECTED_NULLSAFE = 'syntax error, unexpected token "?->", expecting "," or ";"';
+
+    /** Zend 8.2 profile message for `new Class()::…`. */
+    public const REFERENCE_PROFILE_UNEXPECTED_DOUBLE_COLON = 'syntax error, unexpected token "::", expecting "," or ";"';
+
+    /** Zend 8.2 profile message for `new Class()(…)`. */
+    public const REFERENCE_PROFILE_UNEXPECTED_PAREN = 'syntax error, unexpected token "(", expecting "," or ";"';
+
+    /** Zend 8.2 profile message for `new Class()[…]`. */
+    public const REFERENCE_PROFILE_UNEXPECTED_BRACKET = 'syntax error, unexpected token "[", expecting "," or ";"';
+
+    /**
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileSyntaxError(string $code): ?array
+    {
+        if (!preg_match('/\bnew\b/i', $code)) {
+            return null;
+        }
+
+        $tokens = token_get_all($code);
+        if (!\is_array($tokens) || [] === $tokens) {
+            return null;
+        }
+
+        for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
+            $token = $tokens[$i];
+            if (!\is_array($token) || \T_NEW !== $token[0]) {
+                continue;
+            }
+
+            $endIdx = self::dereferenceableNewEndIndex($tokens, $i);
+            if (null === $endIdx || !self::needsDereferenceWrap($tokens, $endIdx)) {
+                continue;
+            }
+            if (self::alreadyParenthesized($tokens, $i, $endIdx)) {
+                continue;
+            }
+
+            $pos = $endIdx + 1;
+            self::skipForwardIgnorable($tokens, $pos);
+            if ($pos >= $c) {
+                continue;
+            }
+
+            $message = self::referenceProfileMessageForToken($tokens[$pos]);
+            if (null === $message) {
+                continue;
+            }
+
+            $deref = $tokens[$pos];
+            if (\is_array($deref) && isset($deref[2])) {
+                $line = (int) $deref[2];
+            } else {
+                $offset = self::tokenByteOffset($tokens, $pos);
+                $line = null !== $offset ? self::byteOffsetToLine($code, $offset) : 1;
+            }
+
+            return [
+                'line' => max(1, $line),
+                'message' => $message,
+            ];
+        }
+
+        return null;
+    }
+
     public static function desugar(string $code): string
     {
+        if (!CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
+            return $code;
+        }
         if (!preg_match('/\bnew\b/i', $code)) {
             return $code;
         }
@@ -62,6 +139,36 @@ final class NewDereferenceableDesugar
         }
 
         return $code;
+    }
+
+    /**
+     * @param array{0: int, 1: string, 2: int}|string $token
+     */
+    private static function referenceProfileMessageForToken($token): ?string
+    {
+        if (\is_string($token)) {
+            return match ($token) {
+                '(' => self::REFERENCE_PROFILE_UNEXPECTED_PAREN,
+                '[' => self::REFERENCE_PROFILE_UNEXPECTED_BRACKET,
+                default => null,
+            };
+        }
+
+        return match ($token[0]) {
+            \T_OBJECT_OPERATOR => self::REFERENCE_PROFILE_UNEXPECTED_OBJECT_OPERATOR,
+            \T_NULLSAFE_OBJECT_OPERATOR => self::REFERENCE_PROFILE_UNEXPECTED_NULLSAFE,
+            \T_DOUBLE_COLON => self::REFERENCE_PROFILE_UNEXPECTED_DOUBLE_COLON,
+            default => null,
+        };
+    }
+
+    private static function byteOffsetToLine(string $code, int $offset): int
+    {
+        if ($offset <= 0) {
+            return 1;
+        }
+
+        return substr_count(substr($code, 0, $offset), "\n") + 1;
     }
 
     /**

@@ -5,12 +5,34 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Ast\NewDereferenceableDesugar;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** PHP 8.4 dereferencable `new` without outer parentheses (#6974). */
+/** PHP 8.4 dereferencable `new` without outer parentheses (#6974, #19684). */
 final class NewDereferenceableDesugarTest extends TestCase
 {
+    private ?string $previousProfile = null;
+
+    protected function setUp(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        $this->previousProfile = false === $prev ? null : $prev;
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        if (!CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
+            $this->markTestSkipped('dereferencable new forward profile unavailable');
+        }
+    }
+
+    protected function tearDown(): void
+    {
+        if (null === $this->previousProfile) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$this->previousProfile);
+        }
+    }
+
     public function testDesugarWrapsMethodChain(): void
     {
         $code = '<?php echo new Greeter()->greet();';
