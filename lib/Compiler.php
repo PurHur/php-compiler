@@ -16477,7 +16477,8 @@ class Compiler {
             }
             $argRoot = $this->unwrapOperandChain($arg);
             $callArg = $callOp->args[$argIndex] ?? null;
-            // file_put_contents($f, 'a', FILE_APPEND | LOCK_EX) — dead temp must use BitwiseOr slot, not prior call return (#18523).
+            // file_put_contents($f, 'a', FILE_APPEND | LOCK_EX) — trailing dead temp must use BitwiseOr (#18523).
+            // Do not steal earlier dead-temp New_ args (DatePeriod start + EXCLUDE|INCLUDE flags, #19735).
             if (
                 ($prev instanceof Op\Expr\BinaryOp\BitwiseOr
                     || $prev instanceof Op\Expr\BinaryOp\BitwiseAnd
@@ -16485,6 +16486,7 @@ class Compiler {
                 && null !== $callArg
                 && $this->callArgIsDeadInlineTemporary($callArg)
                 && !$this->callArgOperandExpectsArrayProducer($callArg)
+                && $argIndex === $this->trailingNonEmbeddedCallArgIndex($callOp)
             ) {
                 if (null === $block->slotForOperand($prev->result)) {
                     foreach ($this->compileExpr($prev, $block) as $op) {
@@ -38051,6 +38053,13 @@ class Compiler {
             !$prelude instanceof Op\Expr
             || !$this->isImmediateVarExportExpressionPrelude($prelude)
             || null === $prelude->result
+        ) {
+            return null;
+        }
+        // new DatePeriod(..., EXCLUDE_START_DATE|INCLUDE_END_DATE) — BitwiseOr feeds options, not arg #0 (#19735).
+        if (
+            $this->isArithmeticInlineCallArgProducer($prelude)
+            && 0 !== $this->trailingNonEmbeddedCallArgIndex($cfgCallOp)
         ) {
             return null;
         }
