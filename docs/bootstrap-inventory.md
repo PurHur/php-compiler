@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5020 |
-| Phase A inventory files (M2 ratio SSOT) | 5020 |
+| PHP files on vm.php path | 5023 |
+| Phase A inventory files (M2 ratio SSOT) | 5023 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13553 |
+| Source constructs flagged (warnings) | 13559 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -866,7 +866,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
 | `ext/sockets/JitSocketExportStream.php` | 0 | 1 |
 | `ext/sockets/JitSocketImportStream.php` | 0 | 1 |
-| `ext/sockets/Module.php` | 0 | 25 |
+| `ext/sockets/Module.php` | 0 | 28 |
 | `ext/sockets/SocketAtmarkJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketConstants.php` | 0 | 1 |
 | `ext/sockets/SocketExportStreamJitHelper.php` | 0 | 1 |
@@ -897,6 +897,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_set_block.php` | 0 | 3 |
 | `ext/sockets/socket_set_nonblock.php` | 0 | 3 |
 | `ext/sockets/socket_set_option.php` | 0 | 3 |
+| `ext/sockets/socket_shutdown.php` | 0 | 3 |
 | `ext/sockets/socket_strerror.php` | 0 | 3 |
 | `ext/sockets/socket_write.php` | 0 | 3 |
 | `ext/sodium/JitSodium.php` | 0 | 1 |
@@ -10846,16 +10847,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new socket_accept (line 52)
 - new socket_set_option (line 53)
 - new socket_get_option (line 54)
-- new socket_getsockname (line 55)
-- new socket_getpeername (line 56)
-- new socket_sendto (line 57)
-- new socket_recvfrom (line 58)
-- new socket_read (line 59)
-- new socket_write (line 60)
-- new socket_close (line 61)
-- new socket_strerror (line 62)
-- new socket_last_error (line 63)
-- new socket_clear_error (line 64)
+- new socket_setopt (line 55)
+- new socket_getopt (line 56)
+- new socket_getsockname (line 57)
+- new socket_getpeername (line 58)
+- new socket_sendto (line 59)
+- new socket_recvfrom (line 60)
+- new socket_shutdown (line 61)
+- new socket_read (line 62)
+- new socket_write (line 63)
+- new socket_close (line 64)
+- new socket_strerror (line 65)
+- new socket_last_error (line 66)
+- new socket_clear_error (line 67)
 - 3 class method(s)
 
 ### `ext/sockets/SocketAtmarkJitHelper.php`
@@ -10901,7 +10905,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/VmSockets.php`
 
 **Warnings** (review for bootstrap subset):
-- 36 class method(s)
+- 37 class method(s)
 
 ### `ext/sockets/socket_accept.php`
 
@@ -10981,9 +10985,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/socket_get_option.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
-- new HashTable (line 53)
-- new Variable (line 55)
+- new ArgumentCountError (line 33)
+- new HashTable (line 54)
+- new Variable (line 56)
 - 2 class method(s)
 - 3 closure(s)
 
@@ -11067,8 +11071,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/socket_set_option.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 36)
+- new ArgumentCountError (line 37)
 - 3 class method(s)
+- 1 closure(s)
+
+### `ext/sockets/socket_shutdown.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- 2 class method(s)
 - 1 closure(s)
 
 ### `ext/sockets/socket_strerror.php`

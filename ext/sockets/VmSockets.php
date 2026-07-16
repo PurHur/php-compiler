@@ -111,6 +111,34 @@ final class VmSockets
     }
 
     /**
+     * php-src: PHP_FUNCTION(socket_shutdown) (#6533).
+     */
+    public static function shutdown(ObjectEntry $object, int $how, Frame $frame): bool
+    {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+        if (0 === SocketsLibcThinAbi::shutdown($fd, $how)) {
+            self::$socketErrors[$object->id] = 0;
+
+            return true;
+        }
+        $errno = SocketsLibcThinAbi::readErrno();
+        self::recordError($object, $errno);
+        self::triggerWarning(
+            $frame,
+            \sprintf(
+                'socket_shutdown(): Unable to shutdown socket [%d]: %s',
+                $errno,
+                SocketsLibcThinAbi::strerror($errno)
+            )
+        );
+
+        return false;
+    }
+
+    /**
      * php-src: PHP_FUNCTION(socket_create) — domain must be AF_UNIX|AF_INET|AF_INET6.
      *
      * @return ObjectEntry|false

@@ -18,7 +18,7 @@ use PHPLLVM\Value;
  *
  * @see https://github.com/php/php-src/blob/master/ext/sockets/sockets.c PHP_FUNCTION(socket_get_option)
  */
-final class socket_get_option extends Internal
+class socket_get_option extends Internal
 {
     public function __construct()
     {
@@ -28,15 +28,16 @@ final class socket_get_option extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
+        $fn = $this->getName();
         if (3 !== $argc) {
             throw new \ArgumentCountError(
-                'socket_get_option() expects exactly 3 arguments, '.$argc.' given'
+                $fn.'() expects exactly 3 arguments, '.$argc.' given'
             );
         }
 
-        $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_get_option', 1);
-        $level = VmSocketArg::requireIntArg($frame->calledArgs[1], 'socket_get_option', 2, 'level');
-        $option = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_get_option', 3, 'option');
+        $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], $fn, 1);
+        $level = VmSocketArg::requireIntArg($frame->calledArgs[1], $fn, 2, 'level');
+        $option = VmSocketArg::requireIntArg($frame->calledArgs[2], $fn, 3, 'option');
         $value = VmSockets::getOption($object, $level, $option, $frame);
         if (false === $value) {
             BuiltinExecute::writeReturn(

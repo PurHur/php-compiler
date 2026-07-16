@@ -20,7 +20,8 @@ class JITTest extends BaseTest {
         foreach (parent::providePHPTests() as $name => $case) {
             // VM-first (#6212/#6248): JIT hangs/OOM on create_listen / datagram accept scripts; defer JIT PHPT.
             if (str_contains($name, 'socket_create_listen')
-                || str_contains($name, 'socket_datagram')) {
+                || str_contains($name, 'socket_datagram')
+                || str_contains($name, 'socket_shutdown')) {
                 continue;
             }
             if (!CompilerVersion::supportsStrIncrement()

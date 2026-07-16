@@ -18,7 +18,7 @@ use PHPLLVM\Value;
  *
  * @see https://github.com/php/php-src/blob/master/ext/sockets/sockets.c PHP_FUNCTION(socket_set_option)
  */
-final class socket_set_option extends Internal
+class socket_set_option extends Internal
 {
     private const SO_LINGER = 13;
     private const SO_RCVTIMEO = 20;
@@ -32,15 +32,16 @@ final class socket_set_option extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
+        $fn = $this->getName();
         if (4 !== $argc) {
             throw new \ArgumentCountError(
-                'socket_set_option() expects exactly 4 arguments, '.$argc.' given'
+                $fn.'() expects exactly 4 arguments, '.$argc.' given'
             );
         }
 
-        $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], 'socket_set_option', 1);
-        $level = VmSocketArg::requireIntArg($frame->calledArgs[1], 'socket_set_option', 2, 'level');
-        $option = VmSocketArg::requireIntArg($frame->calledArgs[2], 'socket_set_option', 3, 'option');
+        $object = VmSocketArg::requireSocketObject($frame->calledArgs[0], $fn, 1);
+        $level = VmSocketArg::requireIntArg($frame->calledArgs[1], $fn, 2, 'level');
+        $option = VmSocketArg::requireIntArg($frame->calledArgs[2], $fn, 3, 'option');
         $valueVar = $frame->calledArgs[3]->resolveIndirect();
         if (
             self::SO_RCVTIMEO === $option
@@ -49,13 +50,14 @@ final class socket_set_option extends Internal
         ) {
             if (Variable::TYPE_ARRAY !== $valueVar->type) {
                 throw new \TypeError(\sprintf(
-                    'socket_set_option(): Argument #4 ($value) must be of type array, %s given',
+                    '%s(): Argument #4 ($value) must be of type array, %s given',
+                    $fn,
                     \PHPCompiler\ext\standard\VmStreamArg::debugTypeName($valueVar)
                 ));
             }
             $value = self::hashTableToPhpArray($valueVar->toArray());
         } else {
-            $value = VmMath::parseIntBuiltinArg($valueVar, 'socket_set_option', 4, 'value');
+            $value = VmMath::parseIntBuiltinArg($valueVar, $fn, 4, 'value');
         }
         $ok = VmSockets::setOption($object, $level, $option, $value, $frame);
         BuiltinExecute::writeReturn(
