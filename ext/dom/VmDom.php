@@ -5911,13 +5911,21 @@ final class VmDom
         return self::namedNodeMapItem($namedNodeMap, $state->listIterIndex);
     }
 
-    public static function namedNodeMapKey(ObjectEntry $namedNodeMap): int
+    public static function namedNodeMapKey(ObjectEntry $namedNodeMap): ?string
     {
         if (!self::isNamedNodeMap($namedNodeMap)) {
             throw new \LogicException('DOMNamedNodeMap::key() called on non-namednodemap in this compiler build');
         }
+        $state = DomRegistry::state($namedNodeMap);
+        if ($state->listIterIndex < 0 || $state->listIterIndex >= \count($state->listNodeIds)) {
+            return null;
+        }
+        $node = self::namedNodeMapItem($namedNodeMap, $state->listIterIndex);
+        if (null === $node) {
+            return null;
+        }
 
-        return DomRegistry::state($namedNodeMap)->listIterIndex;
+        return DomRegistry::state($node)->nodeName;
     }
 
     public static function namedNodeMapNext(ObjectEntry $namedNodeMap): void
