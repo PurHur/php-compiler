@@ -38,6 +38,26 @@ final class VmDomValidationNative
 
     public static function validateSchemaDocument(string $docXml, string $schemaPath): bool
     {
+        return self::validateSchemaAgainstDoc($docXml, static function ($ffi) use ($schemaPath) {
+            return $ffi->xmlSchemaNewParserCtxt($schemaPath);
+        });
+    }
+
+    /**
+     * In-memory XSD validation (php-src dom_document_schema_validate_source / xmlSchemaNewMemParserCtxt; #19419).
+     */
+    public static function validateSchemaDocumentSource(string $docXml, string $schemaSource): bool
+    {
+        return self::validateSchemaAgainstDoc($docXml, static function ($ffi) use ($schemaSource) {
+            return $ffi->xmlSchemaNewMemParserCtxt($schemaSource, \strlen($schemaSource));
+        });
+    }
+
+    /**
+     * @param callable(\FFI): mixed $newParserCtxt returns xmlSchemaParserCtxt*|null
+     */
+    private static function validateSchemaAgainstDoc(string $docXml, callable $newParserCtxt): bool
+    {
         self::$lastErrors = [];
         $ffi = self::ffi();
         if (null === $ffi) {
@@ -54,7 +74,7 @@ final class VmDomValidationNative
                 return false;
             }
 
-            $parser = $ffi->xmlSchemaNewParserCtxt($schemaPath);
+            $parser = $newParserCtxt($ffi);
             if (null === $parser) {
                 self::captureLibxmlErrors();
                 $ffi->xmlFreeDoc($doc);
@@ -245,6 +265,7 @@ void xmlFreeValidCtxt(xmlValidCtxt* cur);
 int xmlValidateDocument(xmlValidCtxt* ctxt, xmlDoc* doc);
 
 xmlSchemaParserCtxt* xmlSchemaNewParserCtxt(const char* URL);
+xmlSchemaParserCtxt* xmlSchemaNewMemParserCtxt(const char* buffer, int size);
 xmlSchema* xmlSchemaParse(xmlSchemaParserCtxt* ctxt);
 void xmlSchemaFreeParserCtxt(xmlSchemaParserCtxt* ctxt);
 void xmlSchemaFree(xmlSchema* schema);
