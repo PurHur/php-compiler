@@ -91,7 +91,7 @@ final class TypeCheck
                 continue;
             }
             if (null !== $dnfArms) {
-                DnfCheck::assertMatches($probe, $dnfArms, $context);
+                DnfCheck::assertMatches($probe, $dnfArms, $context, 'Argument', null, $strict);
 
                 continue;
             }
@@ -109,6 +109,21 @@ final class TypeCheck
 
     public static function coerceParameter(Variable $dest, bool $strict, ?GenericArrayTypeSpec $arraySpec = null): void
     {
+        $target = $dest->resolveIndirect();
+        if (null !== $target->unionTypeConstraints) {
+            self::coerceUnionValue(
+                $target,
+                $target->unionTypeConstraints,
+                $strict,
+                'Argument',
+                $target->declaredTypeLabel
+            );
+            if (null !== $arraySpec) {
+                self::assertGenericArrayShape($dest, $arraySpec, 'Argument');
+            }
+
+            return;
+        }
         self::coerceTypedSlot($dest, $strict, 'Argument');
         if (null !== $arraySpec) {
             self::assertGenericArrayShape($dest, $arraySpec, 'Argument');
@@ -134,7 +149,13 @@ final class TypeCheck
             return;
         }
         if (null !== $target->unionTypeConstraints) {
-            self::coerceUnionPropertyWrite($target, $strict);
+            self::coerceUnionValue(
+                $target,
+                $target->unionTypeConstraints,
+                $strict,
+                null !== $target->functionStaticVarName ? 'Static variable' : 'Property',
+                $target->declaredTypeLabel
+            );
 
             return;
         }
@@ -162,7 +183,7 @@ final class TypeCheck
     ): void {
         $meta = $prototype->resolveIndirect();
         if (null !== $meta->dnfArms) {
-            DnfCheck::assertMatches($value, $meta->dnfArms, $context, 'Return value');
+            DnfCheck::assertMatches($value, $meta->dnfArms, $context, 'Return value', null, $strict);
 
             return;
         }
@@ -205,6 +226,95 @@ final class TypeCheck
             return;
         }
         self::coerceTypedSlot($value, $strict, 'Return value', $constraint, false, $callableName);
+    }
+
+    /**
+     * Weak/strict union coercion for properties, parameters, and returns (#19525).
+     *
+     * @param list<int> $constraints
+     */
+    public static function coerceUnionValue(
+        Variable $target,
+        array $constraints,
+        bool $strict,
+        string $kind,
+        ?string $declaredLabel = null,
+        ?string $returnCallableName = null
+    ): void {
+        if ([] === $constraints) {
+            return;
+        }
+        $resolved = $target->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            if (\in_array(Variable::TYPE_NULL, $constraints, true)) {
+                return;
+            }
+
+            throw self::unionTypeError($resolved, $kind, $declaredLabel, $returnCallableName);
+        }
+        foreach ($constraints as $constraint) {
+            $trial = clone $resolved;
+            try {
+                self::coerceTypedSlot(
+                    $trial,
+                    $strict,
+                    $kind,
+                    $constraint,
+                    'Property' === $kind || 'Static variable' === $kind,
+                    $returnCallableName
+                );
+                $target->copyFrom($trial);
+
+                return;
+            } catch (\TypeError $e) {
+                continue;
+            }
+        }
+
+        throw self::unionTypeError($resolved, $kind, $declaredLabel, $returnCallableName);
+    }
+
+    private static function unionTypeError(
+        Variable $value,
+        string $kind,
+        ?string $declaredLabel,
+        ?string $returnCallableName
+    ): \TypeError {
+        $expected = $declaredLabel ?? 'mixed';
+        if ('Property' === $kind || 'Static variable' === $kind) {
+            return self::propertyTypeError($value, $expected, $value);
+        }
+        if ('Return value' === $kind) {
+            $given = self::valueTypeLabel($value);
+            $message = "Return value must be of type {$expected}, {$given} returned";
+            if (null !== $returnCallableName && '' !== $returnCallableName) {
+                $message = "{$returnCallableName}(): {$message}";
+            }
+
+            return new \TypeError($message);
+        }
+        if ('Argument' === $kind) {
+            $ctx = self::$paramErrorContext;
+            if (null !== $ctx) {
+                return ParamTypeError::forUserCallWithExpectedType(
+                    $ctx->functionName,
+                    $ctx->paramIndex,
+                    $ctx->paramName,
+                    $expected,
+                    $value,
+                    $ctx->scriptPath,
+                    $ctx->callSiteLine,
+                    $ctx->omitParamName
+                );
+            }
+        }
+
+        return new \TypeError(self::strictMessage(
+            Variable::TYPE_INTEGER,
+            $value,
+            $kind,
+            $expected
+        ));
     }
 
     /**
@@ -372,42 +482,6 @@ final class TypeCheck
         }
 
         throw new \TypeError($message);
-    }
-
-    private static function coerceUnionPropertyWrite(Variable $target, bool $strict): void
-    {
-        $constraints = $target->unionTypeConstraints ?? [];
-        if ([] === $constraints) {
-            return;
-        }
-        if (Variable::TYPE_NULL === $target->type) {
-            if (\in_array(Variable::TYPE_NULL, $constraints, true)) {
-                return;
-            }
-
-            throw self::propertyTypeError(
-                $target,
-                $target->declaredTypeLabel ?? 'mixed',
-                $target
-            );
-        }
-        foreach ($constraints as $constraint) {
-            $trial = clone $target;
-            try {
-                self::coerceTypedSlot($trial, $strict, 'Property', $constraint, true);
-                $target->copyFrom($trial);
-
-                return;
-            } catch (\TypeError $e) {
-                continue;
-            }
-        }
-
-        throw self::propertyTypeError(
-            $target,
-            $target->declaredTypeLabel ?? 'mixed',
-            $target
-        );
     }
 
     private static function coerceTypedSlot(
