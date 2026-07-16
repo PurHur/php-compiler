@@ -6,13 +6,14 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** stream_supports_lock() — VM via VmFs; JIT/AOT via __compiler_stream_supports (issue #6039). */
+/** stream_supports_lock() — VM via VmFs; JIT/AOT via __compiler_stream_supports (#6039, #19462). */
 final class stream_supports_lock extends Internal
 {
     public function __construct()
@@ -40,6 +41,8 @@ final class stream_supports_lock extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('stream_supports_lock() requires exactly one argument in this compiler build');
         }
+        StreamIoRuntime::ensureLinkedForUserScriptLowering($context);
+
         $i64 = $context->getTypeFromString('int64');
         $featureLock = $i64->constInt(VmStreamSupports::STREAM_LOCK, false);
 

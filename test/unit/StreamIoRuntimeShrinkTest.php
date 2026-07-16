@@ -8,21 +8,22 @@ use PHPCompiler\ext\standard\StreamIoJitHelper;
 use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
-/** Stream I/O JIT routes standalone + embed through StreamIoJitHelper PHP (#10326, #12956). */
+/**
+ * Stream I/O JIT: embed via StreamIoJitHelper PHP; user-script AOT via StreamIoStandaloneLlvm (#10326, #12956, #19462).
+ */
 final class StreamIoRuntimeShrinkTest extends TestCase
 {
     private const BASELINE_LOC = 1010;
 
-    public function testStreamIoJitDelegatesToRuntimeOnly(): void
+    public function testStreamIoJitDelegatesEmbedToRuntime(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoJit.php');
         $this->assertStringContainsString('StreamIoRuntime::ensureLinked', $source);
-        $this->assertStringNotContainsString('StreamIoStandaloneLlvm', $source);
+        $this->assertStringContainsString('StreamIoStandaloneLlvm', $source);
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('emitFwrite', $source);
         $this->assertStringNotContainsString('emitFread', $source);
         $this->assertStringNotContainsString('emitFopen', $source);
-
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php');
     }
 
     public function testStreamIoJitShrunkAtLeastThirtyPercent(): void
@@ -31,7 +32,7 @@ final class StreamIoRuntimeShrinkTest extends TestCase
         $this->assertLessThanOrEqual((int) floor(self::BASELINE_LOC * 0.7), $loc, 'StreamIoJit.php LOC');
     }
 
-    public function testStreamIoRuntimeUsesJitHelper(): void
+    public function testStreamIoRuntimeUsesJitHelperForEmbed(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoRuntime.php');
         $this->assertStringContainsString('StreamIoJitHelper::fopenArgv', $source);
@@ -39,7 +40,16 @@ final class StreamIoRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamIoJitHelper::fwriteArgv', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
         $this->assertStringContainsString('ensureRuntimeAbiDeclared', $source);
-        $this->assertStringNotContainsString('StreamIoStandaloneLlvm', $source);
+        // User-script AOT upgrades via libc kernels — nested VmFs helpers skip __init__ (#16075, #19462).
+        $this->assertStringContainsString('StreamIoStandaloneLlvm', $source);
+    }
+
+    public function testUserScriptStandaloneLlvmExistsForAotHandles(): void
+    {
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php');
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php');
+        $this->assertStringContainsString('implementForUserScriptLowering', $source);
+        $this->assertStringContainsString('emitStreamSupports', $source);
     }
 
     public function testStreamIoJitHelperMemoryRoundTrip(): void

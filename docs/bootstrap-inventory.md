@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5088 |
-| Phase A inventory files (M2 ratio SSOT) | 5088 |
+| PHP files on vm.php path | 5089 |
+| Phase A inventory files (M2 ratio SSOT) | 5089 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13807 |
+| Source constructs flagged (warnings) | 13810 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3298,7 +3298,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/XsltRegistry.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/Module.php` | 0 | 9 |
-| `ext/zip/VmZipArchive.php` | 0 | 17 |
+| `ext/zip/VmZipArchive.php` | 0 | 18 |
 | `ext/zip/VmZipProcedural.php` | 0 | 1 |
 | `ext/zip/VmZipResourceArg.php` | 0 | 1 |
 | `ext/zip/ZipArchiveAddFile.php` | 0 | 2 |
@@ -3308,7 +3308,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipArchiveConstruct.php` | 0 | 1 |
 | `ext/zip/ZipArchiveExtractTo.php` | 0 | 2 |
 | `ext/zip/ZipArchiveGetFromName.php` | 0 | 2 |
-| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 1 |
+| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 2 |
 | `ext/zip/ZipArchiveOpen.php` | 0 | 2 |
 | `ext/zip/ZipClassMethod.php` | 0 | 1 |
 | `ext/zip/ZipEngine.php` | 0 | 1 |
@@ -3835,6 +3835,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamIo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamIoJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamIoRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StreamIoStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamLibcHandleRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamLifecycle.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamLifecycleJit.php` | 0 | 1 |
@@ -6076,7 +6077,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomParseSimpleXmlJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `ext/dom/DomRegistry.php`
 
@@ -6370,7 +6371,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomDocumentMethodKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 1208)
+- new JIT (line 1209)
 - 61 class method(s)
 - 1 closure(s)
 
@@ -7265,25 +7266,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 150)
 - new DOMException (line 172)
 - new DOMException (line 178)
-- new DOMException (line 227)
-- new DOMException (line 447)
-- new DOMException (line 551)
-- new DOMException (line 572)
-- new DOMException (line 582)
-- new Variable (line 661)
-- new DOMException (line 667)
-- new Error (line 680)
-- new Variable (line 684)
-- new Variable (line 694)
-- new Error (line 720)
-- new Variable (line 755)
-- new Variable (line 761)
-- new Variable (line 767)
-- new Variable (line 773)
-- new Variable (line 781)
-- new Variable (line 793)
-- new Variable (line 816)
+- new DOMException (line 236)
+- new DOMException (line 456)
+- new DOMException (line 560)
+- new DOMException (line 581)
+- new DOMException (line 591)
+- new Variable (line 670)
+- new DOMException (line 676)
+- new Error (line 689)
+- new Variable (line 693)
+- new Variable (line 703)
+- new Error (line 729)
+- new Variable (line 764)
+- new Variable (line 770)
+- new Variable (line 776)
+- new Variable (line 782)
+- new Variable (line 790)
+- new Variable (line 802)
 - new Variable (line 825)
+- new Variable (line 834)
 - 34 class method(s)
 - 1 closure(s)
 
@@ -18054,7 +18055,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/StreamIoJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/StreamLibcHandleJitHelper.php`
 
@@ -19073,13 +19074,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 434)
 - new HashTable (line 1725)
 - new Variable (line 1727)
-- new HashTable (line 2589)
-- new Variable (line 2592)
-- new Variable (line 2598)
-- new Variable (line 2604)
-- new Variable (line 2610)
-- new Variable (line 2617)
-- 144 class method(s)
+- new HashTable (line 2611)
+- new Variable (line 2614)
+- new Variable (line 2620)
+- new Variable (line 2626)
+- new Variable (line 2632)
+- new Variable (line 2639)
+- 145 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
 
@@ -20479,7 +20480,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamMeta.php`
 
 **Warnings** (review for bootstrap subset):
-- 23 class method(s)
+- 24 class method(s)
 
 ### `ext/standard/VmStreamNotification.php`
 
@@ -26807,17 +26808,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 47)
 - new ClassProperty (line 48)
 - new ClassProperty (line 49)
-- new Variable (line 52)
-- new ZipArchiveConstruct (line 58)
-- new ZipArchiveOpen (line 63)
-- new ZipArchiveClose (line 64)
-- new ZipArchiveAddFile (line 65)
-- new ZipArchiveAddFromString (line 66)
-- new ZipArchiveGetFromName (line 67)
-- new ZipArchiveExtractTo (line 68)
-- new ZipArchiveGetStatusString (line 69)
-- new ZipArchiveState (line 82)
-- 19 class method(s)
+- new Variable (line 56)
+- new ZipArchiveConstruct (line 62)
+- new ZipArchiveOpen (line 67)
+- new ZipArchiveClose (line 68)
+- new ZipArchiveAddFile (line 69)
+- new ZipArchiveAddFromString (line 70)
+- new ZipArchiveGetFromName (line 71)
+- new ZipArchiveExtractTo (line 72)
+- new ZipArchiveGetStatusString (line 73)
+- new ZipArchiveCount (line 74)
+- new ZipArchiveState (line 87)
+- 20 class method(s)
 
 ### `ext/zip/VmZipProcedural.php`
 
@@ -26871,7 +26873,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/ZipArchiveGetStatusString.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new ArgumentCountError (line 40)
+- 2 class method(s)
 
 ### `ext/zip/ZipArchiveOpen.php`
 
@@ -30526,8 +30529,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamCapsRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 337)
-- 15 class method(s)
+- new JIT (line 303)
+- 14 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StreamContextRuntime.php`
@@ -30550,8 +30553,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamFilterJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 276)
-- 19 class method(s)
+- new JIT (line 278)
+- 20 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StreamFstat.php`
@@ -30589,9 +30592,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamIoRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 352)
-- 23 class method(s)
+- new JIT (line 556)
+- 38 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/StreamIoStandaloneLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 39 class method(s)
 
 ### `lib/JIT/Builtin/StreamLibcHandleRuntime.php`
 

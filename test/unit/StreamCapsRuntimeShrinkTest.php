@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\StreamCapsJitHelper;
+use PHPCompiler\ext\standard\StreamIoJitHelper;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmStreamMeta;
 use PHPCompiler\ext\standard\VmStreamSupports;
@@ -34,7 +35,7 @@ final class StreamCapsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamCapsJitHelper::isLocalUriArgv', $source);
         $this->assertStringContainsString('StreamCapsJitHelper::isattyArgv', $source);
         $this->assertStringContainsString('StreamCapsJitHelper::isLocalArgv', $source);
-        $this->assertStringContainsString('StreamCapsJitHelper::supportsArgv', $source);
+        $this->assertStringContainsString('StreamIoRuntime::ensureSupportsBridgeLinked', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
     }
 
@@ -71,6 +72,17 @@ final class StreamCapsRuntimeShrinkTest extends TestCase
         $this->assertSame(
             VmFs::streamSupports($handle, VmStreamSupports::STREAM_SUPPORT_SEEK) ? 1 : 0,
             StreamCapsJitHelper::supportsArgv($handle, VmStreamSupports::STREAM_SUPPORT_SEEK)
+        );
+        VmFs::fclose($handle);
+    }
+
+    public function testStreamIoJitHelperMatchesVmFsSupportsLock(): void
+    {
+        $handle = VmFs::tmpfile();
+        $this->assertNotFalse($handle);
+        $this->assertSame(
+            VmFs::streamSupports($handle, VmStreamSupports::STREAM_SUPPORT_LOCK) ? 1 : 0,
+            StreamIoJitHelper::supportsArgv($handle, VmStreamSupports::STREAM_SUPPORT_LOCK)
         );
         VmFs::fclose($handle);
     }
