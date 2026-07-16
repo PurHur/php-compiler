@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * stream_bucket_* registry for compiled JIT/AOT modules (#9380, php-in-PHP).
  *
- * Slot-table ABI mirrors legacy StreamBucketRuntime LLVM globals. VM SSOT for
+ * Slot-table ABI mirrors legacy stream-bucket LLVM globals (now JitStreamBucketKernel). VM SSOT for
  * user-facing builtins remains {@see VmStreamBucket}.
  * php-src: ext/standard/streams.c — stream_bucket_new, brigade helpers
  */

@@ -969,7 +969,7 @@ class Context {
         if (!$this->isUserScriptAot()) {
             Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
         }
-        Builtin\StreamBucketRuntime::ensureDeferredStubsForInventoryEmit($this);
+        \PHPCompiler\ext\standard\JitStreamBucketKernel::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
         Builtin\AssertFail::ensureStandaloneBodies($this);
         Builtin\JitReturnPending::ensureStandaloneBodies($this);
@@ -1086,7 +1086,7 @@ class Context {
             Builtin\Highlight::ensureStandaloneBodies($this);
             Builtin\Hebrev::ensureStandaloneBodies($this);
             Builtin\Hebrevc::ensureStandaloneBodies($this);
-            Builtin\StreamBucketRuntime::ensureStandaloneBodies($this);
+            \PHPCompiler\ext\standard\JitStreamBucketKernel::ensureStandaloneBodies($this);
         } finally {
             Builtin\StreamIoRuntime::endStandaloneInitPhase();
         }

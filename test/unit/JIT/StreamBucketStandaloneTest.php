@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\StreamBucketRuntime;
+use PHPCompiler\ext\standard\JitStreamBucketKernel;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -19,7 +19,7 @@ final class StreamBucketStandaloneTest extends TestCase
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        StreamBucketRuntime::ensureStandaloneBodies($ctx);
+        JitStreamBucketKernel::ensureStandaloneBodies($ctx);
 
         foreach ([
             '__compiler_stream_bucket_register',
