@@ -35,12 +35,7 @@ final class htmlspecialchars extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('htmlspecialchars() requires one to four arguments');
         }
-        $string = InternalStrictArg::resolveCoercibleStringArg(
-            $frame,
-            0,
-            'htmlspecialchars',
-            'string'
-        );
+        $string = self::vmStringArg($frame, 0, 'string');
         $flags = self::DEFAULT_FLAGS;
         $encoding = 'UTF-8';
         $doubleEncode = true;
@@ -106,13 +101,28 @@ final class htmlspecialchars extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'htmlspecialchars', 0, 'string');
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'htmlspecialchars', 0, 'string');
         $flags = $context->getTypeFromString('int64')->constInt(self::DEFAULT_FLAGS, false);
         if ($effectiveArgc >= 2) {
             $flags = JitLongArg::lower($context, $args[1], 'htmlspecialchars() flags');
         }
 
         return JitHtmlspecialchars::escape($context, $str, $flags);
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19296, ext/standard/html.c). */
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'htmlspecialchars', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'htmlspecialchars',
+            $argIndex,
+            $paramName
+        );
     }
 
     private static function resolveEncodingVm(VMVariable $encVar): string
