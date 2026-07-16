@@ -1431,6 +1431,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitHtmlentities.php` | 0 | 1 |
 | `ext/standard/JitHtmlspecialchars.php` | 0 | 1 |
 | `ext/standard/JitHtmlspecialcharsDecode.php` | 0 | 1 |
+| `ext/standard/JitHtmlspecialcharsKernel.php` | 0 | 1 |
 | `ext/standard/JitHttpBuildQuery.php` | 0 | 1 |
 | `ext/standard/JitHttpLastResponseHeaders.php` | 0 | 1 |
 | `ext/standard/JitHttpResponseCode.php` | 0 | 1 |
@@ -3870,7 +3871,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHrtimeRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringHtmlspecialcharsUserScriptLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHttpBuildQuery.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringIdate.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringImageTypeToExtension.php` | 0 | 3 |
@@ -7286,7 +7286,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 35)
 - new ObjectEntry (line 36)
-- 31 class method(s)
+- 32 class method(s)
 
 ### `ext/fileinfo/finfo_buffer.php`
 
@@ -11977,8 +11977,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 418)
 - new ArgumentCountError (line 486)
 - new ArgumentCountError (line 593)
-- new Variable (line 733)
-- new ArgumentCountError (line 776)
+- new Variable (line 728)
+- new ArgumentCountError (line 771)
 - 24 class method(s)
 
 ### `ext/spl/SplFileObjectStorage.php`
@@ -14471,6 +14471,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/JitHtmlspecialcharsDecode.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitHtmlspecialcharsKernel.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -18539,12 +18544,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 434)
 - new HashTable (line 1721)
 - new Variable (line 1723)
-- new HashTable (line 2583)
-- new Variable (line 2586)
-- new Variable (line 2592)
-- new Variable (line 2598)
-- new Variable (line 2604)
-- new Variable (line 2611)
+- new HashTable (line 2585)
+- new Variable (line 2588)
+- new Variable (line 2594)
+- new Variable (line 2600)
+- new Variable (line 2606)
+- new Variable (line 2613)
 - 144 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -19086,7 +19091,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMime.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 11 class method(s)
 
 ### `ext/standard/VmMinMax.php`
 
@@ -20078,8 +20083,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1723)
-- new Error (line 1734)
+- new Error (line 1728)
+- new Error (line 1739)
 - 217 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -30590,17 +30595,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHtmlspecialchars.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
-
-### `lib/JIT/Builtin/StringHtmlspecialcharsUserScriptLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
 
 ### `lib/JIT/Builtin/StringHttpBuildQuery.php`
 
@@ -32925,7 +32925,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 390)
+- new Variable (line 407)
 - 27 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
@@ -37952,7 +37952,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/WeakMapIterator.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 60)
+- new Variable (line 73)
 - 4 class method(s)
 
 ### `lib/VM/WeakRefRegistry.php`
@@ -37970,7 +37970,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 143)
 - new Variable (line 188)
 - new Variable (line 257)
-- 23 class method(s)
+- 25 class method(s)
 - 1 closure(s)
 
 ### `lib/VM/ZendDeclaredInterfaces.php`
