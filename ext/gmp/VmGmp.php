@@ -9,10 +9,11 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmStreamArg;
 
 /**
- * GMP integer semantics in PHP (php-src ext/gmp/gmp.c; issues #3341, #19527).
+ * GMP integer semantics in PHP (php-src ext/gmp/gmp.c; issues #3341, #19527, #19539).
  *
  * Phase 1: decimal/hex init, add/sub/mul/cmp/strval.
- * Phase 2: pow/mod/div/abs/neg/bitwise/intval — no runtime/*.c growth.
+ * Phase 2: pow/mod/div/abs/neg/bitwise/intval.
+ * Phase 3: powm/fact/gcd/lcm/sqrt/sqrtrem/perfect_square/com — no runtime/*.c growth.
  */
 final class VmGmp
 {
@@ -348,6 +349,135 @@ final class VmGmp
             $function,
             VmStreamArg::debugTypeName($resolved)
         ));
+    }
+
+    /** Modular exponentiation (mpz_powm). */
+    public static function powm(string $base, string $exponent, string $modulus): string
+    {
+        $mod = self::normalizeSignedDecimal($modulus);
+        if ('0' === $mod) {
+            throw new \DivisionByZeroError('Division by zero');
+        }
+        $exp = self::normalizeSignedDecimal($exponent);
+        if (self::cmp($exp, '0') < 0) {
+            throw new \ValueError('gmp_powm(): Argument #2 ($exponent) must be greater than or equal to 0');
+        }
+        $m = self::abs($mod);
+        if ('1' === $m) {
+            return '0';
+        }
+        $result = '1';
+        $b = self::mod($base, $m);
+        $eMag = self::splitSign($exp)['mag'];
+        while ('0' !== $eMag) {
+            [$eMag, $bit] = self::divModSmall($eMag, 2);
+            if (1 === $bit) {
+                $result = self::mod(self::mul($result, $b), $m);
+            }
+            if ('0' !== $eMag) {
+                $b = self::mod(self::mul($b, $b), $m);
+            }
+        }
+
+        return $result;
+    }
+
+    public static function fact(string $num): string
+    {
+        $n = self::normalizeSignedDecimal($num);
+        if (self::cmp($n, '0') < 0) {
+            throw new \ValueError('gmp_fact(): Argument #1 ($num) must be greater than or equal to 0');
+        }
+        $result = '1';
+        $i = '2';
+        while (self::cmp($i, $n) <= 0) {
+            $result = self::mul($result, $i);
+            $i = self::add($i, '1');
+        }
+
+        return $result;
+    }
+
+    public static function gcd(string $left, string $right): string
+    {
+        $x = self::abs($left);
+        $y = self::abs($right);
+        while ('0' !== $y) {
+            $t = self::mod($x, $y);
+            $x = $y;
+            $y = $t;
+        }
+
+        return $x;
+    }
+
+    public static function lcm(string $left, string $right): string
+    {
+        $a = self::abs($left);
+        $b = self::abs($right);
+        if ('0' === $a || '0' === $b) {
+            return '0';
+        }
+
+        return self::divQ(self::mul($a, $b), self::gcd($a, $b));
+    }
+
+    public static function sqrt(string $a): string
+    {
+        $n = self::normalizeSignedDecimal($a);
+        if (self::cmp($n, '0') < 0) {
+            throw new \ValueError('gmp_sqrt(): Argument #1 ($a) must be greater than or equal to 0');
+        }
+        if (self::cmp($n, '1') <= 0) {
+            return $n;
+        }
+        $low = '1';
+        $high = $n;
+        $ans = '1';
+        while (self::cmp($low, $high) <= 0) {
+            $mid = self::divQ(self::add($low, $high), '2');
+            $sq = self::mul($mid, $mid);
+            $cmp = self::cmp($sq, $n);
+            if (0 === $cmp) {
+                return $mid;
+            }
+            if ($cmp < 0) {
+                $ans = $mid;
+                $low = self::add($mid, '1');
+            } else {
+                $high = self::sub($mid, '1');
+            }
+        }
+
+        return $ans;
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    public static function sqrtrem(string $a): array
+    {
+        $root = self::sqrt($a);
+        $rem = self::sub(self::normalizeSignedDecimal($a), self::mul($root, $root));
+
+        return [$root, $rem];
+    }
+
+    public static function perfectSquare(string $a): bool
+    {
+        $n = self::normalizeSignedDecimal($a);
+        if (self::cmp($n, '0') < 0) {
+            return false;
+        }
+        $root = self::sqrt($n);
+
+        return 0 === self::cmp(self::mul($root, $root), $n);
+    }
+
+    /** Bitwise complement (~n == -n-1). */
+    public static function com(string $a): string
+    {
+        return self::sub(self::neg($a), '1');
     }
 
     private static function normalizeSignedDecimal(string $value): string
