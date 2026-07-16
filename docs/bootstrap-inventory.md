@@ -1761,6 +1761,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamNotificationCallback.php` | 0 | 2 |
 | `ext/standard/JitStreamPath.php` | 0 | 1 |
 | `ext/standard/JitStreamReadBridgeKernel.php` | 0 | 1 |
+| `ext/standard/JitStreamResourceKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamSetBlocking.php` | 0 | 1 |
 | `ext/standard/JitStreamSetChunkSize.php` | 0 | 1 |
 | `ext/standard/JitStreamSetReadBuffer.php` | 0 | 1 |
@@ -3920,7 +3921,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamReadJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamReadRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamResource.php` | 0 | 1 |
-| `lib/JIT/Builtin/StreamResourceJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamSocketAccept.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamSocketAcceptRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamSocketGetNameRuntime.php` | 0 | 3 |
@@ -16602,6 +16602,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 13 class method(s)
+
+### `ext/standard/JitStreamResourceKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 12 class method(s)
 
 ### `ext/standard/JitStreamSetBlocking.php`
 
@@ -31269,11 +31274,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
-
-### `lib/JIT/Builtin/StreamResourceJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 12 class method(s)
 
 ### `lib/JIT/Builtin/StreamSocketAccept.php`
 
