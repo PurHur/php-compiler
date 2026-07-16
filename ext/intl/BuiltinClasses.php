@@ -9,10 +9,10 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 
 /**
- * Register intl builtin classes (php-src ext/intl/php_intl.c; issues #5774, #6696).
+ * Register intl builtin classes (php-src ext/intl/php_intl.c; issues #5774, #6696, #19549).
  *
- * Locale registers when {@see IntlExtensionPolicy::advertisesLocale()}. ICU skeletons
- * (Collator / IntlDateFormatter) register only when {@see IntlExtensionPolicy::advertisesBuiltins()} (#12115).
+ * Locale / Normalizer / IntlDateFormatter (pattern create/format) register as partial surfaces.
+ * Collator + IntlException remain gated on {@see IntlExtensionPolicy::advertisesBuiltins()} (#12115).
  */
 final class BuiltinClasses
 {
@@ -25,10 +25,19 @@ final class BuiltinClasses
         }
     }
 
+    public static function registerIntlDateFormatter(Context $ctx): void
+    {
+        $before = array_keys($ctx->classes);
+        self::registerIntlDateFormatterClass($ctx);
+        foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
+            $ctx->classes[$lc]->isInternal = true;
+        }
+    }
+
     public static function register(Context $ctx): void
     {
         $before = array_keys($ctx->classes);
-        self::registerIntlDateFormatter($ctx);
+        self::registerIntlDateFormatterClass($ctx);
         self::registerCollator($ctx);
         self::registerIntlException($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
@@ -85,14 +94,30 @@ final class BuiltinClasses
         $ctx->classes['locale'] = $entry;
     }
 
-    private static function registerIntlDateFormatter(Context $ctx): void
+    private static function registerIntlDateFormatterClass(Context $ctx): void
     {
+        if (isset($ctx->classes[VmIntlDateFormatter::CLASS_LC])) {
+            return;
+        }
+
         $entry = new ClassEntry('IntlDateFormatter');
-        $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
+        $entry->isInternal = true;
+        foreach (VmIntlDateFormatter::classConstants() as $name => $value) {
+            $lc = strtolower($name);
+            $const = new \PHPCompiler\VM\Variable(\PHPCompiler\VM\Variable::TYPE_INTEGER);
+            $const->int($value);
+            $entry->constants[$lc] = $const;
+            $entry->constNames[$lc] = $name;
+        }
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $entry->methods['create'] = new IntlDateFormatterCreate();
         $entry->methodVisibility['create'] = $pubStatic;
         $entry->methodNames['create'] = 'create';
-        $ctx->classes['intldateformatter'] = $entry;
+        $entry->methods['format'] = new IntlDateFormatterFormat();
+        $entry->methodVisibility['format'] = $pub;
+        $entry->methodNames['format'] = 'format';
+        $ctx->classes[VmIntlDateFormatter::CLASS_LC] = $entry;
     }
 
     private static function registerCollator(Context $ctx): void

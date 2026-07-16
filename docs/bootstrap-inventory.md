@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5146 |
-| Phase A inventory files (M2 ratio SSOT) | 5146 |
+| PHP files on vm.php path | 5161 |
+| Phase A inventory files (M2 ratio SSOT) | 5161 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13981 |
+| Source constructs flagged (warnings) | 14044 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -33,14 +33,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/JitBcmath.php` | 0 | 4 |
 | `ext/bcmath/Module.php` | 0 | 15 |
 | `ext/bcmath/NumberAdd.php` | 0 | 2 |
+| `ext/bcmath/NumberCeil.php` | 0 | 2 |
 | `ext/bcmath/NumberCompare.php` | 0 | 2 |
 | `ext/bcmath/NumberConstruct.php` | 0 | 2 |
 | `ext/bcmath/NumberDiv.php` | 0 | 2 |
+| `ext/bcmath/NumberFloor.php` | 0 | 2 |
 | `ext/bcmath/NumberFrom.php` | 0 | 2 |
+| `ext/bcmath/NumberMod.php` | 0 | 2 |
 | `ext/bcmath/NumberMul.php` | 0 | 2 |
+| `ext/bcmath/NumberPow.php` | 0 | 2 |
+| `ext/bcmath/NumberRound.php` | 0 | 1 |
+| `ext/bcmath/NumberSqrt.php` | 0 | 1 |
 | `ext/bcmath/NumberSub.php` | 0 | 2 |
 | `ext/bcmath/NumberToString.php` | 0 | 1 |
-| `ext/bcmath/VmBcMathNumber.php` | 0 | 16 |
+| `ext/bcmath/VmBcMathNumber.php` | 0 | 22 |
 | `ext/bcmath/VmBcmath.php` | 0 | 5 |
 | `ext/bcmath/bcadd.php` | 0 | 1 |
 | `ext/bcmath/bcceil.php` | 0 | 1 |
@@ -566,12 +572,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_init.php` | 0 | 2 |
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
-| `ext/intl/BuiltinClasses.php` | 0 | 17 |
+| `ext/intl/BuiltinClasses.php` | 0 | 18 |
 | `ext/intl/CollatorCreate.php` | 0 | 1 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
 | `ext/intl/IntlConstants.php` | 0 | 1 |
-| `ext/intl/IntlDateFormatterCreate.php` | 0 | 1 |
+| `ext/intl/IntlDateFormatterCreate.php` | 0 | 2 |
+| `ext/intl/IntlDateFormatterFormat.php` | 0 | 2 |
 | `ext/intl/IntlError.php` | 0 | 1 |
 | `ext/intl/IntlExtensionPolicy.php` | 0 | 4 |
 | `ext/intl/JitGrapheme.php` | 0 | 2 |
@@ -590,6 +597,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
+| `ext/intl/VmIntlDateFormatter.php` | 0 | 4 |
 | `ext/intl/VmLocale.php` | 0 | 1 |
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
@@ -804,23 +812,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_x509_parse.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_verify.php` | 0 | 2 |
-| `ext/pcntl/Module.php` | 0 | 13 |
+| `ext/pcntl/Module.php` | 0 | 20 |
 | `ext/pcntl/PcntlConstants.php` | 0 | 1 |
 | `ext/pcntl/PcntlHostBridge.php` | 0 | 2 |
 | `ext/pcntl/PcntlLibcThinAbi.php` | 0 | 2 |
-| `ext/pcntl/VmPcntl.php` | 0 | 13 |
+| `ext/pcntl/VmPcntl.php` | 0 | 19 |
 | `ext/pcntl/VmPcntlArg.php` | 0 | 3 |
+| `ext/pcntl/pcntl_alarm.php` | 0 | 3 |
 | `ext/pcntl/pcntl_async_signals.php` | 0 | 3 |
+| `ext/pcntl/pcntl_exec.php` | 0 | 3 |
 | `ext/pcntl/pcntl_fork.php` | 0 | 4 |
 | `ext/pcntl/pcntl_signal.php` | 0 | 3 |
 | `ext/pcntl/pcntl_signal_dispatch.php` | 0 | 3 |
 | `ext/pcntl/pcntl_signal_get_handler.php` | 0 | 4 |
 | `ext/pcntl/pcntl_sigprocmask.php` | 0 | 4 |
 | `ext/pcntl/pcntl_sigtimedwait.php` | 0 | 4 |
+| `ext/pcntl/pcntl_wait.php` | 0 | 4 |
 | `ext/pcntl/pcntl_waitid.php` | 0 | 4 |
 | `ext/pcntl/pcntl_waitpid.php` | 0 | 4 |
 | `ext/pcntl/pcntl_wexitstatus.php` | 0 | 4 |
 | `ext/pcntl/pcntl_wifexited.php` | 0 | 4 |
+| `ext/pcntl/pcntl_wifsignaled.php` | 0 | 4 |
+| `ext/pcntl/pcntl_wifstopped.php` | 0 | 4 |
+| `ext/pcntl/pcntl_wstopsig.php` | 0 | 4 |
+| `ext/pcntl/pcntl_wtermsig.php` | 0 | 4 |
 | `ext/phar/BuiltinClasses.php` | 0 | 3 |
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 9 |
@@ -5074,7 +5089,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bcmath/BcMathNumberMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 12 class method(s)
 
 ### `ext/bcmath/BcmathFunction.php`
 
@@ -5124,6 +5139,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/bcmath/NumberCeil.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
 ### `ext/bcmath/NumberCompare.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5142,16 +5163,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/bcmath/NumberFloor.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
 ### `ext/bcmath/NumberFrom.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 22)
 - 1 class method(s)
 
+### `ext/bcmath/NumberMod.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
 ### `ext/bcmath/NumberMul.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/bcmath/NumberPow.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
+### `ext/bcmath/NumberRound.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/bcmath/NumberSqrt.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `ext/bcmath/NumberSub.php`
@@ -5168,21 +5217,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bcmath/VmBcMathNumber.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 36)
-- new Variable (line 37)
-- new ClassEntry (line 41)
-- new ClassProperty (line 44)
-- new ClassProperty (line 45)
-- new NumberConstruct (line 47)
-- new NumberFrom (line 51)
-- new NumberAdd (line 55)
-- new NumberSub (line 56)
-- new NumberMul (line 57)
-- new NumberDiv (line 58)
-- new NumberCompare (line 59)
-- new NumberToString (line 60)
-- new ObjectEntry (line 84)
-- new Variable (line 86)
+- new Variable (line 39)
+- new Variable (line 40)
+- new ClassEntry (line 44)
+- new ClassProperty (line 47)
+- new ClassProperty (line 48)
+- new NumberConstruct (line 50)
+- new NumberFrom (line 54)
+- new NumberAdd (line 58)
+- new NumberSub (line 59)
+- new NumberMul (line 60)
+- new NumberDiv (line 61)
+- new NumberMod (line 62)
+- new NumberPow (line 63)
+- new NumberSqrt (line 64)
+- new NumberFloor (line 65)
+- new NumberCeil (line 66)
+- new NumberRound (line 67)
+- new NumberCompare (line 68)
+- new NumberToString (line 69)
+- new ObjectEntry (line 93)
+- new Variable (line 95)
 - 9 class method(s)
 
 ### `ext/bcmath/VmBcmath.php`
@@ -8795,23 +8850,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 41)
-- new NormalizerNormalize (line 52)
-- new NormalizerIsNormalized (line 53)
-- new NormalizerGetRawDecomposition (line 54)
-- new ClassEntry (line 70)
-- new LocaleGetDefault (line 73)
-- new LocaleSetDefault (line 74)
-- new LocaleGetPrimaryLanguage (line 75)
-- new LocaleGetRegion (line 76)
-- new LocaleGetScript (line 77)
-- new LocaleGetDisplayName (line 78)
-- new ClassEntry (line 90)
-- new IntlDateFormatterCreate (line 92)
-- new ClassEntry (line 100)
-- new CollatorCreate (line 102)
-- new ClassEntry (line 110)
-- 7 class method(s)
+- new ClassEntry (line 50)
+- new NormalizerNormalize (line 61)
+- new NormalizerIsNormalized (line 62)
+- new NormalizerGetRawDecomposition (line 63)
+- new ClassEntry (line 79)
+- new LocaleGetDefault (line 82)
+- new LocaleSetDefault (line 83)
+- new LocaleGetPrimaryLanguage (line 84)
+- new LocaleGetRegion (line 85)
+- new LocaleGetScript (line 86)
+- new LocaleGetDisplayName (line 87)
+- new ClassEntry (line 103)
+- new IntlDateFormatterCreate (line 114)
+- new IntlDateFormatterFormat (line 117)
+- new ClassEntry (line 125)
+- new CollatorCreate (line 127)
+- new ClassEntry (line 135)
+- 8 class method(s)
 
 ### `ext/intl/CollatorCreate.php`
 
@@ -8840,7 +8896,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlDateFormatterCreate.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
+### `ext/intl/IntlDateFormatterFormat.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 1 class method(s)
 
 ### `ext/intl/IntlError.php`
 
@@ -8850,10 +8913,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 92)
-- new locale_get_region (line 93)
-- new locale_get_script (line 94)
-- 11 class method(s)
+- new locale_get_primary_language (line 102)
+- new locale_get_region (line 103)
+- new locale_get_script (line 104)
+- 12 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
 
@@ -8911,32 +8974,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 40)
-- new locale_get_default (line 50)
-- new locale_set_default (line 51)
-- new locale_get_primary_language (line 52)
-- new locale_get_region (line 53)
-- new locale_get_script (line 54)
-- new normalizer_normalize (line 58)
-- new normalizer_is_normalized (line 59)
-- new normalizer_get_raw_decomposition (line 60)
-- new idn_to_ascii (line 64)
-- new idn_to_utf8 (line 64)
-- new grapheme_strlen (line 80)
-- new grapheme_substr (line 81)
-- new grapheme_strpos (line 82)
-- new grapheme_str_contains (line 83)
-- new grapheme_strstr (line 84)
-- new grapheme_stristr (line 85)
-- new grapheme_stripos (line 86)
-- new grapheme_strrpos (line 87)
-- new grapheme_extract (line 88)
-- new grapheme_levenshtein (line 89)
-- new grapheme_str_split (line 90)
-- new grapheme_strimwidth (line 91)
-- new intl_get_error_code (line 92)
-- new intl_get_error_message (line 93)
-- new intl_is_failure (line 94)
+- new VM\Variable (line 44)
+- new locale_get_default (line 54)
+- new locale_set_default (line 55)
+- new locale_get_primary_language (line 56)
+- new locale_get_region (line 57)
+- new locale_get_script (line 58)
+- new normalizer_normalize (line 62)
+- new normalizer_is_normalized (line 63)
+- new normalizer_get_raw_decomposition (line 64)
+- new idn_to_ascii (line 68)
+- new idn_to_utf8 (line 68)
+- new grapheme_strlen (line 84)
+- new grapheme_substr (line 85)
+- new grapheme_strpos (line 86)
+- new grapheme_str_contains (line 87)
+- new grapheme_strstr (line 88)
+- new grapheme_stristr (line 89)
+- new grapheme_stripos (line 90)
+- new grapheme_strrpos (line 91)
+- new grapheme_extract (line 92)
+- new grapheme_levenshtein (line 93)
+- new grapheme_str_split (line 94)
+- new grapheme_strimwidth (line 95)
+- new intl_get_error_code (line 96)
+- new intl_get_error_message (line 97)
+- new intl_is_failure (line 98)
 - 3 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -8975,6 +9038,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 266)
 - new Variable (line 269)
 - 10 class method(s)
+
+### `ext/intl/VmIntlDateFormatter.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 70)
+- new ObjectEntry (line 75)
+- new Error (line 105)
+- 13 class method(s)
 
 ### `ext/intl/VmLocale.php`
 
@@ -10434,16 +10505,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 18)
 - new pcntl_fork (line 27)
-- new pcntl_waitpid (line 28)
-- new pcntl_wifexited (line 29)
-- new pcntl_wexitstatus (line 30)
-- new pcntl_signal (line 31)
-- new pcntl_signal_dispatch (line 32)
-- new pcntl_async_signals (line 33)
-- new pcntl_signal_get_handler (line 34)
-- new pcntl_sigprocmask (line 35)
-- new pcntl_sigtimedwait (line 36)
-- new pcntl_waitid (line 37)
+- new pcntl_wait (line 28)
+- new pcntl_waitpid (line 29)
+- new pcntl_wifexited (line 30)
+- new pcntl_wexitstatus (line 31)
+- new pcntl_wifsignaled (line 32)
+- new pcntl_wifstopped (line 33)
+- new pcntl_wtermsig (line 34)
+- new pcntl_wstopsig (line 35)
+- new pcntl_alarm (line 36)
+- new pcntl_exec (line 37)
+- new pcntl_signal (line 38)
+- new pcntl_signal_dispatch (line 39)
+- new pcntl_async_signals (line 40)
+- new pcntl_signal_get_handler (line 41)
+- new pcntl_sigprocmask (line 42)
+- new pcntl_sigtimedwait (line 43)
+- new pcntl_waitid (line 44)
 - 2 class method(s)
 
 ### `ext/pcntl/PcntlConstants.php`
@@ -10454,13 +10532,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pcntl/PcntlHostBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 23 class method(s)
 - 1 closure(s)
 
 ### `ext/pcntl/PcntlLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 24 class method(s)
 - 1 closure(s)
 
 ### `ext/pcntl/VmPcntl.php`
@@ -10468,30 +10546,50 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 50)
 - new Error (line 62)
-- new Error (line 74)
-- new Error (line 86)
-- new Variable (line 122)
-- new Variable (line 130)
-- new Variable (line 144)
-- new Error (line 225)
-- new Error (line 240)
-- new Variable (line 268)
-- new HashTable (line 350)
-- new Variable (line 352)
-- 21 class method(s)
+- new Error (line 80)
+- new Error (line 96)
+- new Error (line 108)
+- new Error (line 120)
+- new Error (line 132)
+- new Error (line 144)
+- new Error (line 156)
+- new Error (line 168)
+- new Variable (line 204)
+- new Variable (line 212)
+- new Variable (line 226)
+- new Error (line 307)
+- new Error (line 322)
+- new Variable (line 350)
+- new HashTable (line 432)
+- new Variable (line 434)
+- 28 class method(s)
 
 ### `ext/pcntl/VmPcntlArg.php`
 
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 45)
 - new Variable (line 48)
-- 5 class method(s)
+- 7 class method(s)
+
+### `ext/pcntl/pcntl_alarm.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 36)
+- 2 class method(s)
 
 ### `ext/pcntl/pcntl_async_signals.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
 - new Error (line 44)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_exec.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 48)
 - 2 class method(s)
 
 ### `ext/pcntl/pcntl_fork.php`
@@ -10540,6 +10638,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 54)
 - 2 class method(s)
 
+### `ext/pcntl/pcntl_wait.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 33)
+- new Error (line 47)
+- 2 class method(s)
+
 ### `ext/pcntl/pcntl_waitid.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10570,6 +10676,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 24)
 - new Error (line 30)
 - new Error (line 38)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_wifsignaled.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 31)
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_wifstopped.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 31)
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_wstopsig.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 31)
+- new Error (line 39)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_wtermsig.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 31)
+- new Error (line 39)
 - 2 class method(s)
 
 ### `ext/phar/BuiltinClasses.php`
