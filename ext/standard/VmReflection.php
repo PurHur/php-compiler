@@ -695,7 +695,23 @@ final class VmReflection
             }
         }
 
-        return isset($class->methods[$methodLc]) || isset($class->abstractMethods[$methodLc]);
+        if (isset($class->methods[$methodLc]) || isset($class->abstractMethods[$methodLc])) {
+            return true;
+        }
+
+        // Closure::__invoke is a trampoline (ZEND_ACC_CALL_VIA_TRAMPOLINE), not a table method (#19616).
+        return self::isClosureInvokeMethod($class->name, $methodLc);
+    }
+
+    /**
+     * Closure exposes __invoke via trampoline — php-src Zend/zend_closures.c (#19616).
+     *
+     * Not listed in get_class_methods(), but method_exists() / ReflectionClass::hasMethod() are true.
+     */
+    public static function isClosureInvokeMethod(string $className, string $method): bool
+    {
+        return 'closure' === strtolower(ltrim($className, '\\'))
+            && '__invoke' === strtolower($method);
     }
 
     /**
@@ -720,8 +736,11 @@ final class VmReflection
             if (null === $class) {
                 return false;
             }
+            if (self::methodExistsOnClassWithInheritance($ctx, $class, $method)) {
+                return true;
+            }
 
-            return self::methodExistsOnClassWithInheritance($ctx, $class, $method);
+            return self::isClosureInvokeMethod($class->name, $method);
         }
         if (Variable::TYPE_OBJECT === $objectOrClass->type) {
             $object = $objectOrClass->toObject();
@@ -730,8 +749,15 @@ final class VmReflection
 
                 return self::methodExistsOnClass($class, $method);
             }
+            if ($ctx->runtime->vm->hasInstanceMethod($object->class, $method)) {
+                return true;
+            }
+            // Closure instances: __invoke via trampoline / closureState (#19616).
+            if (null !== $object->closureState && '__invoke' === strtolower($method)) {
+                return true;
+            }
 
-            return $ctx->runtime->vm->hasInstanceMethod($object->class, $method);
+            return self::isClosureInvokeMethod($object->class->name, $method);
         }
         if (Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
             $class = EnumSupport::resolveRuntimeEnumClass($ctx, $objectOrClass->toEnumCase()->enumClass);
@@ -760,13 +786,8 @@ final class VmReflection
         if (null === $entry) {
             return false;
         }
-        if (self::methodExistsOnClass($entry, $method)) {
-            return true;
-        }
-        $classLc = strtolower(ltrim($className, '\\'));
-        $methodLc = strtolower($method);
 
-        return 'closure' === $classLc && '__invoke' === $methodLc;
+        return self::methodExistsOnClass($entry, $method);
     }
 
     /**
@@ -2704,6 +2725,10 @@ final class VmReflection
             }
         }
         if ($entry->isEnum && self::methodExistsOnClass($entry, $method)) {
+            return true;
+        }
+        // Closure::__invoke trampoline — Zend ReflectionClass::hasMethod true (#19616).
+        if (self::isClosureInvokeMethod($entry->name, $method)) {
             return true;
         }
 

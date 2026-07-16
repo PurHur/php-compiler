@@ -137,6 +137,9 @@ final class ReflectionBuiltinHelper
                 $method
             );
         }
+        if (!$exists) {
+            $exists = \PHPCompiler\ext\standard\VmReflection::isClosureInvokeMethod($className, $method);
+        }
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt($exists ? 1 : 0, false);

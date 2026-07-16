@@ -202,11 +202,15 @@ final class JitMethodExists
             if ($object->isEnumClassId($id)) {
                 $classExists = self::enumMethodExistsConst($context, $id, $method);
             } elseif ($walkInheritance) {
-                $classExists = MagicMethodDispatch::hasInstanceMethod($object, $id, $method)
+                $found = MagicMethodDispatch::hasInstanceMethod($object, $id, $method)
+                    || VmReflection::isClosureInvokeMethod($className, $method);
+                $classExists = $found
                     ? $i1->constInt(1, false)
                     : $i1->constInt(0, false);
             } else {
-                $classExists = $object->hasMethod($id, $method)
+                $found = $object->hasMethod($id, $method)
+                    || VmReflection::isClosureInvokeMethod($className, $method);
+                $classExists = $found
                     ? $i1->constInt(1, false)
                     : $i1->constInt(0, false);
             }
