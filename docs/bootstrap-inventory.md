@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5030 |
-| Phase A inventory files (M2 ratio SSOT) | 5030 |
+| PHP files on vm.php path | 5036 |
+| Phase A inventory files (M2 ratio SSOT) | 5036 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13577 |
+| Source constructs flagged (warnings) | 13604 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -871,16 +871,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
 | `ext/sockets/JitSocketExportStream.php` | 0 | 1 |
 | `ext/sockets/JitSocketImportStream.php` | 0 | 1 |
-| `ext/sockets/Module.php` | 0 | 29 |
+| `ext/sockets/Module.php` | 0 | 33 |
 | `ext/sockets/SocketAtmarkJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketConstants.php` | 0 | 1 |
 | `ext/sockets/SocketExportStreamJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketImportStreamJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketsLibcThinAbi.php` | 0 | 1 |
+| `ext/sockets/VmAddressInfo.php` | 0 | 3 |
 | `ext/sockets/VmSocket.php` | 0 | 6 |
+| `ext/sockets/VmSocketAddrinfo.php` | 0 | 1 |
 | `ext/sockets/VmSocketArg.php` | 0 | 1 |
 | `ext/sockets/VmSockets.php` | 0 | 1 |
 | `ext/sockets/socket_accept.php` | 0 | 3 |
+| `ext/sockets/socket_addrinfo_bind.php` | 0 | 3 |
+| `ext/sockets/socket_addrinfo_connect.php` | 0 | 3 |
+| `ext/sockets/socket_addrinfo_explain.php` | 0 | 8 |
+| `ext/sockets/socket_addrinfo_lookup.php` | 0 | 5 |
 | `ext/sockets/socket_atmark.php` | 0 | 3 |
 | `ext/sockets/socket_bind.php` | 0 | 3 |
 | `ext/sockets/socket_clear_error.php` | 0 | 3 |
@@ -6981,107 +6987,107 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1026)
 - new ObjectEntry (line 1042)
 - new DomNodeState (line 1050)
-- new Variable (line 1069)
-- new Variable (line 1090)
-- new ObjectEntry (line 1108)
-- new DomNodeState (line 1116)
-- new Variable (line 1128)
-- new DOMException (line 1145)
-- new Variable (line 1149)
-- new Variable (line 1155)
-- new DOMException (line 1164)
-- new Variable (line 1193)
-- new DOMException (line 1213)
-- new Variable (line 1216)
-- new DOMException (line 1235)
-- new Variable (line 1267)
-- new DOMException (line 1279)
-- new DOMException (line 1292)
-- new Variable (line 1304)
-- new DOMException (line 1370)
-- new DOMException (line 1422)
-- new DOMException (line 1435)
-- new DOMException (line 1458)
-- new DOMException (line 1472)
-- new DOMException (line 1498)
-- new DOMException (line 1553)
-- new DOMException (line 1580)
+- new Variable (line 1073)
+- new Variable (line 1094)
+- new ObjectEntry (line 1112)
+- new DomNodeState (line 1120)
+- new Variable (line 1132)
+- new DOMException (line 1149)
+- new Variable (line 1153)
+- new Variable (line 1159)
+- new DOMException (line 1168)
+- new Variable (line 1197)
+- new DOMException (line 1217)
+- new Variable (line 1220)
+- new DOMException (line 1239)
+- new Variable (line 1271)
+- new DOMException (line 1283)
+- new DOMException (line 1296)
+- new Variable (line 1308)
+- new DOMException (line 1374)
+- new DOMException (line 1426)
+- new DOMException (line 1439)
+- new DOMException (line 1462)
+- new DOMException (line 1476)
+- new DOMException (line 1502)
+- new DOMException (line 1557)
 - new DOMException (line 1584)
-- new DOMException (line 1597)
+- new DOMException (line 1588)
 - new DOMException (line 1601)
-- new DOMException (line 1611)
-- new ObjectEntry (line 1982)
-- new DomNodeState (line 1987)
-- new ObjectEntry (line 2003)
-- new DomNodeState (line 2008)
-- new ObjectEntry (line 2024)
-- new DomNodeState (line 2029)
-- new DOMException (line 2068)
-- new DOMException (line 2078)
-- new DOMException (line 2091)
-- new DOMException (line 2110)
-- new ObjectEntry (line 2198)
-- new DomNodeState (line 2203)
-- new Variable (line 2212)
-- new ObjectEntry (line 2222)
-- new DomNodeState (line 2227)
-- new Variable (line 2233)
-- new ObjectEntry (line 2913)
-- new DomNodeState (line 2915)
-- new ObjectEntry (line 3111)
-- new DomNodeState (line 3113)
-- new ObjectEntry (line 3141)
-- new DomNodeState (line 3143)
-- new ObjectEntry (line 3272)
-- new DomNodeState (line 3277)
-- new DOMException (line 3644)
-- new DOMException (line 3659)
-- new Variable (line 3676)
-- new DOMException (line 3690)
-- new DOMException (line 3693)
-- new DOMException (line 3702)
-- new DOMException (line 3729)
-- new DOMException (line 3742)
-- new DOMException (line 3940)
-- new DOMException (line 4137)
-- new DOMException (line 4141)
-- new DOMException (line 4230)
-- new DOMException (line 4234)
-- new DOMException (line 4292)
-- new DOMException (line 4309)
+- new DOMException (line 1605)
+- new DOMException (line 1615)
+- new ObjectEntry (line 2030)
+- new DomNodeState (line 2035)
+- new ObjectEntry (line 2051)
+- new DomNodeState (line 2056)
+- new ObjectEntry (line 2072)
+- new DomNodeState (line 2077)
+- new DOMException (line 2116)
+- new DOMException (line 2126)
+- new DOMException (line 2139)
+- new DOMException (line 2158)
+- new ObjectEntry (line 2246)
+- new DomNodeState (line 2251)
+- new Variable (line 2260)
+- new ObjectEntry (line 2270)
+- new DomNodeState (line 2275)
+- new Variable (line 2281)
+- new ObjectEntry (line 2961)
+- new DomNodeState (line 2963)
+- new ObjectEntry (line 3159)
+- new DomNodeState (line 3161)
+- new ObjectEntry (line 3189)
+- new DomNodeState (line 3191)
+- new ObjectEntry (line 3320)
+- new DomNodeState (line 3325)
+- new DOMException (line 3692)
+- new DOMException (line 3707)
+- new Variable (line 3724)
+- new DOMException (line 3738)
+- new DOMException (line 3741)
+- new DOMException (line 3750)
+- new DOMException (line 3777)
+- new DOMException (line 3790)
+- new DOMException (line 3988)
+- new DOMException (line 4185)
+- new DOMException (line 4189)
+- new DOMException (line 4278)
+- new DOMException (line 4282)
 - new DOMException (line 4340)
-- new DOMException (line 4382)
-- new DOMException (line 4408)
-- new DOMException (line 5080)
-- new Variable (line 5108)
-- new DOMException (line 5354)
-- new DOMException (line 5437)
-- new DOMException (line 5479)
-- new ObjectEntry (line 5564)
-- new DomNodeState (line 5568)
-- new Variable (line 5575)
-- new ObjectEntry (line 5775)
-- new DomNodeState (line 5779)
-- new Variable (line 5786)
-- new ObjectEntry (line 5806)
-- new DomNodeState (line 5809)
-- new Variable (line 5817)
-- new Variable (line 5965)
-- new DOMException (line 6066)
-- new DOMException (line 6073)
-- new DOMException (line 6080)
-- new DOMException (line 6084)
-- new DOMException (line 6087)
-- new DOMException (line 6096)
-- new Variable (line 6934)
-- new Variable (line 6947)
-- new DOMException (line 7030)
-- new DOMException (line 7057)
-- new DOMException (line 7088)
-- new DOMException (line 7152)
-- new DOMException (line 7160)
-- new DOMException (line 7169)
-- 331 class method(s)
+- new DOMException (line 4357)
+- new DOMException (line 4388)
+- new DOMException (line 4430)
+- new DOMException (line 4456)
+- new DOMException (line 5128)
+- new Variable (line 5156)
+- new DOMException (line 5402)
+- new DOMException (line 5514)
+- new DOMException (line 5556)
+- new ObjectEntry (line 5641)
+- new DomNodeState (line 5645)
+- new Variable (line 5652)
+- new ObjectEntry (line 5852)
+- new DomNodeState (line 5856)
+- new Variable (line 5863)
+- new ObjectEntry (line 5883)
+- new DomNodeState (line 5886)
+- new Variable (line 5894)
+- new Variable (line 6042)
+- new DOMException (line 6143)
+- new DOMException (line 6150)
+- new DOMException (line 6157)
+- new DOMException (line 6161)
+- new DOMException (line 6164)
+- new DOMException (line 6173)
+- new Variable (line 7011)
+- new Variable (line 7024)
+- new DOMException (line 7107)
+- new DOMException (line 7134)
+- new DOMException (line 7165)
+- new DOMException (line 7229)
+- new DOMException (line 7237)
+- new DOMException (line 7246)
+- 334 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomInstanceInvoke.php`
@@ -8174,7 +8180,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/JitIconv.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `ext/iconv/JitIconvString.php`
 
@@ -8209,7 +8215,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/iconv.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -10889,14 +10895,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new socket_getpeername (line 58)
 - new socket_sendto (line 59)
 - new socket_recvfrom (line 60)
-- new socket_shutdown (line 61)
-- new socket_select (line 62)
-- new socket_read (line 63)
-- new socket_write (line 64)
-- new socket_close (line 65)
-- new socket_strerror (line 66)
-- new socket_last_error (line 67)
-- new socket_clear_error (line 68)
+- new socket_addrinfo_lookup (line 61)
+- new socket_addrinfo_connect (line 62)
+- new socket_addrinfo_bind (line 63)
+- new socket_addrinfo_explain (line 64)
+- new socket_shutdown (line 65)
+- new socket_select (line 66)
+- new socket_read (line 67)
+- new socket_write (line 68)
+- new socket_close (line 69)
+- new socket_strerror (line 70)
+- new socket_last_error (line 71)
+- new socket_clear_error (line 72)
 - 3 class method(s)
 
 ### `ext/sockets/SocketAtmarkJitHelper.php`
@@ -10922,7 +10932,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/SocketsLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
-- 31 class method(s)
+- 36 class method(s)
+
+### `ext/sockets/VmAddressInfo.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 36)
+- new ObjectEntry (line 47)
+- 5 class method(s)
 
 ### `ext/sockets/VmSocket.php`
 
@@ -10933,6 +10950,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 181)
 - new Variable (line 269)
 - 19 class method(s)
+
+### `ext/sockets/VmSocketAddrinfo.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `ext/sockets/VmSocketArg.php`
 
@@ -10949,6 +10971,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
 - 2 class method(s)
+- 2 closure(s)
+
+### `ext/sockets/socket_addrinfo_bind.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- 2 class method(s)
+- 2 closure(s)
+
+### `ext/sockets/socket_addrinfo_connect.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- 2 class method(s)
+- 2 closure(s)
+
+### `ext/sockets/socket_addrinfo_explain.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 35)
+- new HashTable (line 45)
+- new Variable (line 47)
+- new HashTable (line 51)
+- new Variable (line 53)
+- new Variable (line 61)
+- 3 class method(s)
+- 1 closure(s)
+
+### `ext/sockets/socket_addrinfo_lookup.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 34)
+- new HashTable (line 77)
+- new Variable (line 79)
+- 3 class method(s)
 - 2 closure(s)
 
 ### `ext/sockets/socket_atmark.php`

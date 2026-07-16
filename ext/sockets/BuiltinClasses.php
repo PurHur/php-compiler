@@ -13,6 +13,7 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         VmSocket::registerClass($ctx);
+        VmAddressInfo::registerClass($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
