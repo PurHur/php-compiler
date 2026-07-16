@@ -588,6 +588,9 @@
         "ext/intl/LocaleParserJitHelper.php",
         "ext/intl/LocaleSetDefault.php",
         "ext/intl/Module.php",
+        "ext/intl/NormalizerGetRawDecomposition.php",
+        "ext/intl/NormalizerIsNormalized.php",
+        "ext/intl/NormalizerNormalize.php",
         "ext/intl/UnicodeCanonical.php",
         "ext/intl/VmGrapheme.php",
         "ext/intl/VmIdn.php",
@@ -615,6 +618,7 @@
         "ext/intl/locale_get_region.php",
         "ext/intl/locale_get_script.php",
         "ext/intl/locale_set_default.php",
+        "ext/intl/normalizer_get_raw_decomposition.php",
         "ext/intl/normalizer_is_normalized.php",
         "ext/intl/normalizer_normalize.php",
         "ext/ldap/JitLdapEscape.php",
@@ -5360,9 +5364,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5126,
+        "inventory_files": 5130,
         "excluded": 0,
-        "eligible": 5126,
+        "eligible": 5130,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
