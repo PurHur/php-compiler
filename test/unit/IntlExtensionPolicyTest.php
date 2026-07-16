@@ -19,6 +19,7 @@ final class IntlExtensionPolicyTest extends TestCase
         self::assertFalse(IntlExtensionPolicy::advertisesIntlDateFormatter());
         self::assertFalse(IntlExtensionPolicy::advertisesIntlCalendar());
         self::assertFalse(IntlExtensionPolicy::advertisesNumberFormatter());
+        self::assertFalse(IntlExtensionPolicy::advertisesMessageFormatter());
         // locale parsers follow forward profile only once Locale is gated (#19670 / #17072).
         self::assertFalse(IntlExtensionPolicy::advertisesLocaleParsers());
         $runtime = new Runtime();
@@ -54,6 +55,12 @@ final class IntlExtensionPolicyTest extends TestCase
         );
         self::assertFalse(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'NumberFormatter')
+        );
+        self::assertFalse(
+            ext\standard\VmReflection::classExists($runtime->vmContext, 'MessageFormatter')
+        );
+        self::assertFalse(
+            ext\standard\VmReflection::functionExists($runtime->vmContext, 'msgfmt_create')
         );
         self::assertFalse(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_primary_language')

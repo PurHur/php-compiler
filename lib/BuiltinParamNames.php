@@ -29,6 +29,11 @@ final class BuiltinParamNames
             'collator::create' => ['locale'],
             'collator::compare' => ['string1', 'string2'],
             'collator::asort' => ['array', 'flags'],
+            'messageformatter::create' => ['locale', 'pattern'],
+            'messageformatter::format' => ['args'],
+            'messageformatter::setpattern' => ['pattern'],
+            'messageformatter::getpattern' => [],
+            'messageformatter::formatmessage' => ['locale', 'pattern', 'args'],
             default => null,
         };
     }
@@ -484,6 +489,12 @@ final class BuiltinParamNames
             case 'stat':
             case 'lstat':
                 return ['filename'];
+            case 'msgfmt_create':
+                return ['locale', 'pattern'];
+            case 'msgfmt_format':
+                return ['formatter', 'args'];
+            case 'msgfmt_format_message':
+                return ['locale', 'pattern', 'args'];
         }
 
         return null;

@@ -108,4 +108,26 @@ PHP;
         $out = ob_get_clean();
         self::assertMatchesRegularExpression('/^-1\n1\na,b,c\nCollator\n$/', $out);
     }
+
+    public function test_messageformatter_format_via_forced_registration(): void
+    {
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerMessageFormatter($runtime->vmContext);
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\msgfmt_create());
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\msgfmt_format());
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\msgfmt_format_message());
+        $code = <<<'PHP'
+<?php
+$fmt = msgfmt_create('en_US', '{0, number} files');
+echo msgfmt_format($fmt, [3]), "\n";
+$oop = MessageFormatter::create('en_US', '{name}');
+$oop->setPattern('{name} uploaded');
+echo $oop->format(['name' => 'doc']), "\n";
+echo msgfmt_format_message('en_US', '{0} x', [1]), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_msgfmt_forced.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("3 files\ndoc uploaded\n1 x\n", ob_get_clean());
+    }
 }
