@@ -26,6 +26,7 @@ final class BuiltinExceptionSupport
     public const CLASS_JSON_EXCEPTION = 'jsonexception';
     public const CLASS_DOM_EXCEPTION = 'domexception';
     public const CLASS_SODIUM_EXCEPTION = 'sodiumexception';
+    public const CLASS_REDIS_EXCEPTION = 'redisexception';
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
     public const CLASS_INVALID_ARGUMENT_EXCEPTION = 'invalidargumentexception';
@@ -160,6 +161,19 @@ final class BuiltinExceptionSupport
         int $line = 0
     ): Variable {
         return self::materializeThrowable($ctx, self::CLASS_SODIUM_EXCEPTION, $message, $file, $line);
+    }
+
+    public static function materializeRedisException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_REDIS_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, self::CLASS_REDIS_EXCEPTION, $message, $file, $line);
     }
 
     public static function materializeDateInvalidTimeZoneException(

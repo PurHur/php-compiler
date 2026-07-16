@@ -714,6 +714,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'yaml_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsRedis()
+                && str_contains($name, 'redis')
+                && !str_contains($name, 'redis_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsRedis()
+                && str_contains($name, 'redis_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZip()
                 && (str_contains($name, 'zip')
                     || str_contains($name, 'ziparchive'))

@@ -43,6 +43,7 @@ function collectCapabilities(string $root): array
         'zip' => new PHPCompiler\ext\zip\Module(),
         'inotify' => new PHPCompiler\ext\inotify\Module(),
         'uuid' => new PHPCompiler\ext\uuid\Module(),
+        'redis' => new PHPCompiler\ext\redis\Module(),
         'uploadprogress' => new PHPCompiler\ext\uploadprogress\Module(),
         'sysvshm' => new PHPCompiler\ext\sysvshm\Module(),
         'sysvsem' => new PHPCompiler\ext\sysvsem\Module(),
