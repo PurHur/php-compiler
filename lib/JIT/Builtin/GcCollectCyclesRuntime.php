@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\VM\CycleCollector;
+use PHPCompiler\ext\standard\JitGcCollectCyclesStandaloneKernel;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -544,7 +545,7 @@ final class GcCollectCyclesRuntime
         self::implementDestructAlreadyInvoked($context);
         self::implementDestructMarkInvoked($context);
         if (!self::usesPhpRegistry($context)) {
-            GcCollectCyclesStandaloneLlvm::ensureCycleScanInternals($context);
+            JitGcCollectCyclesStandaloneKernel::ensureCycleScanInternals($context);
         }
         self::implementCollectCyclesImpl($context);
         self::implementObjectReleaseStorage($context);
@@ -711,7 +712,7 @@ final class GcCollectCyclesRuntime
             return;
         }
 
-        GcCollectCyclesStandaloneLlvm::implementCollectCyclesImpl($context);
+        JitGcCollectCyclesStandaloneKernel::implementCollectCyclesImpl($context);
     }
 
 
@@ -1426,7 +1427,7 @@ final class GcCollectCyclesRuntime
         return $fn;
     }
 
-    /** @internal Standalone AOT LLVM helpers for {@see GcCollectCyclesStandaloneLlvm} (#17015). */
+    /** @internal Standalone AOT LLVM helpers for {@see JitGcCollectCyclesStandaloneKernel} (#17015, #19596). */
     public static function standaloneArrayElemPtr(Context $context, string $globalName, $elemType, Value $index): Value
     {
         return self::arrayElemPtr($context, $globalName, $elemType, $index);

@@ -2,19 +2,21 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Standalone AOT cycle-scan LLVM quarantined from embed PHP path (#17015, #15852).
+ * Standalone AOT GC cycle-scan LLVM leaf (#17015, #15852, #19596).
  *
- * Embed JIT uses {@see \PHPCompiler\ext\standard\GcCollectCyclesJitHelper::collectCyclesEmbed}.
+ * Moved out of lib/JIT/Builtin/ — {@see \PHPCompiler\JIT\Builtin\GcCollectCyclesRuntime}
+ * remains the orchestrator. Embed JIT uses {@see GcCollectCyclesJitHelper::collectCyclesEmbed}.
  * php-src: Zend/zend_gc.c
  */
-final class GcCollectCyclesStandaloneLlvm
+final class JitGcCollectCyclesStandaloneKernel
 {
     private const TYPE_OBJECT = 5;
 
