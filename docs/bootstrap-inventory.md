@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5043 |
-| Phase A inventory files (M2 ratio SSOT) | 5043 |
+| PHP files on vm.php path | 5049 |
+| Phase A inventory files (M2 ratio SSOT) | 5049 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13638 |
+| Source constructs flagged (warnings) | 13650 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -409,16 +409,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 4 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 24 |
-| `ext/gd/VmGd.php` | 0 | 4 |
+| `ext/gd/Module.php` | 0 | 28 |
+| `ext/gd/VmGd.php` | 0 | 6 |
+| `ext/gd/VmGdAvif.php` | 0 | 1 |
 | `ext/gd/VmGdPng.php` | 0 | 1 |
+| `ext/gd/VmGdWebp.php` | 0 | 1 |
+| `ext/gd/imageavif.php` | 0 | 1 |
 | `ext/gd/imagechar.php` | 0 | 1 |
 | `ext/gd/imagecolorallocate.php` | 0 | 1 |
 | `ext/gd/imagecolorat.php` | 0 | 1 |
 | `ext/gd/imagecopy.php` | 0 | 1 |
 | `ext/gd/imagecopymerge.php` | 0 | 1 |
 | `ext/gd/imagecopyresampled.php` | 0 | 1 |
+| `ext/gd/imagecreatefromavif.php` | 0 | 1 |
 | `ext/gd/imagecreatefromstring.php` | 0 | 1 |
+| `ext/gd/imagecreatefromwebp.php` | 0 | 1 |
 | `ext/gd/imagecreatetruecolor.php` | 0 | 1 |
 | `ext/gd/imagecrop.php` | 0 | 1 |
 | `ext/gd/imagecropauto.php` | 0 | 1 |
@@ -433,6 +438,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagestring.php` | 0 | 1 |
 | `ext/gd/imagesx.php` | 0 | 1 |
 | `ext/gd/imagesy.php` | 0 | 1 |
+| `ext/gd/imagewebp.php` | 0 | 1 |
 | `ext/gettext/GettextFunction.php` | 0 | 2 |
 | `ext/gettext/GettextJitHelper.php` | 0 | 1 |
 | `ext/gettext/JitGettext.php` | 0 | 10 |
@@ -7671,6 +7677,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagecropauto (line 77)
 - new imagecreatefromstring (line 80)
 - new imagepng (line 81)
+- new imagewebp (line 82)
+- new imageavif (line 83)
+- new imagecreatefromwebp (line 84)
+- new imagecreatefromavif (line 85)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -7678,13 +7688,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 53)
 - new ObjectEntry (line 76)
-- new ObjectEntry (line 864)
-- 51 class method(s)
+- new ObjectEntry (line 708)
+- new ObjectEntry (line 732)
+- new ObjectEntry (line 958)
+- 57 class method(s)
+
+### `ext/gd/VmGdAvif.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/gd/VmGdPng.php`
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/gd/VmGdWebp.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imageavif.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/gd/imagechar.php`
 
@@ -7716,7 +7743,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/gd/imagecreatefromavif.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/gd/imagecreatefromstring.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecreatefromwebp.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -7787,6 +7824,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imagesy.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagewebp.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -19069,7 +19111,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 230)
 - new Variable (line 235)
 - new Variable (line 248)
-- 25 class method(s)
+- 26 class method(s)
 
 ### `ext/standard/VmIncludePath.php`
 

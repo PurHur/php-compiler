@@ -642,6 +642,100 @@ final class VmGd
         return true;
     }
 
+    public static function encodedWebpBytes(ObjectEntry $image): string
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            throw new \TypeError('imagewebp(): Argument #1 ($image) must be of type GdImage');
+        }
+        if ($state->hasRaster()) {
+            return VmGdWebp::encodeRgb($state->width, $state->height, $state->pixels);
+        }
+        if ($state->hasEncoded() && VmImage::IMAGETYPE_WEBP === $state->imageType) {
+            return $state->encoded;
+        }
+
+        throw new \TypeError('imagewebp(): Argument #1 ($image) must be of type GdImage');
+    }
+
+    public static function writeWebpToOutput(Frame $frame, ObjectEntry $image): bool
+    {
+        OutputBuffer::append(self::encodedWebpBytes($image), $frame->scriptPath ?: null);
+
+        return true;
+    }
+
+    public static function encodedAvifBytes(ObjectEntry $image): string
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            throw new \TypeError('imageavif(): Argument #1 ($image) must be of type GdImage');
+        }
+        if ($state->hasRaster()) {
+            return VmGdAvif::encodeRgb($state->width, $state->height, $state->pixels);
+        }
+        if ($state->hasEncoded() && VmImage::IMAGETYPE_AVIF === $state->imageType) {
+            return $state->encoded;
+        }
+
+        throw new \TypeError('imageavif(): Argument #1 ($image) must be of type GdImage');
+    }
+
+    public static function writeAvifToOutput(Frame $frame, ObjectEntry $image): bool
+    {
+        OutputBuffer::append(self::encodedAvifBytes($image), $frame->scriptPath ?: null);
+
+        return true;
+    }
+
+    public static function createFromWebpBytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdWebp::decodeRgb($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefromwebp');
+
+            return false;
+        }
+        [$width, $height, $pixels] = $decoded;
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('imagecreatefromwebp() requires VM context');
+        }
+        $class = $ctx->classes[self::CLASS_GDIMAGE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('GdImage is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        GdRegistry::attach($entry, GdImageState::fromRaster($width, $height, $pixels));
+
+        return $entry;
+    }
+
+    public static function createFromAvifBytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdAvif::decodeRgb($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefromavif');
+
+            return false;
+        }
+        [$width, $height, $pixels] = $decoded;
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('imagecreatefromavif() requires VM context');
+        }
+        $class = $ctx->classes[self::CLASS_GDIMAGE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('GdImage is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        GdRegistry::attach($entry, GdImageState::fromRaster($width, $height, $pixels));
+
+        return $entry;
+    }
+
     public static function applyFilter(
         Frame $frame,
         ObjectEntry $image,
@@ -1177,8 +1271,9 @@ final class VmGd
     private static function parameterName(string $function, int $position): string
     {
         return match ($function) {
-            'imagepng' => 1 === $position ? 'image' : 'arg',
+            'imagepng', 'imagewebp', 'imageavif' => 1 === $position ? 'image' : 'arg',
             'imagecreatefromstring' => 'image',
+            'imagecreatefromwebp', 'imagecreatefromavif' => 'filename',
             'imagesx', 'imagesy' => 'image',
             'imagecolorat' => match ($position) {
                 1 => 'image',
