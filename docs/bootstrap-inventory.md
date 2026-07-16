@@ -1389,6 +1389,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDnsGetRecordMaterializer.php` | 0 | 1 |
 | `ext/standard/JitEnumExists.php` | 0 | 1 |
 | `ext/standard/JitEnv.php` | 0 | 1 |
+| `ext/standard/JitEnvironMirrorKernel.php` | 0 | 1 |
 | `ext/standard/JitErrorGetLast.php` | 0 | 1 |
 | `ext/standard/JitErrorHandler.php` | 0 | 1 |
 | `ext/standard/JitErrorLog.php` | 0 | 1 |
@@ -3619,7 +3620,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnumCasesRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnvLocalRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/EnvironLibcWalkJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnvironMirrorRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandlerJitRuntime.php` | 0 | 2 |
@@ -14573,6 +14573,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `ext/standard/JitEnvironMirrorKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/JitErrorGetLast.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19055,11 +19060,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 105)
-- new RecursiveIteratorIterator (line 2890)
-- new RecursiveDirectoryIterator (line 2891)
-- new RecursiveIteratorIterator (line 2992)
-- new RecursiveDirectoryIterator (line 2993)
-- 101 class method(s)
+- new RecursiveIteratorIterator (line 2967)
+- new RecursiveDirectoryIterator (line 2968)
+- new RecursiveIteratorIterator (line 3069)
+- new RecursiveDirectoryIterator (line 3070)
+- 102 class method(s)
 - 13 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -29431,11 +29436,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 357)
 - 14 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/EnvironLibcWalkJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
 
 ### `lib/JIT/Builtin/EnvironMirrorRuntime.php`
 
