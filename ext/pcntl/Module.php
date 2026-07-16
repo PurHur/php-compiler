@@ -25,9 +25,16 @@ class Module extends ModuleAbstract
     {
         return [
             new pcntl_fork(),
+            new pcntl_wait(),
             new pcntl_waitpid(),
             new pcntl_wifexited(),
             new pcntl_wexitstatus(),
+            new pcntl_wifsignaled(),
+            new pcntl_wifstopped(),
+            new pcntl_wtermsig(),
+            new pcntl_wstopsig(),
+            new pcntl_alarm(),
+            new pcntl_exec(),
             new pcntl_signal(),
             new pcntl_signal_dispatch(),
             new pcntl_async_signals(),

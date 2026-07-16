@@ -115,6 +115,36 @@ final class PcntlHostBridge
         return (int) \pcntl_waitpid($pid, $status, $options);
     }
 
+    public static function alarmAvailable(): bool
+    {
+        return \function_exists('pcntl_alarm');
+    }
+
+    public static function alarm(int $seconds): int
+    {
+        return (int) \pcntl_alarm($seconds);
+    }
+
+    public static function execAvailable(): bool
+    {
+        return \function_exists('pcntl_exec');
+    }
+
+    /**
+     * @param list<string> $args
+     * @param array<string, string> $env
+     */
+    public static function exec(string $path, array $args, array $env): bool
+    {
+        // Suppress host Warning on failure so @pcntl_exec in user code matches Zend
+        // (errno message would otherwise leak from this bridge call site).
+        if ([] === $env) {
+            return (bool) @\pcntl_exec($path, $args);
+        }
+
+        return (bool) @\pcntl_exec($path, $args, $env);
+    }
+
     public static function wifexited(int $status): bool
     {
         return \pcntl_wifexited($status);
@@ -123,6 +153,26 @@ final class PcntlHostBridge
     public static function wexitstatus(int $status): int
     {
         return (int) \pcntl_wexitstatus($status);
+    }
+
+    public static function wifsignaled(int $status): bool
+    {
+        return \pcntl_wifsignaled($status);
+    }
+
+    public static function wifstopped(int $status): bool
+    {
+        return \pcntl_wifstopped($status);
+    }
+
+    public static function wtermsig(int $status): int
+    {
+        return (int) \pcntl_wtermsig($status);
+    }
+
+    public static function wstopsig(int $status): int
+    {
+        return (int) \pcntl_wstopsig($status);
     }
 
     private static function ffiCallbackAvailable(): bool

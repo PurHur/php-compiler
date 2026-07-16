@@ -63,4 +63,42 @@ final class VmPcntlArg
             throw new \TypeError(VmCallable::invalidCallbackTypeError());
         }
     }
+
+    /**
+     * @return list<string>
+     */
+    public static function parseStringList(Variable $arg, string $function, int $position, string $name): array
+    {
+        $ht = VmArray::requireArrayParam($arg, $function, $position + 1, $name);
+        $out = [];
+        foreach ($ht->iterate(true) as $value) {
+            $out[] = \PHPCompiler\ext\standard\VmString::coerceStringBuiltinArg(
+                $value,
+                $function,
+                $position,
+                $name
+            );
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function parseEnvMap(Variable $arg, string $function, int $position, string $name): array
+    {
+        $ht = VmArray::requireArrayParam($arg, $function, $position + 1, $name);
+        $out = [];
+        foreach ($ht->iterateKeyed(true) as [$keyVar, $value]) {
+            $out[$keyVar->toString()] = \PHPCompiler\ext\standard\VmString::coerceStringBuiltinArg(
+                $value,
+                $function,
+                $position,
+                $name
+            );
+        }
+
+        return $out;
+    }
 }

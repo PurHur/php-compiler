@@ -179,6 +179,8 @@ final class BuiltinByRefParamsTest extends TestCase
 
     public function testPcntlWaitpidStatusByRef(): void
     {
+        $this->assertSame([0], BuiltinByRefParams::forFunction('pcntl_wait'));
+        $this->assertSame([0], BuiltinByRefParams::forFunction('PCNTL_WAIT'));
         $this->assertSame([1], BuiltinByRefParams::forFunction('pcntl_waitpid'));
         $this->assertSame([1], BuiltinByRefParams::forFunction('PCNTL_WAITPID'));
         $this->assertSame([2], BuiltinByRefParams::forFunction('pcntl_sigprocmask'));
