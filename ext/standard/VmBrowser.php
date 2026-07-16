@@ -16,14 +16,40 @@ final class VmBrowser
 {
     public const BROWSCAP_NOT_SET_WARNING = 'get_browser(): browscap ini directive not set';
 
+    private static ?string $startupBrowscapPath = null;
+
+    public static function setStartupBrowscapPath(string $path): void
+    {
+        self::$startupBrowscapPath = $path;
+    }
+
+    public static function startupBrowscapPath(): ?string
+    {
+        return self::$startupBrowscapPath;
+    }
+
     public static function browscapIniPath(Context $ctx): string|false
     {
-        $path = VmIni::get($ctx, 'browscap');
+        $path = self::$startupBrowscapPath;
+        if (null === $path || '' === $path) {
+            $path = VmIni::get($ctx, 'browscap');
+        }
         if (false === $path || '' === $path) {
+            return false;
+        }
+        if (!is_readable($path)) {
             return false;
         }
 
         return $path;
+    }
+
+    /**
+     * @return array<string, string>|false
+     */
+    public static function lookup(Context $ctx, \PHPCompiler\Frame $frame, ?string $userAgent): array|false
+    {
+        return BrowscapEngine::lookup($ctx, $frame, $userAgent);
     }
 
     public static function browscapConfigured(Context $ctx): bool

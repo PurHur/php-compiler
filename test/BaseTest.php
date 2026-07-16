@@ -206,6 +206,7 @@ abstract class BaseTest extends TestCase {
             $stdin = null;
         } else {
             $vmCmd = array_merge($this->phpCommand(), [$this->BIN]);
+            $vmCmd = array_merge($vmCmd, self::phptIniArgvFlags($sections));
             if (str_contains((string) $this->BIN, 'jit.php')) {
                 $vmCmd = array_merge($vmCmd, PhptWebSections::compileArgvFlags($sections));
             }
@@ -307,6 +308,31 @@ abstract class BaseTest extends TestCase {
         $result = preg_replace('(\s+$)m', '', $result); // get rid of trailing whitespace
         $result = preg_replace('(\n\n+)', "\n", $result); // get rid of blank lines
         return $result;
+    }
+
+    /**
+     * @param array<string, string> $sections
+     *
+     * @return list<string>
+     */
+    protected static function phptIniArgvFlags(array $sections): array
+    {
+        if (!isset($sections['INI'])) {
+            return [];
+        }
+        $phptDir = $sections['__phpt_dir'] ?? \dirname(__DIR__);
+        $argv = [];
+        foreach (explode("\n", trim($sections['INI'])) as $line) {
+            $line = trim($line);
+            if ('' === $line || str_starts_with($line, ';')) {
+                continue;
+            }
+            $line = str_replace('{PWD}', $phptDir, $line);
+            $argv[] = '-d';
+            $argv[] = $line;
+        }
+
+        return $argv;
     }
 
     /**
