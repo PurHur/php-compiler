@@ -28189,7 +28189,10 @@ class Compiler {
         return ($callIndex - $firstSibling) >= 2;
     }
 
-    /** True when php-cfg hoisted ≥2 sibling inline New_ producers before a multi-arg ctor (#17524, re-#15124). */
+    /**
+     * True when php-cfg hoisted ≥2 sibling inline New_ producers before a multi-arg ctor (#17524, re-#15124).
+     * Trailing ClassConstFetch/ConstFetch/bitwise option preludes are skipped (#19731).
+     */
     private function hasSiblingMultiArgInlineNewProducers(Block $block, Op $cfgCallOp): bool
     {
         if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
@@ -28199,24 +28202,15 @@ class Compiler {
         if (\count($args) < 2) {
             return false;
         }
-        $callIndex = $this->cfgCallOpIndex($block, $cfgCallOp);
-        if (null === $callIndex || $callIndex < 2) {
-            return false;
-        }
-        $newCount = 0;
-        for ($i = $callIndex - 1; $i >= 0 && $newCount < \count($args); --$i) {
-            $child = $block->orig->children[$i] ?? null;
-            if (!$child instanceof Op\Expr\New_) {
-                break;
-            }
-            ++$newCount;
-        }
+        $siblingNews = $this->siblingInlineNewProducersBeforeCfgOp($block, $cfgCallOp);
+        $newCount = \count($siblingNews);
 
-        return $newCount >= 2 && $newCount === \count($args);
+        return $newCount >= 2 && $newCount <= \count($args);
     }
 
     /**
      * Positional sibling inline New_ → multi-arg ctor/call (#17524, re-#15124 / #14483).
+     * Allows trailing ClassConstFetch/ConstFetch/bitwise options after New_ producers (#19731).
      *
      * @param list<Op\Expr> $producers
      * @param list<Operand|null> $callArgs
@@ -28228,13 +28222,26 @@ class Compiler {
     ): ?Op\Expr\New_ {
         $producerCount = \count($producers);
         $argCount = \count($callArgs);
-        if ($producerCount < 2 || $producerCount !== $argCount) {
+        if ($producerCount < 2) {
             return null;
         }
         foreach ($producers as $producer) {
             if (!$producer instanceof Op\Expr\New_) {
                 return null;
             }
+        }
+        if ($producerCount < $argCount) {
+            // new DatePeriod(new DateTime(...), new DateInterval(...), new DateTime(...), INCLUDE_END_DATE)
+            for ($i = $producerCount; $i < $argCount; ++$i) {
+                if ($this->callArgIsNewExpression($callArgs[$i] ?? null)) {
+                    return null;
+                }
+            }
+        } elseif ($producerCount !== $argCount) {
+            return null;
+        }
+        if ($argIndex >= $producerCount) {
+            return null;
         }
         $callArg = $callArgs[$argIndex] ?? null;
         if (null === $callArg || !$this->callArgIsDeadInlineTemporary($callArg)) {
@@ -28246,7 +28253,8 @@ class Compiler {
     }
 
     /**
-     * Consecutive sibling inline New_ stmts immediately before $cfgCallOp (#17524).
+     * Sibling inline New_ stmts immediately before $cfgCallOp (#17524).
+     * Skips trailing ClassConstFetch/ConstFetch and bitwise option preludes (#19731).
      *
      * @return list<Op\Expr\New_>
      */
@@ -28262,6 +28270,9 @@ class Compiler {
         $producers = [];
         for ($i = $callIndex - 1; $i >= 0 && \count($producers) < \count($cfgCallOp->args); --$i) {
             $child = $block->orig->children[$i] ?? null;
+            if ($this->isTrailingInlineNewCtorOptionPrelude($child)) {
+                continue;
+            }
             if (!$child instanceof Op\Expr\New_) {
                 break;
             }
@@ -28269,6 +28280,21 @@ class Compiler {
         }
 
         return $producers;
+    }
+
+    /**
+     * Scalar / flag option prelude between sibling New_ args and outer ctor (#19731).
+     * e.g. DatePeriod::INCLUDE_END_DATE or EXCLUDE_START_DATE|INCLUDE_END_DATE.
+     */
+    private function isTrailingInlineNewCtorOptionPrelude(?Op $child): bool
+    {
+        if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+            return true;
+        }
+
+        return $child instanceof Op\Expr\BinaryOp\BitwiseOr
+            || $child instanceof Op\Expr\BinaryOp\BitwiseAnd
+            || $child instanceof Op\Expr\BinaryOp\BitwiseXor;
     }
 
     private function cfgCallOpIndex(Block $block, Op $cfgCallOp): ?int

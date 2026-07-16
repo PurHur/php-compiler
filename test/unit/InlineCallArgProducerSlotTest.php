@@ -1577,6 +1577,56 @@ PHP;
         self::assertSame([0, 4, 8], $periodSends, 'DatePeriod arg sends='.json_encode($periodSends));
     }
 
+    /**
+     * Issue #19731 — DatePeriod(..., INCLUDE_END_DATE) must not collapse start/end onto the last New_
+     * when ClassConstFetch sits between sibling New_ producers and the outer ctor.
+     */
+    public function testDatePeriodInlineSiblingNewWithIncludeEndDateUsesPositionalProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$p = new DatePeriod(
+    new DateTime('2020-01-01'),
+    new DateInterval('P1D'),
+    new DateTime('2020-01-03'),
+    DatePeriod::INCLUDE_END_DATE
+);
+$out = [];
+foreach ($p as $d) {
+    $out[] = $d->format('Y-m-d');
+}
+echo implode(',', $out), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dateperiod_inline_include_end.php');
+
+        $newSlots = [];
+        $periodSends = [];
+        $inPeriodCtor = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_NEW === $op->type && 4 === \count($newSlots)) {
+                $inPeriodCtor = true;
+            }
+            if ($inPeriodCtor && OpCode::TYPE_ARG_SEND === $op->type) {
+                $periodSends[] = $op->arg1;
+            }
+            if ($inPeriodCtor && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertSame([0, 4, 8, 13], $newSlots, 'new slots='.json_encode($newSlots));
+        self::assertSame([0, 4, 8], \array_slice($periodSends, 0, 3), 'DatePeriod New_ arg sends='.json_encode($periodSends));
+        self::assertCount(4, $periodSends, 'INCLUDE_END_DATE options arg must still be sent');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("2020-01-01,2020-01-02,2020-01-03\n", ob_get_clean());
+    }
+
     /** Issue #14483 — iterator_count(new DatePeriod(...)) wires outer sibling New_, not inner hoists. */
     public function testIteratorCountInlineDatePeriodUsesSiblingNewProducerSlot(): void
     {
