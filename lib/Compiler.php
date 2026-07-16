@@ -37242,6 +37242,18 @@ class Compiler {
                     return $block->registerConstant(new Operand\Temporary(), $vm);
                 }
             }
+            // Multi-op const-exprs (E::A->value / ->name): fold via the defaults path.
+            // File-scope consts are emitted before DECLARE_ENUM, so runtime CLASS_CONST_FETCH
+            // would raise "Unknown class for constant fetch" (#19567, re-#9711, zend_compile.c).
+            $vm = $this->tryFoldCompileTimeOperandDefault(
+                $terminal->value,
+                $block,
+                $children,
+                true
+            );
+            if (null !== $vm) {
+                return $block->registerConstant(new Operand\Temporary(), $vm);
+            }
         }
         $vm = $this->vmVariableFromCfgLiteralOperand($terminal->value);
         if (null === $vm) {
