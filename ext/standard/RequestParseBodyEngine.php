@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace {
     // Host PHP 8.2 does not ship RequestParseBodyException; define a thin polyfill so
-    // VM builtins can throw it while still mapping to the VM builtin class.
+    // userland `throw new RequestParseBodyException` / class_exists still work under
+    // PHP_COMPILER_PROFILE=8.4 while builtins throw NativeRequestParseBodyException.
     if (!class_exists('RequestParseBodyException', false)) {
         class RequestParseBodyException extends \Exception
         {
@@ -15,6 +16,7 @@ namespace {
 namespace PHPCompiler\ext\standard {
 
 use PHPCompiler\Web\UploadTemp;
+use PHPCompiler\VM\NativeRequestParseBodyException;
 
 /**
  * PHP 8.4+ request_parse_body() engine (php-src: ext/standard/http.c).
@@ -51,7 +53,7 @@ final class RequestParseBodyEngine
 
         $mediaType = self::contentTypeMediaType();
         if ('' === $mediaType) {
-            throw new \RequestParseBodyException('RequestParseBodyException: Missing Content-Type header');
+            throw new NativeRequestParseBodyException('Request does not provide a content type');
         }
 
         $body = self::readRequestBody();
@@ -66,7 +68,7 @@ final class RequestParseBodyEngine
             return self::parseMultipartFromEnvironment($body);
         }
 
-        throw new \RequestParseBodyException('RequestParseBodyException: Unsupported Content-Type');
+        throw new NativeRequestParseBodyException('Content-Type '.$mediaType.' is not supported');
     }
 
     /**
@@ -94,7 +96,7 @@ final class RequestParseBodyEngine
     {
         $boundary = self::extractBoundaryFromEnvironment();
         if (null === $boundary) {
-            throw new \RequestParseBodyException('RequestParseBodyException: Invalid multipart boundary');
+            throw new NativeRequestParseBodyException('Invalid multipart boundary');
         }
 
         $post = [];

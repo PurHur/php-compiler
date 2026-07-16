@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\NativeRequestParseBodyException;
 use PHPCompiler\Web\MultipartNativeJitHelper;
 
 /**
@@ -31,7 +32,7 @@ final class RequestParseBodyNativeJitHelper
             $contentType = self::overlayGetenv('HTTP_CONTENT_TYPE');
         }
         if (false === $contentType || '' === $contentType) {
-            throw new \RequestParseBodyException('RequestParseBodyException: Missing Content-Type header');
+            throw new NativeRequestParseBodyException('Request does not provide a content type');
         }
 
         $body = self::overlayGetenv('REQUEST_BODY');
@@ -54,7 +55,7 @@ final class RequestParseBodyNativeJitHelper
             return;
         }
 
-        throw new \RequestParseBodyException('RequestParseBodyException: Unsupported Content-Type');
+        throw new NativeRequestParseBodyException('Content-Type '.$mediaType.' is not supported');
     }
 
     private static function overlayGetenv(string $name): string|false
