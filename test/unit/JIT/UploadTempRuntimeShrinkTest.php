@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #6342: move_uploaded_file upload temp registry — no phpc_upload_temp.c.
+ * Issue #6342 / #19723: move_uploaded_file upload temp registry — no phpc_upload_temp.c.
  *
  * @group aot-lint
  */
@@ -22,13 +22,16 @@ final class UploadTempRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_upload_temp.c', $linker);
         $this->assertStringNotContainsString('phpc_upload_temp', $linker);
 
-        $jit = (string) file_get_contents($root.'/lib/JIT/Builtin/UploadTempJit.php');
-        $this->assertStringContainsString('UploadTempJitHelper', $jit);
-        $this->assertStringNotContainsString('emitPathHasTraversal', $jit);
-        $this->assertStringNotContainsString('emitIsValidTemp', $jit);
-        $this->assertStringContainsString('__compiler_is_uploaded_file', $jit);
-        $this->assertStringContainsString('__compiler_move_uploaded_file', $jit);
-        $this->assertLessThan(360, \substr_count($jit, "\n") + 1);
+        $kernel = (string) file_get_contents($root.'/ext/standard/JitUploadTempKernel.php');
+        $this->assertStringContainsString('UploadTempJitHelper', $kernel);
+        $this->assertStringNotContainsString('emitPathHasTraversal', $kernel);
+        $this->assertStringNotContainsString('emitIsValidTemp', $kernel);
+        $this->assertStringContainsString('__compiler_is_uploaded_file', $kernel);
+        $this->assertStringContainsString('__compiler_move_uploaded_file', $kernel);
+        $this->assertLessThan(370, \substr_count($kernel, "\n") + 1);
+
+        $orchestrator = (string) file_get_contents($root.'/lib/JIT/Builtin/UploadTempJit.php');
+        $this->assertStringContainsString('JitUploadTempKernel::implement', $orchestrator);
 
         $helper = (string) file_get_contents($root.'/ext/standard/UploadTempJitHelper.php');
         $this->assertStringContainsString('VmFs::isValidUploadTempPath', $helper);

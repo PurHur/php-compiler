@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5222 |
-| Phase A inventory files (M2 ratio SSOT) | 5222 |
+| PHP files on vm.php path | 5223 |
+| Phase A inventory files (M2 ratio SSOT) | 5223 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14346 |
+| Source constructs flagged (warnings) | 14347 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1843,6 +1843,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitUnpack.php` | 0 | 3 |
 | `ext/standard/JitUnserialize.php` | 0 | 1 |
 | `ext/standard/JitUnserializeOptions.php` | 0 | 1 |
+| `ext/standard/JitUploadTempKernel.php` | 0 | 3 |
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitUtf8Latin1.php` | 0 | 1 |
 | `ext/standard/JitVarDump.php` | 0 | 1 |
@@ -4202,7 +4203,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/UndefinedPropertyFetchRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/UndefinedVariableRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/UnpackJitRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/UploadTempJit.php` | 0 | 3 |
+| `lib/JIT/Builtin/UploadTempJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/UsortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ValueBoxWriteBoolJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ValueEchoRuntime.php` | 0 | 2 |
@@ -17261,6 +17262,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitUploadTempKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 302)
+- 13 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/JitUrlencode.php`
 
@@ -33206,9 +33214,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/UploadTempJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 299)
-- 13 class method(s)
-- 1 closure(s)
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/UsortRuntime.php`
 

@@ -4294,6 +4294,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/UndefinedGlobalVariableRuntime.p
 require_once __DIR__.'/../../../lib/JIT/Builtin/UndefinedPropertyFetchRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/UndefinedVariableRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/UnpackJitRuntime.php';
+require_once __DIR__.'/../../../ext/standard/JitUploadTempKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/UploadTempJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/UsortRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ValueBoxWriteBoolJit.php';
