@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitParseStrUserScriptCstrKernel;
 use PHPCompiler\ext\standard\phpc_native_ht_alloc;
 use PHPCompiler\ext\standard\phpc_native_ht_set_hashtable_at;
 use PHPCompiler\ext\standard\phpc_native_ht_set_string_at;
@@ -20,7 +21,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_parse_str via ParseStrJitHelper PHP (#9295, #14217).
  *
- * Embed compiles {@see ParseStrJitHelper}; user-script AOT uses {@see ParseStrRuntimeUserScriptCstr} (#18855).
+ * Embed compiles {@see ParseStrJitHelper}; user-script AOT uses {@see JitParseStrUserScriptCstrKernel} (#18855, #19500).
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
 final class ParseStrRuntime
@@ -263,7 +264,7 @@ final class ParseStrRuntime
      * User-script AOT: __string__* → native cstr → LLVM delimited parser (#18855).
      *
      * Nested {@see ParseStrNativeJitHelper} does not populate sg_* from refresh/populate LLVM;
-     * {@see ParseStrRuntimeUserScriptCstr} mirrors {@see ParseStrEngine} on raw cstr until #18872.
+     * {@see JitParseStrUserScriptCstrKernel} mirrors {@see ParseStrEngine} on raw cstr until #18872.
      */
     private static function implementUserScriptCstrDelimitedBridge(
         Context $context,
@@ -286,7 +287,7 @@ final class ParseStrRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
-        ParseStrRuntimeUserScriptCstr::ensureSubhelpers($context);
+        JitParseStrUserScriptCstrKernel::ensureSubhelpers($context);
         $cstr = self::encodedStringToCstr($context, $encoded);
         $i8 = $context->getTypeFromString('int8');
         $i32 = $context->getTypeFromString('int32');

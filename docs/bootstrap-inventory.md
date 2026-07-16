@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5077 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13764 |
+| Source constructs flagged (warnings) | 13766 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1017,8 +1017,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_memzero.php` | 0 | 2 |
 | `ext/sodium/sodium_pad.php` | 0 | 1 |
 | `ext/sodium/sodium_unpad.php` | 0 | 1 |
-| `ext/spl/AppendIteratorBuiltin.php` | 0 | 4 |
-| `ext/spl/ArrayIteratorBuiltin.php` | 0 | 31 |
+| `ext/spl/AppendIteratorBuiltin.php` | 0 | 8 |
+| `ext/spl/ArrayIteratorBuiltin.php` | 0 | 29 |
 | `ext/spl/ArrayObjectBuiltin.php` | 0 | 27 |
 | `ext/spl/BuiltinClasses.php` | 0 | 1 |
 | `ext/spl/CachingIteratorBuiltin.php` | 0 | 11 |
@@ -1555,6 +1555,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitParseIniMaterializer.php` | 0 | 1 |
 | `ext/standard/JitParseStr.php` | 0 | 1 |
 | `ext/standard/JitParseStrMaterializer.php` | 0 | 1 |
+| `ext/standard/JitParseStrUserScriptCstrKernel.php` | 0 | 1 |
 | `ext/standard/JitParseUrl.php` | 0 | 1 |
 | `ext/standard/JitPassword.php` | 0 | 1 |
 | `ext/standard/JitPasswordAlgo.php` | 0 | 1 |
@@ -3720,7 +3721,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ParamSensitiveLowering.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrNativeOpsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrRuntime.php` | 0 | 7 |
-| `lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrl.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlComponentJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlRuntime.php` | 0 | 3 |
@@ -7085,100 +7085,100 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1185)
 - new Variable (line 1191)
 - new DOMException (line 1200)
-- new Variable (line 1231)
-- new DOMException (line 1251)
-- new Variable (line 1254)
-- new DOMException (line 1273)
-- new Variable (line 1305)
-- new DOMException (line 1317)
-- new DOMException (line 1330)
-- new Variable (line 1342)
-- new DOMException (line 1450)
-- new DOMException (line 1502)
-- new DOMException (line 1515)
-- new DOMException (line 1538)
-- new DOMException (line 1552)
-- new DOMException (line 1578)
-- new DOMException (line 1633)
-- new DOMException (line 1660)
-- new DOMException (line 1664)
-- new DOMException (line 1677)
-- new DOMException (line 1681)
-- new DOMException (line 1691)
-- new ObjectEntry (line 2106)
-- new DomNodeState (line 2111)
-- new ObjectEntry (line 2127)
-- new DomNodeState (line 2132)
-- new ObjectEntry (line 2148)
-- new DomNodeState (line 2153)
-- new DOMException (line 2192)
-- new DOMException (line 2202)
-- new DOMException (line 2215)
-- new DOMException (line 2234)
-- new ObjectEntry (line 2322)
-- new DomNodeState (line 2327)
-- new Variable (line 2336)
-- new ObjectEntry (line 2346)
-- new DomNodeState (line 2351)
-- new Variable (line 2357)
-- new ObjectEntry (line 3037)
-- new DomNodeState (line 3039)
-- new ObjectEntry (line 3235)
-- new DomNodeState (line 3237)
-- new ObjectEntry (line 3265)
-- new DomNodeState (line 3267)
-- new ObjectEntry (line 3396)
-- new DomNodeState (line 3401)
-- new DOMException (line 3772)
-- new DOMException (line 3787)
-- new Variable (line 3804)
-- new DOMException (line 3818)
-- new DOMException (line 3821)
-- new DOMException (line 3830)
-- new Error (line 3860)
-- new DOMException (line 3866)
-- new DOMException (line 3879)
-- new DOMException (line 4077)
-- new DOMException (line 4274)
-- new DOMException (line 4278)
-- new DOMException (line 4367)
-- new DOMException (line 4371)
-- new DOMException (line 4429)
-- new DOMException (line 4446)
-- new DOMException (line 4477)
-- new DOMException (line 4519)
+- new Variable (line 1236)
+- new DOMException (line 1256)
+- new Variable (line 1259)
+- new DOMException (line 1278)
+- new Variable (line 1310)
+- new DOMException (line 1322)
+- new DOMException (line 1335)
+- new Variable (line 1347)
+- new DOMException (line 1455)
+- new DOMException (line 1507)
+- new DOMException (line 1520)
+- new DOMException (line 1543)
+- new DOMException (line 1557)
+- new DOMException (line 1586)
+- new DOMException (line 1641)
+- new DOMException (line 1668)
+- new DOMException (line 1672)
+- new DOMException (line 1685)
+- new DOMException (line 1689)
+- new DOMException (line 1699)
+- new ObjectEntry (line 2132)
+- new DomNodeState (line 2137)
+- new ObjectEntry (line 2153)
+- new DomNodeState (line 2158)
+- new ObjectEntry (line 2174)
+- new DomNodeState (line 2179)
+- new DOMException (line 2218)
+- new DOMException (line 2228)
+- new DOMException (line 2241)
+- new DOMException (line 2260)
+- new ObjectEntry (line 2348)
+- new DomNodeState (line 2353)
+- new Variable (line 2362)
+- new ObjectEntry (line 2372)
+- new DomNodeState (line 2377)
+- new Variable (line 2383)
+- new ObjectEntry (line 3063)
+- new DomNodeState (line 3065)
+- new ObjectEntry (line 3261)
+- new DomNodeState (line 3263)
+- new ObjectEntry (line 3291)
+- new DomNodeState (line 3293)
+- new ObjectEntry (line 3422)
+- new DomNodeState (line 3427)
+- new DOMException (line 3798)
+- new DOMException (line 3813)
+- new Variable (line 3830)
+- new DOMException (line 3844)
+- new DOMException (line 3847)
+- new DOMException (line 3856)
+- new Error (line 3886)
+- new DOMException (line 3892)
+- new DOMException (line 3905)
+- new DOMException (line 4103)
+- new DOMException (line 4300)
+- new DOMException (line 4304)
+- new DOMException (line 4393)
+- new DOMException (line 4397)
+- new DOMException (line 4455)
+- new DOMException (line 4472)
+- new DOMException (line 4503)
 - new DOMException (line 4545)
-- new DOMException (line 5217)
-- new Variable (line 5245)
-- new DOMException (line 5491)
-- new DOMException (line 5603)
-- new DOMException (line 5645)
-- new ObjectEntry (line 5730)
-- new DomNodeState (line 5734)
-- new Variable (line 5741)
-- new ObjectEntry (line 5949)
-- new DomNodeState (line 5953)
-- new Variable (line 5960)
-- new ObjectEntry (line 5980)
-- new DomNodeState (line 5983)
-- new Variable (line 5991)
-- new Variable (line 6160)
-- new DOMException (line 6267)
-- new DOMException (line 6274)
-- new DOMException (line 6281)
-- new DOMException (line 6285)
-- new DOMException (line 6288)
-- new DOMException (line 6297)
-- new DOMException (line 7244)
-- new Variable (line 7303)
-- new Variable (line 7316)
-- new DOMException (line 7399)
-- new DOMException (line 7426)
-- new DOMException (line 7457)
-- new DOMException (line 7521)
-- new DOMException (line 7529)
-- new DOMException (line 7538)
-- 342 class method(s)
+- new DOMException (line 4571)
+- new DOMException (line 5243)
+- new Variable (line 5271)
+- new DOMException (line 5517)
+- new DOMException (line 5629)
+- new DOMException (line 5671)
+- new ObjectEntry (line 5756)
+- new DomNodeState (line 5760)
+- new Variable (line 5767)
+- new ObjectEntry (line 5975)
+- new DomNodeState (line 5979)
+- new Variable (line 5986)
+- new ObjectEntry (line 6006)
+- new DomNodeState (line 6009)
+- new Variable (line 6017)
+- new Variable (line 6186)
+- new DOMException (line 6293)
+- new DOMException (line 6300)
+- new DOMException (line 6307)
+- new DOMException (line 6311)
+- new DOMException (line 6314)
+- new DOMException (line 6323)
+- new DOMException (line 7270)
+- new Variable (line 7329)
+- new Variable (line 7342)
+- new DOMException (line 7425)
+- new DOMException (line 7452)
+- new DOMException (line 7483)
+- new DOMException (line 7547)
+- new DOMException (line 7555)
+- new DOMException (line 7564)
+- 343 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomInstanceInvoke.php`
@@ -11982,45 +11982,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/AppendIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 36)
-- new AppendIteratorConstruct (line 45)
-- new ArgumentCountError (line 197)
-- 17 class method(s)
+- new ClassEntry (line 37)
+- new AppendIteratorConstruct (line 46)
+- new HashTable (line 133)
+- new Variable (line 135)
+- new ObjectEntry (line 139)
+- new Variable (line 142)
+- new ArgumentCountError (line 241)
+- 22 class method(s)
 
 ### `ext/spl/ArrayIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 32)
-- new Variable (line 53)
-- new ArrayIteratorConstruct (line 58)
-- new ArrayIteratorCurrent (line 61)
-- new ArrayIteratorKey (line 63)
-- new ArrayIteratorNext (line 65)
-- new ArrayIteratorRewind (line 67)
-- new ArrayIteratorSeek (line 69)
-- new ArrayIteratorValid (line 71)
-- new ArrayIteratorCount (line 73)
-- new ArrayIteratorGetArrayCopy (line 75)
-- new ArrayIteratorGetFlags (line 77)
-- new ArrayIteratorSetFlags (line 79)
-- new ArrayIteratorAppend (line 81)
-- new ArrayIteratorOffsetGet (line 83)
-- new ArrayIteratorOffsetSet (line 85)
-- new ArrayIteratorOffsetExists (line 87)
-- new ArrayIteratorOffsetUnset (line 89)
-- new ArrayIteratorSortMethod (line 99)
-- new SplArrayUserSortMethod (line 103)
-- new HashTable (line 167)
-- new ArgumentCountError (line 216)
-- new ArgumentCountError (line 384)
-- new ArgumentCountError (line 409)
-- new ArgumentCountError (line 433)
-- new ArgumentCountError (line 463)
-- new ArgumentCountError (line 487)
-- new ArgumentCountError (line 514)
-- new ArgumentCountError (line 544)
-- new ArgumentCountError (line 557)
-- 26 class method(s)
+- new ClassEntry (line 30)
+- new Variable (line 51)
+- new ArrayIteratorConstruct (line 56)
+- new ArrayIteratorCurrent (line 59)
+- new ArrayIteratorKey (line 61)
+- new ArrayIteratorNext (line 63)
+- new ArrayIteratorRewind (line 65)
+- new ArrayIteratorSeek (line 67)
+- new ArrayIteratorValid (line 69)
+- new ArrayIteratorCount (line 71)
+- new ArrayIteratorGetArrayCopy (line 73)
+- new ArrayIteratorGetFlags (line 75)
+- new ArrayIteratorSetFlags (line 77)
+- new ArrayIteratorAppend (line 79)
+- new ArrayIteratorOffsetGet (line 81)
+- new ArrayIteratorOffsetSet (line 83)
+- new ArrayIteratorOffsetExists (line 85)
+- new ArrayIteratorOffsetUnset (line 87)
+- new SplArraySortMethod (line 97)
+- new SplArrayUserSortMethod (line 101)
+- new HashTable (line 165)
+- new ArgumentCountError (line 214)
+- new ArgumentCountError (line 382)
+- new ArgumentCountError (line 407)
+- new ArgumentCountError (line 431)
+- new ArgumentCountError (line 461)
+- new ArgumentCountError (line 485)
+- new ArgumentCountError (line 512)
+- 25 class method(s)
 
 ### `ext/spl/ArrayObjectBuiltin.php`
 
@@ -12088,10 +12090,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 36)
 - new DirectoryIteratorConstruct (line 45)
-- new Variable (line 148)
-- new ObjectEntry (line 166)
-- new ArgumentCountError (line 286)
-- 28 class method(s)
+- new Variable (line 149)
+- new ObjectEntry (line 167)
+- new ArgumentCountError (line 297)
+- 30 class method(s)
 
 ### `ext/spl/EmptyIteratorBuiltin.php`
 
@@ -15316,6 +15318,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/standard/JitParseStrUserScriptCstrKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 25 class method(s)
 
 ### `ext/standard/JitParseUrl.php`
 
@@ -19011,14 +19018,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 319)
 - new Variable (line 393)
 - new Variable (line 434)
-- new HashTable (line 1721)
-- new Variable (line 1723)
-- new HashTable (line 2585)
-- new Variable (line 2588)
-- new Variable (line 2594)
-- new Variable (line 2600)
-- new Variable (line 2606)
-- new Variable (line 2613)
+- new HashTable (line 1725)
+- new Variable (line 1727)
+- new HashTable (line 2589)
+- new Variable (line 2592)
+- new Variable (line 2598)
+- new Variable (line 2604)
+- new Variable (line 2610)
+- new Variable (line 2617)
 - 144 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -29879,18 +29886,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ParseStrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 420)
-- new phpc_native_ht_set_string_key (line 421)
-- new phpc_native_ht_set_string_key_ht (line 422)
-- new phpc_native_ht_set_string_at (line 423)
-- new phpc_native_ht_set_hashtable_at (line 424)
+- new phpc_native_ht_alloc (line 421)
+- new phpc_native_ht_set_string_key (line 422)
+- new phpc_native_ht_set_string_key_ht (line 423)
+- new phpc_native_ht_set_string_at (line 424)
+- new phpc_native_ht_set_hashtable_at (line 425)
 - 21 class method(s)
 - 5 closure(s)
-
-### `lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php`
-
-**Warnings** (review for bootstrap subset):
-- 25 class method(s)
 
 ### `lib/JIT/Builtin/ParseUrl.php`
 

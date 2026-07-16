@@ -3802,7 +3802,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ParamSensitiveLookupRuntime.php'
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParamSensitiveLowering.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrNativeOpsJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php';
+require_once __DIR__.'/../../../ext/standard/JitParseStrUserScriptCstrKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrl.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrlComponentJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrlRuntime.php';
