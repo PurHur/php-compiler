@@ -98,6 +98,41 @@ PHP;
         $this->assertSame("1\n", ob_get_clean());
     }
 
+    /** Trait methods override inherited parent methods (#19630, zend_traits.c). */
+    public function testTraitMethodOverridesInheritedParentMethod(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base { public function f() { return 'base'; } }
+trait T { public function f() { return parent::f() . '+T'; } }
+class A extends Base { use T; }
+echo (new A)->f(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'trait_overrides_parent.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("base+T\n", ob_get_clean());
+    }
+
+    /** Two traits colliding on a parent-overridden name must still fail (#19630). */
+    public function testTraitCollisionOnParentMethodNameStillFails(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Base { public function f(): int { return 0; } }
+trait T1 { public function f(): int { return 1; } }
+trait T2 { public function f(): int { return 2; } }
+class C extends Base { use T1, T2; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Trait method T2::f has not been applied');
+        $this->expectExceptionMessage('collision with T1::f');
+        $runtime->parseAndCompile($code, 'trait_collision_parent.php');
+    }
+
     public function testClassTraitPropertyConflictFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
