@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitPregSubject;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\RuntimeStrictness;
@@ -82,6 +81,24 @@ final class substr_replace extends Internal
         if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('substr_replace() offset must be an integer in this compiler build');
         }
+
+        // Early TypeError for null $string on 8.4 forward profile (#19282, string.c Z_PARAM_ARRAY_OR_STR).
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            JitStringBuiltinArg::lowerZparamStr(
+                $context,
+                $args[0],
+                'substr_replace',
+                0,
+                'string',
+                'array|string'
+            );
+
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $lengthVal = $i64->constInt(0, false);
@@ -108,11 +125,39 @@ final class substr_replace extends Internal
 
         return JitSubstrReplace::replace(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'substr_replace', 0, 'string'),
+            self::jitStringArg($context, $args[0], 0, 'string', 'array|string'),
             JitStringBuiltinArg::lower($context, $args[1], 'substr_replace', 1, 'replace'),
             $this->jitLong($context, $args[2], 'substr_replace() offset'),
             $lengthVal,
             $hasLength
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string'
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'substr_replace',
+                $argIndex,
+                $paramName,
+                $expectedType
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'substr_replace',
+            $argIndex,
+            $paramName,
+            $expectedType
         );
     }
 

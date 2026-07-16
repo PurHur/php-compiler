@@ -31,7 +31,7 @@ final class substr_count extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $haystack = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'substr_count', 'haystack');
+        $haystack = self::vmHaystackArg($frame);
         $needle = self::vmNeedleArg($frame);
         $offset = 0;
         if ($argc >= 3) {
@@ -56,11 +56,21 @@ final class substr_count extends Internal
             throw new \LogicException('substr_count() requires two to four arguments in this compiler build');
         }
 
+        // Early TypeError return before StringSubstrCount::ensureLinked (AOT helper IR gap; #19282).
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'substr_count', 0, 'haystack');
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
         StringSubstrCount::ensureLinked($context);
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $fn = $context->lookupFunction('phpc_substr_count');
-        $hay = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'substr_count', 0, 'haystack');
+        $hay = self::jitHaystackArg($context, $args[0]);
         $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'substr_count', 1, 'needle');
         $offset = $argc >= 3
             ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'substr_count', 3, 'offset')
@@ -153,6 +163,44 @@ final class substr_count extends Internal
         $phi->addIncoming($lenResult, $lenEnd);
 
         return $phi;
+    }
+
+    /**
+     * php-src Z_PARAM_STR for haystack — null TypeError on 8.4 forward profile (#19282, string.c).
+     */
+    private static function vmHaystackArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, 0, 'substr_count', 'haystack')->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'substr_count',
+            0,
+            'haystack'
+        );
+    }
+
+    private static function jitHaystackArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'substr_count',
+                0,
+                'haystack'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'substr_count',
+            0,
+            'haystack'
+        );
     }
 
     /**
