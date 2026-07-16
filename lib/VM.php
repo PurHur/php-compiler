@@ -5260,6 +5260,12 @@ restart:
                         ? $op->block1->func->name
                         : '{closure}';
                     $closureFunc = new Func\PHP($funcName, $op->block1);
+                    if ([] !== $op->attributeNames) {
+                        $closureFunc->attributeNames = $op->attributeNames;
+                    }
+                    if ([] !== $op->attributeEntries) {
+                        $closureFunc->attributeEntries = $op->attributeEntries;
+                    }
                     $captures = $this->bindClosureCaptures($frame, $op->closureCaptures);
                     $state = new ClosureState($closureFunc, $captures);
                     $state->applyDefinitionSite($op->sourceLocation, $op->block1);
@@ -5335,6 +5341,12 @@ restart:
                     $func->deprecated = $op->deprecatedMetadata;
                     if ([] !== $op->parameterMetadata) {
                         $func->parameterMetadata = $op->parameterMetadata;
+                    }
+                    if ([] !== $op->attributeNames) {
+                        $func->attributeNames = $op->attributeNames;
+                    }
+                    if ([] !== $op->attributeEntries) {
+                        $func->attributeEntries = $op->attributeEntries;
                     }
                     $this->context->declareFunction($func);
                     break;

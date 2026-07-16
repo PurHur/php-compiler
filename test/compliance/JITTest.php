@@ -1349,8 +1349,10 @@ class JITTest extends BaseTest {
                 || str_contains($name, 'reflection_class_static_properties')) {
                 continue;
             }
-            // ReflectionProperty/Constant::getAttributes() MCJIT: VM read path (#4136, #2467).
-            if (str_contains($name, 'reflection_property_attributes') || str_contains($name, 'reflection_constant_attributes')) {
+            // ReflectionProperty/Constant/Function::getAttributes() MCJIT: VM read path (#4136, #2467, #19418).
+            if (str_contains($name, 'reflection_property_attributes')
+                || str_contains($name, 'reflection_constant_attributes')
+                || str_contains($name, 'reflection_function_getattributes')) {
                 continue;
             }
             // ReflectionProperty asymmetric probes: VM builtins + asymmetric syntax (#6977).
