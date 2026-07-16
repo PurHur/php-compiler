@@ -2857,21 +2857,13 @@ class VM {
             $fiber->threw = true;
             throw new VM\FiberUncaughtThrow($thrown);
         }
-        $this->context->pendingException = $thrown;
-        for ($handler = $frame; null !== $handler; $handler = $handler->parent) {
-            if ($handler->fiberState !== $fiber && $this->findFiberState($handler) !== $fiber) {
-                break;
-            }
-            $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
-            if (null !== $catchFrame) {
-                $catchFrame->fiberState = $fiber;
-                $fiber->frame = $catchFrame;
+        $catchFrame = $this->findCatchFrameForFiberThrow($fiber, $thrown);
+        if (null !== $catchFrame) {
+            $catchFrame->fiberState = $fiber;
+            $fiber->frame = $catchFrame;
 
-                return;
-            }
+            return;
         }
-        $this->clearTryCatchUnwindState();
-        $this->context->pendingException = null;
         $fiber->status = FiberState::STATUS_TERMINATED;
         $fiber->frame = null;
         $fiber->hasReturnValue = false;
@@ -3155,6 +3147,20 @@ class VM {
             $gen->frame = null;
             $gen->markClosedWithoutReturn();
             throw new VM\GeneratorUncaughtThrow($thrown, $frame);
+        }
+        // Zend/zend_fibers.c: uncaught throw inside a fiber transfers to the resume()/throw()
+        // caller — never jump into the caller's try/catch while still inside runFiberExecution
+        // (#19592; mirrors GeneratorUncaughtThrow above).
+        $fiber = $this->context->currentFiber;
+        if (null !== $fiber && $this->findFiberState($frame) === $fiber) {
+            $catchFrame = $this->findCatchFrameForFiberThrow($fiber, $thrown);
+            if (null !== $catchFrame) {
+                $catchFrame->fiberState = $fiber;
+                $fiber->frame = $catchFrame;
+
+                return $catchFrame;
+            }
+            throw new VM\FiberUncaughtThrow($thrown);
         }
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
@@ -12622,6 +12628,24 @@ restart:
         $this->stashPendingException($thrown);
         for ($handler = $gen->frame; null !== $handler; $handler = $handler->parent) {
             if ($handler->generatorState !== $gen && $this->findGeneratorState($handler) !== $gen) {
+                break;
+            }
+            $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+        }
+        $this->clearTryCatchUnwindState();
+
+        return null;
+    }
+
+    /** Catch handlers inside the fiber callback only (not caller try/catch) (#19592). */
+    private function findCatchFrameForFiberThrow(FiberState $fiber, Variable $thrown): ?Frame
+    {
+        $this->stashPendingException($thrown);
+        for ($handler = $fiber->frame; null !== $handler; $handler = $handler->parent) {
+            if ($handler->fiberState !== $fiber && $this->findFiberState($handler) !== $fiber) {
                 break;
             }
             $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
