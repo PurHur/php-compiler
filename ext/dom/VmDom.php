@@ -2424,7 +2424,9 @@ final class VmDom
         $generalEntities = self::parseDoctypeGeneralEntities($trimmed);
         $parts = self::splitXmlDocumentParts($trimmed);
         if (null === $parts) {
-            self::reportDomLibxmlError($ctx, 'Malformed XML document', 4, 1, $frame);
+            // Prefer libxml-shaped diagnostics (e.g. unclosed start tag) over a generic
+            // "Malformed XML document" — php-src ext/dom/php_dom.c via libxml2 (#16192, #19505).
+            self::reportDomLoadXmlValidationErrors($ctx, $trimmed, $frame);
 
             return false;
         }
@@ -2882,6 +2884,33 @@ final class VmDom
             'file' => '',
             'line' => 1,
         ], $frame, null, 'DOMDocument::loadXML(): '.$message.' in Entity, line: 1');
+    }
+
+    /**
+     * Report VmXml well-formedness diagnostics for loadXML() documents that fail structural
+     * split (php-src ext/dom/php_dom.c via libxml2; #16192, #19505).
+     */
+    private static function reportDomLoadXmlValidationErrors(
+        Context $ctx,
+        string $xml,
+        ?\PHPCompiler\Frame $frame
+    ): void {
+        $validationErrors = VmXml::validationErrorRecords($xml);
+        if ([] === $validationErrors) {
+            self::reportDomLibxmlError($ctx, 'Malformed XML document', 4, 1, $frame);
+
+            return;
+        }
+        foreach ($validationErrors as $validationError) {
+            self::reportDomLibxmlError(
+                $ctx,
+                $validationError['message'],
+                $validationError['code'],
+                $validationError['column'],
+                $frame,
+                $validationError['level']
+            );
+        }
     }
 
     /**
