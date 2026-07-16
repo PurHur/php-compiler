@@ -20,6 +20,8 @@ final class LibxmlConstants
     public const LIBXML_ERR_FATAL = 3;
 
     /** libxml2 XML_PARSE_* flags exposed to userland. */
+    public const LIBXML_RECOVER = 1;
+
     public const LIBXML_NOENT = 2;
 
     public const LIBXML_DTDLOAD = 4;
@@ -79,6 +81,7 @@ final class LibxmlConstants
     public static function parseFlagConstants(): array
     {
         return [
+            'LIBXML_RECOVER' => self::LIBXML_RECOVER,
             'LIBXML_NOENT' => self::LIBXML_NOENT,
             'LIBXML_DTDLOAD' => self::LIBXML_DTDLOAD,
             'LIBXML_DTDATTR' => self::LIBXML_DTDATTR,

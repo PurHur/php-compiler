@@ -631,6 +631,36 @@ PHP;
         }
     }
 
+    public function test_dom_xml_document_create_from_string_living_namespace(): void
+    {
+        $previous = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+                self::markTestSkipped('Dom\\ living-standard namespace withheld without PHP_COMPILER_PROFILE=8.4 (#19581)');
+            }
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+echo (int) method_exists(Dom\XMLDocument::class, 'createFromString'), "\n";
+$doc = Dom\XMLDocument::createFromString('<?xml version="1.0"?><root><a/></root>');
+echo $doc->documentElement->nodeName, "\n";
+$empty = Dom\XMLDocument::createEmpty();
+echo ($empty->documentElement === null ? 'NULL' : 'set'), "\n";
+PHP;
+            $block = $runtime->parseAndCompile($code, 'dom_xml_document.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame("1\nroot\nNULL\n", ob_get_clean());
+        } finally {
+            if (false === $previous) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$previous);
+            }
+        }
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');

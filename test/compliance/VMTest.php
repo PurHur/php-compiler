@@ -1218,12 +1218,14 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsDomLivingStandardNamespace()
-                && str_contains($name, 'dom_html_document')
-                && !str_contains($name, 'dom_html_document_phantom')) {
+                && (str_contains($name, 'dom_html_document') || str_contains($name, 'dom_xml_document'))
+                && !str_contains($name, 'dom_html_document_phantom')
+                && !str_contains($name, 'dom_xml_document_phantom')) {
                 continue;
             }
             if (CompilerVersion::supportsDomLivingStandardNamespace()
-                && str_contains($name, 'dom_html_document_phantom')) {
+                && (str_contains($name, 'dom_html_document_phantom')
+                    || str_contains($name, 'dom_xml_document_phantom'))) {
                 continue;
             }
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {

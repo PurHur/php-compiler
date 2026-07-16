@@ -65,6 +65,12 @@ final class DomLivingBuiltinClasses
         $xmlDocument->isInternal = true;
         $xmlDocument->parentLc = VmDomLiving::CLASS_DOCUMENT;
         $xmlDocument->properties[] = new ClassProperty(VmDomLiving::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
+        $xmlDocument->methods['createfromstring'] = new XmlDocumentCreateFromString();
+        $xmlDocument->methodVisibility['createfromstring'] = $pubStatic;
+        $xmlDocument->methodNames['createfromstring'] = 'createFromString';
+        $xmlDocument->methods['createempty'] = new XmlDocumentCreateEmpty();
+        $xmlDocument->methodVisibility['createempty'] = $pubStatic;
+        $xmlDocument->methodNames['createempty'] = 'createEmpty';
         $ctx->classes[VmDomLiving::CLASS_XML_DOCUMENT] = $xmlDocument;
     }
 }
