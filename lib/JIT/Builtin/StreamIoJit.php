@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /**
  * Stream I/O dispatch — JIT embed + AOT standalone via StreamIoRuntime PHP (#5343, #10326, #12956).
@@ -32,6 +33,13 @@ final class StreamIoJit
 
         self::ensureStreamGlobals($context);
         StreamFilter::ensureLinked($context);
+
+        // User-script AOT: libc + handle-table kernels (VmFs nested helpers skip __init__, #16075 / #19462).
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StreamIoStandaloneLlvm::implementForUserScriptLowering($context);
+
+            return;
+        }
 
         if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
             StreamIoRuntime::implementDeferredStreamIoStubs($context);

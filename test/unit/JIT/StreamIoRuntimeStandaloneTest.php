@@ -45,19 +45,20 @@ final class StreamIoRuntimeStandaloneTest extends TestCase
         try {
             $runtime = new Runtime(Runtime::MODE_AOT);
             $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+            // User-script installs libc kernels immediately (no defer stubs) (#19462).
             StreamIoJit::implement($ctx);
-            $tmpBefore = $ctx->module->getNamedFunction('__compiler_tmpfile');
-            $this->assertNotNull($tmpBefore);
-            $this->assertTrue(StreamIoRuntime::isDeferStub($tmpBefore));
-
-            StreamIoRuntime::ensureLinkedForUserScriptLowering($ctx);
-
-            $tmpAfter = $ctx->module->getNamedFunction('__compiler_tmpfile');
-            $this->assertNotNull($tmpAfter);
-            $this->assertFalse(StreamIoRuntime::isDeferStub($tmpAfter));
+            $tmp = $ctx->module->getNamedFunction('__compiler_tmpfile');
+            $this->assertNotNull($tmp);
+            $this->assertFalse(StreamIoRuntime::isDeferStub($tmp));
+            $this->assertGreaterThan(1, $tmp->countBasicBlocks());
             $supports = $ctx->module->getNamedFunction('__compiler_stream_supports');
             $this->assertNotNull($supports);
             $this->assertFalse(StreamIoRuntime::isDeferStub($supports));
+
+            StreamIoRuntime::ensureLinkedForUserScriptLowering($ctx);
+            $this->assertFalse(StreamIoRuntime::isDeferStub(
+                $ctx->module->getNamedFunction('__compiler_tmpfile')
+            ));
         } finally {
             if (false === $prev || '' === (string) $prev) {
                 putenv('PHP_COMPILER_AOT_USER_SCRIPT=');

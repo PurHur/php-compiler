@@ -83,12 +83,19 @@ final class StreamIoRuntime
     }
 
     /**
-     * User-script standalone must link real stream I/O when fopen/tmpfile appear in lowering (#9142).
+     * User-script standalone must link real stream I/O when fopen/tmpfile appear in lowering (#9142, #19462).
      *
-     * Inventory init defers heavy emitters; script-level JIT must not leave empty __compiler_fopen ABI.
+     * Inventory init defers heavy emitters; user-script AOT cannot nested-JIT VmFs (#16075) —
+     * upgrade via {@see StreamIoStandaloneLlvm} libc + handle-table bridges instead.
      */
     public static function ensureLinkedForUserScriptLowering(Context $context): void
     {
+        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+            StreamIoStandaloneLlvm::implementForUserScriptLowering($context);
+
+            return;
+        }
+
         if (self::allIoRuntimeFunctionsLinked($context)) {
             self::registerIoRuntime($context);
             self::ensureSupportsBridgeLinked($context);
@@ -699,8 +706,8 @@ final class StreamIoRuntime
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         self::declareRuntimeFn($context, '__compiler_fwrite', $i64, false, $i64, $strPtr, $i64);
-        self::declareRuntimeFn($context, '__compiler_fopen', $i64, false, $i64, $strPtr);
-        self::declareRuntimeFn($context, '__compiler_popen', $i64, false, $i64, $strPtr);
+        self::declareRuntimeFn($context, '__compiler_fopen', $i64, false, $strPtr, $strPtr);
+        self::declareRuntimeFn($context, '__compiler_popen', $i64, false, $strPtr, $strPtr);
         self::declareRuntimeFn($context, '__compiler_tmpfile', $i64, false);
         self::declareRuntimeFn($context, '__compiler_fread', $strPtr, false, $i64, $i64);
         self::declareRuntimeFn($context, '__compiler_stream_supports', $context->getTypeFromString('int32'), false, $i64, $i64);

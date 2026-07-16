@@ -17,8 +17,9 @@ final class JitStreamSupports
     public static function invoke(Context $context, Value $handleLong, Value $featureLong): Value
     {
         $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
-        StreamIoRuntime::ensureSupportsBridgeLinked($context);
+        // User-script libc bridges first so PHP nested supports bridge cannot win (#19462, #16075).
         StreamIoRuntime::ensureLinkedForUserScriptLowering($context);
+        StreamIoRuntime::ensureSupportsBridgeLinked($context);
         StreamCaps::ensureLinked($context);
         if (null !== $savedBlock) {
             \PHPCompiler\JIT\BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
