@@ -353,6 +353,41 @@ final class SocketsLibcThinAbi
         return (int) $ffi->close($fd);
     }
 
+    /**
+     * poll(2) — thin ABI for socket_select() (#6395).
+     *
+     * @param list<array{fd: int, events: int}> $entries
+     *
+     * @return list<int>|false revents per entry, or false on error
+     */
+    public static function poll(array $entries, int $timeoutMs): array|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $n = \count($entries);
+        if (0 === $n) {
+            return [];
+        }
+        $pollfd = $ffi->new('struct pollfd['.$n.']');
+        for ($i = 0; $i < $n; ++$i) {
+            $pollfd[$i]->fd = $entries[$i]['fd'];
+            $pollfd[$i]->events = $entries[$i]['events'];
+            $pollfd[$i]->revents = 0;
+        }
+        $rc = (int) $ffi->poll($pollfd, $n, $timeoutMs);
+        if ($rc < 0) {
+            return false;
+        }
+        $out = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $out[] = (int) $pollfd[$i]->revents;
+        }
+
+        return $out;
+    }
+
     public static function fcntlGetFl(int $fd): int
     {
         $ffi = self::ffi();
@@ -494,6 +529,12 @@ int close(int fd);
 int fcntl(int fd, int cmd, ...);
 int sockatmark(int sockfd);
 int shutdown(int sockfd, int how);
+struct pollfd {
+    int fd;
+    short events;
+    short revents;
+};
+int poll(struct pollfd *fds, unsigned long nfds, int timeout);
 int inet_pton(int af, const char *src, void *dst);
 const char *inet_ntop(int af, const void *src, char *dst, unsigned int size);
 unsigned short htons(unsigned short hostshort);

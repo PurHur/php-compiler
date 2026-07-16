@@ -59,6 +59,7 @@ class Module extends ModuleAbstract
             new socket_sendto(),
             new socket_recvfrom(),
             new socket_shutdown(),
+            new socket_select(),
             new socket_read(),
             new socket_write(),
             new socket_close(),
