@@ -9154,6 +9154,8 @@ restart:
             }
 
             return $this->dispatchVmTypeError($e, $frame);
+        } catch (\ValueError $e) {
+            return $this->dispatchVmValueError($e, $frame);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);
         }

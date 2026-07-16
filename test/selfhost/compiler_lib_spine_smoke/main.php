@@ -32,6 +32,15 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
+
+
+
+
+
+
+
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -972,6 +981,8 @@ require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementGetNamespaces.php'
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementIterator.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementOffsetExists.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementOffsetGet.php';
+require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementOffsetSet.php';
+require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementOffsetUnset.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementRegisterXPathNamespace.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementToString.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementXpath.php';
@@ -5159,6 +5170,10 @@ require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/llvm_env_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
+require_once __DIR__.'/../../../ext/intl/NormalizerGetRawDecomposition.php';
+require_once __DIR__.'/../../../ext/intl/NormalizerIsNormalized.php';
+require_once __DIR__.'/../../../ext/intl/NormalizerNormalize.php';
+require_once __DIR__.'/../../../ext/intl/normalizer_get_raw_decomposition.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 

@@ -52,6 +52,12 @@ final class VmSimpleXml
         $entry->methods['offsetexists'] = new SimpleXmlElementOffsetExists();
         $entry->methodVisibility['offsetexists'] = $pub;
         $entry->methodNames['offsetexists'] = 'offsetExists';
+        $entry->methods['offsetset'] = new SimpleXmlElementOffsetSet();
+        $entry->methodVisibility['offsetset'] = $pub;
+        $entry->methodNames['offsetset'] = 'offsetSet';
+        $entry->methods['offsetunset'] = new SimpleXmlElementOffsetUnset();
+        $entry->methodVisibility['offsetunset'] = $pub;
+        $entry->methodNames['offsetunset'] = 'offsetUnset';
         $entry->methods['count'] = new SimpleXmlElementCount();
         $entry->methodVisibility['count'] = $pub;
         $entry->methods['getname'] = new SimpleXmlElementGetName();
@@ -258,6 +264,131 @@ final class VmSimpleXml
         }
 
         return false;
+    }
+
+    /**
+     * SimpleXMLElement::offsetSet (php-src ext/simplexml/sxe.c sxe_prop_dim_write; #19536).
+     *
+     * Integer offsets write element text (or attribute value by index on an attributes view).
+     * Non-integer offsets coerce to attribute names (overwrite allowed; empty name → ValueError).
+     */
+    public static function offsetSet(
+        Context $ctx,
+        ObjectEntry $entry,
+        Variable $offset,
+        Variable $value,
+        ?Frame $frame = null
+    ): void {
+        $offset = $offset->resolveIndirect();
+        $value = $value->resolveIndirect();
+        $vm = $frame?->vmContext?->vm ?? null;
+
+        if (Variable::TYPE_INTEGER === $offset->type) {
+            $index = $offset->toInt();
+            $stringValue = $value->toString($vm, $frame);
+            if (SimpleXmlRegistry::isAttributesView($entry)) {
+                $state = SimpleXmlRegistry::state($entry);
+                $keys = array_keys($state->attributes);
+                if ($index < 0 || $index >= \count($keys)) {
+                    self::warn($ctx, 'SimpleXMLElement::offsetSet(): Cannot add attribute number '.$index.' when only '.\count($keys).' such attributes exist', $frame);
+
+                    return;
+                }
+                $state->attributes[$keys[$index]] = $stringValue;
+
+                return;
+            }
+            $elements = SimpleXmlRegistry::view($entry);
+            if ($index < 0 || $index >= \count($elements)) {
+                $label = ([] !== $elements) ? $elements[0]->name : self::elementName($entry);
+                self::warn(
+                    $ctx,
+                    'SimpleXMLElement::offsetSet(): Cannot add element '.$label.' number '.$index
+                    .' when only '.\count($elements).' such elements exist',
+                    $frame
+                );
+
+                return;
+            }
+            $node = $elements[$index];
+            $node->children = [];
+            $node->text = $stringValue;
+
+            return;
+        }
+
+        $name = $offset->toString($vm, $frame);
+        if ('' === $name) {
+            throw new \ValueError('Cannot create attribute with an empty name');
+        }
+
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            $state = SimpleXmlRegistry::state($entry);
+            if (!\array_key_exists($name, $state->attributes)) {
+                // php-src: attributes() view cannot introduce new attributes.
+                return;
+            }
+            $state->attributes[$name] = $value->toString($vm, $frame);
+
+            return;
+        }
+
+        if (SimpleXmlRegistry::isView($entry)) {
+            $elements = SimpleXmlRegistry::view($entry);
+            if ([] === $elements) {
+                return;
+            }
+            // php-src: dimension write on a multi-node selection updates the first node.
+            $elements[0]->attributes[$name] = $value->toString($vm, $frame);
+
+            return;
+        }
+
+        SimpleXmlRegistry::state($entry)->attributes[$name] = $value->toString($vm, $frame);
+    }
+
+    /**
+     * SimpleXMLElement::offsetUnset (php-src ext/simplexml/sxe.c sxe_prop_dim_delete; #19536).
+     */
+    public static function offsetUnset(
+        Context $ctx,
+        ObjectEntry $entry,
+        Variable $offset,
+        ?Frame $frame = null
+    ): void {
+        $offset = $offset->resolveIndirect();
+        $vm = $frame?->vmContext?->vm ?? null;
+
+        if (Variable::TYPE_INTEGER === $offset->type) {
+            $index = $offset->toInt();
+            if (SimpleXmlRegistry::isAttributesView($entry)) {
+                $state = SimpleXmlRegistry::state($entry);
+                $keys = array_keys($state->attributes);
+                if ($index >= 0 && $index < \count($keys)) {
+                    unset($state->attributes[$keys[$index]]);
+                }
+
+                return;
+            }
+            // Full element deletion needs a parent pointer; clear node content like a soft unset
+            // of the selected node's payload (attribute unset is the ArrayAccess write companion).
+            $elements = SimpleXmlRegistry::view($entry);
+            if ($index >= 0 && $index < \count($elements)) {
+                $node = $elements[$index];
+                $node->attributes = [];
+                $node->children = [];
+                $node->text = '';
+            }
+
+            return;
+        }
+
+        $name = $offset->toString($vm, $frame);
+        if ('' === $name) {
+            return;
+        }
+        $state = SimpleXmlRegistry::state($entry);
+        unset($state->attributes[$name]);
     }
 
     public static function countElements(ObjectEntry $entry): int
