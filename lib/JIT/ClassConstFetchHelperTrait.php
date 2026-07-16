@@ -156,8 +156,7 @@ trait ClassConstFetchHelperTrait
             self::messageDataPtrForRuntime($context, $message),
             $context->constantFromInteger(strlen($message), 'size_t')
         );
-        // abort — not returnVoid — this runs inside non-void methods (#19614).
-        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($merge);
 
@@ -270,11 +269,15 @@ trait ClassConstFetchHelperTrait
                     $context->constantStringFromString($literal)
                 );
                 if ('static' === $lcLiteral) {
-                    // Inline LSB class id (global + declaring fallback) — avoid
-                    // name↔id roundtrip / ensureLinked mid-body (#19614).
-                    return self::emitStaticKeywordClassId($objectType, $block);
+                    $scopeClass = self::jitScopeClassName($objectType, $block) ?? '';
+                    $resolvedStr = LateStaticBindingHelper::emitLateStaticResolvedNameString(
+                        $objectType,
+                        $block,
+                        $scopeClass
+                    );
+                } else {
+                    $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
                 }
-                $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
 
                 return self::emitResolveClassIdFromNameString($objectType, $resolvedStr);
             }
@@ -288,39 +291,6 @@ trait ClassConstFetchHelperTrait
         $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
 
         return self::emitResolveClassIdFromNameString($objectType, $resolvedStr);
-    }
-
-    /**
-     * Runtime class id for literal `static::` (#19614) — load phpc_late_static_class_id
-     * with declaring-scope fallback (no name↔id roundtrip / ensureLinked).
-     *
-     * @return Value int64
-     */
-    private static function emitStaticKeywordClassId(Object_ $objectType, Block $block): Value
-    {
-        $context = $objectType->jitContext();
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        \PHPCompiler\JIT\Builtin\LateStaticBindingGlobals::ensureGlobal($context);
-        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-
-        $runtimeId = LateStaticBindingHelper::emitLoadClassId($context);
-        $scopeClass = self::jitScopeClassName($objectType, $block);
-        if (null === $scopeClass || '' === $scopeClass) {
-            return $runtimeId;
-        }
-        $fallbackId = $objectType->lookup($scopeClass);
-        $i64 = $context->getTypeFromString('int64');
-        $isZero = $context->builder->icmp(
-            Builder::INT_EQ,
-            $runtimeId,
-            $i64->constInt(0, false)
-        );
-
-        return $context->builder->select(
-            $isZero,
-            $context->constantFromInteger($fallbackId, 'int64'),
-            $runtimeId
-        );
     }
 
     private static function fetchDynamicByClassIdValue(
