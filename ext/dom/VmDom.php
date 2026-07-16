@@ -8391,7 +8391,11 @@ final class VmDom
     }
 
     /**
-     * DOMNode::C14N() — inclusive canonical XML (php-src ext/dom/node.c; #14409).
+     * DOMNode::C14N() — inclusive canonical XML (php-src ext/dom/node.c; #14409, #19741).
+     *
+     * libxml xmlC14NDocDumpMemory only serializes nodes in the document tree.
+     * Orphans, removeChild results, cloneNode results, and fragment-only nodes
+     * yield an empty string (even when ownerDocument is set).
      *
      * @param ?array<mixed> $xpath
      * @param ?array<mixed> $nsPrefixes
@@ -8420,6 +8424,10 @@ final class VmDom
             }
 
             return self::c14nSerializeNode($rootVar->toObject(), $withComments, $exclusive, []);
+        }
+        // php-src zim_dom_node_C14N / xmlC14NDocDumpMemory: disconnected nodes → "" (#19741).
+        if (!self::isConnected($node)) {
+            return '';
         }
 
         return self::c14nSerializeNode($node, $withComments, $exclusive, []);
