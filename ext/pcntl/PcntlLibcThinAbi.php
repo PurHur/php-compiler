@@ -176,12 +176,97 @@ final class PcntlLibcThinAbi
         return $rc;
     }
 
+    public static function alarm(int $seconds): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+
+        return (int) $ffi->alarm($seconds);
+    }
+
+    /**
+     * @param list<string> $args
+     * @param array<string, string> $env
+     */
+    public static function exec(string $path, array $args, array $env): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $argv = \array_values($args);
+        \array_unshift($argv, $path);
+        $argvC = self::stringVector($ffi, $argv);
+        if ([] === $env) {
+            $ffi->execv($path, $argvC);
+
+            return false;
+        }
+        $envp = [];
+        foreach ($env as $key => $value) {
+            $envp[] = $key.'='.$value;
+        }
+        $envC = self::stringVector($ffi, $envp);
+        $ffi->execve($path, $argvC, $envC);
+
+        return false;
+    }
+
+    /**
+     * @param list<string> $strings
+     *
+     * @return \FFI\CData
+     */
+    private static function stringVector(\FFI $ffi, array $strings): \FFI\CData
+    {
+        $n = \count($strings);
+        $vec = $ffi->new('char*['.($n + 1).']');
+        for ($i = 0; $i < $n; ++$i) {
+            $len = \strlen($strings[$i]);
+            $buf = $ffi->new('char['.($len + 1).']', false);
+            \FFI::memcpy($buf, $strings[$i], $len);
+            $buf[$len] = "\0";
+            $vec[$i] = $buf;
+        }
+        $vec[$n] = null;
+
+        return $vec;
+    }
+
     public static function wifexited(int $status): bool
     {
         return 0 === ($status & 0x7f);
     }
 
     public static function wexitstatus(int $status): int
+    {
+        return ($status >> 8) & 0xff;
+    }
+
+    /** Linux WIFSIGNALED — ((signed char)((status & 0x7f) + 1) >> 1) > 0 */
+    public static function wifsignaled(int $status): bool
+    {
+        $term = $status & 0x7f;
+
+        return 0 !== $term && 0x7f !== $term;
+    }
+
+    /** Linux WIFSTOPPED — ((status & 0xff) == 0x7f) */
+    public static function wifstopped(int $status): bool
+    {
+        return 0x7f === ($status & 0xff);
+    }
+
+    /** Linux WTERMSIG */
+    public static function wtermsig(int $status): int
+    {
+        return $status & 0x7f;
+    }
+
+    /** Linux WSTOPSIG */
+    public static function wstopsig(int $status): int
     {
         return ($status >> 8) & 0xff;
     }
@@ -211,6 +296,9 @@ sighandler_t signal(int signum, sighandler_t handler);
 int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 pid_t fork(void);
 pid_t waitpid(pid_t pid, int *status, int options);
+unsigned int alarm(unsigned int seconds);
+int execv(const char *path, char *const argv[]);
+int execve(const char *path, char *const argv[], char *const envp[]);
 typedef int idtype_t;
 typedef unsigned int id_t;
 typedef struct { int si_signo; int si_errno; int si_code; } siginfo_t;

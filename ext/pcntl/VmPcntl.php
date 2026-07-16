@@ -62,6 +62,40 @@ final class VmPcntl
         throw new \Error('pcntl_waitpid() is not available in this compiler build');
     }
 
+    /** php-src pcntl_wait() — waitpid(-1, …) (ext/pcntl/pcntl.c; #19565). */
+    public static function wait(int &$status, int $options): int
+    {
+        return self::waitpid(-1, $status, $options);
+    }
+
+    public static function alarm(int $seconds): int
+    {
+        if (PcntlHostBridge::alarmAvailable()) {
+            return PcntlHostBridge::alarm($seconds);
+        }
+        if (PcntlLibcThinAbi::processAvailable()) {
+            return PcntlLibcThinAbi::alarm($seconds);
+        }
+
+        throw new \Error('pcntl_alarm() is not available in this compiler build');
+    }
+
+    /**
+     * @param list<string> $args
+     * @param array<string, string> $env
+     */
+    public static function exec(string $path, array $args, array $env): bool
+    {
+        if (PcntlHostBridge::execAvailable()) {
+            return PcntlHostBridge::exec($path, $args, $env);
+        }
+        if (PcntlLibcThinAbi::processAvailable()) {
+            return PcntlLibcThinAbi::exec($path, $args, $env);
+        }
+
+        throw new \Error('pcntl_exec() is not available in this compiler build');
+    }
+
     public static function wifexited(int $status): bool
     {
         if (PcntlHostBridge::forkAvailable()) {
@@ -84,6 +118,54 @@ final class VmPcntl
         }
 
         throw new \Error('pcntl_wexitstatus() is not available in this compiler build');
+    }
+
+    public static function wifsignaled(int $status): bool
+    {
+        if (PcntlHostBridge::forkAvailable()) {
+            return PcntlHostBridge::wifsignaled($status);
+        }
+        if (PcntlLibcThinAbi::processAvailable()) {
+            return PcntlLibcThinAbi::wifsignaled($status);
+        }
+
+        throw new \Error('pcntl_wifsignaled() is not available in this compiler build');
+    }
+
+    public static function wifstopped(int $status): bool
+    {
+        if (PcntlHostBridge::forkAvailable()) {
+            return PcntlHostBridge::wifstopped($status);
+        }
+        if (PcntlLibcThinAbi::processAvailable()) {
+            return PcntlLibcThinAbi::wifstopped($status);
+        }
+
+        throw new \Error('pcntl_wifstopped() is not available in this compiler build');
+    }
+
+    public static function wtermsig(int $status): int
+    {
+        if (PcntlHostBridge::forkAvailable()) {
+            return PcntlHostBridge::wtermsig($status);
+        }
+        if (PcntlLibcThinAbi::processAvailable()) {
+            return PcntlLibcThinAbi::wtermsig($status);
+        }
+
+        throw new \Error('pcntl_wtermsig() is not available in this compiler build');
+    }
+
+    public static function wstopsig(int $status): int
+    {
+        if (PcntlHostBridge::forkAvailable()) {
+            return PcntlHostBridge::wstopsig($status);
+        }
+        if (PcntlLibcThinAbi::processAvailable()) {
+            return PcntlLibcThinAbi::wstopsig($status);
+        }
+
+        throw new \Error('pcntl_wstopsig() is not available in this compiler build');
     }
 
     public static function hasHandler(int $signo): bool
