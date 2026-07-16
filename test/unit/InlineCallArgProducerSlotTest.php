@@ -3321,6 +3321,65 @@ PHP;
         self::assertContains($limitSendSlot, $newSlots, 'LimitIterator arg #0 must send inner ArrayIterator New_ slot');
     }
 
+    /**
+     * Issue #19439 — new Outer(new Inner(..., Class::CONST), …) must send inner New_ slot, not ClassConstFetch.
+     */
+    public function testNestedNewConstructorClassConstInnerArgUsesInnerProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class Inner {
+    public $a;
+    public $b;
+    public function __construct($a, $b = null) { $this->a = $a; $this->b = $b; }
+}
+class Outer {
+    public $x;
+    public $y;
+    public function __construct($x, $y = null) { $this->x = $x; $this->y = $y; }
+}
+$o = new Outer(new Inner(1, FilesystemIterator::SKIP_DOTS), 3);
+echo is_object($o->x) ? "obj:{$o->x->a}:{$o->x->b}:{$o->y}" : gettype($o->x);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'nested_new_class_const_inner.php');
+
+        $innerNewSlot = null;
+        $outerArgSends = [];
+        $seenOuterNew = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $classSlot = $op->arg2;
+                if (null !== $classSlot && isset($block->constants[$classSlot])) {
+                    $className = $block->constants[$classSlot]->toString();
+                    if ('Inner' === $className) {
+                        $innerNewSlot = $op->arg1;
+                    }
+                    if ('Outer' === $className) {
+                        $seenOuterNew = true;
+                        $outerArgSends = [];
+                    }
+                }
+            }
+            if ($seenOuterNew && OpCode::TYPE_ARG_SEND === $op->type) {
+                $outerArgSends[] = $op->arg1;
+            }
+            if ($seenOuterNew && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertNotNull($innerNewSlot, 'Inner New_ slot');
+        self::assertCount(2, $outerArgSends, 'Outer ctor arg sends='.json_encode($outerArgSends));
+        self::assertSame($innerNewSlot, $outerArgSends[0], 'Outer arg #0 must be Inner New_ slot, not ClassConstFetch');
+        self::assertNotSame($innerNewSlot, $outerArgSends[1]);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('obj:1:4096:3', ob_get_clean());
+    }
+
     /** Issue #12916 — nested inline new LimitIterator(ArrayIterator) runtime parity. */
     public function testNestedNewConstructorInlineNewRuntime(): void
     {

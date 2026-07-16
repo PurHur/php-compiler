@@ -1,6 +1,6 @@
 <?php
 /**
- * Nested `new` as first constructor argument + second mode arg (#TBD).
+ * Nested `new` as first constructor argument + second mode arg (#19439).
  * Zend: php test/repro/maintainer_gap_nested_new_rii_mode.php
  * VM:   php bin/vm.php test/repro/maintainer_gap_nested_new_rii_mode.php
  */
@@ -16,18 +16,18 @@ $fail = false;
 
 echo "literal-mode:\n";
 try {
-    $names = [];
+    $namesLiteral = [];
     foreach (
         new RecursiveIteratorIterator(
             new RecursiveDirectoryIterator($tmp, FilesystemIterator::SKIP_DOTS),
             1
-        ) as $f
+        ) as $fLiteral
     ) {
-        $names[] = $f->getFilename();
+        $namesLiteral[] = $fLiteral->getFilename();
     }
-    sort($names);
-    echo json_encode($names), "\n";
-    if ($names !== ['a.txt', 'b.txt', 'sub']) {
+    sort($namesLiteral);
+    echo json_encode($namesLiteral), "\n";
+    if ($namesLiteral !== ['a.txt', 'b.txt', 'sub']) {
         $fail = true;
     }
 } catch (Throwable $e) {
@@ -36,18 +36,18 @@ try {
 }
 
 echo "const-mode:\n";
-$names = [];
+$namesConst = [];
 foreach (
     new RecursiveIteratorIterator(
         new RecursiveDirectoryIterator($tmp, FilesystemIterator::SKIP_DOTS),
         RecursiveIteratorIterator::SELF_FIRST
-    ) as $f
+    ) as $fConst
 ) {
-    $names[] = $f->getFilename();
+    $namesConst[] = $fConst->getFilename();
 }
-sort($names);
-echo json_encode($names), "\n";
-if ($names !== ['a.txt', 'b.txt', 'sub']) {
+sort($namesConst);
+echo json_encode($namesConst), "\n";
+if ($namesConst !== ['a.txt', 'b.txt', 'sub']) {
     $fail = true;
 }
 
