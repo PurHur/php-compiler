@@ -12,8 +12,8 @@ use PHPCompiler\ext\standard\ModuleRegistry;
  *
  * Grapheme helpers and intl_* error functions require a loaded intl extension on Zend; they stay
  * withheld from function_exists()/class_exists() until {@see ModuleRegistry::extensionLoaded}('intl')
- * (#11472, #17694). Locale + Normalizer are partial surfaces that advertise without loading intl
- * (#6696, #5153).
+ * (#11472, #17694). Locale + Normalizer + IntlDateFormatter (pattern create/format) are partial
+ * surfaces that advertise without loading intl (#6696, #5153, #19549).
  */
 final class IntlExtensionPolicy
 {
@@ -45,6 +45,16 @@ final class IntlExtensionPolicy
 
     /** normalizer_* + Normalizer — partial ext/intl surface (#5153). */
     public static function advertisesNormalizer(): bool
+    {
+        return true;
+    }
+
+    /**
+     * IntlDateFormatter::create()/format() — partial ICU pattern surface without extension_loaded('intl') (#19549).
+     *
+     * Mirrors {@see advertisesNormalizer()}: class_exists without full grapheme/Collator ICU.
+     */
+    public static function advertisesIntlDateFormatter(): bool
     {
         return true;
     }
