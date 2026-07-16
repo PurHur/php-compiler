@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5170 |
-| Phase A inventory files (M2 ratio SSOT) | 5170 |
+| PHP files on vm.php path | 5171 |
+| Phase A inventory files (M2 ratio SSOT) | 5171 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14090 |
+| Source constructs flagged (warnings) | 14101 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -602,6 +602,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmIntlTimeZone.php` | 0 | 12 |
 | `ext/intl/VmLocale.php` | 0 | 1 |
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
+| `ext/intl/VmNumberFormatter.php` | 0 | 11 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
 | `ext/intl/grapheme_levenshtein.php` | 0 | 2 |
 | `ext/intl/grapheme_str_contains.php` | 0 | 2 |
@@ -8860,24 +8861,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 62)
-- new NormalizerNormalize (line 73)
-- new NormalizerIsNormalized (line 74)
-- new NormalizerGetRawDecomposition (line 75)
-- new ClassEntry (line 91)
-- new LocaleGetDefault (line 94)
-- new LocaleSetDefault (line 95)
-- new LocaleGetPrimaryLanguage (line 96)
-- new LocaleGetRegion (line 97)
-- new LocaleGetScript (line 98)
-- new LocaleGetDisplayName (line 99)
-- new ClassEntry (line 115)
-- new IntlDateFormatterCreate (line 126)
-- new IntlDateFormatterFormat (line 129)
-- new ClassEntry (line 137)
-- new CollatorCreate (line 139)
+- new ClassEntry (line 72)
+- new NormalizerNormalize (line 83)
+- new NormalizerIsNormalized (line 84)
+- new NormalizerGetRawDecomposition (line 85)
+- new ClassEntry (line 101)
+- new LocaleGetDefault (line 104)
+- new LocaleSetDefault (line 105)
+- new LocaleGetPrimaryLanguage (line 106)
+- new LocaleGetRegion (line 107)
+- new LocaleGetScript (line 108)
+- new LocaleGetDisplayName (line 109)
+- new ClassEntry (line 125)
+- new IntlDateFormatterCreate (line 136)
+- new IntlDateFormatterFormat (line 139)
 - new ClassEntry (line 147)
-- 9 class method(s)
+- new CollatorCreate (line 149)
+- new ClassEntry (line 157)
+- 10 class method(s)
 
 ### `ext/intl/CollatorCreate.php`
 
@@ -8923,10 +8924,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 124)
-- new locale_get_region (line 125)
-- new locale_get_script (line 126)
-- 14 class method(s)
+- new locale_get_primary_language (line 134)
+- new locale_get_region (line 135)
+- new locale_get_script (line 136)
+- 15 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
 
@@ -8984,32 +8985,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 47)
-- new locale_get_default (line 57)
-- new locale_set_default (line 58)
-- new locale_get_primary_language (line 59)
-- new locale_get_region (line 60)
-- new locale_get_script (line 61)
-- new normalizer_normalize (line 65)
-- new normalizer_is_normalized (line 66)
-- new normalizer_get_raw_decomposition (line 67)
-- new idn_to_ascii (line 71)
-- new idn_to_utf8 (line 71)
-- new grapheme_strlen (line 87)
-- new grapheme_substr (line 88)
-- new grapheme_strpos (line 89)
-- new grapheme_str_contains (line 90)
-- new grapheme_strstr (line 91)
-- new grapheme_stristr (line 92)
-- new grapheme_stripos (line 93)
-- new grapheme_strrpos (line 94)
-- new grapheme_extract (line 95)
-- new grapheme_levenshtein (line 96)
-- new grapheme_str_split (line 97)
-- new grapheme_strimwidth (line 98)
-- new intl_get_error_code (line 99)
-- new intl_get_error_message (line 100)
-- new intl_is_failure (line 101)
+- new VM\Variable (line 50)
+- new locale_get_default (line 60)
+- new locale_set_default (line 61)
+- new locale_get_primary_language (line 62)
+- new locale_get_region (line 63)
+- new locale_get_script (line 64)
+- new normalizer_normalize (line 68)
+- new normalizer_is_normalized (line 69)
+- new normalizer_get_raw_decomposition (line 70)
+- new idn_to_ascii (line 74)
+- new idn_to_utf8 (line 74)
+- new grapheme_strlen (line 90)
+- new grapheme_substr (line 91)
+- new grapheme_strpos (line 92)
+- new grapheme_str_contains (line 93)
+- new grapheme_strstr (line 94)
+- new grapheme_stristr (line 95)
+- new grapheme_stripos (line 96)
+- new grapheme_strrpos (line 97)
+- new grapheme_extract (line 98)
+- new grapheme_levenshtein (line 99)
+- new grapheme_str_split (line 100)
+- new grapheme_strimwidth (line 101)
+- new intl_get_error_code (line 102)
+- new intl_get_error_message (line 103)
+- new intl_is_failure (line 104)
 - 3 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -9108,6 +9109,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `ext/intl/VmNumberFormatter.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 69)
+- new Variable (line 73)
+- new NumberFormatterCreate (line 80)
+- new NumberFormatterFormat (line 83)
+- new Error (line 97)
+- new ObjectEntry (line 99)
+- new Error (line 140)
+- new ArgumentCountError (line 256)
+- new ArgumentCountError (line 286)
+- new Error (line 294)
+- 12 class method(s)
 
 ### `ext/intl/grapheme_extract.php`
 
@@ -15788,7 +15804,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitMultipartKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 10 class method(s)
 
 ### `ext/standard/JitNetGetInterfaces.php`
 

@@ -11,7 +11,7 @@ use PHPCompiler\VM\Context;
 /**
  * Register intl builtin classes (php-src ext/intl/php_intl.c; issues #5774, #6696, #19549, #6151).
  *
- * Locale / Normalizer / IntlDateFormatter / IntlCalendar / IntlTimeZone register as partial surfaces.
+ * Locale / Normalizer / IntlDateFormatter / IntlCalendar / IntlTimeZone / NumberFormatter register as partial surfaces.
  * Collator + IntlException remain gated on {@see IntlExtensionPolicy::advertisesBuiltins()} (#12115).
  */
 final class BuiltinClasses
@@ -44,12 +44,22 @@ final class BuiltinClasses
         }
     }
 
+    public static function registerNumberFormatter(Context $ctx): void
+    {
+        $before = array_keys($ctx->classes);
+        VmNumberFormatter::registerClass($ctx);
+        foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
+            $ctx->classes[$lc]->isInternal = true;
+        }
+    }
+
     public static function register(Context $ctx): void
     {
         $before = array_keys($ctx->classes);
         self::registerIntlDateFormatterClass($ctx);
         VmIntlTimeZone::registerClass($ctx);
         VmIntlCalendar::registerClass($ctx);
+        VmNumberFormatter::registerClass($ctx);
         self::registerCollator($ctx);
         self::registerIntlException($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
