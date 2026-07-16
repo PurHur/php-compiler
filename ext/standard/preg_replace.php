@@ -73,7 +73,7 @@ final class preg_replace extends Internal
             'subject'
         );
         $limit = -1;
-        if (4 === $argc) {
+        if (isset($frame->calledArgs[3])) {
             $limit = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'preg_replace', 4, 'limit');
         }
 
@@ -86,7 +86,8 @@ final class preg_replace extends Internal
             1,
             'replacement'
         );
-        $hasCount = $argc >= 5;
+        // Named count: may skip limit — use isset not argc (#19697).
+        $hasCount = isset($frame->calledArgs[4]);
         $count = 0;
 
         if (Variable::TYPE_STRING === $subjectVar->type) {

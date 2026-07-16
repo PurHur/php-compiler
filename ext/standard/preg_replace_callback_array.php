@@ -63,8 +63,9 @@ final class preg_replace_callback_array extends Internal
             'subject'
         );
 
+        // Named args may skip limit (count: $n) — use isset, not argc (#19697).
         $limit = -1;
-        if ($argc >= 3) {
+        if (isset($frame->calledArgs[2])) {
             $limitVar = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $limitVar->type) {
                 throw new \TypeError(
@@ -75,9 +76,9 @@ final class preg_replace_callback_array extends Internal
             $limit = $limitVar->toInt();
         }
 
-        $hasCount = $argc >= 4;
+        $hasCount = isset($frame->calledArgs[3]);
         $flags = 0;
-        if ($argc >= 5) {
+        if (isset($frame->calledArgs[4])) {
             $flagsVar = $frame->calledArgs[4]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsVar->type) {
                 throw new \TypeError(

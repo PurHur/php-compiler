@@ -5574,6 +5574,25 @@ restart:
                     // Implicit $this / new() prefix occupies low call-arg indices (#6739, #11844).
                     $argIndex = \count($frame->callArgs) + \count($frame->callArgEntries);
                     $value = $this->resolveOutgoingCallArgValue($frame, $argSlot);
+                    // Named sends use definition-order param index for ZEND_SEND_REF (count: $n skips limit, #19697).
+                    if (
+                        null !== $op->arg2
+                        && null === $op->arg3
+                        && isset($frame->block->constants[$op->arg2])
+                        && $frame->call instanceof Func\Internal
+                    ) {
+                        $namedParam = $frame->block->constants[$op->arg2]->toString();
+                        $calleeName = $frame->builtinCalleeQualifiedMethod ?? $frame->call->getName();
+                        $paramNames = BuiltinParamNames::paramNamesForInternalFunction($calleeName) ?? [];
+                        $namedIdx = BuiltinParamNames::lookupNamedParamIndex(
+                            $paramNames,
+                            $namedParam,
+                            $calleeName
+                        );
+                        if (false !== $namedIdx) {
+                            $argIndex = \count($frame->callArgs) + $namedIdx;
+                        }
+                    }
                     $needsRef = $this->outgoingCallArgNeedsReference($frame, $argIndex, $value);
                     if (!$needsRef) {
                         $this->warnUndefinedVariableForScopeRead($frame, $argSlot);

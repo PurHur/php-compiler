@@ -21030,20 +21030,38 @@ class Compiler {
 
                 return null;
             }
+            // preg_replace_callback_array(['/a/' => fn(...)], $subj, -1[, &$count]) —
+            // pattern-map Array_ is arg #0; UnaryMinus limit is arg #2 (closure is map value, #19697).
+            if (
+                'preg_replace_callback_array' === $inlineFuncName
+                && null !== $arrayProducerIndex
+            ) {
+                if (0 === $argIndex) {
+                    return $producers[$arrayProducerIndex];
+                }
+                if (2 === $argIndex && null !== $unaryProducerIndex) {
+                    return $producers[$unaryProducerIndex];
+                }
+
+                return null;
+            }
             // array_map(fn(...), [...]) / array_reduce([...], fn(...)) — closure + inline Array_ (#10651, #10775).
+            // Guard callbackArgIndex >= 0: otherwise 1-(-1)=2 binds limit/flags to the Array_ (#19697).
             if (null !== $closureProducerIndex && null !== $arrayProducerIndex) {
                 $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex(
                     $inlineFuncName
                 );
-                $arrayArgIndex = 1 - $callbackArgIndex;
-                if ($argIndex === $callbackArgIndex) {
-                    return $producers[$closureProducerIndex];
-                }
-                if ($argIndex === $arrayArgIndex) {
-                    return $producers[$arrayProducerIndex];
-                }
+                if ($callbackArgIndex >= 0) {
+                    $arrayArgIndex = 1 - $callbackArgIndex;
+                    if ($argIndex === $callbackArgIndex) {
+                        return $producers[$closureProducerIndex];
+                    }
+                    if ($argIndex === $arrayArgIndex) {
+                        return $producers[$arrayProducerIndex];
+                    }
 
-                return null;
+                    return null;
+                }
             }
             // array_map(intval(...), str_split(...)) / array_filter(str_split(...), is_numeric(...)) — FCC + inline FuncCall haystack (#15487, #15490, #15961).
             if (null !== $closureProducerIndex && null === $arrayProducerIndex) {
@@ -34018,6 +34036,8 @@ class Compiler {
         $unaryArg = match ($name) {
             'explode' => 2,
             'preg_split' => 2,
+            // preg_replace_callback_array([...=>fn()], $subj, -1[, &$count]) — UnaryMinus is limit (#19697)
+            'preg_replace_callback_array' => 2,
             'fseek' => 1,
             default => null,
         };

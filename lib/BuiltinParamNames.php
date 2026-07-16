@@ -321,7 +321,14 @@ final class BuiltinParamNames
             case 'preg_split':
                 return ['pattern', 'subject', 'limit', 'flags'];
             case 'preg_replace':
+            case 'preg_filter':
                 return ['pattern', 'replacement', 'subject', 'limit', 'count'];
+            case 'preg_replace_callback':
+                // php-src ext/pcre/php_pcre.c — pattern/callback/subject/limit/count/flags (#19637, #19697)
+                return ['pattern', 'callback', 'subject', 'limit', 'count', 'flags'];
+            case 'preg_replace_callback_array':
+                // php-src ext/pcre/php_pcre.c — pattern/subject/limit/count/flags (#19697)
+                return ['pattern', 'subject', 'limit', 'count', 'flags'];
             case 'preg_grep':
                 return ['pattern', 'array', 'flags'];
             case 'preg_quote':
@@ -655,7 +662,11 @@ final class BuiltinParamNames
     public static function lookupNamedParamIndex(array $paramNames, string $namedParam, ?string $function = null): int|false
     {
         $lc = strtolower($namedParam);
-        $lowerNames = array_map('strtolower', $paramNames);
+        // InternalArgInfo may prefix by-ref params with '&' (e.g. '&count'); callers use bare names (#19697).
+        $lowerNames = array_map(
+            static fn (string $name): string => strtolower(ltrim($name, '&')),
+            $paramNames
+        );
         $idx = array_search($lc, $lowerNames, true);
         if (false !== $idx) {
             return $idx;

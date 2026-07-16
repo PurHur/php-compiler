@@ -754,6 +754,52 @@ PHP;
         self::assertSame("a[1]b[2]\n", $out);
     }
 
+    /** Issue #19697 — preg_replace_callback_array([...=>fn()], $s, -1, &$count) wires UnaryMinus limit not Array_. */
+    public function testPregReplaceCallbackArrayInlineUnaryLimitCountRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$count = 0;
+$out = preg_replace_callback_array(['/a/' => fn($m) => 'X'], 'aa', -1, $count);
+echo $out, '|', $count, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'preg_replace_callback_array_limit_count.php');
+
+        $initArraySlot = null;
+        $unarySlot = null;
+        $sendSlots = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $initArraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_UNARY_MINUS === $op->type || OpCode::TYPE_MINUS === $op->type) {
+                $unarySlot = $op->arg1;
+            }
+            // Folded unary may be a constant INT slot — detect via ARG_SEND distinct from array.
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $sendSlots = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($initArraySlot);
+        self::assertCount(4, $sendSlots, 'sends='.json_encode($sendSlots));
+        self::assertSame((string) $initArraySlot, (string) $sendSlots[0], 'pattern map');
+        self::assertNotSame((string) $initArraySlot, (string) $sendSlots[2], 'limit must not reuse Array_ slot');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("XX|2\n", $out);
+    }
+
     /** Issue #14119 — var_dump(acosh(), asinh(), atanh()) sibling scalar-literal producers need distinct slots. */
     public function testVarDumpAcoshAsinhAtanhUsesDistinctProducerSlots(): void
     {

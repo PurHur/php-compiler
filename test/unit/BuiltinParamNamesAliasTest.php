@@ -299,6 +299,26 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'subject', 'preg_replace'));
     }
 
+    /** @covers issue #19697 */
+    public function testPregReplaceCallbackArrayNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('preg_replace_callback_array');
+        self::assertSame(['pattern', 'subject', 'limit', 'count', 'flags'], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'limit', 'preg_replace_callback_array'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'count', 'preg_replace_callback_array'));
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'preg_replace_callback_array'));
+
+        $cb = BuiltinParamNames::forFunction('preg_replace_callback');
+        self::assertSame(['pattern', 'callback', 'subject', 'limit', 'count', 'flags'], $cb);
+        self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($cb, 'count', 'preg_replace_callback'));
+    }
+
+    /** @covers issue #19697 — InternalArgInfo '&count' must resolve bare named count: */
+    public function testLookupNamedParamIndexStripsByRefAmpersand(): void
+    {
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex(['pattern', 'subject', 'limit', '&count'], 'count'));
+    }
+
     /** @covers issue #10076 */
     public function testArrayAllAnyNamedParameters(): void
     {
