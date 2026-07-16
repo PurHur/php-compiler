@@ -1858,6 +1858,7 @@ require_once __DIR__.'/../../../ext/standard/JitStreamIoKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamIsLocal.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamIsatty.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamLibcHandleKernel.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamLifecycleKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamMetaKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamNotificationCallback.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamPath.php';
