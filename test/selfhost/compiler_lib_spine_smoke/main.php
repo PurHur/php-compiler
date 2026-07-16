@@ -951,7 +951,6 @@ require_once __DIR__.'/../../../ext/sockets/socket_get_option.php';
 require_once __DIR__.'/../../../ext/sockets/socket_setopt.php';
 require_once __DIR__.'/../../../ext/sockets/socket_getopt.php';
 require_once __DIR__.'/../../../ext/sockets/socket_shutdown.php';
-require_once __DIR__.'/../../../ext/sockets/socket_select.php';
 require_once __DIR__.'/../../../ext/sockets/socket_export_stream.php';
 require_once __DIR__.'/../../../ext/sockets/socket_import_stream.php';
 require_once __DIR__.'/../../../ext/sockets/socket_last_error.php';
