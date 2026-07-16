@@ -156,7 +156,8 @@ trait ClassConstFetchHelperTrait
             self::messageDataPtrForRuntime($context, $message),
             $context->constantFromInteger(strlen($message), 'size_t')
         );
-        $context->builder->returnVoid();
+        // abort — not returnVoid — this runs inside non-void methods (#19614).
+        $context->builder->call($context->lookupFunction('abort'));
 
         $context->builder->positionAtEnd($merge);
 
@@ -269,15 +270,11 @@ trait ClassConstFetchHelperTrait
                     $context->constantStringFromString($literal)
                 );
                 if ('static' === $lcLiteral) {
-                    $scopeClass = self::jitScopeClassName($objectType, $block) ?? '';
-                    $resolvedStr = LateStaticBindingHelper::emitLateStaticResolvedNameString(
-                        $objectType,
-                        $block,
-                        $scopeClass
-                    );
-                } else {
-                    $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
+                    // Direct LSB class id — ensureLinked clears the insert block, so
+                    // avoid name↔id roundtrip via emitResolveClassIdFromNameString (#19614).
+                    return self::emitStaticKeywordClassId($objectType, $block);
                 }
+                $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
 
                 return self::emitResolveClassIdFromNameString($objectType, $resolvedStr);
             }
@@ -291,6 +288,42 @@ trait ClassConstFetchHelperTrait
         $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
 
         return self::emitResolveClassIdFromNameString($objectType, $resolvedStr);
+    }
+
+    /**
+     * Runtime class id for literal `static::` (#19614).
+     *
+     * Loads {@see LateStaticBindingGlobals::GLOBAL_CLASS_ID} with declaring-scope
+     * fallback. Restores the builder insert block after ensureLinked (which clears it).
+     *
+     * @return Value int64
+     */
+    private static function emitStaticKeywordClassId(Object_ $objectType, Block $block): Value
+    {
+        $context = $objectType->jitContext();
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        // Global only — LateStaticBindingRuntime::ensureLinked clears insert / may link helpers.
+        \PHPCompiler\JIT\Builtin\LateStaticBindingGlobals::ensureGlobal($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+
+        $runtimeId = LateStaticBindingHelper::emitLoadClassId($context);
+        $scopeClass = self::jitScopeClassName($objectType, $block);
+        if (null === $scopeClass || '' === $scopeClass) {
+            return $runtimeId;
+        }
+        $fallbackId = $objectType->lookup($scopeClass);
+        $i64 = $context->getTypeFromString('int64');
+        $isZero = $context->builder->icmp(
+            Builder::INT_EQ,
+            $runtimeId,
+            $i64->constInt(0, false)
+        );
+
+        return $context->builder->select(
+            $isZero,
+            $context->constantFromInteger($fallbackId, 'int64'),
+            $runtimeId
+        );
     }
 
     private static function fetchDynamicByClassIdValue(
