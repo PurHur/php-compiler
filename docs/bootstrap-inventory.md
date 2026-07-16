@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5004 |
-| Phase A inventory files (M2 ratio SSOT) | 5004 |
+| PHP files on vm.php path | 5005 |
+| Phase A inventory files (M2 ratio SSOT) | 5005 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13493 |
+| Source constructs flagged (warnings) | 13494 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -462,6 +462,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/HashContextJitHelper.php` | 0 | 1 |
 | `ext/hash/HashFunction.php` | 0 | 1 |
 | `ext/hash/JitHashAlgos.php` | 0 | 1 |
+| `ext/hash/JitHashAlgosKernel.php` | 0 | 1 |
 | `ext/hash/JitHashContext.php` | 0 | 3 |
 | `ext/hash/MhashRegistry.php` | 0 | 1 |
 | `ext/hash/Module.php` | 0 | 16 |
@@ -7940,6 +7941,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/hash/JitHashAlgosKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/hash/JitHashContext.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14281,7 +14287,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitHebrev.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/JitHebrevc.php`
 
@@ -20183,7 +20189,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/addcslashes.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/addslashes.php`
@@ -20967,7 +20973,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/convert_uudecode.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/convert_uuencode.php`
 
@@ -23047,7 +23053,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ord.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/output_add_rewrite_var.php`
 
@@ -24084,7 +24090,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 35)
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/str_increment.php`
 
@@ -24133,9 +24139,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_split.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 44)
-- new Variable (line 46)
-- 2 class method(s)
+- new HashTable (line 43)
+- new Variable (line 45)
+- 3 class method(s)
 
 ### `ext/standard/str_starts_with.php`
 
@@ -24488,7 +24494,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/stripslashes.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/stristr.php`
 
@@ -30376,7 +30382,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHashAlgos.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringHashCrypto.php`
 
@@ -30410,7 +30416,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHashHmacAlgos.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringHex2bin.php`
 

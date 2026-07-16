@@ -4,20 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\standard\HashAlgosRegistry;
+use PHPCompiler\ext\hash\JitHashAlgosKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
-use PHPLLVM\Builder;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_hash_hmac_algos via HashAlgosJitHelper PHP (#18908).
+ * JIT/AOT link for __compiler_hash_hmac_algos via HashAlgosJitHelper PHP (#18908, #19355).
  *
- * User-script standalone AOT uses inline registry LLVM (same as {@see StringHashAlgos})
- * because nested HashAlgosJitHelper emits invalid __hashtable__ bridge types (#3357).
+ * Embed / non-user-script: {@see HashAlgosJitHelper} via {@see JitVmHelperLink}.
+ * User-script standalone AOT: thin {@see JitHashAlgosKernel} registry —
+ * nested helper TUs skip __init__ under PHP_COMPILER_AOT_USER_SCRIPT (#16075 / #3357).
  * SSOT: {@see \PHPCompiler\ext\standard\VmHash::hmacAlgos()}
  * php-src: ext/hash/hash.c — php_hash_hmac_algos()
  */
@@ -28,6 +27,8 @@ final class StringHashHmacAlgos
     private const HELPER_PATH = '/ext/hash/HashAlgosJitHelper.php';
 
     private const HMAC_ALGOS_HELPER = 'PHPCompiler\\ext\\hash\\HashAlgosJitHelper::hmacAlgosArgv';
+
+    private const KERNEL_ENTRY = 'hash_hmac_algos_kernel_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -49,7 +50,7 @@ final class StringHashHmacAlgos
         }
 
         if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            self::implementInlineRegistry($context, $probe);
+            self::implementUserScriptKernel($context, $probe);
 
             return;
         }
@@ -78,7 +79,7 @@ final class StringHashHmacAlgos
         $context->builder->returnValue($ht);
     }
 
-    private static function implementInlineRegistry(Context $context, ?LlvmFunction $probe): void
+    private static function implementUserScriptKernel(Context $context, ?LlvmFunction $probe): void
     {
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $fn = null !== $probe
@@ -88,48 +89,9 @@ final class StringHashHmacAlgos
                 $context->context->functionType($htPtr, false)
             );
 
-        $entry = $fn->appendBasicBlock('hash_hmac_algos_inline_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::KERNEL_ENTRY);
         $context->builder->positionAtEnd($entry);
-
-        $i64 = $context->getTypeFromString('int64');
-        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        $nullHt = $htPtr->constNull();
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $nullHt);
-
-        $failBb = $fn->appendBasicBlock('hash_hmac_algos_inline_fail');
-        $buildBb = $fn->appendBasicBlock('hash_hmac_algos_inline_build');
-        $context->builder->branchIf($isNull, $failBb, $buildBb);
-
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($nullHt);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($buildBb);
-        $setAt = $context->lookupFunction('__hashtable__setStringAt');
-        foreach (HashAlgosRegistry::HMAC_ALGOS as $index => $algo) {
-            $context->builder->call(
-                $setAt,
-                $ht,
-                $i64->constInt($index, false),
-                self::literalString($context, $algo)
-            );
-        }
-        $context->builder->returnValue($ht);
-        $context->builder->clearInsertionPosition();
-
+        JitHashAlgosKernel::emitHmacAlgosBody($context, $fn);
         $context->registerFunction(self::ABI_HASH_HMAC_ALGOS, $fn);
-    }
-
-    private static function literalString(Context $context, string $text): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $charPtr = $context->getTypeFromString('char*');
-        $cstr = $context->builder->pointerCast($context->constantFromString($text), $charPtr);
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(\strlen($text), false),
-            $cstr
-        );
     }
 }
