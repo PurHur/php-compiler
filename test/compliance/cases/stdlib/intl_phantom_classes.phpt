@@ -9,12 +9,19 @@ echo 'number=', (int) class_exists('NumberFormatter', false), "\n";
 echo 'calendar=', (int) class_exists('IntlCalendar', false), "\n";
 echo 'timezone=', (int) class_exists('IntlTimeZone', false), "\n";
 echo 'collator=', (int) class_exists('Collator', false), "\n";
+echo 'messageformatter=', (int) class_exists('MessageFormatter', false), "\n";
 echo 'locale_get_default=', (int) function_exists('locale_get_default'), "\n";
 try {
     Collator::create('en_US');
     echo "collator_no_throw\n";
 } catch (Throwable $e) {
     echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+try {
+    MessageFormatter::create('en_US', '{0}');
+    echo "msgfmt_no_throw\n";
+} catch (Throwable $e) {
+    echo 'msgfmt_err=', get_class($e), "\n";
 }
 try {
     IntlDateFormatter::create('en_US', 0, 0, 'UTC', 1, 'yyyy-MM-dd');
@@ -31,6 +38,8 @@ number=0
 calendar=0
 timezone=0
 collator=0
+messageformatter=0
 locale_get_default=0
 Error: Class "Collator" not found
+msgfmt_err=Error
 formatter_err=Error

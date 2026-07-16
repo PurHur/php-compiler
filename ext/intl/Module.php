@@ -15,8 +15,9 @@ use PHPCompiler\VM;
  * Grapheme builtins are partial PHP implementations without ICU. Register under
  * {@see standard} so extension_loaded('intl') stays false until full ext/intl (#11472).
  * Locale / locale_* / IntlDateFormatter / IntlCalendar / IntlTimeZone / NumberFormatter stay
- * gated with grapheme / IDN / Normalizer / Collator — no phantom class_exists (#19670, #11768,
- * #12115, #17694, #19593, #19594). Implementations remain in-tree for when intl loads.
+ * gated with grapheme / IDN / Normalizer / Collator / MessageFormatter — no phantom class_exists
+ * (#19670, #11768, #12115, #17694, #19593, #19594, #6366). Implementations remain in-tree for
+ * when intl loads.
  */
 class Module extends ModuleAbstract
 {
@@ -42,6 +43,9 @@ class Module extends ModuleAbstract
         }
         if (IntlExtensionPolicy::advertisesCollator()) {
             BuiltinClasses::registerCollator($runtime->vmContext);
+        }
+        if (IntlExtensionPolicy::advertisesMessageFormatter()) {
+            BuiltinClasses::registerMessageFormatter($runtime->vmContext);
         }
         if (IntlExtensionPolicy::advertisesBuiltins()) {
             BuiltinClasses::register($runtime->vmContext);
@@ -81,12 +85,21 @@ class Module extends ModuleAbstract
             ? [new collator_create()]
             : [];
 
+        $msgfmt = IntlExtensionPolicy::advertisesMessageFormatter()
+            ? [
+                new msgfmt_create(),
+                new msgfmt_format(),
+                new msgfmt_format_message(),
+            ]
+            : [];
+
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
             return [
                 ...$functions,
                 ...$normalizer,
                 ...$idn,
                 ...$collator,
+                ...$msgfmt,
                 ...IntlExtensionPolicy::profileLocaleParserFunctions(),
             ];
         }
@@ -96,6 +109,7 @@ class Module extends ModuleAbstract
             ...$normalizer,
             ...$idn,
             ...$collator,
+            ...$msgfmt,
             new grapheme_strlen(),
             new grapheme_substr(),
             new grapheme_strpos(),
