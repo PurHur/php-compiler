@@ -590,11 +590,28 @@ final class SocketsLibcThinAbi
     }
 
     /**
-     * sendmsg(2) with scatter/gather iov and optional control buffer (#6333).
+     * Pack AF_INET sockaddr bytes from addr/port (#19408).
+     */
+    public static function packSockaddrIn(string $addr, int $port): ?string
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $sa = self::makeSockaddrIn($ffi, $addr, $port);
+        if (null === $sa) {
+            return null;
+        }
+
+        return \FFI::string($sa, 16);
+    }
+
+    /**
+     * sendmsg(2) with scatter/gather iov and optional control/name buffers (#6333, #19408).
      *
      * @param list<string> $iov
      */
-    public static function sendmsg(int $fd, array $iov, string $control, int $flags): int
+    public static function sendmsg(int $fd, array $iov, string $control, int $flags, ?string $name = null): int
     {
         $ffi = self::ffi();
         if (null === $ffi) {
@@ -629,14 +646,22 @@ final class SocketsLibcThinAbi
             $msg->msg_control = \FFI::addr($cbufKeep[0]);
             $msg->msg_controllen = $clen;
         }
+        $nbufKeep = null;
+        if (null !== $name && '' !== $name) {
+            $nlen = \strlen($name);
+            $nbufKeep = $ffi->new('char['.$nlen.']');
+            \FFI::memcpy($nbufKeep, $name, $nlen);
+            $msg->msg_name = \FFI::addr($nbufKeep[0]);
+            $msg->msg_namelen = $nlen;
+        }
 
         return (int) $ffi->sendmsg($fd, \FFI::addr($msg), $flags);
     }
 
     /**
-     * recvmsg(2) — returns bytes + payload string + control bytes + flags (#6333).
+     * recvmsg(2) — returns bytes + payload + control + flags + peer name (#6333, #19408).
      *
-     * @return array{0: int, 1: string, 2: string, 3: int}|false
+     * @return array{0: int, 1: string, 2: string, 3: int, 4: string}|false
      */
     public static function recvmsg(int $fd, int $bufferSize, int $controllen, int $flags): array|false
     {
@@ -655,6 +680,11 @@ final class SocketsLibcThinAbi
         $ffi->memset(\FFI::addr($msg), 0, \FFI::sizeof($msg));
         $msg->msg_iov = \FFI::addr($iovec);
         $msg->msg_iovlen = 1;
+        $nameBufSize = 128; // sockaddr_storage
+        $nbuf = $ffi->new('char['.$nameBufSize.']');
+        $ffi->memset($nbuf, 0, $nameBufSize);
+        $msg->msg_name = \FFI::addr($nbuf[0]);
+        $msg->msg_namelen = $nameBufSize;
         $cbuf = null;
         if ($controllen > 0) {
             $cbuf = $ffi->new('char['.$controllen.']');
@@ -672,8 +702,13 @@ final class SocketsLibcThinAbi
         if ($outLen > 0 && null !== $cbuf) {
             $controlOut = \FFI::string($cbuf, $outLen);
         }
+        $nameOut = '';
+        $nameLen = (int) $msg->msg_namelen;
+        if ($nameLen > 0) {
+            $nameOut = \FFI::string($nbuf, \min($nameLen, $nameBufSize));
+        }
 
-        return [$n, $data, $controlOut, (int) $msg->msg_flags];
+        return [$n, $data, $controlOut, (int) $msg->msg_flags, $nameOut];
     }
 
     /**

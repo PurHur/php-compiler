@@ -76,14 +76,28 @@ final class socket_recvmsg extends Internal
     }
 
     /**
-     * @param array{name: null, control: array, iov: list<string>, flags: int} $message
+     * @param array{name: array<string, int|string>|null, control: array, iov: list<string>, flags: int} $message
      */
     private static function messageToVariable(array $message): Variable
     {
         $ht = new HashTable();
 
         $name = new Variable();
-        $name->null();
+        if (null === $message['name']) {
+            $name->null();
+        } else {
+            $nameHt = new HashTable();
+            foreach ($message['name'] as $k => $v) {
+                $slot = new Variable();
+                if (\is_int($v)) {
+                    $slot->int($v);
+                } else {
+                    $slot->string((string) $v);
+                }
+                $nameHt->add((string) $k, $slot);
+            }
+            $name->array($nameHt);
+        }
         $ht->add('name', $name);
 
         $controlHt = new HashTable();
