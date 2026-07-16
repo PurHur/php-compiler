@@ -924,7 +924,8 @@ final class VmSockets
         return $out;
     }
 
-    private static function recordError(?ObjectEntry $object, int $errno): void
+    /** @internal shared with {@see VmSocketAddrinfo} */
+    public static function recordError(?ObjectEntry $object, int $errno): void
     {
         self::$lastError = $errno;
         if (null !== $object) {

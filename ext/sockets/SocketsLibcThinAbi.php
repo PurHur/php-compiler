@@ -429,6 +429,152 @@ final class SocketsLibcThinAbi
     }
 
     /**
+     * getaddrinfo(3) — copy results into PHP-owned snapshots (#6064).
+     *
+     * @param array{ai_flags?: int, ai_family?: int, ai_socktype?: int, ai_protocol?: int} $hints
+     *
+     * @return list<array{
+     *   ai_flags: int,
+     *   ai_family: int,
+     *   ai_socktype: int,
+     *   ai_protocol: int,
+     *   ai_addr: string,
+     *   ai_canonname: ?string
+     * }>|false
+     */
+    public static function getaddrinfo(string $host, ?string $service, array $hints): array|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $hintStruct = $ffi->new('struct addrinfo');
+        $ffi->memset(\FFI::addr($hintStruct), 0, \FFI::sizeof($hintStruct));
+        $hintStruct->ai_flags = (int) ($hints['ai_flags'] ?? 0);
+        $hintStruct->ai_family = (int) ($hints['ai_family'] ?? 0);
+        $hintStruct->ai_socktype = (int) ($hints['ai_socktype'] ?? 0);
+        $hintStruct->ai_protocol = (int) ($hints['ai_protocol'] ?? 0);
+
+        $res = $ffi->new('struct addrinfo*');
+        $node = '' === $host ? null : $host;
+        $svc = null === $service || '' === $service ? null : $service;
+        $rc = (int) $ffi->getaddrinfo($node, $svc, \FFI::addr($hintStruct), \FFI::addr($res));
+        if (0 !== $rc) {
+            return false;
+        }
+
+        $out = [];
+        $head = $res[0];
+        try {
+            $cur = $head;
+            while (null !== $cur) {
+                $addrLen = (int) $cur->ai_addrlen;
+                $addrBytes = '';
+                if ($addrLen > 0 && null !== $cur->ai_addr) {
+                    $raw = $ffi->cast('unsigned char*', $cur->ai_addr);
+                    for ($i = 0; $i < $addrLen; ++$i) {
+                        $addrBytes .= \chr((int) $raw[$i]);
+                    }
+                }
+                $canon = null;
+                if (null !== $cur->ai_canonname) {
+                    $canon = \FFI::string($cur->ai_canonname);
+                }
+                $out[] = [
+                    'ai_flags' => (int) $cur->ai_flags,
+                    'ai_family' => (int) $cur->ai_family,
+                    'ai_socktype' => (int) $cur->ai_socktype,
+                    'ai_protocol' => (int) $cur->ai_protocol,
+                    'ai_addr' => $addrBytes,
+                    'ai_canonname' => $canon,
+                ];
+                $next = $cur->ai_next;
+                $cur = null !== $next ? $next : null;
+            }
+        } finally {
+            $ffi->freeaddrinfo(\FFI::addr($head));
+        }
+
+        return [] === $out ? false : $out;
+    }
+
+    /**
+     * connect(2) / bind(2) with a raw sockaddr byte string (#6064).
+     */
+    public static function connectAddr(int $fd, string $sockaddr): int
+    {
+        return self::addrOp($fd, $sockaddr, 'connect');
+    }
+
+    public static function bindAddr(int $fd, string $sockaddr): int
+    {
+        return self::addrOp($fd, $sockaddr, 'bind');
+    }
+
+    /**
+     * @param 'connect'|'bind' $op
+     */
+    private static function addrOp(int $fd, string $sockaddr, string $op): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+        $len = \strlen($sockaddr);
+        if ($len <= 0) {
+            return -1;
+        }
+        $buf = $ffi->new('char['.$len.']');
+        \FFI::memcpy($buf, $sockaddr, $len);
+
+        return 'bind' === $op
+            ? (int) $ffi->bind($fd, $buf, $len)
+            : (int) $ffi->connect($fd, $buf, $len);
+    }
+
+    /**
+     * Format sockaddr bytes like php-src php_socket_sendto_from() explain (#6064).
+     *
+     * @return array<string, int|string>|null
+     */
+    public static function explainSockaddr(int $family, string $sockaddr): ?array
+    {
+        $ffi = self::ffi();
+        if (null === $ffi || '' === $sockaddr) {
+            return null;
+        }
+        if (2 === $family && \strlen($sockaddr) >= 8) { // AF_INET
+            $sa = $ffi->new('struct sockaddr_in');
+            \FFI::memcpy($sa, $sockaddr, \min(16, \strlen($sockaddr)));
+            $buf = $ffi->new('char[64]');
+            if (null === $ffi->inet_ntop(2, $ffi->cast('void*', \FFI::addr($sa->sin_addr)), $buf, 64)) {
+                return null;
+            }
+
+            return [
+                'sin_port' => (int) $ffi->ntohs($sa->sin_port),
+                'sin_addr' => \FFI::string($buf),
+            ];
+        }
+        if (10 === $family && \strlen($sockaddr) >= 28) { // AF_INET6
+            $sa = $ffi->new('struct sockaddr_in6');
+            \FFI::memcpy($sa, $sockaddr, \min(28, \strlen($sockaddr)));
+            $buf = $ffi->new('char[64]');
+            if (null === $ffi->inet_ntop(10, $ffi->cast('void*', \FFI::addr($sa->sin6_addr)), $buf, 64)) {
+                return null;
+            }
+
+            return [
+                'sin6_port' => (int) $ffi->ntohs($sa->sin6_port),
+                'sin6_addr' => \FFI::string($buf),
+            ];
+        }
+
+        return null;
+    }
+
+    /**
      * @param 'getsockname'|'getpeername' $which
      *
      * @return array{0: string, 1: int}|false
@@ -509,6 +655,24 @@ struct sockaddr_in {
     struct in_addr sin_addr;
     char sin_zero[8];
 };
+struct in6_addr { unsigned char s6_addr[16]; };
+struct sockaddr_in6 {
+    unsigned short sin6_family;
+    unsigned short sin6_port;
+    unsigned int sin6_flowinfo;
+    struct in6_addr sin6_addr;
+    unsigned int sin6_scope_id;
+};
+struct addrinfo {
+    int ai_flags;
+    int ai_family;
+    int ai_socktype;
+    int ai_protocol;
+    unsigned int ai_addrlen;
+    void *ai_addr;
+    char *ai_canonname;
+    struct addrinfo *ai_next;
+};
 struct timeval { long tv_sec; long tv_usec; };
 struct linger { int l_onoff; int l_linger; };
 int socket(int domain, int type, int protocol);
@@ -529,6 +693,8 @@ int close(int fd);
 int fcntl(int fd, int cmd, ...);
 int sockatmark(int sockfd);
 int shutdown(int sockfd, int how);
+int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
+void freeaddrinfo(struct addrinfo *res);
 struct pollfd {
     int fd;
     short events;
