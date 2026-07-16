@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5067 |
-| Phase A inventory files (M2 ratio SSOT) | 5067 |
+| PHP files on vm.php path | 5073 |
+| Phase A inventory files (M2 ratio SSOT) | 5073 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13718 |
+| Source constructs flagged (warnings) | 13748 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -783,7 +783,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/phar/VmPharTar.php` | 0 | 1 |
 | `ext/posix/JitPosix.php` | 0 | 1 |
 | `ext/posix/JitPosixTimes.php` | 0 | 1 |
-| `ext/posix/Module.php` | 0 | 32 |
+| `ext/posix/Module.php` | 0 | 37 |
 | `ext/posix/PosixConstants.php` | 0 | 1 |
 | `ext/posix/PosixCtermidJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixFunction.php` | 0 | 3 |
@@ -792,10 +792,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/PosixStrerrorJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixTerminalJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixTimesJitHelper.php` | 0 | 1 |
-| `ext/posix/VmPosix.php` | 0 | 17 |
+| `ext/posix/VmPosix.php` | 0 | 26 |
 | `ext/posix/VmPosixCtermidPure.php` | 0 | 1 |
 | `ext/posix/VmPosixIdentityWritePure.php` | 0 | 1 |
 | `ext/posix/VmPosixMknodPure.php` | 0 | 1 |
+| `ext/posix/VmPosixPasswdPure.php` | 0 | 1 |
 | `ext/posix/VmPosixRlimitPure.php` | 0 | 1 |
 | `ext/posix/VmPosixSessionPure.php` | 0 | 1 |
 | `ext/posix/VmPosixStrerrorPure.php` | 0 | 1 |
@@ -809,13 +810,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/posix_getegid.php` | 0 | 2 |
 | `ext/posix/posix_geteuid.php` | 0 | 2 |
 | `ext/posix/posix_getgid.php` | 0 | 2 |
+| `ext/posix/posix_getgrgid.php` | 0 | 3 |
+| `ext/posix/posix_getgrnam.php` | 0 | 3 |
 | `ext/posix/posix_getgroups.php` | 0 | 5 |
 | `ext/posix/posix_getlogin.php` | 0 | 2 |
 | `ext/posix/posix_getpgid.php` | 0 | 2 |
 | `ext/posix/posix_getpid.php` | 0 | 2 |
 | `ext/posix/posix_getppid.php` | 0 | 2 |
+| `ext/posix/posix_getpwnam.php` | 0 | 3 |
+| `ext/posix/posix_getpwuid.php` | 0 | 3 |
 | `ext/posix/posix_getrlimit.php` | 0 | 5 |
 | `ext/posix/posix_getsid.php` | 0 | 2 |
+| `ext/posix/posix_getuid.php` | 0 | 2 |
 | `ext/posix/posix_isatty.php` | 0 | 2 |
 | `ext/posix/posix_kill.php` | 0 | 3 |
 | `ext/posix/posix_mkfifo.php` | 0 | 3 |
@@ -3429,7 +3435,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GlobalTypedConstSyntaxRejector.php` | 0 | 2 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 123 |
+| `lib/JIT.php` | 0 | 124 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 1 |
@@ -10226,7 +10232,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/JitPosix.php`
 
 **Warnings** (review for bootstrap subset):
-- 30 class method(s)
+- 32 class method(s)
 
 ### `ext/posix/JitPosixTimes.php`
 
@@ -10239,34 +10245,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\Variable (line 45)
 - new posix_getpid (line 54)
 - new posix_getppid (line 55)
-- new posix_geteuid (line 56)
-- new posix_getgid (line 57)
-- new posix_getegid (line 58)
-- new posix_getgroups (line 59)
-- new posix_uname (line 60)
-- new posix_strerror (line 61)
-- new posix_get_last_error (line 62)
-- new posix_getcwd (line 63)
-- new posix_ctermid (line 64)
-- new posix_errno (line 65)
-- new posix_access (line 66)
-- new posix_mknod (line 67)
-- new posix_mkfifo (line 68)
-- new posix_setuid (line 69)
-- new posix_setgid (line 70)
-- new posix_seteuid (line 71)
-- new posix_setegid (line 72)
-- new posix_times (line 73)
-- new posix_getrlimit (line 74)
-- new posix_setrlimit (line 75)
-- new posix_setsid (line 76)
-- new posix_getsid (line 77)
-- new posix_getpgid (line 78)
-- new posix_setpgid (line 79)
-- new posix_kill (line 80)
-- new posix_getlogin (line 81)
-- new posix_ttyname (line 82)
-- new posix_isatty (line 83)
+- new posix_getuid (line 56)
+- new posix_geteuid (line 57)
+- new posix_getgid (line 58)
+- new posix_getegid (line 59)
+- new posix_getgroups (line 60)
+- new posix_uname (line 61)
+- new posix_strerror (line 62)
+- new posix_get_last_error (line 63)
+- new posix_getcwd (line 64)
+- new posix_ctermid (line 65)
+- new posix_errno (line 66)
+- new posix_access (line 67)
+- new posix_mknod (line 68)
+- new posix_mkfifo (line 69)
+- new posix_setuid (line 70)
+- new posix_setgid (line 71)
+- new posix_seteuid (line 72)
+- new posix_setegid (line 73)
+- new posix_times (line 74)
+- new posix_getrlimit (line 75)
+- new posix_setrlimit (line 76)
+- new posix_setsid (line 77)
+- new posix_getsid (line 78)
+- new posix_getpgid (line 79)
+- new posix_setpgid (line 80)
+- new posix_kill (line 81)
+- new posix_getlogin (line 82)
+- new posix_ttyname (line 83)
+- new posix_isatty (line 84)
+- new posix_getpwuid (line 85)
+- new posix_getpwnam (line 86)
+- new posix_getgrgid (line 87)
+- new posix_getgrnam (line 88)
 - 2 class method(s)
 
 ### `ext/posix/PosixConstants.php`
@@ -10318,19 +10329,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 49)
 - new Error (line 59)
 - new Error (line 69)
-- new Error (line 83)
-- new Error (line 96)
-- new Error (line 138)
-- new Error (line 152)
-- new Error (line 341)
-- new HashTable (line 349)
-- new Variable (line 351)
-- new Error (line 375)
-- new Error (line 383)
-- new Error (line 397)
-- new Error (line 437)
-- new Error (line 478)
-- 37 class method(s)
+- new Error (line 79)
+- new Error (line 93)
+- new Error (line 106)
+- new Error (line 148)
+- new Error (line 162)
+- new HashTable (line 361)
+- new Variable (line 363)
+- new HashTable (line 380)
+- new Variable (line 382)
+- new HashTable (line 386)
+- new Variable (line 388)
+- new Variable (line 392)
+- new Variable (line 395)
+- new Error (line 455)
+- new HashTable (line 463)
+- new Variable (line 465)
+- new Error (line 489)
+- new Error (line 497)
+- new Error (line 511)
+- new Error (line 551)
+- new Error (line 592)
+- 44 class method(s)
 
 ### `ext/posix/VmPosixCtermidPure.php`
 
@@ -10346,6 +10366,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `ext/posix/VmPosixPasswdPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `ext/posix/VmPosixRlimitPure.php`
 
@@ -10421,6 +10446,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 27)
 - 2 class method(s)
 
+### `ext/posix/posix_getgrgid.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
+### `ext/posix/posix_getgrnam.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Error (line 57)
+- 2 class method(s)
+
 ### `ext/posix/posix_getgroups.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10454,6 +10493,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 27)
 - 2 class method(s)
 
+### `ext/posix/posix_getpwnam.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Error (line 57)
+- 2 class method(s)
+
+### `ext/posix/posix_getpwuid.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
 ### `ext/posix/posix_getrlimit.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10464,6 +10517,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/posix/posix_getsid.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/posix/posix_getuid.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
@@ -28106,81 +28165,82 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 8772)
 - new VM\Variable (line 8832)
 - new OpCode (line 8916)
-- new Variable (line 9432)
-- new Variable (line 9493)
-- new JIT\Call\ClosureWithBinding (line 9522)
-- new JIT\Call\RuntimeVariableFunction (line 9577)
-- new Variable (line 9722)
-- new VM\Variable (line 9980)
-- new VM (line 9986)
-- new VM\Variable (line 9999)
-- new Variable (line 10217)
-- new Type (line 10224)
-- new Variable (line 10245)
-- new Type (line 10253)
-- new Variable (line 10275)
-- new Type (line 10283)
-- new Variable (line 10400)
-- new Variable (line 10421)
-- new Variable (line 11516)
-- new Variable (line 11537)
-- new CompileError (line 12284)
-- new CompileError (line 12388)
-- new Variable (line 12439)
-- new Variable (line 12822)
-- new Variable (line 12842)
-- new Variable (line 12863)
-- new Variable (line 12897)
-- new Variable (line 12931)
-- new Variable (line 13023)
-- new Variable (line 13045)
-- new Variable (line 13055)
-- new Variable (line 13207)
-- new Variable (line 13225)
-- new Variable (line 13275)
-- new Variable (line 13302)
-- new Variable (line 13327)
-- new Variable (line 13656)
-- new Variable (line 14024)
-- new Variable (line 14054)
-- new Variable (line 14073)
-- new Variable (line 14103)
-- new Variable (line 14140)
+- new Variable (line 9443)
+- new Variable (line 9504)
+- new JIT\Call\ClosureWithBinding (line 9533)
+- new JIT\Call\RuntimeVariableFunction (line 9588)
+- new Variable (line 9733)
+- new VM\Variable (line 9991)
+- new VM (line 9997)
+- new VM\Variable (line 10010)
+- new Variable (line 10228)
+- new Type (line 10235)
+- new Variable (line 10256)
+- new Type (line 10264)
+- new Variable (line 10286)
+- new Type (line 10294)
+- new Variable (line 10411)
+- new Variable (line 10432)
+- new Variable (line 11539)
+- new Variable (line 11564)
+- new Variable (line 11585)
+- new CompileError (line 12332)
+- new CompileError (line 12436)
+- new Variable (line 12487)
+- new Variable (line 12870)
+- new Variable (line 12890)
+- new Variable (line 12911)
+- new Variable (line 12945)
+- new Variable (line 12979)
+- new Variable (line 13071)
+- new Variable (line 13093)
+- new Variable (line 13103)
+- new Variable (line 13255)
+- new Variable (line 13273)
+- new Variable (line 13323)
+- new Variable (line 13350)
+- new Variable (line 13375)
+- new Variable (line 13704)
+- new Variable (line 14072)
+- new Variable (line 14102)
+- new Variable (line 14121)
+- new Variable (line 14151)
 - new Variable (line 14188)
-- new Variable (line 14231)
-- new VM\Variable (line 14576)
-- new Variable (line 14610)
-- new Variable (line 14661)
-- new Variable (line 14677)
-- new Variable (line 14696)
-- new Variable (line 14703)
-- new OpCode (line 14723)
-- new Variable (line 14724)
-- new Variable (line 14896)
-- new Variable (line 14934)
-- new OpCode (line 14948)
-- new Variable (line 14949)
-- new Variable (line 15008)
-- new OpCode (line 15029)
-- new Variable (line 15030)
-- new Variable (line 15127)
-- new Variable (line 15149)
-- new Variable (line 15217)
-- new Operand\Literal (line 15226)
-- new Variable (line 15241)
-- new Variable (line 15405)
-- new VM\PropertyIsInitializedHandler (line 15487)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15527)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15630)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15706)
-- new JIT\Call\VmCoerceVariableToString (line 15796)
-- new JIT\Call\IncludePathResolverResolve (line 16050)
-- new Variable (line 17106)
-- new VM (line 17150)
-- new VM\Variable (line 17159)
-- new Variable (line 17180)
-- new Variable (line 17226)
-- new Variable (line 17720)
+- new Variable (line 14236)
+- new Variable (line 14279)
+- new VM\Variable (line 14624)
+- new Variable (line 14658)
+- new Variable (line 14709)
+- new Variable (line 14725)
+- new Variable (line 14744)
+- new Variable (line 14751)
+- new OpCode (line 14771)
+- new Variable (line 14772)
+- new Variable (line 14944)
+- new Variable (line 14982)
+- new OpCode (line 14996)
+- new Variable (line 14997)
+- new Variable (line 15056)
+- new OpCode (line 15077)
+- new Variable (line 15078)
+- new Variable (line 15175)
+- new Variable (line 15197)
+- new Variable (line 15265)
+- new Operand\Literal (line 15274)
+- new Variable (line 15289)
+- new Variable (line 15453)
+- new VM\PropertyIsInitializedHandler (line 15535)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15575)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15678)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15754)
+- new JIT\Call\VmCoerceVariableToString (line 15844)
+- new JIT\Call\IncludePathResolverResolve (line 16098)
+- new Variable (line 17154)
+- new VM (line 17198)
+- new VM\Variable (line 17207)
+- new Variable (line 17228)
+- new Variable (line 17274)
+- new Variable (line 17768)
 - 369 class method(s)
 - 7 closure(s)
 

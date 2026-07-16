@@ -49,6 +49,16 @@ final class VmPosix
         throw new \Error('posix_geteuid() is not available in this compiler build');
     }
 
+    public static function getuid(): int
+    {
+        $uid = VmProcessIdentityPure::getuid();
+        if (null !== $uid) {
+            return $uid;
+        }
+
+        throw new \Error('posix_getuid() is not available in this compiler build');
+    }
+
     public static function getgid(): int
     {
         $gid = VmProcessIdentityPure::getgid();
@@ -283,6 +293,110 @@ final class VmPosix
         self::$lastError = 0;
 
         return VmPosixTerminalPure::isatty($fd);
+    }
+
+    /**
+     * @return array{name:string,passwd:string,uid:int,gid:int,gecos:string,dir:string,shell:string}|false
+     */
+    public static function getpwuid(int $uid): array|false
+    {
+        self::$lastError = 0;
+        $entry = VmPosixPasswdPure::getpwuid($uid);
+        if (null === $entry) {
+            self::$lastError = 0;
+
+            return false;
+        }
+
+        return $entry;
+    }
+
+    /**
+     * @return array{name:string,passwd:string,uid:int,gid:int,gecos:string,dir:string,shell:string}|false
+     */
+    public static function getpwnam(string $name): array|false
+    {
+        self::$lastError = 0;
+        $entry = VmPosixPasswdPure::getpwnam($name);
+        if (null === $entry) {
+            return false;
+        }
+
+        return $entry;
+    }
+
+    /**
+     * @return array{name:string,passwd:string,members:list<string>,gid:int}|false
+     */
+    public static function getgrgid(int $gid): array|false
+    {
+        self::$lastError = 0;
+        $entry = VmPosixPasswdPure::getgrgid($gid);
+        if (null === $entry) {
+            return false;
+        }
+
+        return $entry;
+    }
+
+    /**
+     * @return array{name:string,passwd:string,members:list<string>,gid:int}|false
+     */
+    public static function getgrnam(string $name): array|false
+    {
+        self::$lastError = 0;
+        $entry = VmPosixPasswdPure::getgrnam($name);
+        if (null === $entry) {
+            return false;
+        }
+
+        return $entry;
+    }
+
+    /**
+     * @param array{name:string,passwd:string,uid:int,gid:int,gecos:string,dir:string,shell:string} $entry
+     */
+    public static function passwdToHashTable(array $entry): HashTable
+    {
+        $ht = new HashTable();
+        foreach (['name', 'passwd', 'uid', 'gid', 'gecos', 'dir', 'shell'] as $key) {
+            $slot = new Variable();
+            if ('uid' === $key || 'gid' === $key) {
+                $slot->int((int) $entry[$key]);
+            } else {
+                $slot->string((string) $entry[$key]);
+            }
+            $ht->add($key, $slot);
+        }
+
+        return $ht;
+    }
+
+    /**
+     * @param array{name:string,passwd:string,members:list<string>,gid:int} $entry
+     */
+    public static function groupToHashTable(array $entry): HashTable
+    {
+        $ht = new HashTable();
+        foreach (['name', 'passwd'] as $key) {
+            $slot = new Variable();
+            $slot->string((string) $entry[$key]);
+            $ht->add($key, $slot);
+        }
+        $membersHt = new HashTable();
+        foreach ($entry['members'] as $index => $member) {
+            $m = new Variable();
+            $m->string((string) $member);
+            $membersHt->addIndex($index, $m);
+        }
+        $membersSlot = new Variable();
+        $membersSlot->array($membersHt);
+        $ht->add('members', $membersSlot);
+        $gidSlot = new Variable();
+        $gidSlot->int((int) $entry['gid']);
+        $ht->add('gid', $gidSlot);
+
+        return $ht;
     }
 
     public static function getLastError(): int

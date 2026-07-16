@@ -53,6 +53,7 @@ class Module extends ModuleAbstract
         return [
             new posix_getpid(),
             new posix_getppid(),
+            new posix_getuid(),
             new posix_geteuid(),
             new posix_getgid(),
             new posix_getegid(),
@@ -81,6 +82,10 @@ class Module extends ModuleAbstract
             new posix_getlogin(),
             new posix_ttyname(),
             new posix_isatty(),
+            new posix_getpwuid(),
+            new posix_getpwnam(),
+            new posix_getgrgid(),
+            new posix_getgrnam(),
         ];
     }
 }
