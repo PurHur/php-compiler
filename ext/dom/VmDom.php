@@ -1591,6 +1591,25 @@ final class VmDom
             throw new \DOMException('Not an element node');
         }
         $state = DomRegistry::state($element);
+        // Real xmlns / xmlns:* nsDef — not Attr map entries (php-src element.c / nodemap.c; #19718).
+        if ('xmlns' === $qualifiedName
+            && (null === $namespace || '' === $namespace || self::isXmlnsNamespaceUri($namespace))) {
+            $state->namespaceDeclarations[''] = $value;
+            self::detachCachedAttributeIfAny($state, 'xmlns');
+            unset($state->attributes['xmlns'], $state->attributeNamespaces['xmlns']);
+            self::syncElementAttributes($ctx, $element);
+
+            return;
+        }
+        if (str_starts_with($qualifiedName, 'xmlns:') && self::isXmlnsNamespaceUri($namespace)) {
+            $prefix = substr($qualifiedName, 6);
+            $state->namespaceDeclarations[$prefix] = $value;
+            self::detachCachedAttributeIfAny($state, $qualifiedName);
+            unset($state->attributes[$qualifiedName], $state->attributeNamespaces[$qualifiedName]);
+            self::syncElementAttributes($ctx, $element);
+
+            return;
+        }
         $state->attributes[$qualifiedName] = $value;
         $state->attributeNamespaces[$qualifiedName] = $namespace ?? '';
         if (isset($state->attributeNodeIds[$qualifiedName])) {
@@ -1599,9 +1618,8 @@ final class VmDom
                 self::syncAttributeNodeValue($cached, $value);
             }
         }
-        if (self::isXmlnsAttributeName($qualifiedName)) {
-            self::refreshNamespaceDeclarations($state);
-        } else {
+        // Bogus Attr named xmlns:* (null NS) stays in the Attr map — do not promote to nsDef.
+        if (!self::isXmlnsAttributeName($qualifiedName)) {
             [$attrPrefix] = self::splitQualifiedName($qualifiedName);
             self::ensureNamespaceDeclarationForPrefixedAttribute($element, '' !== $attrPrefix ? $attrPrefix : null, $namespace);
         }
@@ -1612,6 +1630,18 @@ final class VmDom
             VmDomTokenList::invalidateForElement($element);
         }
         self::syncElementAttributes($ctx, $element);
+    }
+
+    private static function detachCachedAttributeIfAny(DomNodeState $state, string $qualifiedName): void
+    {
+        if (!isset($state->attributeNodeIds[$qualifiedName])) {
+            return;
+        }
+        $cached = DomRegistry::entry($state->attributeNodeIds[$qualifiedName]);
+        if (null !== $cached && self::isAttr($cached)) {
+            self::detachAttributeNode($cached);
+        }
+        unset($state->attributeNodeIds[$qualifiedName]);
     }
 
     public static function removeAttributeNS(Context $ctx, ObjectEntry $element, ?string $namespace, string $localName): bool
@@ -2124,6 +2154,94 @@ final class VmDom
     }
 
     /**
+     * Drop xmlns / xmlns:* from the Attr map — they live in nsDef (php-src nodemap.c; #19718).
+     *
+     * @param array<string, string> $attributes
+     *
+     * @return array<string, string>
+     */
+    private static function stripNamespaceDeclarationAttributes(array $attributes): array
+    {
+        $out = [];
+        foreach ($attributes as $name => $value) {
+            if (!self::isXmlnsAttributeName($name)) {
+                $out[$name] = $value;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Apply parsed attribute string: nsDef + Attr map without xmlns* (#19718).
+     *
+     * @param array<string, string> $attributes
+     */
+    private static function applyParsedAttributes(DomNodeState $state, array $attributes): void
+    {
+        $state->namespaceDeclarations = self::extractNamespaceDeclarations($attributes);
+        $state->attributes = self::stripNamespaceDeclarationAttributes($attributes);
+    }
+
+    /** nsDef value for xmlns / xmlns:prefix, or null when absent (#19718). */
+    private static function namespaceDeclarationValue(ObjectEntry $element, string $xmlnsName): ?string
+    {
+        $state = DomRegistry::state($element);
+        if ('xmlns' === $xmlnsName) {
+            return \array_key_exists('', $state->namespaceDeclarations)
+                ? $state->namespaceDeclarations['']
+                : null;
+        }
+        if (str_starts_with($xmlnsName, 'xmlns:')) {
+            $prefix = substr($xmlnsName, 6);
+
+            return \array_key_exists($prefix, $state->namespaceDeclarations)
+                ? $state->namespaceDeclarations[$prefix]
+                : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * DOMElement::getAttribute() — qName lookup; xmlns* reads nsDef (php-src element.c; #19718).
+     */
+    public static function getAttribute(ObjectEntry $element, string $name): string
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        if (self::isXmlnsAttributeName($name)) {
+            return self::namespaceDeclarationValue($element, $name) ?? '';
+        }
+        $state = DomRegistry::state($element);
+
+        return $state->attributes[$name] ?? '';
+    }
+
+    /**
+     * DOMElement::hasAttribute() — qName presence; xmlns* probes nsDef (php-src element.c; #19718).
+     */
+    public static function hasAttribute(ObjectEntry $element, string $name): bool
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        if (self::isXmlnsAttributeName($name)) {
+            return null !== self::namespaceDeclarationValue($element, $name);
+        }
+        $state = DomRegistry::state($element);
+
+        return \array_key_exists($name, $state->attributes);
+    }
+
+    /** True when setAttributeNS targets a real xmlns declaration (not a bogus Attr). */
+    private static function isXmlnsNamespaceUri(?string $namespace): bool
+    {
+        return null !== $namespace && self::XMLNS_NAMESPACE_URI === $namespace;
+    }
+
+    /**
      * libxml nsDef for prefixed namespaced attributes (php-src ext/dom/element.c; #19458).
      */
     private static function ensureNamespaceDeclarationForPrefixedAttribute(
@@ -2139,22 +2257,6 @@ final class VmDom
         }
         $state = DomRegistry::state($element);
         $state->namespaceDeclarations[$prefix] = $namespaceUri;
-    }
-
-    /**
-     * Rebuild xmlns map from attributes, preserving createElementNS nsDef (#19397).
-     */
-    private static function refreshNamespaceDeclarations(DomNodeState $state): void
-    {
-        $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
-        if (null === $state->namespaceUri) {
-            return;
-        }
-        $ownPrefix = $state->prefix ?? '';
-        $attrName = '' === $ownPrefix ? 'xmlns' : 'xmlns:'.$ownPrefix;
-        if (!\array_key_exists($attrName, $state->attributes)) {
-            $state->namespaceDeclarations[$ownPrefix] = $state->namespaceUri;
-        }
     }
 
     /**
@@ -2697,6 +2799,9 @@ final class VmDom
 
     /** php-src ext/dom/node.c — xml:id namespace URI. */
     private const XML_NAMESPACE_URI = 'http://www.w3.org/XML/1998/namespace';
+
+    /** xmlns / xmlns:* declaration namespace (php-src / libxml; #19718). */
+    private const XMLNS_NAMESPACE_URI = 'http://www.w3.org/2000/xmlns/';
 
     private static function indexElementIdsRecursive(ObjectEntry $document, ObjectEntry $node): void
     {
@@ -5065,7 +5170,7 @@ final class VmDom
         $state = DomRegistry::state($entry);
         $state->attributes = self::parseAttributes($attrPart);
         self::applyQualifiedElementNames($state, $localName);
-        $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
+        self::applyParsedAttributes($state, $state->attributes);
         self::appendHtmlChildren($ctx, $entry, $inner, $ownerDocument, $frame);
 
         return $entry;
@@ -5446,7 +5551,7 @@ final class VmDom
             $state->lineNo = self::lineNoAtOffset($sourceXml, $baseOffset);
             $state->attributes = self::parseAttributes($selfClose[2] ?? '');
             self::applyQualifiedElementNames($state, $selfClose[1]);
-            $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
+            self::applyParsedAttributes($state, $state->attributes);
 
             return $entry;
         }
@@ -5459,7 +5564,7 @@ final class VmDom
         $state->lineNo = self::lineNoAtOffset($sourceXml, $baseOffset);
         $state->attributes = self::parseAttributes($matches[2] ?? '');
         self::applyQualifiedElementNames($state, $matches[1]);
-        $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
+        self::applyParsedAttributes($state, $state->attributes);
         $openTag = '<'.$matches[1].($matches[2] ?? '').'>';
         $innerBase = $baseOffset + \strlen($openTag);
         $pos = 0;
@@ -7205,9 +7310,7 @@ final class VmDom
             $ownerState = DomRegistry::state($owner);
             $name = $state->nodeName;
             $ownerState->attributes[$name] = $value;
-            if (self::isXmlnsAttributeName($name)) {
-                $ownerState->namespaceDeclarations = self::extractNamespaceDeclarations($ownerState->attributes);
-            }
+            // Bogus Attr named xmlns:* stays in the Attr map; nsDef is separate (#19718).
             if (null !== $ownerState->idAttributeName && $name === $ownerState->idAttributeName) {
                 self::syncElementIdRegistration($owner);
             }

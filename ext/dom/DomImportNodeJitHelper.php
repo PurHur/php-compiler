@@ -26,7 +26,7 @@ final class DomImportNodeJitHelper
 
     public static function getAttributeArgv(ObjectEntry $element, string $name): string
     {
-        return VmDom::getAttributeNS($element, null, $name);
+        return VmDom::getAttribute($element, $name);
     }
 
     /** DOMElement::getAttributeNodeNS() — user-script AOT (#19265). */

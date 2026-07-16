@@ -210,7 +210,7 @@ final class VmDomJitDispatch
     public static function getAttribute(ObjectEntry $element, array $extra): Variable
     {
         $name = self::stringArg($extra[0] ?? self::missingArg('getAttribute', 0), 'getAttribute', 0);
-        $value = VmDom::getAttributeNS($element, null, $name);
+        $value = VmDom::getAttribute($element, $name);
         $var = new Variable();
         $var->string($value);
 
