@@ -1832,6 +1832,7 @@ require_once __DIR__.'/../../../ext/standard/JitStrReplaceMulti.php';
 require_once __DIR__.'/../../../ext/standard/JitStrShuffle.php';
 require_once __DIR__.'/../../../ext/standard/JitStrSplit.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamBucket.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamCapsKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamContextCreate.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamContextGetDefault.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamContextGetOptions.php';
