@@ -18399,6 +18399,46 @@ class Compiler {
 
             return null;
         }
+        // f($x + 1, …, true) — Plus/arith + ConstFetch true/false/null as sibling dead temps (#19515).
+        // php-cfg leaves distinct empty arg Vars; without ordinal wiring both ARG_SENDs bind the ConstFetch.
+        if (
+            $this->producersAreSiblingArithmeticWithHoistedScalarConstFetch($producers)
+            && null !== $callArg
+            && $this->callArgIsDeadInlineTemporary($callArg)
+        ) {
+            $arith = null;
+            $scalarConst = null;
+            foreach ($producers as $producer) {
+                if ($this->isChainedArithmeticBinaryOpExpr($producer)) {
+                    $arith = $producer;
+                } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                    $name = $this->staticNameFromOperand($producer->name);
+                    if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                        $scalarConst = $producer;
+                    }
+                }
+            }
+            if (null !== $arith && null !== $scalarConst) {
+                $deadTempIndexes = [];
+                foreach ($callArgs as $i => $candidate) {
+                    if (
+                        $candidate instanceof Operand
+                        && $this->callArgIsDeadInlineTemporary($candidate)
+                        && !$this->isEmbeddedCallLiteralArg($candidate)
+                    ) {
+                        $deadTempIndexes[] = (int) $i;
+                    }
+                }
+                if (2 === \count($deadTempIndexes)) {
+                    if ($argIndex === $deadTempIndexes[0]) {
+                        return $arith;
+                    }
+                    if ($argIndex === $deadTempIndexes[1]) {
+                        return $scalarConst;
+                    }
+                }
+            }
+        }
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers, $cfgCallOp);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
@@ -24238,9 +24278,9 @@ class Compiler {
                         && $this->isHoistedScalarConstFetchImmediatelyBeforeCall(
                             $cfgChildren[$callIndex - 1] ?? null
                         )
-                        && 'var_export' === strtolower($this->resolveCfgFuncCallName($callOp) ?? '')
                     ) {
-                        // var_export(1.0+0.0, true) — arithmetic feeds arg #0, not trailing return flag (#17210).
+                        // f($x + 1, …, true) / var_export(1.0+0.0, true) — arith feeds earlier arg;
+                        // trailing ConstFetch is bool/null (#19515, #17210).
                         array_unshift($producers, $child);
                         continue;
                     }

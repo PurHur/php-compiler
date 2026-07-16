@@ -1446,11 +1446,11 @@ class Type extends Builtin {
         StatCache::ensureLinked($this->context);
         StatPath::ensureLinked($this->context);
         StreamSync::ensureLinked($this->context);
+        StreamIo::ensureLinked($this->context);
         StreamCaps::ensureLinked($this->context);
         Stats::ensureLinked($this->context);
         StreamGlobals::ensureLinked($this->context);
         StreamLifecycle::ensureLinked($this->context);
-        StreamIo::ensureLinked($this->context);
         GzStreamIo::ensureLinked($this->context);
         Bz2StreamIo::ensureLinked($this->context);
         StreamBuffer::ensureLinked($this->context);

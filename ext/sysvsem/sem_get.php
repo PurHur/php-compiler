@@ -34,8 +34,9 @@ final class sem_get extends Internal
         SemArgs::requireAvailable('sem_get');
         $key = SemArgs::parseKey($frame, 'sem_get');
         $maxAcquire = SemArgs::parseOptionalInt($frame, 1, 'sem_get', 'max_acquire');
-        $perm = SemArgs::parseOptionalInt($frame, 2, 'sem_get', 'perm');
-        $autoRelease = SemArgs::parseOptionalInt($frame, 3, 'sem_get', 'auto_release');
+        $perm = SemArgs::parseOptionalInt($frame, 2, 'sem_get', 'permissions');
+        // php-src stub: bool $auto_release = true (Z_PARAM_BOOL coerces int; #19515)
+        $autoRelease = SemArgs::parseOptionalBoolCoerce($frame, 3, 'sem_get', 'auto_release');
 
         [$result, $message] = VmSem::get(
             $frame->vmContext,

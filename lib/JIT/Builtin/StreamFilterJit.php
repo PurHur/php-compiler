@@ -64,6 +64,8 @@ final class StreamFilterJit
     {
         $probe = $context->module->getNamedFunction('__compiler_stream_filter_append');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            // Repair apply_* if inventory left ret i32 0 on __string__* decls (#19462).
+            self::ensureIdentityApplyStubs($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -335,6 +337,10 @@ final class StreamFilterJit
                 $context->registerFunction($abiName, $fn);
                 continue;
             }
+            if ('__compiler_stream_filter_apply_write' === $abiName
+                || '__compiler_stream_filter_apply_read' === $abiName) {
+                continue; // handled by ensureIdentityApplyStubs below
+            }
             $ft = $context->context->functionType($i32, false, $i64);
             $fn = self::declareOrReuse($context, $abiName, $ft);
             $entry = $fn->appendBasicBlock('stream_filter_inv_stub');
@@ -343,7 +349,31 @@ final class StreamFilterJit
             $context->registerFunction($abiName, $fn);
         }
 
+        self::ensureIdentityApplyStubs($context);
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Identity passthrough for apply_read/write — must return __string__*, not i32 (#19462).
+     */
+    private static function ensureIdentityApplyStubs(Context $context): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($strPtr, false, $i64, $strPtr);
+
+        foreach (['__compiler_stream_filter_apply_write', '__compiler_stream_filter_apply_read'] as $abiName) {
+            $fn = self::declareOrReuse($context, $abiName, $ft);
+            if ($fn->countBasicBlocks() > 0) {
+                foreach (array_reverse($fn->getBasicBlocks()) as $block) {
+                    $block->delete();
+                }
+            }
+            $entry = $fn->appendBasicBlock('stream_filter_apply_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($fn->getParam(1));
+            $context->registerFunction($abiName, $fn);
+        }
     }
 }

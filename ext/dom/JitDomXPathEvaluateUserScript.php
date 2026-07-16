@@ -78,6 +78,12 @@ final class JitDomXPathEvaluateUserScript
 
     private static function countForXPath(string $xml, string $inner): ?int
     {
+        // //tag[n] — at most one node (#19456).
+        if (preg_match('~^//([*\w][\w:-]*)\[(\d+)\]$~', $inner, $posMatches)) {
+            $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $posMatches[1], (int) $posMatches[2]);
+
+            return null === $text ? 0 : 1;
+        }
         if (!preg_match(
             '~^//([*\w][\w:-]*)(?:\[@([^\]=]+)=["\']([^"\']*)["\']\])?$~',
             $inner,
@@ -118,8 +124,11 @@ final class JitDomXPathEvaluateUserScript
                 $position
             );
         }
-        if (preg_match('~^//([*\w][\w:-]*)$~', $inner, $matches)) {
-            return DomParseSimpleXmlJitHelper::firstTagTextArgv($xml, $matches[1]);
+        // //tag or //tag[n] — element string-value (#19456).
+        if (preg_match('~^//([*\w][\w:-]*)(?:\[(\d+)\])?$~', $inner, $matches)) {
+            $position = isset($matches[2]) && '' !== $matches[2] ? (int) $matches[2] : 1;
+
+            return DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $matches[1], $position);
         }
 
         return null;

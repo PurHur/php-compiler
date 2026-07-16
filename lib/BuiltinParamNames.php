@@ -158,6 +158,9 @@ final class BuiltinParamNames
                 return ['clear_realpath_cache', 'filename'];
             case 'mkdir':
                 return ['directory', 'permissions', 'recursive'];
+            case 'sem_get':
+                // php-src ext/sysvsem/sysvsem.stub.php (#19515)
+                return ['key', 'max_acquire', 'permissions', 'auto_release'];
             case 'spl_autoload_register':
                 return ['callback', 'throw', 'prepend'];
             case 'touch':

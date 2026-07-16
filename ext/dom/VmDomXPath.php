@@ -192,14 +192,16 @@ final class VmDomXPath
             return $attrIds;
         }
 
+        // //tag, //tag[@attr='v'], //tag[n] — positional preds keep element string-value (#19456).
         if (preg_match(
-            '~^//([*\w][\w:-]*)(?:\[@([^\]=]+)=["\']([^"\']*)["\']\])?$~',
+            '~^//([*\w][\w:-]*)(?:\[(?:@([^\]=]+)=["\']([^"\']*)["\']|(\d+))\])?$~',
             $expression,
             $matches
         )) {
             $tag = $matches[1];
-            $attr = $matches[2] ?? null;
-            $attrValue = $matches[3] ?? null;
+            $attr = isset($matches[2]) && '' !== $matches[2] ? $matches[2] : null;
+            $attrValue = $matches[3] ?? '';
+            $position = isset($matches[4]) && '' !== $matches[4] ? (int) $matches[4] : null;
             $nodeIds = self::collectDescendantElements($context, $tag, $state->xpathNamespaces);
             if (null !== $attr) {
                 $nodeIds = array_values(array_filter(
@@ -211,6 +213,13 @@ final class VmDomXPath
                         $state->xpathNamespaces
                     )
                 ));
+            }
+            if (null !== $position) {
+                if ($position < 1 || $position > \count($nodeIds)) {
+                    return [];
+                }
+
+                return [$nodeIds[$position - 1]];
             }
 
             return $nodeIds;
