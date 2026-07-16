@@ -7458,7 +7458,17 @@ restart:
                             $this->context->foreachObjectAdvance[$op->arg1] = false;
                             $this->invokeForeachInstanceMethod($frame, $iterable, 'rewind');
                             break;
-                        } catch (\TypeError) {
+                        } catch (\TypeError $e) {
+                            // Property-foreach fallback only for "not iterable" (#3234).
+                            // Return-type / other TypeErrors from getIterator() must reach userland (#19729).
+                            if (!str_contains($e->getMessage(), 'is not iterable')) {
+                                $catchFrame = $this->dispatchVmTypeError($e, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                break;
+                            }
                             unset($this->context->foreachObjectAdvance[$op->arg1]);
                             if (WeakRefSupport::isWeakMap($container->toObject())) {
                                 unset($this->context->objectPropertyIterators[$op->arg1]);
@@ -7471,6 +7481,14 @@ restart:
                             $iter = new ObjectPropertyIterator($container->toObject(), $this, $frame);
                             $iter->reset();
                             $this->context->objectPropertyIterators[$op->arg1] = $iter;
+                            break;
+                        } catch (\Exception $e) {
+                            // zend_interfaces.c — bad getIterator() return is Exception, not TypeError (#19729).
+                            $catchFrame = $this->dispatchVmEngineException($e->getMessage(), $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                             break;
                         }
                     }
