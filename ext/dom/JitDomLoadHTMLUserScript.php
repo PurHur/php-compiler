@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -83,7 +83,7 @@ final class JitDomLoadHTMLUserScript
 
     public static function shouldUse(Context $context): bool
     {
-        return DomDocumentMethodUserScriptLlvm::shouldUse($context);
+        return JitDomDocumentMethodKernel::shouldUse($context);
     }
 
     public static function invoke(Context $context, JITVariable ...$args): Value

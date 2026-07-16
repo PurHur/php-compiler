@@ -3623,7 +3623,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/DefaultTimezoneRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DefineRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomCreateElementNSRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomCreateElementRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php';
+require_once __DIR__.'/../../../ext/dom/JitDomDocumentMethodKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomElementTextContentRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomGetElementByIdRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DomGetElementsByTagNameRuntime.php';

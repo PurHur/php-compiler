@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\JitValueBox;
@@ -29,7 +29,7 @@ final class JitDomDocumentElement
     public static function fetch(Object_ $objectType, Value $obj): JITVariable
     {
         $context = $objectType->jitContext();
-        if (!DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (!JitDomDocumentMethodKernel::shouldUse($context)) {
             return $objectType->propertyFetchOrdinary(
                 $obj,
                 self::CLASS_DOCUMENT,

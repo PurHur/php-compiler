@@ -15634,7 +15634,7 @@ class JIT {
         $proxyName = $this->resolveDomSubclassInstanceMethodProxy($declaringClassLc, $methodLc, $proxyName);
         if (
             'appendchild' === $methodLc
-            && JIT\Builtin\DomDocumentMethodUserScriptLlvm::shouldUse($this->context)
+            && \PHPCompiler\ext\dom\JitDomDocumentMethodKernel::shouldUse($this->context)
             && $this->context->functionIsRegistered('domnode::append')
         ) {
             $proxyName = 'domnode::append';

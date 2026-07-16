@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
@@ -28,8 +30,8 @@ final class DomNodeTreeMutationRuntime
 
     public static function ensureRemoveChildLinked(Context $context): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureRemoveChildBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureRemoveChildBridge($context);
 
             return;
         }
@@ -50,8 +52,8 @@ final class DomNodeTreeMutationRuntime
 
     public static function ensureReplaceChildLinked(Context $context): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureReplaceChildBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureReplaceChildBridge($context);
 
             return;
         }

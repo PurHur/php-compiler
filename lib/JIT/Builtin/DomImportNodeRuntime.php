@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
@@ -43,8 +45,8 @@ final class DomImportNodeRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureImportNodeBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureImportNodeBridge($context);
 
             return;
         }
@@ -66,8 +68,8 @@ final class DomImportNodeRuntime
 
     public static function ensureGetAttributeLinked(Context $context): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureGetAttributeBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureGetAttributeBridge($context);
 
             return;
         }
@@ -89,8 +91,8 @@ final class DomImportNodeRuntime
 
     public static function ensureGetAttributeNodeNSLinked(Context $context): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureGetAttributeNodeNSBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureGetAttributeNodeNSBridge($context);
 
             return;
         }
@@ -112,8 +114,8 @@ final class DomImportNodeRuntime
 
     public static function ensureSetAttributeNodeNSLinked(Context $context): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureSetAttributeNodeNSBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureSetAttributeNodeNSBridge($context);
 
             return;
         }
@@ -134,8 +136,8 @@ final class DomImportNodeRuntime
 
     public static function ensureCreateAttributeNSLinked(Context $context): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureCreateAttributeNSBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureCreateAttributeNSBridge($context);
 
             return;
         }

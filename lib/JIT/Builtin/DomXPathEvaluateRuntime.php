@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+
 use PHPCompiler\JIT\Context;
 
 /** JIT/AOT link for DOMXPath::evaluate() via DomXPathEvaluateJitHelper (#18526). */
@@ -32,16 +34,16 @@ final class DomXPathEvaluateRuntime
 
     public static function ensureBoolLinked(Context $context): void
     {
-        DomDocumentMethodUserScriptLlvm::ensureXPathEvaluateBoolBridge($context);
+        JitDomDocumentMethodKernel::ensureXPathEvaluateBoolBridge($context);
     }
 
     public static function ensureDoubleLinked(Context $context): void
     {
-        DomDocumentMethodUserScriptLlvm::ensureXPathEvaluateDoubleBridge($context);
+        JitDomDocumentMethodKernel::ensureXPathEvaluateDoubleBridge($context);
     }
 
     public static function ensureStringLinked(Context $context): void
     {
-        DomDocumentMethodUserScriptLlvm::ensureXPathEvaluateStringBridge($context);
+        JitDomDocumentMethodKernel::ensureXPathEvaluateStringBridge($context);
     }
 }

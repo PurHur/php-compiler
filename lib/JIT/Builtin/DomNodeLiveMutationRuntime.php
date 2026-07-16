@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\ext\dom\JitDomCreateTextNode;
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringArg;
@@ -79,8 +79,8 @@ final class DomNodeLiveMutationRuntime
 
     public static function invokeCreateDocumentFragment(Context $context, Variable $receiver): Value
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureCreateDocumentFragmentObjectBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureCreateDocumentFragmentObjectBridge($context);
             $abi = self::ABI_CREATE_FRAGMENT_OBJECT;
         } else {
             self::ensureCreateFragmentBridge($context);
@@ -164,21 +164,21 @@ final class DomNodeLiveMutationRuntime
         if ($extraArgCount < $minArity) {
             throw new \LogicException('DomNodeLiveMutationRuntime unsupported arity');
         }
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             if ('replacechildren' === $kind) {
                 if (0 === $extraArgCount) {
-                    DomDocumentMethodUserScriptLlvm::ensureReplaceChildrenBridge($context, $extraArgCount);
+                    JitDomDocumentMethodKernel::ensureReplaceChildrenBridge($context, $extraArgCount);
                     $abi = self::abiFor($kind, $extraArgCount);
                     $llvmArgs = [self::receiverObject($context, $receiver)];
                 } elseif (self::canUseObjectMutationBridge($extraArgs)) {
-                    DomDocumentMethodUserScriptLlvm::ensureReplaceChildrenObjectBridge($context, $extraArgCount);
+                    JitDomDocumentMethodKernel::ensureReplaceChildrenObjectBridge($context, $extraArgCount);
                     $abi = self::replaceChildrenObjectAbi($extraArgCount);
                     $llvmArgs = [self::receiverObject($context, $receiver)];
                     foreach ($extraArgs as $arg) {
                         $llvmArgs[] = self::mutationArgObject($context, $arg);
                     }
                 } elseif (1 === $extraArgCount && Variable::TYPE_STRING === $extraArgs[0]->type) {
-                    DomDocumentMethodUserScriptLlvm::ensureReplaceChildrenStringBridge($context);
+                    JitDomDocumentMethodKernel::ensureReplaceChildrenStringBridge($context);
                     $abi = self::replaceChildrenStringAbi();
                     $llvmArgs = [
                         self::receiverObject($context, $receiver),
@@ -497,8 +497,8 @@ final class DomNodeLiveMutationRuntime
     private static function ensureStringMutationBridge(Context $context, string $kind): void
     {
         match ($kind) {
-            'append' => DomDocumentMethodUserScriptLlvm::ensureAppendStringBridge($context),
-            'prepend' => DomDocumentMethodUserScriptLlvm::ensurePrependStringBridge($context),
+            'append' => JitDomDocumentMethodKernel::ensureAppendStringBridge($context),
+            'prepend' => JitDomDocumentMethodKernel::ensurePrependStringBridge($context),
             default => throw new \LogicException('DOM string live-mutation bridge unsupported for '.$kind),
         };
     }
@@ -515,8 +515,8 @@ final class DomNodeLiveMutationRuntime
     private static function ensureObjectMutationBridge(Context $context, string $kind, int $extraArgCount): void
     {
         match ($kind) {
-            'append' => DomDocumentMethodUserScriptLlvm::ensureAppendObjectBridge($context, $extraArgCount),
-            'prepend' => DomDocumentMethodUserScriptLlvm::ensurePrependObjectBridge($context, $extraArgCount),
+            'append' => JitDomDocumentMethodKernel::ensureAppendObjectBridge($context, $extraArgCount),
+            'prepend' => JitDomDocumentMethodKernel::ensurePrependObjectBridge($context, $extraArgCount),
             default => throw new \LogicException('DOM object live-mutation bridge unsupported for '.$kind),
         };
     }
@@ -547,11 +547,11 @@ final class DomNodeLiveMutationRuntime
 
     private static function ensureMutationBridge(Context $context, string $kind, int $extraArgCount): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             match ($kind) {
-                'append' => DomDocumentMethodUserScriptLlvm::ensureAppendBridge($context, $extraArgCount),
-                'prepend' => DomDocumentMethodUserScriptLlvm::ensurePrependBridge($context, $extraArgCount),
-                'replacechildren' => DomDocumentMethodUserScriptLlvm::ensureReplaceChildrenBridge($context, $extraArgCount),
+                'append' => JitDomDocumentMethodKernel::ensureAppendBridge($context, $extraArgCount),
+                'prepend' => JitDomDocumentMethodKernel::ensurePrependBridge($context, $extraArgCount),
+                'replacechildren' => JitDomDocumentMethodKernel::ensureReplaceChildrenBridge($context, $extraArgCount),
                 default => throw new \LogicException('Unknown DOM live-mutation kind'),
             };
 
@@ -587,8 +587,8 @@ final class DomNodeLiveMutationRuntime
 
     private static function ensureCreateFragmentBridge(Context $context): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureCreateDocumentFragmentBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureCreateDocumentFragmentBridge($context);
 
             return;
         }

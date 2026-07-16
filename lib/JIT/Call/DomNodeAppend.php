@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\ext\dom\DomUserScriptLiveTagListLlvm;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -29,7 +29,7 @@ final class DomNodeAppend implements Call
             $args[0],
             ...\array_slice($args, 1)
         );
-        if (\count($args) >= 2 && DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (\count($args) >= 2 && JitDomDocumentMethodKernel::shouldUse($context)) {
             DomUserScriptLiveTagListLlvm::incrementForChildArg($context, $args[1]);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_append_live_inc_cont');
         }

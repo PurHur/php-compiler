@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -32,7 +32,7 @@ final class JitDomRemoveChild
             $child
         );
         self::clearDetachedLinkSlots($context, $child);
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_remove_child_post');
         }
 

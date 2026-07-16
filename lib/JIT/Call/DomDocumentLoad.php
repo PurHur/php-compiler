@@ -8,7 +8,7 @@ use PHPCompiler\ext\dom\JitDomLoad;
 use PHPCompiler\ext\dom\JitDomLoadUserScript;
 use PHPCompiler\ext\dom\JitDomLoadXMLUserScript;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomLoadRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -21,7 +21,7 @@ final class DomDocumentLoad implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context) && isset($args[1])) {
+        if (JitDomDocumentMethodKernel::shouldUse($context) && isset($args[1])) {
             $path = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
             if (null !== $path && '' !== trim($path)) {
                 $xml = @\file_get_contents($path);
@@ -31,17 +31,17 @@ final class DomDocumentLoad implements Call
             }
         }
 
-        if (!DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (!JitDomDocumentMethodKernel::shouldUse($context)) {
             DomLoadRuntime::ensureLinked($context);
         }
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             BasicBlockHelper::branchToFreshContinue($context, 'dom_load_invoke');
         }
 
         $result = JitDomLoad::invoke($context, ...$args);
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $mainCont = BasicBlockHelper::append($context, 'main_cont_after_dom_load');
             $context->builder->branch($mainCont);
             $context->builder->positionAtEnd($mainCont);

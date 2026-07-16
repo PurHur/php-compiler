@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\Builtin\DomCreateElementRuntime;
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -35,11 +35,11 @@ final class JitDomCreateElement
             throw new \LogicException('DOMDocument::createElement() expects receiver and name');
         }
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context) && \count($args) >= 3) {
+        if (JitDomDocumentMethodKernel::shouldUse($context) && \count($args) >= 3) {
             return self::invokeViaHelper($context, ...$args);
         }
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $nameLit = self::compileTimeStringArg($args[1]);
             if (null !== $nameLit) {
                 $obj = self::materializeElementFromLiteral($context, $nameLit);

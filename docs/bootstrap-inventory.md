@@ -251,6 +251,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomCreateElementNS.php` | 0 | 1 |
 | `ext/dom/JitDomCreateTextNode.php` | 0 | 2 |
 | `ext/dom/JitDomDocumentElement.php` | 0 | 4 |
+| `ext/dom/JitDomDocumentMethodKernel.php` | 0 | 3 |
 | `ext/dom/JitDomElementNavigationProperty.php` | 0 | 3 |
 | `ext/dom/JitDomElementTextContent.php` | 0 | 3 |
 | `ext/dom/JitDomGetElementById.php` | 0 | 5 |
@@ -3543,7 +3544,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DefineRuntime.php` | 0 | 6 |
 | `lib/JIT/Builtin/DomCreateElementNSRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomCreateElementRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php` | 0 | 3 |
 | `lib/JIT/Builtin/DomElementTextContentRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomGetElementByIdRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomGetElementsByTagNameRuntime.php` | 0 | 1 |
@@ -6355,6 +6355,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 77)
 - new JITVariable (line 98)
 - 4 class method(s)
+
+### `ext/dom/JitDomDocumentMethodKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 1208)
+- 61 class method(s)
+- 1 closure(s)
 
 ### `ext/dom/JitDomElementNavigationProperty.php`
 
@@ -19510,12 +19517,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmLocale.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 89)
-- new Variable (line 271)
-- new HashTable (line 272)
-- new Variable (line 274)
-- new Variable (line 284)
-- new Variable (line 291)
+- new HashTable (line 85)
+- new Variable (line 267)
+- new HashTable (line 268)
+- new Variable (line 270)
+- new Variable (line 280)
+- new Variable (line 287)
 - 17 class method(s)
 
 ### `ext/standard/VmLocaleCollate.php`
@@ -28871,13 +28878,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
-
-### `lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- new JIT (line 1185)
-- 61 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/DomElementTextContentRuntime.php`
 

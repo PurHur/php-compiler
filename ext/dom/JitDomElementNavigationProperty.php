@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomNodeChildPropertyRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
@@ -47,7 +47,7 @@ final class JitDomElementNavigationProperty
         $propLc = strtolower($propName);
 
         // User-script AOT: declared slots mirrored after mutations (#18951 pattern).
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $classId = $objectType->lookup(self::CLASS_ELEMENT);
             $jitType = 'childelementcount' === $propLc
                 ? JITVariable::TYPE_NATIVE_LONG

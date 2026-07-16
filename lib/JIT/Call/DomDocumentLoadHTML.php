@@ -8,7 +8,7 @@ use PHPCompiler\ext\dom\DomParseSimpleHtmlJitHelper;
 use PHPCompiler\ext\dom\JitDomLoadHTML;
 use PHPCompiler\ext\dom\JitDomLoadHTMLUserScript;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
@@ -21,7 +21,7 @@ final class DomDocumentLoadHTML implements Call
 {
     public function call(Context $context, Variable ...$args): Value
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context) && isset($args[1])) {
+        if (JitDomDocumentMethodKernel::shouldUse($context) && isset($args[1])) {
             JitDomLoadHTMLUserScript::rememberCompileTimeOptions($context, $args[2] ?? null);
             $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
             if (null !== $lit) {
@@ -32,17 +32,17 @@ final class DomDocumentLoadHTML implements Call
             }
         }
 
-        if (!DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (!JitDomDocumentMethodKernel::shouldUse($context)) {
             DomLoadHTMLRuntime::ensureLinked($context);
         }
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             BasicBlockHelper::branchToFreshContinue($context, 'dom_lh_invoke');
         }
 
         $result = JitDomLoadHTML::invoke($context, ...$args);
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $mainCont = BasicBlockHelper::append($context, 'main_cont_after_dom_lh');
             $context->builder->branch($mainCont);
             $context->builder->positionAtEnd($mainCont);

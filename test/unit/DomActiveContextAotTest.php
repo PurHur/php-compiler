@@ -187,7 +187,7 @@ final class DomActiveContextAotTest extends TestCase
 
     public function testDomDocumentMethodUserScriptBridgeUsesHelperLinkEntryChecks(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php');
+        $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomDocumentMethodKernel.php');
         $this->assertStringContainsString('hasNamedBridgeEntry', $source);
         $this->assertStringContainsString('bridgeEntryForEmit', $source);
     }

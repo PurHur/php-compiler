@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -20,7 +20,7 @@ final class JitDomAppendChild
             throw new \LogicException('DOMNode::appendChild() expects receiver and child node');
         }
 
-        if (!DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (!JitDomDocumentMethodKernel::shouldUse($context)) {
             throw new \LogicException('DOMNode::appendChild() user-script LLVM bridge required in this build');
         }
 

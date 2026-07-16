@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
@@ -128,18 +130,18 @@ final class DomNodeChildPropertyRuntime
     public static function ensureLinked(Context $context, string $propName): void
     {
         $propLc = strtolower($propName);
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             match ($propLc) {
-                'lastchild' => DomDocumentMethodUserScriptLlvm::ensureLastChildBridge($context),
-                'parentnode' => DomDocumentMethodUserScriptLlvm::ensureParentNodeBridge($context),
-                'nextsibling' => DomDocumentMethodUserScriptLlvm::ensureNextSiblingBridge($context),
-                'previoussibling' => DomDocumentMethodUserScriptLlvm::ensurePreviousSiblingBridge($context),
-                'firstelementchild' => DomDocumentMethodUserScriptLlvm::ensureFirstElementChildBridge($context),
-                'lastelementchild' => DomDocumentMethodUserScriptLlvm::ensureLastElementChildBridge($context),
-                'childelementcount' => DomDocumentMethodUserScriptLlvm::ensureChildElementCountBridge($context),
-                'nextelementsibling' => DomDocumentMethodUserScriptLlvm::ensureNextElementSiblingBridge($context),
-                'previouselementsibling' => DomDocumentMethodUserScriptLlvm::ensurePreviousElementSiblingBridge($context),
-                default => DomDocumentMethodUserScriptLlvm::ensureFirstChildBridge($context),
+                'lastchild' => JitDomDocumentMethodKernel::ensureLastChildBridge($context),
+                'parentnode' => JitDomDocumentMethodKernel::ensureParentNodeBridge($context),
+                'nextsibling' => JitDomDocumentMethodKernel::ensureNextSiblingBridge($context),
+                'previoussibling' => JitDomDocumentMethodKernel::ensurePreviousSiblingBridge($context),
+                'firstelementchild' => JitDomDocumentMethodKernel::ensureFirstElementChildBridge($context),
+                'lastelementchild' => JitDomDocumentMethodKernel::ensureLastElementChildBridge($context),
+                'childelementcount' => JitDomDocumentMethodKernel::ensureChildElementCountBridge($context),
+                'nextelementsibling' => JitDomDocumentMethodKernel::ensureNextElementSiblingBridge($context),
+                'previouselementsibling' => JitDomDocumentMethodKernel::ensurePreviousElementSiblingBridge($context),
+                default => JitDomDocumentMethodKernel::ensureFirstChildBridge($context),
             };
 
             return;
