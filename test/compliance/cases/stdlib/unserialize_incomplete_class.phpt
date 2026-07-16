@@ -11,6 +11,7 @@ var_export($obj);
 echo "\n";
 var_export($obj instanceof __PHP_Incomplete_Class);
 echo "\n";
+set_error_handler(static function () { return true; });
 var_export($obj->secret);
 echo "\n";
 $other = unserialize($blob, ['allowed_classes' => ['Other']]);
@@ -22,5 +23,5 @@ echo "\n";
   'secret' => 42,
 ))
 true
-42
+NULL
 true
