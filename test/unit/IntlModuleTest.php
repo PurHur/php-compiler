@@ -72,18 +72,40 @@ PHP;
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
-try {
-    Collator::create('en_US');
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+$c = Collator::create('en_US');
+echo (int) ($c->compare('a', 'b') < 0), "\n";
+echo (int) ($c->compare('b', 'a') > 0), "\n";
+echo (int) (0 === $c->compare('a', 'a')), "\n";
+$p = collator_create('en_US');
+echo (int) ($p->compare('a', 'b') < 0), "\n";
 PHP;
-        $block = $runtime->parseAndCompile($code, 'intl_skeleton.php');
+        $block = $runtime->parseAndCompile($code, 'intl_collator.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame(
-            "Error: Collator::create() is not implemented in this compiler build (issue #5747)\n",
-            ob_get_clean()
-        );
+        self::assertSame("1\n1\n1\n1\n", ob_get_clean());
+    }
+
+    public function test_collator_compare_asort_via_forced_registration(): void
+    {
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerCollator($runtime->vmContext);
+        // Procedural alias needs function table entry.
+        $runtime->vmContext->declareFunction(new \PHPCompiler\ext\intl\collator_create());
+        $code = <<<'PHP'
+<?php
+$c = Collator::create('en_US');
+echo $c->compare('a', 'b'), "\n";
+echo $c->compare('b', 'a'), "\n";
+$arr = ['x' => 'c', 'y' => 'a', 'z' => 'b'];
+$c->asort($arr);
+echo implode(',', $arr), "\n";
+$p = collator_create('en_US');
+echo get_class($p), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_collator_forced.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertMatchesRegularExpression('/^-1\n1\na,b,c\nCollator\n$/', $out);
     }
 }

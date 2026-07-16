@@ -60,7 +60,7 @@ final class BuiltinClasses
         VmIntlTimeZone::registerClass($ctx);
         VmIntlCalendar::registerClass($ctx);
         VmNumberFormatter::registerClass($ctx);
-        self::registerCollator($ctx);
+        VmCollator::registerClass($ctx);
         self::registerIntlException($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
@@ -142,14 +142,13 @@ final class BuiltinClasses
         $ctx->classes[VmIntlDateFormatter::CLASS_LC] = $entry;
     }
 
-    private static function registerCollator(Context $ctx): void
+    public static function registerCollator(Context $ctx): void
     {
-        $entry = new ClassEntry('Collator');
-        $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
-        $entry->methods['create'] = new CollatorCreate();
-        $entry->methodVisibility['create'] = $pubStatic;
-        $entry->methodNames['create'] = 'create';
-        $ctx->classes['collator'] = $entry;
+        $before = array_keys($ctx->classes);
+        VmCollator::registerClass($ctx);
+        foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
+            $ctx->classes[$lc]->isInternal = true;
+        }
     }
 
     private static function registerIntlException(Context $ctx): void

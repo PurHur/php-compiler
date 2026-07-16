@@ -12887,7 +12887,11 @@ restart:
             }
 
             $args = array_merge($frame->callArgs, [$nameVar, $argsVar]);
-            $this->separateInternalByRefArgsForWrite($frame->call, $args);
+            $this->separateInternalByRefArgsForWrite(
+                $frame->call,
+                $args,
+                $frame->builtinCalleeQualifiedMethod
+            );
 
             return $args;
         }
@@ -12901,13 +12905,21 @@ restart:
             $this->internalBuiltinFunctionName($frame->call, $frame)
         );
         if ([] === $frame->callArgs) {
-            $this->separateInternalByRefArgsForWrite($frame->call, $userArgs);
+            $this->separateInternalByRefArgsForWrite(
+                $frame->call,
+                $userArgs,
+                $frame->builtinCalleeQualifiedMethod
+            );
 
             return $userArgs;
         }
 
         $args = $this->mergeOutgoingCallArgs($frame->callArgs, $userArgs);
-        $this->separateInternalByRefArgsForWrite($frame->call, $args);
+        $this->separateInternalByRefArgsForWrite(
+            $frame->call,
+            $args,
+            $frame->builtinCalleeQualifiedMethod
+        );
 
         return $args;
     }
@@ -12944,12 +12956,15 @@ restart:
      *
      * @param list<Variable> $calledArgs
      */
-    private function separateInternalByRefArgsForWrite(Func $call, array $calledArgs): void
+    /**
+     * @param list<Variable> $calledArgs
+     */
+    private function separateInternalByRefArgsForWrite(Func $call, array $calledArgs, ?string $qualifiedMethod = null): void
     {
         if (!$call instanceof Func\Internal) {
             return;
         }
-        $name = $call->getName();
+        $name = $qualifiedMethod ?? $call->getName();
         foreach (BuiltinByRefParams::forFunction($name) as $idx) {
             if (isset($calledArgs[$idx])) {
                 $calledArgs[$idx]->separateArrayForWrite();
@@ -13056,7 +13071,8 @@ restart:
             return false;
         }
         if ($frame->call instanceof Func\Internal) {
-            $name = $frame->call->getName();
+            // Prefer Class::method so instance &$params use the correct index (#5747 Collator::asort).
+            $name = $frame->builtinCalleeQualifiedMethod ?? $frame->call->getName();
 
             return BuiltinByRefParams::isByRefArg($name, $argIndex, $value);
         }

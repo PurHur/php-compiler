@@ -143,6 +143,9 @@ final class BuiltinByRefParams
                 return [0];
             case 'uuid_generate':
                 return [0];
+            case 'collator::asort':
+                // $this + &$array (+ optional flags) — php-src collator.stub.php (#5747)
+                return [1];
             case 'msg_send':
                 // php-src ext/sysvmsg/sysvmsg.stub.php — &$error_code (#3666)
                 return [5];

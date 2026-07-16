@@ -26,6 +26,9 @@ final class BuiltinParamNames
             'datetimezone::__construct' => ['timezone'],
             'arrayobject::__construct' => ['array', 'flags', 'iterator_class'],
             'splfileobject::seek' => ['line'],
+            'collator::create' => ['locale'],
+            'collator::compare' => ['string1', 'string2'],
+            'collator::asort' => ['array', 'flags'],
             default => null,
         };
     }

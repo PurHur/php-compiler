@@ -21,6 +21,13 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([0], BuiltinByRefParams::forFunction('SORT'));
     }
 
+    public function testCollatorAsortArrayArgument(): void
+    {
+        $this->assertSame([1], BuiltinByRefParams::forFunction('Collator::asort'));
+        $this->assertSame([1], BuiltinByRefParams::forFunction('collator::asort'));
+        $this->assertSame([0], BuiltinByRefParams::forFunction('asort'));
+    }
+
     public function testArrayWalkFirstArgument(): void
     {
         $this->assertSame([0], BuiltinByRefParams::forFunction('array_walk'));
