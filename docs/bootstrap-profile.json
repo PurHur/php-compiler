@@ -1105,6 +1105,7 @@
         "ext/standard/AttributeRegistryJitHelper.php",
         "ext/standard/Base64JitHelper.php",
         "ext/standard/Bin2hexJitHelper.php",
+        "ext/standard/JitBin2hexKernel.php",
         "ext/standard/BuiltinAttributes.php",
         "ext/standard/BuiltinClasses.php",
         "ext/standard/BuiltinEnums.php",

@@ -455,6 +455,9 @@ final class VmDom
         $xpath->methods['registernamespace'] = new XPathRegisterNamespace();
         $xpath->methodVisibility['registernamespace'] = $pub;
         $xpath->methodNames['registernamespace'] = 'registerNamespace';
+        $xpath->methods['registerphpfunctions'] = new XPathRegisterPhpFunctions();
+        $xpath->methodVisibility['registerphpfunctions'] = $pub;
+        $xpath->methodNames['registerphpfunctions'] = 'registerPhpFunctions';
         if (CompilerVersion::supportsDomXPathQuote()) {
             $pubStatic = $pub | CfgFunc::FLAG_STATIC;
             $xpath->methods['quote'] = new XPathQuote();

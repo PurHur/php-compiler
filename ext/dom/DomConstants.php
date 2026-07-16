@@ -44,6 +44,18 @@ final class DomConstants
     /** Internal marker for {@see VmDom::createXPath()} handles (#6066). */
     public const XML_XPATH = -4;
 
+    /** Namespace URI for php:function() / php:functionString() (#19331, php-src xpath.c). */
+    public const PHP_XPATH_NS = 'http://php.net/xpath';
+
+    /** php_dom_xpath_callback_ns::mode — none registered (#19331). */
+    public const XPATH_REG_FUNC_MODE_NONE = 0;
+
+    /** Allow any PHP callable via php:function() (#19331). */
+    public const XPATH_REG_FUNC_MODE_ALL = 1;
+
+    /** Allow only explicitly registered handler names (#19331). */
+    public const XPATH_REG_FUNC_MODE_SET = 2;
+
     /** DOMNode::compareDocumentPosition() flags (php-src ext/dom/node.c; #14448). */
     public const DOCUMENT_POSITION_DISCONNECTED = 0x01;
 
