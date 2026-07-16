@@ -11,7 +11,9 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 
-$ci2 = new CachingIterator(new ArrayIterator([1, 2, 3]), CachingIterator::FULL_CACHE);
+$it2 = new ArrayIterator([1, 2, 3]);
+$flags = CachingIterator::FULL_CACHE;
+$ci2 = new CachingIterator($it2, $flags);
 foreach ($ci2 as $_) {
 }
 echo 'full_cache_count=', $ci2->count(), "\n";
