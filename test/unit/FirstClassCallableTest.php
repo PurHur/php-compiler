@@ -243,6 +243,24 @@ echo $maker(42)->v, "\n";
 PHP, 'test.php');
     }
 
+    /** Issue #19727: $obj?->m(...) first-class callable must compile-fatal (Zend/zend_compile.c). */
+    public function testVmNullsafeMethodFirstClassCallableCompileErrors(): void
+    {
+        $rt = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot combine nullsafe operator with Closure creation');
+        $rt->parseAndCompile(<<<'PHP'
+<?php
+declare(strict_types=1);
+class T {
+    public function m(int $x): int { return $x * 2; }
+}
+$n = null;
+$g = $n?->m(...);
+var_export($g);
+PHP, 'test.php');
+    }
+
     /** Issue #9604: trait-used instance method first-class callable. */
     public function testVmTraitMethodFirstClassCallable(): void
     {
