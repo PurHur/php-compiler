@@ -10,7 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** User-script standalone AOT: compile-time DOMXPath::evaluate() (#18526). */
+/** User-script standalone AOT: compile-time DOMXPath::evaluate() (#18526, #19352). */
 final class JitDomXPathEvaluateUserScript
 {
     public static function shouldUse(Context $context): bool
@@ -53,6 +53,25 @@ final class JitDomXPathEvaluateUserScript
 
             return self::boxDouble($context, (float) $count);
         }
+        if (preg_match('~^string\((.+)\)$~i', $expression, $stringWrap)) {
+            $value = self::stringForXPath($xml, trim($stringWrap[1]));
+            if (null === $value) {
+                return null;
+            }
+
+            return self::boxString($context, $value);
+        }
+        if (preg_match('~^number\((.+)\)$~i', $expression, $numberWrap)) {
+            $value = self::stringForXPath($xml, trim($numberWrap[1]));
+            if (null === $value) {
+                return null;
+            }
+            if ('' === $value || !is_numeric($value)) {
+                return self::boxDouble($context, NAN);
+            }
+
+            return self::boxDouble($context, (float) $value);
+        }
 
         return null;
     }
@@ -81,6 +100,31 @@ final class JitDomXPathEvaluateUserScript
         return null === $matched ? 0 : $matched[0];
     }
 
+    /**
+     * First string-value for //@attr, //tag/@attr, //tag[n]/@attr, or //tag text (#19352).
+     */
+    private static function stringForXPath(string $xml, string $inner): ?string
+    {
+        if (preg_match('~^//@([\w.-]+)$~', $inner, $matches)) {
+            return DomParseSimpleXmlJitHelper::firstAttributeValueArgv($xml, $matches[1]);
+        }
+        if (preg_match('~^//([*\w][\w:-]*)(?:\[(\d+)\])?/@([\w.-]+)$~', $inner, $matches)) {
+            $position = isset($matches[2]) && '' !== $matches[2] ? (int) $matches[2] : 1;
+
+            return DomParseSimpleXmlJitHelper::nthTagAttributeValueArgv(
+                $xml,
+                $matches[1],
+                $matches[3],
+                $position
+            );
+        }
+        if (preg_match('~^//([*\w][\w:-]*)$~', $inner, $matches)) {
+            return DomParseSimpleXmlJitHelper::firstTagTextArgv($xml, $matches[1]);
+        }
+
+        return null;
+    }
+
     private static function boxLong(Context $context, int $value): Value
     {
         $slot = JitValueBox::alloc($context);
@@ -102,6 +146,23 @@ final class JitDomXPathEvaluateUserScript
             $context->lookupFunction('__value__writeDouble'),
             JitValueBox::pointer($context, $slot),
             $double->constReal($value)
+        );
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    private static function boxString(Context $context, string $value): Value
+    {
+        $str = $context->builder->load($context->constantStringFromString($value));
+        $owned = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $str
+        );
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            JitValueBox::pointer($context, $slot),
+            $owned
         );
 
         return JitValueBox::normalizeValuePtr($context, $slot);

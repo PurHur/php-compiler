@@ -51,8 +51,18 @@ final class JitDomXPathEvaluate
                 self::loadStringArg($context, $args[1])
             );
         }
+        if (null !== $expr && preg_match('~^string\(~i', $expr)) {
+            DomXPathEvaluateRuntime::ensureStringLinked($context);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_xpath_evaluate_string_cont');
 
-        throw new \LogicException('DOMXPath::evaluate() user-script AOT requires boolean()/count()/number() literal');
+            return $context->builder->call(
+                $context->lookupFunction(DomXPathEvaluateRuntime::ABI_STRING),
+                self::loadObjectArg($context, $args[0]),
+                self::loadStringArg($context, $args[1])
+            );
+        }
+
+        throw new \LogicException('DOMXPath::evaluate() user-script AOT requires boolean()/count()/number()/string() literal');
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value
