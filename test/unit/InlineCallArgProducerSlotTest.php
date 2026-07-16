@@ -1676,6 +1676,75 @@ PHP;
         self::assertSame("2020-01-02,2020-01-03,2020-01-04\n", ob_get_clean());
     }
 
+    /**
+     * Issue #19738 — user multi-arg ctor + trailing Plus/UnaryMinus/Cast must keep positional New_ slots.
+     *
+     * @dataProvider multiArgCtorTrailingScalarOptionProvider
+     */
+    public function testMultiArgCtorTrailingScalarOptionUsesPositionalProducerSlots(
+        string $flagsExpr,
+        int $expectedFlags,
+        ?int $optionOpcodeType
+    ): void {
+        $code = <<<PHP
+<?php
+class C {
+  public function __construct(public \$a, public \$b, public int \$flags) {}
+}
+\$o = new C(new stdClass(), new stdClass(), {$flagsExpr});
+echo get_class(\$o->a), ",", get_class(\$o->b), ",", \$o->flags, "\\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'multi_arg_ctor_trailing_scalar.php');
+
+        $newSlots = [];
+        $ctorSends = [];
+        $optionSlot = null;
+        $inCtor = false;
+        foreach ($block->opCodes as $op) {
+            if (null !== $optionOpcodeType && $op->type === $optionOpcodeType) {
+                $optionSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlots[] = $op->arg1;
+                if (3 === \count($newSlots)) {
+                    $inCtor = true;
+                }
+            }
+            if ($inCtor && OpCode::TYPE_ARG_SEND === $op->type) {
+                $ctorSends[] = $op->arg1;
+            }
+            if ($inCtor && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertCount(3, $ctorSends, 'ctor sends='.json_encode($ctorSends));
+        self::assertSame($newSlots[0], $ctorSends[0], 'arg0 must be first stdClass New_');
+        self::assertSame($newSlots[1], $ctorSends[1], 'arg1 must be second stdClass New_');
+        self::assertNotSame($ctorSends[0], $ctorSends[2], 'arg0 must not share option slot');
+        if (null !== $optionOpcodeType) {
+            self::assertNotNull($optionSlot, 'expected trailing option opcode');
+            self::assertSame($optionSlot, $ctorSends[2], 'flags must use trailing option slot');
+        }
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("stdClass,stdClass,{$expectedFlags}\n", ob_get_clean());
+    }
+
+    /** @return iterable<string, array{string, int, ?int}> */
+    public static function multiArgCtorTrailingScalarOptionProvider(): iterable
+    {
+        yield 'plus' => ['1+2', 3, OpCode::TYPE_PLUS];
+        yield 'umul' => ['2*3', 6, OpCode::TYPE_MUL];
+        yield 'shift' => ['1<<2', 4, OpCode::TYPE_SHIFT_LEFT];
+        // -1 folds to a constant slot (no TYPE_UNARY_MINUS opcode) after #13387.
+        yield 'uminus' => ['-1', -1, null];
+        yield 'cast' => ['(int)1.5', 1, OpCode::TYPE_CAST_INT];
+        yield 'bor' => ['1|2', 3, OpCode::TYPE_BITWISE_OR];
+    }
+
     /** Issue #14483 — iterator_count(new DatePeriod(...)) wires outer sibling New_, not inner hoists. */
     public function testIteratorCountInlineDatePeriodUsesSiblingNewProducerSlot(): void
     {
