@@ -1205,6 +1205,8 @@ final class VmDom
         $attrState = DomRegistry::state($attr);
         $name = $attrState->nodeName;
         $value = $attrState->textContent ?? '';
+        // php-src xmlAddChild / setAttributeNode: moving an Attr detaches it from the previous owner.
+        self::detachAttributeFromPreviousOwner($ctx, $attr, $element);
         $elementState = DomRegistry::state($element);
         $replaced = null;
         if (\array_key_exists($name, $elementState->attributes)) {
@@ -1398,6 +1400,48 @@ final class VmDom
         if ($attr->hasProperty(self::PROP_OWNER_ELEMENT)) {
             $attr->getProperty(self::PROP_OWNER_ELEMENT)->null();
         }
+    }
+
+    /**
+     * Remove Attr from a previous owner element when relocating (php-src ext/dom/node.c xmlAddChild).
+     */
+    private static function detachAttributeFromPreviousOwner(
+        Context $ctx,
+        ObjectEntry $attr,
+        ObjectEntry $newOwner
+    ): void {
+        $attrState = DomRegistry::state($attr);
+        $prevOwnerId = $attrState->ownerElementId;
+        if (null === $prevOwnerId || $prevOwnerId === $newOwner->id) {
+            return;
+        }
+        $prevOwner = DomRegistry::entry($prevOwnerId);
+        if (null === $prevOwner || !self::isElement($prevOwner)) {
+            self::detachAttributeNode($attr);
+
+            return;
+        }
+        $prevState = DomRegistry::state($prevOwner);
+        foreach ($prevState->attributeNodeIds as $qName => $cachedId) {
+            if ($cachedId !== $attr->id) {
+                continue;
+            }
+            unset(
+                $prevState->attributes[$qName],
+                $prevState->attributeNamespaces[$qName],
+                $prevState->attributeNodeIds[$qName]
+            );
+            if (null !== $prevState->idAttributeName && $qName === $prevState->idAttributeName) {
+                $document = self::ownerDocumentEntry($prevOwner);
+                if (null !== $document) {
+                    self::unregisterElementId($document, $prevOwner);
+                }
+                $prevState->idAttributeName = null;
+            }
+            self::syncElementAttributes($ctx, $prevOwner);
+            break;
+        }
+        self::detachAttributeNode($attr);
     }
 
     public static function getAttributeNS(ObjectEntry $element, ?string $namespace, string $localName): string
@@ -3719,6 +3763,10 @@ final class VmDom
         if (self::isDocumentFragment($child)) {
             return self::appendFragmentChildren($ctx, $parent, $child);
         }
+        // php-src ext/dom/node.c: Attr under Element installs via attribute map (not childNodes).
+        if (self::isAttr($child)) {
+            return self::appendOrInsertAttribute($ctx, $parent, $child);
+        }
 
         if (!self::isTreeMutationChild($child)) {
             throw new \DOMException('Hierarchy request error');
@@ -3804,6 +3852,15 @@ final class VmDom
         self::assertMutationParent($parent);
         if (self::isDocumentFragment($newChild)) {
             return self::insertFragmentChildrenBefore($ctx, $parent, $newChild, $refChild);
+        }
+        // php-src: Attr + null refChild ≡ appendChild(Attr); Attr cannot be a previous sibling of a child node.
+        if (self::isAttr($newChild)) {
+            if (null !== $refChild) {
+                // php-src / libxml: Error (not DOMException) when Attr is inserted as sibling of a child.
+                throw new \Error('Cannot add newnode as the previous sibling of refnode');
+            }
+
+            return self::appendOrInsertAttribute($ctx, $parent, $newChild);
         }
         if (!self::isTreeMutationChild($newChild)) {
             throw new \DOMException('Hierarchy request error');
@@ -7134,12 +7191,16 @@ final class VmDom
 
     public static function isAppendableNode(ObjectEntry $entry): bool
     {
-        return self::isTreeMutationChild($entry) || self::isDocumentFragment($entry);
+        return self::isTreeMutationChild($entry)
+            || self::isDocumentFragment($entry)
+            || self::isAttr($entry);
     }
 
     public static function isAppendChildCandidate(ObjectEntry $entry): bool
     {
-        return self::isTreeMutationChild($entry) || self::isDocumentFragment($entry);
+        return self::isTreeMutationChild($entry)
+            || self::isDocumentFragment($entry)
+            || self::isAttr($entry);
     }
 
     private static function isTreeMutationChild(ObjectEntry $entry): bool
@@ -7149,6 +7210,24 @@ final class VmDom
             || self::isCommentNode($entry)
             || self::isEntityReference($entry)
             || self::isProcessingInstruction($entry);
+    }
+
+    /**
+     * Install DOMAttr on an Element via the attribute map (php-src ext/dom/node.c; #19445).
+     * Not a childNodes entry — same observable as setAttributeNode() for the installed Attr.
+     */
+    private static function appendOrInsertAttribute(
+        Context $ctx,
+        ObjectEntry $parent,
+        ObjectEntry $attr
+    ): ObjectEntry {
+        if (!self::isElement($parent)) {
+            throw new \DOMException('Hierarchy request error');
+        }
+        self::assertSameDocument($parent, $attr);
+        self::setAttributeNode($ctx, $parent, $attr);
+
+        return $attr;
     }
 
     private static function appendDocumentChild(Context $ctx, ObjectEntry $document, ObjectEntry $child): void
