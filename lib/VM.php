@@ -800,9 +800,15 @@ class VM {
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
      * Hooked properties: real backing (same-name or separate) probes storage; virtual get-only invokes get (#11262, #11617).
+     * Incomplete objects: E_WARNING + false (zend_object_handlers.c, #19632).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
+        if (VM\IncompleteClassSupport::isIncomplete($object)) {
+            VM\IncompleteClassSupport::emitAccessWarning($object, $this->context, $frame);
+
+            return false;
+        }
         $hookedIsset = $this->issetHookedPropertyForIssetEmpty($object, $propName, $frame);
         if (null !== $hookedIsset) {
             return $hookedIsset;
@@ -824,15 +830,21 @@ class VM {
 
     /**
      * ?? / ??= on property hooks — Zend checks backing null/uninit, not get-hook return (#6472, #8902).
+     * Incomplete objects: E_WARNING + false before write Error (#19632).
      */
     public function objectPropertyIsSetForCoalesceAssign(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
+        if (VM\IncompleteClassSupport::isIncomplete($object)) {
+            VM\IncompleteClassSupport::emitAccessWarning($object, $this->context, $frame);
+
+            return false;
+        }
         $hookedIsset = $this->issetHookedPropertyWithoutGetHook($object, $propName);
         if (null !== $hookedIsset) {
             return $hookedIsset;
         }
 
-        return $this->objectPropertyIsSet($object, $propName, null);
+        return $this->objectPropertyIsSet($object, $propName, $frame);
     }
 
     /**
@@ -1154,9 +1166,16 @@ class VM {
     /**
      * empty($obj->prop) — uninitialized typed slots are empty without read (#6787, zend_object_handlers.c);
      * dynamic / __isset-only properties keep isset semantics (#3298).
+     * Incomplete objects: E_WARNING + empty (true) (#19632).
      */
     public function emptyObjectProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): ?Frame
     {
+        if (VM\IncompleteClassSupport::isIncomplete($object)) {
+            VM\IncompleteClassSupport::emitAccessWarning($object, $this->context, $frame);
+            $dst->bool(true);
+
+            return null;
+        }
         $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($object, $propName, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -5164,6 +5183,19 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
+                        // unset($incomplete->prop) — Error like write (#19632).
+                        if (VM\IncompleteClassSupport::isIncomplete($object)) {
+                            $catchFrame = $this->dispatchVmError(
+                                VM\IncompleteClassSupport::modifyErrorMessage($object),
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
+                        }
                         if (EnumCaseSupport::isEnumCase($object)) {
                             $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
                                 $object->class,
@@ -6496,6 +6528,29 @@ restart:
                         VM\LazyObjectSupport::ensureInitialized($this, $propertyObject);
                     }
                     $propertyObject = VM\LazyObjectSupport::getLazyInstance($propertyObject);
+                    // __PHP_Incomplete_Class — block userland property ops (zend_object_handlers.c, #19632).
+                    if (VM\IncompleteClassSupport::isIncomplete($propertyObject)) {
+                        $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                        if ($forWrite) {
+                            $catchFrame = $this->dispatchVmError(
+                                VM\IncompleteClassSupport::modifyErrorMessage($propertyObject),
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+
+                            return self::EXCEPTION;
+                        }
+                        if ($op->nullsafeFetchPropertyRead) {
+                            $result->null();
+                            break;
+                        }
+                        VM\IncompleteClassSupport::emitAccessWarning($propertyObject, $this->context, $frame);
+                        $result->null();
+                        break;
+                    }
                     if (EnumCaseSupport::isEnumCase($propertyObject)) {
                         $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                         $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
