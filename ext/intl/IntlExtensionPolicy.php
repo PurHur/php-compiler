@@ -95,6 +95,16 @@ final class IntlExtensionPolicy
         return self::advertisesBuiltins();
     }
 
+    /**
+     * Collator / collator_create — require loaded ext/intl (php-src ext/intl/collator; #5747, #19670).
+     *
+     * Implementation stays in-tree but must not phantom-advertise when intl is off.
+     */
+    public static function advertisesCollator(): bool
+    {
+        return self::advertisesBuiltins();
+    }
+
     /** Run Locale compliance when ext/intl is loaded or a phantom-registration guard matches (#19670). */
     public static function runsLocaleCompliance(string $testFileName): bool
     {

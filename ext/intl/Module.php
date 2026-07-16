@@ -40,6 +40,9 @@ class Module extends ModuleAbstract
         if (IntlExtensionPolicy::advertisesNumberFormatter()) {
             BuiltinClasses::registerNumberFormatter($runtime->vmContext);
         }
+        if (IntlExtensionPolicy::advertisesCollator()) {
+            BuiltinClasses::registerCollator($runtime->vmContext);
+        }
         if (IntlExtensionPolicy::advertisesBuiltins()) {
             BuiltinClasses::register($runtime->vmContext);
         }
@@ -74,11 +77,16 @@ class Module extends ModuleAbstract
             ? [new idn_to_ascii(), new idn_to_utf8()]
             : [];
 
+        $collator = IntlExtensionPolicy::advertisesCollator()
+            ? [new collator_create()]
+            : [];
+
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
             return [
                 ...$functions,
                 ...$normalizer,
                 ...$idn,
+                ...$collator,
                 ...IntlExtensionPolicy::profileLocaleParserFunctions(),
             ];
         }
@@ -87,6 +95,7 @@ class Module extends ModuleAbstract
             ...$functions,
             ...$normalizer,
             ...$idn,
+            ...$collator,
             new grapheme_strlen(),
             new grapheme_substr(),
             new grapheme_strpos(),
