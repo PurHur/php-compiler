@@ -139,6 +139,21 @@ final class VmDom
 
     public const PROP_PARENT_ELEMENT = 'parentElement';
 
+    /** ParentNode first element child (php-src ext/dom/parentnode.c; #19431). */
+    public const PROP_FIRST_ELEMENT_CHILD = 'firstElementChild';
+
+    /** ParentNode last element child (php-src ext/dom/parentnode.c; #19431). */
+    public const PROP_LAST_ELEMENT_CHILD = 'lastElementChild';
+
+    /** ParentNode element-only child count (php-src ext/dom/parentnode.c; #19431). */
+    public const PROP_CHILD_ELEMENT_COUNT = 'childElementCount';
+
+    /** NonDocumentTypeChildNode next element sibling (php-src ext/dom/nodelist.c; #19431). */
+    public const PROP_NEXT_ELEMENT_SIBLING = 'nextElementSibling';
+
+    /** NonDocumentTypeChildNode previous element sibling (php-src ext/dom/nodelist.c; #19431). */
+    public const PROP_PREVIOUS_ELEMENT_SIBLING = 'previousElementSibling';
+
     public const PROP_LENGTH = 'length';
 
     public const PROP_NAME = 'name';
@@ -304,6 +319,9 @@ final class VmDom
         $characterData->parentLc = self::CLASS_NODE;
         $characterData->properties[] = new ClassProperty(self::PROP_DATA, null, $strProto);
         $characterData->properties[] = new ClassProperty(self::PROP_LENGTH, null, $intProto);
+        // NonDocumentTypeChildNode on CharacterData (Text/Comment/CDATA; #19431).
+        $characterData->properties[] = new ClassProperty(self::PROP_NEXT_ELEMENT_SIBLING, $nullProto, $objProto);
+        $characterData->properties[] = new ClassProperty(self::PROP_PREVIOUS_ELEMENT_SIBLING, $nullProto, $objProto);
         $characterData->methods['appenddata'] = new CharacterDataAppendData();
         $characterData->methodVisibility['appenddata'] = $pub;
         $characterData->methodNames['appenddata'] = 'appendData';
@@ -519,6 +537,10 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
         $document->properties[] = new ClassProperty(self::PROP_ELEMENT_ID_MAP, $nullProto, $arrayProto);
         $document->properties[] = new ClassProperty(self::PROP_REGISTRY_ID, null, $intProto);
+        // ParentNode on Document (php-src ext/dom/parentnode.c; #19431).
+        $document->properties[] = new ClassProperty(self::PROP_FIRST_ELEMENT_CHILD, $nullProto, $objProto);
+        $document->properties[] = new ClassProperty(self::PROP_LAST_ELEMENT_CHILD, $nullProto, $objProto);
+        $document->properties[] = new ClassProperty(self::PROP_CHILD_ELEMENT_COUNT, null, $intProto);
         $document->methods['loadxml'] = new DocumentLoadXML();
         $document->methodVisibility['loadxml'] = $pub;
         $document->methods['load'] = new DocumentLoad();
@@ -608,6 +630,12 @@ final class VmDom
         $element->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $element->properties[] = new ClassProperty(self::PROP_TAG_NAME, null, $strProto);
         $element->properties[] = new ClassProperty(self::PROP_ATTRIBUTES, $nullProto, $objProto);
+        // ParentNode + NonDocumentTypeChildNode on Element (#19431).
+        $element->properties[] = new ClassProperty(self::PROP_FIRST_ELEMENT_CHILD, $nullProto, $objProto);
+        $element->properties[] = new ClassProperty(self::PROP_LAST_ELEMENT_CHILD, $nullProto, $objProto);
+        $element->properties[] = new ClassProperty(self::PROP_CHILD_ELEMENT_COUNT, null, $intProto);
+        $element->properties[] = new ClassProperty(self::PROP_NEXT_ELEMENT_SIBLING, $nullProto, $objProto);
+        $element->properties[] = new ClassProperty(self::PROP_PREVIOUS_ELEMENT_SIBLING, $nullProto, $objProto);
         $element->methods['appendchild'] = new ElementAppendChild();
         $element->methodVisibility['appendchild'] = $pub;
         $element->methods['getattribute'] = new ElementGetAttribute();
@@ -695,6 +723,10 @@ final class VmDom
         $fragment->methods['__construct'] = $fragmentConstruct;
         $fragment->methodVisibility['__construct'] = $pub;
         $fragment->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        // ParentNode on DocumentFragment (php-src ext/dom/parentnode.c; #19431).
+        $fragment->properties[] = new ClassProperty(self::PROP_FIRST_ELEMENT_CHILD, $nullProto, $objProto);
+        $fragment->properties[] = new ClassProperty(self::PROP_LAST_ELEMENT_CHILD, $nullProto, $objProto);
+        $fragment->properties[] = new ClassProperty(self::PROP_CHILD_ELEMENT_COUNT, null, $intProto);
         $fragment->methods['appendchild'] = new FragmentAppendChild();
         $fragment->methodVisibility['appendchild'] = $pub;
         $fragment->methods['appendxml'] = new FragmentAppendXML();
@@ -5994,6 +6026,27 @@ final class VmDom
         if (!$entry->hasProperty(self::PROP_REGISTRY_ID)) {
             $entry->allocateProperty(self::PROP_REGISTRY_ID)->int(0);
         }
+        // ParentNode props: Element / Document / DocumentFragment (#19431).
+        if (self::isElement($entry) || self::isDocument($entry) || self::isDocumentFragment($entry)) {
+            if (!$entry->hasProperty(self::PROP_FIRST_ELEMENT_CHILD)) {
+                $entry->allocateProperty(self::PROP_FIRST_ELEMENT_CHILD)->null();
+            }
+            if (!$entry->hasProperty(self::PROP_LAST_ELEMENT_CHILD)) {
+                $entry->allocateProperty(self::PROP_LAST_ELEMENT_CHILD)->null();
+            }
+            if (!$entry->hasProperty(self::PROP_CHILD_ELEMENT_COUNT)) {
+                $entry->allocateProperty(self::PROP_CHILD_ELEMENT_COUNT)->int(0);
+            }
+        }
+        // NonDocumentTypeChildNode: Element + CharacterData (Text/Comment/CDATA) (#19431).
+        if (self::isElement($entry) || self::isCharacterData($entry)) {
+            if (!$entry->hasProperty(self::PROP_NEXT_ELEMENT_SIBLING)) {
+                $entry->allocateProperty(self::PROP_NEXT_ELEMENT_SIBLING)->null();
+            }
+            if (!$entry->hasProperty(self::PROP_PREVIOUS_ELEMENT_SIBLING)) {
+                $entry->allocateProperty(self::PROP_PREVIOUS_ELEMENT_SIBLING)->null();
+            }
+        }
     }
 
     private static function initElementPropertySlots(ObjectEntry $entry): void
@@ -6135,6 +6188,12 @@ final class VmDom
         }
         $node->getProperty(self::PROP_NEXT_SIBLING)->null();
         $node->getProperty(self::PROP_PREVIOUS_SIBLING)->null();
+        if ($node->hasProperty(self::PROP_NEXT_ELEMENT_SIBLING)) {
+            $node->getProperty(self::PROP_NEXT_ELEMENT_SIBLING)->null();
+        }
+        if ($node->hasProperty(self::PROP_PREVIOUS_ELEMENT_SIBLING)) {
+            $node->getProperty(self::PROP_PREVIOUS_ELEMENT_SIBLING)->null();
+        }
     }
 
     private static function assertMutationParent(ObjectEntry $parent): void
@@ -6332,6 +6391,8 @@ final class VmDom
             }
         }
 
+        self::syncParentNodeElementProperties($node, $state->childIds);
+
         $childNodesVar = $node->getProperty(self::PROP_CHILD_NODES);
         if (null !== $state->childNodesListId) {
             $list = DomRegistry::entry($state->childNodesListId);
@@ -6425,7 +6486,134 @@ final class VmDom
             } else {
                 $siblingVar->null();
             }
+            self::syncElementSiblingProperties($child, $childIds, $index);
         }
+    }
+
+    /**
+     * ParentNode first/lastElementChild + childElementCount (ext/dom/parentnode.c; #19431).
+     *
+     * @param list<int> $childIds
+     */
+    private static function syncParentNodeElementProperties(ObjectEntry $node, array $childIds): void
+    {
+        if (!self::isElement($node) && !self::isDocument($node) && !self::isDocumentFragment($node)) {
+            return;
+        }
+        if (!$node->hasProperty(self::PROP_FIRST_ELEMENT_CHILD)) {
+            return;
+        }
+        $firstEl = self::firstElementChildEntry($childIds);
+        $lastEl = self::lastElementChildEntry($childIds);
+        $count = self::countElementChildren($childIds);
+        $firstVar = $node->getProperty(self::PROP_FIRST_ELEMENT_CHILD);
+        $lastVar = $node->getProperty(self::PROP_LAST_ELEMENT_CHILD);
+        $countVar = $node->getProperty(self::PROP_CHILD_ELEMENT_COUNT);
+        if (null !== $firstEl) {
+            $firstVar->object($firstEl);
+        } else {
+            $firstVar->null();
+        }
+        if (null !== $lastEl) {
+            $lastVar->object($lastEl);
+        } else {
+            $lastVar->null();
+        }
+        $countVar->int($count);
+    }
+
+    /**
+     * NonDocumentTypeChildNode next/previousElementSibling (ext/dom/nodelist.c; #19431).
+     *
+     * @param list<int> $childIds
+     */
+    private static function syncElementSiblingProperties(ObjectEntry $child, array $childIds, int $index): void
+    {
+        if (!self::isElement($child) && !self::isCharacterData($child)) {
+            return;
+        }
+        if (!$child->hasProperty(self::PROP_NEXT_ELEMENT_SIBLING)) {
+            return;
+        }
+        $nextEl = self::elementSiblingFromIndex($childIds, $index, true);
+        $prevEl = self::elementSiblingFromIndex($childIds, $index, false);
+        $nextVar = $child->getProperty(self::PROP_NEXT_ELEMENT_SIBLING);
+        $prevVar = $child->getProperty(self::PROP_PREVIOUS_ELEMENT_SIBLING);
+        if (null !== $nextEl) {
+            $nextVar->object($nextEl);
+        } else {
+            $nextVar->null();
+        }
+        if (null !== $prevEl) {
+            $prevVar->object($prevEl);
+        } else {
+            $prevVar->null();
+        }
+    }
+
+    /** @param list<int> $childIds */
+    private static function firstElementChildEntry(array $childIds): ?ObjectEntry
+    {
+        foreach ($childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && self::isElement($child)) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param list<int> $childIds */
+    private static function lastElementChildEntry(array $childIds): ?ObjectEntry
+    {
+        for ($i = \count($childIds) - 1; $i >= 0; --$i) {
+            $child = DomRegistry::entry($childIds[$i]);
+            if (null !== $child && self::isElement($child)) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param list<int> $childIds */
+    private static function countElementChildren(array $childIds): int
+    {
+        $count = 0;
+        foreach ($childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && self::isElement($child)) {
+                ++$count;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param list<int> $childIds
+     */
+    private static function elementSiblingFromIndex(array $childIds, int $index, bool $next): ?ObjectEntry
+    {
+        if ($next) {
+            for ($i = $index + 1, $n = \count($childIds); $i < $n; ++$i) {
+                $sib = DomRegistry::entry($childIds[$i]);
+                if (null !== $sib && self::isElement($sib)) {
+                    return $sib;
+                }
+            }
+
+            return null;
+        }
+        for ($i = $index - 1; $i >= 0; --$i) {
+            $sib = DomRegistry::entry($childIds[$i]);
+            if (null !== $sib && self::isElement($sib)) {
+                return $sib;
+            }
+        }
+
+        return null;
     }
 
     /**

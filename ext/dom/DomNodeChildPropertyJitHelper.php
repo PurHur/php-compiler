@@ -76,6 +76,58 @@ final class DomNodeChildPropertyJitHelper
         return self::siblingArgv($node, false);
     }
 
+    /** ParentNode::$firstElementChild (#19431). */
+    public static function firstElementChildArgv(ObjectEntry $node): ?ObjectEntry
+    {
+        $node = DomRegistry::entry($node->id) ?? $node;
+        if (!DomRegistry::has($node)) {
+            return null;
+        }
+
+        return self::firstElementInChildIds(DomRegistry::state($node)->childIds);
+    }
+
+    /** ParentNode::$lastElementChild (#19431). */
+    public static function lastElementChildArgv(ObjectEntry $node): ?ObjectEntry
+    {
+        $node = DomRegistry::entry($node->id) ?? $node;
+        if (!DomRegistry::has($node)) {
+            return null;
+        }
+
+        return self::lastElementInChildIds(DomRegistry::state($node)->childIds);
+    }
+
+    /** ParentNode::$childElementCount (#19431). */
+    public static function childElementCountArgv(ObjectEntry $node): int
+    {
+        $node = DomRegistry::entry($node->id) ?? $node;
+        if (!DomRegistry::has($node)) {
+            return 0;
+        }
+        $count = 0;
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && VmDom::isElement($child)) {
+                ++$count;
+            }
+        }
+
+        return $count;
+    }
+
+    /** NonDocumentTypeChildNode::$nextElementSibling (#19431). */
+    public static function nextElementSiblingArgv(ObjectEntry $node): ?ObjectEntry
+    {
+        return self::elementSiblingArgv($node, true);
+    }
+
+    /** NonDocumentTypeChildNode::$previousElementSibling (#19431). */
+    public static function previousElementSiblingArgv(ObjectEntry $node): ?ObjectEntry
+    {
+        return self::elementSiblingArgv($node, false);
+    }
+
     private static function siblingArgv(ObjectEntry $node, bool $next): ?ObjectEntry
     {
         $node = DomRegistry::entry($node->id) ?? $node;
@@ -103,5 +155,70 @@ final class DomNodeChildPropertyJitHelper
         }
 
         return DomRegistry::entry($sibId);
+    }
+
+    private static function elementSiblingArgv(ObjectEntry $node, bool $next): ?ObjectEntry
+    {
+        $node = DomRegistry::entry($node->id) ?? $node;
+        if (!DomRegistry::has($node)) {
+            return null;
+        }
+        $state = DomRegistry::state($node);
+        if (null === $state->parentId) {
+            return null;
+        }
+        $parent = DomRegistry::entry($state->parentId);
+        if (null === $parent || !DomRegistry::has($parent)) {
+            return null;
+        }
+        $childIds = DomRegistry::state($parent)->childIds;
+        $index = \array_search($node->id, $childIds, true);
+        if (false === $index) {
+            return null;
+        }
+        if ($next) {
+            for ($i = $index + 1, $n = \count($childIds); $i < $n; ++$i) {
+                $sib = DomRegistry::entry($childIds[$i]);
+                if (null !== $sib && VmDom::isElement($sib)) {
+                    return $sib;
+                }
+            }
+
+            return null;
+        }
+        for ($i = $index - 1; $i >= 0; --$i) {
+            $sib = DomRegistry::entry($childIds[$i]);
+            if (null !== $sib && VmDom::isElement($sib)) {
+                return $sib;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param list<int> $childIds */
+    private static function firstElementInChildIds(array $childIds): ?ObjectEntry
+    {
+        foreach ($childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && VmDom::isElement($child)) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    /** @param list<int> $childIds */
+    private static function lastElementInChildIds(array $childIds): ?ObjectEntry
+    {
+        for ($i = \count($childIds) - 1; $i >= 0; --$i) {
+            $child = DomRegistry::entry($childIds[$i]);
+            if (null !== $child && VmDom::isElement($child)) {
+                return $child;
+            }
+        }
+
+        return null;
     }
 }
