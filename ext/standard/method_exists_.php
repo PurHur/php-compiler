@@ -65,7 +65,9 @@ final class method_exists_ extends Internal
 
             return $i1->constInt(0, false);
         }
-        if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
+        // Arg #1 is object|string — do not jitString TYPE_VALUE (locals are value boxes that
+        // may hold objects). Runtime dispatch is in JitMethodExists::invokeFromValueBox (#19616).
+        if (JITVariable::TYPE_STRING === $args[0]->type) {
             $this->jitString($context, $args[0], 'method_exists() class name');
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
