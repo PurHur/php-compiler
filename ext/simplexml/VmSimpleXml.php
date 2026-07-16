@@ -535,16 +535,23 @@ final class VmSimpleXml
             return;
         }
 
+        // php-src zim_simplexmlelement_addAttribute: namespaced attrs require a non-empty prefix
+        // (#19708 — Attribute requires prefix for namespace; leave element unchanged).
         if (null !== $namespace && '' !== $namespace) {
             $colon = strpos($qualifiedName, ':');
-            if (false !== $colon) {
-                $prefix = substr($qualifiedName, 0, $colon);
-                if ('' !== $prefix) {
-                    $xmlnsKey = 'xmlns:'.$prefix;
-                    if (!\array_key_exists($xmlnsKey, $state->attributes)) {
-                        $state->attributes[$xmlnsKey] = $namespace;
-                    }
-                }
+            $prefix = false !== $colon ? substr($qualifiedName, 0, $colon) : '';
+            if ('' === $prefix) {
+                self::warn(
+                    $ctx,
+                    'SimpleXMLElement::addAttribute(): Attribute requires prefix for namespace',
+                    $frame
+                );
+
+                return;
+            }
+            $xmlnsKey = 'xmlns:'.$prefix;
+            if (!\array_key_exists($xmlnsKey, $state->attributes)) {
+                $state->attributes[$xmlnsKey] = $namespace;
             }
         }
 
