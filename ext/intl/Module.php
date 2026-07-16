@@ -54,7 +54,11 @@ class Module extends ModuleAbstract
             $functions[] = new locale_get_script();
         }
         $normalizer = IntlExtensionPolicy::advertisesNormalizer()
-            ? [new normalizer_normalize(), new normalizer_is_normalized()]
+            ? [
+                new normalizer_normalize(),
+                new normalizer_is_normalized(),
+                new normalizer_get_raw_decomposition(),
+            ]
             : [];
         $idn = IntlExtensionPolicy::advertisesIdn()
             ? [new idn_to_ascii(), new idn_to_utf8()]

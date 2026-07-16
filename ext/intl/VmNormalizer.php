@@ -58,6 +58,48 @@ final class VmNormalizer
         };
     }
 
+    /**
+     * php-src normalizer_get_raw_decomposition — UCD Decomposition_Mapping for one code point (#19535).
+     *
+     * @return string|null Decomposition mapping UTF-8, or null when absent / on intl error
+     */
+    public static function getRawDecomposition(
+        string $input,
+        int $form = self::FORM_C,
+        string $function = 'normalizer_get_raw_decomposition'
+    ): ?string {
+        self::assertValidForm($function, 2, $form);
+        IntlError::clear();
+        $codepoints = UnicodeCanonical::utf8Codepoints($input);
+        if (1 !== \count($codepoints)) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                $function.': Input string must be exactly one UTF-8 encoded code point long.: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return null;
+        }
+        $cp = $codepoints[0];
+        if ($cp < 0 || $cp > 0x10FFFF) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                $function.': Code point out of range: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return null;
+        }
+        $parts = UnicodeCanonical::decompose($cp);
+        if (1 === \count($parts) && $parts[0] === $cp) {
+            return null;
+        }
+        $out = '';
+        foreach ($parts as $part) {
+            $out .= UnicodeCanonical::codepointToUtf8($part);
+        }
+
+        return $out;
+    }
+
     public static function parseFormFromFrame(
         \PHPCompiler\Frame $frame,
         int $argIndex,
