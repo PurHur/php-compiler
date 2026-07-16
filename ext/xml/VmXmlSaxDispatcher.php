@@ -12,7 +12,10 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * Invoke registered SAX handlers during xml_parse() (#18203, php-src ext/xml/xml.c).
+ * Invoke registered SAX handlers during xml_parse() (#18203, #19683, php-src ext/xml/xml.c).
+ *
+ * Namespace-aware parsers (xml_parser_create_ns) expand element/attribute names as
+ * uri + separator + localname and strip xmlns declarations from attribute bags.
  */
 final class VmXmlSaxDispatcher
 {
@@ -52,6 +55,10 @@ final class VmXmlSaxDispatcher
 
     private Variable $parserVar;
 
+    /** prefix => uri; empty-string key is the default namespace */
+    /** @var array<string, string> */
+    private array $nsBindings = ['' => ''];
+
     /** @param array<string, mixed> $state */
     private function __construct(Context $ctx, ObjectEntry $parser, array $state, ?Frame $frame)
     {
@@ -74,22 +81,27 @@ final class VmXmlSaxDispatcher
             return $pos;
         }
 
-        $tag = $this->foldTag($open[1]);
+        $rawTag = $open[1];
         $attrSpec = $open[2] ?? '';
         $selfClose = isset($open[3]) && '/' === $open[3];
-        $attrs = self::attributesArray($attrSpec, $this->caseFolding());
+        $savedBindings = $this->nsBindings;
+        $attrs = $this->attributesForHandlers($attrSpec);
+        $tag = $this->expandElementName($rawTag);
         $contentStart = $pos + \strlen($open[0]);
 
         $this->invokeElementStart($tag, $attrs);
 
         if ($selfClose) {
             $this->invokeElementEnd($tag);
+            $this->nsBindings = $savedBindings;
 
             return $contentStart;
         }
 
         $end = VmXml::findElementEndForStruct($data, $pos);
         if (null === $end) {
+            $this->nsBindings = $savedBindings;
+
             return $contentStart;
         }
 
@@ -130,6 +142,7 @@ final class VmXmlSaxDispatcher
         }
 
         $this->invokeElementEnd($tag);
+        $this->nsBindings = $savedBindings;
 
         return $end;
     }
@@ -137,7 +150,7 @@ final class VmXmlSaxDispatcher
     private function invokeElementStart(string $tag, HashTable $attrs): void
     {
         $handler = $this->state['handlers'][XmlParserHandlers::HANDLER_ELEMENT_START] ?? null;
-        $callback = XmlParserHandlers::handlerCallback($this->parser, \is_string($handler) ? $handler : null);
+        $callback = XmlParserHandlers::handlerCallback($this->parser, $handler);
         if (null === $callback) {
             return;
         }
@@ -151,7 +164,7 @@ final class VmXmlSaxDispatcher
     private function invokeElementEnd(string $tag): void
     {
         $handler = $this->state['handlers'][XmlParserHandlers::HANDLER_ELEMENT_END] ?? null;
-        $callback = XmlParserHandlers::handlerCallback($this->parser, \is_string($handler) ? $handler : null);
+        $callback = XmlParserHandlers::handlerCallback($this->parser, $handler);
         if (null === $callback) {
             return;
         }
@@ -163,13 +176,23 @@ final class VmXmlSaxDispatcher
     private function invokeCharacterData(string $text): void
     {
         $handler = $this->state['handlers'][XmlParserHandlers::HANDLER_CHARACTER_DATA] ?? null;
-        $callback = XmlParserHandlers::handlerCallback($this->parser, \is_string($handler) ? $handler : null);
+        $callback = XmlParserHandlers::handlerCallback($this->parser, $handler);
         if (null === $callback) {
             return;
         }
         $dataVar = new Variable();
         $dataVar->string($text);
         VmCallable::invoke($this->ctx, $callback, $this->parserVar, $dataVar);
+    }
+
+    private function nsAware(): bool
+    {
+        return !empty($this->state['nsAware']);
+    }
+
+    private function nsSeparator(): string
+    {
+        return (string) ($this->state['nsSeparator'] ?? ':');
     }
 
     private function foldTag(string $tag): string
@@ -182,23 +205,97 @@ final class VmXmlSaxDispatcher
         return 0 !== ($this->state['options'][XmlConstants::XML_OPTION_CASE_FOLDING] ?? 1);
     }
 
-    private static function attributesArray(string $attrSpec, bool $fold): HashTable
+    /**
+     * Parse attributes, apply xmlns bindings for this element, expand names when NS-aware,
+     * and omit xmlns declarations from the handler attribute bag (expat NS mode).
+     */
+    private function attributesForHandlers(string $attrSpec): HashTable
     {
+        $parsed = self::parseAttributePairs($attrSpec);
+        if ($this->nsAware()) {
+            foreach ($parsed as $name => $value) {
+                if ('xmlns' === $name) {
+                    $this->nsBindings[''] = $value;
+                } elseif (str_starts_with($name, 'xmlns:')) {
+                    $prefix = substr($name, 6);
+                    $this->nsBindings[$prefix] = $value;
+                }
+            }
+        }
+
         $attrs = new HashTable();
+        $fold = $this->caseFolding();
+        foreach ($parsed as $name => $value) {
+            if ($this->nsAware() && ('xmlns' === $name || str_starts_with($name, 'xmlns:'))) {
+                continue;
+            }
+            $expanded = $this->nsAware() ? $this->expandAttributeName($name) : $name;
+            $outName = $fold ? strtoupper($expanded) : $expanded;
+            $val = new Variable();
+            $val->string($value);
+            $attrs->add($outName, $val);
+        }
+
+        return $attrs;
+    }
+
+    private function expandElementName(string $rawTag): string
+    {
+        if (!$this->nsAware()) {
+            return $this->foldTag($rawTag);
+        }
+        $expanded = $this->expandQName($rawTag, true);
+
+        return $this->foldTag($expanded);
+    }
+
+    private function expandAttributeName(string $rawName): string
+    {
+        return $this->expandQName($rawName, false);
+    }
+
+    /**
+     * Expand a QName to uri+sep+local (or local when unbound / no URI).
+     * Element names use the default namespace; attribute names do not (#19683 / expat).
+     */
+    private function expandQName(string $qname, bool $isElement): string
+    {
+        $colon = strpos($qname, ':');
+        if (false !== $colon && 0 !== $colon) {
+            $prefix = substr($qname, 0, $colon);
+            $local = substr($qname, $colon + 1);
+            $uri = $this->nsBindings[$prefix] ?? '';
+            if ('' !== $uri) {
+                return $uri.$this->nsSeparator().$local;
+            }
+
+            return $qname;
+        }
+        if ($isElement) {
+            $uri = $this->nsBindings[''] ?? '';
+            if ('' !== $uri) {
+                return $uri.$this->nsSeparator().$qname;
+            }
+        }
+
+        return $qname;
+    }
+
+    /** @return array<string, string> */
+    private static function parseAttributePairs(string $attrSpec): array
+    {
+        $pairs = [];
         if ('' === trim($attrSpec)) {
-            return $attrs;
+            return $pairs;
         }
         if (preg_match_all('/([A-Za-z_][\w:.-]*)\s*=\s*(?:"([^"]*)"|\'([^\']*)\'|([^\s"\'=<>`]+))/s', $attrSpec, $matches, PREG_SET_ORDER)) {
             foreach ($matches as $match) {
                 $value = '' !== ($match[2] ?? '') ? $match[2] : ('' !== ($match[3] ?? '') ? $match[3] : ($match[4] ?? ''));
-                $val = new Variable();
-                $val->string($value);
-                $name = $fold ? strtoupper($match[1]) : $match[1];
-                $attrs->add($name, $val);
+                $pairs[$match[1]] = $value;
             }
         }
 
-        return $attrs;
+        return $pairs;
     }
 
     private static function skipWhitespace(string $data, int $pos): int

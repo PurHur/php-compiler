@@ -3395,6 +3395,7 @@ require_once __DIR__.'/../../../ext/xml/xml_get_error_code.php';
 require_once __DIR__.'/../../../ext/xml/xml_parse.php';
 require_once __DIR__.'/../../../ext/xml/xml_parse_into_struct.php';
 require_once __DIR__.'/../../../ext/xml/xml_parser_create.php';
+require_once __DIR__.'/../../../ext/xml/xml_parser_create_ns.php';
 require_once __DIR__.'/../../../ext/xml/xml_parser_free.php';
 require_once __DIR__.'/../../../ext/xml/xml_parser_get_option.php';
 require_once __DIR__.'/../../../ext/xml/xml_parser_set_option.php';

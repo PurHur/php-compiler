@@ -33,7 +33,7 @@ final class XmlParserSupport
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
-    public static function createParser(Context $ctx): Variable
+    public static function createParser(Context $ctx, bool $nsAware = false, string $nsSeparator = ':'): Variable
     {
         $class = $ctx->classes[self::CLASS_LC] ?? null;
         if (null === $class) {
@@ -42,7 +42,7 @@ final class XmlParserSupport
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
-        VmXml::initParserState($entry->id);
+        VmXml::initParserState($entry->id, $nsAware, $nsSeparator);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);

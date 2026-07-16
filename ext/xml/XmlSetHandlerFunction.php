@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
 /**
- * Shared wiring for xml_set_* handler registration (php-src ext/xml/xml.c; #18203).
+ * Shared wiring for xml_set_* handler registration (php-src ext/xml/xml.c; #18203, #19343).
  */
 abstract class XmlSetHandlerFunction extends XmlFunction
 {
@@ -19,7 +19,7 @@ abstract class XmlSetHandlerFunction extends XmlFunction
             return;
         }
         $parser = XmlParserSupport::requireParser($frame->calledArgs[0], $this->getName(), 1);
-        $handler = $this->optionalStringHandler($frame->calledArgs[$handlerArgIndex] ?? null);
+        $handler = $this->resolveHandler($frame->calledArgs[$handlerArgIndex] ?? null);
         $frame->returnVar->bool(XmlParserHandlers::setHandler($parser, $slot, $handler));
     }
 
@@ -29,14 +29,17 @@ abstract class XmlSetHandlerFunction extends XmlFunction
             return;
         }
         $parser = XmlParserSupport::requireParser($frame->calledArgs[0], $this->getName(), 1);
-        $start = $this->optionalStringHandler($frame->calledArgs[$startIndex] ?? null);
-        $end = $this->optionalStringHandler($frame->calledArgs[$endIndex] ?? null);
+        $start = $this->resolveHandler($frame->calledArgs[$startIndex] ?? null);
+        $end = $this->resolveHandler($frame->calledArgs[$endIndex] ?? null);
         $ok = XmlParserHandlers::setHandler($parser, $startSlot, $start)
             && XmlParserHandlers::setHandler($parser, $endSlot, $end);
         $frame->returnVar->bool($ok);
     }
 
-    protected function optionalStringHandler(?Variable $arg): ?string
+    /**
+     * Resolve a SAX handler argument to a callable Variable (string name, Closure, or array).
+     */
+    protected function resolveHandler(?Variable $arg): ?Variable
     {
         if (null === $arg) {
             return null;
@@ -46,9 +49,25 @@ abstract class XmlSetHandlerFunction extends XmlFunction
             return null;
         }
         if (Variable::TYPE_STRING === $arg->type) {
-            return $arg->toString();
-        }
+            $name = $arg->toString();
+            if ('' === $name) {
+                return null;
+            }
+            $out = new Variable();
+            $out->string($name);
 
-        return (string) $arg->toString();
+            return $out;
+        }
+        if (Variable::TYPE_OBJECT === $arg->type || Variable::TYPE_ARRAY === $arg->type) {
+            $out = new Variable($arg->type);
+            $out->copyFrom($arg);
+
+            return $out;
+        }
+        // Scalar coercion — Zend converts non-callable scalars to string function names.
+        $out = new Variable();
+        $out->string($arg->toString());
+
+        return $out;
     }
 }

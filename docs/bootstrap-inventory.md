@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5204 |
-| Phase A inventory files (M2 ratio SSOT) | 5204 |
+| PHP files on vm.php path | 5205 |
+| Phase A inventory files (M2 ratio SSOT) | 5205 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14202 |
+| Source constructs flagged (warnings) | 14208 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3300,7 +3300,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/wddx/wddx_serialize_value.php` | 0 | 1 |
 | `ext/wddx/wddx_serialize_vars.php` | 0 | 1 |
 | `ext/xml/BuiltinClasses.php` | 0 | 1 |
-| `ext/xml/Module.php` | 0 | 22 |
+| `ext/xml/Module.php` | 0 | 23 |
 | `ext/xml/VmXml.php` | 0 | 1 |
 | `ext/xml/VmXmlSaxDispatcher.php` | 0 | 9 |
 | `ext/xml/VmXmlStructBuilder.php` | 0 | 18 |
@@ -3308,7 +3308,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/XmlFunction.php` | 0 | 1 |
 | `ext/xml/XmlParserHandlers.php` | 0 | 6 |
 | `ext/xml/XmlParserSupport.php` | 0 | 4 |
-| `ext/xml/XmlSetHandlerFunction.php` | 0 | 1 |
+| `ext/xml/XmlSetHandlerFunction.php` | 0 | 4 |
 | `ext/xml/xml_error_string.php` | 0 | 2 |
 | `ext/xml/xml_get_current_byte_index.php` | 0 | 2 |
 | `ext/xml/xml_get_current_column_number.php` | 0 | 2 |
@@ -3317,6 +3317,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/xml_parse.php` | 0 | 2 |
 | `ext/xml/xml_parse_into_struct.php` | 0 | 4 |
 | `ext/xml/xml_parser_create.php` | 0 | 1 |
+| `ext/xml/xml_parser_create_ns.php` | 0 | 2 |
 | `ext/xml/xml_parser_free.php` | 0 | 2 |
 | `ext/xml/xml_parser_get_option.php` | 0 | 2 |
 | `ext/xml/xml_parser_set_option.php` | 0 | 2 |
@@ -26983,26 +26984,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new xml_parser_create (line 35)
-- new xml_parse (line 36)
-- new xml_parser_free (line 37)
-- new xml_get_error_code (line 38)
-- new xml_error_string (line 39)
-- new xml_get_current_line_number (line 40)
-- new xml_get_current_column_number (line 41)
-- new xml_get_current_byte_index (line 42)
-- new xml_parse_into_struct (line 43)
-- new xml_set_element_handler (line 44)
-- new xml_set_character_data_handler (line 45)
-- new xml_set_default_handler (line 46)
-- new xml_set_processing_instruction_handler (line 47)
-- new xml_set_unparsed_entity_decl_handler (line 48)
-- new xml_set_notation_decl_handler (line 49)
-- new xml_set_external_entity_ref_handler (line 50)
-- new xml_set_start_namespace_decl_handler (line 51)
-- new xml_set_end_namespace_decl_handler (line 52)
-- new xml_set_object (line 53)
-- new xml_parser_set_option (line 54)
-- new xml_parser_get_option (line 55)
+- new xml_parser_create_ns (line 36)
+- new xml_parse (line 37)
+- new xml_parser_free (line 38)
+- new xml_get_error_code (line 39)
+- new xml_error_string (line 40)
+- new xml_get_current_line_number (line 41)
+- new xml_get_current_column_number (line 42)
+- new xml_get_current_byte_index (line 43)
+- new xml_parse_into_struct (line 44)
+- new xml_set_element_handler (line 45)
+- new xml_set_character_data_handler (line 46)
+- new xml_set_default_handler (line 47)
+- new xml_set_processing_instruction_handler (line 48)
+- new xml_set_unparsed_entity_decl_handler (line 49)
+- new xml_set_notation_decl_handler (line 50)
+- new xml_set_external_entity_ref_handler (line 51)
+- new xml_set_start_namespace_decl_handler (line 52)
+- new xml_set_end_namespace_decl_handler (line 53)
+- new xml_set_object (line 54)
+- new xml_parser_set_option (line 55)
+- new xml_parser_get_option (line 56)
 - 2 class method(s)
 
 ### `ext/xml/VmXml.php`
@@ -27013,15 +27015,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/VmXmlSaxDispatcher.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 36)
-- new Variable (line 62)
-- new Variable (line 144)
-- new Variable (line 146)
-- new Variable (line 158)
-- new Variable (line 170)
-- new HashTable (line 187)
-- new Variable (line 194)
-- 9 class method(s)
+- new self (line 39)
+- new Variable (line 69)
+- new Variable (line 157)
+- new Variable (line 159)
+- new Variable (line 171)
+- new Variable (line 183)
+- new HashTable (line 226)
+- new Variable (line 234)
+- 15 class method(s)
 
 ### `ext/xml/VmXmlStructBuilder.php`
 
@@ -27058,12 +27060,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/XmlParserHandlers.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 142)
-- new Variable (line 144)
-- new Variable (line 147)
-- new Variable (line 152)
-- new Variable (line 160)
-- 9 class method(s)
+- new HashTable (line 176)
+- new Variable (line 178)
+- new Variable (line 181)
+- new Variable (line 186)
+- new Variable (line 194)
+- 10 class method(s)
 
 ### `ext/xml/XmlParserSupport.php`
 
@@ -27076,6 +27078,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/XmlSetHandlerFunction.php`
 
 **Warnings** (review for bootstrap subset):
+- new Variable (line 56)
+- new Variable (line 62)
+- new Variable (line 68)
 - 3 class method(s)
 
 ### `ext/xml/xml_error_string.php`
@@ -27125,6 +27130,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/xml_parser_create.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/xml/xml_parser_create_ns.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
 - 2 class method(s)
 
 ### `ext/xml/xml_parser_free.php`
