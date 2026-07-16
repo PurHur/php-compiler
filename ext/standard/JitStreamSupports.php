@@ -17,6 +17,7 @@ final class JitStreamSupports
     public static function invoke(Context $context, Value $handleLong, Value $featureLong): Value
     {
         $savedBlock = \PHPCompiler\JIT\BasicBlockHelper::tryGetInsertBlock($context);
+        StreamIoRuntime::ensureSupportsBridgeLinked($context);
         StreamIoRuntime::ensureLinkedForUserScriptLowering($context);
         StreamCaps::ensureLinked($context);
         if (null !== $savedBlock) {

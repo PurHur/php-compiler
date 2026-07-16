@@ -28,14 +28,11 @@ final class StreamCapsRuntime
 
     private const IS_LOCAL_HELPER = 'PHPCompiler\\ext\\standard\\StreamCapsJitHelper::isLocalArgv';
 
-    private const SUPPORTS_HELPER = 'PHPCompiler\\ext\\standard\\StreamCapsJitHelper::supportsArgv';
-
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::IS_LOCAL_URI_HELPER,
         self::ISATTY_HELPER,
         self::IS_LOCAL_HELPER,
-        self::SUPPORTS_HELPER,
     ];
 
     /** @var list<string> */
@@ -82,6 +79,8 @@ final class StreamCapsRuntime
 
     public static function implement(Context $context): void
     {
+        StreamIoRuntime::ensureSupportsBridgeLinked($context);
+
         if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
 
@@ -100,7 +99,7 @@ final class StreamCapsRuntime
         foreach (self::SINGLE_ARG_ABI_TO_HELPER as $abi => $helper) {
             self::implementSingleArgBridge($context, $abi, $helper);
         }
-        self::implementSupportsBridge($context);
+        StreamIoRuntime::ensureSupportsBridgeLinked($context);
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -122,6 +121,9 @@ final class StreamCapsRuntime
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                return false;
+            }
+            if ('__compiler_stream_supports' === $name && StreamIoRuntime::isDeferStub($fn)) {
                 return false;
             }
         }
@@ -229,42 +231,6 @@ final class StreamCapsRuntime
             $context,
             self::helperFunction($context, $helperLogical),
             [$handleI32]
-        );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i32)
-        );
-        $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementSupportsBridge(Context $context): void
-    {
-        $abiName = '__compiler_stream_supports';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                $abiName,
-                $context->context->functionType($i32, false, $i64, $i64)
-            );
-
-        $entry = $fn->appendBasicBlock('stream_supports_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $handleI32 = $context->builder->trunc($fn->getParam(0), $i32);
-        $featureI32 = $context->builder->trunc($fn->getParam(1), $i32);
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::SUPPORTS_HELPER),
-            [$handleI32, $featureI32]
         );
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i32)

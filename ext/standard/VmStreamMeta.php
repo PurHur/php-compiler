@@ -169,6 +169,30 @@ final class VmStreamMeta
         return !\in_array($uri, ['php://input', 'php://output', 'php://stdin'], true);
     }
 
+    /** stream_supports_lock() — php-src php_stream_supports_lock / plainfile+stdio (#6039, #19462). */
+    public static function supportsLock(string $uri, ?string $mode = null): bool
+    {
+        unset($mode);
+        if ('' === $uri) {
+            return false;
+        }
+        $lower = \strtolower($uri);
+        if (VmPhpMemoryStream::isSupportedUri($uri)) {
+            return false;
+        }
+        if (\in_array($lower, ['php://input', 'php://output', 'php://stdin', 'php://stdout', 'php://stderr'], true)) {
+            return false;
+        }
+        if (self::isSocketTransport($uri)) {
+            return false;
+        }
+        if (\str_starts_with($lower, 'data:') || \str_starts_with($lower, 'php://filter')) {
+            return false;
+        }
+
+        return true;
+    }
+
     /** stream_supports(..., STREAM_META_SEEKABLE) — php-src php_stream_can_seek (PHP 8.4+). */
     public static function supportsSeekable(string $uri): bool
     {

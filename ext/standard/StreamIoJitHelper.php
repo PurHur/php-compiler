@@ -75,4 +75,10 @@ final class StreamIoJitHelper
 
         return (int) $written;
     }
+
+    /** @return 0|1 ABI for __compiler_stream_supports (issue #19462 — same VmFs table as fopen/tmpfile) */
+    public static function supportsArgv(int $handle, int $feature): int
+    {
+        return VmFs::streamSupports($handle, $feature) ? 1 : 0;
+    }
 }
