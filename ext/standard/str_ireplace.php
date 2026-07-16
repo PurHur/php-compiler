@@ -199,12 +199,12 @@ final class str_ireplace extends Internal
         string $paramName
     ): array {
         if (Variable::TYPE_STRING === $var->type || Variable::TYPE_NULL === $var->type) {
-            return [VmString::coerceStringBuiltinArg($arg, $function, $argIndex, $paramName)];
+            return [VmString::coerceStringBuiltinArg($arg, $function, $argIndex, $paramName, 'array|string')];
         }
 
         $needles = [];
         foreach ($var->toArray()->iterateKeyed(true) as [, $value]) {
-            $needles[] = VmString::coerceStringBuiltinArg($value, $function, $argIndex, $paramName);
+            $needles[] = VmString::coerceStringBuiltinArg($value, $function, $argIndex, $paramName, 'array|string');
         }
 
         return $needles;
@@ -221,12 +221,12 @@ final class str_ireplace extends Internal
         string $paramName
     ): array|string {
         if (Variable::TYPE_STRING === $var->type || Variable::TYPE_NULL === $var->type) {
-            return VmString::coerceStringBuiltinArg($arg, $function, $argIndex, $paramName);
+            return VmString::coerceStringBuiltinArg($arg, $function, $argIndex, $paramName, 'array|string');
         }
 
         $values = [];
         foreach ($var->toArray()->iterateKeyed(true) as [, $value]) {
-            $values[] = VmString::coerceStringBuiltinArg($value, $function, $argIndex, $paramName);
+            $values[] = VmString::coerceStringBuiltinArg($value, $function, $argIndex, $paramName, 'array|string');
         }
 
         return $values;
