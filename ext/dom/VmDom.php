@@ -7009,11 +7009,10 @@ final class VmDom
         if (DomConstants::XML_DOCUMENT_NODE === $state->nodeType) {
             return null;
         }
-        if (DomConstants::XML_TEXT_NODE === $state->nodeType
-            || DomConstants::XML_CDATA_SECTION_NODE === $state->nodeType) {
-            return $state->textContent ?? '';
-        }
-        if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
+        // Text / CDATA / Comment / PI / Attr — php-src dom_node_node_value_read (#19455).
+        if (self::isCharacterData($node)
+            || DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType
+            || DomConstants::XML_PROCESSING_INSTRUCTION_NODE === $state->nodeType) {
             return $state->textContent ?? '';
         }
         if (DomConstants::XML_ELEMENT_NODE === $state->nodeType) {
@@ -7021,6 +7020,11 @@ final class VmDom
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
                 if (null === $child) {
+                    continue;
+                }
+                // Comments/PIs do not contribute to Element nodeValue (libxml/php-src).
+                if (self::isCommentNode($child)
+                    || DomConstants::XML_PROCESSING_INSTRUCTION_NODE === DomRegistry::state($child)->nodeType) {
                     continue;
                 }
                 $childValue = self::readNodeValue($child);
@@ -7093,8 +7097,9 @@ final class VmDom
             return '';
         }
         $state = DomRegistry::state($node);
-        if (DomConstants::XML_TEXT_NODE === $state->nodeType
-            || DomConstants::XML_CDATA_SECTION_NODE === $state->nodeType) {
+        // CharacterData + PI — php-src dom_node_text_content_read (#19455).
+        if (self::isCharacterData($node)
+            || DomConstants::XML_PROCESSING_INSTRUCTION_NODE === $state->nodeType) {
             return $state->textContent ?? '';
         }
         if (self::isEntityReference($node)) {
@@ -7106,9 +7111,15 @@ final class VmDom
         $parts = [];
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
-            if (null !== $child) {
-                $parts[] = self::readTextContent($child);
+            if (null === $child) {
+                continue;
             }
+            // Comments/PIs are readable on themselves but omitted from parent textContent.
+            if (self::isCommentNode($child)
+                || DomConstants::XML_PROCESSING_INSTRUCTION_NODE === DomRegistry::state($child)->nodeType) {
+                continue;
+            }
+            $parts[] = self::readTextContent($child);
         }
 
         return implode('', $parts);
