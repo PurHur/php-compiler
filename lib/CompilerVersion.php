@@ -1041,6 +1041,18 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ dereferencable `new` without outer parentheses (`new Class()->m()`, RFC new_without_parentheses).
+     *
+     * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2
+     * (#19684, re-#6974). Forward profile: `PHP_COMPILER_PROFILE=8.4` or stable 8.4.0+.
+     * php-src: Zend/zend_language_parser.y — new_dereferenceable / new_non_dereferenceable.
+     */
+    public static function supportsDereferencableNewWithoutOuterParens(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ try/catch/else — else runs when no exception was thrown (#15817).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2

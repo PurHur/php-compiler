@@ -1,5 +1,19 @@
 --TEST--
-Language: dereferencable `new` without outer parentheses (#6974, PHP 8.4)
+Language: dereferencable `new` without outer parentheses on forward profile (#6974, #19684, PHP 8.4)
+--SKIPIF--
+<?php
+if (!class_exists('PHPCompiler\\CompilerVersion')) {
+    require __DIR__ . '/../../../../vendor/autoload.php';
+}
+if (!PHPCompiler\CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
+    die('skip requires PHP 8.4+ dereferencable new forward profile');
+}
+if (PHP_VERSION_ID < 80400) {
+    die('skip dereferencable new requires PHP 8.4+ Zend for native PHPT');
+}
+?>
+--ENV--
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 declare(strict_types=1);

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5203 |
-| Phase A inventory files (M2 ratio SSOT) | 5203 |
+| PHP files on vm.php path | 5204 |
+| Phase A inventory files (M2 ratio SSOT) | 5204 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14199 |
+| Source constructs flagged (warnings) | 14202 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2326,7 +2326,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamNotification.php` | 0 | 3 |
 | `ext/standard/VmStreamOpenFailure.php` | 0 | 1 |
 | `ext/standard/VmStreamPath.php` | 0 | 1 |
-| `ext/standard/VmStreamSelect.php` | 0 | 6 |
+| `ext/standard/VmStreamSelect.php` | 0 | 7 |
 | `ext/standard/VmStreamSelectGuard.php` | 0 | 1 |
 | `ext/standard/VmStreamSelectPoll.php` | 0 | 1 |
 | `ext/standard/VmStreamSelectPure.php` | 0 | 1 |
@@ -4513,6 +4513,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/MethodVisibility.php` | 0 | 1 |
 | `lib/Module.php` | 0 | 1 |
 | `lib/ModuleAbstract.php` | 0 | 1 |
+| `lib/NewDereferenceableSyntaxRejector.php` | 0 | 2 |
 | `lib/NullSafeLivenessDetector.php` | 0 | 1 |
 | `lib/OpCode.php` | 0 | 1 |
 | `lib/PHPTypes/CompilerTypeReconstructor.php` | 0 | 1 |
@@ -20522,7 +20523,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new PhpMemoryStreamState (line 36)
 - new PhpMemoryStreamState (line 55)
-- 24 class method(s)
+- 25 class method(s)
 
 ### `ext/standard/VmPhpcRunCommandNative.php`
 
@@ -21227,11 +21228,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamSelect.php`
 
 **Warnings** (review for bootstrap subset):
-- new StreamSelectPair (line 63)
-- new StreamSelectPair (line 71)
-- new HashTable (line 80)
-- new Variable (line 86)
-- new Variable (line 91)
+- new StreamSelectPair (line 66)
+- new StreamSelectPair (line 74)
+- new StreamSelectPair (line 83)
+- new HashTable (line 92)
+- new Variable (line 98)
+- new Variable (line 103)
 - 4 class method(s)
 
 ### `ext/standard/VmStreamSelectGuard.php`
@@ -28093,7 +28095,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/NewDereferenceableDesugar.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 20 class method(s)
 - 1 closure(s)
 
 ### `lib/Ast/PipeOperatorDesugar.php`
@@ -29098,7 +29100,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 193 class method(s)
+- 194 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -35039,6 +35041,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 12 class method(s)
 
+### `lib/NewDereferenceableSyntaxRejector.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileFatal (line 31)
+- 1 class method(s)
+
 ### `lib/NullSafeLivenessDetector.php`
 
 **Warnings** (review for bootstrap subset):
@@ -35191,14 +35199,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\standard\Module (line 278)
 - new JIT (line 354)
 - new JITContext (line 368)
-- new SealedClassPreprocessor (line 433)
-- new StaticClassPreprocessor (line 436)
-- new SourcePreprocessor\PropertyHooks (line 439)
-- new State (line 579)
-- new ReflectionProperty (line 606)
-- new ReflectionProperty (line 609)
-- new LintCompiler (line 1020)
-- new Variable (line 1150)
+- new SealedClassPreprocessor (line 434)
+- new StaticClassPreprocessor (line 437)
+- new SourcePreprocessor\PropertyHooks (line 440)
+- new State (line 580)
+- new ReflectionProperty (line 607)
+- new ReflectionProperty (line 610)
+- new LintCompiler (line 1021)
+- new Variable (line 1151)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

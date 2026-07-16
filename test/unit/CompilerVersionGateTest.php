@@ -953,6 +953,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsDereferencableNewWithoutOuterParensFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDereferencableNewWithoutOuterParens());
+    }
+
+    public function testSupportsDereferencableNewWithoutOuterParensTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDereferencableNewWithoutOuterParens());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsCloneWithSyntaxFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsCloneWithSyntax());
