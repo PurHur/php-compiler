@@ -8588,6 +8588,16 @@ class JIT {
                     $this->context->callSiteLine = OpCode::TYPE_ECHO === $op->type
                         ? (int) ($op->arg2 ?? 0)
                         : (int) ($op->arg3 ?? 0);
+                    $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
+                    $echoOp = $block->getOperand($argOffset);
+                    // CFG string Literals must not load include-binding slots: refresh can
+                    // alias inherited locals over slot-backed fromLiteral temps, so
+                    // echo "<html>", "\n" emits $appName/$title (#19504 MiniWebApp AOT).
+                    if ($echoOp instanceof Operand\Literal && \is_string($echoOp->value)) {
+                        JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
+                        JIT\ValueEchoHelper::echoLiteral($this->context, $echoOp->value);
+                        break;
+                    }
                     if ($this->context->inlineIncludeDepth > 0) {
                         JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                     }
@@ -8605,8 +8615,6 @@ class JIT {
                         $this->clearTernaryEchoLiteralMergeState();
                         break;
                     }
-                    $argOffset = $op->type === OpCode::TYPE_ECHO ? $op->arg1 : $op->arg2;
-                    $echoOp = $block->getOperand($argOffset);
                     $echoSlot = $block->slotForOperand($echoOp);
                     if (null !== $echoSlot && isset($this->context->coalesceMergeSlotOperands[$echoSlot])) {
                         $arg = $this->materializeCoalesceMergeSlotArgSend(
