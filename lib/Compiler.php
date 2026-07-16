@@ -16511,12 +16511,16 @@ class Compiler {
             }
             $argRoot = $this->unwrapOperandChain($arg);
             $callArg = $callOp->args[$argIndex] ?? null;
-            // file_put_contents($f, 'a', FILE_APPEND | LOCK_EX) — trailing dead temp must use BitwiseOr (#18523).
-            // Do not steal earlier dead-temp New_ args (DatePeriod start + EXCLUDE|INCLUDE flags, #19735).
+            // Trailing scalar/flag prelude (BitwiseOr, Plus, UnaryMinus, Cast, …) — only last arg (#18523, #19735, #19738).
+            // Do not steal earlier dead-temp New_ args (multi-arg ctor start + options).
             if (
-                ($prev instanceof Op\Expr\BinaryOp\BitwiseOr
-                    || $prev instanceof Op\Expr\BinaryOp\BitwiseAnd
-                    || $prev instanceof Op\Expr\BinaryOp\BitwiseXor)
+                (
+                    $this->isArithmeticInlineCallArgProducer($prev)
+                    || $prev instanceof Op\Expr\UnaryMinus
+                    || $prev instanceof Op\Expr\UnaryPlus
+                    || $prev instanceof Op\Expr\BitwiseNot
+                    || $prev instanceof Op\Expr\Cast
+                )
                 && null !== $callArg
                 && $this->callArgIsDeadInlineTemporary($callArg)
                 && !$this->callArgOperandExpectsArrayProducer($callArg)
@@ -28244,7 +28248,7 @@ class Compiler {
 
     /**
      * True when php-cfg hoisted ≥2 sibling inline New_ producers before a multi-arg ctor (#17524, re-#15124).
-     * Trailing ClassConstFetch/ConstFetch/bitwise option preludes are skipped (#19731).
+     * Trailing ClassConstFetch/ConstFetch/scalar option preludes are skipped (#19731, #19738).
      */
     private function hasSiblingMultiArgInlineNewProducers(Block $block, Op $cfgCallOp): bool
     {
@@ -28263,7 +28267,7 @@ class Compiler {
 
     /**
      * Positional sibling inline New_ → multi-arg ctor/call (#17524, re-#15124 / #14483).
-     * Allows trailing ClassConstFetch/ConstFetch/bitwise options after New_ producers (#19731).
+     * Allows trailing ClassConstFetch/ConstFetch/scalar options after New_ producers (#19731, #19738).
      *
      * @param list<Op\Expr> $producers
      * @param list<Operand|null> $callArgs
@@ -28307,7 +28311,8 @@ class Compiler {
 
     /**
      * Sibling inline New_ stmts immediately before $cfgCallOp (#17524).
-     * Skips trailing ClassConstFetch/ConstFetch and bitwise option preludes (#19731).
+     * Skips trailing ClassConstFetch/ConstFetch and scalar/flag option preludes
+     * (#19731, #19735, #19738) — bitwise, arithmetic, unary, and casts.
      *
      * @return list<Op\Expr\New_>
      */
@@ -28336,18 +28341,24 @@ class Compiler {
     }
 
     /**
-     * Scalar / flag option prelude between sibling New_ args and outer ctor (#19731).
-     * e.g. DatePeriod::INCLUDE_END_DATE or EXCLUDE_START_DATE|INCLUDE_END_DATE.
+     * Scalar / flag option prelude between sibling New_ args and outer ctor (#19731, #19738).
+     * e.g. DatePeriod::INCLUDE_END_DATE, EXCLUDE_START_DATE|INCLUDE_END_DATE, or 1+2 / 1<<2 / -1.
      */
     private function isTrailingInlineNewCtorOptionPrelude(?Op $child): bool
     {
         if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
             return true;
         }
+        if (
+            $child instanceof Op\Expr\UnaryMinus
+            || $child instanceof Op\Expr\UnaryPlus
+            || $child instanceof Op\Expr\BitwiseNot
+            || $child instanceof Op\Expr\Cast
+        ) {
+            return true;
+        }
 
-        return $child instanceof Op\Expr\BinaryOp\BitwiseOr
-            || $child instanceof Op\Expr\BinaryOp\BitwiseAnd
-            || $child instanceof Op\Expr\BinaryOp\BitwiseXor;
+        return $this->isArithmeticInlineCallArgProducer($child);
     }
 
     private function cfgCallOpIndex(Block $block, Op $cfgCallOp): ?int
@@ -38107,9 +38118,10 @@ class Compiler {
         ) {
             return null;
         }
-        // new DatePeriod(..., EXCLUDE_START_DATE|INCLUDE_END_DATE) — BitwiseOr feeds options, not arg #0 (#19735).
+        // Multi-arg ctor/call with trailing scalar/flag prelude — do not bind to arg #0 (#19735, #19738).
+        // Covers BitwiseOr, Plus/Mul/shifts, UnaryMinus, Cast, etc. (isTrailingInlineNewCtorOptionPrelude).
         if (
-            $this->isArithmeticInlineCallArgProducer($prelude)
+            $this->isTrailingInlineNewCtorOptionPrelude($prelude)
             && 0 !== $this->trailingNonEmbeddedCallArgIndex($cfgCallOp)
         ) {
             return null;
@@ -39762,7 +39774,9 @@ class Compiler {
     }
 
     /**
-     * file_put_contents($f, 'a', FILE_APPEND | LOCK_EX) — dead arg temp must use BitwiseOr result, not prior call return (#18523).
+     * Trailing scalar/flag option prelude for multi-arg call/ctor (#18523, #19735, #19738).
+     * file_put_contents(..., FILE_APPEND|LOCK_EX), new C(new X, new Y, 1+2), new C(..., -1), (int) casts.
+     * Dead arg temp must use the prelude result, not prior New_/call return; only the trailing arg binds.
      *
      * @param list<OpCode> $emitOps
      */
@@ -39790,11 +39804,13 @@ class Compiler {
             $assignProducer = $last;
             $last = $last->expr;
         }
-        if (
-            !$last instanceof Op\Expr\BinaryOp\BitwiseOr
-            && !$last instanceof Op\Expr\BinaryOp\BitwiseAnd
-            && !$last instanceof Op\Expr\BinaryOp\BitwiseXor
-        ) {
+        // ConstFetch/ClassConstFetch options use dedicated remaps; bind arithmetic/bitwise/unary/cast here.
+        $isScalarOptionPrelude = $this->isArithmeticInlineCallArgProducer($last)
+            || $last instanceof Op\Expr\UnaryMinus
+            || $last instanceof Op\Expr\UnaryPlus
+            || $last instanceof Op\Expr\BitwiseNot
+            || $last instanceof Op\Expr\Cast;
+        if (!$isScalarOptionPrelude) {
             return null;
         }
         if ($argIndex !== $this->trailingNonEmbeddedCallArgIndex($cfgCallOp)) {
