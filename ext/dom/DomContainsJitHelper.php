@@ -8,7 +8,9 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 
 /**
- * DOMNode::contains() nested helper for user-script AOT (#19507).
+ * DOMNode::contains() — user-script AOT (#19507).
+ *
+ * Returns int 0/1; bridge ABI int64 + caller icmp→int1.
  * php-src: ext/dom/node.c — dom_node_contains
  */
 final class DomContainsJitHelper
@@ -18,11 +20,8 @@ final class DomContainsJitHelper
         unset($ctx);
         $canonical = DomRegistry::entry($node->id) ?? $node;
         $otherCanon = DomRegistry::entry($other->id) ?? $other;
-        if (VmDom::contains($canonical, $otherCanon)) {
-            return 1;
-        }
 
-        return 0;
+        return VmDom::contains($canonical, $otherCanon) ? 1 : 0;
     }
 
     public static function containsNullArgv(Context $ctx, ObjectEntry $node): int

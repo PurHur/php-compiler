@@ -21,6 +21,9 @@ final class DomNodeContains implements Call
             throw new \LogicException('DOMNode::contains() expects receiver and other');
         }
 
-        return DomLivingApiRuntime::invokeContains($context, $args[0], $args[1]);
+        $result = DomLivingApiRuntime::invokeContains($context, $args[0], $args[1]);
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_contains_post_invoke');
+
+        return $result;
     }
 }

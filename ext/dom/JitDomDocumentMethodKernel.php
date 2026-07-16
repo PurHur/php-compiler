@@ -610,8 +610,8 @@ final class JitDomDocumentMethodKernel
                 $context->getTypeFromString('__object__*'),
             ],
             $context->getTypeFromString('int1'),
-            'PHPCompiler\\ext\\dom\\DomContainsJitHelper::containsNullArgv',
-            '/ext/dom/DomContainsJitHelper.php'
+            'PHPCompiler\\ext\\dom\\DomContainsNullJitHelper::containsNullArgv',
+            '/ext/dom/DomContainsNullJitHelper.php'
         );
     }
 
@@ -932,11 +932,7 @@ final class JitDomDocumentMethodKernel
         }
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -992,11 +988,7 @@ final class JitDomDocumentMethodKernel
         }
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -1508,5 +1500,44 @@ final class JitDomDocumentMethodKernel
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    /**
+     * Restore the caller's insert block after bridge emit (mirror JitVmHelperLink::ensureBridge).
+     * Prefer a fresh open block on the caller's function when the saved block is terminated (#19507).
+     */
+    private static function restoreInsertAfterBridge(Context $context, $savedBlock): void
+    {
+        if (null !== $savedBlock) {
+            if (null === $savedBlock->getTerminator()) {
+                $context->builder->positionAtEnd($savedBlock);
+
+                return;
+            }
+            $parent = $savedBlock->getParent();
+            if ($parent instanceof \PHPLLVM\Value\Function_) {
+                $next = $parent->appendBasicBlock('dom_bridge_restore_cont');
+                $context->builder->positionAtEnd($next);
+
+                return;
+            }
+        }
+        $fallback = null;
+        if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {
+            $active = $context->functions[$context->activeFunction];
+            if ($active instanceof \PHPLLVM\Value\Function_) {
+                $fallback = $active;
+            }
+        }
+        if (null === $fallback && $context->main instanceof \PHPLLVM\Value\Function_) {
+            $fallback = $context->main;
+        }
+        if (null !== $fallback && $fallback->countBasicBlocks() > 0) {
+            $next = $fallback->appendBasicBlock('dom_bridge_restore_main_cont');
+            $context->builder->positionAtEnd($next);
+
+            return;
+        }
+        $context->builder->clearInsertionPosition();
     }
 }

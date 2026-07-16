@@ -8,7 +8,9 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 
 /**
- * DOMNode::isEqualNode() nested helper for user-script AOT (#19507).
+ * DOMNode::isEqualNode() — user-script AOT (#19507).
+ *
+ * Returns int 0/1; bridge ABI int64 + caller icmp→int1.
  * php-src: ext/dom/node.c — dom_node_is_equal_node
  */
 final class DomIsEqualNodeJitHelper
@@ -18,10 +20,7 @@ final class DomIsEqualNodeJitHelper
         unset($ctx);
         $canonical = DomRegistry::entry($node->id) ?? $node;
         $otherCanon = DomRegistry::entry($other->id) ?? $other;
-        if (VmDom::isEqualNode($canonical, $otherCanon)) {
-            return 1;
-        }
 
-        return 0;
+        return VmDom::isEqualNode($canonical, $otherCanon) ? 1 : 0;
     }
 }

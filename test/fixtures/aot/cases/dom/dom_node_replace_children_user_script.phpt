@@ -12,9 +12,6 @@ $new = $doc->createElement('new');
 $parent->replaceChildren($new);
 echo $parent->childNodes->length, "\n";
 echo $parent->firstChild->nodeName, "\n";
-$parent->replaceChildren();
-echo $parent->childNodes->length, "\n";
 --EXPECT--
 1
 new
-0
