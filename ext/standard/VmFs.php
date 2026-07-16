@@ -844,6 +844,10 @@ final class VmFs
         $written = VmFsWriteNative::write($path, $data, $flags);
         if (false !== $written) {
             VmStatCache::invalidatePath($path);
+            $parent = \dirname($path);
+            if ('' !== $parent && '.' !== $parent && $parent !== $path) {
+                VmStatCache::invalidatePath($parent);
+            }
         }
 
         return $written;

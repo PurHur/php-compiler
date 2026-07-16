@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
@@ -53,11 +54,15 @@ final class AppendIteratorBuiltin
             'key' => AppendIteratorKey::class,
             'next' => AppendIteratorNext::class,
             'getinneriterator' => AppendIteratorGetInnerIterator::class,
+            'getiteratorindex' => AppendIteratorGetIteratorIndex::class,
+            'getarrayiterator' => AppendIteratorGetArrayIterator::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
         }
         $entry->methodNames['getinneriterator'] = 'getInnerIterator';
+        $entry->methodNames['getiteratorindex'] = 'getIteratorIndex';
+        $entry->methodNames['getarrayiterator'] = 'getArrayIterator';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -99,6 +104,45 @@ final class AppendIteratorBuiltin
         }
 
         return $state['iterators'][$index];
+    }
+
+    public static function iteratorIndex(ObjectEntry $object): int
+    {
+        self::ensureState($object);
+
+        return self::$store[$object->id]['index'];
+    }
+
+    /** @return list<ObjectEntry> */
+    public static function appendedIterators(ObjectEntry $object): array
+    {
+        self::ensureState($object);
+
+        return self::$store[$object->id]['iterators'];
+    }
+
+    public static function createArrayIterator(Frame $frame, ObjectEntry $object): Variable
+    {
+        if (null === $frame->vmContext) {
+            throw new \LogicException('AppendIterator::getArrayIterator() requires VM context');
+        }
+        $class = $frame->vmContext->classes[ArrayIteratorBuiltin::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('ArrayIterator is not registered in this compiler build');
+        }
+        $table = new HashTable();
+        foreach (self::appendedIterators($object) as $index => $inner) {
+            $var = new Variable(Variable::TYPE_OBJECT);
+            $var->object($inner);
+            $table->addIndex($index, $var);
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        SplArrayStorage::init($entry, $table, 0, null, []);
+        $result = new Variable(Variable::TYPE_OBJECT);
+        $result->object($entry);
+
+        return $result;
     }
 
     public static function rewind(Frame $frame, ObjectEntry $object): void
@@ -341,5 +385,47 @@ final class AppendIteratorGetInnerIterator extends VmClassMethod
         } else {
             $frame->returnVar->object($inner);
         }
+    }
+}
+
+final class AppendIteratorGetIteratorIndex extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getIteratorIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            AppendIteratorBuiltin::CLASS_LC,
+            'AppendIterator::getIteratorIndex()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(AppendIteratorBuiltin::iteratorIndex($object));
+    }
+}
+
+final class AppendIteratorGetArrayIterator extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getArrayIterator');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            AppendIteratorBuiltin::CLASS_LC,
+            'AppendIterator::getArrayIterator()'
+        );
+        SplIteratorSupport::copyReturnFrom(
+            $frame,
+            AppendIteratorBuiltin::createArrayIterator($frame, $object)
+        );
     }
 }

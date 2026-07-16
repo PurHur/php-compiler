@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
-use PHPCompiler\ext\standard\StdlibConstants;
-use PHPCompiler\ext\standard\VmInternalCompare;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -96,7 +94,7 @@ final class ArrayIteratorBuiltin
             'natsort' => false,
             'natcasesort' => false,
         ] as $lc => $acceptsFlags) {
-            $entry->methods[$lc] = new ArrayIteratorSortMethod($lc, $acceptsFlags);
+            $entry->methods[$lc] = new SplArraySortMethod(self::CLASS_LC, $lc, $acceptsFlags);
             $entry->methodVisibility[$lc] = $pub;
         }
         foreach (['uasort', 'uksort'] as $lc) {
@@ -517,47 +515,5 @@ final class ArrayIteratorOffsetUnset extends VmClassMethod
             );
         }
         SplArrayStorage::offsetUnset($object, $frame->calledArgs[1]);
-    }
-}
-
-/** @internal */
-final class ArrayIteratorSortMethod extends VmClassMethod
-{
-    public function __construct(
-        private readonly string $methodLc,
-        private readonly bool $acceptsFlags,
-    ) {
-        parent::__construct($methodLc);
-    }
-
-    public function execute(Frame $frame): void
-    {
-        $object = SplIteratorSupport::receiver(
-            $frame,
-            ArrayIteratorBuiltin::CLASS_LC,
-            'ArrayIterator::'.$this->methodLc.'()'
-        );
-        $argc = \count($frame->calledArgs);
-        $method = 'ArrayIterator::'.$this->methodLc.'()';
-        if ($this->acceptsFlags) {
-            if ($argc > 2) {
-                throw new \ArgumentCountError(
-                    $method.' expects at most 1 argument, '.($argc - 1).' given'
-                );
-            }
-            $flags = StdlibConstants::SORT_REGULAR;
-            if ($argc >= 2) {
-                $flags = VmInternalCompare::resolveFrameSortFlags($frame, $method, 1);
-            }
-            SplArrayStorage::sortBacking($object, $this->methodLc, $flags);
-
-            return;
-        }
-        if ($argc > 1) {
-            throw new \ArgumentCountError(
-                $method.' expects exactly 0 arguments, '.($argc - 1).' given'
-            );
-        }
-        SplArrayStorage::sortBacking($object, $this->methodLc);
     }
 }
