@@ -44,9 +44,13 @@ final class VmZipArchive
 
         $entry = new ClassEntry('ZipArchive');
         $entry->isInternal = true;
-        $entry->properties[] = new ClassProperty(self::PROP_STATUS, null, $intProto);
-        $entry->properties[] = new ClassProperty(self::PROP_FILENAME, null, $strProto);
-        $entry->properties[] = new ClassProperty(self::PROP_NUM_FILES, null, $intProto);
+        $entry->properties[] = new ClassProperty(self::PROP_STATUS, null, $intProto, false, $pub, self::CLASS_LC);
+        $entry->properties[] = new ClassProperty(self::PROP_FILENAME, null, $strProto, false, $pub, self::CLASS_LC);
+        $entry->properties[] = new ClassProperty(self::PROP_NUM_FILES, null, $intProto, false, $pub, self::CLASS_LC);
+        // php-src ext/zip/php_zip.c — ZipArchive implements Countable (#19492)
+        if (isset($ctx->classes['countable'])) {
+            $entry->interfaces[] = 'countable';
+        }
 
         foreach (ZipArchiveConstants::CLASS_CONSTANTS as $name => $value) {
             $const = new Variable(Variable::TYPE_INTEGER);
@@ -67,6 +71,7 @@ final class VmZipArchive
             'getfromname' => new ZipArchiveGetFromName(),
             'extractto' => new ZipArchiveExtractTo(),
             'getstatusstring' => new ZipArchiveGetStatusString(),
+            'count' => new ZipArchiveCount(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -399,6 +404,12 @@ final class VmZipArchive
         $state = self::state($entry);
 
         return ZipArchiveConstants::statusString($state->status);
+    }
+
+    /** Countable::count() / ZipArchive::count() — php-src php_zip.c (#19492). */
+    public static function numFiles(ObjectEntry $entry): int
+    {
+        return \count(self::state($entry)->entries);
     }
 
     private static function setStatus(ObjectEntry $entry, ZipArchiveState $state, int $code): void
