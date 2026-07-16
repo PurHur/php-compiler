@@ -2388,11 +2388,19 @@ final class CompilerVersion
     }
 
     /**
-     * ext/bcmath surface visible to extension_loaded()/function_exists() — stable runtime only (#16086).
+     * ext/bcmath surface visible to extension_loaded()/function_exists() (#16086, #19608).
+     *
+     * Match {@see supportsBcmath()} so BcMath\Number / bcadd / extension_loaded('bcmath')
+     * stay paired on forward 8.4 (no phantom class_exists split). Same shape as
+     * {@see advertisesBcround()}.
      */
     public static function advertisesBcmath(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        if (version_compare(self::VERSION, '8.4.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

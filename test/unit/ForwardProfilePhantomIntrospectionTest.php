@@ -92,29 +92,30 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         }
     }
 
-    public function testBcmathCallableButExtensionNotAdvertisedOnForwardProfile(): void
+    public function testBcmathCallableAndAdvertisedOnForwardProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             $this->assertTrue(CompilerVersion::supportsBcmath());
-            $this->assertFalse(CompilerVersion::advertisesBcmath());
+            $this->assertTrue(CompilerVersion::advertisesBcmath());
             $this->assertTrue(CompilerVersion::advertisesBcround());
-            $this->assertFalse(
-                \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('bcmath')
-            );
 
             $runtime = new Runtime();
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('bcmath')
+            );
             $this->assertTrue(isset($runtime->vmContext->functions['bcadd']));
             $this->assertTrue(isset($runtime->vmContext->functions['bcround']));
-            $this->assertFalse(
+            $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($runtime->vmContext, 'bcadd')
             );
             $this->assertTrue(
                 \PHPCompiler\ext\standard\VmReflection::functionExists($runtime->vmContext, 'bcround')
             );
             $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('bcround'));
-            $this->assertFalse(BuiltinIntrospectionPolicy::functionIsAdvertised('bcadd'));
+            $this->assertTrue(BuiltinIntrospectionPolicy::functionIsAdvertised('bcadd'));
+            $this->assertTrue(isset($runtime->vmContext->classes['bcmath\\number']));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
