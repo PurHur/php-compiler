@@ -1070,7 +1070,10 @@ apply_php_cfg_asymmetric_set_visibility_parser_overlay() {
   if [[ ! -f "$parser" || ! -f "$overlay" ]]; then
     return 0
   fi
-  if grep -q 'function extractAsymmetricSetVisibilityFromAttributes' "$parser" 2>/dev/null; then
+  # Method may already exist from a prior apply that only wired promotion (#5059 path).
+  # Always re-check property setVisibility wire — promotion-only trees break lazy-property.
+  if grep -q 'function extractAsymmetricSetVisibilityFromAttributes' "$parser" 2>/dev/null \
+    && grep -qE '\$\w+->setVisibility = \$this->extractAsymmetricSetVisibilityFromAttributes' "$parser" 2>/dev/null; then
     return 0
   fi
   python3 - "$parser" "$overlay" <<'PY'
@@ -1080,17 +1083,15 @@ from pathlib import Path
 parser_path = Path(sys.argv[1])
 method_path = Path(sys.argv[2])
 text = parser_path.read_text()
-if 'function extractAsymmetricSetVisibilityFromAttributes' in text:
-    raise SystemExit(0)
 
-anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
+if 'function extractAsymmetricSetVisibilityFromAttributes' not in text:
+    anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
     {"""
-if anchor not in text:
-    sys.stderr.write("php-cfg-asymmetric-set-visibility: parseExpr_Yield anchor not found in Parser.php\n")
-    raise SystemExit(1)
-
-insert = method_path.read_text().rstrip("\n") + "\n\n"
-text = text.replace(anchor, insert + anchor, 1)
+    if anchor not in text:
+        sys.stderr.write("php-cfg-asymmetric-set-visibility: parseExpr_Yield anchor not found in Parser.php\n")
+        raise SystemExit(1)
+    insert = method_path.read_text().rstrip("\n") + "\n\n"
+    text = text.replace(anchor, insert + anchor, 1)
 
 param_needles = [
     "            $p->promotionReadonly = (bool) ($param->flags & Stmt\\Class_::MODIFIER_READONLY);\n",
@@ -1108,11 +1109,14 @@ prop_needles = [
     "            $prop->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n",
     "            $property->readonly = 0 !== ($node->flags & Node\\Stmt\\Class_::MODIFIER_READONLY);\n",
 ]
-prop_insert_suffix = "            $prop->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($prop->getAttributes());\n"
 for prop_needle in prop_needles:
     if prop_needle in text and 'setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes' not in text:
         if '$prop->propertyFlags' in prop_needle:
-            text = text.replace(prop_needle, prop_needle + prop_insert_suffix, 1)
+            text = text.replace(
+                prop_needle,
+                prop_needle + "            $prop->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($prop->getAttributes());\n",
+                1,
+            )
         elif '$cfgProp->readonly' in prop_needle:
             text = text.replace(
                 prop_needle,
@@ -1154,7 +1158,9 @@ apply_php_cfg_asymmetric_get_visibility_parser_overlay() {
   if [[ ! -f "$parser" || ! -f "$overlay" ]]; then
     return 0
   fi
-  if grep -q 'function extractAsymmetricGetVisibilityFromAttributes' "$parser" 2>/dev/null; then
+  # Method may exist while Stmt\\Property getVisibility wire was skipped (promotion-only).
+  if grep -q 'function extractAsymmetricGetVisibilityFromAttributes' "$parser" 2>/dev/null \
+    && grep -qE '\$\w+->getVisibility = \$this->extractAsymmetricGetVisibilityFromAttributes' "$parser" 2>/dev/null; then
     return 0
   fi
   python3 - "$parser" "$overlay" <<'PY'
@@ -1164,17 +1170,15 @@ from pathlib import Path
 parser_path = Path(sys.argv[1])
 method_path = Path(sys.argv[2])
 text = parser_path.read_text()
-if 'function extractAsymmetricGetVisibilityFromAttributes' in text:
-    raise SystemExit(0)
 
-anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
+if 'function extractAsymmetricGetVisibilityFromAttributes' not in text:
+    anchor = """    protected function parseExpr_Yield(Expr\\Yield_ $expr)
     {"""
-if anchor not in text:
-    sys.stderr.write("php-cfg-asymmetric-get-visibility: parseExpr_Yield anchor not found in Parser.php\n")
-    raise SystemExit(1)
-
-insert = method_path.read_text().rstrip("\n") + "\n\n"
-text = text.replace(anchor, insert + anchor, 1)
+    if anchor not in text:
+        sys.stderr.write("php-cfg-asymmetric-get-visibility: parseExpr_Yield anchor not found in Parser.php\n")
+        raise SystemExit(1)
+    insert = method_path.read_text().rstrip("\n") + "\n\n"
+    text = text.replace(anchor, insert + anchor, 1)
 
 param_needles = [
     "            $p->promotionSetVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($p->getAttributes());\n",
@@ -1189,6 +1193,8 @@ prop_needles = [
     "            $prop->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($prop->getAttributes());\n",
     "            $cfgProp->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($cfgProp->getAttributes());\n",
     "            $property->setVisibility = $this->extractAsymmetricSetVisibilityFromAttributes($property->getAttributes());\n",
+    # Fallback when setVisibility wire was never applied — still recover get after flags.
+    "            $prop->propertyFlags = $node->flags;\n",
 ]
 for prop_needle in prop_needles:
     if prop_needle in text and 'getVisibility = $this->extractAsymmetricGetVisibilityFromAttributes' not in text:
@@ -1274,14 +1280,29 @@ import sys
 from pathlib import Path
 path = Path(sys.argv[1])
 text = path.read_text()
-# Vendor may use $prop or $cfgProp depending on php-cfg revision / readonly overlay.
-pat = re.compile(
-    r"^([ \t]*)\$(prop|cfgProp)->getVisibility = \$this->extractAsymmetricGetVisibilityFromAttributes\(\$\2->getAttributes\(\)\);\n",
-    re.M,
-)
-m = pat.search(text)
+# Prefer getVisibility wire (#5059); fall back to setVisibility / propertyFlags when
+# asymmetric overlays only wired constructor promotion (Stmt\\Property left bare).
+patterns = [
+    re.compile(
+        r"^([ \t]*)\$(prop|cfgProp|property)->getVisibility = \$this->extractAsymmetricGetVisibilityFromAttributes\(\$\2->getAttributes\(\)\);\n",
+        re.M,
+    ),
+    re.compile(
+        r"^([ \t]*)\$(prop|cfgProp|property)->setVisibility = \$this->extractAsymmetricSetVisibilityFromAttributes\(\$\2->getAttributes\(\)\);\n",
+        re.M,
+    ),
+    re.compile(
+        r"^([ \t]*)\$(prop|cfgProp|property)->propertyFlags = \$node->flags;\n",
+        re.M,
+    ),
+]
+m = None
+for pat in patterns:
+    m = pat.search(text)
+    if m:
+        break
 if not m:
-    sys.stderr.write("php-cfg-lazy-property: Parser getVisibility anchor missing\n")
+    sys.stderr.write("php-cfg-lazy-property: Parser getVisibility/setVisibility/propertyFlags anchor missing\n")
     raise SystemExit(1)
 indent, var = m.group(1), m.group(2)
 wire = f"{indent}${var}->propertyLazy = $this->extractLazyPropertyFromAttributes(${var}->getAttributes());\n"
