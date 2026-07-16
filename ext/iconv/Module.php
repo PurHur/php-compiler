@@ -37,6 +37,7 @@ class Module extends ModuleAbstract
             new iconv_get_encoding(),
             new iconv_set_encoding(),
             new iconv_mime_decode(),
+            new iconv_mime_decode_headers(),
             new iconv_mime_encode(),
         ];
     }

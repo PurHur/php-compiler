@@ -7,4 +7,4 @@ declare(strict_types=1);
 stripcslashes(null);
 --EXPECT--
 --EXPECT_EXIT--
-134
+255

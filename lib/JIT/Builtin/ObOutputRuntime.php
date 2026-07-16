@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
+use PHPCompiler\ext\standard\JitObOutputKernel;
 use PHPCompiler\JIT\Context;
 
-/** JIT/AOT ob_* dispatch — standalone routes through ObOutputJitBridge (#9268, #13571). */
+/** JIT/AOT ob_* dispatch — standalone routes through ObOutputJitBridge (#9268, #13571, #19422). */
 final class ObOutputRuntime
 {
     public static function ensureLinked(Context $context): void
@@ -25,7 +25,7 @@ final class ObOutputRuntime
             return;
         }
 
-        if (ObOutputUserScriptLlvm::shouldUse($context)) {
+        if (JitObOutputKernel::shouldUse($context)) {
             ObOutputExecCaptureRuntime::ensureLinked($context);
             self::ensureObReadApiLinked($context);
 
@@ -37,7 +37,7 @@ final class ObOutputRuntime
 
     private static function ensureObReadApiLinked(Context $context): void
     {
-        if (!ObOutputUserScriptLlvm::shouldUse($context)) {
+        if (!JitObOutputKernel::shouldUse($context)) {
             return;
         }
         ObOutputExecCaptureRuntime::ensureReadApiLinked($context);

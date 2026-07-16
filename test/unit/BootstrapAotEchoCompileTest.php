@@ -47,7 +47,7 @@ final class BootstrapAotEchoCompileTest extends TestCase
         self::assertStringContainsString(
             'Hello Bootstrap',
             \implode("\n", $runOut),
-            'bootstrap-aot echo must reach STDOUT via ObOutputUserScriptLlvm (#14459)'
+            'bootstrap-aot echo must reach STDOUT via JitObOutputKernel (#14459, #19422)'
         );
 
         @\unlink($out);

@@ -115,6 +115,18 @@ final class RecursiveArrayIteratorBuiltin
         return $var;
     }
 
+    /** Zend FE_RESET_RW allow-list for array-backed RecursiveArrayIterator (#19444). */
+    public static function allowsForeachByRef(ObjectEntry $object): bool
+    {
+        return isset(self::$store[$object->id]);
+    }
+
+    /** Live HashTable entry for foreach by-ref write-through (#19444). */
+    public static function foreachCurrentByRef(ObjectEntry $object): Variable
+    {
+        return self::current($object);
+    }
+
     public static function key(ObjectEntry $object): int|string
     {
         $state = self::state($object);
