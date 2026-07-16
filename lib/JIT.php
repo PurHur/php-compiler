@@ -10316,6 +10316,17 @@ class JIT {
                                 );
                                 $this->context->scope->toCall = $this->context->functionProxies['simplexmlelement::__construct'];
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
+                            } elseif ($classOp instanceof Operand\Literal
+                                && JIT\RandomizerInstanceMethodJit::isUserScriptAot()
+                                && (
+                                    0 === strcasecmp(ltrim($classOp->value, '\\'), 'Random\\Engine\\Mt19937')
+                                    || 0 === strcasecmp(ltrim($classOp->value, '\\'), 'Random\\Randomizer')
+                                )
+                            ) {
+                                $ctorProxy = strtolower(ltrim($classOp->value, '\\')).'::__construct';
+                                JIT\RandomizerInstanceMethodJit::ensureProxy($this->context, $ctorProxy);
+                                $this->context->scope->toCall = $this->context->functionProxies[$ctorProxy];
+                                $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
                             } elseif ($this->context->type->object->hasConstructor($classId)) {
                                 $proxyName = strtolower($resolvedName).'::'.'__construct';
                                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
@@ -15666,6 +15677,12 @@ class JIT {
         ) {
             JIT\SimpleXmlInstanceMethodJit::ensureProxy($this->context, $proxyName);
         }
+        // Register Randomizer user-script AOT proxies before functionIsRegistered (#19574).
+        if (JIT\RandomizerInstanceMethodJit::isRandomizerInstanceMethodProxy($proxyName)
+            && JIT\RandomizerInstanceMethodJit::isUserScriptAot()
+        ) {
+            JIT\RandomizerInstanceMethodJit::ensureProxy($this->context, $proxyName);
+        }
         $receiverVar = $this->context->getVariableFromOp($receiverOp);
         $receiverVar = $this->resolveUserScriptDomDocumentReceiver(
             $block,
@@ -15738,6 +15755,17 @@ class JIT {
             }
             if (JIT\DomInstanceMethodJit::isDomInstanceMethodProxy($proxyName)) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, $proxyName);
+                if ($this->context->functionIsRegistered($proxyName)) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
+            if (JIT\RandomizerInstanceMethodJit::isRandomizerInstanceMethodProxy($proxyName)
+                && JIT\RandomizerInstanceMethodJit::isUserScriptAot()
+            ) {
+                JIT\RandomizerInstanceMethodJit::ensureProxy($this->context, $proxyName);
                 if ($this->context->functionIsRegistered($proxyName)) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                     $this->context->scope->args = [$receiverVar];
