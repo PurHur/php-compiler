@@ -1241,6 +1241,7 @@ require_once __DIR__.'/../../../ext/standard/GetParentClassJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetcwdJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetdateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetenvJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/JitGetenvKernel.php';
 require_once __DIR__.'/../../../ext/standard/GethostbyaddrJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GethostbynamelJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetimagesizeJitHelper.php';
