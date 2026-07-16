@@ -574,6 +574,108 @@ final class SocketsLibcThinAbi
         return null;
     }
 
+    /** CMSG_ALIGN — Linux glibc (#6333). */
+    public static function cmsgAlign(int $len): int
+    {
+        $align = 8; // sizeof(size_t) on x86_64
+
+        return ($len + $align - 1) & ~($align - 1);
+    }
+
+    /** CMSG_SPACE — buffer size for ancillary data (#6333). */
+    public static function cmsgSpace(int $dataLen): int
+    {
+        // sizeof(struct cmsghdr) == 16 on Linux x86_64
+        return self::cmsgAlign($dataLen) + self::cmsgAlign(16);
+    }
+
+    /**
+     * sendmsg(2) with scatter/gather iov and optional control buffer (#6333).
+     *
+     * @param list<string> $iov
+     */
+    public static function sendmsg(int $fd, array $iov, string $control, int $flags): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+        $n = \count($iov);
+        if ($n <= 0) {
+            return 0;
+        }
+        $iovec = $ffi->new('struct iovec['.$n.']');
+        $bufs = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $payload = $iov[$i];
+            $len = \strlen($payload);
+            $buf = $ffi->new('char['.($len > 0 ? $len : 1).']');
+            if ($len > 0) {
+                \FFI::memcpy($buf, $payload, $len);
+            }
+            $bufs[] = $buf; // keep alive for call duration
+            $iovec[$i]->iov_base = \FFI::addr($buf[0]);
+            $iovec[$i]->iov_len = $len;
+        }
+        $msg = $ffi->new('struct msghdr');
+        $ffi->memset(\FFI::addr($msg), 0, \FFI::sizeof($msg));
+        $msg->msg_iov = \FFI::addr($iovec[0]);
+        $msg->msg_iovlen = $n;
+        $cbufKeep = null;
+        if ('' !== $control) {
+            $clen = \strlen($control);
+            $cbufKeep = $ffi->new('char['.$clen.']');
+            \FFI::memcpy($cbufKeep, $control, $clen);
+            $msg->msg_control = \FFI::addr($cbufKeep[0]);
+            $msg->msg_controllen = $clen;
+        }
+
+        return (int) $ffi->sendmsg($fd, \FFI::addr($msg), $flags);
+    }
+
+    /**
+     * recvmsg(2) — returns bytes + payload string + control bytes + flags (#6333).
+     *
+     * @return array{0: int, 1: string, 2: string, 3: int}|false
+     */
+    public static function recvmsg(int $fd, int $bufferSize, int $controllen, int $flags): array|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        if ($bufferSize < 1) {
+            $bufferSize = 1;
+        }
+        $buf = $ffi->new('char['.$bufferSize.']');
+        $iovec = $ffi->new('struct iovec');
+        $iovec->iov_base = \FFI::addr($buf[0]);
+        $iovec->iov_len = $bufferSize;
+        $msg = $ffi->new('struct msghdr');
+        $ffi->memset(\FFI::addr($msg), 0, \FFI::sizeof($msg));
+        $msg->msg_iov = \FFI::addr($iovec);
+        $msg->msg_iovlen = 1;
+        $cbuf = null;
+        if ($controllen > 0) {
+            $cbuf = $ffi->new('char['.$controllen.']');
+            $ffi->memset($cbuf, 0, $controllen);
+            $msg->msg_control = \FFI::addr($cbuf[0]);
+            $msg->msg_controllen = $controllen;
+        }
+        $n = (int) $ffi->recvmsg($fd, \FFI::addr($msg), $flags);
+        if ($n < 0) {
+            return false;
+        }
+        $data = 0 === $n ? '' : \FFI::string($buf, $n);
+        $controlOut = '';
+        $outLen = (int) $msg->msg_controllen;
+        if ($outLen > 0 && null !== $cbuf) {
+            $controlOut = \FFI::string($cbuf, $outLen);
+        }
+
+        return [$n, $data, $controlOut, (int) $msg->msg_flags];
+    }
+
     /**
      * @param 'getsockname'|'getpeername' $which
      *
@@ -695,6 +797,21 @@ int sockatmark(int sockfd);
 int shutdown(int sockfd, int how);
 int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
 void freeaddrinfo(struct addrinfo *res);
+struct iovec {
+    void *iov_base;
+    unsigned long iov_len;
+};
+struct msghdr {
+    void *msg_name;
+    unsigned int msg_namelen;
+    struct iovec *msg_iov;
+    unsigned long msg_iovlen;
+    void *msg_control;
+    unsigned long msg_controllen;
+    int msg_flags;
+};
+long sendmsg(int sockfd, const struct msghdr *msg, int flags);
+long recvmsg(int sockfd, struct msghdr *msg, int flags);
 struct pollfd {
     int fd;
     short events;
