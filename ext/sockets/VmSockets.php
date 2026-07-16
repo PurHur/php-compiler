@@ -640,6 +640,144 @@ final class VmSockets
     }
 
     /**
+     * php-src: PHP_FUNCTION(socket_getsockname) — AF_INET (#6248).
+     *
+     * @return array{0: string, 1: int}|false
+     */
+    public static function getsockname(ObjectEntry $object, Frame $frame): array|false
+    {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+        $name = SocketsLibcThinAbi::getsocknameInet($fd);
+        if (false === $name) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError($object, $errno);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_getsockname(): unable to retrieve socket name [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
+
+            return false;
+        }
+        self::$socketErrors[$object->id] = 0;
+
+        return $name;
+    }
+
+    /**
+     * php-src: PHP_FUNCTION(socket_getpeername) — AF_INET (#6248).
+     *
+     * @return array{0: string, 1: int}|false
+     */
+    public static function getpeername(ObjectEntry $object, Frame $frame): array|false
+    {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+        $name = SocketsLibcThinAbi::getpeernameInet($fd);
+        if (false === $name) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError($object, $errno);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_getpeername(): unable to retrieve peer name [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
+
+            return false;
+        }
+        self::$socketErrors[$object->id] = 0;
+
+        return $name;
+    }
+
+    /**
+     * php-src: PHP_FUNCTION(socket_sendto) — AF_INET (#6248).
+     */
+    public static function sendto(
+        ObjectEntry $object,
+        string $data,
+        int $length,
+        int $flags,
+        string $addr,
+        int $port,
+        Frame $frame
+    ): int|false {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+        if ($length < 0) {
+            $length = 0;
+        }
+        if ($length > \strlen($data)) {
+            $length = \strlen($data);
+        }
+        $n = SocketsLibcThinAbi::sendtoInet($fd, $data, $length, $flags, $addr, $port);
+        if ($n < 0) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError($object, $errno);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_sendto(): unable to write to socket [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
+
+            return false;
+        }
+        self::$socketErrors[$object->id] = 0;
+
+        return $n;
+    }
+
+    /**
+     * php-src: PHP_FUNCTION(socket_recvfrom) — AF_INET (#6248).
+     *
+     * @return array{0: string, 1: string, 2: int}|false
+     */
+    public static function recvfrom(ObjectEntry $object, int $length, int $flags, Frame $frame): array|false
+    {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+        if ($length < 0) {
+            $length = 0;
+        }
+        $got = SocketsLibcThinAbi::recvfromInet($fd, $length, $flags);
+        if (false === $got) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError($object, $errno);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_recvfrom(): unable to read from socket [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
+
+            return false;
+        }
+        self::$socketErrors[$object->id] = 0;
+
+        return $got;
+    }
+
+    /**
      * @return array<int, string> fd => socket:[inode]
      */
     public static function enumerateSocketFds(): array
