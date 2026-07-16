@@ -918,6 +918,7 @@
         "ext/sockets/socket_create_pair.php",
         "ext/sockets/socket_export_stream.php",
         "ext/sockets/socket_get_option.php",
+        "ext/sockets/socket_getopt.php",
         "ext/sockets/socket_getpeername.php",
         "ext/sockets/socket_getsockname.php",
         "ext/sockets/socket_import_stream.php",
@@ -929,6 +930,8 @@
         "ext/sockets/socket_set_block.php",
         "ext/sockets/socket_set_nonblock.php",
         "ext/sockets/socket_set_option.php",
+        "ext/sockets/socket_setopt.php",
+        "ext/sockets/socket_shutdown.php",
         "ext/sockets/socket_strerror.php",
         "ext/sockets/socket_write.php",
         "ext/sodium/JitSodium.php",
@@ -5254,9 +5257,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5020,
+        "inventory_files": 5023,
         "excluded": 0,
-        "eligible": 5020,
+        "eligible": 5023,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
