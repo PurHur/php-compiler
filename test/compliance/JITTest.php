@@ -1125,12 +1125,14 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsDomLivingStandardNamespace()
-                && str_contains($name, 'dom_html_document')
-                && !str_contains($name, 'dom_html_document_phantom')) {
+                && (str_contains($name, 'dom_html_document') || str_contains($name, 'dom_xml_document'))
+                && !str_contains($name, 'dom_html_document_phantom')
+                && !str_contains($name, 'dom_xml_document_phantom')) {
                 continue;
             }
             if (CompilerVersion::supportsDomLivingStandardNamespace()
-                && str_contains($name, 'dom_html_document_phantom')) {
+                && (str_contains($name, 'dom_html_document_phantom')
+                    || str_contains($name, 'dom_xml_document_phantom'))) {
                 continue;
             }
             // ?-> LLVM lowering verified in NullsafeJitCompileTest (#3219); MCJIT execute needs jit-runtime-probe (#98).
