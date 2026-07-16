@@ -57,6 +57,17 @@ final class MultipartRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('MultipartRuntimeUserScriptLlvm.php', $spine);
     }
 
+    /** General-boundary RPB AOT uses strncmp-walk finders — not libc strstr (#19628). */
+    public function testJitMultipartKernelUsesStrncmpWalkNotStrstr(): void
+    {
+        $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitMultipartKernel.php');
+        $this->assertStringContainsString('__compiler_rpb_mp_find_v1', $kernel);
+        $this->assertStringContainsString('; name="', $kernel);
+        $this->assertStringContainsString('/tmp/phpc_rpb_multipart_up.txt', $kernel);
+        $this->assertStringNotContainsString("lookupFunction('strstr')", $kernel);
+        $this->assertStringNotContainsString("lookupFunction('mkstemp')", $kernel);
+    }
+
     /** isset($_FILES['field']) must use offsetIsSet — upload slots are nested hashtables (#15624). */
     public function testIssetOnFilesSuperglobalUsesOffsetIsSetNotPeekStringKey(): void
     {

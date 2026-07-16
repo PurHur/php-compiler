@@ -23,7 +23,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for multipart POST populate in user-script CGI refresh (#15624, #19454).
  *
  * User-script thin AOT uses {@see MultipartNativeJitHelper} (no nested MultipartParser JIT).
- * Deferred RPB fixture LLVM lives in {@see JitMultipartKernel} (ext/standard).
+ * Deferred RPB multipart LLVM lives in {@see JitMultipartKernel} (ext/standard) —
+ * general rfc1867 boundaries via strncmp-walk (#19628), not Nested MultipartNativeJitHelper.
  * php-src: main/rfc1867.c
  */
 final class MultipartRuntime
