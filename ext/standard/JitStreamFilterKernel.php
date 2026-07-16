@@ -2,20 +2,24 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream_filter_* via StreamFilterJitHelper PHP (#9047).
+ * JIT/AOT ABI bridges for stream_filter_* via StreamFilterJitHelper PHP (#9047, #19644).
+ *
+ * Quarantined from lib/JIT/Builtin/StreamFilterJit — {@see \PHPCompiler\JIT\Builtin\StreamFilter}
+ * stays the thin orchestrator. Call-site lowering stays in {@see JitStreamFilter}.
  *
  * php-src: ext/standard/streamsfuncs.c — stream_filter_append/prepend/remove/register
  */
-final class StreamFilterJit
+final class JitStreamFilterKernel
 {
     private const HELPER_PATH = '/ext/standard/StreamFilterJitHelper.php';
 
@@ -262,7 +266,7 @@ final class StreamFilterJit
         }
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $real = \realpath($path) ?: $path;
             if ($context->hasJitIncludedFileCompiled($real)) {
