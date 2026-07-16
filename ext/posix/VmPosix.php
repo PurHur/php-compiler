@@ -543,6 +543,20 @@ final class VmPosix
         return $pgid;
     }
 
+    /**
+     * posix_getpgrp() — process group of calling process (#19475).
+     * php-src: getpgrp() ≡ getpgid(0) on Linux.
+     */
+    public static function getpgrp(): int
+    {
+        $pgid = self::getpgid(0);
+        if (false === $pgid) {
+            throw new \Error('posix_getpgrp() is not available in this compiler build');
+        }
+
+        return $pgid;
+    }
+
     public static function setpgid(int $pid, int $pgid): bool
     {
         self::$lastError = 0;

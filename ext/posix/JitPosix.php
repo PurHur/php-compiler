@@ -135,6 +135,11 @@ final class JitPosix
         return PosixSessionRuntime::getpgid($context, $pidArg);
     }
 
+    public static function getpgrp(Context $context): Value
+    {
+        return PosixSessionRuntime::getpgrp($context);
+    }
+
     /** posix_setsid() — create session (php-src ext/posix/posix.c; #9218 JIT). */
     public static function setsid(Context $context): Value
     {

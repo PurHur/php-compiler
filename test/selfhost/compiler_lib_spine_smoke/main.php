@@ -846,6 +846,7 @@ require_once __DIR__.'/../../../ext/posix/posix_getgrnam.php';
 require_once __DIR__.'/../../../ext/posix/posix_getgroups.php';
 require_once __DIR__.'/../../../ext/posix/posix_getlogin.php';
 require_once __DIR__.'/../../../ext/posix/posix_getpgid.php';
+require_once __DIR__.'/../../../ext/posix/posix_getpgrp.php';
 require_once __DIR__.'/../../../ext/posix/posix_getpid.php';
 require_once __DIR__.'/../../../ext/posix/posix_getppid.php';
 require_once __DIR__.'/../../../ext/posix/posix_getpwnam.php';
