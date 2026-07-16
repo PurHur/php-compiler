@@ -19,6 +19,7 @@ final class XmlWriterInstanceMethodJit
         'xmlwriter::endelement' => true,
         'xmlwriter::enddocument' => true,
         'xmlwriter::outputmemory' => true,
+        'xmlwriter::flush' => true,
     ];
 
     public static function isXmlWriterInstanceMethodProxy(string $proxyName): bool

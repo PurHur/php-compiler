@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 
-/** XMLWriter::flush() — write URI buffer to disk (php-src ext/xmlwriter/php_xmlwriter.c; #6065). */
+/** XMLWriter::flush() — memory string / URI byte count (php-src ext/xmlwriter/php_xmlwriter.c; #6065, #19385). */
 final class XmlWriterFlush extends XmlWriterClassMethod
 {
     public function __construct()
@@ -19,9 +19,17 @@ final class XmlWriterFlush extends XmlWriterClassMethod
     public function execute(Frame $frame): void
     {
         $entry = $this->receiver($frame, 'XMLWriter::flush()');
-        $ok = VmXmlWriter::flush($entry);
-        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
-            $ret->bool($ok);
+        $empty = true;
+        if (\count($frame->calledArgs) > 1) {
+            $empty = $frame->calledArgs[1]->resolveIndirect()->toBool();
+        }
+        $result = VmXmlWriter::flush($entry, $empty);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
+            if (\is_string($result)) {
+                $ret->string($result);
+            } else {
+                $ret->int((int) $result);
+            }
         });
     }
 }

@@ -22,6 +22,7 @@ final class JitXmlWriterMethod
             'endelement' => JitXmlWriterUserScript::tryEndElement($context, ...$args),
             'enddocument' => JitXmlWriterUserScript::tryEndDocument($context, ...$args),
             'outputmemory' => JitXmlWriterUserScript::tryOutputMemory($context, ...$args),
+            'flush' => JitXmlWriterUserScript::tryFlush($context, ...$args),
             default => null,
         };
         if (null === $result) {
