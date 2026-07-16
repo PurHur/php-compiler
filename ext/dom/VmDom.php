@@ -2272,7 +2272,14 @@ final class VmDom
         $decl = self::parseXmlDeclaration($trimmed);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
         $generalEntities = self::parseDoctypeGeneralEntities($trimmed);
-        [$elementXml, $elementOffset] = self::stripDoctypeWithOffset($trimmed);
+        $parts = self::splitXmlDocumentParts($trimmed);
+        if (null === $parts) {
+            self::reportDomLibxmlError($ctx, 'Malformed XML document', 4, 1, $frame);
+
+            return false;
+        }
+        $elementXml = $parts['rootXml'];
+        $elementOffset = $parts['rootOffset'];
         $validationErrors = VmXml::validationErrorRecords($elementXml);
         if ([] !== $validationErrors) {
             foreach ($validationErrors as $validationError) {
@@ -2299,19 +2306,27 @@ final class VmDom
 
         $state = DomRegistry::state($document);
         $childIds = [];
-        $doctypeDecl = self::parseDoctypeDeclaration($trimmed);
-        if (null !== $doctypeDecl) {
+        foreach ($parts['miscBefore'] as $misc) {
+            $childIds[] = self::attachDocumentMiscChild($ctx, $document, $misc)->id;
+        }
+        if (null !== $parts['doctype']) {
             $doctype = self::attachDoctypeChild(
                 $ctx,
                 $document,
-                $doctypeDecl['name'],
-                $doctypeDecl['publicId'],
-                $doctypeDecl['systemId']
+                $parts['doctype']['name'],
+                $parts['doctype']['publicId'],
+                $parts['doctype']['systemId']
             );
             $childIds[] = $doctype->id;
             self::populateDoctypeInternalSubset($ctx, $doctype, $document, $trimmed);
         }
+        foreach ($parts['miscBetween'] as $misc) {
+            $childIds[] = self::attachDocumentMiscChild($ctx, $document, $misc)->id;
+        }
         $childIds[] = $root->id;
+        foreach ($parts['miscAfter'] as $misc) {
+            $childIds[] = self::attachDocumentMiscChild($ctx, $document, $misc)->id;
+        }
         $state->childIds = $childIds;
         $state->idAttrByElement = $idAttrByElement;
         $state->generalEntities = $generalEntities;
@@ -3321,10 +3336,183 @@ final class VmDom
     }
 
     /**
+     * Split an XML document into Misc nodes, optional DOCTYPE, root element, and trailing Misc (XML 1.0; #19361).
+     *
+     * @return null|array{
+     *   miscBefore: list<array{kind: 'comment'|'pi', data: string, target?: string}>,
+     *   doctype: null|array{name: string, publicId: string, systemId: string},
+     *   miscBetween: list<array{kind: 'comment'|'pi', data: string, target?: string}>,
+     *   rootXml: string,
+     *   rootOffset: int,
+     *   miscAfter: list<array{kind: 'comment'|'pi', data: string, target?: string}>
+     * }
+     */
+    private static function splitXmlDocumentParts(string $xml): ?array
+    {
+        $pos = 0;
+        $len = \strlen($xml);
+        $pos = self::skipXmlDocumentWhitespace($xml, $pos);
+        if (preg_match('/\G<\?xml\s[^?]*\?>/is', $xml, $decl, 0, $pos)) {
+            $pos += \strlen($decl[0]);
+            $pos = self::skipXmlDocumentWhitespace($xml, $pos);
+        }
+
+        $miscBefore = [];
+        while ($pos < $len) {
+            $misc = self::parseDocumentMiscAt($xml, $pos);
+            if (null === $misc) {
+                break;
+            }
+            $miscBefore[] = $misc['node'];
+            $pos = self::skipXmlDocumentWhitespace($xml, $misc['end']);
+        }
+
+        $doctype = null;
+        $doctypeDecl = self::parseDoctypeDeclaration(substr($xml, $pos));
+        if (null !== $doctypeDecl) {
+            $doctypeEnd = self::findXmlDoctypeEnd($xml, $pos);
+            if (null === $doctypeEnd) {
+                return null;
+            }
+            $doctype = $doctypeDecl;
+            $pos = self::skipXmlDocumentWhitespace($xml, $doctypeEnd);
+        }
+
+        $miscBetween = [];
+        while ($pos < $len) {
+            $misc = self::parseDocumentMiscAt($xml, $pos);
+            if (null === $misc) {
+                break;
+            }
+            $miscBetween[] = $misc['node'];
+            $pos = self::skipXmlDocumentWhitespace($xml, $misc['end']);
+        }
+
+        if ($pos >= $len || '<' !== $xml[$pos]) {
+            return null;
+        }
+        $rootOffset = $pos;
+        $rootEnd = self::findElementEnd($xml, $pos);
+        if (null === $rootEnd) {
+            return null;
+        }
+        $rootXml = substr($xml, $rootOffset, $rootEnd - $rootOffset);
+        $pos = self::skipXmlDocumentWhitespace($xml, $rootEnd);
+
+        $miscAfter = [];
+        while ($pos < $len) {
+            $misc = self::parseDocumentMiscAt($xml, $pos);
+            if (null === $misc) {
+                break;
+            }
+            $miscAfter[] = $misc['node'];
+            $pos = self::skipXmlDocumentWhitespace($xml, $misc['end']);
+        }
+        if ($pos < $len) {
+            return null;
+        }
+
+        return [
+            'miscBefore' => $miscBefore,
+            'doctype' => $doctype,
+            'miscBetween' => $miscBetween,
+            'rootXml' => $rootXml,
+            'rootOffset' => $rootOffset,
+            'miscAfter' => $miscAfter,
+        ];
+    }
+
+    private static function skipXmlDocumentWhitespace(string $xml, int $pos): int
+    {
+        $len = \strlen($xml);
+        while ($pos < $len && 1 === preg_match('/\s/', $xml[$pos])) {
+            ++$pos;
+        }
+
+        return $pos;
+    }
+
+    /**
+     * @return null|array{end: int, node: array{kind: 'comment'|'pi', data: string, target?: string}}
+     */
+    private static function parseDocumentMiscAt(string $xml, int $pos): ?array
+    {
+        $comment = VmXml::parseCommentAt($xml, $pos);
+        if (null !== $comment) {
+            return [
+                'end' => $comment['end'],
+                'node' => ['kind' => 'comment', 'data' => $comment['data']],
+            ];
+        }
+        $pi = VmXml::parseProcessingInstructionAt($xml, $pos);
+        if (null !== $pi) {
+            return [
+                'end' => $pi['end'],
+                'node' => ['kind' => 'pi', 'data' => $pi['data'], 'target' => $pi['target']],
+            ];
+        }
+
+        return null;
+    }
+
+    /** @return null|int byte offset after <!DOCTYPE …> at $pos */
+    private static function findXmlDoctypeEnd(string $xml, int $pos): ?int
+    {
+        if (!preg_match('/\G<!DOCTYPE\s/i', $xml, $open, 0, $pos)) {
+            return null;
+        }
+        unset($open);
+        $len = \strlen($xml);
+        $i = $pos + 9;
+        $bracketDepth = 0;
+        while ($i < $len) {
+            $ch = $xml[$i];
+            if ('[' === $ch) {
+                ++$bracketDepth;
+            } elseif (']' === $ch && $bracketDepth > 0) {
+                --$bracketDepth;
+            } elseif ('>' === $ch && 0 === $bracketDepth) {
+                return $i + 1;
+            }
+            ++$i;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array{kind: 'comment'|'pi', data: string, target?: string} $misc
+     */
+    private static function attachDocumentMiscChild(
+        Context $ctx,
+        ObjectEntry $document,
+        array $misc
+    ): ObjectEntry {
+        if ('pi' === $misc['kind']) {
+            $node = self::createProcessingInstruction(
+                $ctx,
+                $misc['target'] ?? '',
+                $misc['data'],
+                $document
+            );
+        } else {
+            $node = self::createComment($ctx, $misc['data'], $document);
+        }
+        self::linkChildToParent($node, $document);
+        self::propagateDocumentId($node, $document->id);
+
+        return $node;
+    }
+
+    /**
      * @return array{0: string, 1: int} element XML and byte offset in $xml for line numbers (#15290)
      */
     private static function stripDoctypeWithOffset(string $xml): array
     {
+        $parts = self::splitXmlDocumentParts($xml);
+        if (null !== $parts) {
+            return [$parts['rootXml'], $parts['rootOffset']];
+        }
         $offset = 0;
         if (preg_match('/^\s*<\?xml[^?]*\?>\s*/s', $xml, $match)) {
             $offset += \strlen($match[0]);
@@ -5032,6 +5220,16 @@ final class VmDom
 
                 continue;
             }
+            $pi = VmXml::parseProcessingInstructionAt($inner, $pos);
+            if (null !== $pi) {
+                $owner = self::ownerDocumentEntry($entry) ?? $entry;
+                $piNode = self::createProcessingInstruction($ctx, $pi['target'], $pi['data'], $owner);
+                $state->childIds[] = $piNode->id;
+                self::linkChildToParent($piNode, $entry);
+                $pos = $pi['end'];
+
+                continue;
+            }
             $end = self::findElementEnd($inner, $pos);
             if (null === $end) {
                 return null;
@@ -5110,6 +5308,12 @@ final class VmDom
             $comment = VmXml::parseCommentAt($content, $scan);
             if (null !== $comment) {
                 $scan = $comment['end'];
+
+                continue;
+            }
+            $pi = VmXml::parseProcessingInstructionAt($content, $scan);
+            if (null !== $pi) {
+                $scan = $pi['end'];
 
                 continue;
             }

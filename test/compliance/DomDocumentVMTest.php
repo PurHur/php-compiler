@@ -224,6 +224,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_loadxml_comment.phpt',
             'dom_loadxml_comment.phpt'
         );
+        yield 'dom_loadxml_preamble_comment_pi.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_loadxml_preamble_comment_pi.phpt',
+            'dom_loadxml_preamble_comment_pi.phpt'
+        );
         yield 'dom_load_empty_source.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_load_empty_source.phpt',
             'dom_load_empty_source.phpt'
