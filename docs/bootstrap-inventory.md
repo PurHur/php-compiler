@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5023 |
-| Phase A inventory files (M2 ratio SSOT) | 5023 |
+| PHP files on vm.php path | 5024 |
+| Phase A inventory files (M2 ratio SSOT) | 5024 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13559 |
+| Source constructs flagged (warnings) | 13560 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1394,6 +1394,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitGetallheaders.php` | 0 | 1 |
 | `ext/standard/JitGetcwd.php` | 0 | 1 |
 | `ext/standard/JitGetdate.php` | 0 | 1 |
+| `ext/standard/JitGetenvKernel.php` | 0 | 1 |
 | `ext/standard/JitGethostbyaddr.php` | 0 | 1 |
 | `ext/standard/JitGethostbyname.php` | 0 | 1 |
 | `ext/standard/JitGethostbynamel.php` | 0 | 1 |
@@ -7385,15 +7386,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/filter/JitFilter.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 778)
-- new JITVariable (line 815)
-- new JITVariable (line 850)
-- new JITVariable (line 1246)
-- new JITVariable (line 1421)
-- new JITVariable (line 1464)
-- new JITVariable (line 1465)
-- new JITVariable (line 1466)
-- new JITVariable (line 1467)
+- new JITVariable (line 782)
+- new JITVariable (line 819)
+- new JITVariable (line 854)
+- new JITVariable (line 1250)
+- new JITVariable (line 1425)
+- new JITVariable (line 1468)
+- new JITVariable (line 1469)
+- new JITVariable (line 1470)
+- new JITVariable (line 1471)
 - 39 class method(s)
 
 ### `ext/filter/JitFilterId.php`
@@ -7441,13 +7442,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 914)
 - new Variable (line 952)
 - new Variable (line 973)
-- new Variable (line 1060)
-- new Variable (line 1243)
-- new Variable (line 1505)
-- new HashTable (line 1559)
-- new HashTable (line 1574)
-- new Variable (line 1613)
-- 73 class method(s)
+- new Variable (line 1110)
+- new Variable (line 1293)
+- new Variable (line 1530)
+- new HashTable (line 1584)
+- new HashTable (line 1599)
+- new Variable (line 1638)
+- 72 class method(s)
 
 ### `ext/filter/filter_has_var.php`
 
@@ -14280,6 +14281,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/JitGetdate.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitGetenvKernel.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -30366,7 +30372,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFilterDomain.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 123)
+- new JIT (line 126)
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/StringFilterEmail.php`
@@ -30476,7 +30482,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringGetenv.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 131)
+- new JIT (line 136)
 - 10 class method(s)
 - 1 closure(s)
 

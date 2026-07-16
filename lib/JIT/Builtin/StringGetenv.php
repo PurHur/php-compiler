@@ -8,16 +8,19 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\LibcExtern;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\ext\standard\JitGetenvKernel;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_getenv via GetenvJitHelper PHP overlay (#9092, #8992).
+ * JIT/AOT link for __compiler_getenv via GetenvJitHelper PHP overlay (#9092, #8992, #19373).
  *
- * Embed and standalone AOT compile the same PHP bridge; deferred user-script AOT uses libc getenv (#13194, #17316).
+ * Embed / non-deferred: {@see GetenvJitHelper} bridge.
+ * Deferred inventory / user-script AOT: thin {@see JitGetenvKernel} libc getenv —
+ * nested helper TUs skip __init__ under heavy StreamIo defer (#16075, #13194).
  * php-src: ext/standard/basic_functions.c — zif_getenv
  */
 final class StringGetenv
@@ -31,6 +34,8 @@ final class StringGetenv
     private const APACHE_SETENV_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::apacheSetenv';
 
     private const ABI_NAME = '__compiler_getenv';
+
+    private const KERNEL_ENTRY = 'getenv_kernel_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -155,6 +160,11 @@ final class StringGetenv
     private static function implementDeferredInventoryStub(Context $context): void
     {
         $probe = $context->module->getNamedFunction(self::ABI_NAME);
+        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
+            $context->registerFunction(self::ABI_NAME, $probe);
+
+            return;
+        }
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI_NAME, $probe);
 
@@ -162,74 +172,18 @@ final class StringGetenv
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        LibcExtern::register($context);
         $valuePtr = $context->getTypeFromString('__value__*');
         $strPtr = $context->getTypeFromString('__string__*');
         $i8 = $context->getTypeFromString('int8');
-        $i64 = $context->getTypeFromString('int64');
         $voidTy = $context->getTypeFromString('void');
         $ft = $context->context->functionType($voidTy, false, $strPtr, $i8, $valuePtr);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(self::ABI_NAME, $ft);
 
-        $entry = $fn->appendBasicBlock('getenv_libc_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::KERNEL_ENTRY);
         $context->builder->positionAtEnd($entry);
-
-        $nameStr = $fn->getParam(0);
-        $localOnly = $fn->getParam(1);
-        $out = $fn->getParam(2);
-        $valMap = $context->structFieldMap['__value__'];
-        $strMap = $context->structFieldMap['__string__'];
-        $zero = $i64->constInt(0, false);
-        $i8p = $context->getTypeFromString('int8*');
-
-        $isLocal = $context->builder->icmp(Builder::INT_NE, $localOnly, $i8->constInt(0, false));
-        $libcBb = $fn->appendBasicBlock('getenv_libc_lookup');
-        $missingBb = $fn->appendBasicBlock('getenv_libc_missing');
-        $hitBb = $fn->appendBasicBlock('getenv_libc_hit');
-        $doneBb = $fn->appendBasicBlock('getenv_libc_done');
-        $context->builder->branchIf($isLocal, $missingBb, $libcBb);
-
-        $context->builder->positionAtEnd($libcBb);
-        $nameBytes = $context->builder->structGep($nameStr, $strMap['value']);
-        $envRaw = $context->builder->call($context->lookupFunction('getenv'), $nameBytes);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $envRaw, $i8p->constNull());
-        $context->builder->branchIf($isNull, $missingBb, $hitBb);
-
-        $context->builder->positionAtEnd($hitBb);
-        $len = $context->builder->call($context->lookupFunction('strlen'), $envRaw);
-        $lenI64 = $len->typeOf() === $i64
-            ? $len
-            : $context->builder->zExt($len, $i64);
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $lenI64,
-            $envRaw
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $out,
-            $owned
-        );
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($missingBb);
-        $context->builder->store(
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false),
-            $context->builder->structGep($out, $valMap['type'])
-        );
-        $valueField = $context->builder->structGep($out, $valMap['value']);
-        $firstByte = $context->builder->inBoundsGEP(
-            $valueField,
-            $context->getTypeFromString('int32')->constInt(0, false),
-            $zero
-        );
-        $context->builder->store($i8->constInt(0, false), $firstByte);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
-        $context->builder->returnVoid();
+        JitGetenvKernel::emitBody($context, $fn);
         $context->registerFunction(self::ABI_NAME, $fn);
         $context->builder->clearInsertionPosition();
         BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
