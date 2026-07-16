@@ -964,7 +964,8 @@ class VM {
                 $resolved->dnfArms,
                 $this->context,
                 'Property',
-                $resolved
+                $resolved,
+                false
             );
         }
     }
@@ -3347,7 +3348,8 @@ restart:
                                 $writeTarget->dnfArms,
                                 $this->context,
                                 'Property',
-                                $writeTarget
+                                $writeTarget,
+                                $strict
                             );
                         }
                     } catch (\TypeError $e) {
@@ -6067,7 +6069,10 @@ restart:
                                         DnfCheck::assertMatches(
                                             $arg1,
                                             $frame->block->paramDnfConstraints[$op->arg1],
-                                            $vmContext
+                                            $vmContext,
+                                            'Argument',
+                                            null,
+                                            $strict
                                         );
                                     } elseif (isset($frame->block->paramIntersectionConstraints[$op->arg1])) {
                                         TypeCheck::assertParamIntersection(
@@ -16374,7 +16379,10 @@ restart:
                 $value,
                 $block->returnDnfConstraints,
                 $this->context,
-                'Return value'
+                'Return value',
+                null,
+                $block->strictTypes,
+                $this->returnTypeCallableName($block->func)
             );
 
             return;
@@ -16407,10 +16415,10 @@ restart:
                 return;
             }
         }
-        $strict = true;
+        // Return type checks use the declaring function's strict_types (zend_verify_return_type).
         TypeCheck::coerceReturn(
             $value,
-            $strict,
+            $block->strictTypes,
             $block->returnTypeConstraint,
             $block->returnLiteralBoolType,
             $this->returnTypeCallableName($block->func)

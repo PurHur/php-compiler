@@ -17,7 +17,9 @@ final class DnfCheck
         array $arms,
         Context $context,
         string $kind = 'Argument',
-        ?Variable $propertyMeta = null
+        ?Variable $propertyMeta = null,
+        bool $strict = true,
+        ?string $returnCallableName = null
     ): void {
         if ([] === $arms) {
             return;
@@ -26,6 +28,31 @@ final class DnfCheck
         foreach ($arms as $arm) {
             if (self::matchesArm($resolved, $arm, $context)) {
                 return;
+            }
+        }
+        if (!$strict) {
+            $scalarConstraints = \PHPCompiler\DnfType::scalarTypeConstraintsFromArms($arms);
+            if ([] !== $scalarConstraints) {
+                $label = null !== $propertyMeta && null !== $propertyMeta->declaredTypeLabel
+                    ? $propertyMeta->declaredTypeLabel
+                    : \PHPCompiler\DnfType::formatUnionType($arms);
+                $probe = new Variable();
+                $probe->copyFrom($resolved);
+                try {
+                    TypeCheck::coerceUnionValue(
+                        $probe,
+                        $scalarConstraints,
+                        false,
+                        $kind,
+                        $label,
+                        $returnCallableName
+                    );
+                    $value->copyFrom($probe);
+
+                    return;
+                } catch (\TypeError $e) {
+                    // fall through to TypeError with union label
+                }
             }
         }
         $expected = \PHPCompiler\DnfType::formatUnionType($arms);
@@ -37,6 +64,14 @@ final class DnfCheck
             $ctx->throwExpectedType($expected, $value);
         }
         $given = self::givenTypeLabel($resolved);
+        if ('Return value' === $kind) {
+            $message = "Return value must be of type {$expected}, {$given} returned";
+            if (null !== $returnCallableName && '' !== $returnCallableName) {
+                $message = "{$returnCallableName}(): {$message}";
+            }
+
+            throw new \TypeError($message);
+        }
         throw new \TypeError("{$kind} must be of type {$expected}, {$given} given");
     }
 

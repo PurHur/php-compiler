@@ -112,6 +112,43 @@ final class DnfType
     }
 
     /**
+     * Scalar/null Variable::TYPE_* arms for weak union coercion (#19525).
+     * Class-name / intersection / true|false literal arms are omitted (exact-match only).
+     *
+     * @param list<DnfArm> $arms
+     * @return list<int>
+     */
+    public static function scalarTypeConstraintsFromArms(array $arms): array
+    {
+        $out = [];
+        foreach ($arms as $arm) {
+            $kind = $arm['kind'] ?? '';
+            if ('null' === $kind) {
+                $out[] = \PHPCompiler\VM\Variable::TYPE_NULL;
+
+                continue;
+            }
+            if ('literal' !== $kind) {
+                continue;
+            }
+            $mapped = match ($arm['name'] ?? '') {
+                'int' => \PHPCompiler\VM\Variable::TYPE_INTEGER,
+                'float' => \PHPCompiler\VM\Variable::TYPE_FLOAT,
+                'bool' => \PHPCompiler\VM\Variable::TYPE_BOOLEAN,
+                'string' => \PHPCompiler\VM\Variable::TYPE_STRING,
+                'array' => \PHPCompiler\VM\Variable::TYPE_ARRAY,
+                'null' => \PHPCompiler\VM\Variable::TYPE_NULL,
+                default => null,
+            };
+            if (null !== $mapped) {
+                $out[] = $mapped;
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * @param list<DnfArm> $arms
      */
     public static function formatUnionType(array $arms): string
