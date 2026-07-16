@@ -14,7 +14,7 @@ final class IntlExtensionPolicyTest extends TestCase
     {
         self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
         self::assertFalse(IntlExtensionPolicy::advertisesIdn());
-        self::assertTrue(IntlExtensionPolicy::advertisesNormalizer());
+        self::assertFalse(IntlExtensionPolicy::advertisesNormalizer());
         self::assertTrue(IntlExtensionPolicy::advertisesLocale());
         self::assertTrue(IntlExtensionPolicy::advertisesIntlDateFormatter());
         self::assertTrue(IntlExtensionPolicy::advertisesIntlCalendar());
@@ -29,6 +29,12 @@ final class IntlExtensionPolicyTest extends TestCase
         );
         self::assertFalse(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'idn_to_utf8')
+        );
+        self::assertFalse(
+            ext\standard\VmReflection::functionExists($runtime->vmContext, 'normalizer_normalize')
+        );
+        self::assertFalse(
+            ext\standard\VmReflection::classExists($runtime->vmContext, 'Normalizer')
         );
         self::assertTrue(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_default')

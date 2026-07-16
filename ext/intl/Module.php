@@ -15,8 +15,8 @@ use PHPCompiler\VM;
  * Grapheme builtins are partial PHP implementations without ICU. Register under
  * {@see standard} so extension_loaded('intl') stays false until full ext/intl (#11472).
  * Locale + locale_get_default()/set_default() advertise without loading intl (#6696), like
- * Normalizer, IntlDateFormatter (#19549), IntlCalendar/IntlTimeZone (#6151), and NumberFormatter
- * (#5154); grapheme helpers / IDN / Collator stay gated (#11768, #12115, #17694, #19593).
+ * IntlDateFormatter (#19549), IntlCalendar/IntlTimeZone (#6151), and NumberFormatter (#5154);
+ * grapheme helpers / IDN / Normalizer / Collator stay gated (#11768, #12115, #17694, #19593, #19594).
  */
 class Module extends ModuleAbstract
 {

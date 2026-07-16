@@ -11,8 +11,8 @@ use PHPCompiler\VM\Context;
 /**
  * Register intl builtin classes (php-src ext/intl/php_intl.c; issues #5774, #6696, #19549, #6151).
  *
- * Locale / Normalizer / IntlDateFormatter / IntlCalendar / IntlTimeZone / NumberFormatter register as partial surfaces.
- * Collator + IntlException remain gated on {@see IntlExtensionPolicy::advertisesBuiltins()} (#12115).
+ * Locale / IntlDateFormatter / IntlCalendar / IntlTimeZone / NumberFormatter register as partial surfaces.
+ * Normalizer + Collator + IntlException remain gated on {@see IntlExtensionPolicy::advertisesBuiltins()} (#12115, #19594).
  */
 final class BuiltinClasses
 {

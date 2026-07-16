@@ -133,7 +133,11 @@ final class BuiltinIntrospectionPolicy
         ], true)) {
             return IntlExtensionPolicy::advertisesBuiltins();
         }
-        if (\in_array($lc, ['normalizer_normalize', 'normalizer_is_normalized'], true)) {
+        if (\in_array($lc, [
+            'normalizer_normalize',
+            'normalizer_is_normalized',
+            'normalizer_get_raw_decomposition',
+        ], true)) {
             return IntlExtensionPolicy::advertisesNormalizer();
         }
         if (\in_array($lc, ['idn_to_ascii', 'idn_to_utf8'], true)) {

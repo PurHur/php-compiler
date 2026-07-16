@@ -12,12 +12,12 @@ use PHPUnit\Framework\TestCase;
 /** @group intl_normalizer */
 final class VmNormalizerTest extends TestCase
 {
-    public function test_normalizer_advertised_on_vm(): void
+    public function test_normalizer_withheld_without_intl(): void
     {
         $runtime = new Runtime();
-        self::assertTrue(VmReflection::functionExists($runtime->vmContext, 'normalizer_normalize'));
-        self::assertTrue(VmReflection::functionExists($runtime->vmContext, 'normalizer_is_normalized'));
-        self::assertTrue(VmReflection::classExists($runtime->vmContext, 'Normalizer'));
+        self::assertFalse(VmReflection::functionExists($runtime->vmContext, 'normalizer_normalize'));
+        self::assertFalse(VmReflection::functionExists($runtime->vmContext, 'normalizer_is_normalized'));
+        self::assertFalse(VmReflection::classExists($runtime->vmContext, 'Normalizer'));
     }
 
     public function test_nfc_latin1_e_acute(): void
