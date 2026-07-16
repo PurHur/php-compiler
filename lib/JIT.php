@@ -8365,18 +8365,15 @@ class JIT {
                                 if (!str_starts_with($e->getMessage(), 'Undefined constant ')) {
                                     throw $e;
                                 }
-                                $message = $e->getMessage();
-                                JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
-                                JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                                JIT\ClassConstVisibilityJitGuard::emitUndefinedConstantError(
+                                    $this->context,
+                                    $this,
+                                    $e->getMessage()
+                                );
                                 $resultOp = $block->getOperand($op->arg1);
                                 $nullLit = new Operand\Literal(null);
                                 $nullLit->type = Type::null();
                                 $this->assignOperand($resultOp, JIT\Variable::fromLiteral($this->context, $nullLit));
-                                if ([] !== $this->context->tryCatch->handlerStack) {
-                                    JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
-                                } else {
-                                    JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
-                                }
                                 break;
                             }
                             $resultOp = $block->getOperand($op->arg1);

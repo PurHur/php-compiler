@@ -219,18 +219,11 @@ trait ClassConstFetchHelperTrait
                 }
                 // Runtime Error for missing / private-on-parent const (#19615).
                 $context = $objectType->jitContext();
-                ErrorRaise::registerDeclarations($context);
-                ErrorRaise::ensureLinked($context);
+                ClassConstVisibilityJitGuard::emitUndefinedConstantError($context, $jit, $e->getMessage());
                 $nullLit = new \PHPCfg\Operand\Literal(null);
                 $nullLit->type = \PHPTypes\Type::null();
-                $dummy = Variable::fromLiteral($context, $nullLit);
-                if ([] !== $context->tryCatch->handlerStack) {
-                    TryCatchHelper::emitCatchableErrorMessage($context, $jit, $e->getMessage());
-                } else {
-                    ErrorRaise::emitRaise($context, $e->getMessage());
-                }
 
-                return $dummy;
+                return Variable::fromLiteral($context, $nullLit);
             }
         }
 

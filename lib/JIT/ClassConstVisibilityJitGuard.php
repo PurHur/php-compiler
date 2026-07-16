@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
 use PHPCompiler\ClassConstVisibility;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\MethodVisibility;
@@ -26,7 +27,7 @@ final class ClassConstVisibilityJitGuard
     ): void {
         $holdingId = $objectType->resolveClassConstHoldingId($classId, strtolower($constName));
         if (null === $holdingId) {
-            // Missing / private-on-parent: classConstFetch throws; JIT.php emits runtime Error (#19615).
+            // Missing / private-on-parent: classConstFetch throws; caller emits runtime Error (#19615).
             return;
         }
         $vis = $objectType->constVisibility($holdingId, $constName);
@@ -50,6 +51,48 @@ final class ClassConstVisibilityJitGuard
         } catch (\LogicException $e) {
             self::emitViolation($context, $jit, $e->getMessage());
         }
+    }
+
+    /**
+     * Runtime Error for Undefined constant Class::CONST (private parent / missing) (#19615).
+     *
+     * Catchable Error-object IR fails AOT module verify in several try/catch shapes.
+     * JIT keeps catchable throws; AOT sets pending Error and aborts (Zend message).
+     */
+    public static function emitUndefinedConstantError(
+        Context $context,
+        \PHPCompiler\JIT $jit,
+        string $message
+    ): void {
+        ErrorRaise::registerDeclarations($context);
+        ErrorRaise::ensureLinked($context);
+        $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        $canCatch = [] !== $context->tryCatch->handlerStack
+            && null !== $insert
+            && Builtin::LOAD_TYPE_STANDALONE !== $context->loadType;
+        if ($canCatch) {
+            $fn = $insert->getParent();
+            assert($fn instanceof Function_);
+            TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+            $cont = $fn->appendBasicBlock('after_class_const_undef');
+            $context->builder->positionAtEnd($cont);
+
+            return;
+        }
+        if (null === $insert) {
+            ErrorRaise::emitRaise($context, $message);
+
+            return;
+        }
+        $fn = $insert->getParent();
+        assert($fn instanceof Function_);
+        ErrorRaise::emitRaise($context, $message);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+        }
+        self::returnAfterPendingError($context, $fn);
+        $cont = $fn->appendBasicBlock('after_class_const_undef_ret');
+        $context->builder->positionAtEnd($cont);
     }
 
     private static function callerClassLc(Context $context, ?Block $enclosingBlock): ?string
@@ -89,30 +132,40 @@ final class ClassConstVisibilityJitGuard
         ErrorRaise::registerDeclarations($context);
         ErrorRaise::ensureLinked($context);
 
-        $fn = $context->builder->getInsertBlock()->getParent();
-        assert($fn instanceof Function_);
-        $entry = $context->builder->getInsertBlock();
-        if (null === $entry || null !== $entry->getTerminator()) {
+        $insert = BasicBlockHelper::tryGetInsertBlock($context);
+        if (null === $insert || null !== $insert->getTerminator()) {
             return;
         }
+        $fn = $insert->getParent();
+        assert($fn instanceof Function_);
 
         $failBlock = $fn->appendBasicBlock('class_const_vis_violation');
         $continueBlock = $fn->appendBasicBlock('class_const_vis_continue');
 
-        $context->builder->positionAtEnd($entry);
+        $context->builder->positionAtEnd($insert);
         $context->builder->branch($failBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        if ([] !== $context->tryCatch->handlerStack) {
+        $useCatchable = [] !== $context->tryCatch->handlerStack
+            && Builtin::LOAD_TYPE_STANDALONE !== $context->loadType;
+        if ($useCatchable) {
             TryCatchHelper::emitCatchableErrorMessage($context, $jit, $message);
+            $sealed = BasicBlockHelper::tryGetInsertBlock($context);
+            if (null !== $sealed && null === $sealed->getTerminator()) {
+                self::returnAfterPendingError($context, $fn);
+            }
         } else {
             ErrorRaise::emitRaise($context, $message);
+            if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+                $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_error'));
+            }
             self::returnAfterPendingError($context, $fn);
         }
 
         $context->builder->positionAtEnd($continueBlock);
     }
 
+    /** Typed return after pending Error — never ret void from __value__ methods (#19615). */
     private static function returnAfterPendingError(Context $context, Function_ $fn): void
     {
         if (BasicBlockHelper::isVoidLlvmFunctionValue($fn)) {
@@ -123,29 +176,32 @@ final class ClassConstVisibilityJitGuard
         $fnType = BasicBlockHelper::llvmFunctionSignatureType($fn);
         if (null !== $fnType) {
             $returnType = $fnType->getReturnType();
-            if (Type::KIND_POINTER === $returnType->getKind()) {
-                $context->builder->returnValue($returnType->constNull());
+            $kind = $returnType->getKind();
+            if (Type::KIND_VOID === $kind) {
+                $context->builder->returnVoid();
 
                 return;
             }
-            if (Type::KIND_INTEGER === $returnType->getKind()) {
+            if (Type::KIND_INTEGER === $kind) {
                 $context->builder->returnValue($returnType->constInt(0, false));
 
                 return;
             }
-            $structName = $context->getStringFromType($returnType);
-            if ('__value__' === $structName) {
-                $slot = JitValueBox::alloc($context);
-                $context->builder->call(
-                    $context->lookupFunction('__value__writeNull'),
-                    JitValueBox::pointer($context, $slot)
-                );
-                $context->builder->returnValue($context->builder->load($slot));
+            if (Type::KIND_DOUBLE === $kind || Type::KIND_FLOAT === $kind) {
+                $context->builder->returnValue($returnType->constReal(0.0));
 
                 return;
             }
+            $context->builder->returnValue($returnType->constNull());
+
+            return;
         }
-        $context->builder->returnVoid();
+        $slot = JitValueBox::alloc($context);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            JitValueBox::pointer($context, $slot)
+        );
+        $context->builder->returnValue($context->builder->load($slot));
     }
 
     private static function isSubclassOf(Object_ $object, string $childLc, string $parentLc): bool
