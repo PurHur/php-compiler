@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\JitGetObjectVars;
+use PHPCompiler\JIT\Builtin\CastArrayRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** Shared (array) cast helpers for CastHelper + CastArrayValueBoxJit (#10046). */
+/** Shared (array) cast helpers for CastHelper + CastArrayValueBoxJit (#10046, #19631). */
 final class CastArrayShared
 {
     public static function ensureInsertBlock(Context $context, string $label): void
@@ -48,13 +50,16 @@ final class CastArrayShared
         return self::wrapScalarInArray($context, $src);
     }
 
-    /** Zend convert_to_array: Resource/Closure pseudo-classes embed zval at index 0 (#15012, #15015). */
+    /**
+     * Zend convert_to_array: Resource/Closure singleton; ArrayObject backing (#19631);
+     * else get_object_vars mangling.
+     */
     public static function emitObjectOperandToArray(Context $context, Variable $src, bool $mangledKeys = true): Variable
     {
         $resourceClassId = self::resourceClassIdIfRegistered($context);
         $closureClassId = self::closureClassIdIfRegistered($context);
         if (null === $resourceClassId && null === $closureClassId) {
-            return self::emitGetObjectVarsArray($context, $src, $mangledKeys);
+            return self::emitSplOrGetObjectVars($context, $src, $mangledKeys);
         }
 
         $objPtr = self::loadObjectPtrFromOperand($context, $src);
@@ -94,7 +99,7 @@ final class CastArrayShared
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($plainBlock);
-        $fromObj = self::emitGetObjectVarsArray($context, $src, $mangledKeys);
+        $fromObj = self::emitSplOrGetObjectVars($context, $src, $mangledKeys);
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($mergeBlock);
@@ -107,6 +112,70 @@ final class CastArrayShared
         $result->value = $phi;
 
         return $result;
+    }
+
+    private static function emitSplOrGetObjectVars(Context $context, Variable $src, bool $mangledKeys): Variable
+    {
+        $operandPtr = self::operandToValueBox($context, $src);
+        $splBoxed = CastArrayRuntime::callTrySplArrayCast($context, $operandPtr);
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($splBoxed, $context->structFieldMap['__value__']['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_ARRAY, false)
+        );
+
+        $splBlock = BasicBlockHelper::append($context, 'cast_array_spl_hit');
+        $govBlock = BasicBlockHelper::append($context, 'cast_array_gov_fallback');
+        $mergeBlock = BasicBlockHelper::append($context, 'cast_array_spl_merge');
+        $doneBlock = BasicBlockHelper::append($context, 'cast_array_spl_done');
+
+        $context->builder->branchIf($isArray, $splBlock, $govBlock);
+
+        $context->builder->positionAtEnd($splBlock);
+        $fromSpl = HashTableHelper::emptyVariable($context);
+        $fromSpl->value = $splBoxed;
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($govBlock);
+        $fromGov = self::emitGetObjectVarsArray($context, $src, $mangledKeys);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($fromSpl->value->typeOf());
+        $phi->addIncoming($fromSpl->value, $splBlock);
+        $phi->addIncoming($fromGov->value, $govBlock);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+        $result = HashTableHelper::emptyVariable($context);
+        $result->value = $phi;
+
+        return $result;
+    }
+
+    private static function operandToValueBox(Context $context, Variable $src): Value
+    {
+        if (Variable::TYPE_VALUE === $src->type) {
+            return JitValueBox::valuePtrFromVariable($context, $src);
+        }
+        if (Variable::TYPE_OBJECT === $src->type) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeObject'),
+                $ptr,
+                $context->helper->loadValue($src)
+            );
+
+            return $ptr;
+        }
+
+        throw new \LogicException(
+            'object (array) cast requires object or boxed value operand: '.Variable::getStringType($src->type)
+        );
     }
 
     private static function closureClassIdIfRegistered(Context $context): ?int
