@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5113 |
-| Phase A inventory files (M2 ratio SSOT) | 5113 |
+| PHP files on vm.php path | 5121 |
+| Phase A inventory files (M2 ratio SSOT) | 5121 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13893 |
+| Source constructs flagged (warnings) | 13918 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -467,23 +467,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gettext/textdomain.php` | 0 | 2 |
 | `ext/gmp/GmpFunction.php` | 0 | 1 |
 | `ext/gmp/GmpToString.php` | 0 | 1 |
-| `ext/gmp/Module.php` | 0 | 18 |
-| `ext/gmp/VmGmp.php` | 0 | 4 |
+| `ext/gmp/Module.php` | 0 | 26 |
+| `ext/gmp/VmGmp.php` | 0 | 5 |
 | `ext/gmp/VmGmpObject.php` | 0 | 7 |
 | `ext/gmp/gmp_abs.php` | 0 | 2 |
 | `ext/gmp/gmp_add.php` | 0 | 2 |
 | `ext/gmp/gmp_and.php` | 0 | 2 |
 | `ext/gmp/gmp_cmp.php` | 0 | 2 |
+| `ext/gmp/gmp_com.php` | 0 | 2 |
 | `ext/gmp/gmp_div_q.php` | 0 | 2 |
 | `ext/gmp/gmp_div_qr.php` | 0 | 3 |
 | `ext/gmp/gmp_div_r.php` | 0 | 2 |
+| `ext/gmp/gmp_fact.php` | 0 | 2 |
+| `ext/gmp/gmp_gcd.php` | 0 | 2 |
 | `ext/gmp/gmp_init.php` | 0 | 2 |
 | `ext/gmp/gmp_intval.php` | 0 | 2 |
+| `ext/gmp/gmp_lcm.php` | 0 | 2 |
 | `ext/gmp/gmp_mod.php` | 0 | 2 |
 | `ext/gmp/gmp_mul.php` | 0 | 2 |
 | `ext/gmp/gmp_neg.php` | 0 | 2 |
 | `ext/gmp/gmp_or.php` | 0 | 2 |
+| `ext/gmp/gmp_perfect_square.php` | 0 | 2 |
 | `ext/gmp/gmp_pow.php` | 0 | 2 |
+| `ext/gmp/gmp_powm.php` | 0 | 2 |
+| `ext/gmp/gmp_sqrt.php` | 0 | 2 |
+| `ext/gmp/gmp_sqrtrem.php` | 0 | 2 |
 | `ext/gmp/gmp_strval.php` | 0 | 2 |
 | `ext/gmp/gmp_sub.php` | 0 | 2 |
 | `ext/gmp/gmp_xor.php` | 0 | 2 |
@@ -8116,15 +8124,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new gmp_or (line 42)
 - new gmp_xor (line 43)
 - new gmp_intval (line 44)
+- new gmp_powm (line 45)
+- new gmp_fact (line 46)
+- new gmp_gcd (line 47)
+- new gmp_lcm (line 48)
+- new gmp_sqrt (line 49)
+- new gmp_sqrtrem (line 50)
+- new gmp_perfect_square (line 51)
+- new gmp_com (line 52)
 - 3 class method(s)
 
 ### `ext/gmp/VmGmp.php`
 
 **Warnings** (review for bootstrap subset):
-- new DivisionByZeroError (line 252)
-- new DivisionByZeroError (line 280)
-- new DivisionByZeroError (line 585)
-- 45 class method(s)
+- new DivisionByZeroError (line 253)
+- new DivisionByZeroError (line 281)
+- new DivisionByZeroError (line 359)
+- new DivisionByZeroError (line 715)
+- 53 class method(s)
 
 ### `ext/gmp/VmGmpObject.php`
 
@@ -8161,6 +8178,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/gmp/gmp_com.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_div_q.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8180,6 +8203,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 22)
 - 1 class method(s)
 
+### `ext/gmp/gmp_fact.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_gcd.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_init.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8187,6 +8222,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/gmp/gmp_intval.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_lcm.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -8216,7 +8257,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/gmp/gmp_perfect_square.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_pow.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_powm.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_sqrt.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_sqrtrem.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)

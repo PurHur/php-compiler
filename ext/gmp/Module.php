@@ -8,7 +8,7 @@ use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM\Context;
 
-/** gmp extension module entry (php-src ext/gmp/gmp.c; issues #3341, #19527). */
+/** gmp extension module entry (php-src ext/gmp/gmp.c; issues #3341, #19527, #19539). */
 class Module extends ModuleAbstract
 {
     public function init(Runtime $runtime): void
@@ -42,6 +42,14 @@ class Module extends ModuleAbstract
             new gmp_or(),
             new gmp_xor(),
             new gmp_intval(),
+            new gmp_powm(),
+            new gmp_fact(),
+            new gmp_gcd(),
+            new gmp_lcm(),
+            new gmp_sqrt(),
+            new gmp_sqrtrem(),
+            new gmp_perfect_square(),
+            new gmp_com(),
         ];
     }
 }

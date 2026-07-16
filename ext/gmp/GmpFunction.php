@@ -38,6 +38,11 @@ abstract class GmpFunction extends Internal
 
             return;
         }
+        if (\is_bool($result)) {
+            $frame->returnVar->bool($result);
+
+            return;
+        }
         if (\is_int($result)) {
             $frame->returnVar->int($result);
 

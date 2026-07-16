@@ -30,5 +30,9 @@ final class GmpModuleTest extends BaseTest
             __DIR__.'/../compliance/cases/gmp/phase2_arith.phpt',
             'gmp_phase2_arith.phpt'
         );
+        yield 'gmp_phase3_arith.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/gmp/phase3_arith.phpt',
+            'gmp_phase3_arith.phpt'
+        );
     }
 }
