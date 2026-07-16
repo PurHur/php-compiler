@@ -184,6 +184,43 @@ final class SplFileObjectStorage
         return 0;
     }
 
+    /** @return int|false */
+    public static function ftell(ObjectEntry $object)
+    {
+        return VmFs::ftell(self::state($object)['handle']);
+    }
+
+    /** @return \PHPCompiler\VM\HashTable|false */
+    public static function fstat(ObjectEntry $object)
+    {
+        return VmFs::fstat(self::state($object)['handle']);
+    }
+
+    public static function flock(ObjectEntry $object, int $operation): bool
+    {
+        return VmFs::flock(self::state($object)['handle'], $operation);
+    }
+
+    public static function fflush(ObjectEntry $object): bool
+    {
+        return VmFs::fflush(self::state($object)['handle']);
+    }
+
+    public static function ftruncate(ObjectEntry $object, int $size): bool
+    {
+        self::freeLine(self::$state[$object->id]);
+
+        return VmFs::ftruncate(self::state($object)['handle'], $size);
+    }
+
+    /** @return int|false */
+    public static function fpassthru(ObjectEntry $object)
+    {
+        self::freeLine(self::$state[$object->id]);
+
+        return VmFs::fpassthru(self::state($object)['handle']);
+    }
+
     /** @return string|false */
     public static function getCurrentLine(ObjectEntry $object)
     {
