@@ -8633,10 +8633,12 @@ restart:
             $fallback = $this->context->classes[$declaring]->name;
             $funcClassLc = null;
             $funcIsTrait = false;
+            $methodLc = null;
             if (null !== $frame->block->func && null !== $frame->block->func->class) {
                 $funcClassLc = $frame->block->func->class->value;
                 $funcLc = strtolower(ltrim($funcClassLc, '\\'));
                 $funcIsTrait = ($this->context->classes[$funcLc] ?? null)?->isTrait ?? false;
+                $methodLc = strtolower($frame->block->func->name);
             }
             $calledLc = null !== $frame->calledClass && '' !== $frame->calledClass
                 ? $frame->calledClass
@@ -8647,7 +8649,11 @@ restart:
                 $funcIsTrait,
                 $calledLc,
                 $fallback,
-                fn (string $lc): string => $this->context->classes[$lc]->name
+                fn (string $lc): string => $this->context->classes[$lc]->name,
+                $methodLc,
+                fn (string $classLc, string $method): ?string => $this->context->classes[$classLc]->traitMethodSources[$method] ?? null,
+                fn (string $classLc): ?string => $this->context->classes[$classLc]->parentLc ?? null,
+                fn (string $classLc): bool => ($this->context->classes[$classLc] ?? null)?->isTrait ?? false,
             );
         }
         if ('static' === $lcClass) {
@@ -11920,6 +11926,16 @@ restart:
         if (MethodVisibility::isPublic($vis)) {
             return null;
         }
+        // Trait methods keep access to private/protected consts imported from that trait onto the
+        // composing class when self:: binds to the composing class (#9187, #19629, zend_traits.c).
+        $sourceTrait = $classEntry->traitConstSources[$constLc] ?? null;
+        if (null !== $sourceTrait && '' !== $sourceTrait) {
+            $traitLc = strtolower(ltrim($sourceTrait, '\\'));
+            $traitEntry = $this->context->classes[$traitLc] ?? null;
+            if (null !== $traitEntry && $this->isInTraitMethodScopeForTrait($frame, $traitEntry)) {
+                return null;
+            }
+        }
         try {
             ClassConstVisibility::assertAccessible(
                 $vis,
@@ -13558,14 +13574,18 @@ restart:
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
             $funcClassValue = $frame->block->func->class->value;
             $funcClassLc = strtolower($funcClassValue);
-            if ('parent' === $scopeKeyword) {
+            if ('parent' === $scopeKeyword || 'self' === $scopeKeyword) {
                 $funcIsTrait = ($this->context->classes[$funcClassLc] ?? null)?->isTrait ?? false;
                 if ($funcIsTrait) {
                     return VM\TraitSelfClassScope::resolveComposingClassLc(
                         $funcClassValue,
                         true,
                         $frame->calledClass,
-                        $funcClassLc
+                        $funcClassLc,
+                        strtolower($frame->block->func->name),
+                        fn (string $classLc, string $method): ?string => $this->context->classes[$classLc]->traitMethodSources[$method] ?? null,
+                        fn (string $classLc): ?string => $this->context->classes[$classLc]->parentLc ?? null,
+                        fn (string $classLc): bool => ($this->context->classes[$classLc] ?? null)?->isTrait ?? false,
                     );
                 }
             }

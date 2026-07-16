@@ -35,9 +35,16 @@ final class ClassConstVisibilityJitGuard
         }
 
         $context = $objectType->jitContext();
+        $callerLc = self::callerClassLc($context, $block);
+        // Trait methods may fetch composing-class consts imported from that trait via self:: (#9187, #19629).
+        $sourceTraitLc = $objectType->traitConstSourceLc($holdingId, $constName);
+        if (null !== $sourceTraitLc && null !== $callerLc && $sourceTraitLc === $callerLc
+            && $objectType->hasDeclaredClass($sourceTraitLc)
+            && $objectType->isInTraitMethodScopeForTraitId($objectType->lookup($sourceTraitLc), $block)) {
+            return;
+        }
         $declaringClass = $objectType->classNameForId($holdingId);
         $declaringLc = strtolower(ltrim($declaringClass, '\\'));
-        $callerLc = self::callerClassLc($context, $block);
         try {
             ClassConstVisibility::assertAccessible(
                 $vis,

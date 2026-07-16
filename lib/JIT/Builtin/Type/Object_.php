@@ -4328,11 +4328,24 @@ class Object_ extends Type {
         }
         $name = strtolower($classOp->value);
         if ('self' === $name) {
-            if ('' === $this->context->scope->className) {
+            $declaringClass = $this->context->scope->className;
+            if ('' === $declaringClass) {
                 PseudoClassScope::fatalInGlobalScope('self');
             }
+            $scopeLc = strtolower(ltrim($declaringClass, '\\'));
+            if ($this->isTraitClass($scopeLc)) {
+                $composing = $this->context->scope->traitComposingClassName;
+                if ('' !== $composing && !$this->isTraitClass(strtolower(ltrim($composing, '\\')))) {
+                    $declaringClass = $composing;
+                } elseif ($this->context->scope->classId > 0) {
+                    $fromId = $this->classNameForId($this->context->scope->classId);
+                    if ('' !== $fromId && !$this->isTraitClass(strtolower(ltrim($fromId, '\\')))) {
+                        $declaringClass = $fromId;
+                    }
+                }
+            }
 
-            return $this->lookup($this->context->scope->className);
+            return $this->lookup($declaringClass);
         }
         if ('static' === $name) {
             $called = $this->context->scope->calledClassName;
@@ -4534,6 +4547,18 @@ class Object_ extends Type {
         $sourceTraitLc = $this->traitMethodSource($this->lookup($declaringLc), $methodLc);
 
         return null !== $sourceTraitLc && $sourceTraitLc === $traitLc;
+    }
+
+    /** Lowercase trait FQCN that imported a composing-class constant, if any (#9187, #19629). */
+    public function traitConstSourceLc(int $classId, string $constName): ?string
+    {
+        $key = strtolower($constName);
+        $src = $this->traitConstSources[$classId][$key] ?? null;
+        if (null === $src || '' === $src) {
+            return null;
+        }
+
+        return strtolower(ltrim($src, '\\'));
     }
 
     /**

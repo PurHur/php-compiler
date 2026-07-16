@@ -614,8 +614,23 @@ final class ClosureSupport
             if (null === $frame->block->func || null === $frame->block->func->class) {
                 PseudoClassScope::fatalInGlobalScope('self');
             }
+            $funcClassValue = $frame->block->func->class->value;
+            $declaring = strtolower($funcClassValue);
+            $funcIsTrait = ($ctx->classes[$declaring] ?? null)?->isTrait ?? false;
+            if ($funcIsTrait) {
+                $declaring = TraitSelfClassScope::resolveComposingClassLc(
+                    $funcClassValue,
+                    true,
+                    $frame->calledClass,
+                    $declaring,
+                    strtolower($frame->block->func->name),
+                    fn (string $classLc, string $method): ?string => $ctx->classes[$classLc]->traitMethodSources[$method] ?? null,
+                    fn (string $classLc): ?string => $ctx->classes[$classLc]->parentLc ?? null,
+                    fn (string $classLc): bool => ($ctx->classes[$classLc] ?? null)?->isTrait ?? false,
+                );
+            }
 
-            return strtolower($frame->block->func->class->value);
+            return $declaring;
         }
         if ('static' === $lcClass) {
             if (null !== $frame->calledClass && '' !== $frame->calledClass) {
@@ -639,7 +654,11 @@ final class ClosureSupport
                     $funcClassValue,
                     true,
                     $frame->calledClass,
-                    $declaring
+                    $declaring,
+                    strtolower($frame->block->func->name),
+                    fn (string $classLc, string $method): ?string => $ctx->classes[$classLc]->traitMethodSources[$method] ?? null,
+                    fn (string $classLc): ?string => $ctx->classes[$classLc]->parentLc ?? null,
+                    fn (string $classLc): bool => ($ctx->classes[$classLc] ?? null)?->isTrait ?? false,
                 );
             }
             if (!isset($ctx->classes[$declaring])) {

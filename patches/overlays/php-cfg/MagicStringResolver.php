@@ -44,9 +44,6 @@ class MagicStringResolver extends NodeVisitorAbstract
     /** True while visiting StaticCall::class — preserve `parent` for runtime dispatch (#6735). */
     protected bool $inStaticCallClassName = false;
 
-    /** True while visiting trait `self::class` — preserve `self` for composing-class resolution (#18879). */
-    protected bool $inTraitSelfClassPseudoConst = false;
-
     private const PRESERVE_LEXICAL_TYPE = 'phpcPreserveLexicalType';
 
     /** @var string */
@@ -139,18 +136,6 @@ class MagicStringResolver extends NodeVisitorAbstract
             }
         } elseif ($node instanceof Node\Expr\StaticCall) {
             $this->inStaticCallClassName = true;
-        } elseif ($node instanceof Node\Expr\ClassConstFetch) {
-            $constName = $node->name instanceof Node\Identifier
-                ? $node->name->toString()
-                : ($node->name instanceof Node\Name ? $node->name->toString() : '');
-            if (
-                'class' === strtolower($constName)
-                && $node->class instanceof Node\Name
-                && 'self' === strtolower($node->class->toString())
-                && [] !== $this->traitStack
-            ) {
-                $this->inTraitSelfClassPseudoConst = true;
-            }
         } elseif ($node instanceof Node\Expr\ConstFetch) {
             if ('__property__' === strtolower($node->name->toString())) {
                 if ($this->propertyStack === []) {
@@ -170,7 +155,9 @@ class MagicStringResolver extends NodeVisitorAbstract
             }
             switch (strtolower($node->toString())) {
                 case 'self':
-                    if ($this->inTraitSelfClassPseudoConst) {
+                    // Keep lexical `self` inside traits so VM/JIT bind to the composing class
+                    // (#19629, #18879, Zend/zend_traits.c) — methods, constants, and ::class.
+                    if ([] !== $this->traitStack) {
                         break;
                     }
                     if (! empty($this->classStack)) {
@@ -252,8 +239,6 @@ class MagicStringResolver extends NodeVisitorAbstract
             }
         } elseif ($node instanceof Node\Expr\StaticCall) {
             $this->inStaticCallClassName = false;
-        } elseif ($node instanceof Node\Expr\ClassConstFetch) {
-            $this->inTraitSelfClassPseudoConst = false;
         }
     }
 
