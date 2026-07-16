@@ -7,7 +7,9 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMDocument::adoptNode() — VM stub until cross-document adoption (#17494, php-src ext/dom/document.c). */
+/**
+ * DOMDocument::adoptNode() — cross-document reparent (php-src ext/dom/document.c; #19654).
+ */
 final class DocumentAdoptNode extends DomClassMethod
 {
     public function __construct()
@@ -17,7 +19,7 @@ final class DocumentAdoptNode extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
-        $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::adoptNode()');
+        $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::adoptNode()');
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocument::adoptNode() expects at least 1 argument');
         }
@@ -29,6 +31,14 @@ final class DocumentAdoptNode extends DomClassMethod
         if (!VmDom::isDomNode($node)) {
             throw new \TypeError('DOMDocument::adoptNode(): Argument #1 ($node) must be of type DOMNode');
         }
-        throw new \Error('Not yet implemented');
+        if (null === $frame->vmContext) {
+            throw new \LogicException('DOMDocument::adoptNode() requires VM context in this compiler build');
+        }
+        if (null === $frame->returnVar) {
+            VmDom::adoptNode($frame->vmContext, $document, $node);
+
+            return;
+        }
+        $frame->returnVar->copyFrom(VmDom::adoptNode($frame->vmContext, $document, $node));
     }
 }

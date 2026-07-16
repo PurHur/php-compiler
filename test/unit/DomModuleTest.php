@@ -265,21 +265,32 @@ PHP;
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
-$doc = new DOMDocument();
-$doc->loadXML('<root><a/></root>');
-$node = $doc->documentElement->firstChild;
-echo (int) method_exists($doc, 'adoptNode'), "\n";
+$d1 = new DOMDocument();
+$d1->loadXML('<a><n>t</n></a>');
+$d2 = new DOMDocument();
+$d2->loadXML('<b/>');
+$n = $d1->documentElement->firstChild;
+echo (int) method_exists($d2, 'adoptNode'), "\n";
+$a = $d2->adoptNode($n);
+echo $a->nodeName, "\n";
+echo $d1->saveXML($d1->documentElement), "\n";
+echo ($a->ownerDocument === $d2) ? "owner-d2\n" : "owner-other\n";
+$d2->documentElement->appendChild($a);
+echo $d2->saveXML($d2->documentElement), "\n";
 try {
-    $doc->adoptNode($node);
-    echo "no_throw\n";
-} catch (Error $e) {
-    echo $e->getMessage(), "\n";
+    $d2->adoptNode($d1);
+    echo "adopted-doc\n";
+} catch (DOMException $e) {
+    echo (DOMException::NOT_SUPPORTED_ERR === $e->getCode()) ? "reject-doc\n" : ("other\n");
 }
 PHP;
         $block = $runtime->parseAndCompile($code, 'dom_adopt_node.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("1\nNot yet implemented\n", ob_get_clean());
+        self::assertSame(
+            "1\nn\n<a/>\nowner-d2\n<b><n>t</n></b>\nreject-doc\n",
+            ob_get_clean()
+        );
     }
 
     public function test_dom_node_is_supported_and_default_namespace(): void

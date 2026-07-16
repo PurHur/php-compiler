@@ -70,6 +70,7 @@ final class VmDomInstanceInvoke
             'replacechildren' => VmDomJitDispatch::replaceChildren($ctx, $self, $extra),
             'createdocumentfragment' => VmDomJitDispatch::createDocumentFragment($ctx, $self, $extra),
             'importnode' => VmDomJitDispatch::importNode($ctx, $self, $extra),
+            'adoptnode' => VmDomJitDispatch::adoptNode($ctx, $self, $extra),
             'getattribute' => VmDomJitDispatch::getAttribute($self, $extra),
             'setattribute' => VmDomJitDispatch::setAttribute($ctx, $self, $extra),
             'getattributenodens' => VmDomJitDispatch::getAttributeNodeNS($ctx, $self, $extra),

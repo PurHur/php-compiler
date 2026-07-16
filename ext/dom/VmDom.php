@@ -7451,6 +7451,107 @@ final class VmDom
         return $var;
     }
 
+    /**
+     * DOMDocument::adoptNode() — move node into this document (php-src ext/dom/document.c; #19654).
+     *
+     * Unlinks from the previous parent / owner element and updates ownerDocument. Does not
+     * insert into the target tree (caller must appendChild / etc.).
+     */
+    public static function adoptNode(Context $ctx, ObjectEntry $document, ObjectEntry $node): Variable
+    {
+        self::ensureDocument($document);
+        if (!self::isDomNode($node)) {
+            throw new \TypeError('DOMDocument::adoptNode(): Argument #1 ($node) must be of type DOMNode');
+        }
+        if (self::isDocument($node)
+            || self::isDocumentType($node)
+            || self::isEntity($node)
+            || self::isNotation($node)
+        ) {
+            return self::rejectAdoptUnsupportedNode($node, $document);
+        }
+
+        if (self::isAttr($node)) {
+            self::unlinkAttributeFromOwnerElement($ctx, $node);
+        } else {
+            self::detachNodeIfAttached($ctx, $node);
+        }
+
+        $oldDocumentId = DomRegistry::state($node)->documentId;
+        if ($oldDocumentId !== $document->id) {
+            self::propagateDocumentId($node, $document->id);
+            self::syncSubtree($ctx, $node);
+        }
+
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($node);
+
+        return $var;
+    }
+
+    /** php-src php_dom_throw_error(NOT_SUPPORTED_ERR) + RETURN_FALSE on legacy non-strict. */
+    private static function rejectAdoptUnsupportedNode(ObjectEntry $node, ObjectEntry $targetDocument): Variable
+    {
+        $strictSource = self::isDocument($node) ? $node : (self::ownerDocumentEntry($node) ?? $targetDocument);
+        if (self::documentStrictErrorChecking($strictSource)) {
+            throw new \DOMException('Not Supported Error', DomExceptionConstants::NOT_SUPPORTED_ERR);
+        }
+        $var = new Variable();
+        $var->bool(false);
+
+        return $var;
+    }
+
+    private static function documentStrictErrorChecking(ObjectEntry $document): bool
+    {
+        if (!$document->hasProperty(self::PROP_STRICT_ERROR_CHECKING)) {
+            return true;
+        }
+        $slot = $document->getProperty(self::PROP_STRICT_ERROR_CHECKING)->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN === $slot->type) {
+            return $slot->toBool();
+        }
+
+        return true;
+    }
+
+    /** Detach Attr from its owner element (php-src xmlUnlinkNode for ATTRIBUTE_NODE). */
+    private static function unlinkAttributeFromOwnerElement(Context $ctx, ObjectEntry $attr): void
+    {
+        $attrState = DomRegistry::state($attr);
+        $prevOwnerId = $attrState->ownerElementId;
+        if (null === $prevOwnerId) {
+            return;
+        }
+        $prevOwner = DomRegistry::entry($prevOwnerId);
+        if (null === $prevOwner || !self::isElement($prevOwner)) {
+            self::detachAttributeNode($attr);
+
+            return;
+        }
+        $prevState = DomRegistry::state($prevOwner);
+        foreach ($prevState->attributeNodeIds as $qName => $cachedId) {
+            if ($cachedId !== $attr->id) {
+                continue;
+            }
+            unset(
+                $prevState->attributes[$qName],
+                $prevState->attributeNamespaces[$qName],
+                $prevState->attributeNodeIds[$qName]
+            );
+            if (null !== $prevState->idAttributeName && $qName === $prevState->idAttributeName) {
+                $document = self::ownerDocumentEntry($prevOwner);
+                if (null !== $document) {
+                    self::unregisterElementId($document, $prevOwner);
+                }
+                $prevState->idAttributeName = null;
+            }
+            self::syncElementAttributes($ctx, $prevOwner);
+            break;
+        }
+        self::detachAttributeNode($attr);
+    }
+
     private static function importNodeEntry(
         Context $ctx,
         ObjectEntry $document,
