@@ -601,18 +601,32 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'normalizer_phantom')) {
                 continue;
             }
-            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesLocale()
-                && str_contains($name, 'locale_get_default')
-                && !str_contains($name, 'locale_gated')) {
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsLocaleCompliance($name)
+                && (str_contains($name, 'locale_get_default')
+                    || str_contains($name, 'locale_class')
+                    || str_contains($name, 'locale_set_default'))
+                && !str_contains($name, 'locale_gated')
+                && !str_contains($name, 'intl_phantom')) {
                 continue;
             }
             if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsLocaleParserCompliance($name)
                 && str_contains($name, 'locale_get_parts')
-                && !str_contains($name, 'locale_gated')) {
+                && !str_contains($name, 'locale_gated')
+                && !str_contains($name, 'intl_phantom')) {
                 continue;
             }
-            // locale_get_default()/locale_get_*: JIT lowering deferred when ext/intl loaded (#9576, #5125).
-            if (str_contains($name, 'locale_get_default') || str_contains($name, 'locale_get_parts')) {
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsIntlOopCompliance($name)
+                && (str_contains($name, 'intldateformatter')
+                    || str_contains($name, 'numberformatter')
+                    || str_contains($name, 'intlcalendar')
+                    || str_contains($name, 'intl_skeleton'))
+                && !str_contains($name, 'intl_phantom')) {
+                continue;
+            }
+            // locale_get_default()/locale_get_*/locale_gated: JIT lowering deferred (#9576, #5125, #19670).
+            if (str_contains($name, 'locale_get_default')
+                || str_contains($name, 'locale_get_parts')
+                || str_contains($name, 'locale_gated')) {
                 continue;
             }
             if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesBuiltins()

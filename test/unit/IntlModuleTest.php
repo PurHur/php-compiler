@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\intl\IntlExtensionPolicy;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
 /**
- * intl module skeleton registration (issue #5774).
+ * intl module skeleton registration (issue #5774, #19670).
  *
  * @group intl_module_skeleton
  */
@@ -19,7 +20,7 @@ final class IntlModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        self::assertTrue(VmReflection::classExists($ctx, 'IntlDateFormatter'));
+        self::assertFalse(VmReflection::classExists($ctx, 'IntlDateFormatter'));
         self::assertFalse(VmReflection::classExists($ctx, 'Collator'));
         self::assertFalse(VmReflection::classExists($ctx, 'IntlException'));
         self::assertFalse(VmReflection::functionExists($ctx, 'intl_get_error_code'));
@@ -35,11 +36,14 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'intl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('1000', ob_get_clean());
+        self::assertSame('0000', ob_get_clean());
     }
 
     public function test_intl_date_formatter_pattern_create_format(): void
     {
+        if (!IntlExtensionPolicy::advertisesIntlDateFormatter()) {
+            self::markTestSkipped('IntlDateFormatter withheld until extension_loaded(\'intl\') (#19670)');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -62,7 +66,7 @@ PHP;
 
     public function test_intl_skeleton_create_stubs_throw_when_advertised(): void
     {
-        if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesBuiltins()) {
+        if (!IntlExtensionPolicy::advertisesBuiltins()) {
             self::markTestSkipped('intl extension not advertised on reference profile');
         }
         $runtime = new Runtime();

@@ -1,24 +1,36 @@
 --TEST--
-stdlib intl Collator withheld; IntlDateFormatter partial advertise (#12115, #19549)
+stdlib intl OOP + locale_* withheld without ext/intl (#19670, re-#16214)
 --FILE--
 <?php
 echo 'intl_loaded=', (int) extension_loaded('intl'), "\n";
-echo 'collator=', (int) class_exists('Collator', false), "\n";
+echo 'locale=', (int) class_exists('Locale', false), "\n";
 echo 'formatter=', (int) class_exists('IntlDateFormatter', false), "\n";
+echo 'number=', (int) class_exists('NumberFormatter', false), "\n";
+echo 'calendar=', (int) class_exists('IntlCalendar', false), "\n";
+echo 'timezone=', (int) class_exists('IntlTimeZone', false), "\n";
+echo 'collator=', (int) class_exists('Collator', false), "\n";
+echo 'locale_get_default=', (int) function_exists('locale_get_default'), "\n";
 try {
     Collator::create('en_US');
     echo "collator_no_throw\n";
 } catch (Throwable $e) {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
-$f = IntlDateFormatter::create('en_US', IntlDateFormatter::NONE, IntlDateFormatter::NONE, 'UTC', IntlDateFormatter::GREGORIAN, 'yyyy-MM-dd');
-echo 'create_ok=', (int) ($f instanceof IntlDateFormatter), "\n";
-echo $f->format(new DateTime('2024-01-02 00:00:00', new DateTimeZone('UTC'))), "\n";
+try {
+    IntlDateFormatter::create('en_US', 0, 0, 'UTC', 1, 'yyyy-MM-dd');
+    echo "formatter_no_throw\n";
+} catch (Throwable $e) {
+    echo 'formatter_err=', get_class($e), "\n";
+}
 ?>
 --EXPECT--
 intl_loaded=0
+locale=0
+formatter=0
+number=0
+calendar=0
+timezone=0
 collator=0
-formatter=1
+locale_get_default=0
 Error: Class "Collator" not found
-create_ok=1
-2024-01-02
+formatter_err=Error
