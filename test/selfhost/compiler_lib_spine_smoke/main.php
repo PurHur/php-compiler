@@ -5061,6 +5061,7 @@ require_once __DIR__.'/../../../lib/VM/HeaderCallbackQueue.php';
 require_once __DIR__.'/../../../lib/VM/ImplementsHierarchyRuntimeCheck.php';
 require_once __DIR__.'/../../../lib/VM/InOperator.php';
 require_once __DIR__.'/../../../lib/VM/InOperatorJitHelper.php';
+require_once __DIR__.'/../../../lib/VM/IncompleteClassSupport.php';
 require_once __DIR__.'/../../../lib/VM/InstanceOfClassName.php';
 require_once __DIR__.'/../../../lib/VM/InstanceOfJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/InterfaceCheck.php';
