@@ -150,4 +150,22 @@ PHP;
         $runtime->run($block);
         self::assertSame("obj\ncafe\nbad_null\n", ob_get_clean());
     }
+
+    public function test_resourcebundle_version_via_forced_registration(): void
+    {
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerResourceBundle($runtime->vmContext);
+        $code = <<<'PHP'
+<?php
+$rb = ResourceBundle::create('en', null);
+echo $rb === false || $rb === null ? 'null' : 'obj', "\n";
+$ver = $rb->get('Version');
+echo is_string($ver) && $ver !== '' ? 'version_ok' : 'version_bad', "\n";
+echo strlen($ver) > 0 ? '1' : '0', "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_resourcebundle_forced.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("obj\nversion_ok\n1\n", ob_get_clean());
+    }
 }

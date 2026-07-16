@@ -511,6 +511,7 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'intlcalendar')
                     || str_contains($name, 'msgfmt_format')
                     || str_contains($name, 'transliterator')
+                    || str_contains($name, 'resourcebundle')
                     || str_contains($name, 'intl_skeleton')
                     || str_contains($name, 'intl_char')
                     || str_contains($name, 'intl_uconverter')
