@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5093 |
-| Phase A inventory files (M2 ratio SSOT) | 5093 |
+| PHP files on vm.php path | 5102 |
+| Phase A inventory files (M2 ratio SSOT) | 5102 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13823 |
+| Source constructs flagged (warnings) | 13855 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3146,6 +3146,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/stats/stats_covariance.php` | 0 | 2 |
 | `ext/stats/stats_standard_deviation.php` | 0 | 2 |
 | `ext/stats/stats_variance.php` | 0 | 2 |
+| `ext/sysvmsg/Module.php` | 0 | 8 |
+| `ext/sysvmsg/MsgArgs.php` | 0 | 2 |
+| `ext/sysvmsg/VmMsg.php` | 0 | 6 |
+| `ext/sysvmsg/msg_get_queue.php` | 0 | 2 |
+| `ext/sysvmsg/msg_queue_exists.php` | 0 | 2 |
+| `ext/sysvmsg/msg_receive.php` | 0 | 4 |
+| `ext/sysvmsg/msg_remove_queue.php` | 0 | 2 |
+| `ext/sysvmsg/msg_send.php` | 0 | 3 |
+| `ext/sysvmsg/msg_stat_queue.php` | 0 | 2 |
 | `ext/sysvsem/Module.php` | 0 | 5 |
 | `ext/sysvsem/SemArgs.php` | 0 | 2 |
 | `ext/sysvsem/VmSem.php` | 0 | 4 |
@@ -4417,7 +4426,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 91 |
+| `lib/Runtime.php` | 0 | 92 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -25748,6 +25757,73 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/sysvmsg/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new VM\Variable (line 28)
+- new msg_get_queue (line 42)
+- new msg_send (line 43)
+- new msg_receive (line 44)
+- new msg_remove_queue (line 45)
+- new msg_stat_queue (line 46)
+- new msg_queue_exists (line 47)
+- 3 class method(s)
+
+### `ext/sysvmsg/MsgArgs.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 19)
+- 7 class method(s)
+
+### `ext/sysvmsg/VmMsg.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 36)
+- new Variable (line 44)
+- new ObjectEntry (line 45)
+- new HashTable (line 198)
+- new Variable (line 200)
+- 13 class method(s)
+
+### `ext/sysvmsg/msg_get_queue.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 3 class method(s)
+
+### `ext/sysvmsg/msg_queue_exists.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 2 class method(s)
+
+### `ext/sysvmsg/msg_receive.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Variable (line 54)
+- new Variable (line 63)
+- 3 class method(s)
+
+### `ext/sysvmsg/msg_remove_queue.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 3 class method(s)
+
+### `ext/sysvmsg/msg_send.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Variable (line 52)
+- 3 class method(s)
+
+### `ext/sysvmsg/msg_stat_queue.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 3 class method(s)
+
 ### `ext/sysvsem/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -27322,7 +27398,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 571)
+- new ArgumentCountError (line 592)
 - 14 class method(s)
 
 ### `lib/BuiltinTypeClassConstant.php`
@@ -34275,17 +34351,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\uploadprogress\Module (line 274)
 - new ext\sysvshm\Module (line 275)
 - new ext\sysvsem\Module (line 276)
-- new ext\standard\Module (line 277)
-- new JIT (line 353)
-- new JITContext (line 367)
-- new SealedClassPreprocessor (line 432)
-- new StaticClassPreprocessor (line 435)
-- new SourcePreprocessor\PropertyHooks (line 438)
-- new State (line 578)
-- new ReflectionProperty (line 605)
-- new ReflectionProperty (line 608)
-- new LintCompiler (line 1019)
-- new Variable (line 1149)
+- new ext\sysvmsg\Module (line 277)
+- new ext\standard\Module (line 278)
+- new JIT (line 354)
+- new JITContext (line 368)
+- new SealedClassPreprocessor (line 433)
+- new StaticClassPreprocessor (line 436)
+- new SourcePreprocessor\PropertyHooks (line 439)
+- new State (line 579)
+- new ReflectionProperty (line 606)
+- new ReflectionProperty (line 609)
+- new LintCompiler (line 1020)
+- new Variable (line 1150)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

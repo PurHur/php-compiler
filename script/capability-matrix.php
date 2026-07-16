@@ -46,6 +46,7 @@ function collectCapabilities(string $root): array
         'uploadprogress' => new PHPCompiler\ext\uploadprogress\Module(),
         'sysvshm' => new PHPCompiler\ext\sysvshm\Module(),
         'sysvsem' => new PHPCompiler\ext\sysvsem\Module(),
+        'sysvmsg' => new PHPCompiler\ext\sysvmsg\Module(),
     ];
 
     $capabilities = [];

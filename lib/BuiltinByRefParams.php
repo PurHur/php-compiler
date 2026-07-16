@@ -137,6 +137,12 @@ final class BuiltinByRefParams
                 return [0];
             case 'uuid_generate':
                 return [0];
+            case 'msg_send':
+                // php-src ext/sysvmsg/sysvmsg.stub.php — &$error_code (#3666)
+                return [5];
+            case 'msg_receive':
+                // &$received_message_type, &$message, &$error_code (#3666)
+                return [2, 4, 7];
         }
 
         return [];
