@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlwriter;
 
-/** Per-instance XMLWriter buffer state (#6065). */
+/** Per-instance XMLWriter buffer state (#6065, #19340). */
 final class XmlWriterState
 {
     public bool $open = false;
@@ -16,12 +16,19 @@ final class XmlWriterState
 
     public string $buffer = '';
 
-    /** @var list<string> */
+    /** @var list<array{name: string, hasIndentedChild: bool}> */
     public array $elementStack = [];
+
+    /** True while the current element's start tag is still open (`<name` …). */
+    public bool $startTagOpen = false;
 
     public bool $documentStarted = false;
 
     public ?string $version = null;
 
     public ?string $encoding = null;
+
+    public bool $indent = false;
+
+    public string $indentString = ' ';
 }

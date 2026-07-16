@@ -10,7 +10,7 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * XMLWriter streaming serializer — PHP-in-PHP (php-src ext/xmlwriter/php_xmlwriter.c; #6065).
+ * XMLWriter streaming serializer — PHP-in-PHP (php-src ext/xmlwriter/php_xmlwriter.c; #6065, #19340).
  */
 final class VmXmlWriter
 {
@@ -31,12 +31,30 @@ final class VmXmlWriter
         $entry->methods['openuri'] = new XmlWriterOpenURI();
         $entry->methodVisibility['openuri'] = $pub;
         $entry->methodNames['openuri'] = 'openURI';
+        $entry->methods['setindent'] = new XmlWriterSetIndent();
+        $entry->methodVisibility['setindent'] = $pub;
+        $entry->methodNames['setindent'] = 'setIndent';
+        $entry->methods['setindentstring'] = new XmlWriterSetIndentString();
+        $entry->methodVisibility['setindentstring'] = $pub;
+        $entry->methodNames['setindentstring'] = 'setIndentString';
         $entry->methods['startdocument'] = new XmlWriterStartDocument();
         $entry->methodVisibility['startdocument'] = $pub;
         $entry->methodNames['startdocument'] = 'startDocument';
         $entry->methods['startelement'] = new XmlWriterStartElement();
         $entry->methodVisibility['startelement'] = $pub;
         $entry->methodNames['startelement'] = 'startElement';
+        $entry->methods['writeattribute'] = new XmlWriterWriteAttribute();
+        $entry->methodVisibility['writeattribute'] = $pub;
+        $entry->methodNames['writeattribute'] = 'writeAttribute';
+        $entry->methods['writeelement'] = new XmlWriterWriteElement();
+        $entry->methodVisibility['writeelement'] = $pub;
+        $entry->methodNames['writeelement'] = 'writeElement';
+        $entry->methods['writecdata'] = new XmlWriterWriteCData();
+        $entry->methodVisibility['writecdata'] = $pub;
+        $entry->methodNames['writecdata'] = 'writeCData';
+        $entry->methods['writecomment'] = new XmlWriterWriteComment();
+        $entry->methodVisibility['writecomment'] = $pub;
+        $entry->methodNames['writecomment'] = 'writeComment';
         $entry->methods['text'] = new XmlWriterText();
         $entry->methodVisibility['text'] = $pub;
         $entry->methodNames['text'] = 'text';
@@ -79,14 +97,7 @@ final class VmXmlWriter
     public static function openMemory(ObjectEntry $entry): bool
     {
         $state = self::ensureState($entry);
-        $state->open = true;
-        $state->mode = 'memory';
-        $state->uri = null;
-        $state->buffer = '';
-        $state->elementStack = [];
-        $state->documentStarted = false;
-        $state->version = null;
-        $state->encoding = null;
+        self::resetState($state, 'memory', null);
 
         return true;
     }
@@ -105,14 +116,23 @@ final class VmXmlWriter
         }
 
         $state = self::ensureState($entry);
-        $state->open = true;
-        $state->mode = 'uri';
-        $state->uri = $uri;
-        $state->buffer = '';
-        $state->elementStack = [];
-        $state->documentStarted = false;
-        $state->version = null;
-        $state->encoding = null;
+        self::resetState($state, 'uri', $uri);
+
+        return true;
+    }
+
+    public static function setIndent(ObjectEntry $entry, bool $enable): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::setIndent()');
+        $state->indent = $enable;
+
+        return true;
+    }
+
+    public static function setIndentString(ObjectEntry $entry, string $indentation): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::setIndentString()');
+        $state->indentString = $indentation;
 
         return true;
     }
@@ -149,8 +169,66 @@ final class VmXmlWriter
                 var_export($name, true)
             ));
         }
-        $state->elementStack[] = $name;
-        $state->buffer .= '<'.self::escapeElementName($name).'>';
+        self::closeStartTagIfOpen($state);
+        if ([] !== $state->elementStack) {
+            if ($state->indent) {
+                $parentIdx = \count($state->elementStack) - 1;
+                $state->elementStack[$parentIdx]['hasIndentedChild'] = true;
+                $state->buffer .= "\n".str_repeat($state->indentString, \count($state->elementStack));
+            }
+        }
+        $state->elementStack[] = ['name' => $name, 'hasIndentedChild' => false];
+        $state->buffer .= '<'.self::escapeElementName($name);
+        $state->startTagOpen = true;
+
+        return true;
+    }
+
+    public static function writeAttribute(ObjectEntry $entry, string $name, string $value): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::writeAttribute()');
+        if (!$state->startTagOpen || [] === $state->elementStack) {
+            return false;
+        }
+        if (!self::isValidAttributeName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::writeAttribute(): Argument #1 ($name) must be a valid attribute name, %s given',
+                var_export($name, true)
+            ));
+        }
+        $state->buffer .= ' '.self::escapeElementName($name).'="'.self::escapeAttribute($value).'"';
+
+        return true;
+    }
+
+    public static function writeElement(ObjectEntry $entry, string $name, ?string $content = null): bool
+    {
+        if (!self::startElement($entry, $name)) {
+            return false;
+        }
+        if (null !== $content) {
+            if (!self::text($entry, $content)) {
+                return false;
+            }
+        }
+
+        return self::endElement($entry);
+    }
+
+    public static function writeCData(ObjectEntry $entry, string $content): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::writeCData()');
+        self::closeStartTagIfOpen($state);
+        $state->buffer .= '<![CDATA['.$content.']]>';
+
+        return true;
+    }
+
+    public static function writeComment(ObjectEntry $entry, string $content): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::writeComment()');
+        self::closeStartTagIfOpen($state);
+        $state->buffer .= '<!--'.$content.'-->';
 
         return true;
     }
@@ -158,6 +236,7 @@ final class VmXmlWriter
     public static function text(ObjectEntry $entry, string $content): bool
     {
         $state = self::requireOpen($entry, 'XMLWriter::text()');
+        self::closeStartTagIfOpen($state);
         $state->buffer .= self::escapeText($content);
 
         return true;
@@ -169,8 +248,20 @@ final class VmXmlWriter
         if ([] === $state->elementStack) {
             return false;
         }
-        $name = array_pop($state->elementStack);
-        $state->buffer .= '</'.self::escapeElementName($name).'>';
+        if ($state->startTagOpen) {
+            $state->buffer .= '/>';
+            array_pop($state->elementStack);
+            $state->startTagOpen = false;
+
+            return true;
+        }
+        $frame = array_pop($state->elementStack);
+        if ($frame['hasIndentedChild']) {
+            $state->buffer .= "\n".str_repeat($state->indentString, \count($state->elementStack));
+            $state->buffer .= '</'.self::escapeElementName($frame['name']).'>'."\n";
+        } else {
+            $state->buffer .= '</'.self::escapeElementName($frame['name']).'>';
+        }
 
         return true;
     }
@@ -180,6 +271,10 @@ final class VmXmlWriter
         $state = self::requireOpen($entry, 'XMLWriter::endDocument()');
         while ([] !== $state->elementStack) {
             self::endElement($entry);
+        }
+        // php-src/libxml xmlTextWriterEndDocument appends a trailing newline.
+        if (!str_ends_with($state->buffer, "\n")) {
+            $state->buffer .= "\n";
         }
         if ('uri' === $state->mode && null !== $state->uri) {
             if (false === @file_put_contents($state->uri, $state->buffer)) {
@@ -222,6 +317,22 @@ final class VmXmlWriter
         return true;
     }
 
+    private static function resetState(XmlWriterState $state, string $mode, ?string $uri): void
+    {
+        $state->open = true;
+        $state->mode = $mode;
+        $state->uri = $uri;
+        $state->buffer = '';
+        $state->elementStack = [];
+        $state->startTagOpen = false;
+        $state->documentStarted = false;
+        $state->version = null;
+        $state->encoding = null;
+        // indent flags persist across openMemory in Zend? Reset for clean writers.
+        $state->indent = false;
+        $state->indentString = ' ';
+    }
+
     private static function requireOpen(ObjectEntry $entry, string $label): XmlWriterState
     {
         if (!XmlWriterRegistry::has($entry)) {
@@ -235,6 +346,14 @@ final class VmXmlWriter
         return $state;
     }
 
+    private static function closeStartTagIfOpen(XmlWriterState $state): void
+    {
+        if ($state->startTagOpen) {
+            $state->buffer .= '>';
+            $state->startTagOpen = false;
+        }
+    }
+
     private static function isValidElementName(string $name): bool
     {
         if ('' === $name) {
@@ -245,6 +364,11 @@ final class VmXmlWriter
         }
 
         return true;
+    }
+
+    private static function isValidAttributeName(string $name): bool
+    {
+        return self::isValidElementName($name);
     }
 
     private static function escapeElementName(string $name): string

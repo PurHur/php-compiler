@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5082 |
-| Phase A inventory files (M2 ratio SSOT) | 5082 |
+| PHP files on vm.php path | 5088 |
+| Phase A inventory files (M2 ratio SSOT) | 5088 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13783 |
+| Source constructs flagged (warnings) | 13807 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3265,7 +3265,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlrpc/xmlrpc_encode.php` | 0 | 2 |
 | `ext/xmlwriter/BuiltinClasses.php` | 0 | 1 |
 | `ext/xmlwriter/Module.php` | 0 | 1 |
-| `ext/xmlwriter/VmXmlWriter.php` | 0 | 14 |
+| `ext/xmlwriter/VmXmlWriter.php` | 0 | 20 |
 | `ext/xmlwriter/XmlWriterClassMethod.php` | 0 | 1 |
 | `ext/xmlwriter/XmlWriterEndDocument.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterEndElement.php` | 0 | 2 |
@@ -3274,9 +3274,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/XmlWriterOpenURI.php` | 0 | 3 |
 | `ext/xmlwriter/XmlWriterOutputMemory.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterRegistry.php` | 0 | 1 |
+| `ext/xmlwriter/XmlWriterSetIndent.php` | 0 | 3 |
+| `ext/xmlwriter/XmlWriterSetIndentString.php` | 0 | 3 |
 | `ext/xmlwriter/XmlWriterStartDocument.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterStartElement.php` | 0 | 3 |
 | `ext/xmlwriter/XmlWriterText.php` | 0 | 3 |
+| `ext/xmlwriter/XmlWriterWriteAttribute.php` | 0 | 3 |
+| `ext/xmlwriter/XmlWriterWriteCData.php` | 0 | 3 |
+| `ext/xmlwriter/XmlWriterWriteComment.php` | 0 | 3 |
+| `ext/xmlwriter/XmlWriterWriteElement.php` | 0 | 3 |
 | `ext/xsl/BuiltinClasses.php` | 0 | 1 |
 | `ext/xsl/Module.php` | 0 | 2 |
 | `ext/xsl/VmXsl.php` | 0 | 6 |
@@ -26568,17 +26574,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 27)
 - new XmlWriterOpenMemory (line 28)
 - new XmlWriterOpenURI (line 31)
-- new XmlWriterStartDocument (line 34)
-- new XmlWriterStartElement (line 37)
-- new XmlWriterText (line 40)
-- new XmlWriterEndElement (line 43)
-- new XmlWriterEndDocument (line 46)
-- new XmlWriterOutputMemory (line 49)
-- new XmlWriterFlush (line 52)
-- new XmlWriterState (line 72)
-- new Error (line 228)
-- new Error (line 232)
-- 18 class method(s)
+- new XmlWriterSetIndent (line 34)
+- new XmlWriterSetIndentString (line 37)
+- new XmlWriterStartDocument (line 40)
+- new XmlWriterStartElement (line 43)
+- new XmlWriterWriteAttribute (line 46)
+- new XmlWriterWriteElement (line 49)
+- new XmlWriterWriteCData (line 52)
+- new XmlWriterWriteComment (line 55)
+- new XmlWriterText (line 58)
+- new XmlWriterEndElement (line 61)
+- new XmlWriterEndDocument (line 64)
+- new XmlWriterOutputMemory (line 67)
+- new XmlWriterFlush (line 70)
+- new XmlWriterState (line 90)
+- new Error (line 339)
+- new Error (line 343)
+- 27 class method(s)
 
 ### `ext/xmlwriter/XmlWriterClassMethod.php`
 
@@ -26627,6 +26639,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `ext/xmlwriter/XmlWriterSetIndent.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/XmlWriterSetIndentString.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
 ### `ext/xmlwriter/XmlWriterStartDocument.php`
 
 **Warnings** (review for bootstrap subset):
@@ -26644,6 +26670,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/XmlWriterWriteAttribute.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/XmlWriterWriteCData.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/XmlWriterWriteComment.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/XmlWriterWriteElement.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
 - 1 class method(s)
 - 1 closure(s)
 
