@@ -34,5 +34,9 @@ final class GmpModuleTest extends BaseTest
             __DIR__.'/../compliance/cases/gmp/phase3_arith.phpt',
             'gmp_phase3_arith.phpt'
         );
+        yield 'gmp_phase4_random_import.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/gmp/phase4_random_import.phpt',
+            'gmp_phase4_random_import.phpt'
+        );
     }
 }
