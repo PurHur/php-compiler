@@ -1,5 +1,5 @@
 --TEST--
-stdlib intl OOP classes withheld without ext/intl — no phantom class_exists (#12115, ext/intl/php_intl.c)
+stdlib intl Collator withheld; IntlDateFormatter partial advertise (#12115, #19549)
 --FILE--
 <?php
 echo 'intl_loaded=', (int) extension_loaded('intl'), "\n";
@@ -11,16 +11,14 @@ try {
 } catch (Throwable $e) {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
-try {
-    IntlDateFormatter::create('en_US', 0, 0);
-    echo "formatter_no_throw\n";
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+$f = IntlDateFormatter::create('en_US', IntlDateFormatter::NONE, IntlDateFormatter::NONE, 'UTC', IntlDateFormatter::GREGORIAN, 'yyyy-MM-dd');
+echo 'create_ok=', (int) ($f instanceof IntlDateFormatter), "\n";
+echo $f->format(new DateTime('2024-01-02 00:00:00', new DateTimeZone('UTC'))), "\n";
 ?>
 --EXPECT--
 intl_loaded=0
 collator=0
-formatter=0
+formatter=1
 Error: Class "Collator" not found
-Error: Class "IntlDateFormatter" not found
+create_ok=1
+2024-01-02
