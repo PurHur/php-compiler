@@ -112,7 +112,8 @@ final class VmMime
         if ($len >= 3 && 0 === \strncmp($data, "\xff\xd8\xff", 3)) {
             return 'image/jpeg';
         }
-        if ($len >= 8 && 0 === \strncmp($data, "\x89PNG\r\n\x1a\n", 8)) {
+        // libmagic: bare 8-byte PNG signature is application/octet-stream; require IHDR type (#19470).
+        if (self::looksLikePngWithIhdr($data)) {
             return 'image/png';
         }
         if ($len >= 6 && (0 === \strncmp($data, 'GIF87a', 6) || 0 === \strncmp($data, 'GIF89a', 6))) {
@@ -145,6 +146,17 @@ final class VmMime
         }
 
         return 'application/octet-stream';
+    }
+
+    /**
+     * libmagic PNG: signature alone is not enough — first chunk type must be IHDR (#19470).
+     * Minimum: 8-byte signature + 4-byte length + "IHDR" (16 bytes).
+     */
+    private static function looksLikePngWithIhdr(string $data): bool
+    {
+        return \strlen($data) >= 16
+            && 0 === \strncmp($data, "\x89PNG\r\n\x1a\n", 8)
+            && 'IHDR' === \substr($data, 12, 4);
     }
 
     /**

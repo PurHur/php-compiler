@@ -43,7 +43,11 @@ final class VmMimeTest extends TestCase
 
     public function testDetectFromBytesPng(): void
     {
-        $this->assertSame('image/png', VmMime::detectFromBytes("\x89PNG\r\n\x1a\n\x00\x00"));
+        // Bare signature → octet-stream (libmagic / #19470); IHDR type required for image/png.
+        $this->assertSame('application/octet-stream', VmMime::detectFromBytes("\x89PNG\r\n\x1a\n"));
+        $this->assertSame('application/octet-stream', VmMime::detectFromBytes("\x89PNG\r\n\x1a\n\x00\x00"));
+        $ihdr = pack('N', 13).'IHDR'.pack('NN', 1, 1).chr(8).chr(2).chr(0).chr(0).chr(0).pack('N', 0);
+        $this->assertSame('image/png', VmMime::detectFromBytes("\x89PNG\r\n\x1a\n".$ihdr));
     }
 
     public function testDetectFromBytesPlainText(): void
