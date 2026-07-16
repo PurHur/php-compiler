@@ -15,7 +15,6 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\Builtin\RequestParseBodyRuntime;
-use PHPCompiler\JIT\Builtin\RequestParseBodyUserScriptLlvm;
 use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPLLVM\Value;
@@ -93,9 +92,9 @@ final class request_parse_body extends Internal
         $postHt = HashTableHelper::alloc($context);
         $filesHt = HashTableHelper::alloc($context);
         if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            RequestParseBodyUserScriptLlvm::ensureLinked($context);
+            JitRequestParseBodyKernel::ensureLinked($context);
             $context->builder->call(
-                $context->lookupFunction(RequestParseBodyUserScriptLlvm::BRIDGE_NAME),
+                $context->lookupFunction(JitRequestParseBodyKernel::BRIDGE_NAME),
                 $postHt,
                 $filesHt
             );

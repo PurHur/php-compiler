@@ -2,9 +2,11 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\MultipartRuntime;
+use PHPCompiler\JIT\Builtin\ParseStrRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
@@ -12,16 +14,17 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * User-script standalone AOT: init-safe LLVM for request_parse_body() (#5965, #17316).
+ * User-script standalone AOT: init-safe LLVM for request_parse_body() (#19466, #5965, #17316).
  *
  * Reads REQUEST_BODY / CONTENT_TYPE via libc getenv (mirrored from putenv() via POSIX setenv).
  * strdup's the body before strtok/urldecode in-place parse so environ is not mutated.
  * Multipart uses {@see MultipartNativeJitHelper::populateMultipartIntoNative} (prelinked;
  * no sg_FILES legacy bridge). Media-type detect uses libc `strncmp` — not `strncasecmp`,
  * which may resolve to CaseCompareJitHelper's PHP string ABI in deferred AOT (#5965).
+ * Housed in ext/standard (not lib/JIT/Builtin) — same kernel-move pattern as #19454 / #19399.
  * php-src: ext/standard/http.c
  */
-final class RequestParseBodyUserScriptLlvm
+final class JitRequestParseBodyKernel
 {
     public const BRIDGE_NAME = '__compiler_request_parse_body_user_aot';
 
