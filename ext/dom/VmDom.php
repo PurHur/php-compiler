@@ -1175,6 +1175,34 @@ final class VmDom
         return self::createAttributeNS($ctx, null, $name, $ownerDocument);
     }
 
+    /**
+     * Presence probe for nested AOT (#19507): returns $element if attribute exists,
+     * otherwise returns owner document (always non-null ObjectEntry).
+     */
+    public static function attributePresenceProbe(ObjectEntry $element, string $qualifiedName): ObjectEntry
+    {
+        if (0 !== self::hasAttributeNameInt($element, $qualifiedName)) {
+            return $element;
+        }
+        $owner = self::ownerDocumentEntry($element);
+        if (null !== $owner) {
+            return $owner;
+        }
+
+        return $element;
+    }
+
+    /** Nullable Attr for nested AOT helpers (#19507) — ObjectEntry|null crosses helper edge; int does not. */
+    public static function getAttributeNodeOrNull(Context $ctx, ObjectEntry $element, string $name): ?ObjectEntry
+    {
+        $var = self::getAttributeNode($ctx, $element, $name);
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return null;
+        }
+
+        return $var->toObject();
+    }
+
     public static function getAttributeNode(Context $ctx, ObjectEntry $element, string $name): Variable
     {
         if (!self::isElement($element)) {
@@ -1659,6 +1687,35 @@ final class VmDom
         }
 
         return true;
+    }
+
+    /** Presence as int for nested AOT helpers (#19507). */
+    public static function hasAttributeNameInt(ObjectEntry $element, string $qualifiedName): int
+    {
+        if (!self::isElement($element)) {
+            return 0;
+        }
+        $qualifiedName = self::normalizeToggleAttributeQName($element, $qualifiedName);
+        if (self::isXmlnsAttributeName($qualifiedName)) {
+            return 0;
+        }
+        $state = DomRegistry::state($element);
+        if (\array_key_exists($qualifiedName, $state->attributes)) {
+            return 1;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Omit-force toggle returning int 0/1 for nested AOT helpers (#19507).
+     * Keep DomRegistry access inside VmDom (not the nested helper TU).
+     */
+    public static function toggleAttributeOmitInt(Context $ctx, ObjectEntry $element, string $qualifiedName): int
+    {
+        self::toggleAttribute($ctx, $element, $qualifiedName, null);
+
+        return self::hasAttributeNameInt($element, $qualifiedName);
     }
 
     /** DOMElement::setIdAttribute() — manual ID map for getElementById() (php-src ext/dom/node.c; #14493). */

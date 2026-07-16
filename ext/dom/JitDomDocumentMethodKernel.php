@@ -13,6 +13,7 @@ use PHPCompiler\JIT\Builtin\DomGetElementByIdRuntime;
 use PHPCompiler\JIT\Builtin\DomGetElementsByTagNameRuntime;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
+use PHPCompiler\JIT\Builtin\DomLivingApiRuntime;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLFileRuntime;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
 use PHPCompiler\JIT\Builtin\DomLoadRuntime;
@@ -583,6 +584,120 @@ final class JitDomDocumentMethodKernel
         );
     }
 
+    public static function ensureContainsBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_CONTAINS,
+            'dom_node_contains_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomContainsJitHelper::containsArgv',
+            '/ext/dom/DomContainsJitHelper.php'
+        );
+    }
+
+    public static function ensureContainsNullBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_CONTAINS_NULL,
+            'dom_node_contains_null_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomContainsNullJitHelper::containsNullArgv',
+            '/ext/dom/DomContainsNullJitHelper.php'
+        );
+    }
+
+    public static function ensureGetRootNodeBridge(Context $context): void
+    {
+        self::ensureContextObjectValueBridge(
+            $context,
+            DomLivingApiRuntime::ABI_GET_ROOT_NODE,
+            'dom_node_get_root_node_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            'PHPCompiler\\ext\\dom\\DomGetRootNodeJitHelper::getRootNodeArgv',
+            '/ext/dom/DomGetRootNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureIsEqualNodeBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_IS_EQUAL_NODE,
+            'dom_node_is_equal_node_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomIsEqualNodeJitHelper::isEqualNodeArgv',
+            '/ext/dom/DomIsEqualNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureToggleAttributeBridge(Context $context): void
+    {
+        self::ensureToggleAttributeOmitBridge($context);
+    }
+
+    public static function ensureToggleAttributeOmitBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_TOGGLE_ATTRIBUTE_OMIT,
+            'dom_element_toggle_attribute_omit_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\ext\dom\DomToggleAttributeJitHelper::toggleOmitArgv',
+            '/ext/dom/DomToggleAttributeJitHelper.php'
+        );
+    }
+
+    public static function ensureToggleAttributeForceTrueBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_TOGGLE_ATTRIBUTE_FORCE_TRUE,
+            'dom_element_toggle_attribute_force_true_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\ext\dom\DomToggleAttributeJitHelper::toggleForceTrueArgv',
+            '/ext/dom/DomToggleAttributeJitHelper.php'
+        );
+    }
+
+    public static function ensureToggleAttributeForceFalseBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_TOGGLE_ATTRIBUTE_FORCE_FALSE,
+            'dom_element_toggle_attribute_force_false_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\ext\dom\DomToggleAttributeJitHelper::toggleForceFalseArgv',
+            '/ext/dom/DomToggleAttributeJitHelper.php'
+        );
+    }
+
     public static function ensureRemoveChildBridge(Context $context): void
     {
         $objPtr = $context->getTypeFromString('__object__*');
@@ -853,11 +968,7 @@ final class JitDomDocumentMethodKernel
         }
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -913,11 +1024,7 @@ final class JitDomDocumentMethodKernel
         }
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -984,11 +1091,8 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -1070,11 +1174,8 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -1149,11 +1250,8 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     private static function ensureNestedHelperProxies(Context $context): void
@@ -1282,11 +1380,8 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -1353,11 +1448,8 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -1424,10 +1516,46 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
+    }
+
+    /**
+     * Restore the caller's insert block after bridge emit (mirror JitVmHelperLink::ensureBridge).
+     * Prefer a fresh open block on the caller's function when the saved block is terminated (#19507).
+     */
+    private static function restoreInsertAfterBridge(Context $context, $savedBlock): void
+    {
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
+            if (null === $savedBlock->getTerminator()) {
+                $context->builder->positionAtEnd($savedBlock);
+
+                return;
+            }
+            $parent = $savedBlock->getParent();
+            if ($parent instanceof \PHPLLVM\Value\Function_) {
+                $next = $parent->appendBasicBlock('dom_bridge_restore_cont');
+                $context->builder->positionAtEnd($next);
+
+                return;
+            }
         }
+        $fallback = null;
+        if ('' !== $context->activeFunction && isset($context->functions[$context->activeFunction])) {
+            $active = $context->functions[$context->activeFunction];
+            if ($active instanceof \PHPLLVM\Value\Function_) {
+                $fallback = $active;
+            }
+        }
+        if (null === $fallback && $context->main instanceof \PHPLLVM\Value\Function_) {
+            $fallback = $context->main;
+        }
+        if (null !== $fallback && $fallback->countBasicBlocks() > 0) {
+            $next = $fallback->appendBasicBlock('dom_bridge_restore_main_cont');
+            $context->builder->positionAtEnd($next);
+
+            return;
+        }
+        $context->builder->clearInsertionPosition();
     }
 }

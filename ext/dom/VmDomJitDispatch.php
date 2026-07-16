@@ -308,6 +308,83 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function dispatchContains(ObjectEntry $receiver, array $extra): Variable
+    {
+        return match (strtolower($receiver->class->name)) {
+            'domtokenlist' => self::tokenListContains($receiver, $extra),
+            default => self::nodeContains($receiver, $extra),
+        };
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function nodeContains(ObjectEntry $node, array $extra): Variable
+    {
+        $otherVar = ($extra[0] ?? self::missingArg('contains', 0))->resolveIndirect();
+        $other = null;
+        if (Variable::TYPE_NULL !== $otherVar->type) {
+            $other = VariableObject::entry($otherVar);
+        }
+        $result = new Variable();
+        $result->bool(VmDom::contains($node, $other));
+
+        return $result;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function toggleAttribute(VmContext $ctx, ObjectEntry $element, array $extra): Variable
+    {
+        $name = self::stringArg($extra[0] ?? self::missingArg('toggleAttribute', 0), 'toggleAttribute', 0);
+        $force = null;
+        if (isset($extra[1])) {
+            $forceVar = $extra[1]->resolveIndirect();
+            if (Variable::TYPE_NULL === $forceVar->type) {
+                $force = null;
+            } elseif (Variable::TYPE_BOOLEAN === $forceVar->type) {
+                $force = $forceVar->toBool();
+            } else {
+                throw new \TypeError(
+                    'DOMElement::toggleAttribute(): Argument #2 ($force) must be of type ?bool, '
+                    .VmDom::typeLabel($forceVar).' given'
+                );
+            }
+        }
+        $var = new Variable();
+        $var->bool(VmDom::toggleAttribute($ctx, $element, $name, $force));
+
+        return $var;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function getRootNode(ObjectEntry $node, array $extra): Variable
+    {
+        unset($extra);
+        $result = new Variable();
+        $result->object(VmDom::getRootNode($node));
+
+        return $result;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function isEqualNode(ObjectEntry $node, array $extra): Variable
+    {
+        $other = VariableObject::entry(($extra[0] ?? self::missingArg('isEqualNode', 0))->resolveIndirect());
+        $result = new Variable();
+        $result->bool(VmDom::isEqualNode($node, $other));
+
+        return $result;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function xpathQuery(VmContext $ctx, ObjectEntry $xpath, array $extra): Variable
     {
         $expression = self::stringArg($extra[0] ?? self::missingArg('query', 0), 'query', 0);

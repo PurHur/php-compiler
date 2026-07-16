@@ -74,6 +74,10 @@ final class DomInstanceMethodJit
         'domelement::getattributenode' => true,
         'domelement::getattributenodens' => true,
         'domelement::setattributenodens' => true,
+        'domelement::toggleattribute' => true,
+        'domnode::contains' => true,
+        'domnode::getrootnode' => true,
+        'domnode::isequalnode' => true,
         'domxpath::query' => true,
         'domxpath::evaluate' => true,
         'domnodelist::item' => true,
@@ -224,6 +228,26 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domelement::toggleattribute' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementToggleAttribute();
+
+                return;
+            }
+            if ('domnode::contains' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeContains();
+
+                return;
+            }
+            if ('domnode::getrootnode' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeGetRootNode();
+
+                return;
+            }
+            if ('domnode::isequalnode' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomNodeIsEqualNode();
+
+                return;
+            }
             if ('domelement::removechild' === $lc || 'domnode::removechild' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomNodeRemoveChild();
 
@@ -296,6 +320,10 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domnode::append');
             self::ensureProxy($context, 'domnode::prepend');
             self::ensureProxy($context, 'domnode::replacechildren');
+            self::ensureProxy($context, 'domelement::toggleattribute');
+            self::ensureProxy($context, 'domnode::contains');
+            self::ensureProxy($context, 'domnode::getrootnode');
+            self::ensureProxy($context, 'domnode::isequalnode');
             self::ensureProxy($context, 'domnode::removechild');
             self::ensureProxy($context, 'domelement::removechild');
             self::ensureProxy($context, 'domnode::replacechild');
