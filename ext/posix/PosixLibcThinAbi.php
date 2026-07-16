@@ -120,6 +120,26 @@ final class PosixLibcThinAbi
     }
 
     /**
+     * getlogin(3) — utmp login name; NULL on failure (#6504).
+     */
+    public static function getlogin(): ?string
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+
+        $ptr = $ffi->getlogin();
+        if (null === $ptr) {
+            return null;
+        }
+
+        $name = \FFI::string($ptr);
+
+        return '' === $name ? null : $name;
+    }
+
+    /**
      * times(2) system tick counter since boot — read-only thin ABI (#13524).
      */
     public static function systemClockTicks(): ?int
@@ -192,6 +212,7 @@ struct tms {
     clock_t tms_cstime;
 };
 clock_t times(struct tms *buf);
+char *getlogin(void);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

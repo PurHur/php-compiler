@@ -78,6 +78,9 @@ class Module extends ModuleAbstract
             new posix_getpgid(),
             new posix_setpgid(),
             new posix_kill(),
+            new posix_getlogin(),
+            new posix_ttyname(),
+            new posix_isatty(),
         ];
     }
 }
