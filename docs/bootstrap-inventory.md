@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5102 |
-| Phase A inventory files (M2 ratio SSOT) | 5102 |
+| PHP files on vm.php path | 5113 |
+| Phase A inventory files (M2 ratio SSOT) | 5113 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13856 |
+| Source constructs flagged (warnings) | 13893 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -467,15 +467,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gettext/textdomain.php` | 0 | 2 |
 | `ext/gmp/GmpFunction.php` | 0 | 1 |
 | `ext/gmp/GmpToString.php` | 0 | 1 |
-| `ext/gmp/Module.php` | 0 | 7 |
-| `ext/gmp/VmGmp.php` | 0 | 1 |
+| `ext/gmp/Module.php` | 0 | 18 |
+| `ext/gmp/VmGmp.php` | 0 | 4 |
 | `ext/gmp/VmGmpObject.php` | 0 | 7 |
+| `ext/gmp/gmp_abs.php` | 0 | 2 |
 | `ext/gmp/gmp_add.php` | 0 | 2 |
+| `ext/gmp/gmp_and.php` | 0 | 2 |
 | `ext/gmp/gmp_cmp.php` | 0 | 2 |
+| `ext/gmp/gmp_div_q.php` | 0 | 2 |
+| `ext/gmp/gmp_div_qr.php` | 0 | 3 |
+| `ext/gmp/gmp_div_r.php` | 0 | 2 |
 | `ext/gmp/gmp_init.php` | 0 | 2 |
+| `ext/gmp/gmp_intval.php` | 0 | 2 |
+| `ext/gmp/gmp_mod.php` | 0 | 2 |
 | `ext/gmp/gmp_mul.php` | 0 | 2 |
+| `ext/gmp/gmp_neg.php` | 0 | 2 |
+| `ext/gmp/gmp_or.php` | 0 | 2 |
+| `ext/gmp/gmp_pow.php` | 0 | 2 |
 | `ext/gmp/gmp_strval.php` | 0 | 2 |
 | `ext/gmp/gmp_sub.php` | 0 | 2 |
+| `ext/gmp/gmp_xor.php` | 0 | 2 |
 | `ext/hash/BuiltinClasses.php` | 0 | 1 |
 | `ext/hash/HashAlgosJitHelper.php` | 0 | 1 |
 | `ext/hash/HashContextDebugInfo.php` | 0 | 3 |
@@ -8094,12 +8105,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new gmp_mul (line 31)
 - new gmp_cmp (line 32)
 - new gmp_strval (line 33)
+- new gmp_pow (line 34)
+- new gmp_mod (line 35)
+- new gmp_div_q (line 36)
+- new gmp_div_r (line 37)
+- new gmp_div_qr (line 38)
+- new gmp_abs (line 39)
+- new gmp_neg (line 40)
+- new gmp_and (line 41)
+- new gmp_or (line 42)
+- new gmp_xor (line 43)
+- new gmp_intval (line 44)
 - 3 class method(s)
 
 ### `ext/gmp/VmGmp.php`
 
 **Warnings** (review for bootstrap subset):
-- 24 class method(s)
+- new DivisionByZeroError (line 252)
+- new DivisionByZeroError (line 280)
+- new DivisionByZeroError (line 585)
+- 45 class method(s)
 
 ### `ext/gmp/VmGmpObject.php`
 
@@ -8112,7 +8137,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 45)
 - 3 class method(s)
 
+### `ext/gmp/gmp_abs.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_add.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_and.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -8124,13 +8161,62 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/gmp/gmp_div_q.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/gmp/gmp_div_qr.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- new HashTable (line 33)
+- 1 class method(s)
+
+### `ext/gmp/gmp_div_r.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_init.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 22)
 - 1 class method(s)
 
+### `ext/gmp/gmp_intval.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_mod.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_mul.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_neg.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_or.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_pow.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -8143,6 +8229,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/gmp/gmp_sub.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_xor.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -24115,7 +24207,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 95)
 - new Variable (line 97)
 - new Variable (line 103)
-- new JITVariable (line 131)
+- new JITVariable (line 133)
 - 4 class method(s)
 
 ### `ext/standard/preg_grep.php`
@@ -28437,86 +28529,86 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Literal (line 8140)
 - new Variable (line 8200)
 - new Operand\Literal (line 8297)
-- new Variable (line 8654)
-- new Variable (line 8772)
-- new VM\Variable (line 8832)
-- new OpCode (line 8916)
-- new Variable (line 9443)
-- new Variable (line 9504)
-- new JIT\Call\ClosureWithBinding (line 9533)
-- new JIT\Call\RuntimeVariableFunction (line 9588)
-- new Variable (line 9733)
-- new VM\Variable (line 9991)
-- new VM (line 9997)
-- new VM\Variable (line 10010)
-- new Variable (line 10228)
-- new Type (line 10235)
-- new Variable (line 10256)
-- new Type (line 10264)
-- new Variable (line 10286)
-- new Type (line 10294)
-- new Variable (line 10411)
-- new Variable (line 10432)
-- new Variable (line 11539)
-- new Variable (line 11564)
-- new Variable (line 11585)
-- new CompileError (line 12332)
-- new CompileError (line 12436)
-- new Variable (line 12487)
-- new Variable (line 12870)
-- new Variable (line 12890)
-- new Variable (line 12911)
-- new Variable (line 12945)
-- new Variable (line 12979)
-- new Variable (line 13071)
-- new Variable (line 13093)
-- new Variable (line 13103)
-- new Variable (line 13255)
-- new Variable (line 13273)
-- new Variable (line 13323)
-- new Variable (line 13350)
-- new Variable (line 13375)
-- new Variable (line 13704)
-- new Variable (line 14072)
-- new Variable (line 14102)
-- new Variable (line 14121)
-- new Variable (line 14151)
-- new Variable (line 14188)
-- new Variable (line 14236)
-- new Variable (line 14279)
-- new VM\Variable (line 14624)
-- new Variable (line 14658)
-- new Variable (line 14709)
-- new Variable (line 14725)
-- new Variable (line 14744)
-- new Variable (line 14751)
-- new OpCode (line 14771)
-- new Variable (line 14772)
-- new Variable (line 14944)
-- new Variable (line 14982)
-- new OpCode (line 14996)
-- new Variable (line 14997)
-- new Variable (line 15056)
-- new OpCode (line 15077)
-- new Variable (line 15078)
-- new Variable (line 15175)
-- new Variable (line 15197)
-- new Variable (line 15265)
-- new Operand\Literal (line 15274)
-- new Variable (line 15289)
-- new Variable (line 15453)
-- new VM\PropertyIsInitializedHandler (line 15535)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15575)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15678)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15754)
-- new JIT\Call\VmCoerceVariableToString (line 15844)
-- new JIT\Call\IncludePathResolverResolve (line 16098)
-- new Variable (line 17154)
-- new VM (line 17198)
-- new VM\Variable (line 17207)
-- new Variable (line 17228)
-- new Variable (line 17274)
-- new Variable (line 17768)
+- new Variable (line 8662)
+- new Variable (line 8780)
+- new VM\Variable (line 8840)
+- new OpCode (line 8924)
+- new Variable (line 9451)
+- new Variable (line 9512)
+- new JIT\Call\ClosureWithBinding (line 9541)
+- new JIT\Call\RuntimeVariableFunction (line 9596)
+- new Variable (line 9741)
+- new VM\Variable (line 9999)
+- new VM (line 10005)
+- new VM\Variable (line 10018)
+- new Variable (line 10236)
+- new Type (line 10243)
+- new Variable (line 10264)
+- new Type (line 10272)
+- new Variable (line 10294)
+- new Type (line 10302)
+- new Variable (line 10419)
+- new Variable (line 10440)
+- new Variable (line 11547)
+- new Variable (line 11572)
+- new Variable (line 11593)
+- new CompileError (line 12340)
+- new CompileError (line 12444)
+- new Variable (line 12495)
+- new Variable (line 12878)
+- new Variable (line 12898)
+- new Variable (line 12919)
+- new Variable (line 12953)
+- new Variable (line 12987)
+- new Variable (line 13079)
+- new Variable (line 13101)
+- new Variable (line 13111)
+- new Variable (line 13263)
+- new Variable (line 13281)
+- new Variable (line 13331)
+- new Variable (line 13358)
+- new Variable (line 13383)
+- new Variable (line 13712)
+- new Variable (line 14080)
+- new Variable (line 14110)
+- new Variable (line 14129)
+- new Variable (line 14159)
+- new Variable (line 14196)
+- new Variable (line 14244)
+- new Variable (line 14287)
+- new VM\Variable (line 14632)
+- new Variable (line 14666)
+- new Variable (line 14717)
+- new Variable (line 14733)
+- new Variable (line 14752)
+- new Variable (line 14759)
+- new OpCode (line 14779)
+- new Variable (line 14780)
+- new Variable (line 14952)
+- new Variable (line 14990)
+- new OpCode (line 15004)
+- new Variable (line 15005)
+- new Variable (line 15064)
+- new OpCode (line 15085)
+- new Variable (line 15086)
+- new Variable (line 15183)
+- new Variable (line 15205)
+- new Variable (line 15273)
+- new Operand\Literal (line 15282)
+- new Variable (line 15297)
+- new Variable (line 15461)
+- new VM\PropertyIsInitializedHandler (line 15543)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15583)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15686)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15762)
+- new JIT\Call\VmCoerceVariableToString (line 15852)
+- new JIT\Call\IncludePathResolverResolve (line 16106)
+- new Variable (line 17162)
+- new VM (line 17206)
+- new VM\Variable (line 17215)
+- new Variable (line 17236)
+- new Variable (line 17282)
+- new Variable (line 17776)
 - 369 class method(s)
 - 7 closure(s)
 

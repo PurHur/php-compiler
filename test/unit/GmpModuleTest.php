@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__.'/../BaseTest.php';
 
-/** VM compliance for ext/gmp phase-1 builtins (#3341). */
+/** VM compliance for ext/gmp phase-1/2 builtins (#3341, #19527). */
 final class GmpModuleTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
@@ -25,6 +25,10 @@ final class GmpModuleTest extends BaseTest
         yield 'gmp_init_null.phpt' => self::parsePHPT(
             __DIR__.'/../compliance/cases/gmp/gmp_init_null.phpt',
             'gmp_init_null.phpt'
+        );
+        yield 'gmp_phase2_arith.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/gmp/phase2_arith.phpt',
+            'gmp_phase2_arith.phpt'
         );
     }
 }

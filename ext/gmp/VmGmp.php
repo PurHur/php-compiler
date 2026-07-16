@@ -9,9 +9,10 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmStreamArg;
 
 /**
- * GMP integer semantics in PHP (php-src ext/gmp/gmp.c; issue #3341).
+ * GMP integer semantics in PHP (php-src ext/gmp/gmp.c; issues #3341, #19527).
  *
- * Phase 1: decimal/hex init, add/sub/mul/cmp/strval — no runtime/*.c growth.
+ * Phase 1: decimal/hex init, add/sub/mul/cmp/strval.
+ * Phase 2: pow/mod/div/abs/neg/bitwise/intval — no runtime/*.c growth.
  */
 final class VmGmp
 {
@@ -201,6 +202,152 @@ final class VmGmp
         }
 
         throw new \ValueError('gmp_strval(): Base must be 10 or 16 in this compiler build');
+    }
+
+    public static function abs(string $signedDecimal): string
+    {
+        $parts = self::splitSign(self::normalizeSignedDecimal($signedDecimal));
+
+        return $parts['mag'];
+    }
+
+    public static function neg(string $signedDecimal): string
+    {
+        return self::negate(self::normalizeSignedDecimal($signedDecimal));
+    }
+
+    public static function pow(string $base, int $exponent): string
+    {
+        if ($exponent < 0) {
+            throw new \ValueError('gmp_pow(): Argument #2 ($exponent) must be greater than or equal to 0');
+        }
+        if (0 === $exponent) {
+            return '1';
+        }
+        $result = '1';
+        $b = self::normalizeSignedDecimal($base);
+        $e = $exponent;
+        while ($e > 0) {
+            if (0 !== ($e & 1)) {
+                $result = self::mul($result, $b);
+            }
+            $e >>= 1;
+            if ($e > 0) {
+                $b = self::mul($b, $b);
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Toward-zero quotient and remainder (mpz_tdiv_q / mpz_tdiv_r).
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function divQr(string $left, string $right): array
+    {
+        $divisor = self::normalizeSignedDecimal($right);
+        if ('0' === $divisor) {
+            throw new \DivisionByZeroError('Division by zero');
+        }
+        $a = self::splitSign(self::normalizeSignedDecimal($left));
+        $b = self::splitSign($divisor);
+        [$qMag, $rMag] = self::divModMagnitude($a['mag'], $b['mag']);
+        $qSign = ($a['neg'] !== $b['neg']) ? '-' : '';
+        $rSign = $a['neg'] ? '-' : '';
+        $q = ('0' === $qMag) ? '0' : self::normalizeSignedDecimal($qSign.$qMag);
+        $r = ('0' === $rMag) ? '0' : self::normalizeSignedDecimal($rSign.$rMag);
+
+        return [$q, $r];
+    }
+
+    public static function divQ(string $left, string $right): string
+    {
+        return self::divQr($left, $right)[0];
+    }
+
+    public static function divR(string $left, string $right): string
+    {
+        return self::divQr($left, $right)[1];
+    }
+
+    /** Non-negative remainder (mpz_mod). */
+    public static function mod(string $left, string $right): string
+    {
+        $divisor = self::normalizeSignedDecimal($right);
+        if ('0' === $divisor) {
+            throw new \DivisionByZeroError('Division by zero');
+        }
+        $r = self::divR($left, $divisor);
+        if (self::cmp($r, '0') < 0) {
+            $r = self::add($r, self::abs($divisor));
+        }
+
+        return $r;
+    }
+
+    public static function bitwiseAnd(string $left, string $right): string
+    {
+        return self::bitwiseOp($left, $right, 'and');
+    }
+
+    public static function bitwiseOr(string $left, string $right): string
+    {
+        return self::bitwiseOp($left, $right, 'or');
+    }
+
+    public static function bitwiseXor(string $left, string $right): string
+    {
+        return self::bitwiseOp($left, $right, 'xor');
+    }
+
+    /** Truncate like mpz_get_si into PHP int. */
+    public static function toInt(string $signedDecimal): int
+    {
+        $normalized = self::normalizeSignedDecimal($signedDecimal);
+        if (self::cmp($normalized, (string) \PHP_INT_MAX) <= 0
+            && self::cmp($normalized, (string) \PHP_INT_MIN) >= 0) {
+            return (int) $normalized;
+        }
+        $width = \PHP_INT_SIZE * 8;
+        $bits = self::toTwosComplementBits($normalized, $width);
+
+        return self::signedIntFromBits($bits);
+    }
+
+    public static function coerceExponent(Variable $var, string $function): int
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return $resolved->toInt();
+        }
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return 0;
+        }
+        if (Variable::TYPE_STRING === $resolved->type) {
+            $raw = trim($resolved->toString());
+            if ('' === $raw || !preg_match('/^[+-]?[0-9]+$/', $raw)) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #2 ($exponent) must be of type int, string given',
+                    $function
+                ));
+            }
+            if (self::cmp($raw, (string) \PHP_INT_MAX) > 0 || self::cmp($raw, (string) \PHP_INT_MIN) < 0) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #2 ($exponent) must be of type int, string given',
+                    $function
+                ));
+            }
+
+            return (int) $raw;
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #2 ($exponent) must be of type int, %s given',
+            $function,
+            VmStreamArg::debugTypeName($resolved)
+        ));
     }
 
     private static function normalizeSignedDecimal(string $value): string
@@ -427,5 +574,175 @@ final class VmGmp
         }
 
         return [ltrim($quotient, '0') ?: '0', $remainder];
+    }
+
+    /** @return array{0: string, 1: string} */
+    private static function divModMagnitude(string $dividend, string $divisor): array
+    {
+        $dividend = ltrim($dividend, '0') ?: '0';
+        $divisor = ltrim($divisor, '0') ?: '0';
+        if ('0' === $divisor) {
+            throw new \DivisionByZeroError('Division by zero');
+        }
+        if ('0' === $dividend) {
+            return ['0', '0'];
+        }
+        if (self::cmpMagnitude($dividend, $divisor) < 0) {
+            return ['0', $dividend];
+        }
+        $quotient = '';
+        $remainder = '0';
+        $len = strlen($dividend);
+        for ($i = 0; $i < $len; ++$i) {
+            $remainder = ltrim($remainder.$dividend[$i], '0') ?: '0';
+            $digit = 0;
+            for ($d = 9; $d >= 1; --$d) {
+                $prod = self::mulSingleDigit($divisor, $d);
+                if (self::cmpMagnitude($prod, $remainder) <= 0) {
+                    $digit = $d;
+                    $remainder = self::subMagnitude($remainder, $prod);
+                    break;
+                }
+            }
+            $quotient .= (string) $digit;
+        }
+
+        return [ltrim($quotient, '0') ?: '0', $remainder];
+    }
+
+    private static function bitwiseOp(string $left, string $right, string $op): string
+    {
+        $a = self::normalizeSignedDecimal($left);
+        $b = self::normalizeSignedDecimal($right);
+        $sa = self::splitSign($a);
+        $sb = self::splitSign($b);
+        $width = max(self::bitLengthMagnitude($sa['mag']), self::bitLengthMagnitude($sb['mag']), 1) + 2;
+        $bitsLeft = self::toTwosComplementBits($a, $width);
+        $bitsRight = self::toTwosComplementBits($b, $width);
+        $out = '';
+        for ($i = 0; $i < $width; ++$i) {
+            $x = '1' === $bitsLeft[$i];
+            $y = '1' === $bitsRight[$i];
+            $bit = match ($op) {
+                'and' => $x && $y,
+                'or' => $x || $y,
+                'xor' => $x !== $y,
+                default => throw new \LogicException('unknown bitwise op'),
+            };
+            $out .= $bit ? '1' : '0';
+        }
+
+        return self::fromTwosComplementBits($out);
+    }
+
+    private static function bitLengthMagnitude(string $mag): int
+    {
+        $mag = ltrim($mag, '0') ?: '0';
+        if ('0' === $mag) {
+            return 0;
+        }
+        $bits = 0;
+        $n = $mag;
+        while ('0' !== $n) {
+            [$n] = self::divModSmall($n, 2);
+            ++$bits;
+        }
+
+        return $bits;
+    }
+
+    private static function toTwosComplementBits(string $signed, int $width): string
+    {
+        $normalized = self::normalizeSignedDecimal($signed);
+        $parts = self::splitSign($normalized);
+        if (!$parts['neg']) {
+            return self::padBits(self::magnitudeToBits($parts['mag']), $width, '0');
+        }
+        // two's complement: 2^width - |n|
+        $power = self::pow('2', $width);
+        $tc = self::sub($power, $parts['mag']);
+
+        return self::padBits(self::magnitudeToBits(self::splitSign($tc)['mag']), $width, '0');
+    }
+
+    private static function fromTwosComplementBits(string $bits): string
+    {
+        $width = strlen($bits);
+        if (0 === $width) {
+            return '0';
+        }
+        if ('0' === $bits[0]) {
+            return self::normalizeSignedDecimal(self::bitsToMagnitude($bits));
+        }
+        // negative: value = bits_as_unsigned - 2^width
+        $unsigned = self::bitsToMagnitude($bits);
+        $power = self::pow('2', $width);
+
+        return self::sub($unsigned, $power);
+    }
+
+    private static function magnitudeToBits(string $mag): string
+    {
+        $mag = ltrim($mag, '0') ?: '0';
+        if ('0' === $mag) {
+            return '0';
+        }
+        $bits = '';
+        $n = $mag;
+        while ('0' !== $n) {
+            [$n, $rem] = self::divModSmall($n, 2);
+            $bits = (string) $rem.$bits;
+        }
+
+        return $bits;
+    }
+
+    private static function bitsToMagnitude(string $bits): string
+    {
+        $acc = '0';
+        $len = strlen($bits);
+        for ($i = 0; $i < $len; ++$i) {
+            $acc = self::mulMagnitude($acc, '2');
+            if ('1' === $bits[$i]) {
+                $acc = self::addMagnitude($acc, '1');
+            }
+        }
+
+        return $acc;
+    }
+
+    private static function padBits(string $bits, int $width, string $pad): string
+    {
+        $len = strlen($bits);
+        if ($len >= $width) {
+            return substr($bits, -$width);
+        }
+
+        return str_repeat($pad, $width - $len).$bits;
+    }
+
+    private static function signedIntFromBits(string $bits): int
+    {
+        $width = strlen($bits);
+        if (0 === $width) {
+            return 0;
+        }
+        $negative = '1' === $bits[0];
+        if (!$negative) {
+            $mag = self::bitsToMagnitude($bits);
+            if (self::cmp($mag, (string) \PHP_INT_MAX) > 0) {
+                return \PHP_INT_MAX;
+            }
+
+            return (int) $mag;
+        }
+        $unsigned = self::bitsToMagnitude($bits);
+        $power = self::pow('2', $width);
+        $signed = self::sub($unsigned, $power);
+        if (self::cmp($signed, (string) \PHP_INT_MIN) < 0) {
+            return \PHP_INT_MIN;
+        }
+
+        return (int) $signed;
     }
 }
