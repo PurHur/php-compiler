@@ -18,6 +18,7 @@ final class ForeachIterator
      * Resolve Iterator or IteratorAggregate::getIterator() for foreach.
      *
      * @throws \TypeError when the object is not iterable
+     * @throws \Exception when getIterator() returns a non-Iterator value (zend_interfaces.c, #19729)
      */
     public static function resolveTraversableObject(VM $vm, Frame $frame, Variable $container): Variable
     {
@@ -29,17 +30,26 @@ final class ForeachIterator
         $context = $vm->context;
 
         if (InterfaceCheck::entryImplements($entry, 'iteratoraggregate', $context)) {
+            $aggregateName = $entry->name;
             $inner = $vm->invokeForeachInstanceMethod($frame, $container, 'getIterator')->resolveIndirect();
             if (Variable::TYPE_OBJECT !== $inner->type) {
-                throw new \LogicException('IteratorAggregate::getIterator() must return an object');
+                throw self::badGetIteratorException($aggregateName);
             }
-            if (!self::entryImplementsIteratorProtocol($inner->toObject()->class, $context)) {
-                throw new \LogicException(
-                    'IteratorAggregate::getIterator() must return an object implementing Iterator'
-                );
+            $innerObject = $inner->toObject();
+            if (null !== $innerObject->generatorState
+                || self::entryImplementsIteratorProtocol($innerObject->class, $context)
+            ) {
+                return $inner;
+            }
+            // Nested IteratorAggregate (e.g. ArrayObject) — unwrap once more.
+            // Returning $this is rejected by Zend (no Iterator handlers on the aggregate).
+            if (InterfaceCheck::entryImplements($innerObject->class, 'iteratoraggregate', $context)
+                && $innerObject !== $container->toObject()
+            ) {
+                return self::resolveTraversableObject($vm, $frame, $inner);
             }
 
-            return $inner;
+            throw self::badGetIteratorException($aggregateName);
         }
 
         if (self::entryImplementsIteratorProtocol($entry, $context)) {
@@ -56,6 +66,13 @@ final class ForeachIterator
         }
 
         return self::entryHasIteratorMethods($entry);
+    }
+
+    private static function badGetIteratorException(string $aggregateName): \Exception
+    {
+        return new \Exception(
+            'Objects returned by '.$aggregateName.'::getIterator() must be traversable or implement interface Iterator'
+        );
     }
 
     private static function entryHasIteratorMethods(ClassEntry $entry): bool
