@@ -136,19 +136,11 @@ final class TraitCollisionCheck
      */
     private function verifyClass(string $classLc, array $class): void
     {
+        // Zend: only composing-class own methods exclude traits; inherited parent
+        // methods are overridden by the trait (#19630). Keep parent methods out of
+        // $excluded so trait↔trait collisions on parent-overriding names are still
+        // diagnosed at compile time.
         $excluded = $class['ownMethods'];
-        $current = $class['extends'];
-        $visited = [];
-        while (null !== $current && !isset($visited[$current])) {
-            $visited[$current] = true;
-            if (!isset($this->classes[$current])) {
-                break;
-            }
-            foreach ($this->classes[$current]['ownMethods'] as $name => $_) {
-                $excluded[$name] = true;
-            }
-            $current = $this->classes[$current]['extends'];
-        }
 
         /** @var array<string, string> method lc => trait display */
         $traitSources = [];

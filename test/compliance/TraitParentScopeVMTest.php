@@ -11,7 +11,14 @@ class TraitParentScopeVMTest extends VMTest
 {
     public static function providePHPTests(): \Generator
     {
-        $path = __DIR__.'/cases/language/trait_parent_scope/parent_method_composing.phpt';
-        yield 'trait_parent_method_composing' => self::parsePHPT($path, 'parent_method_composing.phpt');
+        $dir = __DIR__.'/cases/language/trait_parent_scope';
+        yield 'trait_parent_method_composing' => self::parsePHPT(
+            $dir.'/parent_method_composing.phpt',
+            'parent_method_composing.phpt'
+        );
+        yield 'trait_overrides_parent_method' => self::parsePHPT(
+            $dir.'/trait_overrides_parent_method.phpt',
+            'trait_overrides_parent_method.phpt'
+        );
     }
 }

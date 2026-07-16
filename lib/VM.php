@@ -13911,27 +13911,20 @@ restart:
     }
 
     /**
+     * Methods that block trait import — composing-class own methods only.
+     *
+     * Zend precedence (zend_traits.c): trait methods override inherited parent
+     * methods of the same name; only methods declared on the using class win
+     * over the trait (#19630, re-#18878). Parent methods are merged later via
+     * inheritFromParent() and skip slots already filled by the trait.
+     *
      * @param array<string, true> $ownMethods
      *
      * @return array<string, true>
      */
     protected function traitMethodExclusions(ClassEntry $entry, array $ownMethods): array
     {
-        $excluded = $ownMethods;
-        $visited = [];
-        $current = $entry->parentLc;
-        while (null !== $current && !isset($visited[$current])) {
-            $visited[$current] = true;
-            if (!isset($this->context->classes[$current])) {
-                break;
-            }
-            foreach ($this->context->classes[$current]->methods as $name => $_) {
-                $excluded[$name] = true;
-            }
-            $current = $this->context->classes[$current]->parentLc;
-        }
-
-        return $excluded;
+        return $ownMethods;
     }
 
     protected function applyTraitUse(ClassEntry $entry, string $traitName, array $ownMethods = []): void

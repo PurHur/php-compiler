@@ -12284,20 +12284,9 @@ class JIT {
             : strtolower(ltrim($this->context->type->object->classNameForId($classId), '\\'));
         $className = $this->context->type->object->classNameForId($classId);
         $object = $this->context->type->object;
+        // Zend: trait methods override inherited parent methods; only composing-class
+        // own methods exclude the trait (#19630, zend_traits.c).
         $excluded = $ownMethods;
-        $visited = [];
-        $current = $object->parentClassLc($classLc);
-        while (null !== $current && !isset($visited[$current])) {
-            $visited[$current] = true;
-            if (!$object->hasDeclaredClass($current)) {
-                break;
-            }
-            $parentId = $object->lookup($current);
-            foreach ($object->declaredMethodNames($parentId) as $methodLc) {
-                $excluded[$methodLc] = true;
-            }
-            $current = $object->parentClassLc($current);
-        }
 
         /** @var array<string, array<string, array{traitId: int, traitName: string, traitLc: string, methodLc: string}>> */
         $perTraitMethods = [];
