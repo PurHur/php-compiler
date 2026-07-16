@@ -70,12 +70,45 @@ final class StreamContextJitHelper
         return $out;
     }
 
+    /**
+     * php-src parse_context_params() (#19696) — keep notification Variable (Closures);
+     * merge options into wrapper options; do not http_build_query-export callables.
+     */
     public static function setParams(HashTable $dest, ?HashTable $params): void
     {
         if (null === $params) {
             return;
         }
-        self::replaceParams($dest, $params);
+
+        $notificationVar = $params->find('notification');
+        if (null !== $notificationVar) {
+            VmStreamNotification::validateContextNotificationParam(
+                $notificationVar,
+                'stream_context_set_params'
+            );
+            self::upsertParamSlot($dest, 'notification', $notificationVar);
+        }
+
+        $optionsVar = $params->find('options');
+        if (null !== $optionsVar) {
+            $resolvedOpts = $optionsVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $resolvedOpts->type) {
+                throw new \TypeError('Invalid stream/context parameter');
+            }
+            self::mergeOptions($dest, $resolvedOpts->toArray(), 'stream_context_set_params');
+        }
+
+        foreach ($params->iterateKeyed(true) as [$keyVar, $valVar]) {
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $key->type) {
+                continue;
+            }
+            $name = $key->toString();
+            if ('notification' === $name || 'options' === $name) {
+                continue;
+            }
+            self::upsertParamSlot($dest, $name, $valVar);
+        }
     }
 
     /**
@@ -200,6 +233,33 @@ final class StreamContextJitHelper
             $existing->copyFrom($slot);
         } else {
             $context->add(VmStreamContext::PARAMS_MARKER_KEY, $slot);
+        }
+    }
+
+    /** Copy a params key without scalar export so Closures survive (#19696). */
+    private static function upsertParamSlot(HashTable $context, string $name, Variable $value): void
+    {
+        $paramsSlot = $context->find(VmStreamContext::PARAMS_MARKER_KEY);
+        $copy = new Variable();
+        $copy->copyFrom($value);
+
+        if (null === $paramsSlot) {
+            $paramsHt = new HashTable();
+            $paramsHt->add($name, $copy);
+            $slot = new Variable(Variable::TYPE_ARRAY);
+            $slot->array($paramsHt);
+            $context->add(VmStreamContext::PARAMS_MARKER_KEY, $slot);
+
+            return;
+        }
+
+        $paramsSlot->separateArrayForWrite();
+        $paramsHt = $paramsSlot->resolveIndirect()->toArray();
+        $existing = $paramsHt->find($name);
+        if (null !== $existing) {
+            $existing->copyFrom($copy);
+        } else {
+            $paramsHt->add($name, $copy);
         }
     }
 

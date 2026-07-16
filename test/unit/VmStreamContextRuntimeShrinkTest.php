@@ -98,4 +98,45 @@ final class VmStreamContextRuntimeShrinkTest extends TestCase
         $sourceOut = $paramsSlot->resolveIndirect()->toArray()->find('source');
         $this->assertSame('unit-test', $sourceOut->resolveIndirect()->toString());
     }
+
+    public function testSetParamsNotificationClosurePreserved(): void
+    {
+        $ctx = VmStreamContext::create();
+        $ctxVar = new \PHPCompiler\VM\Variable();
+        $ctxVar->array($ctx);
+
+        $params = new \PHPCompiler\VM\Variable();
+        $params->newArray();
+        $notification = new \PHPCompiler\VM\Variable();
+        $notification->null();
+        $params->toArray()->add('notification', $notification);
+
+        $this->assertTrue(VmStreamContext::setParams($ctxVar, $params));
+        $got = VmStreamContext::getParamsHashTable($ctxVar);
+        $notif = $got->find('notification');
+        $this->assertNotNull($notif);
+        $this->assertSame(\PHPCompiler\VM\Variable::TYPE_NULL, $notif->resolveIndirect()->type);
+
+        $opts = new \PHPCompiler\VM\Variable();
+        $opts->newArray();
+        $http = new \PHPCompiler\VM\Variable();
+        $http->newArray();
+        $method = new \PHPCompiler\VM\Variable();
+        $method->string('POST');
+        $http->toArray()->add('method', $method);
+        $opts->toArray()->add('http', $http);
+        $params2 = new \PHPCompiler\VM\Variable();
+        $params2->newArray();
+        $params2->toArray()->add('options', $opts);
+
+        $this->assertTrue(VmStreamContext::setParams($ctxVar, $params2));
+        $options = VmStreamContext::getOptionsHashTable($ctxVar);
+        $httpOut = $options->find('http');
+        $this->assertNotNull($httpOut);
+        $methodOut = $httpOut->resolveIndirect()->toArray()->find('method');
+        $this->assertSame('POST', $methodOut->resolveIndirect()->toString());
+        // notification must survive options-only set_params (php-src parse_context_params)
+        $got2 = VmStreamContext::getParamsHashTable($ctxVar);
+        $this->assertNotNull($got2->find('notification'));
+    }
 }
