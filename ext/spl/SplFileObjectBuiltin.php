@@ -344,6 +344,12 @@ final class SplFileObjectCurrent extends VmClassMethod
 
             return;
         }
+        // READ_CSV — php-src current_zval HashTable (#19663).
+        if (\is_array($line)) {
+            $frame->returnVar->array(VmFs::csvRowToArray($line));
+
+            return;
+        }
         $frame->returnVar->string($line);
     }
 }
