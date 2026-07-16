@@ -381,39 +381,116 @@ final class VmDateTimeNative
             return self::yearOffsetParseResult(strtolower($matches[1]), $base, $tzName);
         }
         if (1 === preg_match('/^(.+?) (last|next|this) year$/i', $time, $matches)) {
-            return self::yearRelativeMonthDayParseResult(
+            $yearRelative = self::yearRelativeMonthDayParseResult(
                 strtolower($matches[2]),
                 trim($matches[1]),
                 $base,
                 $tzName
             );
+            if (null !== $yearRelative) {
+                return $yearRelative;
+            }
         }
         if (1 === preg_match('/^(last|next|this) year (.+)$/i', $time, $matches)) {
-            return self::yearRelativeMonthDayParseResult(
+            $yearRelative = self::yearRelativeMonthDayParseResult(
                 strtolower($matches[1]),
                 trim($matches[2]),
                 $base,
                 $tzName
             );
+            if (null !== $yearRelative) {
+                return $yearRelative;
+            }
+        }
+        // Absolute calendar date + relative phrase (#19534) — timelib parse_date.re combination.
+        $absoluteRelative = self::tryParseAbsoluteDateWithRelativeSuffix($time, $tzName);
+        if (null !== $absoluteRelative) {
+            return $absoluteRelative;
         }
         if (1 === preg_match(
-            '/^(.+?)\s+([+-]\s*\d+\s+(?:second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years))$/i',
+            '/^(.+?)\s+([+-].+)$/',
             $time,
             $matches
         )) {
             try {
                 $parsed = self::parseDateTimeAbsolute(trim($matches[1]), $tzName);
-                $modifier = preg_replace('/\s+/', ' ', trim($matches[2])) ?? trim($matches[2]);
-                $timestamp = self::modifyRelative($parsed['timestamp'], $modifier, $tzName);
-                $result = ['timestamp' => $timestamp, 'microsecond' => $parsed['microsecond']];
-                if (isset($parsed['timezone'])) {
-                    $result['timezone'] = $parsed['timezone'];
-                }
+                $modifier = trim($matches[2]);
+                $compound = self::tryApplyCompoundSignedRelativeDelta($parsed['timestamp'], $modifier, $tzName);
+                if (null !== $compound) {
+                    $result = ['timestamp' => $compound, 'microsecond' => $parsed['microsecond']];
+                    if (isset($parsed['timezone'])) {
+                        $result['timezone'] = $parsed['timezone'];
+                    }
 
-                return $result;
+                    return $result;
+                }
+                // Single-unit fallback (e.g. "+1 day") when compound grammar does not consume.
+                if (1 === preg_match(
+                    '/^[+-]\s*\d+\s+(?:second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)$/i',
+                    $modifier
+                )) {
+                    $normalized = preg_replace('/\s+/', ' ', $modifier) ?? $modifier;
+                    $timestamp = self::modifyRelative($parsed['timestamp'], $normalized, $tzName);
+                    $result = ['timestamp' => $timestamp, 'microsecond' => $parsed['microsecond']];
+                    if (isset($parsed['timezone'])) {
+                        $result['timezone'] = $parsed['timezone'];
+                    }
+
+                    return $result;
+                }
             } catch (NativeDateMalformedStringException) {
-                return null;
+                // Fall through — absolute prefix may not be a date.
             }
+        }
+
+        return null;
+    }
+
+    /**
+     * php-src timelib — absolute date/time followed by a relative phrase (#19534).
+     *
+     * Examples: "2020-01-15 next Monday", "2020-02-01 last day of this month".
+     *
+     * @return array{timestamp: int, microsecond: int, timezone?: string}|null
+     */
+    private static function tryParseAbsoluteDateWithRelativeSuffix(string $time, string $tzName): ?array
+    {
+        $weekday = 'monday|tuesday|wednesday|thursday|friday|saturday|sunday';
+        $suffixPatterns = [
+            '/^(.+?)\s+((?:next|last|previous|this)\s+(?:'.$weekday.'))$/i',
+            '/^(.+?)\s+((?:'.$weekday.'))$/i',
+            '/^(.+?)\s+((?:first|last)\s+day\s+of\s+(?:next|this|last)\s+month)$/i',
+            '/^(.+?)\s+((?:next|last|this)\s+(?:month|year))$/i',
+            '/^(.+?)\s+((?:today|tomorrow|yesterday)(?:\s+.+)?)$/i',
+            '/^(.+?)\s+(midnight|noon)$/i',
+        ];
+        foreach ($suffixPatterns as $pattern) {
+            if (1 !== preg_match($pattern, $time, $matches)) {
+                continue;
+            }
+            $absolute = trim($matches[1]);
+            $relative = trim($matches[2]);
+            if ('' === $absolute || '' === $relative || strcasecmp($absolute, $time) === 0) {
+                continue;
+            }
+            try {
+                $parsed = self::parseDateTimeAbsolute($absolute, $tzName);
+            } catch (NativeDateMalformedStringException) {
+                continue;
+            }
+            $useTz = $parsed['timezone'] ?? $tzName;
+            $extended = self::tryParseExtendedDateTimeString($relative, $useTz, $parsed['timestamp']);
+            if (null === $extended) {
+                $extended = self::tryParseRelativeDateTimeModifier($relative, $useTz, $parsed['timestamp']);
+            }
+            if (null === $extended) {
+                continue;
+            }
+            if (!isset($extended['timezone']) && isset($parsed['timezone'])) {
+                $extended['timezone'] = $parsed['timezone'];
+            }
+
+            return $extended;
         }
 
         return null;
