@@ -20,6 +20,7 @@ final class IntlExtensionPolicyTest extends TestCase
         self::assertFalse(IntlExtensionPolicy::advertisesIntlCalendar());
         self::assertFalse(IntlExtensionPolicy::advertisesNumberFormatter());
         self::assertFalse(IntlExtensionPolicy::advertisesMessageFormatter());
+        self::assertFalse(IntlExtensionPolicy::advertisesTransliterator());
         // locale parsers follow forward profile only once Locale is gated (#19670 / #17072).
         self::assertFalse(IntlExtensionPolicy::advertisesLocaleParsers());
         $runtime = new Runtime();

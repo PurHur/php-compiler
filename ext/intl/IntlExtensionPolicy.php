@@ -115,6 +115,14 @@ final class IntlExtensionPolicy
         return self::advertisesBuiltins();
     }
 
+    /**
+     * Transliterator / transliterator_* — require loaded ext/intl (php-src transliterator; #6139, #19670).
+     */
+    public static function advertisesTransliterator(): bool
+    {
+        return self::advertisesBuiltins();
+    }
+
     /** Run Locale compliance when ext/intl is loaded or a phantom-registration guard matches (#19670). */
     public static function runsLocaleCompliance(string $testFileName): bool
     {
