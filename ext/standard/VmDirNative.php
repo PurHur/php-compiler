@@ -17,7 +17,7 @@ final class VmDirNative
 
     private const MAX_HANDLES = 256;
 
-    /** @var array<int, array{entries: list<string>, pos: int}> */
+    /** @var array<int, array{path: string, entries: list<string>, pos: int}> */
     private static array $slots = [];
 
     private static int $nextSlot = 1;
@@ -60,7 +60,7 @@ final class VmDirNative
             if (isset(self::$slots[$slot])) {
                 continue;
             }
-            self::$slots[$slot] = ['entries' => $entries, 'pos' => 0];
+            self::$slots[$slot] = ['path' => $path, 'entries' => $entries, 'pos' => 0];
 
             return self::HANDLE_BASE + $slot;
         }
@@ -98,6 +98,12 @@ final class VmDirNative
         if (null === $slot || !isset(self::$slots[$slot])) {
             return;
         }
+        $path = self::$slots[$slot]['path'];
+        $entries = self::scanPath($path);
+        if (false === $entries) {
+            $entries = [];
+        }
+        self::$slots[$slot]['entries'] = $entries;
         self::$slots[$slot]['pos'] = 0;
     }
 

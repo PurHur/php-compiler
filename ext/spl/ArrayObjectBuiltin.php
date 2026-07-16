@@ -85,6 +85,15 @@ final class ArrayObjectBuiltin
             $entry->methods[$lc] = new SplArrayUserSortMethod(self::CLASS_LC, $lc);
             $entry->methodVisibility[$lc] = $pub;
         }
+        foreach ([
+            'asort' => true,
+            'ksort' => true,
+            'natsort' => false,
+            'natcasesort' => false,
+        ] as $lc => $acceptsFlags) {
+            $entry->methods[$lc] = new SplArraySortMethod(self::CLASS_LC, $lc, $acceptsFlags);
+            $entry->methodVisibility[$lc] = $pub;
+        }
 
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'ArrayObject');
 

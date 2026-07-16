@@ -53,6 +53,7 @@ final class DirectoryIteratorBuiltin
             'next' => DirectoryIteratorNext::class,
             'isdot' => DirectoryIteratorIsDot::class,
             'gettype' => DirectoryIteratorGetType::class,
+            '__tostring' => DirectoryIteratorToString::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -210,6 +211,16 @@ final class DirectoryIteratorStorage
         }
 
         return $type;
+    }
+
+    public static function filename(ObjectEntry $object): string
+    {
+        $filename = self::state($object)['filename'];
+        if (false === $filename) {
+            return '';
+        }
+
+        return $filename;
     }
 
     public static function setFlags(ObjectEntry $object, int $flags): void
@@ -407,6 +418,33 @@ final class DirectoryIteratorIsDot extends VmClassMethod
             'DirectoryIterator::isDot()'
         );
         SplIteratorSupport::setReturnBool($frame, DirectoryIteratorStorage::isDot($object));
+    }
+}
+
+final class DirectoryIteratorToString extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__toString');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            DirectoryIteratorBuiltin::CLASS_LC,
+            'DirectoryIterator::__toString()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $filename = DirectoryIteratorStorage::filename($object);
+        if ('' === $filename) {
+            $frame->returnVar->string('');
+
+            return;
+        }
+        $frame->returnVar->string($filename);
     }
 }
 

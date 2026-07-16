@@ -50,6 +50,9 @@ final class VmDirPure
         if (!self::available()) {
             return false;
         }
+        if (\function_exists('clearstatcache')) {
+            @\clearstatcache(true, $path);
+        }
 
         $entries = @\scandir($path, \SCANDIR_SORT_NONE);
         if (false === $entries || !\is_array($entries)) {
