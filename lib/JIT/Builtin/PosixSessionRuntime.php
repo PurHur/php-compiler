@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\JitSleep;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -64,6 +65,30 @@ final class PosixSessionRuntime
         );
 
         return \PHPCompiler\ext\posix\JitPosix::boxedPidOrFalse($context, $raw, 'posix_getpgid');
+    }
+
+    /** posix_getpgrp() ≡ getpgid(0) on Linux (#19475). */
+    public static function getpgrp(Context $context): Value
+    {
+        self::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $raw = $context->builder->call(
+            $context->lookupFunction(self::ABI_GETPGID),
+            $i64->constInt(0, false)
+        );
+        // getpgrp never returns false in php-src — always int.
+        $i32 = $context->getTypeFromString('int32');
+        $rawI32 = $raw->typeOf() === $i32
+            ? $raw
+            : $context->builder->trunc($raw, $i32);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong(
+            $context,
+            $slot,
+            $context->builder->zExt($rawI32, $i64)
+        );
+
+        return JitValueBox::pointer($context, $slot);
     }
 
     public static function ensureLinked(Context $context): void

@@ -77,6 +77,7 @@ class Module extends ModuleAbstract
             new posix_setsid(),
             new posix_getsid(),
             new posix_getpgid(),
+            new posix_getpgrp(),
             new posix_setpgid(),
             new posix_kill(),
             new posix_getlogin(),
