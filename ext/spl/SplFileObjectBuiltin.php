@@ -76,6 +76,12 @@ final class SplFileObjectBuiltin
             'eof' => SplFileObjectEof::class,
             'seek' => SplFileObjectSeek::class,
             'fseek' => SplFileObjectFseek::class,
+            'ftell' => SplFileObjectFtell::class,
+            'fstat' => SplFileObjectFstat::class,
+            'flock' => SplFileObjectFlock::class,
+            'fflush' => SplFileObjectFflush::class,
+            'ftruncate' => SplFileObjectFtruncate::class,
+            'fpassthru' => SplFileObjectFpassthru::class,
             'getcurrentline' => SplFileObjectGetCurrentLine::class,
             'fgetcsv' => SplFileObjectFgetcsv::class,
             'fputcsv' => SplFileObjectFputcsv::class,
@@ -114,6 +120,12 @@ final class SplFileObjectBuiltin
             $entry->methods['eof'],
             $entry->methods['seek'],
             $entry->methods['fseek'],
+            $entry->methods['ftell'],
+            $entry->methods['fstat'],
+            $entry->methods['flock'],
+            $entry->methods['fflush'],
+            $entry->methods['ftruncate'],
+            $entry->methods['fpassthru'],
             $entry->methods['getcurrentline'],
             $entry->methods['fgetcsv'],
             $entry->methods['fputcsv'],
@@ -444,6 +456,180 @@ final class SplFileObjectFseek extends VmClassMethod
             );
         }
         $frame->returnVar->int(SplFileObjectStorage::fseek($object, $offset, $whence));
+    }
+}
+
+/** php-src SplFileObject::ftell — php_stream_tell (#19664). */
+final class SplFileObjectFtell extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('ftell');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::ftell()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pos = SplFileObjectStorage::ftell($object);
+        if (false === $pos) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($pos);
+    }
+}
+
+/** php-src SplFileObject::fstat (#19664). */
+final class SplFileObjectFstat extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fstat');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::fstat()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $stat = SplFileObjectStorage::fstat($object);
+        if (false === $stat) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->array($stat);
+    }
+}
+
+/** php-src SplFileObject::flock (#19664). */
+final class SplFileObjectFlock extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('flock');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::flock()'
+        );
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'SplFileObject::flock() expects at least 1 argument, '.($argc - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $operation = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1],
+            'SplFileObject::flock',
+            1,
+            'operation'
+        );
+        SplIteratorSupport::setReturnBool($frame, SplFileObjectStorage::flock($object, $operation));
+    }
+}
+
+/** php-src SplFileObject::fflush (#19664). */
+final class SplFileObjectFflush extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fflush');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::fflush()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        SplIteratorSupport::setReturnBool($frame, SplFileObjectStorage::fflush($object));
+    }
+}
+
+/** php-src SplFileObject::ftruncate (#19664). */
+final class SplFileObjectFtruncate extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('ftruncate');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::ftruncate()'
+        );
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(
+                'SplFileObject::ftruncate() expects exactly 1 argument, '.($argc - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $size = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1],
+            'SplFileObject::ftruncate',
+            1,
+            'size'
+        );
+        SplIteratorSupport::setReturnBool($frame, SplFileObjectStorage::ftruncate($object, $size));
+    }
+}
+
+/** php-src SplFileObject::fpassthru (#19664). */
+final class SplFileObjectFpassthru extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fpassthru');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::fpassthru()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $n = SplFileObjectStorage::fpassthru($object);
+        if (false === $n) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($n);
     }
 }
 
