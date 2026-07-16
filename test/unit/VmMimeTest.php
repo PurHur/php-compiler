@@ -58,6 +58,18 @@ final class VmMimeTest extends TestCase
         $this->assertSame('text/html', VmMime::detectFromBytes("<!DOCTYPE html>\n<html></html>\n"));
     }
 
+    /** Issue #19353: XML PI / JSON / SVG MIME sniff. */
+    public function testDetectFromBytesXmlJsonSvg(): void
+    {
+        $this->assertSame('text/xml', VmMime::detectFromBytes('<?xml version="1.0"?><a/>'));
+        $this->assertSame('application/json', VmMime::detectFromBytes('{"a":1}'));
+        $this->assertSame('application/json', VmMime::detectFromBytes('  [1,2]'));
+        $this->assertSame('image/svg+xml', VmMime::detectFromBytes('<svg xmlns="http://www.w3.org/2000/svg"/>'));
+        // Leading whitespace before <?xml is plain; BOM+JSON is plain (libmagic).
+        $this->assertSame('text/plain', VmMime::detectFromBytes('  <?xml version="1.0"?><a/>'));
+        $this->assertSame('text/plain', VmMime::detectFromBytes("\xef\xbb\xbf{\"a\":1}"));
+    }
+
     public function testDetectFromBytesBinary(): void
     {
         $this->assertSame('application/octet-stream', VmMime::detectFromBytes("\x00binary"));

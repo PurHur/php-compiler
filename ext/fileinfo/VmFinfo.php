@@ -242,7 +242,11 @@ final class VmFinfo
 
     private static function guessEncoding(string $data, string $mime): string
     {
-        if (0 === \strpos($mime, 'text/') || 'application/x-empty' === $mime) {
+        $textLike = 0 === \strpos($mime, 'text/')
+            || 'application/x-empty' === $mime
+            || 'application/json' === $mime
+            || 'image/svg+xml' === $mime;
+        if ($textLike) {
             for ($i = 0, $len = \min(\strlen($data), 4096); $i < $len; ++$i) {
                 if (\ord($data[$i]) > 127) {
                     return 'utf-8';
@@ -298,6 +302,12 @@ final class VmFinfo
                     : 'PHP script, ASCII text';
             case 'text/html':
                 return 'HTML document, ASCII text';
+            case 'text/xml':
+                return self::asciiTextSuffix($data, 'XML 1.0 document, ASCII text');
+            case 'application/json':
+                return 'JSON data';
+            case 'image/svg+xml':
+                return self::asciiTextSuffix($data, 'SVG Scalable Vector Graphics image, ASCII text');
             case 'text/plain':
                 return 'ASCII text';
             case 'image/jpeg':
@@ -311,6 +321,15 @@ final class VmFinfo
             default:
                 return 'data';
         }
+    }
+
+    private static function asciiTextSuffix(string $data, string $prefix): string
+    {
+        if (false === \strpos($data, "\n") && false === \strpos($data, "\r")) {
+            return $prefix.', with no line terminators';
+        }
+
+        return $prefix;
     }
 
     private static function describePdf(string $data): ?string

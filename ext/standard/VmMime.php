@@ -126,14 +126,91 @@ final class VmMime
         if ('' === $payload) {
             return 'application/x-empty';
         }
+        // XML PI is matched before HTML; leading whitespace before <?xml is plain (libmagic).
+        if (self::looksLikeXml($payload)) {
+            return 'text/xml';
+        }
         if (self::looksLikeHtml($payload)) {
             return 'text/html';
+        }
+        if (self::looksLikeSvg($payload)) {
+            return 'image/svg+xml';
+        }
+        // JSON magic ignores UTF-8 BOM (BOM+JSON → text/plain in Zend/libmagic).
+        if (0 === $offset && self::looksLikeJson($payload)) {
+            return 'application/json';
         }
         if (self::looksLikePlainText($payload)) {
             return 'text/plain';
         }
 
         return 'application/octet-stream';
+    }
+
+    /**
+     * libmagic XML PI heuristic (Magdir/sgml; #19353).
+     * Requires <?xml at byte 0 of the post-BOM payload (no leading whitespace).
+     */
+    private static function looksLikeXml(string $data): bool
+    {
+        return \strlen($data) >= 5 && 0 === \strncasecmp($data, '<?xml', 5);
+    }
+
+    /**
+     * libmagic SVG heuristic — lowercase <svg tag only (#19353).
+     */
+    private static function looksLikeSvg(string $data): bool
+    {
+        $trim = \ltrim($data);
+        if (\strlen($trim) < 4 || 0 !== \strncmp($trim, '<svg', 4)) {
+            return false;
+        }
+        if (4 === \strlen($trim)) {
+            return true;
+        }
+        $next = $trim[4];
+
+        return ' ' === $next || '>' === $next || '/' === $next || "\t" === $next
+            || "\n" === $next || "\r" === $next;
+    }
+
+    /**
+     * libmagic JSON object/array heuristic (#19353).
+     * Accepts trailing commas (libmagic); rejects incomplete `{`/`[` (falls through).
+     */
+    private static function looksLikeJson(string $data): bool
+    {
+        $trim = \ltrim($data);
+        if ('' === $trim) {
+            return false;
+        }
+        $start = $trim[0];
+        if ('{' !== $start && '[' !== $start) {
+            return false;
+        }
+        if (\strlen($trim) < 2) {
+            return false;
+        }
+        if (self::jsonDecodeOk($trim)) {
+            return true;
+        }
+        // libmagic tolerates a trailing comma before } or ].
+        $relaxed = \preg_replace('/,\s*([}\]])/', '$1', $trim);
+        if (!\is_string($relaxed) || $relaxed === $trim) {
+            return false;
+        }
+
+        return self::jsonDecodeOk($relaxed);
+    }
+
+    private static function jsonDecodeOk(string $json): bool
+    {
+        \json_decode($json);
+        if (\JSON_ERROR_NONE !== \json_last_error()) {
+            return false;
+        }
+        // Objects/arrays only — scalars never start with { or [.
+        return true;
     }
 
     /** libmagic HTML heuristic (php-src ext/fileinfo; #19247). */
