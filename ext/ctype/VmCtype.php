@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\ctype;
 
+use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /**
- * Locale-independent ASCII ctype classification (php-src ext/ctype/ctype.c; #7253).
+ * Locale-independent ASCII ctype classification (php-src ext/ctype/ctype.c; #7253, #19717).
  */
 final class VmCtype
 {
@@ -33,18 +34,51 @@ final class VmCtype
         bool $allowMinus = false
     ): bool {
         $var = $var->resolveIndirect();
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            return false;
-        }
 
+        // php-src ctype_impl: strings only; everything else is ctype_fallback (#19717).
         if (Variable::TYPE_STRING === $var->type) {
             return self::checkString($var->toString(), $kind);
         }
+
+        self::emitFallbackDeprecation($function, $var);
         if (Variable::TYPE_INTEGER === $var->type) {
             return self::checkInt($var->toInt(), $kind, $allowDigits, $allowMinus);
         }
 
         return false;
+    }
+
+    /**
+     * php-src ctype_fallback(): E_DEPRECATED then long-as-byte / else false.
+     *
+     * Message: "{fn}(): Argument of type %s will be interpreted as string in the future"
+     */
+    public static function emitFallbackDeprecation(string $function, Variable $var): void
+    {
+        $typeName = EnumCaseSupport::typeNameForVariable($var);
+        self::emitFallbackDeprecationForTypeName($function, $typeName);
+    }
+
+    public static function emitFallbackDeprecationForTypeName(string $function, string $typeName): void
+    {
+        $vm = VM::running();
+        if (null === $vm) {
+            return;
+        }
+        $frame = $vm->builtinHandlerFrame();
+        if (null === $frame) {
+            $frames = $vm->context->runStackFrames();
+            $frame = [] !== $frames ? $frames[0] : null;
+        }
+        $vm->context->errors->internalDeprecated(
+            sprintf(
+                '%s(): Argument of type %s will be interpreted as string in the future',
+                $function,
+                $typeName
+            ),
+            $vm->context,
+            $frame
+        );
     }
 
     public static function checkString(string $text, int $kind): bool
