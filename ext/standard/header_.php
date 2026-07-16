@@ -20,11 +20,14 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
 /**
  * header() for HTTP response headers (VM ResponseContext + JIT pending queue; issue #5344, #8274).
+ *
+ * Z_PARAM_STR $header — null TypeError on 8.4 forward profile (#19224, php-src ext/standard/head.c).
  */
 final class header_ extends Internal
 {
@@ -43,15 +46,8 @@ final class header_ extends Internal
         if (!isset($frame->calledArgs[0])) {
             throw new \LogicException('header() requires one to three arguments');
         }
-        $line = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'header', 0, 'header');
-        if (VmSapiHeaderGuard::headersAlreadySent($frame)) {
-            VmSapiHeaderGuard::warnHeadersAlreadySent($frame);
-            if (null !== $frame->returnVar) {
-                $frame->returnVar->null();
-            }
-
-            return;
-        }
+        // php-src ZEND_PARSE_PARAMETERS before sapi headers_sent (#19224, ext/standard/head.c).
+        $line = self::vmHeaderArg($frame);
         $replace = true;
         $responseCode = 0;
         if (isset($frame->calledArgs[1])) {
@@ -59,6 +55,14 @@ final class header_ extends Internal
         }
         if (isset($frame->calledArgs[2])) {
             $responseCode = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'header', 3, 'response_code');
+        }
+        if (VmSapiHeaderGuard::headersAlreadySent($frame)) {
+            VmSapiHeaderGuard::warnHeadersAlreadySent($frame);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->null();
+            }
+
+            return;
         }
         if (VmSapiHeaderGuard::headerLineContainsNewline($line)) {
             VmSapiHeaderGuard::warnHeaderNewline($frame);
@@ -84,7 +88,7 @@ final class header_ extends Internal
         if ([] === $args || \count($args) > 3) {
             throw new \LogicException('header() requires one to three arguments');
         }
-        $line = JitStringBuiltinArg::lower($context, $args[0], 'header', 0, 'header');
+        $line = self::jitHeaderArg($context, $args[0]);
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             HttpResponseCode::emitStandaloneStatusLine(
                 $context,
@@ -102,5 +106,41 @@ final class header_ extends Internal
         JitPendingHeaders::add($context, $line, $replaceI32);
 
         return $context->getTypeFromString('int32')->constInt(0, false);
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19224, ext/standard/head.c). */
+    private static function vmHeaderArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, 0, 'header', 'header')->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'header',
+            0,
+            'header'
+        );
+    }
+
+    private static function jitHeaderArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'header',
+                0,
+                'header'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'header',
+            0,
+            'header'
+        );
     }
 }
