@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\spl\SplArrayStorage;
+
 /**
  * (array) cast lowering for VM (issue #3328, Zend cast_object / convert_to_array).
  */
@@ -44,6 +46,13 @@ final class CastSupport
             }
             if (null !== $obj->closureState) {
                 return self::singletonArrayCast($src);
+            }
+            // ArrayObject/ArrayIterator: (array) uses backing storage unless STD_PROP_LIST (#19631).
+            $splCast = SplArrayStorage::arrayCastDuplicate($obj);
+            if (null !== $splCast) {
+                $result->array($splCast);
+
+                return $result;
             }
             $result->newArray();
             self::objectToArray($obj, $result->toArray(), $classesByLc ?? []);

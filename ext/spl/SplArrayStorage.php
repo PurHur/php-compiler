@@ -149,6 +149,25 @@ final class SplArrayStorage
         return self::state($object)['table']->duplicate();
     }
 
+    /**
+     * php-src spl_array_get_properties_for(ZEND_PROP_PURPOSE_ARRAY_CAST) — dup backing
+     * storage when STD_PROP_LIST is unset; null falls through to zend_std properties (#19631).
+     *
+     * Uses {@see \PHPCompiler\VM\HashTableJitHelper::duplicateCopy} so JIT/AOT nested helpers
+     * resolve the same linked `__hashtable__duplicate` bridge as other cast paths (#18451).
+     */
+    public static function arrayCastDuplicate(ObjectEntry $object): ?HashTable
+    {
+        if (!self::hasState($object)) {
+            return null;
+        }
+        if (0 !== (self::getFlags($object) & self::FLAG_STD_PROP_LIST)) {
+            return null;
+        }
+
+        return \PHPCompiler\VM\HashTableJitHelper::duplicateCopy(self::state($object)['table']);
+    }
+
     /** php-src spl_array_object_exchange_array — replace backing array, return previous (#12964). */
     public static function exchangeArray(ObjectEntry $object, HashTable $input): HashTable
     {
