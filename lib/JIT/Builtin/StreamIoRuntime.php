@@ -11,6 +11,7 @@ use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPCompiler\ext\standard\JitStreamIoKernel;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -86,12 +87,12 @@ final class StreamIoRuntime
      * User-script standalone must link real stream I/O when fopen/tmpfile appear in lowering (#9142, #19462).
      *
      * Inventory init defers heavy emitters; user-script AOT cannot nested-JIT VmFs (#16075) —
-     * upgrade via {@see StreamIoStandaloneLlvm} libc + handle-table bridges instead.
+     * upgrade via {@see JitStreamIoKernel} libc + handle-table bridges instead.
      */
     public static function ensureLinkedForUserScriptLowering(Context $context): void
     {
         if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            StreamIoStandaloneLlvm::implementForUserScriptLowering($context);
+            JitStreamIoKernel::implementForUserScriptLowering($context);
 
             return;
         }
