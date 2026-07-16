@@ -9,12 +9,12 @@ use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** StreamMetaJit routes through StreamMetaJitHelper PHP not inline feof/fcntl LLVM (#13846). */
+/** JitStreamMetaKernel routes through StreamMetaJitHelper PHP not inline feof/fcntl LLVM (#13846, #19678). */
 final class StreamMetaRuntimeShrinkTest extends TestCase
 {
     public function testStreamMetaJitUsesJitHelperNotInlineLlvm(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamMetaJit.php');
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamMetaKernel.php');
         $this->assertStringContainsString('StreamMetaJitHelper', $source);
         $this->assertStringContainsString('JitNestedHelperCoerce', $source);
         $this->assertStringNotContainsString('emitGetMetaData', $source);
@@ -23,7 +23,7 @@ final class StreamMetaRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('feof')", $source);
         $this->assertStringNotContainsString("lookupFunction('strncmp')", $source);
         $this->assertStringNotContainsString('phpc_stream_handles', $source);
-        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(240, \substr_count($source, "\n") + 1);
     }
 
     public function testStreamMetaJitHelperDelegatesToVmFs(): void

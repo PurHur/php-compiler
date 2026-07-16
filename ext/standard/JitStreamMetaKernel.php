@@ -2,10 +2,11 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamModeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -13,12 +14,15 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream meta ABI via StreamMetaJitHelper PHP (#6007, #13846).
+ * JIT/AOT ABI bridges for stream meta via StreamMetaJitHelper PHP (#6007, #13846, #19678).
  *
- * Replaces ~424-line feof/fcntl/strncmp LLVM; SSOT {@see \PHPCompiler\ext\standard\StreamMetaJitHelper}
- * php-src: ext/standard/streams.c — stream_get_meta_data / stream_set_blocking
+ * Quarantined from lib/JIT/Builtin/StreamMetaJit — {@see \PHPCompiler\JIT\Builtin\StreamMeta}
+ * stays the thin orchestrator.
+ *
+ * Replaces ~424-line feof/fcntl/strncmp LLVM; SSOT {@see StreamMetaJitHelper}
+ * php-src: ext/standard/streamsfuncs.c — stream_get_meta_data / stream_set_blocking
  */
-final class StreamMetaJit
+final class JitStreamMetaKernel
 {
     private const HELPER_PATH = '/ext/standard/StreamMetaJitHelper.php';
 
@@ -100,7 +104,7 @@ final class StreamMetaJit
             '__compiler_stream_get_meta_data' => $context->context->functionType($htPtr, false, $i64),
             '__compiler_stream_set_blocking' => $context->context->functionType($i32, false, $i64, $i64),
             '__compiler_stream_enable_crypto' => $context->context->functionType($i32, false, $i64, $i64, $i64, $i64),
-            default => throw new \LogicException('StreamMetaJit: unknown function '.$name),
+            default => throw new \LogicException('JitStreamMetaKernel: unknown function '.$name),
         };
 
         return $context->module->addFunction($name, $ft);
@@ -197,7 +201,7 @@ final class StreamMetaJit
         }
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamMetaJitHelper.php');
             if (null === $block) {
@@ -219,7 +223,7 @@ final class StreamMetaJit
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after StreamMetaJit bridge (#13846)');
+                throw new \LogicException($name.' missing after JitStreamMetaKernel bridge (#13846)');
             }
             $context->registerFunction($name, $fn);
         }

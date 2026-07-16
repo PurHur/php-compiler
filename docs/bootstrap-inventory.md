@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5183 |
-| Phase A inventory files (M2 ratio SSOT) | 5183 |
+| PHP files on vm.php path | 5203 |
+| Phase A inventory files (M2 ratio SSOT) | 5203 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14140 |
+| Source constructs flagged (warnings) | 14199 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -196,8 +196,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomGetRootNodeJitHelper.php` | 0 | 1 |
 | `ext/dom/DomHtmlDocumentPropertySupport.php` | 0 | 2 |
 | `ext/dom/DomImportNodeJitHelper.php` | 0 | 2 |
+| `ext/dom/DomIsConnectedJitHelper.php` | 0 | 1 |
 | `ext/dom/DomIsEqualNodeJitHelper.php` | 0 | 1 |
-| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 20 |
+| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 22 |
 | `ext/dom/DomLoadHTMLFileJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadHTMLJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadJitHelper.php` | 0 | 1 |
@@ -280,6 +281,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomLoadXML.php` | 0 | 1 |
 | `ext/dom/JitDomLoadXMLUserScript.php` | 0 | 4 |
 | `ext/dom/JitDomNodeChildProperty.php` | 0 | 1 |
+| `ext/dom/JitDomNodeIsConnected.php` | 0 | 2 |
 | `ext/dom/JitDomNodeListItem.php` | 0 | 1 |
 | `ext/dom/JitDomNodeListItemUserScript.php` | 0 | 1 |
 | `ext/dom/JitDomNodeListLength.php` | 0 | 2 |
@@ -351,7 +353,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListReplace.php` | 0 | 1 |
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 359 |
+| `ext/dom/VmDom.php` | 0 | 360 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 24 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
@@ -1768,6 +1770,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamIoKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamIsLocal.php` | 0 | 1 |
 | `ext/standard/JitStreamIsatty.php` | 0 | 1 |
+| `ext/standard/JitStreamMetaKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamNotificationCallback.php` | 0 | 2 |
 | `ext/standard/JitStreamPath.php` | 0 | 1 |
 | `ext/standard/JitStreamReadBridgeKernel.php` | 0 | 1 |
@@ -3353,8 +3356,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlrpc/xmlrpc_encode.php` | 0 | 2 |
 | `ext/xmlwriter/BuiltinClasses.php` | 0 | 1 |
 | `ext/xmlwriter/JitXmlWriterMethod.php` | 0 | 1 |
-| `ext/xmlwriter/JitXmlWriterUserScript.php` | 0 | 3 |
-| `ext/xmlwriter/Module.php` | 0 | 1 |
+| `ext/xmlwriter/JitXmlWriterUserScript.php` | 0 | 5 |
+| `ext/xmlwriter/Module.php` | 0 | 17 |
 | `ext/xmlwriter/VmXmlWriter.php` | 0 | 21 |
 | `ext/xmlwriter/XmlWriterClassMethod.php` | 0 | 1 |
 | `ext/xmlwriter/XmlWriterEndDocument.php` | 0 | 2 |
@@ -3364,6 +3367,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/XmlWriterOpenMemory.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterOpenURI.php` | 0 | 3 |
 | `ext/xmlwriter/XmlWriterOutputMemory.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterProceduralFunction.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterRegistry.php` | 0 | 1 |
 | `ext/xmlwriter/XmlWriterSetIndent.php` | 0 | 3 |
 | `ext/xmlwriter/XmlWriterSetIndentString.php` | 0 | 3 |
@@ -3374,6 +3378,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/XmlWriterWriteCData.php` | 0 | 3 |
 | `ext/xmlwriter/XmlWriterWriteComment.php` | 0 | 3 |
 | `ext/xmlwriter/XmlWriterWriteElement.php` | 0 | 3 |
+| `ext/xmlwriter/xmlwriter_end_document.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_end_element.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_flush.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_full_end_element.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_open_memory.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_open_uri.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_output_memory.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_set_indent.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_set_indent_string.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_start_document.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_start_element.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_text.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_write_attribute.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_write_cdata.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_write_comment.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_write_element.php` | 0 | 2 |
 | `ext/xsl/BuiltinClasses.php` | 0 | 1 |
 | `ext/xsl/Module.php` | 0 | 2 |
 | `ext/xsl/VmXsl.php` | 0 | 6 |
@@ -3659,6 +3679,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DomLoadRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomLoadXMLRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomNodeChildPropertyRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/DomNodeIsConnectedRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomNodeListItemRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomNodeLiveMutationRuntime.php` | 0 | 9 |
 | `lib/JIT/Builtin/DomNodeTreeMutationRuntime.php` | 0 | 1 |
@@ -3925,7 +3946,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamLifecycleJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamLifecycleRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamMeta.php` | 0 | 1 |
-| `lib/JIT/Builtin/StreamMetaJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamModeRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamNotificationRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamPathRuntime.php` | 0 | 3 |
@@ -6159,6 +6179,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 73)
 - 5 class method(s)
 
+### `ext/dom/DomIsConnectedJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/dom/DomIsEqualNodeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6170,22 +6195,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 26)
 - new Variable (line 27)
 - new ClassEntry (line 30)
-- new ClassEntry (line 34)
-- new ClassProperty (line 37)
-- new Variable (line 37)
-- new ClassEntry (line 40)
-- new ClassEntry (line 45)
-- new ClassProperty (line 47)
-- new ClassEntry (line 50)
-- new ClassProperty (line 53)
-- new ClassProperty (line 54)
-- new ClassProperty (line 55)
-- new HtmlDocumentCreateFromString (line 56)
-- new HtmlDocumentCreateEmpty (line 59)
-- new ClassEntry (line 64)
-- new ClassProperty (line 67)
-- new XmlDocumentCreateFromString (line 68)
-- new XmlDocumentCreateEmpty (line 71)
+- new ClassProperty (line 33)
+- new Variable (line 33)
+- new ClassEntry (line 37)
+- new ClassProperty (line 40)
+- new Variable (line 40)
+- new ClassEntry (line 43)
+- new ClassEntry (line 48)
+- new ClassProperty (line 50)
+- new ClassEntry (line 53)
+- new ClassProperty (line 56)
+- new ClassProperty (line 57)
+- new ClassProperty (line 58)
+- new HtmlDocumentCreateFromString (line 59)
+- new HtmlDocumentCreateEmpty (line 62)
+- new ClassEntry (line 67)
+- new ClassProperty (line 70)
+- new XmlDocumentCreateFromString (line 71)
+- new XmlDocumentCreateEmpty (line 74)
 - 1 class method(s)
 
 ### `ext/dom/DomLoadHTMLFileJitHelper.php`
@@ -6221,7 +6248,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomNodePropertySupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 47)
+- new Variable (line 49)
 - 3 class method(s)
 
 ### `ext/dom/DomParseSimpleHtmlJitHelper.php`
@@ -6541,8 +6568,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomDocumentMethodKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 1324)
-- 71 class method(s)
+- new JIT (line 1340)
+- 72 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/JitDomElementNavigationProperty.php`
@@ -6637,6 +6664,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomNodeChildProperty.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/dom/JitDomNodeIsConnected.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 46)
 - 2 class method(s)
 
 ### `ext/dom/JitDomNodeListItem.php`
@@ -7006,16 +7039,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDom.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 193)
-- new Variable (line 194)
-- new Variable (line 195)
 - new Variable (line 196)
 - new Variable (line 197)
 - new Variable (line 198)
-- new ClassEntry (line 201)
-- new ClassProperty (line 203)
-- new ClassProperty (line 204)
-- new ClassProperty (line 205)
+- new Variable (line 199)
+- new Variable (line 200)
+- new Variable (line 201)
+- new ClassEntry (line 204)
 - new ClassProperty (line 206)
 - new ClassProperty (line 207)
 - new ClassProperty (line 208)
@@ -7024,134 +7054,132 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 211)
 - new ClassProperty (line 212)
 - new ClassProperty (line 213)
+- new ClassProperty (line 214)
 - new ClassProperty (line 215)
-- new NodeCloneNode (line 217)
-- new NodeAppendChild (line 219)
-- new NodeReplaceChild (line 221)
-- new NodeInsertBefore (line 223)
-- new NodeRemoveChild (line 225)
-- new NodeIsSameNode (line 227)
-- new NodeIsEqualNode (line 230)
-- new NodeHasChildNodes (line 233)
-- new NodeContains (line 236)
-- new NodeGetRootNode (line 240)
-- new NodeAppend (line 243)
-- new NodeReplaceChildren (line 246)
-- new NodePrepend (line 249)
-- new NodeBefore (line 251)
-- new NodeAfter (line 253)
-- new NodeReplaceWith (line 255)
-- new NodeRemove (line 257)
-- new NodeLookupPrefix (line 259)
-- new NodeLookupNamespaceURI (line 261)
-- new NodeGetLineNo (line 263)
-- new NodeGetNodePath (line 265)
-- new NodeHasAttributes (line 267)
-- new NodeIsDefaultNamespace (line 269)
-- new NodeIsSupported (line 271)
-- new NodeCompareDocumentPosition (line 274)
-- new NodeNormalize (line 285)
-- new NodeC14N (line 287)
-- new NodeC14NFile (line 290)
-- new ClassEntry (line 295)
-- new ClassProperty (line 298)
-- new ClassProperty (line 299)
-- new TextSplitText (line 300)
-- new TextIsWhitespaceInElementContent (line 303)
-- new TextIsElementContentWhitespace (line 306)
-- new ClassEntry (line 311)
-- new ClassProperty (line 314)
+- new ClassProperty (line 216)
+- new ClassProperty (line 218)
+- new ClassProperty (line 221)
+- new NodeCloneNode (line 223)
+- new NodeAppendChild (line 225)
+- new NodeReplaceChild (line 227)
+- new NodeInsertBefore (line 229)
+- new NodeRemoveChild (line 231)
+- new NodeIsSameNode (line 233)
+- new NodeIsEqualNode (line 236)
+- new NodeHasChildNodes (line 239)
+- new NodeContains (line 242)
+- new NodeGetRootNode (line 246)
+- new NodeAppend (line 249)
+- new NodeReplaceChildren (line 252)
+- new NodePrepend (line 255)
+- new NodeBefore (line 257)
+- new NodeAfter (line 259)
+- new NodeReplaceWith (line 261)
+- new NodeRemove (line 263)
+- new NodeLookupPrefix (line 265)
+- new NodeLookupNamespaceURI (line 267)
+- new NodeGetLineNo (line 269)
+- new NodeGetNodePath (line 271)
+- new NodeHasAttributes (line 273)
+- new NodeIsDefaultNamespace (line 275)
+- new NodeIsSupported (line 277)
+- new NodeCompareDocumentPosition (line 280)
+- new NodeNormalize (line 291)
+- new NodeC14N (line 293)
+- new NodeC14NFile (line 296)
+- new ClassEntry (line 301)
+- new ClassProperty (line 304)
+- new ClassProperty (line 305)
+- new TextSplitText (line 306)
+- new TextIsWhitespaceInElementContent (line 309)
+- new TextIsElementContentWhitespace (line 312)
 - new ClassEntry (line 317)
 - new ClassProperty (line 320)
-- new ClassProperty (line 321)
-- new ClassProperty (line 323)
-- new ClassProperty (line 324)
-- new CharacterDataAppendData (line 325)
-- new CharacterDataDeleteData (line 328)
-- new CharacterDataInsertData (line 331)
-- new CharacterDataReplaceData (line 334)
-- new CharacterDataSubstringData (line 337)
-- new ClassEntry (line 342)
-- new ClassProperty (line 345)
+- new ClassEntry (line 323)
+- new ClassProperty (line 326)
+- new ClassProperty (line 327)
+- new ClassProperty (line 329)
+- new ClassProperty (line 330)
+- new CharacterDataAppendData (line 331)
+- new CharacterDataDeleteData (line 334)
+- new CharacterDataInsertData (line 337)
+- new CharacterDataReplaceData (line 340)
+- new CharacterDataSubstringData (line 343)
 - new ClassEntry (line 348)
 - new ClassProperty (line 351)
 - new ClassEntry (line 354)
 - new ClassProperty (line 357)
-- new ClassProperty (line 358)
-- new ClassProperty (line 359)
-- new ClassProperty (line 360)
-- new ClassEntry (line 363)
+- new ClassEntry (line 360)
+- new ClassProperty (line 363)
+- new ClassProperty (line 364)
+- new ClassProperty (line 365)
 - new ClassProperty (line 366)
-- new ClassProperty (line 367)
-- new ClassProperty (line 368)
-- new ClassEntry (line 371)
+- new ClassEntry (line 369)
+- new ClassProperty (line 372)
+- new ClassProperty (line 373)
 - new ClassProperty (line 374)
-- new ClassProperty (line 375)
-- new ClassProperty (line 376)
-- new ClassProperty (line 377)
-- new ClassEntry (line 380)
-- new ClassProperty (line 389)
-- new NodeListItem (line 390)
-- new NodeListCount (line 392)
-- new NodeListRewind (line 394)
-- new NodeListValid (line 396)
-- new NodeListCurrent (line 398)
-- new NodeListKey (line 400)
-- new NodeListNext (line 402)
-- new ClassEntry (line 406)
-- new ClassProperty (line 415)
-- new NamedNodeMapItem (line 416)
-- new NamedNodeMapGetNamedItem (line 418)
-- new NamedNodeMapGetNamedItemNS (line 421)
-- new NamedNodeMapCount (line 424)
-- new NamedNodeMapRewind (line 426)
-- new NamedNodeMapValid (line 428)
-- new NamedNodeMapCurrent (line 430)
-- new NamedNodeMapKey (line 432)
-- new NamedNodeMapNext (line 434)
-- new ClassEntry (line 439)
-- new ClassProperty (line 442)
-- new ClassProperty (line 443)
-- new TokenListAdd (line 444)
-- new TokenListRemove (line 446)
-- new TokenListContains (line 448)
-- new TokenListToggle (line 450)
-- new TokenListItem (line 452)
-- new TokenListReplace (line 454)
-- new TokenListSupports (line 456)
-- new TokenListCount (line 458)
-- new ClassEntry (line 463)
-- new XPathConstruct (line 465)
-- new XPathQuery (line 469)
-- new XPathEvaluate (line 471)
-- new XPathRegisterNamespace (line 473)
-- new XPathRegisterPhpFunctions (line 476)
-- new XPathQuote (line 481)
-- new ClassEntry (line 486)
-- new ImplementationCreateDocument (line 488)
-- new ImplementationCreateDocumentType (line 490)
-- new ImplementationGetFeature (line 492)
-- new ImplementationHasFeature (line 494)
-- new ClassEntry (line 499)
-- new ClassProperty (line 502)
-- new ClassProperty (line 503)
-- new ClassProperty (line 504)
-- new ClassProperty (line 505)
-- new ClassProperty (line 506)
-- new ClassProperty (line 507)
-- new ClassEntry (line 510)
+- new ClassEntry (line 377)
+- new ClassProperty (line 380)
+- new ClassProperty (line 381)
+- new ClassProperty (line 382)
+- new ClassProperty (line 383)
+- new ClassEntry (line 386)
+- new ClassProperty (line 395)
+- new NodeListItem (line 396)
+- new NodeListCount (line 398)
+- new NodeListRewind (line 400)
+- new NodeListValid (line 402)
+- new NodeListCurrent (line 404)
+- new NodeListKey (line 406)
+- new NodeListNext (line 408)
+- new ClassEntry (line 412)
+- new ClassProperty (line 421)
+- new NamedNodeMapItem (line 422)
+- new NamedNodeMapGetNamedItem (line 424)
+- new NamedNodeMapGetNamedItemNS (line 427)
+- new NamedNodeMapCount (line 430)
+- new NamedNodeMapRewind (line 432)
+- new NamedNodeMapValid (line 434)
+- new NamedNodeMapCurrent (line 436)
+- new NamedNodeMapKey (line 438)
+- new NamedNodeMapNext (line 440)
+- new ClassEntry (line 445)
+- new ClassProperty (line 448)
+- new ClassProperty (line 449)
+- new TokenListAdd (line 450)
+- new TokenListRemove (line 452)
+- new TokenListContains (line 454)
+- new TokenListToggle (line 456)
+- new TokenListItem (line 458)
+- new TokenListReplace (line 460)
+- new TokenListSupports (line 462)
+- new TokenListCount (line 464)
+- new ClassEntry (line 469)
+- new XPathConstruct (line 471)
+- new XPathQuery (line 475)
+- new XPathEvaluate (line 477)
+- new XPathRegisterNamespace (line 479)
+- new XPathRegisterPhpFunctions (line 482)
+- new XPathQuote (line 487)
+- new ClassEntry (line 492)
+- new ImplementationCreateDocument (line 494)
+- new ImplementationCreateDocumentType (line 496)
+- new ImplementationGetFeature (line 498)
+- new ImplementationHasFeature (line 500)
+- new ClassEntry (line 505)
+- new ClassProperty (line 508)
+- new ClassProperty (line 509)
+- new ClassProperty (line 510)
+- new ClassProperty (line 511)
+- new ClassProperty (line 512)
 - new ClassProperty (line 513)
-- new ClassProperty (line 514)
-- new ClassProperty (line 515)
-- new ClassProperty (line 516)
-- new ClassEntry (line 519)
-- new DocumentConstruct (line 522)
-- new ClassProperty (line 526)
-- new ClassProperty (line 527)
-- new ClassProperty (line 528)
-- new ClassProperty (line 529)
-- new ClassProperty (line 530)
-- new ClassProperty (line 531)
+- new ClassEntry (line 516)
+- new ClassProperty (line 519)
+- new ClassProperty (line 520)
+- new ClassProperty (line 521)
+- new ClassProperty (line 522)
+- new ClassEntry (line 525)
+- new DocumentConstruct (line 528)
 - new ClassProperty (line 532)
 - new ClassProperty (line 533)
 - new ClassProperty (line 534)
@@ -7160,209 +7188,215 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 537)
 - new ClassProperty (line 538)
 - new ClassProperty (line 539)
+- new ClassProperty (line 540)
 - new ClassProperty (line 541)
 - new ClassProperty (line 542)
 - new ClassProperty (line 543)
-- new DocumentLoadXML (line 544)
-- new DocumentLoad (line 546)
-- new DocumentLoadHTML (line 548)
-- new DocumentLoadHTMLFile (line 551)
-- new DocumentCreateElement (line 554)
-- new DocumentCreateElementNS (line 556)
-- new DocumentCreateAttributeNS (line 558)
-- new DocumentCreateAttribute (line 560)
-- new DocumentCreateDocumentFragment (line 562)
-- new DocumentCreateEntityReference (line 564)
-- new DocumentCreateTextNode (line 567)
-- new DocumentCreateComment (line 570)
-- new DocumentCreateCDATASection (line 573)
-- new DocumentCreateProcessingInstruction (line 576)
-- new DocumentAppendChild (line 579)
-- new DocumentSaveXML (line 581)
-- new DocumentSave (line 583)
-- new DocumentSaveHTML (line 585)
-- new DocumentSaveHTMLFile (line 588)
-- new DocumentGetElementsByTagName (line 591)
-- new DocumentGetElementsByTagNameNS (line 593)
-- new DocumentGetElementById (line 596)
-- new DocumentImportNode (line 598)
-- new DocumentAdoptNode (line 600)
-- new DocumentRegisterNodeClass (line 603)
-- new DocumentNormalizeDocument (line 606)
-- new DocumentXInclude (line 609)
-- new DocumentSchemaValidate (line 611)
-- new DocumentRelaxNGValidate (line 614)
-- new DocumentSchemaValidateSource (line 617)
-- new DocumentRelaxNGValidateSource (line 620)
-- new DocumentValidate (line 623)
-- new ClassEntry (line 627)
-- new ClassProperty (line 630)
-- new ClassProperty (line 631)
-- new ClassProperty (line 632)
-- new ClassProperty (line 634)
-- new ClassProperty (line 635)
+- new ClassProperty (line 544)
+- new ClassProperty (line 545)
+- new ClassProperty (line 547)
+- new ClassProperty (line 548)
+- new ClassProperty (line 549)
+- new DocumentLoadXML (line 550)
+- new DocumentLoad (line 552)
+- new DocumentLoadHTML (line 554)
+- new DocumentLoadHTMLFile (line 557)
+- new DocumentCreateElement (line 560)
+- new DocumentCreateElementNS (line 562)
+- new DocumentCreateAttributeNS (line 564)
+- new DocumentCreateAttribute (line 566)
+- new DocumentCreateDocumentFragment (line 568)
+- new DocumentCreateEntityReference (line 570)
+- new DocumentCreateTextNode (line 573)
+- new DocumentCreateComment (line 576)
+- new DocumentCreateCDATASection (line 579)
+- new DocumentCreateProcessingInstruction (line 582)
+- new DocumentAppendChild (line 585)
+- new DocumentSaveXML (line 587)
+- new DocumentSave (line 589)
+- new DocumentSaveHTML (line 591)
+- new DocumentSaveHTMLFile (line 594)
+- new DocumentGetElementsByTagName (line 597)
+- new DocumentGetElementsByTagNameNS (line 599)
+- new DocumentGetElementById (line 602)
+- new DocumentImportNode (line 604)
+- new DocumentAdoptNode (line 606)
+- new DocumentRegisterNodeClass (line 609)
+- new DocumentNormalizeDocument (line 612)
+- new DocumentXInclude (line 615)
+- new DocumentSchemaValidate (line 617)
+- new DocumentRelaxNGValidate (line 620)
+- new DocumentSchemaValidateSource (line 623)
+- new DocumentRelaxNGValidateSource (line 626)
+- new DocumentValidate (line 629)
+- new ClassEntry (line 633)
 - new ClassProperty (line 636)
 - new ClassProperty (line 637)
 - new ClassProperty (line 638)
-- new ElementAppendChild (line 639)
-- new ElementGetAttribute (line 641)
-- new ElementGetAttributeNode (line 643)
-- new ElementGetAttributeNodeNS (line 645)
-- new ElementGetAttributeNS (line 648)
-- new ElementHasAttribute (line 650)
-- new ElementHasAttributeNS (line 652)
-- new ElementRemoveAttribute (line 654)
-- new ElementRemoveAttributeNode (line 656)
-- new ElementSetAttribute (line 658)
-- new ElementSetAttributeNode (line 660)
-- new ElementSetAttributeNodeNS (line 662)
-- new ElementSetAttributeNS (line 665)
-- new ElementRemoveAttributeNS (line 667)
-- new ElementSetIdAttribute (line 669)
-- new ElementSetIdAttributeNS (line 672)
-- new ElementGetElementsByTagName (line 675)
-- new ElementGetElementsByTagNameNS (line 677)
-- new ElementGetAttributeNames (line 681)
-- new ElementInsertAdjacentHTML (line 686)
-- new ElementInsertAdjacentElement (line 691)
-- new ElementInsertAdjacentText (line 696)
-- new ElementToggleAttribute (line 701)
-- new ElementGetInnerHTML (line 706)
-- new ElementGetOuterHTML (line 709)
-- new ClassProperty (line 714)
-- new ClassEntry (line 718)
-- new FragmentConstruct (line 721)
-- new ClassProperty (line 725)
-- new ClassProperty (line 727)
-- new ClassProperty (line 728)
-- new ClassProperty (line 729)
-- new FragmentAppendChild (line 730)
-- new FragmentAppendXML (line 732)
-- new ObjectEntry (line 746)
-- new DomNodeState (line 748)
-- new Variable (line 762)
-- new ObjectEntry (line 785)
-- new DomNodeState (line 790)
-- new Variable (line 816)
-- new ObjectEntry (line 844)
-- new DomNodeState (line 865)
-- new Variable (line 905)
-- new HashTable (line 916)
-- new Variable (line 917)
-- new HashTable (line 929)
-- new Variable (line 936)
-- new DomNodeState (line 959)
-- new DomNodeState (line 1008)
-- new ObjectEntry (line 1032)
-- new DomNodeState (line 1040)
-- new Variable (line 1058)
-- new ObjectEntry (line 1074)
-- new DomNodeState (line 1082)
-- new Variable (line 1105)
-- new Variable (line 1126)
-- new ObjectEntry (line 1144)
-- new DomNodeState (line 1152)
-- new Variable (line 1164)
-- new DOMException (line 1209)
-- new Variable (line 1213)
+- new ClassProperty (line 640)
+- new ClassProperty (line 641)
+- new ClassProperty (line 642)
+- new ClassProperty (line 643)
+- new ClassProperty (line 644)
+- new ElementAppendChild (line 645)
+- new ElementGetAttribute (line 647)
+- new ElementGetAttributeNode (line 649)
+- new ElementGetAttributeNodeNS (line 651)
+- new ElementGetAttributeNS (line 654)
+- new ElementHasAttribute (line 656)
+- new ElementHasAttributeNS (line 658)
+- new ElementRemoveAttribute (line 660)
+- new ElementRemoveAttributeNode (line 662)
+- new ElementSetAttribute (line 664)
+- new ElementSetAttributeNode (line 666)
+- new ElementSetAttributeNodeNS (line 668)
+- new ElementSetAttributeNS (line 671)
+- new ElementRemoveAttributeNS (line 673)
+- new ElementSetIdAttribute (line 675)
+- new ElementSetIdAttributeNS (line 678)
+- new ElementGetElementsByTagName (line 681)
+- new ElementGetElementsByTagNameNS (line 683)
+- new ElementGetAttributeNames (line 687)
+- new ElementInsertAdjacentHTML (line 692)
+- new ElementInsertAdjacentElement (line 697)
+- new ElementInsertAdjacentText (line 702)
+- new ElementToggleAttribute (line 707)
+- new ElementGetInnerHTML (line 712)
+- new ElementGetOuterHTML (line 715)
+- new ClassProperty (line 720)
+- new ClassEntry (line 724)
+- new FragmentConstruct (line 727)
+- new ClassProperty (line 731)
+- new ClassProperty (line 733)
+- new ClassProperty (line 734)
+- new ClassProperty (line 735)
+- new FragmentAppendChild (line 736)
+- new FragmentAppendXML (line 738)
+- new ObjectEntry (line 752)
+- new DomNodeState (line 754)
+- new Variable (line 768)
+- new ObjectEntry (line 791)
+- new DomNodeState (line 796)
+- new Variable (line 822)
+- new ObjectEntry (line 850)
+- new DomNodeState (line 871)
+- new Variable (line 911)
+- new HashTable (line 922)
+- new Variable (line 923)
+- new HashTable (line 935)
+- new Variable (line 942)
+- new DomNodeState (line 965)
+- new DomNodeState (line 1014)
+- new ObjectEntry (line 1038)
+- new DomNodeState (line 1046)
+- new Variable (line 1064)
+- new ObjectEntry (line 1080)
+- new DomNodeState (line 1088)
+- new Variable (line 1111)
+- new Variable (line 1132)
+- new ObjectEntry (line 1150)
+- new DomNodeState (line 1158)
+- new Variable (line 1170)
+- new DOMException (line 1215)
 - new Variable (line 1219)
-- new DOMException (line 1228)
-- new Variable (line 1264)
-- new DOMException (line 1284)
-- new Variable (line 1287)
-- new DOMException (line 1306)
-- new Variable (line 1338)
-- new DOMException (line 1350)
-- new DOMException (line 1363)
-- new Variable (line 1375)
-- new DOMException (line 1483)
-- new DOMException (line 1535)
-- new DOMException (line 1548)
-- new DOMException (line 1571)
-- new DOMException (line 1585)
-- new DOMException (line 1614)
-- new DOMException (line 1669)
-- new DOMException (line 1725)
-- new DOMException (line 1729)
-- new DOMException (line 1742)
-- new DOMException (line 1746)
-- new DOMException (line 1756)
-- new ObjectEntry (line 2207)
-- new DomNodeState (line 2212)
-- new ObjectEntry (line 2228)
-- new DomNodeState (line 2233)
-- new ObjectEntry (line 2249)
-- new DomNodeState (line 2254)
-- new DOMException (line 2293)
-- new DOMException (line 2303)
-- new DOMException (line 2316)
-- new DOMException (line 2335)
-- new ObjectEntry (line 2423)
-- new DomNodeState (line 2428)
-- new Variable (line 2437)
-- new ObjectEntry (line 2447)
-- new DomNodeState (line 2452)
-- new Variable (line 2458)
-- new ObjectEntry (line 3169)
-- new DomNodeState (line 3171)
-- new ObjectEntry (line 3367)
-- new DomNodeState (line 3369)
-- new ObjectEntry (line 3397)
-- new DomNodeState (line 3399)
-- new ObjectEntry (line 3528)
-- new DomNodeState (line 3533)
-- new DOMException (line 3904)
-- new DOMException (line 3919)
-- new Variable (line 3936)
-- new DOMException (line 3950)
-- new DOMException (line 3953)
-- new DOMException (line 3962)
-- new Error (line 3992)
-- new DOMException (line 3998)
-- new DOMException (line 4011)
-- new DOMException (line 4209)
-- new DOMException (line 4406)
-- new DOMException (line 4410)
-- new DOMException (line 4499)
-- new DOMException (line 4503)
-- new DOMException (line 4561)
-- new DOMException (line 4578)
-- new DOMException (line 4609)
-- new DOMException (line 4651)
-- new DOMException (line 4677)
-- new DOMException (line 5349)
-- new Variable (line 5377)
-- new DOMException (line 5623)
-- new DOMException (line 5735)
-- new DOMException (line 5777)
-- new ObjectEntry (line 5862)
-- new DomNodeState (line 5866)
-- new Variable (line 5873)
-- new ObjectEntry (line 6081)
-- new DomNodeState (line 6085)
-- new Variable (line 6092)
-- new ObjectEntry (line 6112)
-- new DomNodeState (line 6115)
-- new Variable (line 6123)
-- new Variable (line 6292)
-- new DOMException (line 6399)
-- new DOMException (line 6406)
-- new DOMException (line 6413)
-- new DOMException (line 6417)
-- new DOMException (line 6420)
-- new DOMException (line 6429)
-- new DOMException (line 7376)
-- new Variable (line 7435)
-- new Variable (line 7448)
-- new Variable (line 7486)
-- new DOMException (line 7497)
-- new Variable (line 7499)
-- new DOMException (line 7632)
-- new DOMException (line 7659)
-- new DOMException (line 7690)
-- new DOMException (line 7754)
-- new DOMException (line 7762)
-- new DOMException (line 7771)
+- new Variable (line 1225)
+- new DOMException (line 1234)
+- new Variable (line 1270)
+- new DOMException (line 1290)
+- new Variable (line 1293)
+- new DOMException (line 1312)
+- new Variable (line 1344)
+- new DOMException (line 1356)
+- new DOMException (line 1369)
+- new Variable (line 1381)
+- new DOMException (line 1489)
+- new DOMException (line 1541)
+- new DOMException (line 1554)
+- new DOMException (line 1577)
+- new DOMException (line 1591)
+- new DOMException (line 1620)
+- new DOMException (line 1675)
+- new DOMException (line 1731)
+- new DOMException (line 1735)
+- new DOMException (line 1748)
+- new DOMException (line 1752)
+- new DOMException (line 1762)
+- new ObjectEntry (line 2213)
+- new DomNodeState (line 2218)
+- new ObjectEntry (line 2234)
+- new DomNodeState (line 2239)
+- new ObjectEntry (line 2255)
+- new DomNodeState (line 2260)
+- new DOMException (line 2299)
+- new DOMException (line 2309)
+- new DOMException (line 2322)
+- new DOMException (line 2341)
+- new ObjectEntry (line 2429)
+- new DomNodeState (line 2434)
+- new Variable (line 2443)
+- new ObjectEntry (line 2453)
+- new DomNodeState (line 2458)
+- new Variable (line 2464)
+- new ObjectEntry (line 3175)
+- new DomNodeState (line 3177)
+- new ObjectEntry (line 3373)
+- new DomNodeState (line 3375)
+- new ObjectEntry (line 3403)
+- new DomNodeState (line 3405)
+- new ObjectEntry (line 3534)
+- new DomNodeState (line 3539)
+- new DOMException (line 3910)
+- new DOMException (line 3925)
+- new Variable (line 3942)
+- new DOMException (line 3956)
+- new DOMException (line 3959)
+- new DOMException (line 3968)
+- new Error (line 3998)
+- new DOMException (line 4004)
+- new DOMException (line 4017)
+- new DOMException (line 4215)
+- new DOMException (line 4412)
+- new DOMException (line 4416)
+- new DOMException (line 4505)
+- new DOMException (line 4509)
+- new DOMException (line 4567)
+- new DOMException (line 4584)
+- new DOMException (line 4615)
+- new DOMException (line 4657)
+- new DOMException (line 4683)
+- new DOMException (line 5355)
+- new Variable (line 5383)
+- new DOMException (line 5629)
+- new DOMException (line 5741)
+- new DOMException (line 5783)
+- new ObjectEntry (line 5868)
+- new DomNodeState (line 5872)
+- new Variable (line 5879)
+- new ObjectEntry (line 6087)
+- new DomNodeState (line 6091)
+- new Variable (line 6098)
+- new ObjectEntry (line 6118)
+- new DomNodeState (line 6121)
+- new Variable (line 6129)
+- new Variable (line 6298)
+- new DOMException (line 6405)
+- new DOMException (line 6412)
+- new DOMException (line 6419)
+- new DOMException (line 6423)
+- new DOMException (line 6426)
+- new DOMException (line 6435)
+- new DOMException (line 7382)
+- new Variable (line 7441)
+- new Variable (line 7454)
+- new Variable (line 7492)
+- new DOMException (line 7503)
+- new Variable (line 7505)
+- new DOMException (line 7638)
+- new DOMException (line 7665)
+- new DOMException (line 7696)
+- new DOMException (line 7760)
+- new DOMException (line 7768)
+- new DOMException (line 7777)
 - 357 class method(s)
 - 1 closure(s)
 
@@ -16713,6 +16747,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitStreamMetaKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 210)
+- 9 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/JitStreamNotificationCallback.php`
 
@@ -27332,12 +27373,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new XMLWriter (line 43)
-- new XMLWriter (line 237)
-- 19 class method(s)
+- new XMLWriter (line 246)
+- new XMLWriter (line 266)
+- new XMLWriter (line 409)
+- 28 class method(s)
 
 ### `ext/xmlwriter/Module.php`
 
 **Warnings** (review for bootstrap subset):
+- new xmlwriter_open_memory (line 28)
+- new xmlwriter_open_uri (line 29)
+- new xmlwriter_set_indent (line 30)
+- new xmlwriter_set_indent_string (line 31)
+- new xmlwriter_start_document (line 32)
+- new xmlwriter_end_document (line 33)
+- new xmlwriter_start_element (line 34)
+- new xmlwriter_end_element (line 35)
+- new xmlwriter_full_end_element (line 36)
+- new xmlwriter_write_attribute (line 37)
+- new xmlwriter_write_element (line 38)
+- new xmlwriter_write_cdata (line 39)
+- new xmlwriter_write_comment (line 40)
+- new xmlwriter_text (line 41)
+- new xmlwriter_output_memory (line 42)
+- new xmlwriter_flush (line 43)
 - 2 class method(s)
 
 ### `ext/xmlwriter/VmXmlWriter.php`
@@ -27413,6 +27472,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 - 1 closure(s)
 
+### `ext/xmlwriter/XmlWriterProceduralFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ObjectEntry (line 96)
+- 5 class method(s)
+
 ### `ext/xmlwriter/XmlWriterRegistry.php`
 
 **Warnings** (review for bootstrap subset):
@@ -27477,6 +27542,102 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_end_document.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_end_element.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_flush.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_full_end_element.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_open_memory.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_open_uri.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 2 closure(s)
+
+### `ext/xmlwriter/xmlwriter_output_memory.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_set_indent.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_set_indent_string.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_start_document.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_start_element.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_text.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_write_attribute.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_write_cdata.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_write_comment.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_write_element.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 - 1 closure(s)
 
@@ -28937,7 +29098,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 192 class method(s)
+- 193 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -29824,6 +29985,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/JIT/Builtin/DomNodeIsConnectedRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/DomNodeListItemRuntime.php`
 
@@ -31369,13 +31535,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
-### `lib/JIT/Builtin/StreamMetaJit.php`
-
-**Warnings** (review for bootstrap subset):
-- new JIT (line 206)
-- 9 class method(s)
-- 1 closure(s)
-
 ### `lib/JIT/Builtin/StreamModeRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -32718,10 +32877,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 91)
-- new Variable (line 112)
-- new Variable (line 133)
-- new Variable (line 238)
+- new Variable (line 94)
+- new Variable (line 115)
+- new Variable (line 136)
+- new Variable (line 241)
 - 5 class method(s)
 
 ### `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php`
@@ -34788,7 +34947,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/XmlWriterInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\XmlWriterMethod (line 48)
+- new Call\XmlWriterMethod (line 49)
 - 3 class method(s)
 
 ### `lib/JitMcjitEmbed.php`

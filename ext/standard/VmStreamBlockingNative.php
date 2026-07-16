@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * VM stream_set_blocking — {@see VmStreamBlockingPure} SSOT, no libc fcntl FFI (#6007, #12251).
  *
- * Mirrors {@see \PHPCompiler\JIT\Builtin\StreamMetaJit} emitSetBlocking; JIT/AOT uses
+ * Mirrors {@see \PHPCompiler\ext\standard\JitStreamMetaKernel} set-blocking bridge; JIT/AOT uses
  * __compiler_stream_set_blocking on phpc_stream_handles.
  *
  * php-src: ext/standard/streams.c — php_stream_set_blocking
