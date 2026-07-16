@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmCallable;
@@ -401,6 +402,11 @@ final class VmDomXPath
     }
 
     /**
+     * Absolute location path from the document root (XPath 1.0 / php-src xpath.c; #19709).
+     *
+     * Leading `/` selects from the document node — not from documentElement as context —
+     * so `/r` matches the root element `r`, and `/r/a` walks child axis from there.
+     *
      * @param array<string, string> $namespaces
      *
      * @return list<int>
@@ -410,32 +416,43 @@ final class VmDomXPath
         string $path,
         array $namespaces
     ): array {
-        $segments = explode('/', $path);
-        $current = VmDom::isDocument($context)
-            ? $context->getProperty(VmDom::PROP_DOCUMENT_ELEMENT)->resolveIndirect()->toObject()
-            : $context;
-        $lastIndex = \count($segments) - 1;
-        foreach ($segments as $index => $segment) {
-            if ('' === $segment) {
-                continue;
+        $document = VmDom::isDocument($context)
+            ? $context
+            : VmDom::ownerDocumentEntry($context);
+        if (null === $document || !VmDom::isDocument($document)) {
+            return [];
+        }
+
+        $segments = [];
+        foreach (explode('/', $path) as $segment) {
+            if ('' !== $segment) {
+                $segments[] = $segment;
             }
-            if (!VmDom::isElement($current)) {
-                return [];
+        }
+        if ([] === $segments) {
+            return [];
+        }
+
+        $currentIds = self::collectChildElements($document, $segments[0], $namespaces);
+        $n = \count($segments);
+        for ($i = 1; $i < $n; ++$i) {
+            $nextIds = [];
+            foreach ($currentIds as $id) {
+                $node = DomRegistry::entry($id);
+                if (null === $node) {
+                    continue;
+                }
+                foreach (self::collectChildElements($node, $segments[$i], $namespaces) as $childId) {
+                    $nextIds[] = $childId;
+                }
             }
-            $children = self::collectChildElements($current, $segment, $namespaces);
-            if ([] === $children) {
-                return [];
-            }
-            if ($index === $lastIndex) {
-                return $children;
-            }
-            $current = DomRegistry::entry($children[0]);
-            if (null === $current) {
+            $currentIds = $nextIds;
+            if ([] === $currentIds) {
                 return [];
             }
         }
 
-        return [];
+        return $currentIds;
     }
 
     /**
@@ -805,7 +822,8 @@ final class VmDomXPath
 
             return $var;
         }
-        // Node-set argument — php:function passes DOMNode arrays; functionString coerces to string.
+        // Node-set argument — php:function passes DOMNode[]; functionString coerces to string-value
+        // of the first node (php-src xpath_callbacks.c; #19331 / #19709).
         $nodeIds = self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, false);
         if ($nodesetToString) {
             $var = new Variable(Variable::TYPE_STRING);
@@ -819,15 +837,18 @@ final class VmDomXPath
 
             return $var;
         }
-        // php:function() with string() already handled above; bare path → string via first node text.
-        $var = new Variable(Variable::TYPE_STRING);
-        if ([] === $nodeIds) {
-            $var->string('');
-
-            return $var;
+        $ht = new HashTable();
+        foreach ($nodeIds as $nodeId) {
+            $node = DomRegistry::entry($nodeId);
+            if (null === $node) {
+                continue;
+            }
+            $obj = new Variable(Variable::TYPE_OBJECT);
+            $obj->object($node);
+            $ht->append($obj);
         }
-        $node = DomRegistry::entry($nodeIds[0]);
-        $var->string(null !== $node ? (VmDom::readNodeValue($node) ?? '') : '');
+        $var = new Variable(Variable::TYPE_ARRAY);
+        $var->array($ht);
 
         return $var;
     }
