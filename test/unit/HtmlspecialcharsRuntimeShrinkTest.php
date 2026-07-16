@@ -6,20 +6,23 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** htmlspecialchars() JIT routes through HtmlspecialcharsJitHelper PHP for embed + user-script AOT (#9445, #18967). */
+/** htmlspecialchars() JIT: PHP helper embed + ext kernel for user-script AOT (#9445, #18967, #19389). */
 final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
 {
-    public function testStringHtmlspecialcharsUsesJitHelperNotLlvmMonolith(): void
+    public function testStringHtmlspecialcharsUsesJitHelperAndExtKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialchars.php');
         $this->assertStringContainsString('HtmlspecialcharsJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('StreamIoRuntime::shouldDeferHeavyStreamIoEmitters', $source);
-        $this->assertStringContainsString('StringHtmlspecialcharsUserScriptLlvm::ensureLinked', $source);
+        $this->assertStringContainsString('JitHtmlspecialcharsKernel', $source);
+        $this->assertStringContainsString('htmlspecialchars_kernel_entry', $source);
+        $this->assertStringNotContainsString('StringHtmlspecialcharsUserScriptLlvm', $source);
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
         $this->assertStringNotContainsString('htmlspecialchars_count_head', $source);
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsUserScriptLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsUserScriptLlvm.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitHtmlspecialcharsKernel.php');
     }
 
     public function testHtmlspecialcharsJitHelperIsSelfContained(): void
@@ -44,11 +47,13 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testSpineBundleOmitsDeletedHtmlspecialcharsUserScriptLlvm(): void
+    public function testSpineBundleIncludesHtmlspecialcharsKernel(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('HtmlspecialcharsJitHelper.php', $spine);
         $this->assertStringContainsString('StringHtmlspecialchars.php', $spine);
+        $this->assertStringContainsString('JitHtmlspecialcharsKernel.php', $spine);
+        $this->assertStringNotContainsString('StringHtmlspecialcharsUserScriptLlvm.php', $spine);
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm.php', $spine);
     }
 
