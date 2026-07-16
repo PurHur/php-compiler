@@ -60,6 +60,8 @@ final class BuiltinByRefParams
                 return [1, 2];
             case 'socket_create_pair':
                 return [3];
+            case 'socket_select':
+                return [0, 1, 2];
             case 'socket_getsockname':
             case 'socket_getpeername':
                 return [1, 2];

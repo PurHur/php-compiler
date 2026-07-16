@@ -186,6 +186,8 @@ final class BuiltinParamNames
             case 'fwrite':
             case 'fputs':
                 return ['stream', 'data', 'length'];
+            case 'socket_select':
+                return ['read', 'write', 'except', 'seconds', 'microseconds'];
             case 'fputcsv':
                 return ['stream', 'fields', 'separator', 'enclosure', 'escape', 'eol'];
             case 'stream_context_create':

@@ -57,6 +57,108 @@ final class VmSockets
         return $r >= 0 && 0 !== $r;
     }
 
+    /**
+     * socket_select() via poll(2) (php-src ext/sockets/sockets.c; #6395).
+     *
+     * @param list<array{key: int|string, object: ObjectEntry, fd: int}>|null $read
+     * @param list<array{key: int|string, object: ObjectEntry, fd: int}>|null $write
+     * @param list<array{key: int|string, object: ObjectEntry, fd: int}>|null $except
+     *
+     * @return array{read: list<array{key: int|string, object: ObjectEntry, fd: int}>, write: list<array{key: int|string, object: ObjectEntry, fd: int}>, except: list<array{key: int|string, object: ObjectEntry, fd: int}>, count: int}|false
+     */
+    public static function select(
+        ?array $read,
+        ?array $write,
+        ?array $except,
+        int $seconds,
+        int $microseconds,
+    ): array|false {
+        $polLin = 0x001;
+        $polLout = 0x004;
+        $polLerr = 0x008;
+        $polLhup = 0x010;
+        $polLpri = 0x002;
+
+        /** @var list<array{slot: array{key: int|string, object: ObjectEntry, fd: int}, events: int, kind: int}> $entries */
+        $entries = [];
+        if (null !== $read) {
+            foreach ($read as $slot) {
+                $entries[] = ['slot' => $slot, 'events' => $polLin | $polLhup, 'kind' => 1];
+            }
+        }
+        if (null !== $write) {
+            foreach ($write as $slot) {
+                $entries[] = ['slot' => $slot, 'events' => $polLout, 'kind' => 2];
+            }
+        }
+        if (null !== $except) {
+            foreach ($except as $slot) {
+                $entries[] = ['slot' => $slot, 'events' => $polLerr | $polLhup | $polLpri, 'kind' => 3];
+            }
+        }
+
+        $timeoutMs = -1;
+        if ($seconds >= 0) {
+            $timeoutMs = ($seconds * 1000) + (int) \floor($microseconds / 1000);
+            if ($timeoutMs < 0) {
+                $timeoutMs = 0;
+            }
+        }
+
+        if ([] === $entries) {
+            // No descriptors but at least one empty array was passed — timeout only.
+            if ($timeoutMs > 0) {
+                usleep($timeoutMs * 1000);
+            }
+
+            return [
+                'read' => [],
+                'write' => [],
+                'except' => [],
+                'count' => 0,
+            ];
+        }
+
+        $pollEntries = [];
+        foreach ($entries as $entry) {
+            $pollEntries[] = ['fd' => $entry['slot']['fd'], 'events' => $entry['events']];
+        }
+        $revents = SocketsLibcThinAbi::poll($pollEntries, $timeoutMs);
+        if (false === $revents) {
+            self::recordError(null, SocketsLibcThinAbi::readErrno());
+
+            return false;
+        }
+
+        $readyRead = [];
+        $readyWrite = [];
+        $readyExcept = [];
+        $readyCount = 0;
+        foreach ($revents as $i => $rev) {
+            if (0 === $rev) {
+                continue;
+            }
+            $entry = $entries[$i];
+            $requested = $entry['events'];
+            if (0 === ($rev & $requested) && 0 === ($rev & ($polLerr | $polLhup))) {
+                continue;
+            }
+            match ($entry['kind']) {
+                1 => $readyRead[] = $entry['slot'],
+                2 => $readyWrite[] = $entry['slot'],
+                3 => $readyExcept[] = $entry['slot'],
+            };
+            ++$readyCount;
+        }
+
+        return [
+            'read' => $readyRead,
+            'write' => $readyWrite,
+            'except' => $readyExcept,
+            'count' => $readyCount,
+        ];
+    }
+
     /** php-src: ext/sockets/sockets.c — PHP_FUNCTION(socket_set_nonblock) via fcntl(F_SETFL). */
     public static function setNonblockForObject(ObjectEntry $object): bool
     {
