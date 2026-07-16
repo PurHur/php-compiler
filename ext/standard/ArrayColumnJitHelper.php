@@ -186,28 +186,25 @@ final class ArrayColumnJitHelper
         return null;
     }
 
+    /**
+     * php-src: zend_hash_update on the extracted index_key cell — illegal offsets
+     * (objects/enum cases/arrays) throw TypeError "Illegal offset type" (#19742).
+     */
     private static function storeAtKey(HashTable $out, Variable $key, Variable $value): void
     {
         $stored = new Variable();
         $stored->copyFrom($value);
-        $resolved = $key->resolveIndirect();
-        if (Variable::TYPE_INTEGER === $resolved->type) {
-            $out->updateIndex($resolved->toInt(), $stored);
+        $normalized = HashTable::normalizeIndexKey($key);
+        if (Variable::TYPE_INTEGER === $normalized->type) {
+            $out->updateIndex($normalized->toInt(), $stored);
 
             return;
         }
-        if (Variable::TYPE_STRING === $resolved->type) {
-            $out->update($resolved->toString(), $stored);
+        if (Variable::TYPE_STRING === $normalized->type) {
+            $out->update($normalized->toString(), $stored);
 
             return;
         }
-        if (Variable::TYPE_NULL === $resolved->type) {
-            $out->update('', $stored);
-
-            return;
-        }
-        throw new \LogicException(
-            'array_column() index_key value must be int, string, or null in this compiler build'
-        );
+        throw new \TypeError('Illegal offset type');
     }
 }
