@@ -8,10 +8,10 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmStreamSocketNative;
 
 /**
- * ext/ftp advertisement — php-src ext/ftp/php_ftp.c (#3353, #7270).
+ * ext/ftp advertisement — php-src ext/ftp/php_ftp.c (#3353, #7270, #19672).
  *
- * {@code function_exists('ftp_connect'|'ftp_fget'|…)} once handlers register (#3353, #6762);
- * {@code extension_loaded('ftp')} stays false until the module advertises as loaded.
+ * {@code function_exists('ftp_connect'|…)} / {@code Ftp\Connection} / {@code extension_loaded('ftp')}
+ * stay paired — Zend never splits the module flag from the procedural + Connection surface.
  */
 final class FtpExtensionPolicy
 {
@@ -20,9 +20,9 @@ final class FtpExtensionPolicy
         return CompilerVersion::supportsFtpConnection() && VmStreamSocketNative::available();
     }
 
-    /** extension_loaded('ftp') — false until full ext/ftp parity ships (#3353 phase 2). */
+    /** extension_loaded('ftp') — same gate as ftp_* / Ftp\Connection (#19672). */
     public static function advertisesExtension(): bool
     {
-        return false;
+        return self::advertisesBuiltins();
     }
 }
