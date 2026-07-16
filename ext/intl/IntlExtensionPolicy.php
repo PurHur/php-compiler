@@ -131,6 +131,14 @@ final class IntlExtensionPolicy
         return self::advertisesBuiltins();
     }
 
+    /**
+     * IntlBreakIterator / IntlRuleBasedBreakIterator / IntlPartsIterator — require loaded ext/intl (#6188, #19670).
+     */
+    public static function advertisesBreakIterator(): bool
+    {
+        return self::advertisesBuiltins();
+    }
+
     /** Run Locale compliance when ext/intl is loaded or a phantom-registration guard matches (#19670). */
     public static function runsLocaleCompliance(string $testFileName): bool
     {

@@ -168,4 +168,42 @@ PHP;
         $runtime->run($block);
         self::assertSame("obj\nversion_ok\n1\n", ob_get_clean());
     }
+
+    public function test_breakiterator_word_parts_via_forced_registration(): void
+    {
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerBreakIterator($runtime->vmContext);
+        $code = <<<'PHP'
+<?php
+foreach (['IntlBreakIterator', 'IntlRuleBasedBreakIterator', 'IntlPartsIterator'] as $c) {
+    echo $c, '=', class_exists($c, false) ? '1' : '0', "\n";
+}
+$bi = IntlBreakIterator::createWordInstance('en_US');
+echo get_class($bi), "\n";
+$bi->setText('Hello world');
+$parts = [];
+$start = $bi->first();
+while (($end = $bi->next()) !== IntlBreakIterator::DONE) {
+    $parts[] = substr('Hello world', $start, $end - $start);
+    $start = $end;
+}
+echo implode('|', $parts), "\n";
+$it = $bi->getPartsIterator();
+$it->rewind();
+$out = [];
+while ($it->valid()) {
+    $out[] = $it->current();
+    $it->next();
+}
+echo implode('|', $out), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_breakiterator_forced.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "IntlBreakIterator=1\nIntlRuleBasedBreakIterator=1\nIntlPartsIterator=1\n"
+            ."IntlRuleBasedBreakIterator\nHello| |world\nHello| |world\n",
+            ob_get_clean()
+        );
+    }
 }
