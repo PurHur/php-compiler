@@ -6566,7 +6566,7 @@ class InternalArgInfo
         'SDO_Sequence::move' => ['', 'toindex' => 'int', 'fromindex' => 'int'],
         'SeekableIterator::seek' => ['', 'position' => 'int'],
         'sem_acquire' => ['bool', 'id' => ''],
-        'sem_get' => ['resource', 'key' => 'int', 'max_acquire=' => 'int', 'perm=' => 'int', 'auto_release=' => 'int'],
+        'sem_get' => ['SysvSemaphore|false', 'key' => 'int', 'max_acquire=' => 'int', 'permissions=' => 'int', 'auto_release=' => 'bool'],
         'sem_release' => ['bool', 'id' => ''],
         'sem_remove' => ['bool', 'id' => ''],
         'serialize' => ['string', 'variable' => ''],
