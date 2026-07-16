@@ -14703,8 +14703,16 @@ restart:
         if (null !== $entry->parentLc && isset($this->context->classes[$entry->parentLc])) {
             $parent = $this->context->classes[$entry->parentLc];
             if (isset($parent->constants[$memberLc])) {
+                $vis = $parent->constVisibility[$memberLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                // Skip private parent constants — same rule as inheritFromParent (#19615).
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                    return $this->resolveInheritedClassConstant($parent, $memberLc);
+                }
+
                 return $parent->constants[$memberLc];
             }
+
+            return $this->resolveInheritedClassConstant($parent, $memberLc);
         }
 
         return null;
@@ -14980,22 +14988,29 @@ restart:
         $childLc = strtolower($entry->name);
         $this->inheritParentPropertyHooks($entry, $parent);
         foreach ($parent->constants as $name => $value) {
-            if (!isset($entry->constants[$name])) {
-                $entry->constants[$name] = $value;
-                if (isset($parent->constNames[$name])) {
-                    $entry->constNames[$name] = $parent->constNames[$name];
-                }
-                $entry->constDeclaringClassLc[$name] = $parent->constDeclaringClassLc[$name]
-                    ?? strtolower(ltrim($parent->name, '\\'));
-                if (isset($parent->constVisibility[$name])) {
-                    $entry->constVisibility[$name] = $parent->constVisibility[$name];
-                }
-                if (isset($parent->constDeprecated[$name])) {
-                    $entry->constDeprecated[$name] = $parent->constDeprecated[$name];
-                }
-                if (isset($parent->constFinal[$name])) {
-                    $entry->constFinal[$name] = true;
-                }
+            if (isset($entry->constants[$name])) {
+                continue;
+            }
+            // Private class constants are not inherited (Zend zend_constants.c / #19615).
+            // Child self::PRIVATE must be Undefined constant Child::X, not a visibility leak.
+            $vis = $parent->constVisibility[$name] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                continue;
+            }
+            $entry->constants[$name] = $value;
+            if (isset($parent->constNames[$name])) {
+                $entry->constNames[$name] = $parent->constNames[$name];
+            }
+            $entry->constDeclaringClassLc[$name] = $parent->constDeclaringClassLc[$name]
+                ?? strtolower(ltrim($parent->name, '\\'));
+            if (isset($parent->constVisibility[$name])) {
+                $entry->constVisibility[$name] = $parent->constVisibility[$name];
+            }
+            if (isset($parent->constDeprecated[$name])) {
+                $entry->constDeprecated[$name] = $parent->constDeprecated[$name];
+            }
+            if (isset($parent->constFinal[$name])) {
+                $entry->constFinal[$name] = true;
             }
         }
         foreach ($parent->propDeprecated as $name => $deprecated) {

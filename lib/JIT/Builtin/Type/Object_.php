@@ -4386,7 +4386,8 @@ class Object_ extends Type {
     {
         $this->emitDirectTraitConstAccessErrorIfNeeded($classId, $constName, $block);
         $key = strtolower($constName);
-        if (!isset($this->classConstants[$classId][$key])) {
+        $resolvedId = $this->resolveClassConstHoldingId($classId, $key);
+        if (null === $resolvedId) {
             // The registry name is lowercased; PSR-4 autoload in the native
             // fallback is case-sensitive, so prefer the caller's original-case
             // literal when available (#15889 isolated unit emission).
@@ -4394,14 +4395,45 @@ class Object_ extends Type {
             if (null !== $native) {
                 return $native;
             }
-            throw new \LogicException("Undefined constant: {$constName}");
+            // Guard/emit path already raised Undefined at IR level (#19615). Return a
+            // null SSA dummy so AOT/JIT compile can finish (Zend raises at runtime).
+            return $this->jitConstantFromEntry(['type' => Variable::TYPE_NULL, 'value' => null]);
         }
 
-        if ($this->isEnumClassId($classId)) {
-            return $this->jitEnumCaseFromBacking($classId, $key);
+        if ($this->isEnumClassId($resolvedId)) {
+            return $this->jitEnumCaseFromBacking($resolvedId, $key);
         }
 
-        return $this->jitConstantFromEntry($this->classConstants[$classId][$key]);
+        return $this->jitConstantFromEntry($this->classConstants[$resolvedId][$key]);
+    }
+
+    /**
+     * Find the class id that holds a fetchable class constant, skipping private
+     * parent constants (Zend zend_constants.c / #19615).
+     */
+    public function resolveClassConstHoldingId(int $classId, string $constKeyLc): ?int
+    {
+        $constKeyLc = strtolower($constKeyLc);
+        $currentId = $classId;
+        for ($depth = 0; $depth < 64; ++$depth) {
+            if (isset($this->classConstants[$currentId][$constKeyLc])) {
+                if ($currentId === $classId) {
+                    return $currentId;
+                }
+                $vis = $this->constVisibility($currentId, $constKeyLc);
+                // Private constants are not inherited — keep walking (#19615).
+                if (($vis & \PHPCfg\Func::FLAG_PRIVATE) === 0) {
+                    return $currentId;
+                }
+            }
+            $parentLc = $this->parentClassLc($this->classNameForId($currentId));
+            if (null === $parentLc || !isset($this->classes[$parentLc])) {
+                return null;
+            }
+            $currentId = $this->classes[$parentLc];
+        }
+
+        return null;
     }
 
     /** Native PHP class constants for nested JIT helper compiles (PasswordJitHelper → VmPassword, #9275). */
@@ -4419,6 +4451,13 @@ class Object_ extends Type {
         try {
             $ref = new \ReflectionClassConstant($fqcn, $constName);
         } catch (\ReflectionException) {
+            return null;
+        }
+        // Host Reflection surfaces private parent constants under the child name;
+        // Zend treats child::PRIVATE as undefined (#19615).
+        if ($ref->isPrivate()
+            && strtolower($ref->getDeclaringClass()->getName()) !== strtolower($fqcn)
+        ) {
             return null;
         }
         $raw = $ref->getValue();

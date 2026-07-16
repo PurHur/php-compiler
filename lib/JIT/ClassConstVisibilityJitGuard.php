@@ -24,13 +24,25 @@ final class ClassConstVisibilityJitGuard
         int $classId,
         string $constName
     ): void {
-        $vis = $objectType->constVisibility($classId, $constName);
+        $holdingId = $objectType->resolveClassConstHoldingId($classId, strtolower($constName));
+        $context = $objectType->jitContext();
+        if (null === $holdingId) {
+            // External stubs may still resolve via Reflection in classConstFetch.
+            if ($objectType->isExternalOnlyClass($classId)) {
+                return;
+            }
+            // Missing or only private-on-parent — Zend Undefined constant (#19615).
+            $display = $objectType->classNameForId($classId);
+            self::emitViolation($context, $jit, "Undefined constant {$display}::{$constName}");
+
+            return;
+        }
+        $vis = $objectType->constVisibility($holdingId, $constName);
         if (MethodVisibility::isPublic($vis)) {
             return;
         }
 
-        $context = $objectType->jitContext();
-        $declaringClass = $objectType->classNameForId($classId);
+        $declaringClass = $objectType->classNameForId($holdingId);
         $declaringLc = strtolower(ltrim($declaringClass, '\\'));
         $callerLc = self::callerClassLc($context, $block);
         try {
