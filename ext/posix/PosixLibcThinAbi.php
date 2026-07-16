@@ -140,6 +140,21 @@ final class PosixLibcThinAbi
     }
 
     /**
+     * initgroups(3) — initialize supplementary group access list (#19476).
+     *
+     * Write syscall; thin libc ABI only (no pure-PHP substitute).
+     */
+    public static function initgroups(string $username, int $groupId): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+
+        return (int) $ffi->initgroups($username, $groupId);
+    }
+
+    /**
      * times(2) system tick counter since boot — read-only thin ABI (#13524).
      */
     public static function systemClockTicks(): ?int
@@ -213,6 +228,7 @@ struct tms {
 };
 clock_t times(struct tms *buf);
 char *getlogin(void);
+int initgroups(const char *user, gid_t group);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

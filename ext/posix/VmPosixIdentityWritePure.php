@@ -36,6 +36,16 @@ final class VmPosixIdentityWritePure
         return self::setId('setegid', $gid);
     }
 
+    /** @return bool|null null when thin libc ABI unavailable */
+    public static function initgroups(string $username, int $groupId): ?bool
+    {
+        if (!self::available()) {
+            return null;
+        }
+
+        return 0 === PosixLibcThinAbi::initgroups($username, $groupId);
+    }
+
     public static function lastErrno(): int
     {
         return PosixLibcThinAbi::readErrno();

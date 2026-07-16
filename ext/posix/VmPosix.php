@@ -189,6 +189,25 @@ final class VmPosix
     }
 
     /**
+     * posix_initgroups() — initgroups(3) supplementary groups (#19476).
+     *
+     * php-src: ext/posix/posix.c — PHP_FUNCTION(posix_initgroups)
+     */
+    public static function initgroups(string $username, int $groupId): bool
+    {
+        self::$lastError = 0;
+        $ok = VmPosixIdentityWritePure::initgroups($username, $groupId);
+        if (null === $ok) {
+            throw new \Error('posix_initgroups() is not available in this compiler build');
+        }
+        if (!$ok) {
+            self::$lastError = VmPosixIdentityWritePure::lastErrno();
+        }
+
+        return $ok;
+    }
+
+    /**
      * @throws \TypeError php-src Z_PARAM_LONG rejects enum cases (#7372, #7373, #7374)
      */
     public static function rejectEnumCaseIntArg(
