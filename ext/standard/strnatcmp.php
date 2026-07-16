@@ -45,8 +45,8 @@ final class strnatcmp extends Internal
             throw new \LogicException('strnatcmp() requires exactly two arguments');
         }
         StringStrnatcmp::ensureLinked($context);
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strnatcmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strnatcmp', 1, 'string2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strnatcmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strnatcmp', 1, 'string2'));
         $fn = $context->lookupFunction('strnatcmp');
         $raw = $context->builder->call($fn, $p0, $p1);
         $i64 = $context->getTypeFromString('int64');
@@ -60,7 +60,7 @@ final class strnatcmp extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'strnatcmp', $paramName)->toString();
         }
 
-        return VmString::coerceStringBuiltinArg(
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[$argIndex],
             'strnatcmp',
             $argIndex,

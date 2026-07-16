@@ -47,8 +47,8 @@ final class strcasecmp extends Internal
             throw new \LogicException('strcasecmp() requires exactly two arguments');
         }
         StringStrcasecmp::ensureLinked($context);
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strcasecmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strcasecmp', 1, 'string2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strcasecmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strcasecmp', 1, 'string2'));
         $fn = $context->lookupFunction('strcasecmp');
         $raw = $context->builder->call($fn, $p0, $p1);
         $i64 = $context->getTypeFromString('int64');
@@ -62,7 +62,7 @@ final class strcasecmp extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'strcasecmp', $paramName)->toString();
         }
 
-        return VmString::coerceStringBuiltinArg(
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[$argIndex],
             'strcasecmp',
             $argIndex,

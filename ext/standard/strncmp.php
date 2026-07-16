@@ -47,8 +47,8 @@ final class strncmp extends Internal
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         StringStrncmp::ensureLinked($context);
-        $left = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strncmp', 0, 'string1');
-        $right = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strncmp', 1, 'string2');
+        $left = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strncmp', 0, 'string1');
+        $right = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strncmp', 1, 'string2');
         $length = JitLongArg::lower($context, $args[2], 'strncmp() length');
 
         return StringStrncmp::invoke($context, $left, $right, $length);
@@ -60,7 +60,7 @@ final class strncmp extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'strncmp', $paramName)->toString();
         }
 
-        return VmString::coerceStringBuiltinArg(
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[$argIndex],
             'strncmp',
             $argIndex,

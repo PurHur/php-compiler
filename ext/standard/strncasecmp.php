@@ -18,6 +18,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -28,8 +29,8 @@ final class strncasecmp extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'strncasecmp', 3);
-        $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strncasecmp', 0, 'string1');
-        $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strncasecmp', 1, 'string2');
+        $a = self::vmStringArg($frame, 0, 'string1');
+        $b = self::vmStringArg($frame, 1, 'string2');
         if (null === $frame->returnVar) {
             return;
         }
@@ -46,8 +47,8 @@ final class strncasecmp extends Internal
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         StringStrncasecmp::ensureLinked($context);
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strncasecmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strncasecmp', 1, 'string2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strncasecmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strncasecmp', 1, 'string2'));
         $length = $context->builder->zExt(
             $context->builder->trunc(
                 JitLongArg::lower($context, $args[2], 'strncasecmp() length'),
@@ -59,5 +60,19 @@ final class strncasecmp extends Internal
         $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->sExt($raw, $i64);
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strncasecmp', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'strncasecmp',
+            $argIndex,
+            $paramName
+        );
     }
 }
