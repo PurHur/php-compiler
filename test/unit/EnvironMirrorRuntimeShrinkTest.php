@@ -50,7 +50,15 @@ final class EnvironMirrorRuntimeShrinkTest extends TestCase
     public function testEnvironMirrorRuntimeCentralizesUserScriptLlvm(): void
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/EnvironMirrorUserScriptLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/EnvironLibcWalkJit.php');
         $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/EnvironMirrorRuntime.php');
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/EnvironLibcWalkJit.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitEnvironMirrorKernel.php');
+    }
+
+    public function testPhpcNativeEnvironMirrorUsesExtKernel(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/phpc_native_environ_mirror_into_ht.php');
+        $this->assertStringContainsString('JitEnvironMirrorKernel::mirrorIntoHashtable', $source);
+        $this->assertStringNotContainsString('EnvironLibcWalkJit', $source);
     }
 }

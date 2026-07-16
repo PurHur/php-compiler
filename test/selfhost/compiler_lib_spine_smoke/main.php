@@ -40,6 +40,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -1465,6 +1466,7 @@ require_once __DIR__.'/../../../ext/standard/JitDnsGetMxMaterializer.php';
 require_once __DIR__.'/../../../ext/standard/JitDnsGetRecord.php';
 require_once __DIR__.'/../../../ext/standard/JitDnsGetRecordMaterializer.php';
 require_once __DIR__.'/../../../ext/standard/JitEnumExists.php';
+require_once __DIR__.'/../../../ext/standard/JitEnvironMirrorKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitEnv.php';
 require_once __DIR__.'/../../../ext/standard/JitErrorGetLast.php';
 require_once __DIR__.'/../../../ext/standard/JitErrorHandler.php';
@@ -3712,7 +3714,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/EmbedObEchoBridge.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/EmbedObOutput.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/EnumCasesRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/EnvLocalRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/EnvironLibcWalkJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/EnvironMirrorRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ErrorHandler.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ErrorHandlerJitRuntime.php';
@@ -5169,6 +5170,10 @@ require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/llvm_env_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
+require_once __DIR__.'/../../../ext/intl/NormalizerGetRawDecomposition.php';
+require_once __DIR__.'/../../../ext/intl/NormalizerIsNormalized.php';
+require_once __DIR__.'/../../../ext/intl/NormalizerNormalize.php';
+require_once __DIR__.'/../../../ext/intl/normalizer_get_raw_decomposition.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 

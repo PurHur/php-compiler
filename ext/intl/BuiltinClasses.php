@@ -47,6 +47,17 @@ final class BuiltinClasses
             $entry->constants[$lc] = $const;
             $entry->constNames[$lc] = $name;
         }
+        $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
+        $methods = [
+            'normalize' => [new NormalizerNormalize(), 'normalize'],
+            'isnormalized' => [new NormalizerIsNormalized(), 'isNormalized'],
+            'getrawdecomposition' => [new NormalizerGetRawDecomposition(), 'getRawDecomposition'],
+        ];
+        foreach ($methods as $lc => [$handler, $name]) {
+            $entry->methods[$lc] = $handler;
+            $entry->methodVisibility[$lc] = $pubStatic;
+            $entry->methodNames[$lc] = $name;
+        }
         $ctx->classes['normalizer'] = $entry;
     }
 

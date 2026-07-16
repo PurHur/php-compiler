@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5128 |
-| Phase A inventory files (M2 ratio SSOT) | 5128 |
+| PHP files on vm.php path | 5132 |
+| Phase A inventory files (M2 ratio SSOT) | 5132 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13940 |
+| Source constructs flagged (warnings) | 13952 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -559,7 +559,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_init.php` | 0 | 2 |
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
-| `ext/intl/BuiltinClasses.php` | 0 | 14 |
+| `ext/intl/BuiltinClasses.php` | 0 | 17 |
 | `ext/intl/CollatorCreate.php` | 0 | 1 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
@@ -576,7 +576,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleGetScript.php` | 0 | 2 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 26 |
+| `ext/intl/Module.php` | 0 | 27 |
+| `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
+| `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
+| `ext/intl/NormalizerNormalize.php` | 0 | 2 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
@@ -604,6 +607,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/locale_get_region.php` | 0 | 3 |
 | `ext/intl/locale_get_script.php` | 0 | 3 |
 | `ext/intl/locale_set_default.php` | 0 | 2 |
+| `ext/intl/normalizer_get_raw_decomposition.php` | 0 | 2 |
 | `ext/intl/normalizer_is_normalized.php` | 0 | 2 |
 | `ext/intl/normalizer_normalize.php` | 0 | 2 |
 | `ext/ldap/JitLdapEscape.php` | 0 | 2 |
@@ -1391,6 +1395,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDnsGetRecordMaterializer.php` | 0 | 1 |
 | `ext/standard/JitEnumExists.php` | 0 | 1 |
 | `ext/standard/JitEnv.php` | 0 | 1 |
+| `ext/standard/JitEnvironMirrorKernel.php` | 0 | 1 |
 | `ext/standard/JitErrorGetLast.php` | 0 | 1 |
 | `ext/standard/JitErrorHandler.php` | 0 | 1 |
 | `ext/standard/JitErrorLog.php` | 0 | 1 |
@@ -3621,7 +3626,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnumCasesRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnvLocalRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/EnvironLibcWalkJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnvironMirrorRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandlerJitRuntime.php` | 0 | 2 |
@@ -8738,18 +8742,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 41)
-- new ClassEntry (line 59)
-- new LocaleGetDefault (line 62)
-- new LocaleSetDefault (line 63)
-- new LocaleGetPrimaryLanguage (line 64)
-- new LocaleGetRegion (line 65)
-- new LocaleGetScript (line 66)
-- new LocaleGetDisplayName (line 67)
-- new ClassEntry (line 79)
-- new IntlDateFormatterCreate (line 81)
-- new ClassEntry (line 89)
-- new CollatorCreate (line 91)
-- new ClassEntry (line 99)
+- new NormalizerNormalize (line 52)
+- new NormalizerIsNormalized (line 53)
+- new NormalizerGetRawDecomposition (line 54)
+- new ClassEntry (line 70)
+- new LocaleGetDefault (line 73)
+- new LocaleSetDefault (line 74)
+- new LocaleGetPrimaryLanguage (line 75)
+- new LocaleGetRegion (line 76)
+- new LocaleGetScript (line 77)
+- new LocaleGetDisplayName (line 78)
+- new ClassEntry (line 90)
+- new IntlDateFormatterCreate (line 92)
+- new ClassEntry (line 100)
+- new CollatorCreate (line 102)
+- new ClassEntry (line 110)
 - 7 class method(s)
 
 ### `ext/intl/CollatorCreate.php`
@@ -8856,26 +8863,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new locale_get_primary_language (line 52)
 - new locale_get_region (line 53)
 - new locale_get_script (line 54)
-- new normalizer_normalize (line 57)
-- new normalizer_is_normalized (line 57)
-- new idn_to_ascii (line 60)
-- new idn_to_utf8 (line 60)
-- new grapheme_strlen (line 76)
-- new grapheme_substr (line 77)
-- new grapheme_strpos (line 78)
-- new grapheme_str_contains (line 79)
-- new grapheme_strstr (line 80)
-- new grapheme_stristr (line 81)
-- new grapheme_stripos (line 82)
-- new grapheme_strrpos (line 83)
-- new grapheme_extract (line 84)
-- new grapheme_levenshtein (line 85)
-- new grapheme_str_split (line 86)
-- new grapheme_strimwidth (line 87)
-- new intl_get_error_code (line 88)
-- new intl_get_error_message (line 89)
-- new intl_is_failure (line 90)
+- new normalizer_normalize (line 58)
+- new normalizer_is_normalized (line 59)
+- new normalizer_get_raw_decomposition (line 60)
+- new idn_to_ascii (line 64)
+- new idn_to_utf8 (line 64)
+- new grapheme_strlen (line 80)
+- new grapheme_substr (line 81)
+- new grapheme_strpos (line 82)
+- new grapheme_str_contains (line 83)
+- new grapheme_strstr (line 84)
+- new grapheme_stristr (line 85)
+- new grapheme_stripos (line 86)
+- new grapheme_strrpos (line 87)
+- new grapheme_extract (line 88)
+- new grapheme_levenshtein (line 89)
+- new grapheme_str_split (line 90)
+- new grapheme_strimwidth (line 91)
+- new intl_get_error_code (line 92)
+- new intl_get_error_message (line 93)
+- new intl_is_failure (line 94)
 - 3 class method(s)
+
+### `ext/intl/NormalizerGetRawDecomposition.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 1 class method(s)
+
+### `ext/intl/NormalizerIsNormalized.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/intl/NormalizerNormalize.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
 
 ### `ext/intl/UnicodeCanonical.php`
 
@@ -8904,7 +8930,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmNormalizer.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `ext/intl/grapheme_extract.php`
 
@@ -9050,6 +9076,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 20)
+- 2 class method(s)
+
+### `ext/intl/normalizer_get_raw_decomposition.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 
 ### `ext/intl/normalizer_is_normalized.php`
@@ -14589,6 +14621,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `ext/standard/JitEnvironMirrorKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/JitErrorGetLast.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19071,11 +19108,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 105)
-- new RecursiveIteratorIterator (line 2890)
-- new RecursiveDirectoryIterator (line 2891)
-- new RecursiveIteratorIterator (line 2992)
-- new RecursiveDirectoryIterator (line 2993)
-- 101 class method(s)
+- new RecursiveIteratorIterator (line 3008)
+- new RecursiveDirectoryIterator (line 3009)
+- new RecursiveIteratorIterator (line 3110)
+- new RecursiveDirectoryIterator (line 3111)
+- 103 class method(s)
 - 13 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -29447,11 +29484,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 357)
 - 14 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/EnvironLibcWalkJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
 
 ### `lib/JIT/Builtin/EnvironMirrorRuntime.php`
 
