@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5011 |
-| Phase A inventory files (M2 ratio SSOT) | 5011 |
+| PHP files on vm.php path | 5016 |
+| Phase A inventory files (M2 ratio SSOT) | 5016 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13513 |
+| Source constructs flagged (warnings) | 13530 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -464,6 +464,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/JitHashAlgos.php` | 0 | 1 |
 | `ext/hash/JitHashAlgosKernel.php` | 0 | 1 |
 | `ext/hash/JitHashContext.php` | 0 | 3 |
+| `ext/hash/JitHashCryptoKernel.php` | 0 | 1 |
 | `ext/hash/MhashRegistry.php` | 0 | 1 |
 | `ext/hash/Module.php` | 0 | 16 |
 | `ext/hash/VmHashContext.php` | 0 | 6 |
@@ -515,6 +516,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
 | `ext/intl/BuiltinClasses.php` | 0 | 10 |
 | `ext/intl/CollatorCreate.php` | 0 | 1 |
+| `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
 | `ext/intl/IntlConstants.php` | 0 | 1 |
 | `ext/intl/IntlDateFormatterCreate.php` | 0 | 1 |
@@ -525,9 +527,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleGetDefault.php` | 0 | 2 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 24 |
+| `ext/intl/Module.php` | 0 | 26 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
+| `ext/intl/VmIdn.php` | 0 | 5 |
 | `ext/intl/VmLocale.php` | 0 | 1 |
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
@@ -542,6 +545,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/grapheme_strrpos.php` | 0 | 4 |
 | `ext/intl/grapheme_strstr.php` | 0 | 4 |
 | `ext/intl/grapheme_substr.php` | 0 | 4 |
+| `ext/intl/idn_to_ascii.php` | 0 | 1 |
+| `ext/intl/idn_to_utf8.php` | 0 | 1 |
 | `ext/intl/intl_get_error_code.php` | 0 | 1 |
 | `ext/intl/intl_get_error_message.php` | 0 | 1 |
 | `ext/intl/intl_is_failure.php` | 0 | 1 |
@@ -861,7 +866,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
 | `ext/sockets/JitSocketExportStream.php` | 0 | 1 |
 | `ext/sockets/JitSocketImportStream.php` | 0 | 1 |
-| `ext/sockets/Module.php` | 0 | 20 |
+| `ext/sockets/Module.php` | 0 | 21 |
 | `ext/sockets/SocketAtmarkJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketConstants.php` | 0 | 1 |
 | `ext/sockets/SocketExportStreamJitHelper.php` | 0 | 1 |
@@ -877,6 +882,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_close.php` | 0 | 3 |
 | `ext/sockets/socket_connect.php` | 0 | 3 |
 | `ext/sockets/socket_create.php` | 0 | 3 |
+| `ext/sockets/socket_create_listen.php` | 0 | 4 |
 | `ext/sockets/socket_create_pair.php` | 0 | 7 |
 | `ext/sockets/socket_export_stream.php` | 0 | 3 |
 | `ext/sockets/socket_get_option.php` | 0 | 5 |
@@ -3850,7 +3856,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHashAlgos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCryptoJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringHashCryptoLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCryptoPhp.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHashEquals.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHashHmacAlgos.php` | 0 | 1 |
@@ -7960,6 +7965,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 329)
 - 18 class method(s)
 
+### `ext/hash/JitHashCryptoKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 18 class method(s)
+
 ### `ext/hash/MhashRegistry.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8303,6 +8313,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/intl/IdnFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 33)
+- 3 class method(s)
+
 ### `ext/intl/IntlClassMethod.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8328,10 +8345,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 77)
-- new locale_get_region (line 78)
-- new locale_get_script (line 79)
-- 10 class method(s)
+- new locale_get_primary_language (line 87)
+- new locale_get_region (line 88)
+- new locale_get_script (line 89)
+- 11 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
 
@@ -8372,21 +8389,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new locale_get_script (line 54)
 - new normalizer_normalize (line 57)
 - new normalizer_is_normalized (line 57)
-- new grapheme_strlen (line 71)
-- new grapheme_substr (line 72)
-- new grapheme_strpos (line 73)
-- new grapheme_str_contains (line 74)
-- new grapheme_strstr (line 75)
-- new grapheme_stristr (line 76)
-- new grapheme_stripos (line 77)
-- new grapheme_strrpos (line 78)
-- new grapheme_extract (line 79)
-- new grapheme_levenshtein (line 80)
-- new grapheme_str_split (line 81)
-- new grapheme_strimwidth (line 82)
-- new intl_get_error_code (line 83)
-- new intl_get_error_message (line 84)
-- new intl_is_failure (line 85)
+- new idn_to_ascii (line 60)
+- new idn_to_utf8 (line 60)
+- new grapheme_strlen (line 76)
+- new grapheme_substr (line 77)
+- new grapheme_strpos (line 78)
+- new grapheme_str_contains (line 79)
+- new grapheme_strstr (line 80)
+- new grapheme_stristr (line 81)
+- new grapheme_stripos (line 82)
+- new grapheme_strrpos (line 83)
+- new grapheme_extract (line 84)
+- new grapheme_levenshtein (line 85)
+- new grapheme_str_split (line 86)
+- new grapheme_strimwidth (line 87)
+- new intl_get_error_code (line 88)
+- new intl_get_error_message (line 89)
+- new intl_is_failure (line 90)
 - 3 class method(s)
 
 ### `ext/intl/UnicodeCanonical.php`
@@ -8398,6 +8417,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 34 class method(s)
+
+### `ext/intl/VmIdn.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 262)
+- new Variable (line 263)
+- new Variable (line 266)
+- new Variable (line 269)
+- 10 class method(s)
 
 ### `ext/intl/VmLocale.php`
 
@@ -8496,6 +8524,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 76)
 - 2 class method(s)
 - 1 closure(s)
+
+### `ext/intl/idn_to_ascii.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/intl/idn_to_utf8.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/intl/intl_get_error_code.php`
 
@@ -10797,18 +10835,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new socket_set_block (line 45)
 - new socket_create (line 46)
 - new socket_create_pair (line 47)
-- new socket_connect (line 48)
-- new socket_bind (line 49)
-- new socket_listen (line 50)
-- new socket_accept (line 51)
-- new socket_set_option (line 52)
-- new socket_get_option (line 53)
-- new socket_read (line 54)
-- new socket_write (line 55)
-- new socket_close (line 56)
-- new socket_strerror (line 57)
-- new socket_last_error (line 58)
-- new socket_clear_error (line 59)
+- new socket_create_listen (line 48)
+- new socket_connect (line 49)
+- new socket_bind (line 50)
+- new socket_listen (line 51)
+- new socket_accept (line 52)
+- new socket_set_option (line 53)
+- new socket_get_option (line 54)
+- new socket_read (line 55)
+- new socket_write (line 56)
+- new socket_close (line 57)
+- new socket_strerror (line 58)
+- new socket_last_error (line 59)
+- new socket_clear_error (line 60)
 - 3 class method(s)
 
 ### `ext/sockets/SocketAtmarkJitHelper.php`
@@ -10854,7 +10893,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/VmSockets.php`
 
 **Warnings** (review for bootstrap subset):
-- 31 class method(s)
+- 32 class method(s)
 
 ### `ext/sockets/socket_accept.php`
 
@@ -10902,6 +10941,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
+- 2 class method(s)
+- 2 closure(s)
+
+### `ext/sockets/socket_create_listen.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 39)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -24157,7 +24204,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_pad.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/str_repeat.php`
@@ -24995,7 +25042,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/wordwrap.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/zend_thread_id.php`
 
@@ -30442,11 +30489,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
-
-### `lib/JIT/Builtin/StringHashCryptoLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 18 class method(s)
 
 ### `lib/JIT/Builtin/StringHashCryptoPhp.php`
 

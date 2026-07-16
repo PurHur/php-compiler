@@ -38,11 +38,11 @@ final class str_pad extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('str_pad() requires two to four arguments');
         }
-        $input = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'str_pad', 'string');
+        $input = self::vmStringArg($frame, 0, 'string');
         $padLength = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_pad', 2, 'length');
         $padString = ' ';
         if (isset($frame->calledArgs[2])) {
-            $padString = InternalStrictArg::resolveCoercibleStringArg($frame, 2, 'str_pad', 'pad_string');
+            $padString = self::vmStringArg($frame, 2, 'pad_string');
         }
         // Compiler convention: 0 = STR_PAD_LEFT, 1 = STR_PAD_RIGHT (default).
         $padType = 1;
@@ -65,10 +65,10 @@ final class str_pad extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('str_pad() requires two to four arguments');
         }
-        $input = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'str_pad', 0, 'string');
+        $input = self::jitStringArg($context, $args[0], 0, 'string');
         $padLength = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_pad', 2, 'length');
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
-            $padString = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'str_pad', 2, 'pad_string');
+            $padString = self::jitStringArg($context, $args[2], 2, 'pad_string');
         } else {
             $padString = $context->builder->load($context->constantStringFromString(' '));
         }
@@ -90,6 +90,45 @@ final class str_pad extends Internal
             $padLength,
             $padString,
             $padType
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'str_pad', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'str_pad',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'str_pad',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'str_pad',
+            $argIndex,
+            $paramName
         );
     }
 }

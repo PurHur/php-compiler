@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\hash;
 
 use PHPCompiler\ext\openssl\VmOpensslSignNative;
 use PHPCompiler\JIT\Context;
@@ -13,18 +13,20 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Thin libcrypto EVP bridge for user-script standalone AOT (#3357, #16734, #19274).
+ * Thin libcrypto EVP bridge for user-script standalone AOT (#3357, #16734, #19274, #19362).
  *
  * Nested HashCryptoJitHelper does not run reliably in minimal standalone init
  * (helper unit __init__ skipped under PHP_COMPILER_AOT_USER_SCRIPT). OpenSSL
  * EVP_Digest/HMAC match php-src ext/hash without nested PHP lowering.
+ * Moved out of lib/JIT/Builtin/StringHashCryptoLlvm so Builtin surface shrinks
+ * (same shape as {@see JitHashAlgosKernel} / #19355).
  *
  * Digest buffers must use {@see allocaI8Bytes()} / {@see arrayAlloca} — PHPLLVM
  * {@see \PHPLLVM\Builder::alloca()} takes only a Type; bare `alloca($i8, N)`
  * ignores N and emits a 1-byte frame (AOT hash always-raw, #19274).
- * php-src: ext/standard/hash.c, ext/hash/hash.c
+ * php-src: ext/hash/hash.c — PHP_FUNCTION(hash) / HMAC / PBKDF2 / HKDF
  */
-final class StringHashCryptoLlvm
+final class JitHashCryptoKernel
 {
     private const MAX_DIGEST_BYTES = 64;
 
