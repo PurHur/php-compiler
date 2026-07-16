@@ -5101,6 +5101,7 @@
         "lib/VM/SensitiveParamJitHelper.php",
         "lib/VM/SensitiveParamSupport.php",
         "lib/VM/ShutdownQueue.php",
+        "lib/VM/SplArrayCastJitHelper.php",
         "lib/VM/StringOffsetJitHelper.php",
         "lib/VM/StringableSupport.php",
         "lib/VM/TickQueue.php",
@@ -5415,9 +5416,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5181,
+        "inventory_files": 5182,
         "excluded": 0,
-        "eligible": 5181,
+        "eligible": 5182,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

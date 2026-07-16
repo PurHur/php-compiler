@@ -5130,6 +5130,7 @@ require_once __DIR__.'/../../../lib/VM/ScriptStack.php';
 require_once __DIR__.'/../../../lib/VM/SensitiveParamJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/SensitiveParamSupport.php';
 require_once __DIR__.'/../../../lib/VM/ShutdownQueue.php';
+require_once __DIR__.'/../../../lib/VM/SplArrayCastJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/StringOffsetJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/StringableSupport.php';
 require_once __DIR__.'/../../../lib/VM/TickQueue.php';
