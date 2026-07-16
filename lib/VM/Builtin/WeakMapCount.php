@@ -32,6 +32,15 @@ final class WeakMapCount extends VmClassMethod
 
             return;
         }
-        $frame->returnVar->int($ht->getNumElements());
+        // Count live entries only — same filter as WeakMapIterator (#19369).
+        // getNumElements() can still include tombstones/stale keys if purge races materialization.
+        $live = 0;
+        foreach ($ht->iterateKeyed() as $pair) {
+            [$storedKeyVar] = $pair;
+            if (WeakRefSupport::isLiveMapKey($storedKeyVar)) {
+                ++$live;
+            }
+        }
+        $frame->returnVar->int($live);
     }
 }

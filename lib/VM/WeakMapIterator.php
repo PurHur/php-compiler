@@ -25,6 +25,19 @@ final class WeakMapIterator
         }
         foreach ($ht->iterateKeyed(true) as $pair) {
             [$storedKeyVar, $value] = $pair;
+            $storedKeyVar = $storedKeyVar->resolveIndirect();
+            // bucketKeyToVariable materializes live o:<id> keys to TYPE_OBJECT (#19369 / #4434).
+            if (Variable::TYPE_OBJECT === $storedKeyVar->type) {
+                if (!WeakRefSupport::isTargetAlive($storedKeyVar)) {
+                    continue;
+                }
+                $this->pairs[] = [$storedKeyVar, $value];
+                continue;
+            }
+            if (EnumCaseSupport::isEnumCaseVariable($storedKeyVar)) {
+                $this->pairs[] = [$storedKeyVar, $value];
+                continue;
+            }
             if (Variable::TYPE_STRING !== $storedKeyVar->type) {
                 continue;
             }
