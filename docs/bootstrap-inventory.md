@@ -1481,6 +1481,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitFunctionExists.php` | 0 | 1 |
 | `ext/standard/JitFwrite.php` | 0 | 1 |
 | `ext/standard/JitGcCollectCycles.php` | 0 | 1 |
+| `ext/standard/JitGcCollectCyclesStandaloneKernel.php` | 0 | 1 |
 | `ext/standard/JitGcMemCaches.php` | 0 | 1 |
 | `ext/standard/JitGcStatus.php` | 0 | 1 |
 | `ext/standard/JitGcToggle.php` | 0 | 1 |
@@ -3680,7 +3681,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/GcCollectCyclesNativeOpsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/GcCollectCyclesRuntime.php` | 0 | 7 |
-| `lib/JIT/Builtin/GcCollectCyclesStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/GcStatusRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/GcToggleRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GetBrowserRuntime.php` | 0 | 3 |
@@ -15146,6 +15146,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitGcCollectCyclesStandaloneKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/standard/JitGcMemCaches.php`
 
@@ -29868,18 +29873,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GcCollectCyclesRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 955)
-- new JIT (line 998)
-- new JIT (line 1041)
-- new JIT (line 1351)
-- new JIT (line 1382)
+- new JIT (line 956)
+- new JIT (line 999)
+- new JIT (line 1042)
+- new JIT (line 1352)
+- new JIT (line 1383)
 - 62 class method(s)
 - 5 closure(s)
-
-### `lib/JIT/Builtin/GcCollectCyclesStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 6 class method(s)
 
 ### `lib/JIT/Builtin/GcStatusRuntime.php`
 
