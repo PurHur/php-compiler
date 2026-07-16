@@ -5974,14 +5974,20 @@ restart:
                             }
                             if ($needsElementChecks) {
                                 $trailing = [];
+                                $trailingArgIndexes = [];
                                 if (null !== $namedVariadicPack) {
+                                    $packOffset = 0;
                                     foreach ($namedVariadicPack->toArray()->iterate(true) as $value) {
                                         $trailing[] = $value;
+                                        // Zend Argument #N is call-site order; named packs start at the variadic slot (#19695).
+                                        $trailingArgIndexes[] = $variadicParamIdx + $packOffset;
+                                        ++$packOffset;
                                     }
                                 } else {
                                     for ($i = $recvIdx; $i <= $variadicEndIdx; ++$i) {
                                         if (array_key_exists($i, $frame->calledArgs)) {
                                             $trailing[] = $frame->calledArgs[$i];
+                                            $trailingArgIndexes[] = $i;
                                         }
                                     }
                                 }
@@ -5990,6 +5996,7 @@ restart:
                                     \PHPCompiler\VM\UserParamErrorContext::forRecvFrame($frame, $variadicParamIdx, true),
                                     static function () use (
                                         $trailing,
+                                        $trailingArgIndexes,
                                         $strict,
                                         $frame,
                                         $variadicSlot,
@@ -6005,7 +6012,8 @@ restart:
                                             $vmContext,
                                             isset($frame->block->paramIterableSlots[$variadicSlot]),
                                             isset($frame->block->paramNeverSlots[$variadicSlot]),
-                                            $frame->block->paramVariadicElementIntersectionDisplayLabels[$variadicSlot] ?? null
+                                            $frame->block->paramVariadicElementIntersectionDisplayLabels[$variadicSlot] ?? null,
+                                            $trailingArgIndexes
                                         );
                                     }
                                 );
