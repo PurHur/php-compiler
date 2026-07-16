@@ -6428,7 +6428,14 @@ final class VmDom
         }
     }
 
-    /** @param list<int> $nodeIds */
+    /**
+     * Refresh live NodeList membership without resetting the Iterator cursor.
+     *
+     * php-src ext/dom/nodelist.c keeps the traversal index across live updates;
+     * resetting here made getElementsByTagName() foreach hang (valid() → refresh → index 0).
+     *
+     * @param list<int> $nodeIds
+     */
     private static function updateNodeListMembers(ObjectEntry $nodeList, array $nodeIds): void
     {
         if (!self::isNodeList($nodeList)) {
@@ -6436,7 +6443,6 @@ final class VmDom
         }
         $state = DomRegistry::state($nodeList);
         $state->listNodeIds = $nodeIds;
-        $state->listIterIndex = 0;
         if (isset($nodeList->properties[self::PROP_LENGTH])) {
             $nodeList->properties[self::PROP_LENGTH]->int(\count($nodeIds));
         }
