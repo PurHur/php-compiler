@@ -22,9 +22,14 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoNativeJit.php');
         $jit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoJit.php');
         $php = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoPhp.php');
-        $llvm = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoLlvm.php');
+        $llvm = (string) file_get_contents(__DIR__.'/../../../ext/hash/JitHashCryptoKernel.php');
         $this->assertStringContainsString('emitHkdf', $llvm);
         $this->assertStringNotContainsString('hc_llvm_hkdf_stub', $llvm);
+        $this->assertStringContainsString('JitHashCryptoKernel', $llvm);
+        $jitDeferred = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoJit.php');
+        $this->assertStringContainsString('JitHashCryptoKernel', $jitDeferred);
+        $this->assertStringNotContainsString('StringHashCryptoLlvm', $jitDeferred);
         $this->assertStringContainsString('__compiler_hash', $jit);
         $this->assertStringContainsString('StringHashEquals', $jit);
         $this->assertStringContainsString('StringHashHmacAlgos', $jit);

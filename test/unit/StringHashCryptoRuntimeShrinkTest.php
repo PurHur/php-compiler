@@ -25,7 +25,18 @@ final class StringHashCryptoRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHashCryptoJit.php');
         $this->assertStringContainsString('StringHashCryptoPhp', $source);
+        $this->assertStringContainsString('JitHashCryptoKernel', $source);
+        $this->assertStringNotContainsString('StringHashCryptoLlvm', $source);
         $this->assertStringNotContainsString('StringHashCryptoNativeJit', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHashCryptoLlvm.php');
+        $this->assertFileExists(__DIR__.'/../../ext/hash/JitHashCryptoKernel.php');
+    }
+
+    public function testSpineBundleIncludesHashCryptoKernel(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitHashCryptoKernel.php', $spine);
+        $this->assertStringNotContainsString('StringHashCryptoLlvm.php', $spine);
     }
 
     public function testHashCryptoJitHelperDelegatesToVmHash(): void
