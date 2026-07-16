@@ -3066,6 +3066,29 @@ class Object_ extends Type {
                 \PHPCfg\Func::FLAG_PUBLIC | \PHPCfg\Func::FLAG_STATIC
             );
         }
+        if ('random\\randomizer' === $lcname) {
+            $this->defineProperty($id, 'engine', Variable::TYPE_OBJECT);
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach ([
+                '__construct', 'nextint', 'getint', 'getbytes', 'shufflearray', 'shufflebytes',
+                'pickarraykeys', '__serialize', '__unserialize',
+            ] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+            if (\PHPCompiler\CompilerVersion::supportsRandomIntervalBoundary()) {
+                foreach (['nextfloat', 'getfloat', 'getbytesfromstring'] as $method) {
+                    $this->defineMethodVisibility($id, $method, $pub);
+                }
+            }
+        }
+        if ('random\\engine\\mt19937' === $lcname) {
+            $this->markHasConstructor($id);
+            $pub = \PHPCfg\Func::FLAG_PUBLIC;
+            foreach (['__construct', 'generate', '__serialize', '__unserialize', '__debuginfo'] as $method) {
+                $this->defineMethodVisibility($id, $method, $pub);
+            }
+        }
         if ('weakmap' === $lcname) {
             $this->weakMapClassId = $id;
             $this->defineProperty($id, '__weak_map', Variable::TYPE_HASHTABLE);

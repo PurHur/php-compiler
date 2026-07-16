@@ -1,5 +1,7 @@
 --TEST--
 Stdlib: Random\Randomizer::getBytesFromString() seeded Mt19937 (#19572, ext/random/randomizer.c, PHP 8.3+)
+--ENV--
+PHP_COMPILER_PROFILE=8.3
 --SKIPIF--
 <?php
 if (!getenv('PHP_COMPILER_PROFILE') || version_compare(getenv('PHP_COMPILER_PROFILE'), '8.3', '<')) {
