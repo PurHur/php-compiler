@@ -210,11 +210,19 @@ final class IncludeBindingEmitHelper
                 continue;
             }
             foreach ($context->scope->variables as $scopeOp) {
+                if ($scopeOp === $calleeOp) {
+                    continue;
+                }
                 if (OperandName::resolve($scopeOp) !== $bindingName) {
                     continue;
                 }
                 $scopeVar = $context->scope->variables[$scopeOp];
                 if (Variable::KIND_VARIABLE !== $scopeVar->kind) {
+                    continue;
+                }
+                // Only refresh known include-binding aliases — never clobber unrelated
+                // slot-backed temps that happen to share a name resolution (#19504).
+                if (!$scopeVar->includeBinding) {
                     continue;
                 }
                 self::storeIncludeBindingRestore($context, $scopeOp, $scopeVar, $restored);
