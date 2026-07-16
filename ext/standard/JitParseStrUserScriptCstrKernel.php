@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringStrspn;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -12,13 +13,14 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Init-safe LLVM delimited-pair parser for user-script AOT superglobal refresh (#13571, #13900).
+ * Init-safe LLVM delimited-pair parser for user-script AOT superglobal refresh (#13571, #13900, #19500).
  *
  * Nested {@see ParseStrJitHelper::parseIntoNative} segfaults at {@code main_after_init}; this
  * hand-lowering mirrors {@see ParseStrEngine} for runtime libc getenv strings.
+ * Housed in ext/standard (not lib/JIT/Builtin) — same kernel-move pattern as #19466 / #19500.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
-final class ParseStrRuntimeUserScriptCstr
+final class JitParseStrUserScriptCstrKernel
 {
     private const MAX_KEY_PARTS = 16;
 
