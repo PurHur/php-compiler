@@ -28,7 +28,13 @@ final class preg_split extends Internal
             );
         }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_split() pattern', 0);
-        $subject = VmReflection::stringArg($frame->calledArgs[1], 'preg_split() subject', 1);
+        // Z_PARAM_STR $subject — null TypeError on 8.4 forward profile (#19320, ext/pcre/php_pcre.c).
+        $subject = VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[1],
+            'preg_split',
+            1,
+            'subject'
+        );
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_split', $pattern);
         $limit = -1;
         $flags = 0;
@@ -103,7 +109,8 @@ final class preg_split extends Internal
         return JitPregSplit::invoke(
             $context,
             JitStringBuiltinArg::lower($context, $args[0], 'preg_split', 0, 'pattern'),
-            JitStringBuiltinArg::lower($context, $args[1], 'preg_split', 1, 'subject'),
+            // Z_PARAM_STR $subject — null TypeError on 8.4 forward profile (#19320).
+            JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'preg_split', 1, 'subject'),
             $limit,
             $flags
         );

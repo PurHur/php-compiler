@@ -27,7 +27,13 @@ final class preg_match_all extends Internal
             throw new \LogicException('preg_match_all() requires 2 to 5 arguments in this compiler build');
         }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_match_all() pattern', 0);
-        $subject = VmReflection::stringArg($frame->calledArgs[1], 'preg_match_all() subject', 1);
+        // Z_PARAM_STR $subject — null TypeError on 8.4 forward profile (#19320, ext/pcre/php_pcre.c).
+        $subject = VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[1],
+            'preg_match_all',
+            1,
+            'subject'
+        );
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_match_all', $pattern);
 
         $flags = 0;
