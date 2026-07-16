@@ -607,6 +607,101 @@ final class VmPhpFdStream
         return $sys;
     }
 
+    /**
+     * Anonymous selectable tempfile fd for php://temp stream_select cast (#19691).
+     * mkstemp + unlink — keeps the fd open without a host tmpfile() resource.
+     *
+     * php-src: main/streams/memory.c — php_stream_temp cast dumps to a real tempfile
+     */
+    public static function openUnlinkedTempFd(): ?int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $dir = VmSysGetTempDirNative::resolve();
+        if ('' === $dir) {
+            return null;
+        }
+        $sep = ('/' === $dir[\strlen($dir) - 1] || '\\' === $dir[\strlen($dir) - 1]) ? '' : '/';
+        $template = $dir.$sep.'phpXXXXXX';
+        $len = \strlen($template);
+        try {
+            $buf = $ffi->new('char['.($len + 1).']');
+            \FFI::memcpy($buf, $template."\0", $len + 1);
+            $fd = (int) $ffi->mkstemp($buf);
+            if ($fd < 0) {
+                return null;
+            }
+            $path = \FFI::string($buf);
+            try {
+                $ffi->unlink($path);
+            } catch (\Throwable) {
+            }
+
+            return $fd;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** Write all bytes to a raw OS fd (select-cast helper, #19691). */
+    public static function writeAllRawFd(int $fd, string $data): bool
+    {
+        if ($fd < 0) {
+            return false;
+        }
+        if ('' === $data) {
+            return true;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            $len = \strlen($data);
+            $buf = $ffi->new('char['.$len.']');
+            \FFI::memcpy($buf, $data, $len);
+            $written = 0;
+            while ($written < $len) {
+                $n = (int) $ffi->write($fd, \FFI::addr($buf[$written]), $len - $written);
+                if ($n <= 0) {
+                    return false;
+                }
+                $written += $n;
+            }
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** lseek(SEEK_SET) on a raw OS fd (select-cast helper, #19691). */
+    public static function seekRawFd(int $fd, int $offset): bool
+    {
+        if ($fd < 0 || $offset < 0) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            return (int) $ffi->lseek($fd, $offset, self::SEEK_SET) >= 0;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /** close(2) for ephemeral select-cast fds (#19691). */
+    public static function closeRawFd(int $fd): void
+    {
+        self::closeFd($fd);
+    }
+
     private static function closeFd(int $fd): void
     {
         $ffi = self::ffi();
@@ -672,6 +767,8 @@ int flock(int fd, int operation);
 int fsync(int fd);
 int fdatasync(int fd);
 int fcntl(int fd, int cmd, ...);
+int mkstemp(char *template);
+int unlink(const char *pathname);
 extern int errno;
 CDEF;
 

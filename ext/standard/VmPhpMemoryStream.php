@@ -89,8 +89,43 @@ final class VmPhpMemoryStream
     }
 
     /**
-     * Cast php://temp to a selectable host tempfile for stream_select (php-src php_stream_temp cast).
-     * php://memory stays non-selectable (#19688). Caller keeps the resource alive for the select call.
+     * Cast php://temp to a selectable OS fd via VmPhpFdStream mkstemp (#19691).
+     * php://memory stays non-selectable (#19688). Caller must close the fd after select.
+     */
+    public static function castFdForSelect(int $handle): ?int
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state || !\str_starts_with($state->uri, 'php://temp')) {
+            return null;
+        }
+        if (!VmPhpFdStream::available()) {
+            return null;
+        }
+        $fd = VmPhpFdStream::openUnlinkedTempFd();
+        if (null === $fd) {
+            return null;
+        }
+        if ('' !== $state->buffer && !VmPhpFdStream::writeAllRawFd($fd, $state->buffer)) {
+            VmPhpFdStream::closeRawFd($fd);
+
+            return null;
+        }
+        $pos = $state->position;
+        if ($pos < 0) {
+            $pos = 0;
+        }
+        if (!VmPhpFdStream::seekRawFd($fd, $pos)) {
+            VmPhpFdStream::closeRawFd($fd);
+
+            return null;
+        }
+
+        return $fd;
+    }
+
+    /**
+     * Cast php://temp to a selectable host tempfile when Pure/FFI fd cast is unavailable (#19688/#19691).
+     * php://memory stays non-selectable. Caller must fclose after select.
      *
      * @return resource|null
      */

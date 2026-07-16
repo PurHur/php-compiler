@@ -2326,7 +2326,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamNotification.php` | 0 | 3 |
 | `ext/standard/VmStreamOpenFailure.php` | 0 | 1 |
 | `ext/standard/VmStreamPath.php` | 0 | 1 |
-| `ext/standard/VmStreamSelect.php` | 0 | 7 |
+| `ext/standard/VmStreamSelect.php` | 0 | 8 |
 | `ext/standard/VmStreamSelectGuard.php` | 0 | 1 |
 | `ext/standard/VmStreamSelectPoll.php` | 0 | 1 |
 | `ext/standard/VmStreamSelectPure.php` | 0 | 1 |
@@ -20503,7 +20503,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new PhpFdStreamState (line 120)
-- 32 class method(s)
+- 36 class method(s)
 
 ### `ext/standard/VmPhpFilterStream.php`
 
@@ -20522,7 +20522,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new PhpMemoryStreamState (line 36)
 - new PhpMemoryStreamState (line 55)
-- 25 class method(s)
+- 26 class method(s)
 
 ### `ext/standard/VmPhpcRunCommandNative.php`
 
@@ -21227,13 +21227,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamSelect.php`
 
 **Warnings** (review for bootstrap subset):
-- new StreamSelectPair (line 66)
-- new StreamSelectPair (line 74)
-- new StreamSelectPair (line 83)
-- new HashTable (line 92)
-- new Variable (line 98)
-- new Variable (line 103)
-- 4 class method(s)
+- new StreamSelectPair (line 71)
+- new StreamSelectPair (line 79)
+- new StreamSelectPair (line 85)
+- new StreamSelectPair (line 94)
+- new HashTable (line 103)
+- new Variable (line 109)
+- new Variable (line 114)
+- 6 class method(s)
 
 ### `ext/standard/VmStreamSelectGuard.php`
 
