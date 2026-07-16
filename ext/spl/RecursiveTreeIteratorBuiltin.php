@@ -101,7 +101,8 @@ final class SplTreeIteratorStorage
         SplDualIteratorStorage::initRecursive($object, $inner, $mode);
         self::$store[$object->id] = [
             'flags' => RecursiveTreeIteratorBuiltin::BYPASS_KEY,
-            'prefix' => ['', '| ', ' ', '|-', '\\-', ''],
+            // php-src default_prefix: "", "| ", "  ", "|-", "\\-", "" (#6273).
+            'prefix' => ['', '| ', '  ', '|-', '\\-', ''],
             'postfix' => '',
         ];
     }
@@ -165,6 +166,14 @@ final class SplTreeIteratorStorage
         if (Variable::TYPE_ARRAY === $current->type) {
             return 'Array';
         }
+        // php-src convert_to_string — invoke __toString on SplFileInfo etc. (#6273).
+        if (Variable::TYPE_OBJECT === $current->type) {
+            if (null === $frame->vmContext || null === $frame->vmContext->runtime) {
+                return null;
+            }
+
+            return $frame->vmContext->runtime->vm->castObjectToString($current->toObject());
+        }
 
         return $current->toString();
     }
@@ -174,11 +183,12 @@ final class SplTreeIteratorStorage
         if (null === $iterator) {
             return false;
         }
-        if (null === $frame->vmContext) {
+        if (null === $frame->vmContext || null === $frame->vmContext->runtime) {
             return false;
         }
-        $lc = strtolower($iterator->class->name);
-        if (!isset($iterator->class->methods['hasnext'])) {
+        $vm = $frame->vmContext->runtime->vm;
+        // Walk parent ClassEntry — RecursiveCachingIterator inherits hasNext (#6273).
+        if (!$vm->hasInstanceMethod($iterator->class, 'hasnext')) {
             return false;
         }
         $result = SplDualIteratorStorage::callInner($frame, $iterator, 'hasNext')->resolveIndirect();
@@ -221,17 +231,27 @@ final class RecursiveTreeIteratorConstruct extends VmClassMethod
             throw new \LogicException('RecursiveTreeIterator::__construct() requires VM context');
         }
 
-        $inner = SplDualIteratorStorage::resolveRecursiveIterator(
+        $userInner = SplDualIteratorStorage::resolveRecursiveIterator(
             $frame->vmContext,
             $frame,
             $frame->calledArgs[1]
         );
+        // php-src spl_recursive_it_it_construct RIT_RecursiveTreeIterator (#6273):
+        // flags, caching_it_flags, mode — wrap user iterator in RecursiveCachingIterator
+        // so getPrefix() can call hasNext() on each stack level.
         $flags = RecursiveTreeIteratorBuiltin::BYPASS_KEY;
+        $cachingFlags = CachingIteratorBuiltin::CATCH_GET_CHILD;
         $mode = IteratorIteratorBuiltin::SELF_FIRST;
         if (isset($frame->calledArgs[2])) {
             $arg = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_INTEGER === $arg->type) {
                 $flags = $arg->toInt();
+            }
+        }
+        if (isset($frame->calledArgs[3])) {
+            $arg = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $arg->type) {
+                $cachingFlags = $arg->toInt();
             }
         }
         if (isset($frame->calledArgs[4])) {
@@ -241,7 +261,17 @@ final class RecursiveTreeIteratorConstruct extends VmClassMethod
             }
         }
 
-        SplTreeIteratorStorage::init($object, $inner, $mode);
+        $cachingVar = RecursiveCachingIteratorBuiltin::createFromInnerAndFlags(
+            $frame->vmContext,
+            $frame,
+            $userInner,
+            $cachingFlags
+        )->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $cachingVar->type) {
+            throw new \LogicException('RecursiveTreeIterator failed to wrap RecursiveCachingIterator');
+        }
+
+        SplTreeIteratorStorage::init($object, $cachingVar->toObject(), $mode);
         SplTreeIteratorStorage::setFlags($object, $flags);
     }
 }

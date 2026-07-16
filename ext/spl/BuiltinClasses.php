@@ -34,10 +34,11 @@ final class BuiltinClasses
         CachingIteratorBuiltin::registerClass($ctx);
         InfiniteIteratorBuiltin::registerClass($ctx);
         NoRewindIteratorBuiltin::registerClass($ctx);
-        RecursiveTreeIteratorBuiltin::registerClass($ctx);
-        // RecursiveIterator (and siblings) must exist before SplFileObject / RecursiveCachingIterator (#6393, #6915).
+        // RecursiveIterator (and siblings) must exist before RecursiveCachingIterator (#6393, #6915).
+        // RecursiveCachingIterator before RecursiveTreeIterator — tree wraps caching for hasNext (#6273).
         VmSplIterators::register($ctx);
         RecursiveCachingIteratorBuiltin::registerClass($ctx);
+        RecursiveTreeIteratorBuiltin::registerClass($ctx);
         SplFileObjectBuiltin::registerClass($ctx);
         SplTempFileObjectBuiltin::registerClass($ctx);
         SplHeapBuiltin::registerClasses($ctx);

@@ -31,6 +31,9 @@ final class CachingIteratorBuiltin
     /** php-src CIT_TOSTRING_USE_INNER */
     public const TOSTRING_USE_INNER = 0x00000008;
 
+    /** php-src CIT_CATCH_GET_CHILD — default RecursiveTreeIterator caching flag (#6273). */
+    public const CATCH_GET_CHILD = 0x00000010;
+
     /** php-src CIT_FULL_CACHE */
     public const FULL_CACHE = 0x00000100;
 
@@ -59,6 +62,7 @@ final class CachingIteratorBuiltin
             'TOSTRING_USE_KEY' => self::TOSTRING_USE_KEY,
             'TOSTRING_USE_CURRENT' => self::TOSTRING_USE_CURRENT,
             'TOSTRING_USE_INNER' => self::TOSTRING_USE_INNER,
+            'CATCH_GET_CHILD' => self::CATCH_GET_CHILD,
             'FULL_CACHE' => self::FULL_CACHE,
         ]);
 
