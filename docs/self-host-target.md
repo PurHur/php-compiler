@@ -79,7 +79,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Indicator | Formula | Jun 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **5132** / **5132** (`php script/bootstrap-spine-count.php`) |
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **5144** / **5144** (`php script/bootstrap-spine-count.php`) |
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~97%** |
 | **M5 vendor prelink** | `object_ok` packages ÷ 3 | **3 / 3** (cfg, types, llvm) |
 | **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~90%** |
