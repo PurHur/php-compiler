@@ -4000,7 +4000,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StreamCapsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamContextRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamEnableCrypto.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamFilter.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StreamFilterJit.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamFilterKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamFstat.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamFstatRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamGlobals.php';

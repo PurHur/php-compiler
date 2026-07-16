@@ -1067,7 +1067,7 @@ class Context {
             Builtin\StringFormat::ensureDeferredStubsForInventoryEmit($this);
             Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
             Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
-            Builtin\StreamFilterJit::ensureDeferredStubsForInventoryEmit($this);
+            \PHPCompiler\ext\standard\JitStreamFilterKernel::ensureDeferredStubsForInventoryEmit($this);
             Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
             Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);

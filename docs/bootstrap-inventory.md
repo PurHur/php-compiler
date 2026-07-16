@@ -1756,6 +1756,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamCopyToString.php` | 0 | 1 |
 | `ext/standard/JitStreamEnableCrypto.php` | 0 | 1 |
 | `ext/standard/JitStreamFilter.php` | 0 | 1 |
+| `ext/standard/JitStreamFilterKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamGetContents.php` | 0 | 1 |
 | `ext/standard/JitStreamGetFilters.php` | 0 | 2 |
 | `ext/standard/JitStreamGetLine.php` | 0 | 1 |
@@ -3909,7 +3910,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamContextRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamEnableCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamFilter.php` | 0 | 1 |
-| `lib/JIT/Builtin/StreamFilterJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamFstat.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamFstatRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamGlobals.php` | 0 | 1 |
@@ -16630,6 +16630,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/standard/JitStreamFilterKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 282)
+- 20 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/JitStreamGetContents.php`
 
@@ -31255,14 +31262,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamFilter.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `lib/JIT/Builtin/StreamFilterJit.php`
-
-**Warnings** (review for bootstrap subset):
-- new JIT (line 278)
-- 20 class method(s)
-- 1 closure(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StreamFstat.php`
 
