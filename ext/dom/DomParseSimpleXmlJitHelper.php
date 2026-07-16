@@ -186,13 +186,43 @@ final class DomParseSimpleXmlJitHelper
     /** First element child tag under the document element (#19268). */
     public static function firstChildTagArgv(string $xml): ?string
     {
+        $node = self::firstChildNodeArgv($xml);
+        if (null === $node || 'element' !== $node['kind']) {
+            return null;
+        }
+
+        return $node['data'];
+    }
+
+    /**
+     * First child under the document element for user-script AOT navigation (#19455).
+     *
+     * @return null|array{kind: 'comment'|'text'|'element', data: string}
+     */
+    public static function firstChildNodeArgv(string $xml): ?array
+    {
         if (!preg_match('/<([a-zA-Z_][\w:.-]*)(?:\s[^>]*)?>/', $xml, $root, PREG_OFFSET_CAPTURE)) {
             return null;
         }
         $afterRoot = (int) $root[0][1] + \strlen($root[0][0]);
         $rest = substr($xml, $afterRoot);
-        if (preg_match('/<([a-zA-Z_][\w:.-]*)(?:\s|\/|>)/', $rest, $child)) {
-            return $child[1];
+        if (preg_match('/^\s*<!--(.*?)-->/s', $rest, $comment)) {
+            return ['kind' => 'comment', 'data' => $comment[1]];
+        }
+        if (preg_match('/^\s*<([a-zA-Z_][\w:.-]*)(?:\s|\/|>)/', $rest, $child)) {
+            return ['kind' => 'element', 'data' => $child[1]];
+        }
+        if (preg_match('/^([^<]+)/', $rest, $text)) {
+            $data = $text[1];
+            // Strip trailing whitespace that only pads a following close tag.
+            if (preg_match('/^(.*?)(\s*)$/s', $data, $parts)
+                && '' !== $parts[1]
+            ) {
+                return ['kind' => 'text', 'data' => $parts[1]];
+            }
+            if ('' !== trim($data)) {
+                return ['kind' => 'text', 'data' => $data];
+            }
         }
 
         return null;

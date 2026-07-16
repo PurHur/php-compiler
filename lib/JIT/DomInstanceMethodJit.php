@@ -45,6 +45,7 @@ final class DomInstanceMethodJit
     private const USER_SCRIPT_DIRECT_METHODS = [
         'domdocument::createelement' => true,
         'domdocument::createelementns' => true,
+        'domdocument::createcomment' => true,
         'domdocument::createattributens' => true,
         'domdocument::load' => true,
         'domdocument::loadhtml' => true,
@@ -100,6 +101,11 @@ final class DomInstanceMethodJit
             }
             if ('domdocument::createelementns' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentCreateElementNS();
+
+                return;
+            }
+            if ('domdocument::createcomment' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentCreateComment();
 
                 return;
             }
@@ -273,6 +279,7 @@ final class DomInstanceMethodJit
             self::ensureDomElementPropertyLayout($context);
             self::ensureProxy($context, 'domdocument::createelement');
             self::ensureProxy($context, 'domdocument::createelementns');
+            self::ensureProxy($context, 'domdocument::createcomment');
             self::ensureProxy($context, 'domdocument::load');
             self::ensureProxy($context, 'domdocument::loadhtml');
             self::ensureProxy($context, 'domdocument::loadhtmlfile');
