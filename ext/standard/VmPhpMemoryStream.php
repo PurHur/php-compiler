@@ -88,6 +88,46 @@ final class VmPhpMemoryStream
         return \str_starts_with($uri, 'php://temp') ? 'temp' : 'memory';
     }
 
+    /**
+     * Cast php://temp to a selectable host tempfile for stream_select (php-src php_stream_temp cast).
+     * php://memory stays non-selectable (#19688). Caller keeps the resource alive for the select call.
+     *
+     * @return resource|null
+     */
+    public static function castHostResourceForSelect(int $handle)
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state || !\str_starts_with($state->uri, 'php://temp')) {
+            return null;
+        }
+        if (!\function_exists('tmpfile')) {
+            return null;
+        }
+        $tf = @\tmpfile();
+        if (!\is_resource($tf)) {
+            return null;
+        }
+        if ('' !== $state->buffer) {
+            $written = @\fwrite($tf, $state->buffer);
+            if (false === $written) {
+                @\fclose($tf);
+
+                return null;
+            }
+        }
+        $pos = $state->position;
+        if ($pos < 0) {
+            $pos = 0;
+        }
+        if (-1 === @\fseek($tf, $pos)) {
+            @\fclose($tf);
+
+            return null;
+        }
+
+        return $tf;
+    }
+
     public static function read(int $handle, int $length): string|false
     {
         $state = self::$streams[$handle] ?? null;
