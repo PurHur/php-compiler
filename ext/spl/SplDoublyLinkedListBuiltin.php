@@ -71,6 +71,7 @@ final class SplDoublyLinkedListBuiltin
             'top' => SplDoublyLinkedListTop::class,
             'bottom' => SplDoublyLinkedListBottom::class,
             'isempty' => SplDoublyLinkedListIsEmpty::class,
+            'add' => SplDoublyLinkedListAdd::class,
             'count' => SplDoublyLinkedListCount::class,
             'offsetget' => SplDoublyLinkedListOffsetGet::class,
             'offsetset' => SplDoublyLinkedListOffsetSet::class,
@@ -81,6 +82,7 @@ final class SplDoublyLinkedListBuiltin
             'current' => SplDoublyLinkedListCurrent::class,
             'key' => SplDoublyLinkedListKey::class,
             'next' => SplDoublyLinkedListNext::class,
+            'prev' => SplDoublyLinkedListPrev::class,
             'setiteratormode' => SplDoublyLinkedListSetIteratorMode::class,
             'getiteratormode' => SplDoublyLinkedListGetIteratorMode::class,
         ] as $lc => $class) {
@@ -108,6 +110,8 @@ final class SplDoublyLinkedListBuiltin
             $entry->methods['top'],
             $entry->methods['bottom'],
             $entry->methods['isempty'],
+            $entry->methods['add'],
+            $entry->methods['prev'],
             $entry->methods['offsetget'],
             $entry->methods['rewind'],
             $entry->methods['valid']
@@ -200,6 +204,37 @@ final class SplDoublyLinkedListBuiltin
         } else {
             ++self::$iteratorPositions[$object->id];
         }
+    }
+
+    /** php-src spl_dllist_it_rewind / bidirectional — opposite of next() keep-mode step. */
+    public static function prev(ObjectEntry $object): void
+    {
+        if (!self::valid($object)) {
+            return;
+        }
+        $mode = self::getIteratorMode($object);
+        if ($mode & self::IT_MODE_LIFO) {
+            ++self::$iteratorPositions[$object->id];
+        } else {
+            --self::$iteratorPositions[$object->id];
+        }
+    }
+
+    /**
+     * php-src SplDoublyLinkedList::add — insert at $index (0..count inclusive).
+     */
+    public static function add(ObjectEntry $object, Variable $index, Variable $value): void
+    {
+        $pos = self::coerceIndex($index, 'add', false);
+        $count = self::count($object);
+        if ($pos < 0 || $pos > $count) {
+            throw new \OutOfRangeException(
+                'SplDoublyLinkedList::add(): Argument #1 ($index) is out of range'
+            );
+        }
+        $copy = new Variable();
+        $copy->copyFrom($value->resolveIndirect());
+        \array_splice(self::$store[$object->id], $pos, 0, [$copy]);
     }
 
     private static function iteratorPosition(ObjectEntry $object): int
@@ -784,6 +819,48 @@ final class SplDoublyLinkedListNext extends VmClassMethod
             'SplDoublyLinkedList::next()'
         );
         SplDoublyLinkedListBuiltin::next($object);
+    }
+}
+
+final class SplDoublyLinkedListPrev extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('prev');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::prev()'
+        );
+        SplDoublyLinkedListBuiltin::prev($object);
+    }
+}
+
+final class SplDoublyLinkedListAdd extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('add');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::add()'
+        );
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'SplDoublyLinkedList::add() expects exactly 2 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplDoublyLinkedListBuiltin::add($object, $frame->calledArgs[1], $frame->calledArgs[2]);
     }
 }
 
