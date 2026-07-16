@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5024 |
-| Phase A inventory files (M2 ratio SSOT) | 5024 |
+| PHP files on vm.php path | 5029 |
+| Phase A inventory files (M2 ratio SSOT) | 5029 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13560 |
+| Source constructs flagged (warnings) | 13569 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -405,12 +405,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/ftp_systype.php` | 0 | 2 |
 | `ext/gd/BuiltinClasses.php` | 0 | 2 |
 | `ext/gd/GdExtensionPolicy.php` | 0 | 1 |
+| `ext/gd/GdFonts.php` | 0 | 1 |
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 4 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 20 |
+| `ext/gd/Module.php` | 0 | 24 |
 | `ext/gd/VmGd.php` | 0 | 4 |
 | `ext/gd/VmGdPng.php` | 0 | 1 |
+| `ext/gd/imagechar.php` | 0 | 1 |
 | `ext/gd/imagecolorallocate.php` | 0 | 1 |
 | `ext/gd/imagecolorat.php` | 0 | 1 |
 | `ext/gd/imagecopy.php` | 0 | 1 |
@@ -422,10 +424,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagecropauto.php` | 0 | 1 |
 | `ext/gd/imagedestroy.php` | 0 | 1 |
 | `ext/gd/imagefill.php` | 0 | 1 |
+| `ext/gd/imagefilledrectangle.php` | 0 | 1 |
 | `ext/gd/imagefilter.php` | 0 | 1 |
 | `ext/gd/imageflip.php` | 0 | 1 |
+| `ext/gd/imageline.php` | 0 | 1 |
 | `ext/gd/imagepng.php` | 0 | 1 |
 | `ext/gd/imagesetpixel.php` | 0 | 1 |
+| `ext/gd/imagestring.php` | 0 | 1 |
 | `ext/gd/imagesx.php` | 0 | 1 |
 | `ext/gd/imagesy.php` | 0 | 1 |
 | `ext/gettext/GettextFunction.php` | 0 | 2 |
@@ -7286,7 +7291,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 35)
 - new ObjectEntry (line 36)
-- 31 class method(s)
+- 32 class method(s)
 
 ### `ext/fileinfo/finfo_buffer.php`
 
@@ -7601,6 +7606,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/gd/GdFonts.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/gd/GdFunction.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7637,12 +7647,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagecopymerge (line 67)
 - new imagecopyresampled (line 68)
 - new imagesetpixel (line 69)
-- new imagefilter (line 70)
-- new imageflip (line 71)
-- new imagecrop (line 72)
-- new imagecropauto (line 73)
-- new imagecreatefromstring (line 76)
-- new imagepng (line 77)
+- new imageline (line 70)
+- new imagefilledrectangle (line 71)
+- new imagestring (line 72)
+- new imagechar (line 73)
+- new imagefilter (line 74)
+- new imageflip (line 75)
+- new imagecrop (line 76)
+- new imagecropauto (line 77)
+- new imagecreatefromstring (line 80)
+- new imagepng (line 81)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -7650,13 +7664,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 53)
 - new ObjectEntry (line 76)
-- new ObjectEntry (line 676)
-- 42 class method(s)
+- new ObjectEntry (line 861)
+- 51 class method(s)
 
 ### `ext/gd/VmGdPng.php`
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/gd/imagechar.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/gd/imagecolorallocate.php`
 
@@ -7713,6 +7732,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/gd/imagefilledrectangle.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/gd/imagefilter.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7723,12 +7747,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/gd/imageline.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/gd/imagepng.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `ext/gd/imagesetpixel.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagestring.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -11977,8 +12011,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 418)
 - new ArgumentCountError (line 486)
 - new ArgumentCountError (line 593)
-- new Variable (line 733)
-- new ArgumentCountError (line 776)
+- new Variable (line 728)
+- new ArgumentCountError (line 771)
 - 24 class method(s)
 
 ### `ext/spl/SplFileObjectStorage.php`
@@ -18539,12 +18573,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 434)
 - new HashTable (line 1721)
 - new Variable (line 1723)
-- new HashTable (line 2583)
-- new Variable (line 2586)
-- new Variable (line 2592)
-- new Variable (line 2598)
-- new Variable (line 2604)
-- new Variable (line 2611)
+- new HashTable (line 2585)
+- new Variable (line 2588)
+- new Variable (line 2594)
+- new Variable (line 2600)
+- new Variable (line 2606)
+- new Variable (line 2613)
 - 144 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -19086,7 +19120,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMime.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 11 class method(s)
 
 ### `ext/standard/VmMinMax.php`
 
@@ -20078,8 +20112,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1723)
-- new Error (line 1734)
+- new Error (line 1728)
+- new Error (line 1739)
 - 217 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -32925,7 +32959,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 390)
+- new Variable (line 407)
 - 27 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
@@ -37952,7 +37986,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/WeakMapIterator.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 60)
+- new Variable (line 73)
 - 4 class method(s)
 
 ### `lib/VM/WeakRefRegistry.php`
@@ -37970,7 +38004,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 143)
 - new Variable (line 188)
 - new Variable (line 257)
-- 23 class method(s)
+- 25 class method(s)
 - 1 closure(s)
 
 ### `lib/VM/ZendDeclaredInterfaces.php`
