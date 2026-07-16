@@ -221,6 +221,21 @@ final class SplFileObjectStorage
         return VmFs::fpassthru(self::state($object)['handle']);
     }
 
+    public static function getMaxLineLen(ObjectEntry $object): int
+    {
+        return self::state($object)['maxLineLen'];
+    }
+
+    public static function setMaxLineLen(ObjectEntry $object, int $maxLength): void
+    {
+        if ($maxLength < 0) {
+            throw new \ValueError(
+                'SplFileObject::setMaxLineLen(): Argument #1 ($maxLength) must be greater than or equal to 0'
+            );
+        }
+        self::$state[$object->id]['maxLineLen'] = $maxLength;
+    }
+
     /** @return string|false */
     public static function getCurrentLine(ObjectEntry $object)
     {
@@ -316,7 +331,11 @@ final class SplFileObjectStorage
         if (VmFs::feof($state['handle'])) {
             return false;
         }
-        $readLen = $length ?? ($state['maxLineLen'] > 0 ? $state['maxLineLen'] : null);
+        $readLen = $length;
+        if (null === $readLen && $state['maxLineLen'] > 0) {
+            // php-src max_line_len+1 buffer for get_line (#19665).
+            $readLen = $state['maxLineLen'] + 1;
+        }
         if (self::hasFlag($state, self::FLAG_READ_CSV)) {
             return self::readCsvLineEx($object, $lineAdd, $readLen);
         }
@@ -327,11 +346,17 @@ final class SplFileObjectStorage
     private static function readPlainLineEx(ObjectEntry $object, bool $silent, int $lineAdd, ?int $length): bool
     {
         $state = &self::$state[$object->id];
+        // php-src uses max_line_len+1 as php_stream_get_line buffer size (#19665).
+        if (null === $length && $state['maxLineLen'] > 0) {
+            $readLen = $state['maxLineLen'] + 1;
+        } else {
+            $readLen = $length;
+        }
         do {
             if (VmFs::feof($state['handle'])) {
                 return false;
             }
-            $line = VmFs::fgets($state['handle'], $length);
+            $line = VmFs::fgets($state['handle'], $readLen);
             if (false === $line) {
                 return false;
             }

@@ -83,6 +83,8 @@ final class SplFileObjectBuiltin
             'ftruncate' => SplFileObjectFtruncate::class,
             'fpassthru' => SplFileObjectFpassthru::class,
             'getcurrentline' => SplFileObjectGetCurrentLine::class,
+            'setmaxlinelen' => SplFileObjectSetMaxLineLen::class,
+            'getmaxlinelen' => SplFileObjectGetMaxLineLen::class,
             'fgetcsv' => SplFileObjectFgetcsv::class,
             'fputcsv' => SplFileObjectFputcsv::class,
             'setcsvcontrol' => SplFileObjectSetCsvControl::class,
@@ -101,6 +103,8 @@ final class SplFileObjectBuiltin
         $entry->methodNames['setflags'] = 'setFlags';
         $entry->methodNames['getflags'] = 'getFlags';
         $entry->methodNames['getcurrentline'] = 'getCurrentLine';
+        $entry->methodNames['setmaxlinelen'] = 'setMaxLineLen';
+        $entry->methodNames['getmaxlinelen'] = 'getMaxLineLen';
         $entry->methodNames['haschildren'] = 'hasChildren';
         $entry->methodNames['getchildren'] = 'getChildren';
         $entry->methodNames['__tostring'] = '__toString';
@@ -127,6 +131,8 @@ final class SplFileObjectBuiltin
             $entry->methods['ftruncate'],
             $entry->methods['fpassthru'],
             $entry->methods['getcurrentline'],
+            $entry->methods['setmaxlinelen'],
+            $entry->methods['getmaxlinelen'],
             $entry->methods['fgetcsv'],
             $entry->methods['fputcsv'],
             $entry->methods['setflags'],
@@ -630,6 +636,59 @@ final class SplFileObjectFpassthru extends VmClassMethod
             return;
         }
         $frame->returnVar->int($n);
+    }
+}
+
+/** php-src SplFileObject::setMaxLineLen (#19665). */
+final class SplFileObjectSetMaxLineLen extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setMaxLineLen');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::setMaxLineLen()'
+        );
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(
+                'SplFileObject::setMaxLineLen() expects exactly 1 argument, '.($argc - 1).' given'
+            );
+        }
+        $maxLength = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1],
+            'SplFileObject::setMaxLineLen',
+            1,
+            'maxLength'
+        );
+        SplFileObjectStorage::setMaxLineLen($object, $maxLength);
+    }
+}
+
+/** php-src SplFileObject::getMaxLineLen (#19665). */
+final class SplFileObjectGetMaxLineLen extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getMaxLineLen');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::getMaxLineLen()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplFileObjectStorage::getMaxLineLen($object));
     }
 }
 
