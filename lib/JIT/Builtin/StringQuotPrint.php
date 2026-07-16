@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -35,8 +36,16 @@ final class StringQuotPrint
 
     public static function implement(Context $context): void
     {
+        // Restore caller insert block after bridge emit (#19283) — clearInsertionPosition
+        // left the user-script builder detached ("Current basic block has no parent function").
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::implementBridge($context, '__compiler_quoted_printable_encode', self::ENCODE_HELPER);
         self::implementBridge($context, '__compiler_quoted_printable_decode', self::DECODE_HELPER);
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBridge(Context $context, string $abiName, string $helperLogical): void
@@ -64,7 +73,6 @@ final class StringQuotPrint
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

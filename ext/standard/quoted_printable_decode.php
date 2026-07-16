@@ -24,7 +24,7 @@ final class quoted_printable_decode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('quoted_printable_decode() requires exactly one argument in this compiler build');
         }
-        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'quoted_printable_decode', 0, 'string');
+        $data = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'quoted_printable_decode', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -36,10 +36,33 @@ final class quoted_printable_decode extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('quoted_printable_decode() requires exactly one argument in this compiler build');
         }
+
         return JitQuotedPrintableDecode::decode(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'quoted_printable_decode', 0, 'string'),
-            $args[0]
+            $args[0],
+            static fn (Context $ctx): Value => self::jitStringArg($ctx, $args[0])
+        );
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19283, ext/standard/quot_print.c). */
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'quoted_printable_decode',
+                0,
+                'string'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'quoted_printable_decode',
+            0,
+            'string'
         );
     }
 }
