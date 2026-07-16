@@ -21,9 +21,6 @@ final class DomNodeGetRootNode implements Call
             throw new \LogicException('DOMNode::getRootNode() called without $this');
         }
 
-        $result = DomLivingApiRuntime::invokeGetRootNode($context, $args[0]);
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_get_root_node_post_invoke');
-
-        return $result;
+        return DomLivingApiRuntime::invokeGetRootNode($context, $args[0]);
     }
 }

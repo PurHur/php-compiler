@@ -7,10 +7,10 @@ PHP_COMPILER_PROFILE=8.4
 $dom = new DOMDocument();
 $el = $dom->createElement('p');
 $dom->appendChild($el);
-echo (int) $el->toggleAttribute('hidden'), "\n";
-echo (int) $el->toggleAttribute('hidden'), "\n";
-echo (int) $el->toggleAttribute('hidden', true), "\n";
-echo (int) $el->toggleAttribute('hidden', false), "\n";
+echo $el->toggleAttribute('hidden') ? "1\n" : "0\n";
+echo $el->toggleAttribute('hidden') ? "1\n" : "0\n";
+echo $el->toggleAttribute('hidden', true) ? "1\n" : "0\n";
+echo $el->toggleAttribute('hidden', false) ? "1\n" : "0\n";
 --EXPECT--
 1
 0

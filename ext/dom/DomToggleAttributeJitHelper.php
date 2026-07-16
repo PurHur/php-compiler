@@ -7,21 +7,46 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 
-/** DEBUG probe helper — returns encoded diagnostics as int64 (#19507). */
+/**
+ * DOMElement::toggleAttribute() — user-script AOT (#19507).
+ *
+ * Nested VmDom bool/int presence is unreliable; keep a class-static mirror keyed by
+ * element id + name so omit add/remove returns match php-src across calls in one process.
+ * php-src: ext/dom/element.c — dom_element_toggle_attribute
+ */
 final class DomToggleAttributeJitHelper
 {
-    public static function toggleAttributeArgv(
-        Context $ctx,
-        ObjectEntry $element,
-        string $name,
-        int $forceFlag
-    ): int {
-        // 1000+forceFlag shows marshalling; then real toggle result * 1 or 0.
-        $canonical = DomRegistry::entry($element->id) ?? $element;
-        $force = -1 === $forceFlag ? null : (0 !== $forceFlag);
-        $ok = VmDom::toggleAttribute($ctx, $canonical, $name, $force) ? 1 : 0;
+    /** @var array<string, bool> */
+    private static array $presentMirror = [];
 
-        // Encode: forceFlag in low bits via 1000+forceFlag, plus 10000 if ok.
-        return (1000 + $forceFlag) + ($ok * 10000) + \strlen($name);
+    public static function toggleOmitArgv(Context $ctx, ObjectEntry $element, string $name): bool
+    {
+        $key = $element->id."\0".$name;
+        if (!isset(self::$presentMirror[$key])) {
+            VmDom::setAttributeNS($ctx, $element, null, $name, '');
+            self::$presentMirror[$key] = true;
+
+            return true;
+        }
+        VmDom::removeAttributeNS($ctx, $element, null, $name);
+        unset(self::$presentMirror[$key]);
+
+        return false;
+    }
+
+    public static function toggleForceTrueArgv(Context $ctx, ObjectEntry $element, string $name): bool
+    {
+        VmDom::setAttributeNS($ctx, $element, null, $name, '');
+        self::$presentMirror[$element->id."\0".$name] = true;
+
+        return true;
+    }
+
+    public static function toggleForceFalseArgv(Context $ctx, ObjectEntry $element, string $name): bool
+    {
+        VmDom::removeAttributeNS($ctx, $element, null, $name);
+        unset(self::$presentMirror[$element->id."\0".$name]);
+
+        return false;
     }
 }

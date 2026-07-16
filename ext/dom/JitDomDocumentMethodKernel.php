@@ -647,17 +647,53 @@ final class JitDomDocumentMethodKernel
 
     public static function ensureToggleAttributeBridge(Context $context): void
     {
+        self::ensureToggleAttributeOmitBridge($context);
+    }
+
+    public static function ensureToggleAttributeOmitBridge(Context $context): void
+    {
         self::ensureContextBridge(
             $context,
-            DomLivingApiRuntime::ABI_TOGGLE_ATTRIBUTE,
-            'dom_element_toggle_attribute_user_script',
+            DomLivingApiRuntime::ABI_TOGGLE_ATTRIBUTE_OMIT,
+            'dom_element_toggle_attribute_omit_user_script',
             [
                 $context->getTypeFromString('__object__*'),
                 $context->getTypeFromString('__string__*'),
-                $context->getTypeFromString('int64'),
             ],
             $context->getTypeFromString('int1'),
-            'PHPCompiler\\ext\\dom\\DomToggleAttributeJitHelper::toggleAttributeArgv',
+            'PHPCompiler\ext\dom\DomToggleAttributeJitHelper::toggleOmitArgv',
+            '/ext/dom/DomToggleAttributeJitHelper.php'
+        );
+    }
+
+    public static function ensureToggleAttributeForceTrueBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_TOGGLE_ATTRIBUTE_FORCE_TRUE,
+            'dom_element_toggle_attribute_force_true_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\ext\dom\DomToggleAttributeJitHelper::toggleForceTrueArgv',
+            '/ext/dom/DomToggleAttributeJitHelper.php'
+        );
+    }
+
+    public static function ensureToggleAttributeForceFalseBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_TOGGLE_ATTRIBUTE_FORCE_FALSE,
+            'dom_element_toggle_attribute_force_false_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\ext\dom\DomToggleAttributeJitHelper::toggleForceFalseArgv',
             '/ext/dom/DomToggleAttributeJitHelper.php'
         );
     }
@@ -1055,11 +1091,8 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -1141,11 +1174,8 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -1220,11 +1250,8 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     private static function ensureNestedHelperProxies(Context $context): void
@@ -1353,11 +1380,8 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -1424,11 +1448,8 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**
@@ -1495,11 +1516,8 @@ final class JitDomDocumentMethodKernel
         $context->builder->returnValue(JitValueBox::normalizeValuePtr($context, $destPtr));
         $context->registerFunction($abi, $fn);
 
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
+        // Never clearInsertionPosition mid-user-script — orphaned entryAlloca GEPs (#19507).
+        self::restoreInsertAfterBridge($context, $savedBlock);
     }
 
     /**

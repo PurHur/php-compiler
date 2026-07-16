@@ -7,7 +7,6 @@ final class DomContainsNullJitHelper
 {
     public static function containsNullArgv(Context $ctx, ObjectEntry $node): int
     {
-        unset($ctx, $node);
         return 0;
     }
 }

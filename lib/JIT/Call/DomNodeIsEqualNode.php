@@ -21,9 +21,6 @@ final class DomNodeIsEqualNode implements Call
             throw new \LogicException('DOMNode::isEqualNode() expects receiver and other');
         }
 
-        $result = DomLivingApiRuntime::invokeIsEqualNode($context, $args[0], $args[1]);
-        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_is_equal_node_post_invoke');
-
-        return $result;
+        return DomLivingApiRuntime::invokeIsEqualNode($context, $args[0], $args[1]);
     }
 }
