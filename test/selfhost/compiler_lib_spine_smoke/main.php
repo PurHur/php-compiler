@@ -635,6 +635,7 @@ require_once __DIR__.'/../../../ext/intl/msgfmt_format_message.php';
 require_once __DIR__.'/../../../ext/intl/VmTransliterator.php';
 require_once __DIR__.'/../../../ext/intl/transliterator_create.php';
 require_once __DIR__.'/../../../ext/intl/transliterator_transliterate.php';
+require_once __DIR__.'/../../../ext/intl/VmResourceBundle.php';
 require_once __DIR__.'/../../../ext/intl/IdnFunction.php';
 require_once __DIR__.'/../../../ext/intl/IntlClassMethod.php';
 require_once __DIR__.'/../../../ext/intl/IntlConstants.php';

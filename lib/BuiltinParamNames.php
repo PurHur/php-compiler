@@ -36,6 +36,9 @@ final class BuiltinParamNames
             'messageformatter::formatmessage' => ['locale', 'pattern', 'args'],
             'transliterator::create' => ['id', 'direction'],
             'transliterator::transliterate' => ['string', 'start', 'end'],
+            'resourcebundle::create' => ['locale', 'bundlename', 'fallback'],
+            'resourcebundle::get' => ['index'],
+            'resourcebundle::count' => [],
             default => null,
         };
     }
