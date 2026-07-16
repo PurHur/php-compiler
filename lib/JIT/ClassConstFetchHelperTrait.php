@@ -19,7 +19,6 @@ use PHPCompiler\JIT\ReadonlyBridge;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
-use PHPCompiler\VM\TraitSelfClassScope;
 use PHPCfg\Operand;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -369,7 +368,7 @@ trait ClassConstFetchHelperTrait
     }
 
     /**
-     * self::class in trait methods — composing class when invoked via user (#18879).
+     * self::class in trait methods — composing class when invoked via user (#18879, #19629).
      */
     private static function resolveJitSelfClassPseudoConstDisplayName(
         Object_ $objectType,
@@ -380,38 +379,22 @@ trait ClassConstFetchHelperTrait
         if (null !== $lc && 'self' !== $lc) {
             return null;
         }
-        $funcClassLc = null;
         $funcIsTrait = false;
         if (null !== $block->func?->class) {
-            $funcClassLc = $block->func->class->value;
-            $funcIsTrait = $objectType->isTraitClass(strtolower(ltrim($funcClassLc, '\\')));
+            $funcIsTrait = $objectType->isTraitClass(strtolower(ltrim($block->func->class->value, '\\')));
         }
         if (!$funcIsTrait) {
             return null;
         }
-        $scopeName = $objectType->jitContext()->scope->className ?? '';
-        if ('' !== $scopeName && !$objectType->isTraitClass(strtolower(ltrim($scopeName, '\\')))) {
-            return $scopeName;
-        }
-        $scope = self::jitScopeClassName($objectType, $block);
-        if (null === $scope || '' === $scope) {
-            return null;
-        }
-        $called = $objectType->jitContext()->scope->calledClassName ?? '';
 
-        return TraitSelfClassScope::resolveSelfClassName(
-            $funcClassLc,
-            true,
-            '' !== $called ? $called : null,
-            $scope
-        );
+        return self::jitComposingScopeClassName($objectType, $block);
     }
 
     private static function resolveJitClassNameString(Object_ $objectType, Block $block, string $className): string
     {
         $lc = strtolower($className);
         if ('self' === $lc) {
-            $scope = self::jitScopeClassName($objectType, $block);
+            $scope = self::jitComposingScopeClassName($objectType, $block);
             if (null === $scope) {
                 PseudoClassScope::fatalInGlobalScope('self');
             }

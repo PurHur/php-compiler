@@ -12511,11 +12511,17 @@ class JIT {
                     $this->context->scope->blockStorage->detach($methodBlock);
                 }
                 $savedTraitComposing = $this->context->scope->traitComposingClassName;
+                $savedScopeClassName = $this->context->scope->className;
                 $this->context->scope->traitComposingClassName = $className;
+                if ('' === $savedScopeClassName
+                    || $this->context->type->object->isTraitClass(strtolower(ltrim($savedScopeClassName, '\\')))) {
+                    $this->context->scope->className = strtolower(ltrim($className, '\\'));
+                }
                 try {
                     $this->compileBlock($methodBlock, $classLc.'::'.$methodLc);
                 } finally {
                     $this->context->scope->traitComposingClassName = $savedTraitComposing;
+                    $this->context->scope->className = $savedScopeClassName;
                 }
             }
         }
@@ -15370,8 +15376,26 @@ class JIT {
             if (null === $block->func || null === $block->func->class) {
                 PseudoClassScope::fatalInGlobalScope('self');
             }
+            $declaringClass = $block->func->class->value;
+            $declaringLc = strtolower(ltrim($declaringClass, '\\'));
+            if ($this->context->type->object->isTraitClass($declaringLc)) {
+                $composing = $this->context->scope->traitComposingClassName;
+                if ('' !== $composing && !$this->context->type->object->isTraitClass(strtolower(ltrim($composing, '\\')))) {
+                    return $composing;
+                }
+                if ($this->context->scope->classId > 0) {
+                    $fromId = $this->context->type->object->classNameForId($this->context->scope->classId);
+                    if ('' !== $fromId && !$this->context->type->object->isTraitClass(strtolower(ltrim($fromId, '\\')))) {
+                        return $fromId;
+                    }
+                }
+                $scopeName = $this->context->scope->className;
+                if ('' !== $scopeName && !$this->context->type->object->isTraitClass(strtolower(ltrim($scopeName, '\\')))) {
+                    return $scopeName;
+                }
+            }
 
-            return $block->func->class->value;
+            return $declaringClass;
         }
         if ('static' === $lc) {
             if ($this->context->scope->calledClassName !== '') {
