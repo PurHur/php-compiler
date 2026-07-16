@@ -46,7 +46,7 @@ final class VmSocketMsg
     }
 
     /**
-     * @param array{iov?: list<string>, control?: list<array{level: int, type: int, data: mixed}>} $message
+     * @param array{iov?: list<string>, control?: list<array{level: int, type: int, data: mixed}>, name?: array<string, mixed>} $message
      */
     public static function sendmsg(ObjectEntry $object, array $message, int $flags, Frame $frame): int|false
     {
@@ -70,7 +70,14 @@ final class VmSocketMsg
                 return false;
             }
         }
-        $n = SocketsLibcThinAbi::sendmsg($fd, $iov, $control, $flags);
+        $name = null;
+        if (isset($message['name']) && \is_array($message['name'])) {
+            $name = self::marshalName($message['name'], $frame);
+            if (null === $name) {
+                return false;
+            }
+        }
+        $n = SocketsLibcThinAbi::sendmsg($fd, $iov, $control, $flags, $name);
         if ($n < 0) {
             $errno = SocketsLibcThinAbi::readErrno();
             VmSockets::recordError($object, $errno);
@@ -93,7 +100,7 @@ final class VmSocketMsg
     /**
      * @param array{buffer_size?: int, controllen?: int} $message
      *
-     * @return array{bytes: int, message: array{name: null, control: array, iov: list<string>, flags: int}}|false
+     * @return array{bytes: int, message: array{name: array<string, int|string>|null, control: array, iov: list<string>, flags: int}}|false
      */
     public static function recvmsg(ObjectEntry $object, array $message, int $flags, Frame $frame): array|false
     {
@@ -138,16 +145,98 @@ final class VmSocketMsg
             return false;
         }
         VmSockets::recordError($object, 0);
+        $name = self::unmarshalName($got[4] ?? '');
 
         return [
             'bytes' => $got[0],
             'message' => [
-                'name' => null,
+                'name' => $name,
                 'control' => [],
                 'iov' => [$got[1]],
                 'flags' => $got[3],
             ],
         ];
+    }
+
+    /**
+     * Marshal PHP name array to sockaddr bytes (php-src conversions.c; #19408).
+     *
+     * @param array<string, mixed> $name
+     */
+    private static function marshalName(array $name, Frame $frame): ?string
+    {
+        $family = VmSockets::AF_INET;
+        if (isset($name['family'])) {
+            $family = (int) $name['family'];
+        }
+        if (VmSockets::AF_INET === $family) {
+            if (!isset($name['addr'], $name['port'])) {
+                VmSockets::triggerWarning(
+                    $frame,
+                    'socket_sendmsg(): error converting user data (path: msghdr > name): AF_INET name requires addr and port'
+                );
+
+                return null;
+            }
+            $addr = \is_string($name['addr']) ? $name['addr'] : (string) $name['addr'];
+            $port = (int) $name['port'];
+            $packed = SocketsLibcThinAbi::packSockaddrIn($addr, $port);
+            if (null === $packed) {
+                VmSockets::triggerWarning(
+                    $frame,
+                    \sprintf(
+                        'socket_sendmsg(): could not resolve address \'%s\' to get an AF_INET address',
+                        $addr
+                    )
+                );
+
+                return null;
+            }
+
+            return $packed;
+        }
+        VmSockets::triggerWarning(
+            $frame,
+            'socket_sendmsg(): unsupported sockaddr family for name (#19408)'
+        );
+
+        return null;
+    }
+
+    /**
+     * Unmarshal sockaddr bytes to PHP name array (php-src conversions.c; #19408).
+     *
+     * @return array<string, int|string>|null
+     */
+    private static function unmarshalName(string $sockaddr): ?array
+    {
+        if ('' === $sockaddr || \strlen($sockaddr) < 2) {
+            return null;
+        }
+        $family = \ord($sockaddr[0]) | (\ord($sockaddr[1]) << 8);
+        if (0 === $family) {
+            return null;
+        }
+        $explained = SocketsLibcThinAbi::explainSockaddr($family, $sockaddr);
+        if (null === $explained) {
+            return null;
+        }
+        if (isset($explained['sin_addr'], $explained['sin_port'])) {
+            return [
+                'family' => VmSockets::AF_INET,
+                'addr' => (string) $explained['sin_addr'],
+                'port' => (int) $explained['sin_port'],
+            ];
+        }
+        if (isset($explained['sin6_addr'], $explained['sin6_port'])) {
+            return [
+                'family' => VmSockets::AF_INET6,
+                'addr' => (string) $explained['sin6_addr'],
+                'port' => (int) $explained['sin6_port'],
+            ];
+        }
+
+        return null;
     }
 
     /**
@@ -215,12 +304,13 @@ final class VmSocketMsg
     /**
      * Parse PHP message HashTable into native-ish array for sendmsg.
      *
-     * @return array{iov: list<string>, control?: list<array{level: int, type: int, data: mixed}>}|null
+     * @return array{iov: list<string>, control?: list<array{level: int, type: int, data: mixed}>, name?: array<string, mixed>}|null
      */
     public static function parseSendMessage(HashTable $ht, Frame $frame): ?array
     {
         $iov = null;
         $control = null;
+        $name = null;
         foreach ($ht->iterateKeyed(true) as [$keyVar, $val]) {
             $key = $keyVar->resolveIndirect()->toString();
             if ('iov' === $key) {
@@ -241,6 +331,11 @@ final class VmSocketMsg
                 if (null === $control) {
                     return null;
                 }
+            } elseif ('name' === $key && Variable::TYPE_ARRAY === $val->type) {
+                $name = self::parseNameArray($val->toArray(), $frame);
+                if (null === $name) {
+                    return null;
+                }
             }
         }
         if (null === $iov) {
@@ -255,6 +350,29 @@ final class VmSocketMsg
         $out = ['iov' => $iov];
         if (null !== $control) {
             $out['control'] = $control;
+        }
+        if (null !== $name) {
+            $out['name'] = $name;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private static function parseNameArray(HashTable $ht, Frame $frame): ?array
+    {
+        $out = [];
+        foreach ($ht->iterateKeyed(true) as [$keyVar, $val]) {
+            $key = $keyVar->resolveIndirect()->toString();
+            if ('family' === $key || 'port' === $key) {
+                $out[$key] = VmMath::parseIntBuiltinArg($val, 'socket_sendmsg', 1, 'message');
+            } elseif ('addr' === $key) {
+                $out[$key] = VmString::coerceOperand($val->resolveIndirect());
+            } elseif ('path' === $key) {
+                $out[$key] = VmString::coerceOperand($val->resolveIndirect());
+            }
         }
 
         return $out;
