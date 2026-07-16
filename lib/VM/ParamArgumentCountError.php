@@ -83,14 +83,24 @@ final class ParamArgumentCountError
 
     private static function resolveFunctionName(Frame $frame): string
     {
-        if ($frame->call instanceof \PHPCompiler\Func\PHP) {
-            return $frame->call->getName();
+        // Callee ARG_RECV frames leave $frame->call null; the caller still holds Func\PHP (#19526).
+        $call = $frame->call;
+        if (!($call instanceof \PHPCompiler\Func\PHP) && null !== $frame->parent) {
+            $call = $frame->parent->call;
+        }
+        if ($call instanceof \PHPCompiler\Func\PHP) {
+            return $call->getName();
         }
         $method = null;
-        if (null !== $frame->block->func && \is_string($frame->block->func->name)) {
-            $method = $frame->block->func->name;
+        $cfgFunc = $frame->block->func;
+        if (null !== $cfgFunc && \is_string($cfgFunc->name)) {
+            $method = $cfgFunc->name;
         }
-        if (null !== $method) {
+        // Only instance methods use arg0 as $this — free functions may take an object (#19526).
+        $isInstanceMethod = null !== $cfgFunc
+            && null !== $cfgFunc->class
+            && !(($cfgFunc->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC);
+        if (null !== $method && $isInstanceMethod) {
             $selfVar = null;
             if ([] !== $frame->callArgs) {
                 $selfVar = $frame->callArgs[0]->resolveIndirect();
