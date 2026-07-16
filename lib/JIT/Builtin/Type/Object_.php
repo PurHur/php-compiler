@@ -4395,9 +4395,8 @@ class Object_ extends Type {
             if (null !== $native) {
                 return $native;
             }
-            // Guard/emit path already raised Undefined at IR level (#19615). Return a
-            // null SSA dummy so AOT/JIT compile can finish (Zend raises at runtime).
-            return $this->jitConstantFromEntry(['type' => Variable::TYPE_NULL, 'value' => null]);
+            $display = $classNameHint ?? $this->classNameForId($classId);
+            throw new \LogicException("Undefined constant {$display}::{$constName}");
         }
 
         if ($this->isEnumClassId($resolvedId)) {

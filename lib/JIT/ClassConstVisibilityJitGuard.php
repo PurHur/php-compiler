@@ -25,16 +25,8 @@ final class ClassConstVisibilityJitGuard
         string $constName
     ): void {
         $holdingId = $objectType->resolveClassConstHoldingId($classId, strtolower($constName));
-        $context = $objectType->jitContext();
         if (null === $holdingId) {
-            // External stubs may still resolve via Reflection in classConstFetch.
-            if ($objectType->isExternalOnlyClass($classId)) {
-                return;
-            }
-            // Missing or only private-on-parent — Zend Undefined constant (#19615).
-            $display = $objectType->classNameForId($classId);
-            self::emitViolation($context, $jit, "Undefined constant {$display}::{$constName}");
-
+            // Missing / private-on-parent: classConstFetch throws; JIT.php emits runtime Error (#19615).
             return;
         }
         $vis = $objectType->constVisibility($holdingId, $constName);
@@ -42,6 +34,7 @@ final class ClassConstVisibilityJitGuard
             return;
         }
 
+        $context = $objectType->jitContext();
         $declaringClass = $objectType->classNameForId($holdingId);
         $declaringLc = strtolower(ltrim($declaringClass, '\\'));
         $callerLc = self::callerClassLc($context, $block);
