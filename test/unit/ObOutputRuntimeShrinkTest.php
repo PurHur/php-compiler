@@ -47,9 +47,10 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ObOutputExecCaptureJitHelper', $execCaptureRuntime);
         $this->assertStringContainsString('implementGetContents', $execCaptureRuntime);
         $this->assertStringContainsString('ensureReadApiLinked', $execCaptureRuntime);
-        $this->assertStringContainsString('ObOutputExecCaptureLlvm::ensureLinked', $execCaptureRuntime);
+        $this->assertStringContainsString('JitObOutputExecCaptureKernel::ensureLinked', $execCaptureRuntime);
         $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $execCaptureRuntime);
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitObOutputExecCaptureKernel.php');
 
         $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitObOutputKernel.php');
         $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $kernel);
@@ -64,8 +65,10 @@ final class ObOutputRuntimeShrinkTest extends TestCase
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('JitObOutputKernel.php', $spine);
+        $this->assertStringContainsString('JitObOutputExecCaptureKernel.php', $spine);
         $this->assertStringContainsString('ObOutputJitHelper.php', $spine);
         $this->assertStringNotContainsString('ObOutputUserScriptLlvm.php', $spine);
+        $this->assertStringNotContainsString('ObOutputExecCaptureLlvm.php', $spine);
     }
 
     public function testObOutputJitHelperStackSemantics(): void

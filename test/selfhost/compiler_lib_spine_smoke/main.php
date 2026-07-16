@@ -3853,7 +3853,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ObGzhandler.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObGzhandlerJitRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutput.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutputEchoJitEmit.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php';
+require_once __DIR__.'/../../../ext/standard/JitObOutputExecCaptureKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutputExecCaptureRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutputJitBridge.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutputRuntime.php';
