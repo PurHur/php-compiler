@@ -246,6 +246,82 @@ final class VmFtpCore
         return $ok;
     }
 
+    public static function nbContinue(ObjectEntry $connection): int
+    {
+        self::ensureLive($connection, 'ftp_nb_continue');
+        $hostConn = self::requireHostConn($connection, 'ftp_nb_continue');
+        if (!\function_exists('ftp_nb_continue')) {
+            throw new \LogicException('ftp_nb_continue() requires host ext/ftp (issue #6675)');
+        }
+
+        return (int) @\ftp_nb_continue($hostConn);
+    }
+
+    public static function nbFget(
+        ObjectEntry $connection,
+        int $streamHandle,
+        string $remoteFile,
+        int $mode,
+        int $offset
+    ): int {
+        self::ensureLive($connection, 'ftp_nb_fget');
+        $hostConn = self::requireHostConn($connection, 'ftp_nb_fget');
+        if (!\function_exists('ftp_nb_fget')) {
+            throw new \LogicException('ftp_nb_fget() requires host ext/ftp (issue #6675)');
+        }
+        $hostFp = self::hostStreamForWrite($streamHandle);
+        if (false === $hostFp) {
+            return FtpConstants::FTP_FAILED;
+        }
+        $owned = $hostFp['owned'];
+        $fp = $hostFp['fp'];
+        $status = (int) @\ftp_nb_fget($hostConn, $fp, $remoteFile, $mode, $offset);
+        if ($owned && FtpConstants::FTP_FINISHED === $status) {
+            \rewind($fp);
+            $payload = \stream_get_contents($fp);
+            if (false !== $payload && '' !== $payload) {
+                VmFs::fwrite($streamHandle, $payload);
+            }
+            \fclose($fp);
+        } elseif ($owned && FtpConstants::FTP_FAILED === $status) {
+            \fclose($fp);
+        }
+
+        return $status;
+    }
+
+    public static function nbGet(
+        ObjectEntry $connection,
+        string $localFile,
+        string $remoteFile,
+        int $mode,
+        int $resumePos
+    ): int {
+        self::ensureLive($connection, 'ftp_nb_get');
+        $hostConn = self::requireHostConn($connection, 'ftp_nb_get');
+        if (!\function_exists('ftp_nb_get')) {
+            throw new \LogicException('ftp_nb_get() requires host ext/ftp (issue #6675)');
+        }
+
+        return (int) @\ftp_nb_get($hostConn, $localFile, $remoteFile, $mode, $resumePos);
+    }
+
+    public static function nbPut(
+        ObjectEntry $connection,
+        string $remoteFile,
+        string $localFile,
+        int $mode,
+        int $startPos
+    ): int {
+        self::ensureLive($connection, 'ftp_nb_put');
+        $hostConn = self::requireHostConn($connection, 'ftp_nb_put');
+        if (!\function_exists('ftp_nb_put')) {
+            throw new \LogicException('ftp_nb_put() requires host ext/ftp (issue #6675)');
+        }
+
+        return (int) @\ftp_nb_put($hostConn, $remoteFile, $localFile, $mode, $startPos);
+    }
+
     public static function fput(
         ObjectEntry $connection,
         string $remoteFile,

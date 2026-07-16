@@ -17,6 +17,9 @@ final class FtpConstants
     public const FTP_TIMEOUT_SEC = 0;
     public const FTP_AUTOSEEK = 1;
     public const FTP_USEPASVADDRESS = 2;
+    public const FTP_FAILED = 0;
+    public const FTP_FINISHED = 1;
+    public const FTP_MOREDATA = 2;
 
     /**
      * @return array<string, int>
@@ -32,6 +35,9 @@ final class FtpConstants
             'FTP_TIMEOUT_SEC' => self::FTP_TIMEOUT_SEC,
             'FTP_AUTOSEEK' => self::FTP_AUTOSEEK,
             'FTP_USEPASVADDRESS' => self::FTP_USEPASVADDRESS,
+            'FTP_FAILED' => self::FTP_FAILED,
+            'FTP_FINISHED' => self::FTP_FINISHED,
+            'FTP_MOREDATA' => self::FTP_MOREDATA,
         ];
     }
 }

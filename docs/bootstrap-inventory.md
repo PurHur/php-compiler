@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5077 |
-| Phase A inventory files (M2 ratio SSOT) | 5077 |
+| PHP files on vm.php path | 5081 |
+| Phase A inventory files (M2 ratio SSOT) | 5081 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13766 |
+| Source constructs flagged (warnings) | 13778 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -396,7 +396,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/BuiltinClasses.php` | 0 | 1 |
 | `ext/ftp/FtpConstants.php` | 0 | 1 |
 | `ext/ftp/FtpExtensionPolicy.php` | 0 | 1 |
-| `ext/ftp/Module.php` | 0 | 9 |
+| `ext/ftp/Module.php` | 0 | 13 |
 | `ext/ftp/VmFtpArg.php` | 0 | 1 |
 | `ext/ftp/VmFtpConnection.php` | 0 | 2 |
 | `ext/ftp/VmFtpCore.php` | 0 | 7 |
@@ -406,6 +406,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/ftp_fput.php` | 0 | 2 |
 | `ext/ftp/ftp_login.php` | 0 | 2 |
 | `ext/ftp/ftp_mlsd.php` | 0 | 2 |
+| `ext/ftp/ftp_nb_continue.php` | 0 | 2 |
+| `ext/ftp/ftp_nb_fget.php` | 0 | 2 |
+| `ext/ftp/ftp_nb_get.php` | 0 | 2 |
+| `ext/ftp/ftp_nb_put.php` | 0 | 2 |
 | `ext/ftp/ftp_ssl_connect.php` | 0 | 2 |
 | `ext/ftp/ftp_systype.php` | 0 | 2 |
 | `ext/gd/BuiltinClasses.php` | 0 | 2 |
@@ -7621,6 +7625,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ftp_fput (line 62)
 - new ftp_mlsd (line 63)
 - new ftp_systype (line 64)
+- new ftp_nb_continue (line 65)
+- new ftp_nb_fget (line 66)
+- new ftp_nb_get (line 67)
+- new ftp_nb_put (line 68)
 - 4 class method(s)
 
 ### `ext/ftp/VmFtpArg.php`
@@ -7643,7 +7651,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 204)
 - new HashTable (line 205)
 - new Variable (line 207)
-- 24 class method(s)
+- 28 class method(s)
 
 ### `ext/ftp/ftp_close.php`
 
@@ -7679,6 +7687,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/ftp/ftp_nb_continue.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/ftp/ftp_nb_fget.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+
+### `ext/ftp/ftp_nb_get.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+
+### `ext/ftp/ftp_nb_put.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/ftp/ftp_ssl_connect.php`
@@ -9748,7 +9780,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_cipher_iv_length.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 35)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_cipher_key_length.php`
