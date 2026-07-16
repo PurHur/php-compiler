@@ -35,7 +35,6 @@ final class NestedJitCompileScopeLintTest extends TestCase
             'lib/JIT/Builtin/Highlight.php',
             'lib/JIT/Builtin/Hebrev.php',
             'lib/JIT/Builtin/ObGzhandlerJitRuntime.php',
-            'lib/JIT/Builtin/UploadTempJit.php',
         ];
     }
 
