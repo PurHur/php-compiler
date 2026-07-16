@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
@@ -80,6 +81,7 @@ final class CachingIteratorBuiltin
             'getflags' => CachingIteratorGetFlags::class,
             'setflags' => CachingIteratorSetFlags::class,
             'count' => CachingIteratorCount::class,
+            'getcache' => CachingIteratorGetCache::class,
             '__tostring' => CachingIteratorToString::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
@@ -89,6 +91,7 @@ final class CachingIteratorBuiltin
         $entry->methodNames['getinneriterator'] = 'getInnerIterator';
         $entry->methodNames['getflags'] = 'getFlags';
         $entry->methodNames['setflags'] = 'setFlags';
+        $entry->methodNames['getcache'] = 'getCache';
         $entry->methodNames['__tostring'] = '__toString';
 
         $entry->isInternal = true;
@@ -97,7 +100,13 @@ final class CachingIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['rewind'], $entry->methods['valid'], $entry->methods['hasnext'], $entry->methods['__construct'])
+        return isset(
+            $entry->methods['rewind'],
+            $entry->methods['valid'],
+            $entry->methods['hasnext'],
+            $entry->methods['getcache'],
+            $entry->methods['__construct']
+        )
             && $entry->constructor instanceof CachingIteratorConstruct;
     }
 }
@@ -112,7 +121,8 @@ final class SplCachingIteratorStorage
      *     index: int,
      *     cached: ?Variable,
      *     cachedKey: ?Variable,
-     *     fullCache: list<true>
+     *     fullCache: HashTable,
+     *     innerPinKey: string
      * }>
      */
     private static array $store = [];
@@ -132,7 +142,8 @@ final class SplCachingIteratorStorage
             'index' => -1,
             'cached' => null,
             'cachedKey' => null,
-            'fullCache' => [],
+            // php-src intern->u.caching.zcache — keyed by iterator key (#19469).
+            'fullCache' => new HashTable(),
             'innerPinKey' => $pinKey,
         ];
     }
@@ -159,7 +170,7 @@ final class SplCachingIteratorStorage
         $state['index'] = -1;
         $state['cached'] = null;
         $state['cachedKey'] = null;
-        $state['fullCache'] = [];
+        $state['fullCache'] = new HashTable();
         self::next($frame, $object);
     }
 
@@ -246,14 +257,17 @@ final class SplCachingIteratorStorage
 
     public static function count(ObjectEntry $object): int
     {
-        $state = self::state($object);
-        if (0 === ($state['flags'] & CachingIteratorBuiltin::FULL_CACHE)) {
-            throw new \BadMethodCallException(
-                'CachingIterator does not use a full cache (see CachingIterator::__construct)'
-            );
-        }
+        return self::requireFullCache($object)->getNumElements();
+    }
 
-        return \count($state['fullCache']);
+    /**
+     * php-src CachingIterator::getCache — return intern->u.caching.zcache (#19469).
+     *
+     * @throws \BadMethodCallException when FULL_CACHE is not set
+     */
+    public static function getCache(ObjectEntry $object): HashTable
+    {
+        return self::requireFullCache($object);
     }
 
     public static function toString(ObjectEntry $object): string
@@ -282,8 +296,67 @@ final class SplCachingIteratorStorage
         $state['cached'] = $current->resolveIndirect();
         $state['cachedKey'] = $key->resolveIndirect();
         if (0 !== ($state['flags'] & CachingIteratorBuiltin::FULL_CACHE)) {
-            $state['fullCache'][] = true;
+            // php-src spl_caching_it_next: array_set_zval_key(zcache, key, data)
+            self::storeFullCacheEntry($state['fullCache'], $state['cachedKey'], $state['cached']);
         }
+    }
+
+    /** Mirror php-src array_set_zval_key for FULL_CACHE accumulation. */
+    private static function storeFullCacheEntry(HashTable $cache, Variable $key, Variable $value): void
+    {
+        $resolvedKey = $key->resolveIndirect();
+        $resolvedValue = $value->resolveIndirect();
+        $stored = new Variable($resolvedValue->type);
+        $stored->copyFrom($resolvedValue);
+        if (Variable::TYPE_INTEGER === $resolvedKey->type) {
+            $idx = $resolvedKey->toInt();
+            if (null !== $cache->findIndex($idx)) {
+                $cache->updateIndex($idx, $stored);
+            } else {
+                $cache->addIndex($idx, $stored);
+            }
+
+            return;
+        }
+        if (Variable::TYPE_NULL === $resolvedKey->type) {
+            $strKey = '';
+        } elseif (Variable::TYPE_FLOAT === $resolvedKey->type) {
+            $idx = (int) $resolvedKey->toFloat();
+            if (null !== $cache->findIndex($idx)) {
+                $cache->updateIndex($idx, $stored);
+            } else {
+                $cache->addIndex($idx, $stored);
+            }
+
+            return;
+        } elseif (Variable::TYPE_STRING === $resolvedKey->type) {
+            $strKey = $resolvedKey->toString();
+        } elseif (Variable::TYPE_BOOLEAN === $resolvedKey->type) {
+            $strKey = $resolvedKey->toBool() ? '1' : '';
+        } else {
+            // Objects/arrays as keys: Zend array_set_zval_key converts / warns;
+            // numeric list append keeps iteration progressing for scalar workloads.
+            $cache->append($stored);
+
+            return;
+        }
+        if (null !== $cache->find($strKey)) {
+            $cache->update($strKey, $stored);
+        } else {
+            $cache->add($strKey, $stored);
+        }
+    }
+
+    private static function requireFullCache(ObjectEntry $object): HashTable
+    {
+        $state = self::state($object);
+        if (0 === ($state['flags'] & CachingIteratorBuiltin::FULL_CACHE)) {
+            throw new \BadMethodCallException(
+                'CachingIterator does not use a full cache (see CachingIterator::__construct)'
+            );
+        }
+
+        return $state['fullCache'];
     }
 
     private static function syncInnerPosition(Frame $frame, ObjectEntry $inner, int $wrapperIndex): void
@@ -294,7 +367,7 @@ final class SplCachingIteratorStorage
         }
     }
 
-    /** @return array{inner: ObjectEntry, flags: int, index: int, cached: ?Variable, cachedKey: ?Variable, fullCache: list<true>} */
+    /** @return array{inner: ObjectEntry, flags: int, index: int, cached: ?Variable, cachedKey: ?Variable, fullCache: HashTable, innerPinKey: string} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
@@ -597,6 +670,27 @@ final class CachingIteratorCount extends VmClassMethod
             return;
         }
         $frame->returnVar->int(SplCachingIteratorStorage::count($object));
+    }
+}
+
+final class CachingIteratorGetCache extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getCache');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            CachingIteratorBuiltin::CLASS_LC,
+            'CachingIterator::getCache()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(SplCachingIteratorStorage::getCache($object));
     }
 }
 
