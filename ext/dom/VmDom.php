@@ -8044,7 +8044,7 @@ final class VmDom
         return $ok;
     }
 
-    /** DOMDocument::schemaValidateSource() — in-memory XSD validation stub (php-src ext/dom/document.c; #18748). */
+    /** DOMDocument::schemaValidateSource() — in-memory XSD via libxml2 FFI (php-src ext/dom/document.c; #18748, #19419). */
     public static function schemaValidateSource(
         Context $ctx,
         ObjectEntry $document,
@@ -8061,20 +8061,25 @@ final class VmDom
 
             return false;
         }
+        if (!VmDomValidationNative::available()) {
+            self::triggerDomWarning($frame, 'DOMDocument::schemaValidateSource(): not implemented in this compiler build');
 
-        $rootName = DomRegistry::state($document)->documentElementName ?? 'root';
-        if ('' === $rootName) {
-            $rootName = 'root';
+            return false;
         }
-        self::triggerDomWarning(
-            $frame,
-            'DOMDocument::schemaValidateSource(): '.sprintf(
-                "Element '%s': No matching global declaration available for the validation root.",
-                $rootName
-            )
-        );
 
-        return false;
+        $docXml = self::saveXML($document);
+        $ok = VmDomValidationNative::validateSchemaDocumentSource($docXml, $source);
+        if (!$ok) {
+            $errors = VmDomValidationNative::consumeLastErrors();
+            foreach ($errors as $error) {
+                self::triggerDomWarning($frame, 'DOMDocument::schemaValidateSource(): '.$error);
+            }
+            if ([] === $errors) {
+                self::triggerDomWarning($frame, 'DOMDocument::schemaValidateSource(): Invalid Schema');
+            }
+        }
+
+        return $ok;
     }
 
     /** DOMDocument::relaxNGValidateSource() — in-memory RelaxNG validation stub (php-src ext/dom/document.c; #18748). */
