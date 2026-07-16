@@ -199,6 +199,7 @@ final class Superglobals
     {
         $cookie = $context->ensureSuperglobal('_COOKIE');
         self::populateCookieHeader($cookie->toArray(), $cookieHeader);
+        $context->captureFilterInputSnapshot('_COOKIE', $cookie->toArray());
     }
 
     /**
@@ -387,6 +388,7 @@ final class Superglobals
     {
         $get = $context->ensureSuperglobal('_GET');
         self::populateFormEncoded($get->toArray(), $queryString);
+        $context->captureFilterInputSnapshot('_GET', $get->toArray());
     }
 
     /** JIT/AOT standalone refresh — $_GET table (#9907). */
@@ -595,6 +597,7 @@ final class Superglobals
         $post = $context->ensureSuperglobal('_POST');
         $files = $context->ensureSuperglobal('_FILES');
         self::populatePostIntoTables($post->toArray(), $files->toArray(), $postBody);
+        $context->captureFilterInputSnapshot('_POST', $post->toArray());
     }
 
     /** JIT/AOT standalone refresh — $_POST table (#9907). */

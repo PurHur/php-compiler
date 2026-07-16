@@ -1519,24 +1519,23 @@ final class VmFilter
             || '.' === $ch || '-' === $ch;
     }
 
-    /** filter_has_var() — key present in INPUT_* superglobal (php-src ext/filter/filter.c; #3294). */
+    /** filter_has_var() — key present in request-input snapshot (php-src IF_G; #3294, #19640). */
     public static function hasInputVar(Context $ctx, int $type, string $key): bool
     {
-        $sgName = self::inputSuperglobalName($type);
-        $sg = $ctx->getSuperglobal($sgName);
-        if (null === $sg || Variable::TYPE_ARRAY !== $sg->type) {
+        $ht = self::requestInputTable($ctx, $type);
+        if (null === $ht) {
             return false;
         }
         $keyVar = new Variable();
         $keyVar->string($key);
 
-        return $sg->toArray()->offsetIsSet($keyVar);
+        return $ht->offsetIsSet($keyVar);
     }
 
     /**
-     * filter_input_array() — batch filter from superglobal (#3294).
+     * filter_input_array() — batch filter from request-input snapshot (#3294, #19640).
      *
-     * @return HashTable|null null when the input superglobal is missing or not an array
+     * @return HashTable|null null when the input snapshot is missing
      */
     public static function filterInputArray(
         Context $ctx,
@@ -1545,13 +1544,42 @@ final class VmFilter
         int $addEmpty,
         Frame $frame
     ): ?HashTable {
-        $sgName = self::inputSuperglobalName($type);
-        $sg = $ctx->getSuperglobal($sgName);
-        if (null === $sg || Variable::TYPE_ARRAY !== $sg->type) {
+        $ht = self::requestInputTable($ctx, $type);
+        if (null === $ht) {
             return null;
         }
 
-        return self::filterVarArray($sg->toArray(), $definition, $addEmpty, $frame);
+        return self::filterVarArray($ht, $definition, $addEmpty, $frame);
+    }
+
+    /**
+     * Original request INPUT_* table (not live $_GET/$_POST) (#19640).
+     */
+    public static function requestInputTable(Context $ctx, int $type): ?HashTable
+    {
+        return $ctx->getFilterInputSnapshot(self::inputSuperglobalName($type));
+    }
+
+    /**
+     * filter_input() value lookup from request-input snapshot (#19640).
+     */
+    public static function requestInputValue(Context $ctx, int $type, string $key): ?Variable
+    {
+        $ht = self::requestInputTable($ctx, $type);
+        if (null === $ht) {
+            return null;
+        }
+        $keyVar = new Variable();
+        $keyVar->string($key);
+        if (!$ht->offsetIsSet($keyVar)) {
+            return null;
+        }
+        $stored = $ht->find($key);
+        if (null === $stored) {
+            return null;
+        }
+
+        return $stored->resolveIndirect();
     }
 
     /**

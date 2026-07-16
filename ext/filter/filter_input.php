@@ -56,28 +56,12 @@ final class filter_input extends Internal
         if (null === $ctx) {
             throw new \LogicException('filter_input() requires VM context in this compiler build');
         }
-        $sgName = VmFilter::inputSuperglobalName($typeInt);
-        $sg = $ctx->getSuperglobal($sgName);
-        if (null === $sg || Variable::TYPE_ARRAY !== $sg->type) {
+        $value = VmFilter::requestInputValue($ctx, $typeInt, $keyStr);
+        if (null === $value) {
             $frame->returnVar->null();
 
             return;
         }
-        $keyVar = new Variable();
-        $keyVar->string($keyStr);
-        $ht = $sg->toArray();
-        if (!$ht->offsetIsSet($keyVar)) {
-            $frame->returnVar->null();
-
-            return;
-        }
-        $stored = $ht->find($keyStr);
-        if (null === $stored) {
-            $frame->returnVar->null();
-
-            return;
-        }
-        $value = $stored->resolveIndirect();
         if (!VmFilter::isSupportedFilter($filterId)) {
             filter_var::triggerUnknownFilterWarning($frame, $filterId);
         }
