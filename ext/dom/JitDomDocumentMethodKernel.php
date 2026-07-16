@@ -20,6 +20,7 @@ use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
 use PHPCompiler\JIT\Builtin\DomLoadRuntime;
 use PHPCompiler\JIT\Builtin\DomLoadXMLRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeChildPropertyRuntime;
+use PHPCompiler\JIT\Builtin\DomNodeIsConnectedRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeListItemRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
@@ -444,6 +445,21 @@ final class JitDomDocumentMethodKernel
             $context->getTypeFromString('__string__*'),
             'PHPCompiler\\ext\\dom\\DomElementTextContentJitHelper::textContentArgv',
             '/ext/dom/DomElementTextContentJitHelper.php'
+        );
+    }
+
+    public static function ensureIsConnectedBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeIsConnectedRuntime::ABI_NAME,
+            'dom_node_is_connected_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('int64'),
+            'PHPCompiler\\ext\\dom\\DomIsConnectedJitHelper::isConnectedArgv',
+            '/ext/dom/DomIsConnectedJitHelper.php'
         );
     }
 

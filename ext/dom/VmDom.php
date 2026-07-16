@@ -137,6 +137,9 @@ final class VmDom
 
     public const PROP_PARENT_NODE = 'parentNode';
 
+    /** PHP 8.3+ DOMNode::$isConnected (ext/dom/node.c; #19653). */
+    public const PROP_IS_CONNECTED = 'isConnected';
+
     public const PROP_PARENT_ELEMENT = 'parentElement';
 
     /** ParentNode first element child (php-src ext/dom/parentnode.c; #19431). */
@@ -211,6 +214,9 @@ final class VmDom
         $node->properties[] = new ClassProperty(self::PROP_PREVIOUS_SIBLING, $nullProto, $objProto);
         $node->properties[] = new ClassProperty(self::PROP_NEXT_SIBLING, $nullProto, $objProto);
         $node->properties[] = new ClassProperty(self::PROP_PARENT_NODE, $nullProto, $objProto);
+        if (CompilerVersion::supportsDomNodeIsConnected()) {
+            $node->properties[] = new ClassProperty(self::PROP_IS_CONNECTED, null, $boolProto);
+        }
         if (CompilerVersion::supportsDomParentElement()) {
             $node->properties[] = new ClassProperty(self::PROP_PARENT_ELEMENT, $nullProto, $objProto);
         }
@@ -2763,7 +2769,7 @@ final class VmDom
     }
 
     /** True when $node has the document as an ancestor (live tree, not orphan/fragment-only). */
-    private static function isConnectedToDocument(ObjectEntry $node): bool
+    public static function isConnected(ObjectEntry $node): bool
     {
         if (!DomRegistry::has($node)) {
             return false;
@@ -2793,7 +2799,7 @@ final class VmDom
      */
     private static function registerSubtreeElementIdsIfConnected(ObjectEntry $node): void
     {
-        if (!self::isConnectedToDocument($node)) {
+        if (!self::isConnected($node)) {
             return;
         }
         $document = self::ownerDocumentEntry($node);
@@ -2809,7 +2815,7 @@ final class VmDom
      */
     private static function unregisterSubtreeElementIdsIfConnected(ObjectEntry $node): void
     {
-        if (!self::isConnectedToDocument($node)) {
+        if (!self::isConnected($node)) {
             return;
         }
         $document = self::ownerDocumentEntry($node);

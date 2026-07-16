@@ -2547,6 +2547,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ DOMNode::$isConnected (ext/dom/node.c, php-src#11677, #19653).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 property gate).
+     * Enable via stable 8.3.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     */
+    public static function supportsDomNodeIsConnected(): bool
+    {
+        return self::supportsDomApiSince('8.3.0');
+    }
+
+    /**
      * PHP 8.4+ Dom\ living-standard namespace (Dom\HTMLDocument, Dom\XMLDocument, …; ext/dom/html_document.c).
      */
     public static function supportsDomLivingStandardNamespace(): bool

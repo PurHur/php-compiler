@@ -943,6 +943,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'get_root_node_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDomNodeIsConnected()
+                && str_contains($name, 'dom_node_is_connected')
+                && !str_contains($name, 'is_connected_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDomNodeIsConnected()
+                && str_contains($name, 'is_connected_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsDomNodeIsEqualNode()
                 && str_contains($name, 'dom_node_is_equal_node')
                 && !str_contains($name, 'is_equal_node_phantom')) {
