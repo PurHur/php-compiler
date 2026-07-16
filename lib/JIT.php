@@ -534,7 +534,7 @@ class JIT {
         return $literalArmCount > 0;
     }
 
-    /** True when a call/method result may pollute the ?: echo slot before the JUMPIF (#18784). */
+    /** True when a call/method result may pollute the ?: echo slot before the JUMPIF (#18784, #19459). */
     private function ternaryEchoMergeFollowsObjectProducerCall(Block $jumpIfBlock, int $jumpIfIndex): bool
     {
         for ($i = 0; $i < $jumpIfIndex; ++$i) {
@@ -9130,7 +9130,18 @@ class JIT {
                         if (null !== $ternaryMergeEcho) {
                             $this->context->coalesceAssignTargets[$ternaryMergeEcho] = true;
                             $needsStackPhi = $this->ternaryEchoMergeNeedsStackPhi($mergeBlock, $op->block1, $op->block2);
-                            $this->ensureCoalesceMergeStackSlot($ternaryMergeEcho);
+                            // Literal-arm condition redirect must not allocate a __value__ phi
+                            // slot — that pollutes merge ECHO for runtime-bridge i1 conditions (#19459, #18784).
+                            $needsLiteralRedirect = $this->ternaryEchoMergeNeedsLiteralArmRedirect(
+                                $block,
+                                $i,
+                                $mergeBlock,
+                                $op->block1,
+                                $op->block2
+                            );
+                            if (!$needsLiteralRedirect) {
+                                $this->ensureCoalesceMergeStackSlot($ternaryMergeEcho);
+                            }
                             $echoSlot = $this->mergeEchoSlot($mergeBlock);
                             if (null !== $echoSlot && $needsStackPhi) {
                                 $this->context->coalesceMergeSlotOperands[$echoSlot] = $ternaryMergeEcho;
@@ -11451,6 +11462,10 @@ class JIT {
      * Bool-return instance methods (e.g. DOMDocument::loadHTML) branch to fresh
      * continuations; boxed __value__* results from the next call can be unreachable
      * for assignOperandValue unless copied on-stack in the current block.
+     *
+     * Runtime-bridge bool builtins (stream_supports_lock, file_exists) return i1 after
+     * NestedJitCompileScope helper linking; pin those too so ?: echo / JUMPIF still see
+     * a dominated value (#19459).
      */
     private function materializeCallResultReachable(PHPLLVM\Value $llvmResult): PHPLLVM\Value
     {
@@ -11461,6 +11476,16 @@ class JIT {
             $this->context->builder->store($llvmResult, $objSlot);
 
             return $this->context->builder->load($objSlot);
+        }
+        if ('int1' === $ty || 'bool' === $ty) {
+            JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'call_result_i1_reach_cont');
+            $i1Slot = JIT\BasicBlockHelper::entryAlloca(
+                $this->context,
+                $this->context->getTypeFromString('int1')
+            );
+            $this->context->builder->store($llvmResult, $i1Slot);
+
+            return $this->context->builder->load($i1Slot);
         }
         if ('__value__*' !== $ty) {
             return $llvmResult;
@@ -11498,6 +11523,29 @@ class JIT {
             $llvmResult = $this->materializeCallResultReachable($llvmResult);
             JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'call_assign_cont');
             $llvmTy = $this->context->getStringFromType($llvmResult->typeOf());
+            if ('int1' === $llvmTy || 'bool' === $llvmTy) {
+                // Keep runtime-bridge i1 results in an entry alloca (KIND_VARIABLE) so
+                // JUMPIF / ?: literal-echo redirect can reload after CFG splits (#19459).
+                if ($this->context->hasVariableOp($result)) {
+                    $this->context->getVariableFromOp($result)->free();
+                }
+                $i1Slot = JIT\BasicBlockHelper::entryAlloca(
+                    $this->context,
+                    $this->context->getTypeFromString('int1')
+                );
+                $this->context->builder->store($llvmResult, $i1Slot);
+                $this->context->setVariableOp(
+                    $result,
+                    new Variable(
+                        $this->context,
+                        Variable::TYPE_NATIVE_BOOL,
+                        Variable::KIND_VARIABLE,
+                        $i1Slot
+                    )
+                );
+
+                return;
+            }
             if (
                 $this->context->hasVariableOp($result)
                 && ('__value__*' === $llvmTy || '__value__' === $llvmTy)
