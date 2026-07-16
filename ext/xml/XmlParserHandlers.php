@@ -32,6 +32,8 @@ final class XmlParserHandlers
             'line' => 0,
             'column' => 0,
             'byteIndex' => 0,
+            'nsAware' => false,
+            'nsSeparator' => ':',
             'options' => [
                 XmlConstants::XML_OPTION_CASE_FOLDING => 1,
                 XmlConstants::XML_OPTION_TARGET_ENCODING => 'UTF-8',
@@ -54,13 +56,16 @@ final class XmlParserHandlers
         ];
     }
 
-    public static function setHandler(ObjectEntry $parser, string $slot, ?string $handler): bool
+    public static function setHandler(ObjectEntry $parser, string $slot, ?Variable $handler): bool
     {
         $state = VmXml::parserState($parser->id);
         if (null === $state) {
             return false;
         }
-        $state['handlers'][$slot] = ('' === $handler) ? null : $handler;
+        if (null !== $handler && Variable::TYPE_STRING === $handler->type && '' === $handler->toString()) {
+            $handler = null;
+        }
+        $state['handlers'][$slot] = $handler;
         VmXml::replaceParserState($parser->id, $state);
 
         return true;
@@ -128,16 +133,45 @@ final class XmlParserHandlers
         return VmXml::parserState($parser->id);
     }
 
-    public static function handlerCallback(ObjectEntry $parser, ?string $handlerName): ?Variable
+    /**
+     * Resolve a stored SAX handler to a call_user_func-compatible Variable.
+     *
+     * Accepts string function names (legacy), Closure / invokable objects, and
+     * callable arrays (#19683, #19343; php-src ext/xml/xml.c).
+     */
+    public static function handlerCallback(ObjectEntry $parser, mixed $handler): ?Variable
     {
-        if (null === $handlerName || '' === $handlerName) {
+        if (null === $handler) {
             return null;
         }
+        if ($handler instanceof Variable) {
+            $handler = $handler->resolveIndirect();
+            if (Variable::TYPE_NULL === $handler->type) {
+                return null;
+            }
+            if (Variable::TYPE_STRING === $handler->type) {
+                $handlerName = $handler->toString();
+                if ('' === $handlerName) {
+                    return null;
+                }
+
+                return self::stringHandlerCallback($parser, $handlerName);
+            }
+
+            // Closure / invokable object / callable array — pass through.
+            return $handler;
+        }
+        if (!\is_string($handler) || '' === $handler) {
+            return null;
+        }
+
+        return self::stringHandlerCallback($parser, $handler);
+    }
+
+    private static function stringHandlerCallback(ObjectEntry $parser, string $handlerName): Variable
+    {
         $state = VmXml::parserState($parser->id);
-        if (null === $state) {
-            return null;
-        }
-        $object = $state['handlerObject'] ?? null;
+        $object = null !== $state ? ($state['handlerObject'] ?? null) : null;
         if ($object instanceof ObjectEntry) {
             $ht = new HashTable();
             $ht->append(self::objectVar($object));

@@ -29,9 +29,12 @@ final class VmXml
     /** @var array<int, array<string, mixed>> */
     private static array $parsers = [];
 
-    public static function initParserState(int $parserId): void
+    public static function initParserState(int $parserId, bool $nsAware = false, string $nsSeparator = ':'): void
     {
-        self::$parsers[$parserId] = XmlParserHandlers::defaultParserState();
+        $state = XmlParserHandlers::defaultParserState();
+        $state['nsAware'] = $nsAware;
+        $state['nsSeparator'] = $nsSeparator;
+        self::$parsers[$parserId] = $state;
     }
 
     /** @return null|array<string, mixed> */

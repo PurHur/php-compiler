@@ -19,20 +19,39 @@ final class XmlModuleSkeletonTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['xml_parser_create', 'xml_parse'] as $fn) {
+        foreach (['xml_parser_create', 'xml_parser_create_ns', 'xml_parse'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
         $code = <<<'PHP'
 <?php
 echo (int) function_exists('xml_parser_create');
+echo (int) function_exists('xml_parser_create_ns');
 echo (int) function_exists('xml_parse');
 echo (int) extension_loaded('xml');
 PHP;
         $block = $runtime->parseAndCompile($code, 'xml_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111', ob_get_clean());
+        self::assertSame('1111', ob_get_clean());
+    }
+
+    public function test_xml_parser_create_ns_expands_namespaced_elements(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+function ns_start($parser, $name, $attrs) { echo "S:$name\n"; }
+function ns_end($parser, $name) { echo "E:$name\n"; }
+$p = xml_parser_create_ns();
+xml_parser_set_option($p, XML_OPTION_CASE_FOLDING, 0);
+xml_set_element_handler($p, 'ns_start', 'ns_end');
+xml_parse($p, '<r xmlns:a="urn:a"><a:x/></r>', true);
+PHP;
+        $block = $runtime->parseAndCompile($code, 'xml_parser_create_ns.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("S:r\nS:urn:a:x\nE:urn:a:x\nE:r\n", ob_get_clean());
     }
 
     public function test_xml_parser_create_returns_xmlparser_object(): void

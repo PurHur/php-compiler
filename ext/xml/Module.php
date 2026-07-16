@@ -10,7 +10,7 @@ use PHPCompiler\Runtime;
 /**
  * xml extension module entry (php-src ext/xml/xml.c; issue #7406).
  *
- * SAX/expat parity tracked in #3494; v1 skeleton enables function_exists() and inventory.
+ * SAX/expat parity tracked in #3494; namespace parsers via xml_parser_create_ns (#19683).
  */
 class Module extends ModuleAbstract
 {
@@ -33,6 +33,7 @@ class Module extends ModuleAbstract
     {
         return [
             new xml_parser_create(),
+            new xml_parser_create_ns(),
             new xml_parse(),
             new xml_parser_free(),
             new xml_get_error_code(),
