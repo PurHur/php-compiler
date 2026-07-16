@@ -33,7 +33,8 @@ final class JitDefine
         JITVariable $valueArg
     ): Value {
         DefineRuntime::ensureLinked($context);
-        $nameStr = JitStringBuiltinArg::lower($context, $nameArg, 'define', 0, 'constant_name');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19652, ext/standard/basic_functions.c).
+        $nameStr = JitStringBuiltinArg::lowerZparamStr($context, $nameArg, 'define', 0, 'constant_name');
 
         return DefineRuntime::emitDefine($context, $nameStr, $valueArg);
     }

@@ -30,7 +30,7 @@ final class defined_ extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('defined() requires VM context');
         }
-        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'defined', 0, 'constant_name');
+        $name = self::vmConstantNameArg($frame);
         $name = VmReflection::normalizeGlobalIntrospectionName($name);
         $defined = VmConstants::constantDefined($frame->vmContext, $name);
         if (null !== $frame->returnVar) {
@@ -43,9 +43,8 @@ final class defined_ extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('defined() requires exactly one argument');
         }
-        if (JITVariable::TYPE_VALUE === $args[0]->type || JITVariable::TYPE_OBJECT === $args[0]->type) {
-            JitStringBuiltinArg::lower($context, $args[0], 'defined', 0, 'constant_name');
-        }
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19652, ext/standard/basic_functions.c).
+        $nameStr = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'defined', 0, 'constant_name');
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
             $literal = VmReflection::normalizeGlobalIntrospectionName($literal);
@@ -59,9 +58,19 @@ final class defined_ extends Internal
 
             return DefineRuntime::emitDefined($context, $nameStr);
         }
-        $nameStr = $context->helper->loadValue($args[0]);
         $nameStr = GlobalIntrospectionNameRuntime::normalizeString($context, $nameStr);
 
         return DefineRuntime::emitDefined($context, $nameStr);
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19652, ext/standard/basic_functions.c). */
+    private static function vmConstantNameArg(Frame $frame): string
+    {
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'defined',
+            0,
+            'constant_name'
+        );
     }
 }
