@@ -13,21 +13,22 @@ use PHPLLVM\Value;
 /** LLVM JIT/AOT helper for quoted_printable_decode() — VmString parity, no phpc_quot_print.c (#5225). */
 final class JitQuotedPrintableDecode
 {
-    public static function decode(Context $context, Value $str, ?JITVariable $subjectArg = null): Value
+    /**
+     * @param callable(Context): Value $lower Z_PARAM_STR lowering after ensureLinked (#19283)
+     */
+    public static function decode(Context $context, JITVariable $subjectArg, callable $lower): Value
     {
-        if (null !== $subjectArg) {
-            $literal = JitStringArg::compileTimeLiteral($subjectArg);
-            if (null !== $literal) {
-                return $context->builder->load(
-                    $context->constantStringFromString(VmString::quoted_printable_decode($literal))
-                );
-            }
+        $literal = JitStringArg::compileTimeLiteral($subjectArg);
+        if (null !== $literal) {
+            return $context->builder->load(
+                $context->constantStringFromString(VmString::quoted_printable_decode($literal))
+            );
         }
         StringQuotPrint::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_quoted_printable_decode'),
-            $str
+            $lower($context)
         );
     }
 }

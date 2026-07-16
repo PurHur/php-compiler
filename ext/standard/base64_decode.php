@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -28,7 +29,7 @@ final class base64_decode extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('base64_decode() requires one or two arguments in this compiler build');
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'base64_decode', 0, 'string');
+        $data = self::vmStringArg($frame);
         $strict = false;
         if (2 === $argc) {
             $strictVar = $frame->calledArgs[1]->resolveIndirect();
@@ -84,7 +85,43 @@ final class base64_decode extends Internal
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_base64_decode'),
-            JitStringBuiltinArg::lower($context, $args[0], 'base64_decode', 0, 'string')
+            self::jitStringArg($context, $args[0])
+        );
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19283, ext/standard/base64.c). */
+    private static function vmStringArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, 0, 'base64_decode', 'string')->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'base64_decode',
+            0,
+            'string'
+        );
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'base64_decode',
+                0,
+                'string'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'base64_decode',
+            0,
+            'string'
         );
     }
 }

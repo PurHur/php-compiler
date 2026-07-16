@@ -15,7 +15,6 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -41,7 +40,7 @@ final class hex2bin extends Internal
                 \sprintf('hex2bin() expects exactly 1 argument, %d given', $argc)
             );
         }
-        $data = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'hex2bin', 'string');
+        $data = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'hex2bin', 0, 'string');
         $strict = false;
         if (2 === $argc) {
             $strictVar = $frame->calledArgs[1]->resolveIndirect();
@@ -130,11 +129,21 @@ final class hex2bin extends Internal
         $outPtr = JitValueBox::pointer($context, $slot);
         $context->builder->call(
             $context->lookupFunction('__compiler_hex2bin'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hex2bin', 0, 'string'),
+            self::jitStringArg($context, $args[0]),
             $strictI8,
             $outPtr
         );
 
         return $outPtr;
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19283, ext/standard/string.c). */
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'hex2bin', 0, 'string');
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'hex2bin', 0, 'string');
     }
 }
