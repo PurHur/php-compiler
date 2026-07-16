@@ -59,6 +59,16 @@ PHP;
         self::assertSame('false', ob_get_clean());
     }
 
+    public function test_xmlreader_open_instance_repro(): void
+    {
+        $runtime = new Runtime();
+        $code = (string) file_get_contents(__DIR__.'/../repro/maintainer_gap_xmlreader_open_instance.php');
+        $block = $runtime->parseAndCompile($code, 'xmlreader_open_instance_repro.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\nroot,a\n", ob_get_clean());
+    }
+
     public function test_xmlreader_xml_memory_repro(): void
     {
         $runtime = new Runtime();

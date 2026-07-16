@@ -76,14 +76,27 @@ final class VmXmlReader
 
     public static function open(Context $ctx, string $uri, ?Frame $frame = null): ?ObjectEntry
     {
-        $contents = VmFsReadNative::read($uri);
-        if (false === $contents) {
-            self::warn($ctx, 'XMLReader::open(): Unable to open source data', $frame);
-
+        $contents = self::readUriContents($ctx, $uri, $frame);
+        if (null === $contents) {
             return null;
         }
 
         return self::openFromString($ctx, $uri, $contents, $frame);
+    }
+
+    /**
+     * XMLReader::open() instance form — reset parser state on an existing reader (#19330).
+     */
+    public static function openOnto(Context $ctx, ObjectEntry $entry, string $uri, ?Frame $frame = null): bool
+    {
+        self::requireClass($entry, 'XMLReader::open()');
+        $contents = self::readUriContents($ctx, $uri, $frame);
+        if (null === $contents) {
+            return false;
+        }
+        self::bindParsedSource($ctx, $entry, $uri, $contents, $frame);
+
+        return true;
     }
 
     public static function openFromString(Context $ctx, string $uri, string $data, ?Frame $frame = null): ?ObjectEntry
@@ -97,6 +110,18 @@ final class VmXmlReader
         self::bindParsedSource($ctx, $entry, $uri, $data, $frame);
 
         return $entry;
+    }
+
+    private static function readUriContents(Context $ctx, string $uri, ?Frame $frame): ?string
+    {
+        $contents = VmFsReadNative::read($uri);
+        if (false === $contents) {
+            self::warn($ctx, 'XMLReader::open(): Unable to open source data', $frame);
+
+            return null;
+        }
+
+        return $contents;
     }
 
     /**
