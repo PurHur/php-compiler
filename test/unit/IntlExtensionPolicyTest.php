@@ -13,6 +13,7 @@ final class IntlExtensionPolicyTest extends TestCase
     public function testGraphemeBuiltinsWithheldUntilIntlLoaded(): void
     {
         self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
+        self::assertFalse(IntlExtensionPolicy::advertisesIdn());
         self::assertTrue(IntlExtensionPolicy::advertisesNormalizer());
         self::assertTrue(IntlExtensionPolicy::advertisesLocale());
         self::assertTrue(IntlExtensionPolicy::advertisesIntlDateFormatter());
@@ -21,6 +22,12 @@ final class IntlExtensionPolicyTest extends TestCase
         $runtime = new Runtime();
         self::assertFalse(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'grapheme_strlen')
+        );
+        self::assertFalse(
+            ext\standard\VmReflection::functionExists($runtime->vmContext, 'idn_to_ascii')
+        );
+        self::assertFalse(
+            ext\standard\VmReflection::functionExists($runtime->vmContext, 'idn_to_utf8')
         );
         self::assertTrue(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_default')

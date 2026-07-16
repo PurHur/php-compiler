@@ -136,6 +136,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['normalizer_normalize', 'normalizer_is_normalized'], true)) {
             return IntlExtensionPolicy::advertisesNormalizer();
         }
+        if (\in_array($lc, ['idn_to_ascii', 'idn_to_utf8'], true)) {
+            return IntlExtensionPolicy::advertisesIdn();
+        }
         if (\in_array($lc, [
             'locale_get_primary_language',
             'locale_get_region',
