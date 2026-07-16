@@ -1649,6 +1649,201 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_cms_sign() — CMS/S/MIME sign (php-src ext/openssl/openssl.c; #6592).
+     */
+    public static function cmsSign(
+        string $inputFilename,
+        string $outputFilename,
+        Variable $certArg,
+        Variable $keyArg,
+        ?Variable $headersVar,
+        int $flags,
+        int $encoding,
+        ?Frame $frame = null
+    ): bool {
+        if (!VmOpensslCmsNative::available()) {
+            self::userWarning('openssl_cms_sign(): OpenSSL CMS is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        if (OpensslConstants::OPENSSL_ENCODING_SMIME === $encoding
+            && 0 !== ($flags & OpensslConstants::OPENSSL_CMS_DETACHED)
+        ) {
+            self::userWarning('openssl_cms_sign(): Detached signatures not possible with S/MIME encoding', $frame);
+
+            return false;
+        }
+
+        $certPem = self::resolvePemMaterial(
+            self::coerceCertificatePem($certArg, 'openssl_cms_sign', 2, 'certificate'),
+            'openssl_cms_sign',
+            $frame
+        );
+        $keyPem = self::resolvePemMaterial(
+            self::coercePkeyPem($keyArg, 'openssl_cms_sign', 3, 'private_key'),
+            'openssl_cms_sign',
+            $frame
+        );
+        if (false === $certPem || false === $keyPem) {
+            return false;
+        }
+
+        $headers = self::coercePkcs7Headers($headersVar, 'openssl_cms_sign');
+        if (false === VmOpensslCmsNative::sign(
+            $inputFilename,
+            $outputFilename,
+            $certPem,
+            $keyPem,
+            $headers,
+            $flags,
+            $encoding
+        )) {
+            self::userWarning('openssl_cms_sign(): Error creating CMS structure!', $frame);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * openssl_cms_verify() — CMS/S/MIME verify (php-src ext/openssl/openssl.c; #6592).
+     */
+    public static function cmsVerify(
+        string $inputFilename,
+        int $flags,
+        ?string $signersCertificatesFilename,
+        ?string $contentOutputFilename,
+        int $encoding,
+        ?Frame $frame = null
+    ): bool {
+        if (!VmOpensslCmsNative::available()) {
+            self::userWarning('openssl_cms_verify(): OpenSSL CMS is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        return VmOpensslCmsNative::verify(
+            $inputFilename,
+            $flags,
+            $signersCertificatesFilename,
+            $contentOutputFilename,
+            $encoding
+        );
+    }
+
+    /**
+     * openssl_cms_encrypt() — CMS/S/MIME encrypt (php-src ext/openssl/openssl.c; #6592).
+     */
+    public static function cmsEncrypt(
+        string $inputFilename,
+        string $outputFilename,
+        Variable $certsArg,
+        ?Variable $headersVar,
+        int $flags,
+        int $encoding,
+        int $cipherId,
+        ?Frame $frame = null
+    ): bool {
+        if (!VmOpensslCmsNative::available()) {
+            self::userWarning('openssl_cms_encrypt(): OpenSSL CMS is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $certPems = self::coerceRecipientCertPems($certsArg, 'openssl_cms_encrypt', 2, 'certificate');
+        if ([] === $certPems) {
+            return false;
+        }
+        $resolved = [];
+        foreach ($certPems as $pem) {
+            $material = self::resolvePemMaterial($pem, 'openssl_cms_encrypt', $frame);
+            if (false === $material) {
+                return false;
+            }
+            $resolved[] = $material;
+        }
+
+        $headers = self::coercePkcs7Headers($headersVar, 'openssl_cms_encrypt');
+        if (false === VmOpensslCmsNative::encrypt(
+            $inputFilename,
+            $outputFilename,
+            $resolved,
+            $headers,
+            $flags,
+            $encoding,
+            $cipherId
+        )) {
+            self::userWarning('openssl_cms_encrypt(): Error encrypting message!', $frame);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * openssl_cms_decrypt() — CMS/S/MIME decrypt (php-src ext/openssl/openssl.c; #6592).
+     */
+    public static function cmsDecrypt(
+        string $inputFilename,
+        string $outputFilename,
+        Variable $certArg,
+        Variable $keyArg,
+        int $encoding,
+        ?Frame $frame = null
+    ): bool {
+        if (!VmOpensslCmsNative::available()) {
+            self::userWarning('openssl_cms_decrypt(): OpenSSL CMS is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        if ($encoding < OpensslConstants::OPENSSL_ENCODING_DER
+            || $encoding > OpensslConstants::OPENSSL_ENCODING_PEM
+        ) {
+            throw new \ValueError('openssl_cms_decrypt(): Argument #5 ($encoding) must be an OPENSSL_ENCODING_* constant');
+        }
+
+        $certPem = self::resolvePemMaterial(
+            self::coerceCertificatePem($certArg, 'openssl_cms_decrypt', 2, 'certificate'),
+            'openssl_cms_decrypt',
+            $frame
+        );
+        $keyPem = self::resolvePemMaterial(
+            self::coercePkeyPem($keyArg, 'openssl_cms_decrypt', 3, 'private_key'),
+            'openssl_cms_decrypt',
+            $frame
+        );
+        if (false === $certPem || false === $keyPem) {
+            return false;
+        }
+
+        if (false === VmOpensslCmsNative::decrypt($inputFilename, $outputFilename, $certPem, $keyPem, $encoding)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * openssl_cms_read() — extract certs from CMS PEM content (php-src ext/openssl/openssl.c; #6592).
+     *
+     * @return list<string>|false
+     */
+    public static function cmsRead(string $cmsPemContent, ?Frame $frame = null): array|false
+    {
+        if (!VmOpensslCmsNative::available()) {
+            self::userWarning('openssl_cms_read(): OpenSSL CMS is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        return VmOpensslCmsNative::read($cmsPemContent);
+    }
+
+    /**
      * Load PEM from inline string, filesystem path, or file:// URI.
      *
      * @return string|false
