@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringUrldecode;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -21,8 +22,10 @@ final class urldecode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('urldecode() requires exactly one argument');
         }
-        $subject = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19272, ext/standard/url.c)
+        $subject = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
             'urldecode',
             0,
             'string'
@@ -39,9 +42,54 @@ final class urldecode extends Internal
             throw new \LogicException('urldecode() requires exactly one argument');
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'urldecode', 0, 'string');
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            return JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'urldecode', 0, 'string');
+        }
+
+        $literal = $args[0]->compileTimeString ?? null;
+        if (
+            null === $literal
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+        ) {
+            $literal = '';
+        }
+        if (null !== $literal) {
+            return $context->builder->call(
+                $context->lookupFunction('__string__separate'),
+                $context->builder->load(
+                    $context->constantStringFromString(VmString::urldecode($literal))
+                )
+            );
+        }
+
+        StringUrldecode::ensureLinked($context);
+        $str = self::jitStringArg($context, $args[0]);
 
         return JitUrlencode::urldecode($context, $str);
     }
 
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19272, ext/standard/url.c). */
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'urldecode',
+                0,
+                'string'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'urldecode',
+            0,
+            'string'
+        );
+    }
 }
