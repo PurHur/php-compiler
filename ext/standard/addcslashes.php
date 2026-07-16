@@ -24,8 +24,8 @@ final class addcslashes extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('addcslashes() requires exactly two arguments in this compiler build');
         }
-        $subject = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'addcslashes', 'str');
-        $charlist = InternalStrictArg::resolveCoercibleStringArg($frame, 1, 'addcslashes', 'characters');
+        $subject = self::vmStringArg($frame, 0, 'str');
+        $charlist = self::vmStringArg($frame, 1, 'characters');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::addcslashes($subject, $charlist))
@@ -46,7 +46,7 @@ final class addcslashes extends Internal
         }
 
         StringCslashes::ensureLinked($context);
-        $subject = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'addcslashes', 0, 'str');
+        $subject = self::jitStringArg($context, $args[0], 0, 'str');
         if (null !== $charlistLit) {
             return $context->builder->call(
                 $context->lookupFunction('__compiler_addcslashes'),
@@ -54,12 +54,51 @@ final class addcslashes extends Internal
                 $context->builder->load($context->constantStringFromString($charlistLit))
             );
         }
-        $charlist = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'addcslashes', 1, 'characters');
+        $charlist = self::jitStringArg($context, $args[1], 1, 'characters');
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_addcslashes'),
             $subject,
             $charlist
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'addcslashes', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'addcslashes',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'addcslashes',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'addcslashes',
+            $argIndex,
+            $paramName
         );
     }
 }

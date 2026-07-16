@@ -1,22 +1,31 @@
 --TEST--
-stdlib Z_PARAM_STR/LONG null coercion on 8.4 forward profile (#19161, ext/standard/string.c)
+stdlib Z_PARAM_STR/LONG null — coerce vs TypeError on 8.4 forward profile (#19161/#19309/#19319)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-echo var_export(dirname(null), true), "\n";
-echo var_export(explode(',', null), true), "\n";
-echo var_export(ord(null), true), "\n";
-echo var_export(chr(null), true), "\n";
-echo var_export(parse_url(null), true), "\n";
+foreach ([
+    'dirname' => static fn () => dirname(null),
+    'explode' => static fn () => explode(',', null),
+    'ord' => static fn () => ord(null),
+    'chr' => static fn () => chr(null),
+    'parse_url' => static fn () => parse_url(null),
+] as $label => $factory) {
+    try {
+        $result = $factory();
+        echo "$label: ";
+        var_export($result);
+        echo "\n";
+    } catch (TypeError $e) {
+        echo "$label: ", $e->getMessage(), "\n";
+    }
+}
 ?>
 --EXPECT--
-''
-array (
-  0 => '',
-)
-0
-'' . "\0" . ''
-array (
+dirname: ''
+explode: explode(): Argument #2 ($string) must be of type string, null given
+ord: ord(): Argument #1 ($character) must be of type string, null given
+chr: '' . "\0" . ''
+parse_url: array (
   'path' => '',
 )

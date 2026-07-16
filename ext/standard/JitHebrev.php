@@ -28,7 +28,7 @@ final class JitHebrev
             return self::materializeString($context, VmHebrev::convert($strLit, $maxLit));
         }
 
-        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hebrev', 0, 'string');
+        $str = self::jitStringArg($context, $args[0]);
         $i64 = $context->getTypeFromString('int64');
         $max = $argc >= 2
             ? JitStrictIntArg::lower($context, $args[1], 'hebrev', 2, 'max_chars_per_line')
@@ -79,5 +79,26 @@ final class JitHebrev
         $context->builder->call($context->lookupFunction('__value__writeString'), $ptr, $owned);
 
         return $ptr;
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'hebrev',
+                0,
+                'string'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'hebrev',
+            0,
+            'string'
+        );
     }
 }

@@ -38,7 +38,7 @@ final class str_getcsv extends Internal
                 ));
             }
         }
-        $input = VmString::stringBuiltinArgForFrame($frame, 0, 'str_getcsv', 0, 'string');
+        $input = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'str_getcsv', 0, 'string');
         $separator = ',';
         $enclosure = '"';
         $escape = '\\';
@@ -67,7 +67,7 @@ final class str_getcsv extends Internal
             throw new \LogicException('str_getcsv() expects at most 4 arguments');
         }
         $strPtr = $context->getTypeFromString('__string__*');
-        $input = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'str_getcsv', 0, 'string');
+        $input = self::jitStringArg($context, $args[0], 0, 'string');
         $separator = $strPtr->constNull();
         $enclosure = $strPtr->constNull();
         $escape = $strPtr->constNull();
@@ -82,5 +82,30 @@ final class str_getcsv extends Internal
         }
 
         return JitStrGetcsv::invoke($context, $input, $separator, $enclosure, $escape);
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'str_getcsv',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'str_getcsv',
+            $argIndex,
+            $paramName
+        );
     }
 }
