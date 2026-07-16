@@ -303,6 +303,15 @@ final class VmXml
             return self::errorRecord(1, 1, 'Start tag expected, \'<\' not found', 4, LibxmlConstants::LIBXML_ERR_FATAL, 0);
         }
 
+        // XML 1.0 document ::= prolog element Misc* — comments/PIs may surround the root (#19361).
+        $trimmed = self::stripDocumentMiscEnvelope($trimmed);
+        if ('' === $trimmed) {
+            return self::errorRecord(1, 1, 'Document is empty', 4, LibxmlConstants::LIBXML_ERR_FATAL, 0);
+        }
+        if ('<' !== $trimmed[0]) {
+            return self::errorRecord(1, 1, 'Start tag expected, \'<\' not found', 4, LibxmlConstants::LIBXML_ERR_FATAL, 0);
+        }
+
         $unclosed = self::detectUnclosedStartTag($trimmed);
         if (null !== $unclosed) {
             return $unclosed;
@@ -332,6 +341,126 @@ final class VmXml
         }
 
         return self::adjustFragmentErrorOffset($error, $trimmed, $matches[3]);
+    }
+
+    /**
+     * Strip leading/trailing Misc (Comment | PI | S) and an optional XML declaration / DOCTYPE
+     * so the remaining string is the document element (php-src libxml document production; #19361).
+     */
+    private static function stripDocumentMiscEnvelope(string $xml): string
+    {
+        $pos = 0;
+        $len = \strlen($xml);
+        $pos = self::skipXmlWhitespace($xml, $pos);
+        if (preg_match('/\G<\?xml\s[^?]*\?>/is', $xml, $decl, 0, $pos)) {
+            $pos += \strlen($decl[0]);
+            $pos = self::skipXmlWhitespace($xml, $pos);
+        }
+        while ($pos < $len) {
+            $miscEnd = self::consumeDocumentMiscAt($xml, $pos);
+            if (null === $miscEnd) {
+                break;
+            }
+            $pos = self::skipXmlWhitespace($xml, $miscEnd);
+        }
+        if (preg_match('/\G<!DOCTYPE\s/i', $xml, $doctypeOpen, 0, $pos)) {
+            unset($doctypeOpen);
+            $doctypeEnd = self::findDoctypeEnd($xml, $pos);
+            if (null !== $doctypeEnd) {
+                $pos = self::skipXmlWhitespace($xml, $doctypeEnd);
+            }
+        }
+        while ($pos < $len) {
+            $miscEnd = self::consumeDocumentMiscAt($xml, $pos);
+            if (null === $miscEnd) {
+                break;
+            }
+            $pos = self::skipXmlWhitespace($xml, $miscEnd);
+        }
+        $rootStart = $pos;
+        if ($rootStart >= $len || '<' !== $xml[$rootStart]) {
+            return substr($xml, $rootStart);
+        }
+        $rootEnd = self::findElementEnd($xml, $rootStart);
+        if (null === $rootEnd) {
+            return substr($xml, $rootStart);
+        }
+
+        return substr($xml, $rootStart, $rootEnd - $rootStart);
+    }
+
+    private static function skipXmlWhitespace(string $xml, int $pos): int
+    {
+        $len = \strlen($xml);
+        while ($pos < $len && 1 === preg_match('/\s/', $xml[$pos])) {
+            ++$pos;
+        }
+
+        return $pos;
+    }
+
+    /** @return null|int byte offset after one Comment or PI at $pos (not <?xml …?>) */
+    public static function consumeDocumentMiscAt(string $content, int $pos): ?int
+    {
+        $comment = self::parseCommentAt($content, $pos);
+        if (null !== $comment) {
+            return $comment['end'];
+        }
+        $pi = self::parseProcessingInstructionAt($content, $pos);
+        if (null !== $pi) {
+            return $pi['end'];
+        }
+
+        return null;
+    }
+
+    /**
+     * Parse a processing instruction at $pos (excludes the XML declaration; #19361).
+     *
+     * @return null|array{end: int, target: string, data: string}
+     */
+    public static function parseProcessingInstructionAt(string $content, int $pos): ?array
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        if (!preg_match('/\G<\?([A-Za-z_][\w:.-]*)(?:\s+([\s\S]*?))?\?>/s', $content, $match, 0, $pos)) {
+            return null;
+        }
+        if (0 === strcasecmp($match[1], 'xml')) {
+            return null;
+        }
+
+        return [
+            'end' => $pos + \strlen($match[0]),
+            'target' => $match[1],
+            'data' => isset($match[2]) ? trim($match[2]) : '',
+        ];
+    }
+
+    /** @return null|int byte offset after <!DOCTYPE …> starting at $pos */
+    private static function findDoctypeEnd(string $xml, int $pos): ?int
+    {
+        if (!preg_match('/\G<!DOCTYPE\s/i', $xml, $doctypeOpen, 0, $pos)) {
+            return null;
+        }
+        unset($doctypeOpen);
+        $len = \strlen($xml);
+        $i = $pos + 9;
+        $bracketDepth = 0;
+        while ($i < $len) {
+            $ch = $xml[$i];
+            if ('[' === $ch) {
+                ++$bracketDepth;
+            } elseif (']' === $ch && $bracketDepth > 0) {
+                --$bracketDepth;
+            } elseif ('>' === $ch && 0 === $bracketDepth) {
+                return $i + 1;
+            }
+            ++$i;
+        }
+
+        return null;
     }
 
     /**
@@ -537,6 +666,12 @@ final class VmXml
 
                 continue;
             }
+            $pi = self::parseProcessingInstructionAt($content, $pos);
+            if (null !== $pi) {
+                $pos = $pi['end'];
+
+                continue;
+            }
             $end = self::findElementEnd($content, $pos);
             if (null === $end) {
                 $mismatch = self::detectTagMismatch($content, $pos);
@@ -631,6 +766,12 @@ final class VmXml
 
                 continue;
             }
+            $pi = self::parseProcessingInstructionAt($content, $scan);
+            if (null !== $pi) {
+                $scan = $pi['end'];
+
+                continue;
+            }
             ++$scan;
         }
 
@@ -688,6 +829,12 @@ final class VmXml
             $comment = self::parseCommentAt($content, $scan);
             if (null !== $comment) {
                 $scan = $comment['end'];
+
+                continue;
+            }
+            $pi = self::parseProcessingInstructionAt($content, $scan);
+            if (null !== $pi) {
+                $scan = $pi['end'];
 
                 continue;
             }
