@@ -20,18 +20,28 @@ use PHPCompiler\VM\Variable;
 /** @internal */
 final class VmNullStringParamDeprecation
 {
-    public static function message(string $function, int $argIndex, string $paramName): string
-    {
+    public static function message(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string'
+    ): string {
         return sprintf(
-            '%s(): Passing null to parameter #%d ($%s) of type string is deprecated',
+            '%s(): Passing null to parameter #%d ($%s) of type %s is deprecated',
             $function,
             $argIndex + 1,
-            $paramName
+            $paramName,
+            $expectedType
         );
     }
 
-    public static function emit(?Frame $frame, string $function, int $argIndex, string $paramName): void
-    {
+    public static function emit(
+        ?Frame $frame,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string'
+    ): void {
         $vm = VM::running();
         if (null === $vm) {
             return;
@@ -44,7 +54,7 @@ final class VmNullStringParamDeprecation
             }
         }
         $vm->context->errors->internalDeprecated(
-            self::message($function, $argIndex, $paramName),
+            self::message($function, $argIndex, $paramName, $expectedType),
             $vm->context,
             $frame
         );
@@ -145,7 +155,7 @@ final class VmString
                     self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null', $expectedType)
                 );
             }
-            VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+            VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName, $expectedType);
 
             return '';
         }
@@ -176,7 +186,7 @@ final class VmString
                 );
             }
             if (!self::requiresForwardProfileStrictStringNull()) {
-                VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+                VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName, $expectedType);
             }
 
             return '';

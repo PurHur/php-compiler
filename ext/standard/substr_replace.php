@@ -207,11 +207,11 @@ final class substr_replace extends Internal
     private static function resolveScalarReplace(Variable $replaceArg, Variable $replaceVar): string
     {
         if (Variable::TYPE_STRING === $replaceVar->type || Variable::TYPE_NULL === $replaceVar->type) {
-            return VmString::coerceStringBuiltinArg($replaceArg, 'substr_replace', 1, 'replace');
+            return VmString::coerceStringBuiltinArg($replaceArg, 'substr_replace', 1, 'replace', 'array|string');
         }
 
         foreach ($replaceVar->toArray()->iterateKeyed(true) as [, $value]) {
-            return VmString::coerceStringBuiltinArg($value, 'substr_replace', 1, 'replace');
+            return VmString::coerceStringBuiltinArg($value, 'substr_replace', 1, 'replace', 'array|string');
         }
 
         return '';
@@ -260,7 +260,7 @@ final class substr_replace extends Internal
         }
         $scalarReplace = $replaceIsArray
             ? null
-            : VmString::coerceStringBuiltinArg($replaceVar, 'substr_replace', 1, 'replace');
+            : VmString::coerceStringBuiltinArg($replaceVar, 'substr_replace', 1, 'replace', 'array|string');
 
         /** @var list<Variable> $offsetValues */
         $offsetValues = $offsetIsArray ? self::arrayArgValues($offsetVar) : [];

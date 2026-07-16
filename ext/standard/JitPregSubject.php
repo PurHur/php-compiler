@@ -86,6 +86,7 @@ final class JitPregSubject
         $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $arrayTy = $i8->constInt(Variable::TYPE_ARRAY & 0x7f, false);
         $stringTy = $i8->constInt(Variable::TYPE_STRING & 0x7f, false);
+        $nullTy = $i8->constInt(Variable::TYPE_NULL & 0x7f, false);
         $enumCaseTy = $i8->constInt(Variable::TYPE_ENUM_CASE, false);
         $objectTy = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
 
@@ -95,7 +96,8 @@ final class JitPregSubject
 
         $isArray = $context->builder->icmp(Builder::INT_EQ, $typeKind, $arrayTy);
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeKind, $stringTy);
-        $isAllowed = $context->builder->or($isArray, $isString);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeKind, $nullTy);
+        $isAllowed = $context->builder->or($isArray, $context->builder->or($isString, $isNull));
         $context->builder->branchIf($isAllowed, $okBlock, $checkBlock);
 
         $context->builder->positionAtEnd($checkBlock);
@@ -105,12 +107,13 @@ final class JitPregSubject
         $context->builder->branchIf($isReject, $rejectBlock, $okBlock);
 
         $context->builder->positionAtEnd($rejectBlock);
+        // Avoid compileTimeGivenLabel() on TYPE_VALUE — structGep assert under LLVM (#19755).
         self::emitTypeErrorAndAbort(
             $context,
             $function,
             $argIndex,
             $paramName,
-            self::compileTimeGivenLabel($context, $arg)
+            'mixed'
         );
 
         $context->builder->positionAtEnd($okBlock);
