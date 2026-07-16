@@ -303,7 +303,13 @@ final class InternalStrictArg
 
     /**
      * Reject null for array|string internal parameters when caller uses strict_types (#11015)
-     * or 8.4 forward profile requires Z_PARAM_STR_OR_ARR null TypeError (#18914).
+     * or 8.4 forward profile requires Z_PARAM_STR_OR_ARR null TypeError (#18914, #19241).
+     *
+     * Uses {@see VmString::requiresZparamStrStrictNullOnForwardProfile} — not the retired
+     * {@see VmString::requiresForwardProfileStrictStringNull} global switch (always false).
+     *
+     * @return bool true when a compile-time null emitted an unconditional abort — callers must
+     *              return an unreachable dummy value and not continue IR emission
      */
     public static function rejectNullStringOrArray(
         Context $context,
@@ -311,9 +317,12 @@ final class InternalStrictArg
         string $function,
         string $paramName,
         int $argNumber
-    ): void {
-        if (!$context->callerStrictTypes && !VmString::requiresForwardProfileStrictStringNull()) {
-            return;
+    ): bool {
+        if (
+            !$context->callerStrictTypes
+            && !VmString::requiresZparamStrStrictNullOnForwardProfile()
+        ) {
+            return false;
         }
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             self::raiseTypeErrorAndAbort(
@@ -326,10 +335,10 @@ final class InternalStrictArg
                 )
             );
 
-            return;
+            return true;
         }
         if (Variable::TYPE_VALUE !== $arg->type) {
-            return;
+            return false;
         }
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -361,6 +370,8 @@ final class InternalStrictArg
             )
         );
         $context->builder->positionAtEnd($okBlock);
+
+        return false;
     }
 
     /**
