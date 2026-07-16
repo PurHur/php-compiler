@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5168 |
-| Phase A inventory files (M2 ratio SSOT) | 5168 |
+| PHP files on vm.php path | 5170 |
+| Phase A inventory files (M2 ratio SSOT) | 5170 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14056 |
+| Source constructs flagged (warnings) | 14090 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -597,7 +597,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
+| `ext/intl/VmIntlCalendar.php` | 0 | 22 |
 | `ext/intl/VmIntlDateFormatter.php` | 0 | 4 |
+| `ext/intl/VmIntlTimeZone.php` | 0 | 12 |
 | `ext/intl/VmLocale.php` | 0 | 1 |
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
@@ -8858,24 +8860,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 50)
-- new NormalizerNormalize (line 61)
-- new NormalizerIsNormalized (line 62)
-- new NormalizerGetRawDecomposition (line 63)
-- new ClassEntry (line 79)
-- new LocaleGetDefault (line 82)
-- new LocaleSetDefault (line 83)
-- new LocaleGetPrimaryLanguage (line 84)
-- new LocaleGetRegion (line 85)
-- new LocaleGetScript (line 86)
-- new LocaleGetDisplayName (line 87)
-- new ClassEntry (line 103)
-- new IntlDateFormatterCreate (line 114)
-- new IntlDateFormatterFormat (line 117)
-- new ClassEntry (line 125)
-- new CollatorCreate (line 127)
-- new ClassEntry (line 135)
-- 8 class method(s)
+- new ClassEntry (line 62)
+- new NormalizerNormalize (line 73)
+- new NormalizerIsNormalized (line 74)
+- new NormalizerGetRawDecomposition (line 75)
+- new ClassEntry (line 91)
+- new LocaleGetDefault (line 94)
+- new LocaleSetDefault (line 95)
+- new LocaleGetPrimaryLanguage (line 96)
+- new LocaleGetRegion (line 97)
+- new LocaleGetScript (line 98)
+- new LocaleGetDisplayName (line 99)
+- new ClassEntry (line 115)
+- new IntlDateFormatterCreate (line 126)
+- new IntlDateFormatterFormat (line 129)
+- new ClassEntry (line 137)
+- new CollatorCreate (line 139)
+- new ClassEntry (line 147)
+- 9 class method(s)
 
 ### `ext/intl/CollatorCreate.php`
 
@@ -8921,10 +8923,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 114)
-- new locale_get_region (line 115)
-- new locale_get_script (line 116)
-- 13 class method(s)
+- new locale_get_primary_language (line 124)
+- new locale_get_region (line 125)
+- new locale_get_script (line 126)
+- 14 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
 
@@ -8982,32 +8984,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 44)
-- new locale_get_default (line 54)
-- new locale_set_default (line 55)
-- new locale_get_primary_language (line 56)
-- new locale_get_region (line 57)
-- new locale_get_script (line 58)
-- new normalizer_normalize (line 62)
-- new normalizer_is_normalized (line 63)
-- new normalizer_get_raw_decomposition (line 64)
-- new idn_to_ascii (line 68)
-- new idn_to_utf8 (line 68)
-- new grapheme_strlen (line 84)
-- new grapheme_substr (line 85)
-- new grapheme_strpos (line 86)
-- new grapheme_str_contains (line 87)
-- new grapheme_strstr (line 88)
-- new grapheme_stristr (line 89)
-- new grapheme_stripos (line 90)
-- new grapheme_strrpos (line 91)
-- new grapheme_extract (line 92)
-- new grapheme_levenshtein (line 93)
-- new grapheme_str_split (line 94)
-- new grapheme_strimwidth (line 95)
-- new intl_get_error_code (line 96)
-- new intl_get_error_message (line 97)
-- new intl_is_failure (line 98)
+- new VM\Variable (line 47)
+- new locale_get_default (line 57)
+- new locale_set_default (line 58)
+- new locale_get_primary_language (line 59)
+- new locale_get_region (line 60)
+- new locale_get_script (line 61)
+- new normalizer_normalize (line 65)
+- new normalizer_is_normalized (line 66)
+- new normalizer_get_raw_decomposition (line 67)
+- new idn_to_ascii (line 71)
+- new idn_to_utf8 (line 71)
+- new grapheme_strlen (line 87)
+- new grapheme_substr (line 88)
+- new grapheme_strpos (line 89)
+- new grapheme_str_contains (line 90)
+- new grapheme_strstr (line 91)
+- new grapheme_stristr (line 92)
+- new grapheme_stripos (line 93)
+- new grapheme_strrpos (line 94)
+- new grapheme_extract (line 95)
+- new grapheme_levenshtein (line 96)
+- new grapheme_str_split (line 97)
+- new grapheme_strimwidth (line 98)
+- new intl_get_error_code (line 99)
+- new intl_get_error_message (line 100)
+- new intl_is_failure (line 101)
 - 3 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -9047,6 +9049,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 269)
 - 10 class method(s)
 
+### `ext/intl/VmIntlCalendar.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 139)
+- new Variable (line 143)
+- new IntlCalendarCreateInstance (line 151)
+- new IntlCalendarGet (line 152)
+- new IntlCalendarSet (line 153)
+- new IntlCalendarGetTimeZone (line 154)
+- new IntlCalendarGetTime (line 155)
+- new IntlCalendarSetTime (line 156)
+- new Error (line 177)
+- new ObjectEntry (line 181)
+- new ArgumentCountError (line 439)
+- new ArgumentCountError (line 484)
+- new Error (line 492)
+- new ArgumentCountError (line 526)
+- new Error (line 534)
+- new ArgumentCountError (line 577)
+- new Error (line 585)
+- new ArgumentCountError (line 612)
+- new Error (line 620)
+- new ArgumentCountError (line 647)
+- new Error (line 655)
+- 17 class method(s)
+
 ### `ext/intl/VmIntlDateFormatter.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9054,6 +9082,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 75)
 - new Error (line 105)
 - 13 class method(s)
+
+### `ext/intl/VmIntlTimeZone.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 68)
+- new Variable (line 72)
+- new IntlTimeZoneCreateTimeZone (line 80)
+- new IntlTimeZoneCreateDefault (line 81)
+- new IntlTimeZoneGetID (line 82)
+- new Error (line 105)
+- new ObjectEntry (line 108)
+- new ArgumentCountError (line 183)
+- new ArgumentCountError (line 213)
+- new ArgumentCountError (line 237)
+- new Error (line 245)
+- 11 class method(s)
 
 ### `ext/intl/VmLocale.php`
 

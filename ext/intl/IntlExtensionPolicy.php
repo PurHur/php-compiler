@@ -13,8 +13,8 @@ use PHPCompiler\ext\standard\ModuleRegistry;
  * Grapheme helpers, IDN converters, and intl_* error functions require a loaded intl extension on
  * Zend; they stay withheld from function_exists()/class_exists() until
  * {@see ModuleRegistry::extensionLoaded}('intl') (#11472, #17694, #19593). Locale + Normalizer +
- * IntlDateFormatter (pattern create/format) are partial surfaces that advertise without loading
- * intl (#6696, #5153, #19549).
+ * IntlDateFormatter + IntlCalendar / IntlTimeZone are partial surfaces that advertise without
+ * loading intl (#6696, #5153, #19549, #6151).
  */
 final class IntlExtensionPolicy
 {
@@ -56,6 +56,16 @@ final class IntlExtensionPolicy
      * Mirrors {@see advertisesNormalizer()}: class_exists without full grapheme/Collator ICU.
      */
     public static function advertisesIntlDateFormatter(): bool
+    {
+        return true;
+    }
+
+    /**
+     * IntlCalendar / IntlTimeZone — Gregorian field/timezone subset without extension_loaded('intl') (#6151).
+     *
+     * Mirrors {@see advertisesIntlDateFormatter()}: class_exists without full ICU calendar DB.
+     */
+    public static function advertisesIntlCalendar(): bool
     {
         return true;
     }

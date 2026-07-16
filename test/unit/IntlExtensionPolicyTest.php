@@ -17,6 +17,7 @@ final class IntlExtensionPolicyTest extends TestCase
         self::assertTrue(IntlExtensionPolicy::advertisesNormalizer());
         self::assertTrue(IntlExtensionPolicy::advertisesLocale());
         self::assertTrue(IntlExtensionPolicy::advertisesIntlDateFormatter());
+        self::assertTrue(IntlExtensionPolicy::advertisesIntlCalendar());
         // locale_get_primary_language/region/script are forward-profile parsers on 8.4.0-dev (#17117).
         self::assertTrue(IntlExtensionPolicy::advertisesLocaleParsers());
         $runtime = new Runtime();
@@ -40,6 +41,12 @@ final class IntlExtensionPolicyTest extends TestCase
         );
         self::assertTrue(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'IntlDateFormatter')
+        );
+        self::assertTrue(
+            ext\standard\VmReflection::classExists($runtime->vmContext, 'IntlCalendar')
+        );
+        self::assertTrue(
+            ext\standard\VmReflection::classExists($runtime->vmContext, 'IntlTimeZone')
         );
     }
 
