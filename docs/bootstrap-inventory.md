@@ -1695,6 +1695,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamGetMetaData.php` | 0 | 1 |
 | `ext/standard/JitStreamGetTransports.php` | 0 | 2 |
 | `ext/standard/JitStreamGetWrappers.php` | 0 | 2 |
+| `ext/standard/JitStreamIoKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamIsLocal.php` | 0 | 1 |
 | `ext/standard/JitStreamIsatty.php` | 0 | 1 |
 | `ext/standard/JitStreamNotificationCallback.php` | 0 | 2 |
@@ -3848,7 +3849,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamIo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamIoJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamIoRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/StreamIoStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamLibcHandleRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamLifecycle.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamLifecycleJit.php` | 0 | 1 |
@@ -16081,6 +16081,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 31)
 - 3 class method(s)
 
+### `ext/standard/JitStreamIoKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 39 class method(s)
+
 ### `ext/standard/JitStreamIsLocal.php`
 
 **Warnings** (review for bootstrap subset):
@@ -20841,7 +20846,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmZlibCore.php`
 
 **Warnings** (review for bootstrap subset):
-- 40 class method(s)
+- 42 class method(s)
 
 ### `ext/standard/VmZlibLibzReference.php`
 
@@ -30701,14 +30706,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamIoRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 556)
+- new JIT (line 557)
 - 38 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StreamIoStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 39 class method(s)
 
 ### `lib/JIT/Builtin/StreamLibcHandleRuntime.php`
 

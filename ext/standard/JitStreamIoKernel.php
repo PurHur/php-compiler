@@ -2,8 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StreamFilter;
+use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -11,15 +13,16 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM stream I/O for standalone / user-script AOT — fopen/fread/fwrite/tmpfile (#5343, #19462).
+ * LLVM stream I/O for standalone / user-script AOT — fopen/fread/fwrite/tmpfile (#5343, #19462, #19530).
  *
- * Embed JIT uses {@see StreamIoRuntime} + {@see StreamIoJitHelper} PHP.
+ * Embed JIT uses {@see \PHPCompiler\JIT\Builtin\StreamIoRuntime} + {@see StreamIoJitHelper} PHP.
  * User-script AOT cannot nested-JIT VmFs helpers (statics skip __init__, #16075) —
  * this libc + {@see StreamGlobalsJit} handle-table path is the user-script SSOT.
+ * Housed in ext/standard (not lib/JIT/Builtin) — same kernel-move pattern as #19500 / #19466.
  *
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */
-final class StreamIoStandaloneLlvm
+final class JitStreamIoKernel
 {
     private const MAX_HANDLES = 256;
 
@@ -357,7 +360,7 @@ final class StreamIoStandaloneLlvm
                 $name,
                 $context->context->functionType($i8p, false, $i8p, $i8p)
             ),
-            default => throw new \LogicException('StreamIoStandaloneLlvm: unknown '.$name),
+            default => throw new \LogicException('JitStreamIoKernel: unknown '.$name),
         };
         $context->registerFunction($name, $fn);
 
@@ -441,7 +444,7 @@ final class StreamIoStandaloneLlvm
         $zero = $i64->constInt(0, false);
         $global = $context->module->getNamedGlobal($globalName);
         if (null === $global) {
-            throw new \LogicException('StreamIoStandaloneLlvm: '.$globalName.' missing');
+            throw new \LogicException('JitStreamIoKernel: '.$globalName.' missing');
         }
         $slot = $context->builder->gep($global, $zero, $handle);
 
@@ -455,7 +458,7 @@ final class StreamIoStandaloneLlvm
         $zero = $i64->constInt(0, false);
         $global = $context->module->getNamedGlobal($globalName);
         if (null === $global) {
-            throw new \LogicException('StreamIoStandaloneLlvm: '.$globalName.' missing');
+            throw new \LogicException('JitStreamIoKernel: '.$globalName.' missing');
         }
         $slot = $context->builder->gep($global, $zero, $handle);
         $context->builder->store($value, $context->builder->bitcast($slot, $i8p->pointerType(0)));
@@ -471,7 +474,7 @@ final class StreamIoStandaloneLlvm
         $zero = $i64->constInt(0, false);
         $global = $context->module->getNamedGlobal($globalName);
         if (null === $global) {
-            throw new \LogicException('StreamIoStandaloneLlvm: '.$globalName.' missing');
+            throw new \LogicException('JitStreamIoKernel: '.$globalName.' missing');
         }
         $slot = $context->builder->gep($global, $zero, $handle);
 
@@ -485,7 +488,7 @@ final class StreamIoStandaloneLlvm
         $zero = $i64->constInt(0, false);
         $global = $context->module->getNamedGlobal($globalName);
         if (null === $global) {
-            throw new \LogicException('StreamIoStandaloneLlvm: '.$globalName.' missing');
+            throw new \LogicException('JitStreamIoKernel: '.$globalName.' missing');
         }
         $slot = $context->builder->gep($global, $zero, $handle);
         $context->builder->store($value, $context->builder->bitcast($slot, $i32->pointerType(0)));
@@ -511,7 +514,7 @@ final class StreamIoStandaloneLlvm
         $zeroI64 = $i64->constInt(0, false);
         $global = $context->module->getNamedGlobal($globalName);
         if (null === $global) {
-            throw new \LogicException('StreamIoStandaloneLlvm: '.$globalName.' missing');
+            throw new \LogicException('JitStreamIoKernel: '.$globalName.' missing');
         }
         $slot = $context->builder->gep($global, $zeroI64, $handle);
         $context->builder->store($i8->constInt(1, false), $context->builder->bitcast($slot, $i8->pointerType(0)));
@@ -1178,7 +1181,7 @@ final class StreamIoStandaloneLlvm
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StreamIoStandaloneLlvm implement');
+                throw new \LogicException($name.' missing after JitStreamIoKernel implement');
             }
             $context->registerFunction($name, $fn);
         }
