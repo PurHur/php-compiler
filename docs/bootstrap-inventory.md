@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5183 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14133 |
+| Source constructs flagged (warnings) | 14136 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1124,7 +1124,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplFileInfoBuiltin.php` | 0 | 4 |
 | `ext/spl/SplFileInfoStorage.php` | 0 | 1 |
 | `ext/spl/SplFileIteratorSerializeDeny.php` | 0 | 3 |
-| `ext/spl/SplFileObjectBuiltin.php` | 0 | 10 |
+| `ext/spl/SplFileObjectBuiltin.php` | 0 | 13 |
 | `ext/spl/SplFileObjectStorage.php` | 0 | 1 |
 | `ext/spl/SplFixedArrayBuiltin.php` | 0 | 34 |
 | `ext/spl/SplFixedArraySerializeSupport.php` | 0 | 3 |
@@ -13088,19 +13088,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 48)
 - new SplFileObjectConstruct (line 65)
-- new ArgumentCountError (line 143)
-- new ArgumentCountError (line 388)
-- new ArgumentCountError (line 418)
-- new ArgumentCountError (line 486)
-- new ArgumentCountError (line 593)
-- new Variable (line 728)
-- new ArgumentCountError (line 771)
-- 24 class method(s)
+- new ArgumentCountError (line 161)
+- new ArgumentCountError (line 412)
+- new ArgumentCountError (line 442)
+- new ArgumentCountError (line 541)
+- new ArgumentCountError (line 597)
+- new ArgumentCountError (line 659)
+- new ArgumentCountError (line 737)
+- new ArgumentCountError (line 844)
+- new Variable (line 979)
+- new ArgumentCountError (line 1022)
+- 32 class method(s)
 
 ### `ext/spl/SplFileObjectStorage.php`
 
 **Warnings** (review for bootstrap subset):
-- 27 class method(s)
+- 38 class method(s)
 
 ### `ext/spl/SplFixedArrayBuiltin.php`
 
@@ -14785,8 +14788,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 256)
 - new ArgumentCountError (line 259)
-- new ArgumentCountError (line 288)
-- new ArgumentCountError (line 291)
+- new ArgumentCountError (line 289)
+- new ArgumentCountError (line 292)
 - 15 class method(s)
 
 ### `ext/standard/JitDateCreate.php`
@@ -16783,7 +16786,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamSyncKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 230)
+- new JIT (line 229)
 - 9 class method(s)
 - 3 closure(s)
 
@@ -22415,8 +22418,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/date.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
-- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 20)
+- new ArgumentCountError (line 23)
 - 3 class method(s)
 
 ### `ext/standard/date_add.php`
@@ -23511,8 +23514,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/gmdate.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 20)
+- new ArgumentCountError (line 23)
 - 3 class method(s)
 
 ### `ext/standard/gmgetdate.php`
@@ -25953,7 +25956,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/strtotime.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 
 ### `ext/standard/strtoupper.php`
