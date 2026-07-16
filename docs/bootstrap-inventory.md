@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5016 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13529 |
+| Source constructs flagged (warnings) | 13530 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -333,7 +333,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListReplace.php` | 0 | 1 |
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 340 |
+| `ext/dom/VmDom.php` | 0 | 341 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 19 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
@@ -7061,13 +7061,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 5878)
 - new DOMException (line 5881)
 - new DOMException (line 5890)
-- new Variable (line 6718)
-- new Variable (line 6731)
-- new DOMException (line 6814)
-- new DOMException (line 6825)
-- new DOMException (line 6892)
-- new DOMException (line 6900)
-- new DOMException (line 6909)
+- new Variable (line 6728)
+- new Variable (line 6741)
+- new DOMException (line 6824)
+- new DOMException (line 6851)
+- new DOMException (line 6882)
+- new DOMException (line 6946)
+- new DOMException (line 6954)
+- new DOMException (line 6963)
 - 326 class method(s)
 - 2 closure(s)
 
