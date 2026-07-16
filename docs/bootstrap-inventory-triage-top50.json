@@ -1,29 +1,7 @@
 {
-    "scanned": 4293,
+    "scanned": 5170,
     "top": 50,
     "rows": [
-        {
-            "message": "Stmt_TraitUse",
-            "file_count": 5,
-            "examples": [
-                "ext/standard/array_diff_assoc.php",
-                "ext/standard/array_diff_key.php",
-                "ext/standard/array_intersect_assoc.php"
-            ],
-            "issue": null,
-            "rank": 1
-        },
-        {
-            "message": "Trait \"VmArrayAssocSetOps\" not found",
-            "file_count": 4,
-            "examples": [
-                "ext/standard/array_diff_assoc.php",
-                "ext/standard/array_diff_key.php",
-                "ext/standard/array_intersect_assoc.php"
-            ],
-            "issue": null,
-            "rank": 2
-        },
         {
             "message": "Cannot redeclare class::$func",
             "file_count": 1,
@@ -31,7 +9,7 @@
                 "ext/standard/VmSplAutoload.php"
             ],
             "issue": null,
-            "rank": 3
+            "rank": 1
         },
         {
             "message": "Cannot redeclare class::$multiline",
@@ -40,7 +18,7 @@
                 "ext/standard/VmPregEngine.php"
             ],
             "issue": null,
-            "rank": 4
+            "rank": 2
         },
         {
             "message": "Cannot redeclare class::$ownerLc",
@@ -49,7 +27,16 @@
                 "ext/spl/SplLegacySerializableMethods.php"
             ],
             "issue": null,
-            "rank": 5
+            "rank": 3
+        },
+        {
+            "message": "Stmt_TraitUse",
+            "file_count": 1,
+            "examples": [
+                "lib/JIT/ClassConstFetchHelper.php"
+            ],
+            "issue": null,
+            "rank": 4
         },
         {
             "message": "Trait \"ClassConstFetchHelperTrait\" not found",
@@ -58,7 +45,25 @@
                 "lib/JIT/ClassConstFetchHelper.php"
             ],
             "issue": null,
+            "rank": 5
+        },
+        {
+            "message": "Unknown type declaration found: ''",
+            "file_count": 1,
+            "examples": [
+                "ext/dom/VmDom.php"
+            ],
+            "issue": null,
             "rank": 6
+        },
+        {
+            "message": "Unknown type declaration found: PHPCompiler\\OpCode[]",
+            "file_count": 1,
+            "examples": [
+                "lib/Compiler.php"
+            ],
+            "issue": null,
+            "rank": 7
         }
     ],
     "source": "live"

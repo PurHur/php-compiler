@@ -641,6 +641,8 @@ require_once __DIR__.'/../../../ext/intl/NormalizerNormalize.php';
 require_once __DIR__.'/../../../ext/intl/UnicodeCanonical.php';
 require_once __DIR__.'/../../../ext/intl/VmGrapheme.php';
 require_once __DIR__.'/../../../ext/intl/VmIntlDateFormatter.php';
+require_once __DIR__.'/../../../ext/intl/VmIntlTimeZone.php';
+require_once __DIR__.'/../../../ext/intl/VmIntlCalendar.php';
 require_once __DIR__.'/../../../ext/intl/VmLocale.php';
 require_once __DIR__.'/../../../ext/intl/VmNormalizer.php';
 require_once __DIR__.'/../../../ext/intl/VmIdn.php';
