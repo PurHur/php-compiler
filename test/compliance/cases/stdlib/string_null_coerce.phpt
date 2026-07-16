@@ -1,5 +1,5 @@
 --TEST--
-stdlib Z_PARAM_STR/LONG null — coerce vs TypeError on 8.4 forward profile (#19161/#19309/#19319)
+stdlib Z_PARAM_STR/LONG null — coerce vs TypeError on 8.4 forward profile (#19161/#19309/#19318/#19319)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -25,7 +25,7 @@ foreach ([
 dirname: ''
 explode: explode(): Argument #2 ($string) must be of type string, null given
 ord: ord(): Argument #1 ($character) must be of type string, null given
-chr: '' . "\0" . ''
+chr: chr(): Argument #1 ($codepoint) must be of type int, null given
 parse_url: array (
   'path' => '',
 )

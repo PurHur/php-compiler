@@ -36,19 +36,14 @@ final class wordwrap extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $text = InternalStrictArg::resolveCoercibleStringArg(
-            $frame,
-            0,
-            'wordwrap',
-            'string'
-        );
+        $text = self::vmStringArg($frame, 0, 'string');
         $width = 75;
         if ($argc >= 2) {
             $width = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'wordwrap', 2, 'width');
         }
         $break = "\n";
         if ($argc >= 3) {
-            $break = VmString::coerceStringBuiltinArg(
+            $break = VmString::coerceZparamStrBuiltinArg(
                 $frame->calledArgs[2],
                 'wordwrap',
                 2,
@@ -92,7 +87,7 @@ final class wordwrap extends Internal
             $width = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'wordwrap', 2, 'width');
         }
         if ($argc >= 3) {
-            $break = JitStringBuiltinArg::lower($context, $args[2], 'wordwrap', 2, 'break');
+            $break = JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'wordwrap', 2, 'break');
         } else {
             $break = $context->builder->load($context->constantStringFromString("\n"));
         }
@@ -105,7 +100,7 @@ final class wordwrap extends Internal
             $cutI8 = $context->builder->zExt($context->helper->loadValue($args[3]), $i8);
         }
 
-        $text = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'wordwrap', 0, 'string');
+        $text = self::jitStringArg($context, $args[0], 0, 'string');
         StringWordwrap::ensureLinked($context);
 
         return $context->builder->call(
@@ -114,6 +109,45 @@ final class wordwrap extends Internal
             $width,
             $break,
             $cutI8
+        );
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'wordwrap', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'wordwrap',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'wordwrap',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'wordwrap',
+            $argIndex,
+            $paramName
         );
     }
 

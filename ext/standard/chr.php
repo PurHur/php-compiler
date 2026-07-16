@@ -27,7 +27,7 @@ final class chr extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'chr', 1);
-        $n = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'chr', 0, 'codepoint');
+        $n = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'chr', 1, 'codepoint');
         if (null === $frame->returnVar) {
             return;
         }
