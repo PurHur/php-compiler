@@ -8320,7 +8320,12 @@ class JIT {
                         $this->assignOperandValue($block->getOperand($op->arg1), $classNameVal);
                         break;
                     }
-                    if ($classOp instanceof Operand\Literal) {
+                    // Literal `static::CONST` must resolve at runtime (LSB); baking
+                    // declaring-class id here matches self:: (#19614, zend_execute.c).
+                    $classIsStaticKeyword = $classOp instanceof Operand\Literal
+                        && \is_string($classOp->value)
+                        && 'static' === strtolower($classOp->value);
+                    if ($classOp instanceof Operand\Literal && !$classIsStaticKeyword) {
                         $classId = $this->context->type->object->resolveClassId($classOp);
                         if ($nameOp instanceof Operand\Literal) {
                             if ('native_type_map' === strtolower($nameOp->value) || 'type_map' === strtolower($nameOp->value)) {
