@@ -162,21 +162,63 @@ final class JitXmlWriterUserScript
         if (null === $writer) {
             return null;
         }
-        $flush = true;
-        if (isset($args[1])) {
-            if (null !== $args[1]->compileTimeLong) {
-                $flush = 0 !== (int) $args[1]->compileTimeLong;
-            } elseif (JITVariable::TYPE_NULL === $args[1]->type || !empty($args[1]->isNullConstant)) {
-                $flush = true;
-            } else {
-                // Bool literals are NATIVE_BOOL without compileTimeLong — default flush=true is
-                // fine for AOT fixtures; reject unknown dynamic flush args.
-                return null;
-            }
+        $flush = self::compileTimeEmptyFlag($args[1] ?? null);
+        if (null === $flush) {
+            return null;
         }
         $out = $writer->outputMemory($flush);
 
         return self::stringValue($context, (string) $out);
+    }
+
+    public static function tryFlush(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer) {
+            return null;
+        }
+        $empty = self::compileTimeEmptyFlag($args[1] ?? null);
+        if (null === $empty) {
+            return null;
+        }
+        $out = $writer->flush($empty);
+        if (\is_string($out)) {
+            return self::stringValue($context, $out);
+        }
+
+        return self::intValue($context, (int) $out);
+    }
+
+    /** @return ?bool null = dynamic / unknown (cannot fold) */
+    private static function compileTimeEmptyFlag(?JITVariable $arg): ?bool
+    {
+        if (null === $arg) {
+            return true;
+        }
+        if (null !== $arg->compileTimeLong) {
+            return 0 !== (int) $arg->compileTimeLong;
+        }
+        if (JITVariable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant)) {
+            return true;
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            // Constant int1: CallUnpackCompileTime uses constInt(false). Instruction-backed
+            // bools (common for `true`/`false` temporaries) cannot be folded here.
+            if (\is_object($const) && \method_exists($const, 'constInt')) {
+                try {
+                    return 0 !== (int) $const->constInt(false);
+                } catch (\Throwable $e) {
+                    return null;
+                }
+            }
+            if (\is_object($const) && \method_exists($const, 'isConstant') && $const->isConstant()
+                && \method_exists($const, 'getConstantValue')) {
+                return 0 !== (int) $const->getConstantValue();
+            }
+        }
+
+        return null;
     }
 
     private static function requireWriter(?JITVariable $receiver): ?\XMLWriter
@@ -228,6 +270,15 @@ final class JitXmlWriterUserScript
         $slot = JitValueBox::alloc($context);
         $i1 = $context->getTypeFromString('int1');
         JitValueBox::writeBool($context, $slot, $i1->constInt($ok ? 1 : 0, false));
+
+        return JitValueBox::normalizeValuePtr($context, $slot);
+    }
+
+    private static function intValue(Context $context, int $n): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $i64 = $context->getTypeFromString('int64');
+        JitValueBox::writeLong($context, $slot, $i64->constInt($n, true));
 
         return JitValueBox::normalizeValuePtr($context, $slot);
     }

@@ -326,22 +326,36 @@ final class VmXmlWriter
         return $out;
     }
 
-    public static function flush(ObjectEntry $entry): bool
+    /**
+     * XMLWriter::flush — memory returns buffer string; URI returns bytes written (php-src php_xmlwriter_flush; #19385).
+     * PHP 8.0+ never returns false.
+     *
+     * @return string|int
+     */
+    public static function flush(ObjectEntry $entry, bool $empty = true): string|int
     {
         $state = self::requireOpen($entry, 'XMLWriter::flush()');
-        if ('uri' !== $state->mode || null === $state->uri) {
-            return false;
+        if ('memory' === $state->mode) {
+            $out = $state->buffer;
+            if ($empty) {
+                $state->buffer = '';
+            }
+
+            return $out;
+        }
+        if (null === $state->uri) {
+            return 0;
         }
         if ('' === $state->buffer) {
-            return true;
+            return 0;
         }
         $written = @file_put_contents($state->uri, $state->buffer, \FILE_APPEND);
         if (false === $written) {
-            return false;
+            return 0;
         }
         $state->buffer = '';
 
-        return true;
+        return $written;
     }
 
     private static function resetState(XmlWriterState $state, string $mode, ?string $uri): void

@@ -544,6 +544,7 @@ final class Variable {
                 break;
             case self::TYPE_NATIVE_BOOL:
                 $value = $context->constantFromBool($op->value);
+                $literal = $op->value ? 1 : 0;
                 break;
             case self::TYPE_NULL:
                 $slot = JitValueBox::alloc($context);

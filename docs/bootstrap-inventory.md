@@ -27260,8 +27260,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new XMLWriter (line 43)
-- new XMLWriter (line 195)
-- 16 class method(s)
+- new XMLWriter (line 237)
+- 19 class method(s)
 
 ### `ext/xmlwriter/Module.php`
 
@@ -27289,8 +27289,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new XmlWriterOutputMemory (line 70)
 - new XmlWriterFlush (line 73)
 - new XmlWriterState (line 93)
-- new Error (line 366)
-- new Error (line 370)
+- new Error (line 380)
+- new Error (line 384)
 - 29 class method(s)
 
 ### `ext/xmlwriter/XmlWriterClassMethod.php`
@@ -34652,27 +34652,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 446)
 - new Variable (line 501)
 - new Variable (line 524)
-- new Variable (line 554)
-- new Variable (line 597)
-- new Variable (line 611)
-- new Variable (line 631)
-- new self (line 649)
-- new self (line 660)
-- new self (line 669)
-- new self (line 682)
-- new self (line 689)
-- new self (line 696)
-- new self (line 709)
-- new self (line 719)
-- new Variable (line 855)
-- new Variable (line 864)
-- new Variable (line 894)
-- new Variable (line 940)
-- new Variable (line 962)
-- new Variable (line 976)
-- new Variable (line 1020)
-- new Variable (line 1038)
-- new Variable (line 1060)
+- new Variable (line 555)
+- new Variable (line 598)
+- new Variable (line 612)
+- new Variable (line 632)
+- new self (line 650)
+- new self (line 661)
+- new self (line 670)
+- new self (line 683)
+- new self (line 690)
+- new self (line 697)
+- new self (line 710)
+- new self (line 720)
+- new Variable (line 856)
+- new Variable (line 865)
+- new Variable (line 895)
+- new Variable (line 941)
+- new Variable (line 963)
+- new Variable (line 977)
+- new Variable (line 1021)
+- new Variable (line 1039)
+- new Variable (line 1061)
 - 20 class method(s)
 
 ### `lib/JIT/VariableFunctionCallHelper.php`
@@ -34735,7 +34735,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/XmlWriterInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\XmlWriterMethod (line 47)
+- new Call\XmlWriterMethod (line 48)
 - 3 class method(s)
 
 ### `lib/JitMcjitEmbed.php`
