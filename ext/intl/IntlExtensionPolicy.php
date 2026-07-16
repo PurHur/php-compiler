@@ -10,10 +10,11 @@ use PHPCompiler\ext\standard\ModuleRegistry;
 /**
  * ext/intl builtin advertisement — php-src ext/intl/php_intl.c module registration (#11768, #11825).
  *
- * Grapheme helpers and intl_* error functions require a loaded intl extension on Zend; they stay
- * withheld from function_exists()/class_exists() until {@see ModuleRegistry::extensionLoaded}('intl')
- * (#11472, #17694). Locale + Normalizer + IntlDateFormatter (pattern create/format) are partial
- * surfaces that advertise without loading intl (#6696, #5153, #19549).
+ * Grapheme helpers, IDN converters, and intl_* error functions require a loaded intl extension on
+ * Zend; they stay withheld from function_exists()/class_exists() until
+ * {@see ModuleRegistry::extensionLoaded}('intl') (#11472, #17694, #19593). Locale + Normalizer +
+ * IntlDateFormatter (pattern create/format) are partial surfaces that advertise without loading
+ * intl (#6696, #5153, #19549).
  */
 final class IntlExtensionPolicy
 {
@@ -60,13 +61,24 @@ final class IntlExtensionPolicy
     }
 
     /**
-     * idn_to_ascii()/idn_to_utf8() — partial ext/intl surface when libidn2 or host intl is reachable (#6169).
+     * idn_to_ascii()/idn_to_utf8() — require loaded ext/intl (php-src ext/intl/idn/idn.c; #19593).
      *
-     * Mirrors {@see advertisesNormalizer()}: function_exists without extension_loaded('intl').
+     * Implementation stays in-tree (#6169) but must not phantom-advertise when
+     * extension_loaded('intl') is false (Zend 8.2 reference without intl).
      */
     public static function advertisesIdn(): bool
     {
-        return VmIdn::available();
+        return self::advertisesBuiltins();
+    }
+
+    /** Run IDN compliance when ext/intl is loaded or a phantom-registration guard matches (#19593). */
+    public static function runsIdnCompliance(string $testFileName): bool
+    {
+        if (self::advertisesIdn()) {
+            return true;
+        }
+
+        return str_contains($testFileName, 'idn_phantom');
     }
 
     /** grapheme_strlen/substr/strpos/extract/str_split — require loaded ext/intl (#17694, php-src ext/intl/php_intl.c). */
