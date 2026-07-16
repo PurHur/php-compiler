@@ -55,12 +55,8 @@ final class VmLocale
      */
     public static function nlLanginfo(int $item): string|false
     {
+        // php-src ext/standard/nl_langinfo.c — invalid item returns false without warning (#19232).
         if (!self::isValidNlLanginfoItem($item)) {
-            \trigger_error(
-                \sprintf("nl_langinfo(): Item '%d' is not valid", $item),
-                \E_USER_WARNING
-            );
-
             return false;
         }
 
