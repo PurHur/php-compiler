@@ -67,6 +67,15 @@ final class VmStreamSelect
 
                 continue;
             }
+            // php://temp casts to a selectable tempfile fd; php://memory stays omitted (#19688).
+            if (VmPhpMemoryStream::isValidHandle($handle)) {
+                $castHost = VmPhpMemoryStream::castHostResourceForSelect($handle);
+                if (\is_resource($castHost)) {
+                    $pairs[] = new StreamSelectPair($handle, null, $castHost);
+                }
+
+                continue;
+            }
             $host = VmFs::lookupResource($handle);
             if (!\is_resource($host)) {
                 continue;
