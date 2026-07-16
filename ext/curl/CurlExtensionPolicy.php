@@ -8,8 +8,9 @@ namespace PHPCompiler\ext\curl;
  * ext/curl advertisement — php-src ext/curl/interface.c (#12117, #13588, #16659).
  *
  * Phase 2 introspection ({@see VmCurlCore}) keeps curl_* implementations in-tree without
- * libcurl HTTP I/O (#3325). Zend never splits CURLFile / CURLStringFile from the module —
- * withhold class_exists until {@see advertisesExtension()} (#19671, same pattern as #19670).
+ * libcurl HTTP I/O (#3325). Zend never splits CURLFile / CURLStringFile / CurlShareHandle
+ * from the module — withhold class_exists / function_exists until {@see advertisesExtension()}
+ * (#19671, #19728, same pattern as #19670).
  */
 final class CurlExtensionPolicy
 {
@@ -54,17 +55,35 @@ final class CurlExtensionPolicy
             || str_contains($testFileName, 'curl_string_file_phantom');
     }
 
-    /** curl_share_* + minimal easy-handle stubs for CURLOPT_SHARE (#6322). */
+    /**
+     * curl_share_* + CurlShareHandle — only with loaded ext/curl (#19728, re-#12117).
+     *
+     * Zend registers share APIs in the same module startup as curl_init (php-src
+     * ext/curl/interface.c / curl.stub.php). Advertising share while withholding
+     * easy-handle entrypoints is a phantom split; gate on {@see advertisesExtension()}
+     * so share + core surfaces appear together when #3325 lands.
+     */
     public static function advertisesShareHandles(): bool
     {
-        return self::advertisesBuiltins();
+        return self::advertisesExtension();
+    }
+
+    /** Run curl_share_* compliance when share is advertised or a phantom guard matches (#19728). */
+    public static function runsCurlShareCompliance(string $testFileName): bool
+    {
+        if (self::advertisesShareHandles()) {
+            return true;
+        }
+
+        return str_contains($testFileName, 'curl_share_phantom')
+            || str_contains($testFileName, 'class_exists_curlhandle_no_curl');
     }
 
     /**
      * curl_init/curl_setopt/curl_close — only when ext/curl is loaded (#18470, #11627).
      *
-     * Share-handle stubs (#6322) stay on {@see advertisesShareHandles}; easy-handle entrypoints
-     * must not appear in function_exists until extension_loaded('curl') is true (Zend parity).
+     * Share + easy-handle entrypoints must not appear in function_exists until
+     * extension_loaded('curl') is true (Zend parity; #19728).
      */
     public static function advertisesEasyHandleStubs(): bool
     {
