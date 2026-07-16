@@ -45,13 +45,22 @@ final class SplFileInfoBuiltin
             'getpathname' => SplFileInfoGetPathname::class,
             'getextension' => SplFileInfoGetExtension::class,
             'getrealpath' => SplFileInfoGetRealPath::class,
+            'gettype' => SplFileInfoGetType::class,
             'isfile' => SplFileInfoIsFile::class,
             'isdir' => SplFileInfoIsDir::class,
+            'islink' => SplFileInfoIsLink::class,
             'isreadable' => SplFileInfoIsReadable::class,
             'iswritable' => SplFileInfoIsWritable::class,
+            'isexecutable' => SplFileInfoIsExecutable::class,
             'getctime' => SplFileInfoGetCTime::class,
             'getmtime' => SplFileInfoGetMTime::class,
+            'getatime' => SplFileInfoGetATime::class,
             'getsize' => SplFileInfoGetSize::class,
+            'getperms' => SplFileInfoGetPerms::class,
+            'getowner' => SplFileInfoGetOwner::class,
+            'getgroup' => SplFileInfoGetGroup::class,
+            'getinode' => SplFileInfoGetInode::class,
+            'getlinktarget' => SplFileInfoGetLinkTarget::class,
             '__tostring' => SplFileInfoToString::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
@@ -59,13 +68,22 @@ final class SplFileInfoBuiltin
         }
         $entry->methodNames['getextension'] = 'getExtension';
         $entry->methodNames['getrealpath'] = 'getRealPath';
+        $entry->methodNames['gettype'] = 'getType';
         $entry->methodNames['isfile'] = 'isFile';
         $entry->methodNames['isdir'] = 'isDir';
+        $entry->methodNames['islink'] = 'isLink';
         $entry->methodNames['isreadable'] = 'isReadable';
         $entry->methodNames['iswritable'] = 'isWritable';
+        $entry->methodNames['isexecutable'] = 'isExecutable';
         $entry->methodNames['getctime'] = 'getCTime';
         $entry->methodNames['getmtime'] = 'getMTime';
+        $entry->methodNames['getatime'] = 'getATime';
         $entry->methodNames['getsize'] = 'getSize';
+        $entry->methodNames['getperms'] = 'getPerms';
+        $entry->methodNames['getowner'] = 'getOwner';
+        $entry->methodNames['getgroup'] = 'getGroup';
+        $entry->methodNames['getinode'] = 'getInode';
+        $entry->methodNames['getlinktarget'] = 'getLinkTarget';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -78,7 +96,10 @@ final class SplFileInfoBuiltin
             $entry->methods['getfilename'],
             $entry->methods['getpathname'],
             $entry->methods['getextension'],
+            $entry->methods['gettype'],
             $entry->methods['isfile'],
+            $entry->methods['islink'],
+            $entry->methods['getperms'],
             $entry->methods['getsize']
         );
     }
@@ -280,6 +301,32 @@ final class SplFileInfoGetRealPath extends VmClassMethod
     }
 }
 
+final class SplFileInfoGetType extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::getType()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pathname = SplFileInfoStorage::pathname($object);
+        $type = VmFs::fileType($pathname);
+        if (false === $type) {
+            throw new \RuntimeException('SplFileInfo::getType(): Lstat failed for '.$pathname);
+        }
+        $frame->returnVar->string($type);
+    }
+}
+
 final class SplFileInfoIsFile extends VmClassMethod
 {
     public function __construct()
@@ -300,6 +347,54 @@ final class SplFileInfoIsFile extends VmClassMethod
         SplIteratorSupport::setReturnBool(
             $frame,
             VmStatPath::isFile(SplFileInfoStorage::pathname($object))
+        );
+    }
+}
+
+final class SplFileInfoIsLink extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isLink');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::isLink()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        SplIteratorSupport::setReturnBool(
+            $frame,
+            VmStatPath::isLink(SplFileInfoStorage::pathname($object))
+        );
+    }
+}
+
+final class SplFileInfoIsExecutable extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isExecutable');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::isExecutable()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        SplIteratorSupport::setReturnBool(
+            $frame,
+            VmStatPath::isExecutable(SplFileInfoStorage::pathname($object))
         );
     }
 }
@@ -451,5 +546,169 @@ final class SplFileInfoGetSize extends VmClassMethod
             throw new \RuntimeException('SplFileInfo::getSize(): stat failed for '.$pathname);
         }
         $frame->returnVar->int($size);
+    }
+}
+
+final class SplFileInfoGetATime extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getATime');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::getATime()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pathname = SplFileInfoStorage::pathname($object);
+        $atime = VmFs::fileAtime($pathname);
+        if (false === $atime) {
+            throw new \RuntimeException('SplFileInfo::getATime(): stat failed for '.$pathname);
+        }
+        $frame->returnVar->int($atime);
+    }
+}
+
+final class SplFileInfoGetPerms extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPerms');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::getPerms()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pathname = SplFileInfoStorage::pathname($object);
+        $perms = VmFs::filePerms($pathname);
+        if (false === $perms) {
+            throw new \RuntimeException('SplFileInfo::getPerms(): stat failed for '.$pathname);
+        }
+        $frame->returnVar->int($perms);
+    }
+}
+
+final class SplFileInfoGetOwner extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getOwner');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::getOwner()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pathname = SplFileInfoStorage::pathname($object);
+        $owner = VmFs::fileOwner($pathname);
+        if (false === $owner) {
+            throw new \RuntimeException('SplFileInfo::getOwner(): stat failed for '.$pathname);
+        }
+        $frame->returnVar->int($owner);
+    }
+}
+
+final class SplFileInfoGetGroup extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getGroup');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::getGroup()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pathname = SplFileInfoStorage::pathname($object);
+        $group = VmFs::fileGroup($pathname);
+        if (false === $group) {
+            throw new \RuntimeException('SplFileInfo::getGroup(): stat failed for '.$pathname);
+        }
+        $frame->returnVar->int($group);
+    }
+}
+
+final class SplFileInfoGetInode extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getInode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::getInode()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pathname = SplFileInfoStorage::pathname($object);
+        $inode = VmFs::fileInode($pathname);
+        if (false === $inode) {
+            throw new \RuntimeException('SplFileInfo::getInode(): stat failed for '.$pathname);
+        }
+        $frame->returnVar->int($inode);
+    }
+}
+
+final class SplFileInfoGetLinkTarget extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getLinkTarget');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::getLinkTarget()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pathname = SplFileInfoStorage::pathname($object);
+        $target = VmFs::readlink($pathname);
+        if (false !== $target) {
+            $frame->returnVar->string($target);
+
+            return;
+        }
+        // php-src spl_directory.c — strerror(errno) after php_sys_readlink failure
+        $errnoMsg = false === VmFs::fileType($pathname)
+            ? 'No such file or directory'
+            : 'Invalid argument';
+        throw new \RuntimeException(
+            'Unable to read link '.$pathname.', error: '.$errnoMsg
+        );
     }
 }

@@ -12425,8 +12425,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 32)
 - new SplFileInfoConstruct (line 38)
-- new ArgumentCountError (line 102)
-- 17 class method(s)
+- new ArgumentCountError (line 123)
+- 26 class method(s)
 
 ### `ext/spl/SplFileInfoStorage.php`
 
