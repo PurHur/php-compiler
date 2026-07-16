@@ -67,6 +67,10 @@ class Module extends ModuleAbstract
             $functions[] = new imagecopymerge();
             $functions[] = new imagecopyresampled();
             $functions[] = new imagesetpixel();
+            $functions[] = new imageline();
+            $functions[] = new imagefilledrectangle();
+            $functions[] = new imagestring();
+            $functions[] = new imagechar();
             $functions[] = new imagefilter();
             $functions[] = new imageflip();
             $functions[] = new imagecrop();

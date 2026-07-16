@@ -209,9 +209,197 @@ final class VmGd
         if ($x < 0 || $y < 0 || $x >= $state->width || $y >= $state->height) {
             return false;
         }
-        $pixels = $state->pixels;
-        $pixels[$y * $state->width + $x] = $color;
-        $state->pixels = $pixels;
+        $state->pixels[$y * $state->width + $x] = $color;
+
+        return true;
+    }
+
+    /**
+     * imageline() — Bresenham stroke with libgd clip (php-src ext/gd/libgd/gd.c gdImageLine; #6534).
+     */
+    public static function line(ObjectEntry $image, int $x1, int $y1, int $x2, int $y2, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $maxX = $state->width - 1;
+        $maxY = $state->height - 1;
+        if (!self::clip1d($x1, $y1, $x2, $y2, $maxX) || !self::clip1d($y1, $x1, $y2, $x2, $maxY)) {
+            return true;
+        }
+
+        $dx = \abs($x2 - $x1);
+        $dy = \abs($y2 - $y1);
+        if (0 === $dx) {
+            self::vLine($state, $x1, $y1, $y2, $color);
+
+            return true;
+        }
+        if (0 === $dy) {
+            self::hLine($state, $y1, $x1, $x2, $color);
+
+            return true;
+        }
+
+        if ($dy <= $dx) {
+            $d = 2 * $dy - $dx;
+            $incr1 = 2 * $dy;
+            $incr2 = 2 * ($dy - $dx);
+            if ($x1 > $x2) {
+                $x = $x2;
+                $y = $y2;
+                $ydirflag = -1;
+                $xend = $x1;
+            } else {
+                $x = $x1;
+                $y = $y1;
+                $ydirflag = 1;
+                $xend = $x2;
+            }
+            self::putPixel($state, $x, $y, $color);
+            if ((($y2 - $y1) * $ydirflag) > 0) {
+                while ($x < $xend) {
+                    ++$x;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        ++$y;
+                        $d += $incr2;
+                    }
+                    self::putPixel($state, $x, $y, $color);
+                }
+            } else {
+                while ($x < $xend) {
+                    ++$x;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        --$y;
+                        $d += $incr2;
+                    }
+                    self::putPixel($state, $x, $y, $color);
+                }
+            }
+        } else {
+            $d = 2 * $dx - $dy;
+            $incr1 = 2 * $dx;
+            $incr2 = 2 * ($dx - $dy);
+            if ($y1 > $y2) {
+                $y = $y2;
+                $x = $x2;
+                $yend = $y1;
+                $xdirflag = -1;
+            } else {
+                $y = $y1;
+                $x = $x1;
+                $yend = $y2;
+                $xdirflag = 1;
+            }
+            self::putPixel($state, $x, $y, $color);
+            if ((($x2 - $x1) * $xdirflag) > 0) {
+                while ($y < $yend) {
+                    ++$y;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        ++$x;
+                        $d += $incr2;
+                    }
+                    self::putPixel($state, $x, $y, $color);
+                }
+            } else {
+                while ($y < $yend) {
+                    ++$y;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        --$x;
+                        $d += $incr2;
+                    }
+                    self::putPixel($state, $x, $y, $color);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * imagefilledrectangle() — clipped fill (php-src _gdImageFilledVRectangle; #6534).
+     */
+    public static function filledRectangle(ObjectEntry $image, int $x1, int $y1, int $x2, int $y2, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if ($x1 === $x2 && $y1 === $y2) {
+            self::putPixel($state, $x1, $y1, $color);
+
+            return true;
+        }
+        if ($x1 > $x2) {
+            $t = $x1;
+            $x1 = $x2;
+            $x2 = $t;
+        }
+        if ($y1 > $y2) {
+            $t = $y1;
+            $y1 = $y2;
+            $y2 = $t;
+        }
+        if ($x1 < 0) {
+            $x1 = 0;
+        }
+        if ($x2 >= $state->width) {
+            $x2 = $state->width - 1;
+        }
+        if ($y1 < 0) {
+            $y1 = 0;
+        }
+        if ($y2 >= $state->height) {
+            $y2 = $state->height - 1;
+        }
+        if ($x1 > $x2 || $y1 > $y2) {
+            return true;
+        }
+        $width = $state->width;
+        for ($y = $y1; $y <= $y2; ++$y) {
+            $row = $y * $width;
+            for ($x = $x1; $x <= $x2; ++$x) {
+                $state->pixels[$row + $x] = $color;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * imagechar() — single glyph from built-in font (php-src gdImageChar; #6534).
+     */
+    public static function char(ObjectEntry $image, int $font, int $x, int $y, string $char, int $color): bool
+    {
+        $ch = '' === $char ? 0 : \ord($char[0]);
+
+        return self::drawChar(GdRegistry::state($image), GdFonts::get($font), $x, $y, $ch, $color);
+    }
+
+    /**
+     * imagestring() — horizontal string from built-in font (php-src gdImageString; #6534).
+     */
+    public static function string(ObjectEntry $image, int $font, int $x, int $y, string $text, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $fontData = GdFonts::get($font);
+        $len = \strlen($text);
+        for ($i = 0; $i < $len; ++$i) {
+            self::drawChar($state, $fontData, $x, $y, \ord($text[$i]), $color);
+            $x += $fontData['w'];
+        }
 
         return true;
     }
@@ -998,7 +1186,138 @@ final class VmGd
                 3 => 'y',
                 default => 'arg',
             },
+            'imageline', 'imagefilledrectangle' => match ($position) {
+                1 => 'image',
+                2 => 'x1',
+                3 => 'y1',
+                4 => 'x2',
+                5 => 'y2',
+                6 => 'color',
+                default => 'arg',
+            },
+            'imagestring', 'imagechar' => match ($position) {
+                1 => 'image',
+                2 => 'font',
+                3 => 'x',
+                4 => 'y',
+                5 => 'char' === \substr($function, -4) ? 'char' : 'string',
+                6 => 'color',
+                default => 'arg',
+            },
             default => 'arg',
         };
+    }
+
+    private static function putPixel(GdImageState $state, int $x, int $y, int $color): void
+    {
+        if ($x < 0 || $y < 0 || $x >= $state->width || $y >= $state->height) {
+            return;
+        }
+        $state->pixels[$y * $state->width + $x] = $color;
+    }
+
+    private static function hLine(GdImageState $state, int $y, int $x1, int $x2, int $color): void
+    {
+        if ($x2 < $x1) {
+            $t = $x2;
+            $x2 = $x1;
+            $x1 = $t;
+        }
+        for (; $x1 <= $x2; ++$x1) {
+            self::putPixel($state, $x1, $y, $color);
+        }
+    }
+
+    private static function vLine(GdImageState $state, int $x, int $y1, int $y2, int $color): void
+    {
+        if ($y2 < $y1) {
+            $t = $y1;
+            $y1 = $y2;
+            $y2 = $t;
+        }
+        for (; $y1 <= $y2; ++$y1) {
+            self::putPixel($state, $x, $y1, $color);
+        }
+    }
+
+    /**
+     * libgd clip_1d — clip line segment to [0, maxdim] on the first axis.
+     */
+    private static function clip1d(int &$x0, int &$y0, int &$x1, int &$y1, int $maxdim): bool
+    {
+        if ($x0 < 0) {
+            if ($x1 < 0) {
+                return false;
+            }
+            $m = ($y1 - $y0) / (float) ($x1 - $x0);
+            $y0 -= (int) ($m * $x0);
+            $x0 = 0;
+            if ($x1 > $maxdim) {
+                $y1 += (int) ($m * ($maxdim - $x1));
+                $x1 = $maxdim;
+            }
+
+            return true;
+        }
+        if ($x0 > $maxdim) {
+            if ($x1 > $maxdim) {
+                return false;
+            }
+            $m = ($y1 - $y0) / (float) ($x1 - $x0);
+            $y0 += (int) ($m * ($maxdim - $x0));
+            $x0 = $maxdim;
+            if ($x1 < 0) {
+                $y1 -= (int) ($m * $x1);
+                $x1 = 0;
+            }
+
+            return true;
+        }
+        if ($x1 > $maxdim) {
+            $m = ($y1 - $y0) / (float) ($x1 - $x0);
+            $y1 += (int) ($m * ($maxdim - $x1));
+            $x1 = $maxdim;
+
+            return true;
+        }
+        if ($x1 < 0) {
+            $m = ($y1 - $y0) / (float) ($x1 - $x0);
+            $y1 -= (int) ($m * $x1);
+            $x1 = 0;
+
+            return true;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array{nchars:int,offset:int,w:int,h:int,data:string}|null $font
+     */
+    private static function drawChar(?GdImageState $state, ?array $font, int $x, int $y, int $c, int $color): bool
+    {
+        if (null === $state || !$state->hasRaster() || null === $font) {
+            return false;
+        }
+        if ($c < $font['offset'] || $c >= ($font['offset'] + $font['nchars'])) {
+            return true;
+        }
+        $fw = $font['w'];
+        $fh = $font['h'];
+        $fline = ($c - $font['offset']) * $fh * $fw;
+        $data = $font['data'];
+        $cy = 0;
+        for ($py = $y; $py < $y + $fh; ++$py) {
+            $cx = 0;
+            for ($px = $x; $px < $x + $fw; ++$px) {
+                if ("\x01" === $data[$fline + $cy * $fw + $cx]) {
+                    self::putPixel($state, $px, $py, $color);
+                }
+                ++$cx;
+            }
+            ++$cy;
+        }
+
+        return true;
     }
 }
