@@ -741,16 +741,16 @@ final class RandomizerShuffleArray extends VmClassMethod
                 .(\count($frame->calledArgs) - 1).' given'
             );
         }
-        $arrayVar = $frame->calledArgs[1];
-        $arrayVar->separateArrayForWrite();
-        $ht = VmArray::requireArrayParam($arrayVar, 'Random\\Randomizer::shuffleArray', 1, 'array');
+        // php-src randomizer.c: zend_array_dup then shuffle; return copy (input unchanged).
+        $src = VmArray::requireArrayParam($frame->calledArgs[1], 'Random\\Randomizer::shuffleArray', 1, 'array');
+        $ht = $src->duplicate();
         $engine = RandomEngineStorage::engineObject($object);
         VmArray::shufflePackedWithPicker(
             $ht,
             static fn (int $upper): int => RandomEngineStorage::range($engine, 0, $upper - 1)
         );
         if (null !== $frame->returnVar) {
-            $frame->returnVar->null();
+            $frame->returnVar->array($ht);
         }
     }
 }
@@ -815,30 +815,25 @@ final class RandomizerPickArrayKeys extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $arrayArg = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $arrayArg->type) {
-            throw new \TypeError(
-                'Random\\Randomizer::pickArrayKeys(): Argument #1 ($array) must be of type array, '
-                .EnumCaseSupport::typeNameForVariable($arrayArg).' given'
-            );
-        }
+        $ht = VmArray::requireArrayParam($frame->calledArgs[1], 'Random\\Randomizer::pickArrayKeys', 1, 'array');
         $num = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'Random\\Randomizer::pickArrayKeys', 1, 'num');
-        $keys = \array_keys($arrayArg->toArray());
-        $count = \count($keys);
-        if ($num < 0 || $num > $count) {
+        $numAvail = $ht->getNumElements();
+        if (0 === $numAvail) {
+            throw new \ValueError('Random\\Randomizer::pickArrayKeys(): Argument #1 ($array) cannot be empty');
+        }
+        if ($num < 1 || $num > $numAvail) {
             throw new \ValueError(
-                'Random\\Randomizer::pickArrayKeys(): Argument #2 ($num) must be between 0 and the number of elements in argument #1 ($array)'
+                'Random\\Randomizer::pickArrayKeys(): Argument #2 ($num) must be between 1 and the number of elements in argument #1 ($array)'
             );
         }
         $engine = RandomEngineStorage::engineObject($object);
-        $picked = [];
-        $pool = $keys;
-        for ($i = 0; $i < $num; ++$i) {
-            $idx = RandomEngineStorage::range($engine, 0, \count($pool) - 1);
-            $picked[] = $pool[$idx];
-            \array_splice($pool, $idx, 1);
-        }
-        $frame->returnVar->array($picked);
+        $picked = VmArray::pickKeysWithPicker(
+            $ht,
+            $num,
+            static fn (int $min, int $max): int => RandomEngineStorage::range($engine, $min, $max),
+            true
+        );
+        $frame->returnVar->copyFrom($picked);
     }
 }
 

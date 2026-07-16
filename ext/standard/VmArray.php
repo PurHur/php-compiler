@@ -1155,6 +1155,23 @@ final class VmArray
             );
         }
 
+        return self::pickKeysWithPicker(
+            $ht,
+            $num,
+            static fn (int $min, int $max): int => VmMt19937::range($min, $max),
+            false
+        );
+    }
+
+    /**
+     * php-src php_array_pick_keys — bitset sample via {@param $range}(min, max).
+     *
+     * @param callable(int, int): int $range
+     * @param bool                    $alwaysArray When true (Randomizer::pickArrayKeys), wrap a single key in a list (#3722).
+     */
+    public static function pickKeysWithPicker(HashTable $ht, int $num, callable $range, bool $alwaysArray = false): Variable
+    {
+        $numAvail = $ht->getNumElements();
         $keys = [];
         foreach ($ht->iterateKeyed() as $pair) {
             $keyCopy = new Variable();
@@ -1163,9 +1180,16 @@ final class VmArray
         }
 
         if (1 === $num) {
-            $idx = VmMt19937::range(0, $numAvail - 1);
+            $idx = $range(0, $numAvail - 1);
+            $one = new Variable();
+            $one->copyFrom($keys[$idx]);
+            if (!$alwaysArray) {
+                return $one;
+            }
+            $arr = new HashTable();
+            $arr->addIndex(0, $one);
             $result = new Variable();
-            $result->copyFrom($keys[$idx]);
+            $result->array($arr);
 
             return $result;
         }
@@ -1182,7 +1206,7 @@ final class VmArray
         $remaining = $numReq;
         $failures = 0;
         while ($remaining > 0) {
-            $randval = VmMt19937::range(0, $numAvail - 1);
+            $randval = $range(0, $numAvail - 1);
             if ($bitset[$randval]) {
                 if (++$failures > 50) {
                     throw new \Random\BrokenRandomEngineError(
