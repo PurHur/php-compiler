@@ -20,7 +20,7 @@ final class DomInstanceMethodJit
             return self::isUserScriptDirectMethod($lc) || self::isUserScriptGenericDomMethod($lc);
         }
 
-        return (bool) preg_match('/^dom[a-z0-9_]*::[a-z0-9_]+$/', $lc);
+        return (bool) preg_match('/^dom(\\\\[a-z0-9_]+|[a-z0-9_]*)::[a-z0-9_]+$/', $lc);
     }
 
     /** User-script AOT: dedicated LLVM bridges (#17954, #18268). */
@@ -85,6 +85,10 @@ final class DomInstanceMethodJit
         'domxpath::query' => true,
         'domxpath::evaluate' => true,
         'domnodelist::item' => true,
+        'dom\\htmldocument::queryselector' => true,
+        'dom\\htmldocument::queryselectorall' => true,
+        'dom\\htmldocument::getelementbyid' => true,
+        'dom\\htmldocument::savehtml' => true,
     ];
 
     /** User-script AOT: nested VmDomInstanceInvoke JIT aborts — use VmClassMethod lowering (#15407, #17391). */
@@ -287,6 +291,18 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('dom\\htmldocument::queryselector' === $lc
+                || 'dom\\htmldocument::queryselectorall' === $lc
+                || 'dom\\htmldocument::getelementbyid' === $lc
+                || 'dom\\htmldocument::savehtml' === $lc
+            ) {
+                if (!preg_match('/^(dom\\\\[a-z0-9_]+)::([a-z0-9_]+)$/', $lc, $livingMatches)) {
+                    return;
+                }
+                $context->functionProxies[$lc] = new Call\DomInstanceMethod($livingMatches[1], $livingMatches[2]);
+
+                return;
+            }
             if (!self::isUserScriptDirectMethod($lc) && !self::isUserScriptGenericDomMethod($lc)) {
                 return;
             }
@@ -298,7 +314,7 @@ final class DomInstanceMethodJit
         if (!self::isDomInstanceMethodProxy($lc)) {
             return;
         }
-        if (!preg_match('/^(dom[a-z0-9_]*)::([a-z0-9_]+)$/', $lc, $matches)) {
+        if (!preg_match('/^(dom(?:\\\\[a-z0-9_]+|[a-z0-9_]*))::([a-z0-9_]+)$/', $lc, $matches)) {
             return;
         }
         $context->functionProxies[$lc] = new Call\DomInstanceMethod($matches[1], $matches[2]);
@@ -355,6 +371,10 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::createattributens');
             self::ensureProxy($context, 'domnode::comparedocumentposition');
             self::ensureProxy($context, 'domxpath::registernamespace');
+            self::ensureProxy($context, 'dom\\htmldocument::queryselector');
+            self::ensureProxy($context, 'dom\\htmldocument::queryselectorall');
+            self::ensureProxy($context, 'dom\\htmldocument::getelementbyid');
+            self::ensureProxy($context, 'dom\\htmldocument::savehtml');
 
             return;
         }

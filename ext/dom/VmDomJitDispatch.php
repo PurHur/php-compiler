@@ -54,6 +54,61 @@ final class VmDomJitDispatch
     }
 
     /**
+     * Dom\HTMLDocument::querySelector() — php-src parentnode.c (#19580).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function querySelector(ObjectEntry $document, array $extra): Variable
+    {
+        $selectors = self::stringArg($extra[0] ?? self::missingArg('querySelector', 0), 'querySelector', 0);
+        $found = VmDomLiving::querySelector($document, $selectors);
+        $var = new Variable();
+        if (null === $found) {
+            $var->null();
+        } else {
+            $var->object($found);
+        }
+
+        return $var;
+    }
+
+    /**
+     * Dom\HTMLDocument::querySelectorAll() — php-src parentnode.c (#19580).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function querySelectorAll(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        $selectors = self::stringArg(
+            $extra[0] ?? self::missingArg('querySelectorAll', 0),
+            'querySelectorAll',
+            0
+        );
+
+        return VmDomLiving::querySelectorAll($ctx, $document, $selectors);
+    }
+
+    /**
+     * Dom\HTMLDocument::saveHtml() — php-src html_document.c (#19580).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function saveHtml(ObjectEntry $document, array $extra): Variable
+    {
+        $node = null;
+        if (isset($extra[0])) {
+            $first = $extra[0]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $first->type) {
+                $node = VariableObject::entry($first);
+            }
+        }
+        $var = new Variable();
+        $var->string(VmDomLiving::saveHtml($document, $node));
+
+        return $var;
+    }
+
+    /**
      * @param list<Variable> $extra
      */
     public static function createElement(VmContext $ctx, ObjectEntry $document, array $extra): Variable

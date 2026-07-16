@@ -36,6 +36,9 @@ final class VmDomLiving
 
     public const PROP_DOCUMENT_ELEMENT = 'documentElement';
 
+    /** https://html.spec.whatwg.org/#document.title — php-src ext/dom/html_document.c (#19580). */
+    public const PROP_TITLE = 'title';
+
     public static function isLivingDocument(ObjectEntry $entry): bool
     {
         $lc = strtolower($entry->class->name);
@@ -125,6 +128,168 @@ final class VmDomLiving
             0,
             $encoding
         );
+    }
+
+    /**
+     * Dom\HTMLDocument::createFromFile() — php-src ext/dom/html_document.c (#19580).
+     */
+    public static function createFromFile(
+        Context $ctx,
+        string $path,
+        int $options = 0,
+        ?string $overrideEncoding = null,
+        ?Frame $frame = null
+    ): Variable {
+        if ('' === $path) {
+            throw new \ValueError('Dom\\HTMLDocument::createFromFile(): Argument #1 ($path) must not be empty');
+        }
+        self::assertValidHtmlParseOptions($options);
+        if (null !== $overrideEncoding && '' === $overrideEncoding) {
+            throw new \ValueError('Dom\\HTMLDocument::createFromFile(): Argument #3 ($overrideEncoding) must not be empty');
+        }
+
+        $contents = \PHPCompiler\ext\standard\VmFsReadNative::read($path);
+        if (false === $contents) {
+            throw new \DOMException(
+                'Dom\\HTMLDocument::createFromFile(): failed to load external entity "'.$path.'"'
+            );
+        }
+
+        return self::createFromString($ctx, $contents, $options, $overrideEncoding, $frame);
+    }
+
+    /**
+     * Document.title getter — first in-tree HTML title element text (php-src html_document.c; #19580).
+     */
+    public static function htmlDocumentTitle(ObjectEntry $document): string
+    {
+        $title = self::htmlTitleElement($document);
+        if (null === $title) {
+            return '';
+        }
+
+        return VmDom::readTextContent($title);
+    }
+
+    /**
+     * Document.title setter — php-src ext/dom/html_document.c dom_html_document_title_write (#19580).
+     */
+    public static function setHtmlDocumentTitle(Context $ctx, ObjectEntry $document, string $value): void
+    {
+        $title = self::htmlTitleElement($document);
+        if (null === $title) {
+            $head = self::htmlHeadElement($document);
+            if (null === $head) {
+                return;
+            }
+            $titleVar = VmDom::createElement($ctx, 'title', $document);
+            $title = $titleVar->toObject();
+            VmDom::appendChild($ctx, $head, $title);
+        }
+        VmDom::writeTextContent($ctx, $title, $value);
+    }
+
+    /**
+     * First in-tree title element (HTML document order) — php-src dom_get_title_element (#19580).
+     */
+    public static function htmlTitleElement(ObjectEntry $document): ?ObjectEntry
+    {
+        $root = self::htmlRootElement($document);
+        if (null === $root) {
+            return null;
+        }
+
+        return self::findFirstElementByLocalName($root, 'title');
+    }
+
+    /**
+     * Dom\Document::getElementById() — alias of classic ID map (php-src php_dom.stub.php; #19580).
+     */
+    public static function getElementById(ObjectEntry $document, string $elementId): ?ObjectEntry
+    {
+        return VmDom::getElementById($document, $elementId);
+    }
+
+    /**
+     * ParentNode::querySelector() — minimal CSS subset for living DOM (#19580).
+     *
+     * Supports: `*`, tag, `#id`, `.class`, and simple space-separated descendants.
+     */
+    public static function querySelector(ObjectEntry $root, string $selectors): ?ObjectEntry
+    {
+        $matches = self::querySelectorAllIds($root, $selectors);
+        if ([] === $matches) {
+            return null;
+        }
+
+        return DomRegistry::entry($matches[0]);
+    }
+
+    /**
+     * @return list<int> matching element object ids in document order
+     */
+    public static function querySelectorAllIds(ObjectEntry $root, string $selectors): array
+    {
+        $selectors = trim($selectors);
+        if ('' === $selectors) {
+            throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
+        }
+        $parts = preg_split('/\s+/', $selectors) ?: [];
+        if ([] === $parts || 1 === \count($parts) && '' === $parts[0]) {
+            throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
+        }
+
+        $candidates = self::collectDescendantElements($root);
+        if (VmDom::isElement($root)) {
+            array_unshift($candidates, $root);
+        }
+
+        $filtered = $candidates;
+        foreach ($parts as $i => $part) {
+            $simple = self::parseSimpleSelector($part);
+            if (null === $simple) {
+                throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
+            }
+            if (0 === $i) {
+                $filtered = array_values(array_filter(
+                    $filtered,
+                    static fn (ObjectEntry $el): bool => self::elementMatchesSimple($el, $simple)
+                ));
+                continue;
+            }
+            $next = [];
+            $seen = [];
+            foreach ($filtered as $ancestor) {
+                foreach (self::collectDescendantElements($ancestor) as $desc) {
+                    if (isset($seen[$desc->id])) {
+                        continue;
+                    }
+                    if (self::elementMatchesSimple($desc, $simple)) {
+                        $seen[$desc->id] = true;
+                        $next[] = $desc;
+                    }
+                }
+            }
+            $filtered = $next;
+        }
+
+        $ids = [];
+        foreach ($filtered as $el) {
+            $ids[] = $el->id;
+        }
+
+        return $ids;
+    }
+
+    public static function querySelectorAll(Context $ctx, ObjectEntry $root, string $selectors): Variable
+    {
+        return VmDom::createNodeList($ctx, self::querySelectorAllIds($root, $selectors));
+    }
+
+    /** Dom\HTMLDocument::saveHtml() — php-src html_document.c (#19580). */
+    public static function saveHtml(ObjectEntry $document, ?ObjectEntry $node = null): string
+    {
+        return VmDom::saveHTML($document, $node, 0);
     }
 
     /**
@@ -252,6 +417,123 @@ final class VmDomLiving
         }
 
         return self::findDirectChildElementByLocalName($html, 'head');
+    }
+
+    public static function findFirstElementByLocalName(ObjectEntry $root, string $localName): ?ObjectEntry
+    {
+        $localName = strtolower($localName);
+        if (VmDom::isElement($root) && $localName === strtolower(DomRegistry::state($root)->nodeName)) {
+            return $root;
+        }
+        foreach (DomRegistry::state($root)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            $found = self::findFirstElementByLocalName($child, $localName);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return list<ObjectEntry>
+     */
+    private static function collectDescendantElements(ObjectEntry $root): array
+    {
+        $out = [];
+        self::collectDescendantElementsRecursive($root, $out);
+
+        return $out;
+    }
+
+    /**
+     * @param list<ObjectEntry> $out
+     */
+    private static function collectDescendantElementsRecursive(ObjectEntry $node, array &$out): void
+    {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            if (VmDom::isElement($child)) {
+                $out[] = $child;
+            }
+            self::collectDescendantElementsRecursive($child, $out);
+        }
+    }
+
+    /**
+     * @return array{tag: ?string, id: ?string, classes: list<string>}|null
+     */
+    private static function parseSimpleSelector(string $selector): ?array
+    {
+        $selector = trim($selector);
+        if ('' === $selector) {
+            return null;
+        }
+        if ('*' === $selector) {
+            return ['tag' => null, 'id' => null, 'classes' => []];
+        }
+        if (!preg_match('/^([a-zA-Z][\w:-]*|)?(#[\w:-]+)?((?:\.[\w:-]+)*)$/', $selector, $m)) {
+            return null;
+        }
+        $tag = isset($m[1]) && '' !== $m[1] ? strtolower($m[1]) : null;
+        $id = isset($m[2]) && '' !== $m[2] ? substr($m[2], 1) : null;
+        $classes = [];
+        if (isset($m[3]) && '' !== $m[3]) {
+            foreach (explode('.', ltrim($m[3], '.')) as $class) {
+                if ('' !== $class) {
+                    $classes[] = $class;
+                }
+            }
+        }
+        if (null === $tag && null === $id && [] === $classes) {
+            return null;
+        }
+
+        return ['tag' => $tag, 'id' => $id, 'classes' => $classes];
+    }
+
+    /**
+     * @param array{tag: ?string, id: ?string, classes: list<string>} $simple
+     */
+    private static function elementMatchesSimple(ObjectEntry $element, array $simple): bool
+    {
+        $state = DomRegistry::state($element);
+        if (null !== $simple['tag'] && $simple['tag'] !== strtolower($state->nodeName)) {
+            return false;
+        }
+        if (null !== $simple['id']) {
+            $id = $state->attributes['id'] ?? null;
+            if ($simple['id'] !== $id) {
+                return false;
+            }
+        }
+        if ([] !== $simple['classes']) {
+            $classAttr = $state->attributes['class'] ?? '';
+            $present = preg_split('/\s+/', trim($classAttr)) ?: [];
+            $presentMap = [];
+            foreach ($present as $c) {
+                if ('' !== $c) {
+                    $presentMap[$c] = true;
+                }
+            }
+            foreach ($simple['classes'] as $need) {
+                if (!isset($presentMap[$need])) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private static function applyLivingElementClassMap(DomNodeState $state): void

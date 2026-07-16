@@ -9210,6 +9210,14 @@ restart:
                 )) {
                     return null;
                 }
+                if (ext\dom\DomHtmlDocumentPropertySupport::tryAssign(
+                    $resolved->objectPropertyOwner,
+                    $resolved->objectPropertyName,
+                    $src,
+                    $this->context
+                )) {
+                    return null;
+                }
                 if (ext\dom\DomTokenListPropertySupport::tryAssign(
                     $resolved->objectPropertyOwner,
                     $resolved->objectPropertyName,

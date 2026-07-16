@@ -62,6 +62,21 @@ final class DomLivingBuiltinClasses
         $htmlDocument->methods['createempty'] = new HtmlDocumentCreateEmpty();
         $htmlDocument->methodVisibility['createempty'] = $pubStatic;
         $htmlDocument->methodNames['createempty'] = 'createEmpty';
+        $htmlDocument->methods['createfromfile'] = new HtmlDocumentCreateFromFile();
+        $htmlDocument->methodVisibility['createfromfile'] = $pubStatic;
+        $htmlDocument->methodNames['createfromfile'] = 'createFromFile';
+        $htmlDocument->methods['getelementbyid'] = new HtmlDocumentGetElementById();
+        $htmlDocument->methodVisibility['getelementbyid'] = CfgFunc::FLAG_PUBLIC;
+        $htmlDocument->methodNames['getelementbyid'] = 'getElementById';
+        $htmlDocument->methods['queryselector'] = new HtmlDocumentQuerySelector();
+        $htmlDocument->methodVisibility['queryselector'] = CfgFunc::FLAG_PUBLIC;
+        $htmlDocument->methodNames['queryselector'] = 'querySelector';
+        $htmlDocument->methods['queryselectorall'] = new HtmlDocumentQuerySelectorAll();
+        $htmlDocument->methodVisibility['queryselectorall'] = CfgFunc::FLAG_PUBLIC;
+        $htmlDocument->methodNames['queryselectorall'] = 'querySelectorAll';
+        $htmlDocument->methods['savehtml'] = new HtmlDocumentSaveHtml();
+        $htmlDocument->methodVisibility['savehtml'] = CfgFunc::FLAG_PUBLIC;
+        $htmlDocument->methodNames['savehtml'] = 'saveHtml';
         $ctx->classes[VmDomLiving::CLASS_HTML_DOCUMENT] = $htmlDocument;
 
         $xmlDocument = new ClassEntry('Dom\\XMLDocument');

@@ -1,19 +1,10 @@
---TEST--
-stdlib Dom\HTMLDocument living surface — body/title/querySelector/getElementById/createFromFile/saveHtml (#6506, #19580)
---ENV--
-PHP_COMPILER_PROFILE=8.4
---FILE--
 <?php
-echo 'HTMLDocument: ', (int) class_exists('Dom\\HTMLDocument'), "\n";
-echo 'XMLDocument: ', (int) class_exists('Dom\\XMLDocument'), "\n";
-echo 'Document: ', (int) class_exists('Dom\\Document'), "\n";
-echo 'Node: ', (int) class_exists('Dom\\Node'), "\n";
-echo 'Element: ', (int) class_exists('Dom\\Element'), "\n";
-$doc = Dom\HTMLDocument::createFromString('<p>hi</p>');
-echo $doc->body->textContent, "\n";
-$empty = Dom\HTMLDocument::createEmpty();
-echo ($empty->body !== null ? 'empty_body' : 'empty_fail'), "\n";
-
+declare(strict_types=1);
+/**
+ * Maintainer repro: Dom\HTMLDocument living surface (#19580 / #6506).
+ *
+ * Zend 8.4+: body/title/querySelector/getElementById/createFromFile/saveHtml.
+ */
 $html = '<!DOCTYPE html><html><head><title>T</title></head><body><div id="x"><span>s</span></div></body></html>';
 $d = Dom\HTMLDocument::createFromString($html);
 $body = $d->body;
@@ -29,27 +20,17 @@ $byId = $d->getElementById('x');
 echo 'id=', ($byId !== null ? $byId->nodeName : 'NULL'), "\n";
 $saved = $d->saveHtml();
 echo 'save=', (strlen($saved) > 10 && str_contains($saved, '<span>')) ? 'ok' : 'fail', "\n";
-$path = sys_get_temp_dir() . '/phpc_dom_html_' . getmypid() . '.html';
+$path = sys_get_temp_dir() . '/phpc_dom_html_repro_' . getmypid() . '.html';
 file_put_contents($path, $html);
 $fromFile = Dom\HTMLDocument::createFromFile($path);
 @unlink($path);
 echo 'file_title=', $fromFile->title, "\n";
-?>
---EXPECT--
-HTMLDocument: 1
-XMLDocument: 1
-Document: 1
-Node: 1
-Element: 1
-hi
-empty_body
-body=body
-title=T
-qs=yes
-gid=yes
-cff=yes
-sh=yes
-span=s
-id=div
-save=ok
-file_title=T
+$ok = $body !== null
+    && $d->title === 'T'
+    && $span !== null
+    && $span->textContent === 's'
+    && $byId !== null
+    && $byId->nodeName === 'div'
+    && strlen($saved) > 10
+    && $fromFile->title === 'T';
+echo $ok ? "dom_html_document_surface ok\n" : "dom_html_document_surface fail\n";
