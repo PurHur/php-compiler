@@ -910,6 +910,7 @@
         "ext/sockets/socket_close.php",
         "ext/sockets/socket_connect.php",
         "ext/sockets/socket_create.php",
+        "ext/sockets/socket_create_listen.php",
         "ext/sockets/socket_create_pair.php",
         "ext/sockets/socket_export_stream.php",
         "ext/sockets/socket_get_option.php",
@@ -5245,9 +5246,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5011,
+        "inventory_files": 5012,
         "excluded": 0,
-        "eligible": 5011,
+        "eligible": 5012,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

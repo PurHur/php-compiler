@@ -45,6 +45,7 @@ class Module extends ModuleAbstract
             new socket_set_block(),
             new socket_create(),
             new socket_create_pair(),
+            new socket_create_listen(),
             new socket_connect(),
             new socket_bind(),
             new socket_listen(),
