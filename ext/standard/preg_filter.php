@@ -119,7 +119,9 @@ final class preg_filter extends Internal
             ? self::lowerLimit($context, $args[3])
             : $context->getTypeFromString('int64')->constInt(-1, false);
 
-        JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'preg_filter', 'subject', 3);
+        if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'preg_filter', 'subject', 3)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_filter', 2, 'subject');
         $pattern = JitStringArg::lower($context, $args[0], 'preg_filter() pattern');
         $replacement = JitStringArg::lower($context, $args[1], 'preg_filter() replacement');

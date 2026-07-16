@@ -159,13 +159,15 @@ final class preg_replace extends Internal
             );
         }
 
-        JitInternalStrictArg::rejectNullStringOrArray(
+        if (JitInternalStrictArg::rejectNullStringOrArray(
             $context,
             $args[0],
             'preg_replace',
             'pattern',
             1
-        );
+        )) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
         if (($args[0]->isNullConstant ?? false) || '' === JitStringBuiltinArg::compileTimeLiteral($args[0])) {
             return JitPregReplace::returnNullEmptyPattern($context, 'preg_replace');
         }
@@ -186,7 +188,9 @@ final class preg_replace extends Internal
             'replacement',
             'array|string'
         );
-        JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'preg_replace', 'subject', 3);
+        if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'preg_replace', 'subject', 3)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace', 2, 'subject');
         if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
             return JitPregReplace::invokeString(

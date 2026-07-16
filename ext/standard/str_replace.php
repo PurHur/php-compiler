@@ -109,7 +109,9 @@ final class str_replace extends Internal
             throw new \LogicException('str_replace() requires 3 or 4 arguments in this compiler build');
         }
 
-        JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'str_replace', 'subject', 3);
+        if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'str_replace', 'subject', 3)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
         JitPregSubject::requireStringOrArray($context, $args[2], 'str_replace', 2, 'subject');
         $countSlot = self::jitCountSlot($context, 4 === $argc);
         if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
