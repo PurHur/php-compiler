@@ -310,7 +310,7 @@ final class VmDateTimeNative
             return self::weekdayParseResult('bare', strtolower($matches[1]), $base, $tzName);
         }
         if (1 === preg_match(
-            '/^(first|last)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+of\s+([A-Za-z]+)\s+(\d{4})$/i',
+            '/^(first|second|third|fourth|fifth|last)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+of\s+([A-Za-z]+)\s+(\d{4})$/i',
             $time,
             $matches
         )) {
@@ -319,6 +319,20 @@ final class VmDateTimeNative
                 strtolower($matches[2]),
                 $matches[3],
                 (int) $matches[4],
+                $tzName
+            );
+        }
+        // php-src timelib — Nth weekday of this|next|last month (#19550).
+        if (1 === preg_match(
+            '/^(first|second|third|fourth|fifth|last)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+of\s+(this|next|last)\s+month$/i',
+            $time,
+            $matches
+        )) {
+            return self::weekdayOfRelativeMonthParseResult(
+                strtolower($matches[1]),
+                strtolower($matches[2]),
+                strtolower($matches[3]),
+                $base,
                 $tzName
             );
         }
@@ -459,10 +473,14 @@ final class VmDateTimeNative
     private static function tryParseAbsoluteDateWithRelativeSuffix(string $time, string $tzName): ?array
     {
         $weekday = 'monday|tuesday|wednesday|thursday|friday|saturday|sunday';
+        $ordinal = 'first|second|third|fourth|fifth|last';
         $suffixPatterns = [
             '/^(.+?)\s+((?:next|last|previous|this)\s+(?:'.$weekday.'))$/i',
             '/^(.+?)\s+((?:'.$weekday.'))$/i',
             '/^(.+?)\s+((?:first|last)\s+day\s+of\s+(?:next|this|last)\s+month)$/i',
+            // Nth weekday of month — named year or this|next|last (#19550).
+            '/^(.+?)\s+((?:'.$ordinal.')\s+(?:'.$weekday.')\s+of\s+(?:this|next|last)\s+month)$/i',
+            '/^(.+?)\s+((?:'.$ordinal.')\s+(?:'.$weekday.')\s+of\s+[A-Za-z]+\s+\d{4})$/i',
             '/^(.+?)\s+((?:next|last|this)\s+(?:month|year|week))$/i',
             '/^(.+?)\s+((?:today|tomorrow|yesterday)(?:\s+.+)?)$/i',
             '/^(.+?)\s+(midnight|noon)$/i',
@@ -1799,7 +1817,7 @@ final class VmDateTimeNative
     }
 
     /**
-     * php-src timelib — first/last weekday of named month (#15058, ext/standard/parsdate.c).
+     * php-src timelib — first|second|…|fifth|last weekday of named month (#15058, #19550).
      *
      * @return array{timestamp: int, microsecond: int}|null
      */
@@ -1811,14 +1829,93 @@ final class VmDateTimeNative
         string $tzName
     ): ?array {
         $month = self::englishMonthToNumber($monthName);
+        if (null === $month) {
+            return null;
+        }
+
+        return self::weekdayOfYearMonthParseResult($which, $weekday, $year, $month, $tzName);
+    }
+
+    /**
+     * php-src timelib — Nth weekday of this|next|last month relative to $base (#19550).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function weekdayOfRelativeMonthParseResult(
+        string $which,
+        string $weekday,
+        string $when,
+        int $base,
+        string $tzName
+    ): ?array {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $year = self::tmInt($tm, 'tm_year') + 1900;
+        $month = self::tmInt($tm, 'tm_mon') + 1;
+        $monthDelta = match ($when) {
+            'next' => 1,
+            'last' => -1,
+            'this' => 0,
+            default => 999,
+        };
+        if (999 === $monthDelta) {
+            return null;
+        }
+        [$year, $month] = self::shiftYearMonth($year, $month, $monthDelta);
+
+        return self::weekdayOfYearMonthParseResult($which, $weekday, $year, $month, $tzName);
+    }
+
+    /**
+     * Resolve Nth/last weekday in a concrete year-month (timelib ordinal weekday grammar).
+     *
+     * Nth (1–5) starts at the first occurrence then adds (n-1) weeks — may overflow into
+     * the next month (e.g. "fifth Monday of February 2020" → 2020-03-02).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function weekdayOfYearMonthParseResult(
+        string $which,
+        string $weekday,
+        int $year,
+        int $month,
+        string $tzName
+    ): ?array {
         $target = self::weekdayNameToNumber($weekday);
-        if (null === $month || $target < 0) {
+        if ($target < 0) {
             return null;
         }
-        $day = self::weekdayInMonth($year, $month, $target, 'last' === $which);
-        if ($day < 1) {
+        $ordinal = match ($which) {
+            'first' => 1,
+            'second' => 2,
+            'third' => 3,
+            'fourth' => 4,
+            'fifth' => 5,
+            'last' => 0,
+            default => -1,
+        };
+        if ($ordinal < 0) {
             return null;
         }
+        if (0 === $ordinal) {
+            $day = self::weekdayInMonth($year, $month, $target, true);
+            if ($day < 1) {
+                return null;
+            }
+
+            return [
+                'timestamp' => self::mktimeInTimezone($year, $month, $day, 0, 0, 0, $tzName),
+                'microsecond' => 0,
+            ];
+        }
+        $firstDay = self::weekdayInMonth($year, $month, $target, false);
+        if ($firstDay < 1) {
+            return null;
+        }
+        // timelib: first + (n-1)*7 — mktime normalizes overflow past month end (#19550).
+        $day = $firstDay + (($ordinal - 1) * 7);
 
         return [
             'timestamp' => self::mktimeInTimezone($year, $month, $day, 0, 0, 0, $tzName),
