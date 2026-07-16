@@ -60,6 +60,9 @@ final class VmStreamSelect
                 if (null === $fd) {
                     continue;
                 }
+                // proc_open leaves the child SIGSTOP'd until pipe I/O; selecting is wait-for-I/O
+                // and must resume so poll(2) can observe readiness (#19686, php-src proc_open.c).
+                VmProcessProcOpenNative::resumeChildForPipeHandle($handle);
                 $pairs[] = new StreamSelectPair($handle, $fd, null);
 
                 continue;
