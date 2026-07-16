@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5088 |
-| Phase A inventory files (M2 ratio SSOT) | 5088 |
+| PHP files on vm.php path | 5092 |
+| Phase A inventory files (M2 ratio SSOT) | 5092 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13807 |
+| Source constructs flagged (warnings) | 13822 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -535,7 +535,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_init.php` | 0 | 2 |
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
-| `ext/intl/BuiltinClasses.php` | 0 | 10 |
+| `ext/intl/BuiltinClasses.php` | 0 | 14 |
 | `ext/intl/CollatorCreate.php` | 0 | 1 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
@@ -546,6 +546,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/JitGrapheme.php` | 0 | 2 |
 | `ext/intl/JitLocaleParser.php` | 0 | 1 |
 | `ext/intl/LocaleGetDefault.php` | 0 | 2 |
+| `ext/intl/LocaleGetDisplayName.php` | 0 | 3 |
+| `ext/intl/LocaleGetPrimaryLanguage.php` | 0 | 2 |
+| `ext/intl/LocaleGetRegion.php` | 0 | 2 |
+| `ext/intl/LocaleGetScript.php` | 0 | 2 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
 | `ext/intl/Module.php` | 0 | 26 |
@@ -3298,7 +3302,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/XsltRegistry.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/Module.php` | 0 | 9 |
-| `ext/zip/VmZipArchive.php` | 0 | 17 |
+| `ext/zip/VmZipArchive.php` | 0 | 18 |
 | `ext/zip/VmZipProcedural.php` | 0 | 1 |
 | `ext/zip/VmZipResourceArg.php` | 0 | 1 |
 | `ext/zip/ZipArchiveAddFile.php` | 0 | 2 |
@@ -3308,7 +3312,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipArchiveConstruct.php` | 0 | 1 |
 | `ext/zip/ZipArchiveExtractTo.php` | 0 | 2 |
 | `ext/zip/ZipArchiveGetFromName.php` | 0 | 2 |
-| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 1 |
+| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 2 |
 | `ext/zip/ZipArchiveOpen.php` | 0 | 2 |
 | `ext/zip/ZipClassMethod.php` | 0 | 1 |
 | `ext/zip/ZipEngine.php` | 0 | 1 |
@@ -7132,64 +7136,64 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 2372)
 - new DomNodeState (line 2377)
 - new Variable (line 2383)
-- new ObjectEntry (line 3063)
-- new DomNodeState (line 3065)
-- new ObjectEntry (line 3261)
-- new DomNodeState (line 3263)
-- new ObjectEntry (line 3291)
-- new DomNodeState (line 3293)
-- new ObjectEntry (line 3422)
-- new DomNodeState (line 3427)
-- new DOMException (line 3798)
-- new DOMException (line 3813)
-- new Variable (line 3830)
-- new DOMException (line 3844)
-- new DOMException (line 3847)
-- new DOMException (line 3856)
-- new Error (line 3886)
-- new DOMException (line 3892)
-- new DOMException (line 3905)
-- new DOMException (line 4103)
-- new DOMException (line 4300)
-- new DOMException (line 4304)
-- new DOMException (line 4393)
-- new DOMException (line 4397)
-- new DOMException (line 4455)
-- new DOMException (line 4472)
-- new DOMException (line 4503)
-- new DOMException (line 4545)
-- new DOMException (line 4571)
-- new DOMException (line 5243)
-- new Variable (line 5271)
-- new DOMException (line 5517)
-- new DOMException (line 5629)
-- new DOMException (line 5671)
-- new ObjectEntry (line 5756)
-- new DomNodeState (line 5760)
-- new Variable (line 5767)
-- new ObjectEntry (line 5975)
-- new DomNodeState (line 5979)
-- new Variable (line 5986)
-- new ObjectEntry (line 6006)
-- new DomNodeState (line 6009)
-- new Variable (line 6017)
-- new Variable (line 6186)
-- new DOMException (line 6293)
-- new DOMException (line 6300)
-- new DOMException (line 6307)
-- new DOMException (line 6311)
-- new DOMException (line 6314)
-- new DOMException (line 6323)
-- new DOMException (line 7270)
-- new Variable (line 7329)
-- new Variable (line 7342)
-- new DOMException (line 7425)
-- new DOMException (line 7452)
-- new DOMException (line 7483)
-- new DOMException (line 7547)
-- new DOMException (line 7555)
-- new DOMException (line 7564)
-- 343 class method(s)
+- new ObjectEntry (line 3092)
+- new DomNodeState (line 3094)
+- new ObjectEntry (line 3290)
+- new DomNodeState (line 3292)
+- new ObjectEntry (line 3320)
+- new DomNodeState (line 3322)
+- new ObjectEntry (line 3451)
+- new DomNodeState (line 3456)
+- new DOMException (line 3827)
+- new DOMException (line 3842)
+- new Variable (line 3859)
+- new DOMException (line 3873)
+- new DOMException (line 3876)
+- new DOMException (line 3885)
+- new Error (line 3915)
+- new DOMException (line 3921)
+- new DOMException (line 3934)
+- new DOMException (line 4132)
+- new DOMException (line 4329)
+- new DOMException (line 4333)
+- new DOMException (line 4422)
+- new DOMException (line 4426)
+- new DOMException (line 4484)
+- new DOMException (line 4501)
+- new DOMException (line 4532)
+- new DOMException (line 4574)
+- new DOMException (line 4600)
+- new DOMException (line 5272)
+- new Variable (line 5300)
+- new DOMException (line 5546)
+- new DOMException (line 5658)
+- new DOMException (line 5700)
+- new ObjectEntry (line 5785)
+- new DomNodeState (line 5789)
+- new Variable (line 5796)
+- new ObjectEntry (line 6004)
+- new DomNodeState (line 6008)
+- new Variable (line 6015)
+- new ObjectEntry (line 6035)
+- new DomNodeState (line 6038)
+- new Variable (line 6046)
+- new Variable (line 6215)
+- new DOMException (line 6322)
+- new DOMException (line 6329)
+- new DOMException (line 6336)
+- new DOMException (line 6340)
+- new DOMException (line 6343)
+- new DOMException (line 6352)
+- new DOMException (line 7299)
+- new Variable (line 7358)
+- new Variable (line 7371)
+- new DOMException (line 7454)
+- new DOMException (line 7481)
+- new DOMException (line 7512)
+- new DOMException (line 7576)
+- new DOMException (line 7584)
+- new DOMException (line 7593)
+- 344 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomInstanceInvoke.php`
@@ -8524,14 +8528,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 41)
-- new ClassEntry (line 55)
-- new LocaleGetDefault (line 57)
-- new LocaleSetDefault (line 60)
-- new ClassEntry (line 68)
-- new IntlDateFormatterCreate (line 70)
-- new ClassEntry (line 78)
-- new CollatorCreate (line 80)
-- new ClassEntry (line 88)
+- new ClassEntry (line 59)
+- new LocaleGetDefault (line 62)
+- new LocaleSetDefault (line 63)
+- new LocaleGetPrimaryLanguage (line 64)
+- new LocaleGetRegion (line 65)
+- new LocaleGetScript (line 66)
+- new LocaleGetDisplayName (line 67)
+- new ClassEntry (line 79)
+- new IntlDateFormatterCreate (line 81)
+- new ClassEntry (line 89)
+- new CollatorCreate (line 91)
+- new ClassEntry (line 99)
 - 7 class method(s)
 
 ### `ext/intl/CollatorCreate.php`
@@ -8571,9 +8579,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 87)
-- new locale_get_region (line 88)
-- new locale_get_script (line 89)
+- new locale_get_primary_language (line 92)
+- new locale_get_region (line 93)
+- new locale_get_script (line 94)
 - 11 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
@@ -8591,6 +8599,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/intl/LocaleGetDisplayName.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 29)
+- 1 class method(s)
+
+### `ext/intl/LocaleGetPrimaryLanguage.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/intl/LocaleGetRegion.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/intl/LocaleGetScript.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
 - 1 class method(s)
 
 ### `ext/intl/LocaleParserJitHelper.php`
@@ -8656,7 +8689,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmLocale.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 15 class method(s)
 
 ### `ext/intl/VmNormalizer.php`
 
@@ -26807,17 +26840,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 47)
 - new ClassProperty (line 48)
 - new ClassProperty (line 49)
-- new Variable (line 52)
-- new ZipArchiveConstruct (line 58)
-- new ZipArchiveOpen (line 63)
-- new ZipArchiveClose (line 64)
-- new ZipArchiveAddFile (line 65)
-- new ZipArchiveAddFromString (line 66)
-- new ZipArchiveGetFromName (line 67)
-- new ZipArchiveExtractTo (line 68)
-- new ZipArchiveGetStatusString (line 69)
-- new ZipArchiveState (line 82)
-- 19 class method(s)
+- new Variable (line 56)
+- new ZipArchiveConstruct (line 62)
+- new ZipArchiveOpen (line 67)
+- new ZipArchiveClose (line 68)
+- new ZipArchiveAddFile (line 69)
+- new ZipArchiveAddFromString (line 70)
+- new ZipArchiveGetFromName (line 71)
+- new ZipArchiveExtractTo (line 72)
+- new ZipArchiveGetStatusString (line 73)
+- new ZipArchiveCount (line 74)
+- new ZipArchiveState (line 87)
+- 20 class method(s)
 
 ### `ext/zip/VmZipProcedural.php`
 
@@ -26871,7 +26905,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/ZipArchiveGetStatusString.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new ArgumentCountError (line 40)
+- 2 class method(s)
 
 ### `ext/zip/ZipArchiveOpen.php`
 

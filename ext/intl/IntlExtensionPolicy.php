@@ -10,17 +10,22 @@ use PHPCompiler\ext\standard\ModuleRegistry;
 /**
  * ext/intl builtin advertisement — php-src ext/intl/php_intl.c module registration (#11768, #11825).
  *
- * Grapheme helpers and intl_* functions require a loaded intl extension on Zend; partial
- * PHP implementations stay compiled in-tree but are withheld from function_exists() and
- * intl OOP class_exists() until {@see ModuleRegistry::extensionLoaded}('intl') is true
- * (full ext/intl parity, #11472).
+ * Grapheme helpers and intl_* error functions require a loaded intl extension on Zend; they stay
+ * withheld from function_exists()/class_exists() until {@see ModuleRegistry::extensionLoaded}('intl')
+ * (#11472, #17694). Locale + Normalizer are partial surfaces that advertise without loading intl
+ * (#6696, #5153).
  */
 final class IntlExtensionPolicy
 {
-    /** locale_get_default()/Locale — php-src registers only with loaded ext/intl (#9576, #16214). */
+    /**
+     * locale_get_default()/Locale — partial PHP surface without extension_loaded('intl') (#6696, #9576).
+     *
+     * Mirrors {@see advertisesNormalizer()}: BCP-47 default/parser OOP is available while grapheme_*
+     * and full ICU classes stay gated on loaded ext/intl (#16214/#11472/#17694).
+     */
     public static function advertisesLocale(): bool
     {
-        return ModuleRegistry::extensionLoaded('intl');
+        return true;
     }
 
     /**

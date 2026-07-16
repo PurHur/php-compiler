@@ -9,10 +9,10 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 
 /**
- * Register intl builtin classes (php-src ext/intl/php_intl.c; issue #5774).
+ * Register intl builtin classes (php-src ext/intl/php_intl.c; issues #5774, #6696).
  *
- * ICU algorithms land in #3336, #5747, #5201; skeleton classes register only when
- * {@see IntlExtensionPolicy::advertisesBuiltins()} (#12115).
+ * Locale registers when {@see IntlExtensionPolicy::advertisesLocale()}. ICU skeletons
+ * (Collator / IntlDateFormatter) register only when {@see IntlExtensionPolicy::advertisesBuiltins()} (#12115).
  */
 final class BuiltinClasses
 {
@@ -52,14 +52,25 @@ final class BuiltinClasses
 
     private static function registerLocaleClass(Context $ctx): void
     {
+        if (isset($ctx->classes['locale'])) {
+            return;
+        }
+
         $entry = new ClassEntry('Locale');
         $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
-        $entry->methods['getdefault'] = new LocaleGetDefault();
-        $entry->methodVisibility['getdefault'] = $pubStatic;
-        $entry->methodNames['getdefault'] = 'getDefault';
-        $entry->methods['setdefault'] = new LocaleSetDefault();
-        $entry->methodVisibility['setdefault'] = $pubStatic;
-        $entry->methodNames['setdefault'] = 'setDefault';
+        $methods = [
+            'getdefault' => [new LocaleGetDefault(), 'getDefault'],
+            'setdefault' => [new LocaleSetDefault(), 'setDefault'],
+            'getprimarylanguage' => [new LocaleGetPrimaryLanguage(), 'getPrimaryLanguage'],
+            'getregion' => [new LocaleGetRegion(), 'getRegion'],
+            'getscript' => [new LocaleGetScript(), 'getScript'],
+            'getdisplayname' => [new LocaleGetDisplayName(), 'getDisplayName'],
+        ];
+        foreach ($methods as $lc => [$handler, $name]) {
+            $entry->methods[$lc] = $handler;
+            $entry->methodVisibility[$lc] = $pubStatic;
+            $entry->methodNames[$lc] = $name;
+        }
         $ctx->classes['locale'] = $entry;
     }
 
