@@ -51,6 +51,8 @@ final class SplObjectStorageBuiltin
         foreach ([
             'attach' => SplObjectStorageAttach::class,
             'addall' => SplObjectStorageAddAll::class,
+            'removeall' => SplObjectStorageRemoveAll::class,
+            'removeallexcept' => SplObjectStorageRemoveAllExcept::class,
             'contains' => SplObjectStorageContains::class,
             'count' => SplObjectStorageCount::class,
             'detach' => SplObjectStorageDetach::class,
@@ -78,6 +80,8 @@ final class SplObjectStorageBuiltin
         $entry->methodNames['setinfo'] = 'setInfo';
         $entry->methodNames['gethash'] = 'getHash';
         $entry->methodNames['addall'] = 'addAll';
+        $entry->methodNames['removeall'] = 'removeAll';
+        $entry->methodNames['removeallexcept'] = 'removeAllExcept';
 
         $entry->isInternal = true;
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'SplObjectStorage');
@@ -90,6 +94,8 @@ final class SplObjectStorageBuiltin
             $entry->methods['offsetset'],
             $entry->methods['attach'],
             $entry->methods['addall'],
+            $entry->methods['removeall'],
+            $entry->methods['removeallexcept'],
             $entry->methods['detach'],
             $entry->methods['rewind'],
             $entry->methods['getinfo']
@@ -139,6 +145,36 @@ final class SplObjectStorageBuiltin
                 continue;
             }
             self::attach($storage, $object, $otherState['entries'][$key]);
+        }
+    }
+
+    /** php-src SplObjectStorage::removeAll — detach every object present in $other. */
+    public static function removeAll(ObjectEntry $storage, ObjectEntry $other): void
+    {
+        $otherState = self::state($other);
+        foreach ($otherState['order'] as $key) {
+            $object = self::objectForStoredKey($otherState, $key);
+            if (null === $object) {
+                continue;
+            }
+            self::detach($storage, $object);
+        }
+    }
+
+    /** php-src SplObjectStorage::removeAllExcept — keep only objects also present in $other. */
+    public static function removeAllExcept(ObjectEntry $storage, ObjectEntry $other): void
+    {
+        $state = self::state($storage);
+        $otherState = self::state($other);
+        foreach ($state['order'] as $key) {
+            if (isset($otherState['entries'][$key])) {
+                continue;
+            }
+            $object = self::objectForStoredKey($state, $key);
+            if (null === $object) {
+                continue;
+            }
+            self::detach($storage, $object);
         }
     }
 
@@ -438,24 +474,85 @@ final class SplObjectStorageAddAll extends VmClassMethod
                 .(\count($frame->calledArgs) - 1).' given'
             );
         }
-        $otherVar = $frame->calledArgs[1]->resolveIndirect();
+        $other = SplObjectStorageStorageArg::require($frame->calledArgs[1], 'addAll');
+        SplObjectStorageBuiltin::addAll($object, $other);
+    }
+}
+
+final class SplObjectStorageRemoveAll extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('removeAll');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::removeAll()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplObjectStorage::removeAll() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $other = SplObjectStorageStorageArg::require($frame->calledArgs[1], 'removeAll');
+        SplObjectStorageBuiltin::removeAll($object, $other);
+    }
+}
+
+final class SplObjectStorageRemoveAllExcept extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('removeAllExcept');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::removeAllExcept()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplObjectStorage::removeAllExcept() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $other = SplObjectStorageStorageArg::require($frame->calledArgs[1], 'removeAllExcept');
+        SplObjectStorageBuiltin::removeAllExcept($object, $other);
+    }
+}
+
+/** Shared SplObjectStorage argument coercion for addAll/removeAll/removeAllExcept. */
+final class SplObjectStorageStorageArg
+{
+    public static function require(Variable $arg, string $method): ObjectEntry
+    {
+        $otherVar = $arg->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $otherVar->type) {
             throw new \TypeError(
-                'SplObjectStorage::addAll(): Argument #1 ($storage) must be of type SplObjectStorage, '
-                .self::typeLabel($otherVar).' given'
+                'SplObjectStorage::'.$method.'(): Argument #1 ($storage) must be of type SplObjectStorage, '
+                .self::label($otherVar).' given'
             );
         }
         $other = $otherVar->toObject();
         if (strtolower($other->class->name) !== SplObjectStorageBuiltin::CLASS_LC) {
             throw new \TypeError(
-                'SplObjectStorage::addAll(): Argument #1 ($storage) must be of type SplObjectStorage, '
+                'SplObjectStorage::'.$method.'(): Argument #1 ($storage) must be of type SplObjectStorage, '
                 .$other->class->name.' given'
             );
         }
-        SplObjectStorageBuiltin::addAll($object, $other);
+
+        return $other;
     }
 
-    private static function typeLabel(Variable $value): string
+    public static function label(Variable $value): string
     {
         return match ($value->type) {
             Variable::TYPE_NULL => 'null',

@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5226 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14390 |
+| Source constructs flagged (warnings) | 14392 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1150,7 +1150,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplHeapBuiltin.php` | 0 | 31 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 3 |
 | `ext/spl/SplLegacySerializableMethods.php` | 0 | 5 |
-| `ext/spl/SplObjectStorageBuiltin.php` | 0 | 24 |
+| `ext/spl/SplObjectStorageBuiltin.php` | 0 | 26 |
 | `ext/spl/SplObjectStorageSerializeSupport.php` | 0 | 3 |
 | `ext/spl/SplQueueSplStackBuiltin.php` | 0 | 11 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
@@ -13498,27 +13498,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 45)
 - new SplObjectStorageConstruct (line 48)
-- new Variable (line 152)
-- new Variable (line 156)
-- new Variable (line 159)
-- new UnexpectedValueException (line 203)
-- new Variable (line 205)
-- new Variable (line 293)
-- new Variable (line 305)
-- new Variable (line 317)
-- new Variable (line 371)
-- new ArgumentCountError (line 411)
-- new ArgumentCountError (line 436)
-- new ArgumentCountError (line 488)
-- new ArgumentCountError (line 538)
-- new ArgumentCountError (line 565)
-- new ArgumentCountError (line 589)
-- new ArgumentCountError (line 618)
-- new ArgumentCountError (line 741)
-- new ArgumentCountError (line 765)
-- new ArgumentCountError (line 789)
-- new ArgumentCountError (line 818)
-- 47 class method(s)
+- new Variable (line 188)
+- new Variable (line 192)
+- new Variable (line 195)
+- new UnexpectedValueException (line 239)
+- new Variable (line 241)
+- new Variable (line 329)
+- new Variable (line 341)
+- new Variable (line 353)
+- new Variable (line 407)
+- new ArgumentCountError (line 447)
+- new ArgumentCountError (line 472)
+- new ArgumentCountError (line 497)
+- new ArgumentCountError (line 522)
+- new ArgumentCountError (line 585)
+- new ArgumentCountError (line 635)
+- new ArgumentCountError (line 662)
+- new ArgumentCountError (line 686)
+- new ArgumentCountError (line 715)
+- new ArgumentCountError (line 838)
+- new ArgumentCountError (line 862)
+- new ArgumentCountError (line 886)
+- new ArgumentCountError (line 915)
+- 52 class method(s)
 - 1 closure(s)
 
 ### `ext/spl/SplObjectStorageSerializeSupport.php`
