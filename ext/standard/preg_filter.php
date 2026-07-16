@@ -49,10 +49,11 @@ final class preg_filter extends Internal
             'subject'
         );
         $limit = -1;
-        if ($argc >= 4) {
+        if (isset($frame->calledArgs[3])) {
             $limit = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'preg_filter', 4, 'limit');
         }
-        $hasCount = $argc >= 5;
+        // Named count: may skip limit — use isset not argc (#19697).
+        $hasCount = isset($frame->calledArgs[4]);
         $count = 0;
 
         if (Variable::TYPE_STRING === $subjectVar->type) {
