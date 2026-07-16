@@ -29,6 +29,20 @@ final class VmZlibCoreTest extends TestCase
         $this->assertSame($plain, VmZlibCore::gzdecode($gzip));
     }
 
+    /** Issue #19516 — gzip OS byte Unix 0x03; XFL matches zlib (level 1 → 0x04). */
+    public function testGzencodeOsByteUnixAndXfl(): void
+    {
+        $gzip = VmZlibCore::gzencode('hello', 1);
+        $this->assertIsString($gzip);
+        $this->assertSame('03', bin2hex($gzip[9]));
+        $this->assertSame('1f8b0800000000000403', bin2hex(substr($gzip, 0, 10)));
+        $this->assertSame('hello', VmZlibCore::gzdecode($gzip));
+
+        $gzip9 = VmZlibCore::gzencode('hello', 9);
+        $this->assertIsString($gzip9);
+        $this->assertSame('1f8b0800000000000203', bin2hex(substr($gzip9, 0, 10)));
+    }
+
     public function testZlibEncodeDecodeEncodings(): void
     {
         $raw = 'hello zlib';

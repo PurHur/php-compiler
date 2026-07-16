@@ -267,11 +267,31 @@ final class VmZlibCore
         if (false === $deflated) {
             return false;
         }
-        $header = "\x1f\x8b\x08\x00".pack('V', 0)."\x00\xff";
+        // RFC 1952 §2.3 / zlib zutil.h OS_CODE + deflate.c gzip XFL (php-src ext/zlib/zlib.c).
+        $header = "\x1f\x8b\x08\x00".pack('V', 0).self::gzipExtraFlags($level).self::gzipOsCode();
         $crc = VmCrc32::compute($data, 0);
         $isize = \strlen($data) & 0xFFFFFFFF;
 
         return $header.$deflated.pack('V', $crc).pack('V', $isize);
+    }
+
+    /** zlib deflate.c gzip wrapper XFL: level 9 → 2, level < 2 → 4, else 0. */
+    private static function gzipExtraFlags(int $level): string
+    {
+        if (9 === $level) {
+            return "\x02";
+        }
+        if ($level < 2) {
+            return "\x04";
+        }
+
+        return "\x00";
+    }
+
+    /** zlib zutil.h OS_CODE — Unix=0x03, Win32=0x0b (#19516). */
+    private static function gzipOsCode(): string
+    {
+        return \PHP_OS_FAMILY === 'Windows' ? "\x0b" : "\x03";
     }
 
     private static function decodeGzip(string $data, int $maxLength): string|false
