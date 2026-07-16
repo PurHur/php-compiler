@@ -362,6 +362,7 @@ final class RandomizerBuiltin
             foreach ([
                 'nextfloat' => RandomizerNextFloat::class,
                 'getfloat' => RandomizerGetFloat::class,
+                'getbytesfromstring' => RandomizerGetBytesFromString::class,
             ] as $lc => $class) {
                 $entry->methods[$lc] = new $class();
                 $entry->methodVisibility[$lc] = $pub;
@@ -389,7 +390,11 @@ final class RandomizerBuiltin
             return false;
         }
         if (CompilerVersion::supportsRandomIntervalBoundary()) {
-            return isset($entry->methods['getfloat'], $entry->methods['nextfloat']);
+            return isset(
+                $entry->methods['getfloat'],
+                $entry->methods['nextfloat'],
+                $entry->methods['getbytesfromstring']
+            );
         }
 
         return true;
@@ -722,6 +727,92 @@ final class RandomizerGetBytes extends VmClassMethod
             $bytes .= RandomEngineStorage::generate($engine);
         }
         $frame->returnVar->string(\substr($bytes, 0, $length));
+    }
+}
+
+/**
+ * PHP 8.3+ Randomizer::getBytesFromString — php-src ext/random/randomizer.c (#19572).
+ */
+final class RandomizerGetBytesFromString extends VmClassMethod
+{
+    private const RANGE_ATTEMPTS = 50;
+
+    public function __construct()
+    {
+        parent::__construct('getBytesFromString');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = RandomizerBuiltin::receiverRandomizer($frame, 'Random\\Randomizer::getBytesFromString()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'Random\\Randomizer::getBytesFromString() expects at least 2 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $source = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'Random\\Randomizer::getBytesFromString',
+            0,
+            'string'
+        );
+        $length = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[2],
+            'Random\\Randomizer::getBytesFromString',
+            1,
+            'length'
+        );
+        $sourceLength = \strlen($source);
+        if ($sourceLength < 1) {
+            throw new \ValueError(
+                'Random\\Randomizer::getBytesFromString(): Argument #1 ($string) cannot be empty'
+            );
+        }
+        if ($length < 1) {
+            throw new \ValueError(
+                'Random\\Randomizer::getBytesFromString(): Argument #2 ($length) must be greater than 0'
+            );
+        }
+        $maxOffset = $sourceLength - 1;
+        $engine = RandomEngineStorage::engineObject($object);
+        $out = '';
+        if ($maxOffset > 0xff) {
+            while (\strlen($out) < $length) {
+                $offset = RandomEngineStorage::range($engine, 0, $maxOffset);
+                $out .= $source[$offset];
+            }
+        } else {
+            $mask = $maxOffset;
+            $mask |= $mask >> 1;
+            $mask |= $mask >> 2;
+            $mask |= $mask >> 4;
+            $failures = 0;
+            while (\strlen($out) < $length) {
+                $chunk = RandomEngineStorage::generate($engine);
+                $chunkLen = \strlen($chunk);
+                for ($i = 0; $i < $chunkLen; ++$i) {
+                    $offset = \ord($chunk[$i]) & $mask;
+                    if ($offset > $maxOffset) {
+                        if (++$failures > self::RANGE_ATTEMPTS) {
+                            throw new \Random\BrokenRandomEngineError(
+                                'Failed to generate an acceptable random number in '.self::RANGE_ATTEMPTS.' attempts'
+                            );
+                        }
+                        continue;
+                    }
+                    $failures = 0;
+                    $out .= $source[$offset];
+                    if (\strlen($out) >= $length) {
+                        break;
+                    }
+                }
+            }
+        }
+        $frame->returnVar->string(\substr($out, 0, $length));
     }
 }
 
