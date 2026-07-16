@@ -10317,6 +10317,22 @@ class JIT {
                                 $this->context->scope->toCall = $this->context->functionProxies['simplexmlelement::__construct'];
                                 $this->context->scope->args = [$this->context->getVariableFromOp($resultOp)];
                             } elseif ($classOp instanceof Operand\Literal
+                                && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'XMLWriter')
+                                && JIT\XmlWriterInstanceMethodJit::isUserScriptAot()
+                            ) {
+                                // No XMLWriter::__construct — attach host writer at allocate (#19551).
+                                $xwReceiver = $this->context->getVariableFromOp($resultOp);
+                                \PHPCompiler\ext\xmlwriter\JitXmlWriterUserScript::tryInit(
+                                    $this->context,
+                                    $xwReceiver
+                                );
+                                $this->context->scope->preserveNewResultOnNullCall = true;
+                                $this->context->type->object->markObjectConstructed(
+                                    $this->context->helper->loadValue($obj)
+                                );
+                                $this->context->scope->toCall = null;
+                                $this->context->scope->args = [];
+                            } elseif ($classOp instanceof Operand\Literal
                                 && JIT\RandomizerInstanceMethodJit::isUserScriptAot()
                                 && (
                                     0 === strcasecmp(ltrim($classOp->value, '\\'), 'Random\\Engine\\Mt19937')
@@ -15677,6 +15693,12 @@ class JIT {
         ) {
             JIT\SimpleXmlInstanceMethodJit::ensureProxy($this->context, $proxyName);
         }
+        // Register XMLWriter user-script AOT proxies before functionIsRegistered (#19551).
+        if (JIT\XmlWriterInstanceMethodJit::isXmlWriterInstanceMethodProxy($proxyName)
+            && JIT\XmlWriterInstanceMethodJit::isUserScriptAot()
+        ) {
+            JIT\XmlWriterInstanceMethodJit::ensureProxy($this->context, $proxyName);
+        }
         // Register Randomizer user-script AOT proxies before functionIsRegistered (#19574).
         if (JIT\RandomizerInstanceMethodJit::isRandomizerInstanceMethodProxy($proxyName)
             && JIT\RandomizerInstanceMethodJit::isUserScriptAot()
@@ -15696,7 +15718,9 @@ class JIT {
         $simpleXmlUserScript = str_starts_with(strtolower($proxyName), 'simplexmlelement::')
             && ('1' === getenv('PHP_COMPILER_AOT_USER_SCRIPT')
                 || 'true' === strtolower((string) getenv('PHP_COMPILER_AOT_USER_SCRIPT')));
-        if (Type::TYPE_OBJECT === $receiverOp->type?->type && !$splObjectStorageMethod && !$simpleXmlUserScript) {
+        $xmlWriterUserScript = JIT\XmlWriterInstanceMethodJit::isXmlWriterInstanceMethodProxy($proxyName)
+            && JIT\XmlWriterInstanceMethodJit::isUserScriptAot();
+        if (Type::TYPE_OBJECT === $receiverOp->type?->type && !$splObjectStorageMethod && !$simpleXmlUserScript && !$xmlWriterUserScript) {
             JIT\LazyObjectHelper::emitEnsureInitialized(
                 $this->context,
                 $this->context->helper->loadValue($dispatchReceiver)

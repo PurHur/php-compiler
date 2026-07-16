@@ -61,6 +61,9 @@ final class VmXmlWriter
         $entry->methods['endelement'] = new XmlWriterEndElement();
         $entry->methodVisibility['endelement'] = $pub;
         $entry->methodNames['endelement'] = 'endElement';
+        $entry->methods['fullendelement'] = new XmlWriterFullEndElement();
+        $entry->methodVisibility['fullendelement'] = $pub;
+        $entry->methodNames['fullendelement'] = 'fullEndElement';
         $entry->methods['enddocument'] = new XmlWriterEndDocument();
         $entry->methodVisibility['enddocument'] = $pub;
         $entry->methodNames['enddocument'] = 'endDocument';
@@ -255,6 +258,30 @@ final class VmXmlWriter
 
             return true;
         }
+
+        return self::writeFullEndElement($state);
+    }
+
+    /**
+     * Always write an explicit end tag (`</name>`), never a self-closing empty element.
+     * php-src: zim_XMLWriter_fullEndElement / xmlTextWriterFullEndElement (#19551).
+     */
+    public static function fullEndElement(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::fullEndElement()');
+        if ([] === $state->elementStack) {
+            return false;
+        }
+        if ($state->startTagOpen) {
+            $state->buffer .= '>';
+            $state->startTagOpen = false;
+        }
+
+        return self::writeFullEndElement($state);
+    }
+
+    private static function writeFullEndElement(XmlWriterState $state): bool
+    {
         $frame = array_pop($state->elementStack);
         if ($frame['hasIndentedChild']) {
             $state->buffer .= "\n".str_repeat($state->indentString, \count($state->elementStack));
