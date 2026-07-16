@@ -4,13 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\iconv;
 
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -35,7 +34,8 @@ final class iconv extends Internal
         }
         $from = VmIconv::coerceEncodingArg($frame->calledArgs[0], 'iconv', 0, 'from_encoding', $frame);
         $to = VmIconv::coerceEncodingArg($frame->calledArgs[1], 'iconv', 1, 'to_encoding', $frame);
-        $input = InternalStrictArg::resolveCoercibleStringArg($frame, 2, 'iconv', 'string');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19387, re-#18242; iconv.c).
+        $input = VmString::zparamStrBuiltinArgForFrame($frame, 2, 'iconv', 2, 'string');
         if (null === $frame->returnVar) {
             return;
         }

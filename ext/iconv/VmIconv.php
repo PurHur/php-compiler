@@ -27,12 +27,10 @@ final class VmIconv
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19387, re-#18993; iconv.c).
             if (
-                null !== $frame
-                && (
-                    InternalStrictArg::isCallerStrict($frame)
-                    || VmString::requiresForwardProfileStrictStringNull()
-                )
+                VmString::requiresZparamStrStrictNullOnForwardProfile()
+                || (null !== $frame && InternalStrictArg::isCallerStrict($frame))
             ) {
                 throw new \TypeError(sprintf(
                     '%s(): Argument #%d ($%s) must be of type string, null given',
