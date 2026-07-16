@@ -65,9 +65,13 @@ final class VmSimpleXml
         $entry->methodNames['getname'] = 'getName';
         $entry->methods['children'] = new SimpleXmlElementChildren();
         $entry->methodVisibility['children'] = $pub;
-        $entry->methods['asxml'] = new SimpleXmlElementAsXml();
+        $entry->methods['asxml'] = new SimpleXmlElementAsXml('asXML');
         $entry->methodVisibility['asxml'] = $pub;
         $entry->methodNames['asxml'] = 'asXML';
+        // php-src FALIAS: saveXML → asXML (ext/simplexml/sxe.c / simplexml.stub.php; #19413).
+        $entry->methods['savexml'] = new SimpleXmlElementAsXml('saveXML');
+        $entry->methodVisibility['savexml'] = $pub;
+        $entry->methodNames['savexml'] = 'saveXML';
         $entry->methods['addchild'] = new SimpleXmlElementAddChild();
         $entry->methodVisibility['addchild'] = $pub;
         $entry->methodNames['addchild'] = 'addChild';
