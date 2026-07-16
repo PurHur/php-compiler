@@ -234,6 +234,14 @@ final class VmIni
         if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
             return VmAssertState::iniGet($option);
         }
+        if ('browscap' === $key) {
+            $startup = VmBrowser::startupBrowscapPath();
+            if (null !== $startup && '' !== $startup) {
+                return $startup;
+            }
+
+            return '';
+        }
         if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
             return '';
         }
@@ -411,13 +419,20 @@ final class VmIni
      */
     public static function applyStartupIniOverride(string $option, string $value): bool
     {
-        if ('register_argc_argv' !== strtolower($option)) {
-            return false;
-        }
-        self::$registerArgcArgv = self::parseBoolIni($value);
-        IniJitHelper::syncRegisterArgcArgv(self::$registerArgcArgv);
+        $key = strtolower($option);
+        if ('register_argc_argv' === $key) {
+            self::$registerArgcArgv = self::parseBoolIni($value);
+            IniJitHelper::syncRegisterArgcArgv(self::$registerArgcArgv);
 
-        return true;
+            return true;
+        }
+        if ('browscap' === $key) {
+            VmBrowser::setStartupBrowscapPath($value);
+
+            return true;
+        }
+
+        return false;
     }
 
     /** Observable ini_get('max_execution_time') after set_time_limit / ini_set (#12481). */

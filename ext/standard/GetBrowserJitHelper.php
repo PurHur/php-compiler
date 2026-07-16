@@ -18,6 +18,10 @@ final class GetBrowserJitHelper
      */
     public static function browscapConfigured(): int
     {
+        $startup = VmBrowser::startupBrowscapPath();
+        if (null !== $startup && '' !== $startup && is_readable($startup)) {
+            return 1;
+        }
         $path = @ini_get('browscap');
         if (!is_string($path)) {
             return 0;

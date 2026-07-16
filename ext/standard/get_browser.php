@@ -39,14 +39,16 @@ final class get_browser extends Internal
             return;
         }
 
+        $ua = null;
+        $returnArray = false;
         if ($argc >= 1) {
             $uaArg = $frame->calledArgs[0]->resolveIndirect();
             if (Variable::TYPE_NULL !== $uaArg->type) {
-                VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'get_browser', 0, 'browser_name');
+                $ua = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'get_browser', 0, 'browser_name');
             }
         }
         if ($argc >= 2) {
-            VmMath::parseBoolBuiltinArg($frame->calledArgs[1], 'get_browser', 1, 'return_array');
+            $returnArray = VmMath::parseBoolBuiltinArg($frame->calledArgs[1], 'get_browser', 1, 'return_array');
         }
 
         if (!VmBrowser::browscapConfigured($frame->vmContext)) {
@@ -62,10 +64,25 @@ final class get_browser extends Internal
             return;
         }
 
-        // Browscap database parsing deferred — return false until reader lands.
-        BuiltinExecute::writeReturn($frame, static function (Variable $ret): void {
-            $ret->bool(false);
-        });
+        $result = VmBrowser::lookup($frame->vmContext, $frame, $ua);
+        if (false === $result) {
+            BuiltinExecute::writeReturn($frame, static function (Variable $ret): void {
+                $ret->bool(false);
+            });
+
+            return;
+        }
+
+        if ($returnArray) {
+            BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
+                $ret->copyFrom(VmJson::import($result));
+            });
+        } else {
+            $ctx = $frame->vmContext;
+            BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result, $ctx): void {
+                $ret->copyFrom(VmJson::importDecoded((object) $result, false, $ctx));
+            });
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

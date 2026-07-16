@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5043 |
-| Phase A inventory files (M2 ratio SSOT) | 5043 |
+| PHP files on vm.php path | 5044 |
+| Phase A inventory files (M2 ratio SSOT) | 5044 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13638 |
+| Source constructs flagged (warnings) | 13639 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1107,6 +1107,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/AttributeRegistryJitHelper.php` | 0 | 1 |
 | `ext/standard/Base64JitHelper.php` | 0 | 1 |
 | `ext/standard/Bin2hexJitHelper.php` | 0 | 1 |
+| `ext/standard/BrowscapEngine.php` | 0 | 1 |
 | `ext/standard/BuiltinAttributes.php` | 0 | 22 |
 | `ext/standard/BuiltinClasses.php` | 0 | 1 |
 | `ext/standard/BuiltinEnums.php` | 0 | 20 |
@@ -12784,6 +12785,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/BrowscapEngine.php`
+
+**Warnings** (review for bootstrap subset):
+- 15 class method(s)
+
 ### `ext/standard/BuiltinAttributes.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18216,7 +18222,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmBrowser.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/VmCallable.php`
 
@@ -19104,12 +19110,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 786)
-- new HashTable (line 793)
-- new Variable (line 804)
-- new Variable (line 908)
-- new Variable (line 916)
-- new Variable (line 924)
+- new HashTable (line 801)
+- new HashTable (line 808)
+- new Variable (line 819)
+- new Variable (line 923)
+- new Variable (line 931)
+- new Variable (line 939)
 - 57 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
@@ -22140,7 +22146,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 33)
 - 2 class method(s)
-- 2 closure(s)
+- 4 closure(s)
 
 ### `ext/standard/get_called_class_.php`
 
