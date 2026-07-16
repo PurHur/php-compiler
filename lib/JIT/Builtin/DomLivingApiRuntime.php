@@ -109,14 +109,12 @@ final class DomLivingApiRuntime
             }
         }
 
-        return self::i64ToBool(
-            $context,
-            $context->builder->call(
-                $context->lookupFunction(self::ABI_TOGGLE_ATTRIBUTE),
-                self::loadObject($context, $receiver),
-                JitStringArg::lower($context, $name, 'DOMElement::toggleAttribute() name'),
-                $forceFlag
-            )
+        // DEBUG probe: return raw i64 (forceFlag encoding) as native long — no icmp.
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_TOGGLE_ATTRIBUTE),
+            self::loadObject($context, $receiver),
+            JitStringArg::lower($context, $name, 'DOMElement::toggleAttribute() name'),
+            $forceFlag
         );
     }
 
