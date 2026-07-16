@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitMultipartKernel;
 use PHPCompiler\ext\standard\phpc_native_ht_alloc;
 use PHPCompiler\ext\standard\phpc_native_ht_set_hashtable_at;
 use PHPCompiler\ext\standard\phpc_native_ht_set_string_at;
@@ -19,9 +20,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for multipart POST populate in user-script CGI refresh (#15624).
+ * JIT/AOT link for multipart POST populate in user-script CGI refresh (#15624, #19454).
  *
  * User-script thin AOT uses {@see MultipartNativeJitHelper} (no nested MultipartParser JIT).
+ * Deferred RPB fixture LLVM lives in {@see JitMultipartKernel} (ext/standard).
  * php-src: main/rfc1867.c
  */
 final class MultipartRuntime
@@ -63,7 +65,7 @@ final class MultipartRuntime
         $libcStrlen = $context->lookupFunction('strlen');
         ParseStrRuntime::ensureUserScriptLinked($context);
         $context->registerFunction('strlen', $libcStrlen);
-        MultipartRuntimeUserScriptLlvm::ensureLinked($context);
+        JitMultipartKernel::ensureLinked($context);
         $context->registerFunction('strlen', $libcStrlen);
         self::implementRpbMultipartBridge($context);
         $context->registerFunction('strlen', $libcStrlen);
@@ -118,7 +120,7 @@ final class MultipartRuntime
 
         $context->builder->positionAtEnd($work);
         // LLVM fixture populate — Nested MultipartNativeJitHelper cannot fpc/tempnam (#5965).
-        MultipartRuntimeUserScriptLlvm::emitCallFromBridge(
+        JitMultipartKernel::emitCallFromBridge(
             $context,
             $post,
             $files,

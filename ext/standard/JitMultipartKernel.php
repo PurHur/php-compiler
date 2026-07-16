@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ParseStrRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\LibcExtern;
 use PHPLLVM\Builder;
@@ -12,15 +13,16 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Init-safe LLVM fixture multipart populate for user-script AOT request_parse_body (#5965).
+ * User-script AOT LLVM fixture multipart populate (#19454, #5965, #16075).
  *
  * Nested MultipartNativeJitHelper cannot explode/substr or reliably file_put_contents /
  * tempnam under Nested JIT. This path uses libc strncmp + fopen/fwrite for the
  * `----phpc-boundary` AOT fixture (fields `a=hi`, file `up`/`t.txt`/`payload`).
  * Avoids libc strstr (symbol collisions under helper-runtime O=1).
+ * Housed in ext/standard (not lib/JIT/Builtin) — same kernel-move pattern as #19399 / #19430.
  * php-src: main/rfc1867.c
  */
-final class MultipartRuntimeUserScriptLlvm
+final class JitMultipartKernel
 {
     public const PARSE_FUNCTION = '__compiler_rpb_multipart_llvm_parse_v3';
 
