@@ -2,27 +2,27 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\ext\standard\JitStreamBucket;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\BasicBlock;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream_bucket_* registry via StreamBucketJitHelper PHP (#9380).
+ * JIT/AOT ABI bridges for stream_bucket_* via StreamBucketJitHelper PHP (#9380, #19712).
+ *
+ * Quarantined from lib/JIT/Builtin/StreamBucketRuntime — {@see \PHPCompiler\JIT\Builtin\StreamBucket}
+ * stays the thin orchestrator. Call-site lowering stays in {@see JitStreamBucket}.
  *
  * Replaces slot-table LLVM globals (~550 LOC). SSOT: {@see \PHPCompiler\ext\standard\StreamBucketJitHelper}.
  * php-src: ext/standard/streams.c — stream_bucket_new, brigade helpers
  */
-final class StreamBucketRuntime
+final class JitStreamBucketKernel
 {
     public const BUCKET_HANDLE_BASE = 0x30000000;
 
@@ -160,7 +160,7 @@ final class StreamBucketRuntime
                 $i64,
                 $strPtr
             ),
-            default => throw new \LogicException('StreamBucketRuntime: unknown '.$name),
+            default => throw new \LogicException('JitStreamBucketKernel: unknown '.$name),
         };
 
         $fn = $context->module->addFunction($name, $ft);
@@ -293,7 +293,7 @@ final class StreamBucketRuntime
         }
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamBucketJitHelper.php');
             if (null === $block) {

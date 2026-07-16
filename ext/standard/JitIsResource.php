@@ -35,7 +35,7 @@ final class JitIsResource
         $zeroI32 = $i32->constInt(0, false);
         $oneI32 = $i32->constInt(1, false);
 
-        $bucketBase = $i64->constInt(\PHPCompiler\JIT\Builtin\StreamBucketRuntime::BUCKET_HANDLE_BASE, false);
+        $bucketBase = $i64->constInt(JitStreamBucketKernel::BUCKET_HANDLE_BASE, false);
         $filterBase = $i64->constInt(StreamFilterJitHelper::HANDLE_BASE, false);
         $trueVal = $context->constantFromBool(true);
         $falseVal = $context->constantFromBool(false);

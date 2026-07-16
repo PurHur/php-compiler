@@ -4019,7 +4019,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StatPathRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Stats.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StatsJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamBucket.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StreamBucketRuntime.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamBucketKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamBuffer.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamBufferJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamBufferRuntime.php';
