@@ -90,7 +90,10 @@ final class VmPreg
     }
 
     /**
-     * Z_PARAM_STR_OR_ARR on preg and str replace $subject with null to empty string (#11938).
+     * Z_PARAM_STR_OR_ARR on preg/str/substr_replace $subject (#11938).
+     *
+     * Null coerces to "" outside strict_types on profiles &lt; 8.4; TypeError on 8.4 forward
+     * profile (#19282, #19241, php-src ext/standard/string.c / ext/pcre/php_pcre.c).
      *
      * @throws \TypeError
      */
@@ -103,7 +106,10 @@ final class VmPreg
     ): Variable {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            if (InternalStrictArg::isCallerStrict($frame) || VmString::requiresForwardProfileStrictStringNull()) {
+            if (
+                InternalStrictArg::isCallerStrict($frame)
+                || VmString::requiresZparamStrStrictNullOnForwardProfile()
+            ) {
                 throw new \TypeError(
                     self::stringOrArraySubjectTypeError($function, $argIndex, $paramName, 'null')
                 );
