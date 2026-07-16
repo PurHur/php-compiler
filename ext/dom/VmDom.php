@@ -4568,9 +4568,6 @@ final class VmDom
                 $frame
             );
         }
-        if ($end !== \strlen($trimmed)) {
-            return null;
-        }
         $closePos = strrpos(substr($trimmed, 0, $end), '</');
         if (false === $closePos) {
             return null;
@@ -4580,6 +4577,11 @@ final class VmDom
             return null;
         }
         $inner = substr($trimmed, $open['end'], $closePos - $open['end']);
+        // libxml HTML_PARSE_NOIMPLIED: markup after the first root element nests under it
+        // (php-src ext/dom/html_document.c / htmlReadMemory; #19360).
+        if ($end !== \strlen($trimmed)) {
+            $inner .= substr($trimmed, $end);
+        }
 
         $entry = self::createHtmlElementFromTag($ctx, $open['tag'], $open['attrs'], $inner, $ownerDocument, $frame);
         self::syncSubtree($ctx, $entry);
