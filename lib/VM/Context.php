@@ -44,6 +44,15 @@ class Context {
     /** @var array<string, Variable> */
     private array $superglobalVars = [];
 
+    /**
+     * filter_input() / filter_has_var() request-input snapshots (php-src IF_G arrays, #19640).
+     * Keyed by superglobal name (_GET, _POST, …). Captured when CGI/web populates request
+     * tables — not updated by later $_GET[...] = writes.
+     *
+     * @var array<string, HashTable>
+     */
+    private array $filterInputSnapshots = [];
+
     /** @var array<string, Variable> */
     private array $globalVars = [];
 
@@ -723,6 +732,19 @@ class Context {
     public function getSuperglobal(string $name): ?Variable
     {
         return $this->superglobalVars[$name] ?? null;
+    }
+
+    /**
+     * Capture a deep copy of a request-input table for filter_input() (#19640).
+     */
+    public function captureFilterInputSnapshot(string $sgName, HashTable $table): void
+    {
+        $this->filterInputSnapshots[$sgName] = $table->duplicate();
+    }
+
+    public function getFilterInputSnapshot(string $sgName): ?HashTable
+    {
+        return $this->filterInputSnapshots[$sgName] ?? null;
     }
 
     public function ensureGlobal(string $name): Variable

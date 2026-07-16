@@ -1285,6 +1285,11 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'filter_null_on_failure')) {
                 continue;
             }
+            // filter_input() request-input snapshot (#19640): VM captures IF_G tables; MCJIT still reads live sg_*.
+            if (str_contains($name, 'filter_input_request_snapshot')
+                || str_contains($name, 'filter_input_cgi_snapshot_immutable')) {
+                continue;
+            }
             // filter_var() FILTER_VALIDATE_REGEXP array options: VM + AOT (#5020); MCJIT defers array options.
             if (str_contains($name, 'filter_validate_regexp')) {
                 continue;
