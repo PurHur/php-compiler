@@ -22,16 +22,22 @@ final class JitIconv
             throw new \LogicException('iconv() requires exactly three arguments');
         }
 
-        $fromLit = self::encodingCompileTimeLiteral($args[0]);
-        $toLit = self::encodingCompileTimeLiteral($args[1]);
-        $inputLit = JitStringBuiltinArg::compileTimeLiteral($args[2]);
-        $rejectNullEncoding = $context->callerStrictTypes
-            || JitStringBuiltinArg::requiresForwardProfileStrictStringNull();
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19387, re-#18993/#18242).
+        // Do not map null→'' before the fold guard — that incorrectly constant-folds
+        // iconv(null, …) to the default-charset conversion under AOT (#19387).
+        $fromIsNull = self::encodingArgIsNullConstant($args[0]);
+        $toIsNull = self::encodingArgIsNullConstant($args[1]);
+        $inputIsNull = JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant;
+        $rejectNullZparam = $context->callerStrictTypes
+            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile();
+        $fromLit = $fromIsNull ? null : JitStringBuiltinArg::compileTimeLiteral($args[0]);
+        $toLit = $toIsNull ? null : JitStringBuiltinArg::compileTimeLiteral($args[1]);
+        $inputLit = $inputIsNull ? null : JitStringBuiltinArg::compileTimeLiteral($args[2]);
         if (
             null !== $fromLit
             && null !== $toLit
             && null !== $inputLit
-            && !($rejectNullEncoding && (self::encodingArgIsNullConstant($args[0]) || self::encodingArgIsNullConstant($args[1])))
+            && !($rejectNullZparam && ($fromIsNull || $toIsNull || $inputIsNull))
             && null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($fromLit, true))
             && null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($toLit, false))
         ) {
@@ -40,9 +46,17 @@ final class JitIconv
 
         IconvRuntimeLink::ensureLinked($context);
 
-        $from = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv', 0, 'from_encoding');
-        $to = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'iconv', 1, 'to_encoding');
-        $input = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'iconv', 2, 'string');
+        // Always use Z_PARAM_STR lowering so PROFILE=8.4 null TypeError is baked into AOT
+        // the same way as JIT (lowerStrictOrCoercible alone uses the legacy off switch).
+        $from = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'iconv', 0, 'from_encoding')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'iconv', 0, 'from_encoding');
+        $to = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'iconv', 1, 'to_encoding')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'iconv', 1, 'to_encoding');
+        $input = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'iconv', 2, 'string')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[2], 'iconv', 2, 'string');
 
         $result = $context->builder->call(
             $context->lookupFunction('__compiler_iconv'),
@@ -57,15 +71,6 @@ final class JitIconv
     private static function encodingArgIsNullConstant(JITVariable $arg): bool
     {
         return JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant;
-    }
-
-    private static function encodingCompileTimeLiteral(JITVariable $arg): ?string
-    {
-        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            return '';
-        }
-
-        return JitStringBuiltinArg::compileTimeLiteral($arg);
     }
 
     private static function foldCompileTime(Context $context, string $from, string $to, string $input): Value
