@@ -7,12 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** password_needs_rehash() — VM via VmPassword; JIT/AOT via PasswordJitHelper PHP (issue #3279, #6503, #9908). */
+/** password_needs_rehash() — VM via VmPassword; JIT/AOT via PasswordJitHelper PHP (issue #3279, #6503, #9908, #18655). */
 final class password_needs_rehash extends Internal
 {
     public function __construct()
@@ -35,7 +35,14 @@ final class password_needs_rehash extends Internal
                 $argc
             ));
         }
-        $hash = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'password_needs_rehash', 0, 'hash');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#18655, ext/standard/password.c)
+        $hash = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
+            'password_needs_rehash',
+            0,
+            'hash'
+        );
         $algo = VmPassword::resolveAlgo($frame->calledArgs[1], 'password_needs_rehash', 1, 'algo');
         $options = [];
         if (3 === $argc) {
@@ -79,7 +86,14 @@ final class password_needs_rehash extends Internal
 
         return JitPasswordNeedsRehash::invoke(
             $context,
-            JitStringArg::lowerDominating($context, $args[0], 'password_needs_rehash() hash'),
+            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#18655, ext/standard/password.c)
+            JitStringBuiltinArg::lowerZparamStr(
+                $context,
+                $args[0],
+                'password_needs_rehash',
+                0,
+                'hash'
+            ),
             $args[1],
             $options
         );
