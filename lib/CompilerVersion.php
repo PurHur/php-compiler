@@ -2344,6 +2344,17 @@ final class CompilerVersion
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
+    /**
+     * ext/redis via pure PHP {@see \PHPCompiler\ext\redis\VmRedis} — withheld on reference profile (#6098).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2
+     * phantom gate (host phpredis absent). Enable forward profile via `PHP_COMPILER_PROFILE=8.4`.
+     */
+    public static function supportsRedis(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
 
     /**
      * ext/zip via pure PHP {@see \PHPCompiler\ext\zip\VmZipArchive} — withheld on reference profile (#18137, #11676).

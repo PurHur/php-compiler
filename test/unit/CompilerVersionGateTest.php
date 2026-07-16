@@ -399,6 +399,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsRedisFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsRedis());
+    }
+
+    public function testSupportsRedisTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsRedis());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsXmlrpcFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsXmlrpc());
