@@ -132,12 +132,16 @@ final class JitPack
         }
     }
 
+    /** php-src ext/standard/pack.c — null value operands TypeError on 8.4 forward profile (#18992, #19388). */
     private static function rejectNullValueArg(Context $context, JITVariable $arg, int $argNumber): void
     {
         if (JITVariable::TYPE_NULL !== $arg->type) {
             return;
         }
-        if (!$context->callerStrictTypes && !VmString::requiresForwardProfileStrictStringNull()) {
+        if (
+            !$context->callerStrictTypes
+            && !JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+        ) {
             return;
         }
         TypeErrorRaise::registerDeclarations($context);

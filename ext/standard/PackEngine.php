@@ -607,6 +607,8 @@ final class PackEngine
             return $value ? '1' : '';
         }
         if (null === $value) {
+            self::rejectNativeNullForwardProfileValue($valueArgIndex);
+
             return '';
         }
 
@@ -649,6 +651,11 @@ final class PackEngine
         if (\is_bool($value)) {
             return $value ? 1 : 0;
         }
+        if (null === $value) {
+            self::rejectNativeNullForwardProfileValue($valueArgIndex);
+
+            return 0;
+        }
         if (\is_string($value) && is_numeric($value)) {
             return (int) $value;
         }
@@ -689,6 +696,11 @@ final class PackEngine
         if (\is_bool($value)) {
             return $value ? 1.0 : 0.0;
         }
+        if (null === $value) {
+            self::rejectNativeNullForwardProfileValue($valueArgIndex);
+
+            return 0.0;
+        }
         if (\is_string($value) && is_numeric($value)) {
             return (float) $value;
         }
@@ -696,10 +708,22 @@ final class PackEngine
         return 0.0;
     }
 
-    /** php-src ext/standard/pack.c — Z_PARAM_STR null TypeError on 8.4 forward profile (#18992). */
+    /**
+     * php-src ext/standard/pack.c — typed value operands reject null on 8.4 forward profile (#18992, #19388).
+     *
+     * Uses {@see VmString::requiresZparamStrStrictNullOnForwardProfile} (not the retired
+     * {@see VmString::requiresForwardProfileStrictStringNull} global switch).
+     */
     private static function rejectNullForwardProfileValue(Variable $resolved, int $valueArgIndex): void
     {
-        if (Variable::TYPE_NULL === $resolved->type && VmString::requiresForwardProfileStrictStringNull()) {
+        if (Variable::TYPE_NULL === $resolved->type) {
+            self::rejectNativeNullForwardProfileValue($valueArgIndex);
+        }
+    }
+
+    private static function rejectNativeNullForwardProfileValue(int $valueArgIndex): void
+    {
+        if (VmString::requiresZparamStrStrictNullOnForwardProfile()) {
             throw new \TypeError(\sprintf(
                 'pack(): Argument #%d ($values) must be of type string, null given',
                 $valueArgIndex + 2
