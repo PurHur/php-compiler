@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5016 |
-| Phase A inventory files (M2 ratio SSOT) | 5016 |
+| PHP files on vm.php path | 5020 |
+| Phase A inventory files (M2 ratio SSOT) | 5020 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13530 |
+| Source constructs flagged (warnings) | 13553 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -866,7 +866,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
 | `ext/sockets/JitSocketExportStream.php` | 0 | 1 |
 | `ext/sockets/JitSocketImportStream.php` | 0 | 1 |
-| `ext/sockets/Module.php` | 0 | 21 |
+| `ext/sockets/Module.php` | 0 | 25 |
 | `ext/sockets/SocketAtmarkJitHelper.php` | 0 | 1 |
 | `ext/sockets/SocketConstants.php` | 0 | 1 |
 | `ext/sockets/SocketExportStreamJitHelper.php` | 0 | 1 |
@@ -886,10 +886,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_create_pair.php` | 0 | 7 |
 | `ext/sockets/socket_export_stream.php` | 0 | 3 |
 | `ext/sockets/socket_get_option.php` | 0 | 5 |
+| `ext/sockets/socket_getpeername.php` | 0 | 5 |
+| `ext/sockets/socket_getsockname.php` | 0 | 5 |
 | `ext/sockets/socket_import_stream.php` | 0 | 3 |
 | `ext/sockets/socket_last_error.php` | 0 | 3 |
 | `ext/sockets/socket_listen.php` | 0 | 3 |
 | `ext/sockets/socket_read.php` | 0 | 3 |
+| `ext/sockets/socket_recvfrom.php` | 0 | 6 |
+| `ext/sockets/socket_sendto.php` | 0 | 3 |
 | `ext/sockets/socket_set_block.php` | 0 | 3 |
 | `ext/sockets/socket_set_nonblock.php` | 0 | 3 |
 | `ext/sockets/socket_set_option.php` | 0 | 3 |
@@ -7040,35 +7044,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 4152)
 - new DOMException (line 4194)
 - new DOMException (line 4220)
-- new DOMException (line 4890)
-- new Variable (line 4918)
-- new DOMException (line 5148)
-- new DOMException (line 5231)
-- new DOMException (line 5273)
-- new ObjectEntry (line 5358)
-- new DomNodeState (line 5362)
-- new Variable (line 5369)
-- new ObjectEntry (line 5569)
-- new DomNodeState (line 5573)
-- new Variable (line 5580)
-- new ObjectEntry (line 5600)
-- new DomNodeState (line 5603)
-- new Variable (line 5611)
-- new Variable (line 5759)
-- new DOMException (line 5860)
-- new DOMException (line 5867)
-- new DOMException (line 5874)
-- new DOMException (line 5878)
-- new DOMException (line 5881)
-- new DOMException (line 5890)
-- new Variable (line 6728)
-- new Variable (line 6741)
-- new DOMException (line 6824)
-- new DOMException (line 6851)
-- new DOMException (line 6882)
-- new DOMException (line 6946)
-- new DOMException (line 6954)
-- new DOMException (line 6963)
+- new DOMException (line 4892)
+- new Variable (line 4920)
+- new DOMException (line 5150)
+- new DOMException (line 5233)
+- new DOMException (line 5275)
+- new ObjectEntry (line 5360)
+- new DomNodeState (line 5364)
+- new Variable (line 5371)
+- new ObjectEntry (line 5571)
+- new DomNodeState (line 5575)
+- new Variable (line 5582)
+- new ObjectEntry (line 5602)
+- new DomNodeState (line 5605)
+- new Variable (line 5613)
+- new Variable (line 5761)
+- new DOMException (line 5862)
+- new DOMException (line 5869)
+- new DOMException (line 5876)
+- new DOMException (line 5880)
+- new DOMException (line 5883)
+- new DOMException (line 5892)
+- new Variable (line 6730)
+- new Variable (line 6743)
+- new DOMException (line 6826)
+- new DOMException (line 6853)
+- new DOMException (line 6884)
+- new DOMException (line 6948)
+- new DOMException (line 6956)
+- new DOMException (line 6965)
 - 326 class method(s)
 - 2 closure(s)
 
@@ -10842,12 +10846,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new socket_accept (line 52)
 - new socket_set_option (line 53)
 - new socket_get_option (line 54)
-- new socket_read (line 55)
-- new socket_write (line 56)
-- new socket_close (line 57)
-- new socket_strerror (line 58)
-- new socket_last_error (line 59)
-- new socket_clear_error (line 60)
+- new socket_getsockname (line 55)
+- new socket_getpeername (line 56)
+- new socket_sendto (line 57)
+- new socket_recvfrom (line 58)
+- new socket_read (line 59)
+- new socket_write (line 60)
+- new socket_close (line 61)
+- new socket_strerror (line 62)
+- new socket_last_error (line 63)
+- new socket_clear_error (line 64)
 - 3 class method(s)
 
 ### `ext/sockets/SocketAtmarkJitHelper.php`
@@ -10873,7 +10881,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/SocketsLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
-- 26 class method(s)
+- 30 class method(s)
 
 ### `ext/sockets/VmSocket.php`
 
@@ -10893,7 +10901,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/VmSockets.php`
 
 **Warnings** (review for bootstrap subset):
-- 32 class method(s)
+- 36 class method(s)
 
 ### `ext/sockets/socket_accept.php`
 
@@ -10979,6 +10987,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 - 3 closure(s)
 
+### `ext/sockets/socket_getpeername.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new Variable (line 49)
+- new Variable (line 53)
+- 2 class method(s)
+- 2 closure(s)
+
+### `ext/sockets/socket_getsockname.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new Variable (line 49)
+- new Variable (line 53)
+- 2 class method(s)
+- 2 closure(s)
+
 ### `ext/sockets/socket_import_stream.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11004,6 +11030,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
+- 2 class method(s)
+- 2 closure(s)
+
+### `ext/sockets/socket_recvfrom.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new Variable (line 51)
+- new Variable (line 54)
+- new Variable (line 58)
+- 2 class method(s)
+- 2 closure(s)
+
+### `ext/sockets/socket_sendto.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 - 2 closure(s)
 

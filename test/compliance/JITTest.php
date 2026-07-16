@@ -18,8 +18,9 @@ class JITTest extends BaseTest {
     public static function providePHPTests(): \Generator
     {
         foreach (parent::providePHPTests() as $name => $case) {
-            // VM-first (#6212): JIT hangs/OOM on create_listen accept scripts; defer JIT PHPT.
-            if (str_contains($name, 'socket_create_listen')) {
+            // VM-first (#6212/#6248): JIT hangs/OOM on create_listen / datagram accept scripts; defer JIT PHPT.
+            if (str_contains($name, 'socket_create_listen')
+                || str_contains($name, 'socket_datagram')) {
                 continue;
             }
             if (!CompilerVersion::supportsStrIncrement()

@@ -238,23 +238,69 @@ final class SocketsLibcThinAbi
      */
     public static function getsocknameInet(int $fd): array|false
     {
+        return self::nameInet($fd, 'getsockname');
+    }
+
+    /**
+     * @return array{0: string, 1: int}|false
+     */
+    public static function getpeernameInet(int $fd): array|false
+    {
+        return self::nameInet($fd, 'getpeername');
+    }
+
+    /**
+     * sendto(2) to an AF_INET address (#6248).
+     */
+    public static function sendtoInet(int $fd, string $buf, int $length, int $flags, string $addr, int $port): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+        if ($length <= 0) {
+            return 0;
+        }
+        $sa = self::makeSockaddrIn($ffi, $addr, $port);
+        if (null === $sa) {
+            return -1;
+        }
+        $payload = \substr($buf, 0, $length);
+        $c = $ffi->new('char['.\strlen($payload).']');
+        \FFI::memcpy($c, $payload, \strlen($payload));
+
+        return (int) $ffi->sendto($fd, $c, \strlen($payload), $flags, \FFI::addr($sa), 16);
+    }
+
+    /**
+     * recvfrom(2) — returns bytes + peer AF_INET address/port (#6248).
+     *
+     * @return array{0: string, 1: string, 2: int}|false
+     */
+    public static function recvfromInet(int $fd, int $length, int $flags): array|false
+    {
         $ffi = self::ffi();
         if (null === $ffi) {
             return false;
         }
-
+        if ($length <= 0) {
+            return ['', '0.0.0.0', 0];
+        }
         $sa = $ffi->new('struct sockaddr_in');
         $len = $ffi->new('unsigned int');
         $len->cdata = 16;
-        if (0 !== (int) $ffi->getsockname($fd, \FFI::addr($sa), \FFI::addr($len))) {
+        $c = $ffi->new('char['.$length.']');
+        $n = (int) $ffi->recvfrom($fd, $c, $length, $flags, \FFI::addr($sa), \FFI::addr($len));
+        if ($n < 0) {
             return false;
         }
         $buf = $ffi->new('char[64]');
         if (null === $ffi->inet_ntop(2, $ffi->cast('void*', \FFI::addr($sa->sin_addr)), $buf, 64)) {
             return false;
         }
+        $data = 0 === $n ? '' : \FFI::string($c, $n);
 
-        return [\FFI::string($buf), (int) $ffi->ntohs($sa->sin_port)];
+        return [$data, \FFI::string($buf), (int) $ffi->ntohs($sa->sin_port)];
     }
 
     public static function send(int $fd, string $buf, int $length, int $flags = 0): int
@@ -348,6 +394,35 @@ final class SocketsLibcThinAbi
     }
 
     /**
+     * @param 'getsockname'|'getpeername' $which
+     *
+     * @return array{0: string, 1: int}|false
+     */
+    private static function nameInet(int $fd, string $which): array|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $sa = $ffi->new('struct sockaddr_in');
+        $len = $ffi->new('unsigned int');
+        $len->cdata = 16;
+        $rc = 'getpeername' === $which
+            ? (int) $ffi->getpeername($fd, \FFI::addr($sa), \FFI::addr($len))
+            : (int) $ffi->getsockname($fd, \FFI::addr($sa), \FFI::addr($len));
+        if (0 !== $rc) {
+            return false;
+        }
+        $buf = $ffi->new('char[64]');
+        if (null === $ffi->inet_ntop(2, $ffi->cast('void*', \FFI::addr($sa->sin_addr)), $buf, 64)) {
+            return false;
+        }
+
+        return [\FFI::string($buf), (int) $ffi->ntohs($sa->sin_port)];
+    }
+
+    /**
      * @return \FFI\CData|null struct sockaddr_in
      */
     private static function makeSockaddrIn(\FFI $ffi, string $addr, int $port): mixed
@@ -408,10 +483,13 @@ int bind(int sockfd, const void *addr, unsigned int addrlen);
 int listen(int sockfd, int backlog);
 int accept(int sockfd, void *addr, unsigned int *addrlen);
 int getsockname(int sockfd, void *addr, unsigned int *addrlen);
+int getpeername(int sockfd, void *addr, unsigned int *addrlen);
 int setsockopt(int sockfd, int level, int optname, const void *optval, unsigned int optlen);
 int getsockopt(int sockfd, int level, int optname, void *optval, unsigned int *optlen);
 long send(int sockfd, const void *buf, unsigned long len, int flags);
 long recv(int sockfd, void *buf, unsigned long len, int flags);
+long sendto(int sockfd, const void *buf, unsigned long len, int flags, const void *addr, unsigned int addrlen);
+long recvfrom(int sockfd, void *buf, unsigned long len, int flags, void *addr, unsigned int *addrlen);
 int close(int fd);
 int fcntl(int fd, int cmd, ...);
 int sockatmark(int sockfd);

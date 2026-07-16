@@ -144,6 +144,13 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([3], BuiltinByRefParams::forFunction('SOCKET_CREATE_PAIR'));
     }
 
+    public function testSocketDatagramByRef(): void
+    {
+        $this->assertSame([1, 2], BuiltinByRefParams::forFunction('socket_getsockname'));
+        $this->assertSame([1, 2], BuiltinByRefParams::forFunction('socket_getpeername'));
+        $this->assertSame([1, 4, 5], BuiltinByRefParams::forFunction('socket_recvfrom'));
+    }
+
     public function testStreamSocketServerErrnoErrstrByRef(): void
     {
         $this->assertSame([1, 2], BuiltinByRefParams::forFunction('stream_socket_server'));
