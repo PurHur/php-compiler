@@ -1,5 +1,5 @@
 --TEST--
-stdlib pack() null value operands TypeError on 8.4 forward profile (#18992)
+stdlib pack() null value operands TypeError on 8.4 forward profile (#18992, #19388)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--

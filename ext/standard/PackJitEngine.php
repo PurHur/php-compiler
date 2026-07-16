@@ -68,7 +68,8 @@ final class PackJitEngine
             case 'a':
             case 'A':
             case 'Z':
-                $str = self::argString($args[$currentArg++]);
+                $valueIdx = $currentArg;
+                $str = self::argString($args[$currentArg++], $valueIdx);
                 $argCp = 'Z' !== $code ? $arg : ($arg > 0 ? $arg - 1 : 0);
                 $pad = 'A' === $code ? ' ' : "\0";
                 $chunk = \str_pad(\substr($str, 0, $argCp), $arg, $pad);
@@ -77,7 +78,8 @@ final class PackJitEngine
                 return [$output, $outputPos + $arg, $currentArg];
             case 'h':
             case 'H':
-                $str = self::argString($args[$currentArg++]);
+                $valueIdx = $currentArg;
+                $str = self::argString($args[$currentArg++], $valueIdx);
                 $packed = PackEngineEncode::packHex($str, $arg, 'H' === $code);
                 $output = PackEngineEncode::writeAt($output, $outputPos, $packed);
 
@@ -279,7 +281,7 @@ final class PackJitEngine
                         throw new \ValueError(\sprintf('Type %s: not enough arguments', $code));
                     }
                     if ($arg < 0) {
-                        $str = self::argString($args[$currentArg] ?? '');
+                        $str = self::argString($args[$currentArg] ?? '', $currentArg);
                         $arg = \strlen($str);
                         if ('Z' === $code) {
                             ++$arg;
@@ -414,16 +416,20 @@ final class PackJitEngine
     /** @param list<int|float|string|bool|null> $args */
     private static function takeArgLong(array $args, int &$currentArg): int
     {
-        return self::argLong($args[$currentArg++]);
+        $idx = $currentArg++;
+
+        return self::argLong($args[$idx], $idx);
     }
 
     /** @param list<int|float|string|bool|null> $args */
     private static function takeArgDouble(array $args, int &$currentArg): float
     {
-        return self::argDouble($args[$currentArg++]);
+        $idx = $currentArg++;
+
+        return self::argDouble($args[$idx], $idx);
     }
 
-    private static function argString(mixed $value): string
+    private static function argString(mixed $value, int $valueArgIndex = 0): string
     {
         if (\is_string($value)) {
             return $value;
@@ -435,13 +441,15 @@ final class PackJitEngine
             return $value ? '1' : '';
         }
         if (null === $value) {
+            self::rejectNullForwardProfileValue($valueArgIndex);
+
             return '';
         }
 
         return (string) $value;
     }
 
-    private static function argLong(mixed $value): int
+    private static function argLong(mixed $value, int $valueArgIndex = 0): int
     {
         if (\is_int($value)) {
             return $value;
@@ -452,6 +460,11 @@ final class PackJitEngine
         if (\is_bool($value)) {
             return $value ? 1 : 0;
         }
+        if (null === $value) {
+            self::rejectNullForwardProfileValue($valueArgIndex);
+
+            return 0;
+        }
         if (\is_string($value) && is_numeric($value)) {
             return (int) $value;
         }
@@ -459,7 +472,7 @@ final class PackJitEngine
         return 0;
     }
 
-    private static function argDouble(mixed $value): float
+    private static function argDouble(mixed $value, int $valueArgIndex = 0): float
     {
         if (\is_float($value) || \is_int($value)) {
             return (float) $value;
@@ -467,10 +480,26 @@ final class PackJitEngine
         if (\is_bool($value)) {
             return $value ? 1.0 : 0.0;
         }
+        if (null === $value) {
+            self::rejectNullForwardProfileValue($valueArgIndex);
+
+            return 0.0;
+        }
         if (\is_string($value) && is_numeric($value)) {
             return (float) $value;
         }
 
         return 0.0;
+    }
+
+    /** php-src ext/standard/pack.c — null value operands TypeError on 8.4 forward profile (#18992, #19388). */
+    private static function rejectNullForwardProfileValue(int $valueArgIndex): void
+    {
+        if (VmString::requiresZparamStrStrictNullOnForwardProfile()) {
+            throw new \TypeError(\sprintf(
+                'pack(): Argument #%d ($values) must be of type string, null given',
+                $valueArgIndex + 2
+            ));
+        }
     }
 }
