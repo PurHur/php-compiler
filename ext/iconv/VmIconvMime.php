@@ -16,18 +16,19 @@ final class VmIconvMime
         string $encoded,
         int $mode,
         ?string $charset,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        string $function = 'iconv_mime_decode'
     ): string|false {
         $outputCharset = null !== $charset && '' !== $charset
             ? $charset
             : IconvEncodingState::getInternalEncoding();
         if (\strlen($outputCharset) >= IconvConstants::ENCODING_NAME_MAX_LEN) {
-            self::triggerEncodingLengthWarning($frame);
+            self::triggerEncodingLengthWarning($frame, $function);
 
             return false;
         }
         if (null === CharsetEngine::parseEncodingSpec($outputCharset)) {
-            self::triggerWrongEncodingWarning($frame, '???', $outputCharset);
+            self::triggerWrongEncodingWarning($frame, '???', $outputCharset, $function);
 
             return false;
         }
@@ -66,7 +67,7 @@ final class VmIconvMime
                     }
                 }
                 $decodedBytes = $isQ ? self::qDecode($payload) : self::base64Decode($payload);
-                $converted = self::convertWord($wordCharset, $outputCharset, $decodedBytes, $frame);
+                $converted = self::convertWord($wordCharset, $outputCharset, $decodedBytes, $frame, $function);
                 if (false === $converted) {
                     if ($continue) {
                         $out .= \substr($encoded, $i, $next - $i);
@@ -78,14 +79,14 @@ final class VmIconvMime
                 }
                 $out .= $converted;
                 $i = $next;
-                while ($i < $len && self::isWhitespace($encoded[$i])) {
-                    ++$i;
+                // php-src: LWSP between adjacent encoded-words is removed; other trailing
+                // text (including spaces) is copied as-is — do not inject a synthetic space.
+                $j = $i;
+                while ($j < $len && self::isWhitespace($encoded[$j])) {
+                    ++$j;
                 }
-                if ($i < $len && '=' === $encoded[$i] && ($i + 1) < $len && '?' === $encoded[$i + 1]) {
-                    continue;
-                }
-                if ($i < $len && !$strict) {
-                    $out .= ' ';
+                if ($j < $len && '=' === $encoded[$j] && ($j + 1) < $len && '?' === $encoded[$j + 1]) {
+                    $i = $j;
                 }
                 continue;
             }
@@ -110,6 +111,108 @@ final class VmIconvMime
             if ($i > $start) {
                 $out .= \substr($encoded, $start, $i - $start);
             }
+        }
+
+        return $out;
+    }
+
+    /**
+     * iconv_mime_decode_headers() — decode an RFC 822 header block (php-src ext/iconv/iconv.c; #19448).
+     *
+     * @return array<string, string|list<string>>|false
+     */
+    public static function mimeDecodeHeaders(
+        string $headers,
+        int $mode,
+        ?string $charset,
+        ?Frame $frame = null
+    ): array|false {
+        $function = 'iconv_mime_decode_headers';
+        /** @var array<string, string|list<string>> $result */
+        $result = [];
+        $len = \strlen($headers);
+        $pos = 0;
+        $currentName = null;
+        $currentValue = '';
+
+        $flush = static function () use (&$result, &$currentName, &$currentValue): void {
+            if (null === $currentName) {
+                return;
+            }
+            $name = $currentName;
+            $value = $currentValue;
+            $currentName = null;
+            $currentValue = '';
+            if (!\array_key_exists($name, $result)) {
+                $result[$name] = $value;
+
+                return;
+            }
+            if (!\is_array($result[$name])) {
+                $result[$name] = [$result[$name]];
+            }
+            $result[$name][] = $value;
+        };
+
+        while ($pos < $len) {
+            $eol = \strpos($headers, "\n", $pos);
+            if (false === $eol) {
+                $line = \substr($headers, $pos);
+                $pos = $len;
+            } else {
+                $line = \substr($headers, $pos, $eol - $pos);
+                $pos = $eol + 1;
+            }
+            if ('' !== $line && "\r" === $line[\strlen($line) - 1]) {
+                $line = \substr($line, 0, -1);
+            }
+
+            // Blank line ends the header block (body ignored).
+            if ('' === $line) {
+                break;
+            }
+
+            if (null !== $currentName && isset($line[0]) && (' ' === $line[0] || "\t" === $line[0])) {
+                // Folded continuation — drop the leading WSP (RFC 822).
+                $currentValue .= \substr($line, 1);
+                continue;
+            }
+
+            $flush();
+            $colon = \strpos($line, ':');
+            if (false === $colon) {
+                $currentName = null;
+                $currentValue = '';
+                continue;
+            }
+            $currentName = \substr($line, 0, $colon);
+            $value = \substr($line, $colon + 1);
+            if (isset($value[0]) && (' ' === $value[0] || "\t" === $value[0])) {
+                $value = \substr($value, 1);
+            }
+            $currentValue = $value;
+        }
+        $flush();
+
+        $out = [];
+        foreach ($result as $name => $value) {
+            if (\is_array($value)) {
+                $decodedList = [];
+                foreach ($value as $one) {
+                    $decoded = self::mimeDecode($one, $mode, $charset, $frame, $function);
+                    if (false === $decoded) {
+                        return false;
+                    }
+                    $decodedList[] = $decoded;
+                }
+                $out[$name] = $decodedList;
+                continue;
+            }
+            $decoded = self::mimeDecode($value, $mode, $charset, $frame, $function);
+            if (false === $decoded) {
+                return false;
+            }
+            $out[$name] = $decoded;
         }
 
         return $out;
@@ -232,7 +335,8 @@ final class VmIconvMime
         string $fromCharset,
         string $toCharset,
         string $bytes,
-        ?Frame $frame
+        ?Frame $frame,
+        string $function = 'iconv_mime_decode'
     ): string|false {
         if (null === CharsetEngine::parseEncodingSpec($fromCharset)) {
             return false;
@@ -242,7 +346,7 @@ final class VmIconvMime
         }
         $converted = CharsetEngine::convert($fromCharset, $toCharset, $bytes);
         if (false === $converted) {
-            self::triggerWrongEncodingWarning($frame, $toCharset, $fromCharset);
+            self::triggerWrongEncodingWarning($frame, $toCharset, $fromCharset, $function);
 
             return false;
         }

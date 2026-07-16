@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5059 |
-| Phase A inventory files (M2 ratio SSOT) | 5059 |
+| PHP files on vm.php path | 5060 |
+| Phase A inventory files (M2 ratio SSOT) | 5060 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13676 |
+| Source constructs flagged (warnings) | 13685 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -502,12 +502,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/iconv/IconvStringFunction.php` | 0 | 2 |
 | `ext/iconv/JitIconv.php` | 0 | 1 |
 | `ext/iconv/JitIconvString.php` | 0 | 1 |
-| `ext/iconv/Module.php` | 0 | 11 |
+| `ext/iconv/Module.php` | 0 | 12 |
 | `ext/iconv/VmIconv.php` | 0 | 1 |
-| `ext/iconv/VmIconvMime.php` | 0 | 1 |
+| `ext/iconv/VmIconvMime.php` | 0 | 2 |
 | `ext/iconv/iconv.php` | 0 | 3 |
 | `ext/iconv/iconv_get_encoding.php` | 0 | 3 |
 | `ext/iconv/iconv_mime_decode.php` | 0 | 3 |
+| `ext/iconv/iconv_mime_decode_headers.php` | 0 | 7 |
 | `ext/iconv/iconv_mime_encode.php` | 0 | 3 |
 | `ext/iconv/iconv_set_encoding.php` | 0 | 3 |
 | `ext/iconv/iconv_strlen.php` | 0 | 2 |
@@ -8258,7 +8259,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new iconv_get_encoding (line 37)
 - new iconv_set_encoding (line 38)
 - new iconv_mime_decode (line 39)
-- new iconv_mime_encode (line 40)
+- new iconv_mime_decode_headers (line 40)
+- new iconv_mime_encode (line 41)
 - 2 class method(s)
 
 ### `ext/iconv/VmIconv.php`
@@ -8269,7 +8271,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/VmIconvMime.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
+- 1 closure(s)
 
 ### `ext/iconv/iconv.php`
 
@@ -8290,6 +8293,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
 - 2 class method(s)
+- 1 closure(s)
+
+### `ext/iconv/iconv_mime_decode_headers.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- new HashTable (line 78)
+- new Variable (line 80)
+- new HashTable (line 82)
+- new Variable (line 84)
+- 3 class method(s)
 - 1 closure(s)
 
 ### `ext/iconv/iconv_mime_encode.php`
@@ -24921,7 +24935,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/stripcslashes.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/stripos.php`

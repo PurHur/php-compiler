@@ -534,6 +534,7 @@ require_once __DIR__.'/../../../ext/iconv/VmIconvMime.php';
 require_once __DIR__.'/../../../ext/iconv/iconv.php';
 require_once __DIR__.'/../../../ext/iconv/iconv_get_encoding.php';
 require_once __DIR__.'/../../../ext/iconv/iconv_mime_decode.php';
+require_once __DIR__.'/../../../ext/iconv/iconv_mime_decode_headers.php';
 require_once __DIR__.'/../../../ext/iconv/iconv_mime_encode.php';
 require_once __DIR__.'/../../../ext/iconv/iconv_set_encoding.php';
 require_once __DIR__.'/../../../ext/iconv/iconv_strlen.php';
