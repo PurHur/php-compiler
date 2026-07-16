@@ -2,8 +2,9 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -12,12 +13,14 @@ use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 
 /**
- * User-script standalone AOT bridge for __compiler_var_export (#17316, #5965).
+ * User-script standalone AOT bridge for __compiler_var_export (#19430, #17316, #16075).
  *
  * Nested VarExportJitHelper from user-main emit segfaults; link bridge during lowering
- * after VmActiveContextInit publishes sg_vm_context (#17391).
+ * after VmActiveContextInit publishes sg_vm_context (#17391). Housed in ext/standard
+ * (not lib/JIT/Builtin) — same kernel-move pattern as #19389 / #19399.
+ * php-src: ext/standard/var.c — php_var_export_ex
  */
-final class StringVarExportUserScriptLlvm
+final class JitVarExportKernel
 {
     private const HELPER_PATH = '/ext/standard/VarExportJitHelper.php';
 
