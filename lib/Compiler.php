@@ -21938,8 +21938,82 @@ class Compiler {
             return $expr->class === $operand
                 || $this->operandsReferToSameVariable($expr->class, $operand);
         }
+        // new Outer(new Inner(..., Class::CONST), …) — ClassConstFetch feeds inner New_ args (#19439).
+        // php-cfg may rewrite fetch->result into a distinct Temporary on the New_ arg list; link via $arg->ops.
+        if (
+            $expr instanceof Op\Expr\New_
+            || $expr instanceof Op\Expr\FuncCall
+            || $expr instanceof Op\Expr\NsFuncCall
+            || $expr instanceof Op\Expr\MethodCall
+            || $expr instanceof Op\Expr\NullsafeMethodCall
+            || $expr instanceof Op\Expr\StaticCall
+        ) {
+            if ($expr instanceof Op\Expr\MethodCall || $expr instanceof Op\Expr\NullsafeMethodCall) {
+                if (
+                    isset($expr->var)
+                    && $expr->var instanceof Operand
+                    && (
+                        $expr->var === $operand
+                        || $this->operandsReferToSameVariable($expr->var, $operand)
+                    )
+                ) {
+                    return true;
+                }
+            }
+            if (!property_exists($expr, 'args') || !\is_array($expr->args)) {
+                return false;
+            }
+            foreach ($expr->args as $arg) {
+                if (!($arg instanceof Operand)) {
+                    continue;
+                }
+                if ($arg === $operand || $this->operandsReferToSameVariable($arg, $operand)) {
+                    return true;
+                }
+                // Distinct dead temps: arg was written by the same ClassConstFetch/ConstFetch as $operand (#19439).
+                if (
+                    isset($arg->ops)
+                    && \is_array($arg->ops)
+                    && isset($operand->ops)
+                    && \is_array($operand->ops)
+                ) {
+                    foreach ($arg->ops as $argWriteOp) {
+                        if (
+                            ($argWriteOp instanceof Op\Expr\ClassConstFetch
+                                || $argWriteOp instanceof Op\Expr\ConstFetch)
+                            && \in_array($argWriteOp, $operand->ops, true)
+                        ) {
+                            return true;
+                        }
+                    }
+                }
+                if (
+                    isset($arg->ops)
+                    && \is_array($arg->ops)
+                    && (
+                        ($operandWriter = $this->soleWriteExprForOperand($operand)) instanceof Op\Expr
+                    )
+                    && \in_array($operandWriter, $arg->ops, true)
+                ) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
 
         return false;
+    }
+
+    /** Sole write-op for a Temporary when php-cfg left a single producer in $operand->ops (#19439). */
+    private function soleWriteExprForOperand(Operand $operand): ?Op\Expr
+    {
+        if (!isset($operand->ops) || !\is_array($operand->ops) || 1 !== \count($operand->ops)) {
+            return null;
+        }
+        $write = $operand->ops[0] ?? null;
+
+        return $write instanceof Op\Expr ? $write : null;
     }
 
     /**
@@ -23636,6 +23710,17 @@ class Compiler {
                     && $this->cfgExprUsesOperand($next, $child->result)
                 ) {
                     // Hoisted operand inside sibling inline Array_ / bitmask call arg (#10612, #11304, #11387).
+                    continue;
+                }
+                // new Outer(new Inner(..., Class::CONST), mode) — const feeds *inner* New_ only (#19439).
+                // Do not skip when $next is the consumer itself (outer ctor ClassConstFetch args).
+                if (
+                    ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch)
+                    && $next instanceof Op\Expr\New_
+                    && $next !== $callOp
+                    && null !== $child->result
+                    && $this->cfgExprUsesOperand($next, $child->result)
+                ) {
                     continue;
                 }
                 // php-cfg hoists `E::A` before `E::A::class` — case fetch feeds sibling ::class, not call arg (#9426, #16030).
@@ -34700,6 +34785,7 @@ class Compiler {
 
     /**
      * Inline `new Outer(new Inner([...]), …)` — Array_ prelude (optional) + first New_ (#12916).
+     * ClassConstFetch/ConstFetch feeding the *inner* ctor must not bind outer args (#19439).
      *
      * @param list<Op\Expr> $producers
      */
@@ -34714,19 +34800,42 @@ class Compiler {
         }
         if ([] !== $callArgs) {
             $callArg = $callArgs[$argIndex] ?? null;
+            // Only wire a nested New_ when this call arg is that New_ (or its dead temp result).
+            // Bare dead temps (e.g. outer mode ClassConstFetch) must not steal the inner New_ (#19439).
+            $isNewArg = $this->callArgIsNewExpression($callArg);
+            $deadTempFedByNew = false;
             if (
-                !$this->callArgIsNewExpression($callArg)
-                && (!$callArg instanceof Operand || !$this->callArgIsDeadInlineTemporary($callArg))
+                !$isNewArg
+                && $callArg instanceof Operand
+                && $this->callArgIsDeadInlineTemporary($callArg)
             ) {
+                foreach ($producers as $producer) {
+                    if (!$producer instanceof Op\Expr\New_) {
+                        continue;
+                    }
+                    if (
+                        null !== $producer->result
+                        && $this->operandsReferToSameVariable($producer->result, $callArg)
+                    ) {
+                        $deadTempFedByNew = true;
+                        break;
+                    }
+                    // php-cfg rewrites New_->result into a distinct Temporary on the outer arg (#19439).
+                    if (
+                        isset($callArg->ops)
+                        && \is_array($callArg->ops)
+                        && \in_array($producer, $callArg->ops, true)
+                    ) {
+                        $deadTempFedByNew = true;
+                        break;
+                    }
+                }
+            }
+            if (!$isNewArg && !$deadTempFedByNew) {
                 return null;
             }
-            $positional = $producers[$argIndex] ?? null;
-            if (
-                $positional instanceof Op\Expr\ConstFetch
-                || $positional instanceof Op\Expr\ClassConstFetch
-            ) {
-                return null;
-            }
+            // ClassConstFetch/ConstFetch at $argIndex may be an *inner* ctor prelude
+            // (new Outer(new Inner(..., Class::C), …)); skip via the offset walk (#19439).
         }
         $offset = $argIndex;
         while ($offset < \count($producers)) {
