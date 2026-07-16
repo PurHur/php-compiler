@@ -194,6 +194,247 @@ final class VmSockets
     }
 
     /**
+     * php-src: PHP_FUNCTION(socket_bind) — AF_INET bind(2) (#6176).
+     */
+    public static function bind(ObjectEntry $object, string $addr, int $port, Frame $frame): bool
+    {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+        $rc = SocketsLibcThinAbi::bindInet($fd, $addr, $port);
+        if (0 === $rc) {
+            self::$socketErrors[$object->id] = 0;
+
+            return true;
+        }
+        $errno = SocketsLibcThinAbi::readErrno();
+        self::recordError($object, $errno);
+        self::triggerWarning(
+            $frame,
+            \sprintf(
+                'socket_bind(): unable to bind [%d]: %s',
+                $errno,
+                SocketsLibcThinAbi::strerror($errno)
+            )
+        );
+
+        return false;
+    }
+
+    /**
+     * php-src: PHP_FUNCTION(socket_listen) (#6176).
+     */
+    public static function listen(ObjectEntry $object, int $backlog, Frame $frame): bool
+    {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+        $rc = SocketsLibcThinAbi::listen($fd, $backlog);
+        if (0 === $rc) {
+            self::$socketErrors[$object->id] = 0;
+
+            return true;
+        }
+        $errno = SocketsLibcThinAbi::readErrno();
+        self::recordError($object, $errno);
+        self::triggerWarning(
+            $frame,
+            \sprintf(
+                'socket_listen(): unable to listen [%d]: %s',
+                $errno,
+                SocketsLibcThinAbi::strerror($errno)
+            )
+        );
+
+        return false;
+    }
+
+    /**
+     * php-src: PHP_FUNCTION(socket_accept) (#6176).
+     *
+     * @return ObjectEntry|false
+     */
+    public static function accept(ObjectEntry $object, \PHPCompiler\VM\Context $ctx, Frame $frame): ObjectEntry|false
+    {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+        $client = SocketsLibcThinAbi::accept($fd);
+        if ($client < 0) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError($object, $errno);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_accept(): unable to accept [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
+
+            return false;
+        }
+
+        $wrapped = VmSocket::wrapOwnedFd($client, $ctx);
+        self::$socketErrors[$wrapped->id] = 0;
+
+        return $wrapped;
+    }
+
+    /** Linux SOL_SOCKET SO_RCVTIMEO / SO_SNDTIMEO / SO_LINGER */
+    private const SO_LINGER = 13;
+    private const SO_RCVTIMEO = 20;
+    private const SO_SNDTIMEO = 21;
+
+    /**
+     * php-src: PHP_FUNCTION(socket_set_option) — int/timeval/linger (#6176).
+     *
+     * @param int|array{sec?:int,usec?:int,l_onoff?:int,l_linger?:int} $value
+     */
+    public static function setOption(ObjectEntry $object, int $level, int $option, int|array $value, Frame $frame): bool
+    {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+
+        if (self::SO_RCVTIMEO === $option || self::SO_SNDTIMEO === $option) {
+            if (!\is_array($value)) {
+                throw new \TypeError(
+                    'socket_set_option(): Argument #4 ($value) must be of type array when option is SO_RCVTIMEO or SO_SNDTIMEO, '
+                    .\get_debug_type($value).' given'
+                );
+            }
+            if (!\array_key_exists('sec', $value)) {
+                throw new \ValueError('socket_set_option(): Argument #4 ($value) must have key "sec"');
+            }
+            if (!\array_key_exists('usec', $value)) {
+                throw new \ValueError('socket_set_option(): Argument #4 ($value) must have key "usec"');
+            }
+            $sec = (int) $value['sec'];
+            $usec = (int) $value['usec'];
+            $rc = SocketsLibcThinAbi::setsockoptTimeval($fd, $level, $option, $sec, $usec);
+        } elseif (self::SO_LINGER === $option) {
+            if (!\is_array($value)) {
+                throw new \TypeError(
+                    'socket_set_option(): Argument #4 ($value) must be of type array when option is SO_LINGER, '
+                    .\get_debug_type($value).' given'
+                );
+            }
+            if (!\array_key_exists('l_onoff', $value)) {
+                throw new \ValueError('socket_set_option(): Argument #4 ($value) must have key "l_onoff"');
+            }
+            if (!\array_key_exists('l_linger', $value)) {
+                throw new \ValueError('socket_set_option(): Argument #4 ($value) must have key "l_linger"');
+            }
+            $onoff = (int) $value['l_onoff'];
+            $linger = (int) $value['l_linger'];
+            $rc = SocketsLibcThinAbi::setsockoptLinger($fd, $level, $option, $onoff, $linger);
+        } else {
+            if (\is_array($value)) {
+                throw new \TypeError(
+                    'socket_set_option(): Argument #4 ($value) must be of type int, array given'
+                );
+            }
+            $rc = SocketsLibcThinAbi::setsockoptInt($fd, $level, $option, $value);
+        }
+
+        if (0 === $rc) {
+            self::$socketErrors[$object->id] = 0;
+
+            return true;
+        }
+        $errno = SocketsLibcThinAbi::readErrno();
+        self::recordError($object, $errno);
+        self::triggerWarning(
+            $frame,
+            \sprintf(
+                'socket_set_option(): unable to set socket option [%d]: %s',
+                $errno,
+                SocketsLibcThinAbi::strerror($errno)
+            )
+        );
+
+        return false;
+    }
+
+    /**
+     * php-src: PHP_FUNCTION(socket_get_option) (#6176).
+     *
+     * @return int|array{sec:int,usec:int}|array{l_onoff:int,l_linger:int}|false
+     */
+    public static function getOption(ObjectEntry $object, int $level, int $option, Frame $frame): int|array|false
+    {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+
+        if (self::SO_RCVTIMEO === $option || self::SO_SNDTIMEO === $option) {
+            $tv = SocketsLibcThinAbi::getsockoptTimeval($fd, $level, $option);
+            if (false === $tv) {
+                $errno = SocketsLibcThinAbi::readErrno();
+                self::recordError($object, $errno);
+                self::triggerWarning(
+                    $frame,
+                    \sprintf(
+                        'socket_get_option(): unable to get socket option [%d]: %s',
+                        $errno,
+                        SocketsLibcThinAbi::strerror($errno)
+                    )
+                );
+
+                return false;
+            }
+            self::$socketErrors[$object->id] = 0;
+
+            return ['sec' => $tv[0], 'usec' => $tv[1]];
+        }
+        if (self::SO_LINGER === $option) {
+            $lg = SocketsLibcThinAbi::getsockoptLinger($fd, $level, $option);
+            if (false === $lg) {
+                $errno = SocketsLibcThinAbi::readErrno();
+                self::recordError($object, $errno);
+                self::triggerWarning(
+                    $frame,
+                    \sprintf(
+                        'socket_get_option(): unable to get socket option [%d]: %s',
+                        $errno,
+                        SocketsLibcThinAbi::strerror($errno)
+                    )
+                );
+
+                return false;
+            }
+            self::$socketErrors[$object->id] = 0;
+
+            return ['l_onoff' => $lg[0], 'l_linger' => $lg[1]];
+        }
+
+        $val = SocketsLibcThinAbi::getsockoptInt($fd, $level, $option);
+        if (false === $val) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError($object, $errno);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_get_option(): unable to get socket option [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
+
+            return false;
+        }
+        self::$socketErrors[$object->id] = 0;
+
+        return $val;
+    }
+
+    /**
      * @return int|false bytes written
      */
     public static function write(ObjectEntry $object, string $buf, ?int $length): int|false

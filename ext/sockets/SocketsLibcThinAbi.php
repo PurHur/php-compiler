@@ -128,6 +128,112 @@ final class SocketsLibcThinAbi
     }
 
     /**
+     * setsockopt(2) with int optval (SO_REUSEADDR, TCP_NODELAY, …).
+     */
+    public static function setsockoptInt(int $fd, int $level, int $option, int $value): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+        $opt = $ffi->new('int');
+        $opt->cdata = $value;
+
+        return (int) $ffi->setsockopt($fd, $level, $option, \FFI::addr($opt), 4);
+    }
+
+    /**
+     * getsockopt(2) into int (false on failure).
+     *
+     * @return int|false
+     */
+    public static function getsockoptInt(int $fd, int $level, int $option): int|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $opt = $ffi->new('int');
+        $len = $ffi->new('unsigned int');
+        $len->cdata = 4;
+        if (0 !== (int) $ffi->getsockopt($fd, $level, $option, \FFI::addr($opt), \FFI::addr($len))) {
+            return false;
+        }
+
+        return (int) $opt->cdata;
+    }
+
+    /**
+     * setsockopt timeval (SO_RCVTIMEO / SO_SNDTIMEO).
+     */
+    public static function setsockoptTimeval(int $fd, int $level, int $option, int $sec, int $usec): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+        $tv = $ffi->new('struct timeval');
+        $tv->tv_sec = $sec;
+        $tv->tv_usec = $usec;
+
+        return (int) $ffi->setsockopt($fd, $level, $option, \FFI::addr($tv), 16);
+    }
+
+    /**
+     * @return array{0: int, 1: int}|false sec, usec
+     */
+    public static function getsockoptTimeval(int $fd, int $level, int $option): array|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $tv = $ffi->new('struct timeval');
+        $len = $ffi->new('unsigned int');
+        $len->cdata = 16;
+        if (0 !== (int) $ffi->getsockopt($fd, $level, $option, \FFI::addr($tv), \FFI::addr($len))) {
+            return false;
+        }
+
+        return [(int) $tv->tv_sec, (int) $tv->tv_usec];
+    }
+
+    /**
+     * setsockopt linger (SO_LINGER).
+     */
+    public static function setsockoptLinger(int $fd, int $level, int $option, int $onoff, int $linger): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+        $lg = $ffi->new('struct linger');
+        $lg->l_onoff = $onoff;
+        $lg->l_linger = $linger;
+
+        return (int) $ffi->setsockopt($fd, $level, $option, \FFI::addr($lg), 8);
+    }
+
+    /**
+     * @return array{0: int, 1: int}|false l_onoff, l_linger
+     */
+    public static function getsockoptLinger(int $fd, int $level, int $option): array|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $lg = $ffi->new('struct linger');
+        $len = $ffi->new('unsigned int');
+        $len->cdata = 8;
+        if (0 !== (int) $ffi->getsockopt($fd, $level, $option, \FFI::addr($lg), \FFI::addr($len))) {
+            return false;
+        }
+
+        return [(int) $lg->l_onoff, (int) $lg->l_linger];
+    }
+
+    /**
      * @return array{0: string, 1: int}|false
      */
     public static function getsocknameInet(int $fd): array|false
@@ -293,6 +399,8 @@ struct sockaddr_in {
     struct in_addr sin_addr;
     char sin_zero[8];
 };
+struct timeval { long tv_sec; long tv_usec; };
+struct linger { int l_onoff; int l_linger; };
 int socket(int domain, int type, int protocol);
 int socketpair(int domain, int type, int protocol, int sv[2]);
 int connect(int sockfd, const void *addr, unsigned int addrlen);
@@ -300,6 +408,8 @@ int bind(int sockfd, const void *addr, unsigned int addrlen);
 int listen(int sockfd, int backlog);
 int accept(int sockfd, void *addr, unsigned int *addrlen);
 int getsockname(int sockfd, void *addr, unsigned int *addrlen);
+int setsockopt(int sockfd, int level, int optname, const void *optval, unsigned int optlen);
+int getsockopt(int sockfd, int level, int optname, void *optval, unsigned int *optlen);
 long send(int sockfd, const void *buf, unsigned long len, int flags);
 long recv(int sockfd, void *buf, unsigned long len, int flags);
 int close(int fd);
