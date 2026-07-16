@@ -5191,4 +5191,8 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/intl/NormalizerGetRawDecomposition.php';
+require_once __DIR__.'/../../../ext/intl/NormalizerIsNormalized.php';
+require_once __DIR__.'/../../../ext/intl/NormalizerNormalize.php';
+require_once __DIR__.'/../../../ext/intl/normalizer_get_raw_decomposition.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
