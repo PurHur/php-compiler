@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5206 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14230 |
+| Source constructs flagged (warnings) | 14236 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1983,7 +1983,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StreamBucketJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamBufferJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamCapsJitHelper.php` | 0 | 1 |
-| `ext/standard/StreamContextJitHelper.php` | 0 | 12 |
+| `ext/standard/StreamContextJitHelper.php` | 0 | 15 |
 | `ext/standard/StreamFilterJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamIoJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamLibcHandleJitHelper.php` | 0 | 1 |
@@ -2316,7 +2316,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamBlockingNative.php` | 0 | 1 |
 | `ext/standard/VmStreamBlockingPure.php` | 0 | 1 |
 | `ext/standard/VmStreamBucket.php` | 0 | 3 |
-| `ext/standard/VmStreamContext.php` | 0 | 16 |
+| `ext/standard/VmStreamContext.php` | 0 | 19 |
 | `ext/standard/VmStreamContextOptions.php` | 0 | 1 |
 | `ext/standard/VmStreamEnableCrypto.php` | 0 | 1 |
 | `ext/standard/VmStreamFilterArg.php` | 0 | 1 |
@@ -18786,15 +18786,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 26)
 - new HashTable (line 55)
 - new Variable (line 65)
-- new HashTable (line 109)
-- new Variable (line 112)
-- new Variable (line 128)
-- new Variable (line 166)
-- new HashTable (line 184)
-- new Variable (line 186)
-- new HashTable (line 193)
-- new Variable (line 195)
-- 16 class method(s)
+- new HashTable (line 142)
+- new Variable (line 145)
+- new Variable (line 161)
+- new Variable (line 199)
+- new HashTable (line 217)
+- new Variable (line 219)
+- new HashTable (line 226)
+- new Variable (line 228)
+- new Variable (line 243)
+- new HashTable (line 247)
+- new Variable (line 249)
+- 17 class method(s)
 
 ### `ext/standard/StreamFilterJitHelper.php`
 
@@ -21181,13 +21184,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 328)
 - new Variable (line 329)
 - new Variable (line 345)
-- new HashTable (line 473)
-- new Variable (line 482)
-- new HashTable (line 499)
-- new Variable (line 501)
-- new HashTable (line 511)
-- new Variable (line 513)
-- 25 class method(s)
+- new HashTable (line 493)
+- new Variable (line 502)
+- new HashTable (line 519)
+- new Variable (line 521)
+- new HashTable (line 531)
+- new Variable (line 533)
+- new Variable (line 553)
+- new HashTable (line 558)
+- new Variable (line 560)
+- 26 class method(s)
 
 ### `ext/standard/VmStreamContextOptions.php`
 

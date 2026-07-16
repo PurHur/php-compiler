@@ -9,10 +9,10 @@ use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
 /**
- * ftp extension module entry (php-src ext/ftp/php_ftp.c; #7270, #3353).
+ * ftp extension module entry (php-src ext/ftp/php_ftp.c; #7270, #3353, #19672).
  *
- * Register under {@see standard}; {@code extension_loaded('ftp')} stays false until
- * {@see FtpExtensionPolicy::advertisesExtension()} (#3353 phase 2).
+ * Register under {@see standard}; {@code extension_loaded('ftp')} follows
+ * {@see FtpExtensionPolicy::advertisesExtension()} (paired with ftp_* / Ftp\Connection).
  */
 class Module extends ModuleAbstract
 {

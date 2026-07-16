@@ -229,6 +229,9 @@ final class BuiltinIntrospectionPolicy
         if ('phar' === $ext) {
             return \PHPCompiler\ext\phar\PharExtensionPolicy::advertisesExtension();
         }
+        if ('ftp' === $ext) {
+            return \PHPCompiler\ext\ftp\FtpExtensionPolicy::advertisesExtension();
+        }
 
         return true;
     }
