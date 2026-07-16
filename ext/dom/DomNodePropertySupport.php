@@ -38,7 +38,9 @@ final class DomNodePropertySupport
             || (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_DATA) === $lc)
             || (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_LENGTH) === $lc)
             || (VmDom::isTextOrCdataNode($object) && strtolower(VmDom::PROP_WHOLE_TEXT) === $lc)
-            || (VmDom::isNodeList($object) && strtolower(VmDom::PROP_LENGTH) === $lc);
+            || (VmDom::isNodeList($object) && strtolower(VmDom::PROP_LENGTH) === $lc)
+            || (\PHPCompiler\CompilerVersion::supportsDomNodeIsConnected()
+                && strtolower(VmDom::PROP_IS_CONNECTED) === $lc);
     }
 
     public static function getProperty(ObjectEntry $object, string $name, ?Context $ctx = null): Variable
@@ -49,6 +51,13 @@ final class DomNodePropertySupport
         $var->objectPropertyName = $lc;
         if (strtolower(VmDom::PROP_NODE_TYPE) === $lc) {
             $var->int(DomRegistry::state($object)->nodeType);
+
+            return $var;
+        }
+        if (\PHPCompiler\CompilerVersion::supportsDomNodeIsConnected()
+            && strtolower(VmDom::PROP_IS_CONNECTED) === $lc
+        ) {
+            $var->bool(VmDom::isConnected($object));
 
             return $var;
         }

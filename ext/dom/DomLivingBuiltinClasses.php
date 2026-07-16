@@ -29,6 +29,9 @@ final class DomLivingBuiltinClasses
 
         $node = new ClassEntry('Dom\\Node');
         $node->isInternal = true;
+        if (CompilerVersion::supportsDomNodeIsConnected()) {
+            $node->properties[] = new ClassProperty(VmDom::PROP_IS_CONNECTED, null, new Variable(Variable::TYPE_BOOLEAN));
+        }
         $ctx->classes[VmDomLiving::CLASS_NODE] = $node;
 
         $element = new ClassEntry('Dom\\Element');
