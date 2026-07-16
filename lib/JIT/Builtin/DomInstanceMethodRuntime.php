@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\JitDomInstanceMethodKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -87,8 +88,8 @@ final class DomInstanceMethodRuntime
     {
         self::assertValidArity($extraArgCount);
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
-        if (DomInstanceMethodUserScriptLlvm::shouldUse($context)) {
-            DomInstanceMethodUserScriptLlvm::ensureBridge($context, $extraArgCount);
+        if (JitDomInstanceMethodKernel::shouldUse($context)) {
+            JitDomInstanceMethodKernel::ensureBridge($context, $extraArgCount);
 
             return;
         }
