@@ -72,8 +72,39 @@ final class JitDomXPathEvaluateUserScript
 
             return self::boxDouble($context, (float) $value);
         }
+        if (preg_match('~^sum\((.+)\)$~i', $expression, $sumWrap)) {
+            $sum = self::sumForXPath($xml, trim($sumWrap[1]));
+            if (null === $sum) {
+                return null;
+            }
+
+            return self::boxDouble($context, $sum);
+        }
 
         return null;
+    }
+
+    /** XPath 1.0 sum(//tag) over compile-time XML (#19682). */
+    private static function sumForXPath(string $xml, string $inner): ?float
+    {
+        if (!preg_match('~^//([*\w][\w:-]*)$~', $inner, $matches)) {
+            return null;
+        }
+        $tag = $matches[1];
+        $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+        $sum = 0.0;
+        for ($i = 1; $i <= $count; ++$i) {
+            $text = DomParseSimpleXmlJitHelper::nthTagTextArgv($xml, $tag, $i);
+            if (null === $text) {
+                return null;
+            }
+            if ('' === $text || !is_numeric($text)) {
+                return NAN;
+            }
+            $sum += (float) $text;
+        }
+
+        return $sum;
     }
 
     private static function countForXPath(string $xml, string $inner): ?int

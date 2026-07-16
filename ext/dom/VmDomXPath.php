@@ -512,7 +512,7 @@ final class VmDomXPath
 
     private static function isNumericExpression(string $expression): bool
     {
-        return (bool) preg_match('~^(number|count)\(~i', $expression);
+        return (bool) preg_match('~^(number|count|sum)\(~i', $expression);
     }
 
     private static function isStringExpression(string $expression): bool
@@ -540,7 +540,7 @@ final class VmDomXPath
             if (preg_match('~^string\((.+)\)$~i', $inner)) {
                 return '' !== self::evaluateString($ctx, $xpath, $inner, $contextNode);
             }
-            if (preg_match('~^number\((.+)\)$~i', $inner)) {
+            if (preg_match('~^(number|sum)\((.+)\)$~i', $inner)) {
                 $number = self::evaluateNumber($ctx, $xpath, $inner, $contextNode);
 
                 return 0.0 !== $number && !is_nan($number);
@@ -576,6 +576,27 @@ final class VmDomXPath
             }
 
             return NAN;
+        }
+        // XPath 1.0 sum(node-set): coerce each string-value to number (#19682).
+        if (preg_match('~^sum\((.+)\)$~i', $expression, $matches)) {
+            $nodeIds = self::evaluateNodeSet($ctx, $xpath, trim($matches[1]), $contextNode, false);
+            $sum = 0.0;
+            foreach ($nodeIds as $nodeId) {
+                $node = DomRegistry::entry($nodeId);
+                if (null === $node) {
+                    continue;
+                }
+                $value = '';
+                if (VmDom::isElement($node) || VmDom::isTextNode($node) || VmDom::isAttr($node)) {
+                    $value = VmDom::readNodeValue($node) ?? '';
+                }
+                if (!is_numeric($value)) {
+                    return NAN;
+                }
+                $sum += (float) $value;
+            }
+
+            return $sum;
         }
 
         throw new \DOMException('Invalid expression');
