@@ -8,18 +8,20 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 
 /**
- * Register curl builtin classes (php-src ext/curl/curl.stub.php; #6999, #6918, #7266).
+ * Register curl builtin classes (php-src ext/curl/curl.stub.php; #6999, #6918, #7266, #19671).
  *
  * PHP 8.4: libcurl handles are {@see CurlHandle} / {@see CurlMultiHandle} / {@see CurlShareHandle}
  * objects (php-src stub — not backed enums). Handle lifecycle in #3325.
+ * CURLFile / CURLStringFile gate on {@see CurlExtensionPolicy::advertisesFileClasses()} —
+ * no phantom class_exists without ext/curl.
  */
 final class BuiltinClasses
 {
     public static function register(Context $ctx): void
     {
         $before = array_keys($ctx->classes);
-        self::registerCurlFile($ctx);
-        if (CurlExtensionPolicy::advertisesBuiltins()) {
+        if (CurlExtensionPolicy::advertisesFileClasses()) {
+            CurlFileBuiltin::register($ctx);
             CurlStringFileBuiltin::register($ctx);
         }
         if (CurlExtensionPolicy::advertisesEasyHandleStubs()) {
@@ -34,21 +36,6 @@ final class BuiltinClasses
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
-    }
-
-    private static function registerCurlFile(Context $ctx): void
-    {
-        if (CurlExtensionPolicy::advertisesBuiltins()) {
-            CurlFileBuiltin::register($ctx);
-
-            return;
-        }
-
-        if (isset($ctx->classes['curlfile'])) {
-            return;
-        }
-
-        $ctx->classes['curlfile'] = new ClassEntry('CURLFile');
     }
 
     /** php-src ext/curl/curl.stub.php — final class CurlMultiHandle (#7266). */

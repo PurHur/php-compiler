@@ -17,6 +17,7 @@ final class CurlExtensionPolicyTest extends TestCase
         self::assertTrue(CurlExtensionPolicy::advertisesBuiltins());
         self::assertFalse(CurlExtensionPolicy::advertisesExtension());
         self::assertFalse(CurlExtensionPolicy::advertisesHandleClasses());
+        self::assertFalse(CurlExtensionPolicy::advertisesFileClasses());
         self::assertTrue(CurlExtensionPolicy::advertisesShareHandles());
         self::assertFalse(CurlExtensionPolicy::advertisesEasyHandleStubs());
         self::assertFalse(CurlExtensionPolicy::advertisesIntrospectionFunctions());
@@ -34,10 +35,12 @@ echo "\n";
 var_export(class_exists('CurlShareHandle', false));
 echo "\n";
 var_export(class_exists('CURLStringFile', false));
+echo "\n";
+var_export(class_exists('CURLFile', false));
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'curl_handle_classes.php'));
-        self::assertSame("false\nfalse\ntrue\ntrue", ob_get_clean());
+        self::assertSame("false\nfalse\ntrue\nfalse\nfalse", ob_get_clean());
     }
 
     public function testCurlHandleClassesWithheldUntilExtensionAdvertised(): void
@@ -61,6 +64,20 @@ PHP;
         self::assertSame(VmCurlCore::LIBCURL_VERSION, $info['version']);
     }
 
+    public function testCurlFileClassesWithheldWithoutExtension(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        self::assertFalse(VmReflection::classExists($ctx, 'CURLFile'));
+        self::assertFalse(VmReflection::classExists($ctx, 'CURLStringFile'));
+        foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep', 'curl_file_create'] as $fn) {
+            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
+        }
+        foreach (['curl_escape', 'curl_unescape'] as $fn) {
+            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
+        }
+    }
+
     public function testCurlIntrospectionFunctionsRegistered(): void
     {
         $runtime = new Runtime();
@@ -71,6 +88,7 @@ PHP;
         foreach (['curl_escape', 'curl_unescape'] as $fn) {
             self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
-        self::assertTrue(VmReflection::classExists($ctx, 'CURLStringFile'));
+        self::assertFalse(VmReflection::classExists($ctx, 'CURLStringFile'));
+        self::assertFalse(VmReflection::classExists($ctx, 'CURLFile'));
     }
 }

@@ -118,7 +118,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ctype/JitCtype.php` | 0 | 1 |
 | `ext/ctype/Module.php` | 0 | 13 |
 | `ext/ctype/VmCtype.php` | 0 | 1 |
-| `ext/curl/BuiltinClasses.php` | 0 | 3 |
+| `ext/curl/BuiltinClasses.php` | 0 | 2 |
 | `ext/curl/CurlConstants.php` | 0 | 1 |
 | `ext/curl/CurlExtensionPolicy.php` | 0 | 1 |
 | `ext/curl/CurlFileBuiltin.php` | 0 | 12 |
@@ -5723,9 +5723,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 51)
-- new ClassEntry (line 61)
-- 3 class method(s)
+- new ClassEntry (line 48)
+- 2 class method(s)
 
 ### `ext/curl/CurlConstants.php`
 
@@ -5735,7 +5734,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/CurlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 8 class method(s)
 
 ### `ext/curl/CurlFileBuiltin.php`
 
@@ -5772,20 +5771,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 46)
-- new curl_escape (line 59)
-- new curl_unescape (line 60)
-- new curl_version (line 61)
-- new curl_strerror (line 62)
-- new curl_multi_strerror (line 63)
-- new curl_upkeep (line 64)
-- new curl_file_create (line 65)
-- new curl_share_init (line 68)
-- new curl_share_setopt (line 69)
-- new curl_share_close (line 70)
-- new curl_init (line 73)
-- new curl_setopt (line 74)
-- new curl_close (line 75)
+- new VM\Variable (line 47)
+- new curl_escape (line 60)
+- new curl_unescape (line 61)
+- new curl_version (line 62)
+- new curl_strerror (line 63)
+- new curl_multi_strerror (line 64)
+- new curl_upkeep (line 65)
+- new curl_file_create (line 68)
+- new curl_share_init (line 71)
+- new curl_share_setopt (line 72)
+- new curl_share_close (line 73)
+- new curl_init (line 76)
+- new curl_setopt (line 77)
+- new curl_close (line 78)
 - 5 class method(s)
 
 ### `ext/curl/VmCurlArg.php`
