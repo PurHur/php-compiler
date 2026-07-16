@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -29,12 +30,7 @@ final class html_entity_decode extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('html_entity_decode() requires one to three arguments in this compiler build');
         }
-        $string = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'html_entity_decode',
-            0,
-            'string'
-        );
+        $string = self::vmStringArg($frame, 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -68,7 +64,7 @@ final class html_entity_decode extends Internal
         if ($effectiveArgc >= 3) {
             return JitHtmlEntityDecode::decodeWithEncoding(
                 $context,
-                JitStringBuiltinArg::lower($context, $args[0], 'html_entity_decode', 0, 'string'),
+                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'html_entity_decode', 0, 'string'),
                 $argc >= 2
                     ? JitLongArg::lower($context, $args[1], 'html_entity_decode() flags')
                     : $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false),
@@ -94,7 +90,7 @@ final class html_entity_decode extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'html_entity_decode', 0, 'string');
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'html_entity_decode', 0, 'string');
         $i64 = $context->getTypeFromString('int64');
         $flagsVal = $i64->constInt($flags, false);
         if ($argc >= 2 && !$flagsKnown) {
@@ -102,6 +98,21 @@ final class html_entity_decode extends Internal
         }
 
         return JitHtmlEntityDecode::decode($context, $str, $flagsVal);
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19296, ext/standard/html.c). */
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'html_entity_decode', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'html_entity_decode',
+            $argIndex,
+            $paramName
+        );
     }
 
     private static function resolveEncodingVm(Variable $encVar): string

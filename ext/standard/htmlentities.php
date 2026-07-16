@@ -31,12 +31,7 @@ final class htmlentities extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('htmlentities() requires one to four arguments in this compiler build');
         }
-        $string = InternalStrictArg::resolveCoercibleStringArg(
-            $frame,
-            0,
-            'htmlentities',
-            'string'
-        );
+        $string = self::vmStringArg($frame, 0, 'string');
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $encoding = 'UTF-8';
         $doubleEncode = true;
@@ -108,7 +103,7 @@ final class htmlentities extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'htmlentities', 0, 'string');
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'htmlentities', 0, 'string');
         $flagsLlvm = $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false);
         if ($argc >= 2) {
             $flagsLlvm = $flagsKnown
@@ -117,6 +112,21 @@ final class htmlentities extends Internal
         }
 
         return JitHtmlentities::escape($context, $str, $flagsLlvm);
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19296, ext/standard/html.c). */
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'htmlentities', $paramName)->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'htmlentities',
+            $argIndex,
+            $paramName
+        );
     }
 
     private static function compileTimeLong(Context $context, JITVariable $var): ?int
