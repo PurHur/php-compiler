@@ -71,9 +71,12 @@ final class JitFdiv
             } elseif ('number' === $expectedType && VmMath::requiresForwardProfileStrictNumberNull()) {
                 self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
             } elseif ('number' === $expectedType) {
-                self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName);
+                self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'int|float');
             } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull()) {
                 self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
+            } elseif ('float' === $expectedType) {
+                // Z_PARAM_DOUBLE null coerce (number_format; #19756).
+                self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'float');
             }
 
             return $double->constReal(0.0);
@@ -197,9 +200,11 @@ final class JitFdiv
         } elseif ('number' === $expectedType && VmMath::requiresForwardProfileStrictNumberNull()) {
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
         } elseif (!$context->callerStrictTypes && 'number' === $expectedType) {
-            self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName);
+            self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'int|float');
         } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull()) {
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
+        } elseif (!$context->callerStrictTypes && 'float' === $expectedType) {
+            self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'float');
         }
         $context->builder->branch($mergeBlock);
 
@@ -417,14 +422,15 @@ final class JitFdiv
         Context $context,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        string $expectedType = 'int|float'
     ): void {
         if (NestedJitCompileScope::isActive()) {
             return;
         }
         JitBuiltinWarning::emitDeprecated(
             $context,
-            VmNullNumberParamDeprecation::message($function, $argIndex, $paramName)
+            VmNullNumberParamDeprecation::message($function, $argIndex, $paramName, $expectedType)
         );
     }
 }

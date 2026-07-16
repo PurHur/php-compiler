@@ -330,7 +330,8 @@ final class VmMath
         Variable $var,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        ?Frame $frame = null
     ): int {
         $var = $var->resolveIndirect();
         self::rejectEnumCaseIntBuiltinArg($var, $function, $argIndex, $paramName);
@@ -354,7 +355,7 @@ final class VmMath
             return self::floatToZendLong($f);
         }
 
-        return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName);
+        return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName, $frame);
     }
 
     /**
@@ -422,7 +423,7 @@ final class VmMath
             self::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
         }
 
-        return self::parseIntBuiltinArg($var, $function, $userArgIndex, $paramName);
+        return self::parseIntBuiltinArg($var, $function, $userArgIndex, $paramName, $frame);
     }
 
     /**
@@ -514,7 +515,8 @@ final class VmMath
         Variable $var,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        ?Frame $frame = null
     ): int {
         switch ($var->type) {
             case Variable::TYPE_INTEGER:
@@ -525,6 +527,8 @@ final class VmMath
                 if (self::requiresForwardProfileStrictLongNull()) {
                     throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'null'));
                 }
+                // Z_PARAM_LONG: E_DEPRECATED then coerce to 0 (chr/dechex; #19756).
+                VmNullNumberParamDeprecation::emit($frame, $function, $argIndex, $paramName, 'int');
 
                 return 0;
             case Variable::TYPE_STRING:
@@ -550,7 +554,8 @@ final class VmMath
         Variable $var,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        ?Frame $frame = null
     ): float {
         $var = $var->resolveIndirect();
         self::rejectEnumCaseDoubleBuiltinArg($var, $function, $argIndex, $paramName);
@@ -578,6 +583,8 @@ final class VmMath
                 if (self::requiresForwardProfileStrictDoubleNull()) {
                     throw new \TypeError(self::doubleBuiltinTypeError($function, $argIndex, $paramName, 'null'));
                 }
+                // Z_PARAM_DOUBLE: E_DEPRECATED then coerce to 0.0 (#19756).
+                VmNullNumberParamDeprecation::emit($frame, $function, $argIndex, $paramName, 'float');
 
                 return 0.0;
             case Variable::TYPE_STRING:
