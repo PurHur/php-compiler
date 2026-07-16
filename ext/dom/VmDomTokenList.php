@@ -28,9 +28,10 @@ final class VmDomTokenList
     $tokens = [];
     $position = 0;
     $length = \strlen($value);
-    while ($position < $length && false !== ($skip = \strspn($value, self::ASCII_WHITESPACE, $position))) {
-      $position += $skip;
-    }
+    // Skip leading ASCII whitespace. Do not use `false !== strspn(...)`:
+    // strspn returns 0 (not false) when the next char is not whitespace, which
+    // made `false !== 0` spin forever on non-empty class values (#19605).
+    $position += \strspn($value, self::ASCII_WHITESPACE, $position);
     while ($position < $length) {
       $run = \strcspn($value, self::ASCII_WHITESPACE, $position);
       if ($run > 0) {
