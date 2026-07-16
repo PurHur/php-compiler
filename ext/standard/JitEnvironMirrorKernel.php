@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -12,13 +12,13 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Init-safe libc environ walk into native __hashtable__* (#19157).
+ * Init-safe libc environ walk into native __hashtable__* (#19157, #19555).
  *
- * Shared by {@see \PHPCompiler\ext\standard\phpc_native_environ_mirror_into_ht} and
- * user-script superglobal refresh via {@see EnvironMirrorNativeJitHelper}.
+ * Moved out of lib/JIT/Builtin/ — shared by {@see phpc_native_environ_mirror_into_ht}
+ * and user-script superglobal refresh via {@see EnvironMirrorNativeJitHelper}.
  * php-src: sapi/cli/php_cli.c — copy environ into $_SERVER on CLI startup
  */
-final class EnvironLibcWalkJit
+final class JitEnvironMirrorKernel
 {
     public static function ensureEnvironGlobal(Context $context): void
     {
@@ -49,7 +49,7 @@ final class EnvironLibcWalkJit
         $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
         $fn = $context->functions[$context->activeFunction] ?? null;
         if (!$fn instanceof \PHPLLVM\Value\Function_) {
-            throw new \LogicException('EnvironLibcWalkJit requires active function (#19157)');
+            throw new \LogicException('JitEnvironMirrorKernel requires active function (#19157)');
         }
 
         $doneBb = $fn->appendBasicBlock('environ_libc_done');
@@ -136,6 +136,6 @@ final class EnvironLibcWalkJit
             return $context->builder->load($raw);
         }
 
-        throw new \LogicException('EnvironLibcWalkJit: expected native long dest pointer (#19157)');
+        throw new \LogicException('JitEnvironMirrorKernel: expected native long dest pointer (#19157)');
     }
 }

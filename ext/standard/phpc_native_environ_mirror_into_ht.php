@@ -6,12 +6,11 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\EnvironLibcWalkJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** @internal init-safe process environ mirror into native __hashtable__* (#19157). */
+/** @internal init-safe process environ mirror into native __hashtable__* (#19157, #19555). */
 final class phpc_native_environ_mirror_into_ht extends Internal
 {
     public function __construct()
@@ -29,7 +28,7 @@ final class phpc_native_environ_mirror_into_ht extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('phpc_native_environ_mirror_into_ht() expects 1 argument');
         }
-        EnvironLibcWalkJit::mirrorIntoHashtable($context, $args[0]);
+        JitEnvironMirrorKernel::mirrorIntoHashtable($context, $args[0]);
 
         return $context->getTypeFromString('int32')->constInt(0, false);
     }
