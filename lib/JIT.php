@@ -15635,6 +15635,18 @@ class JIT {
             } elseif ('comparedocumentposition' === $methodLc && $this->context->functionIsRegistered('domnode::comparedocumentposition')) {
                 $className = 'DOMNode';
                 $declaringClassLc = 'domnode';
+            } elseif ('contains' === $methodLc && $this->context->functionIsRegistered('domnode::contains')) {
+                $className = 'DOMNode';
+                $declaringClassLc = 'domnode';
+            } elseif ('getrootnode' === $methodLc && $this->context->functionIsRegistered('domnode::getrootnode')) {
+                $className = 'DOMNode';
+                $declaringClassLc = 'domnode';
+            } elseif ('isequalnode' === $methodLc && $this->context->functionIsRegistered('domnode::isequalnode')) {
+                $className = 'DOMNode';
+                $declaringClassLc = 'domnode';
+            } elseif ('toggleattribute' === $methodLc && $this->context->functionIsRegistered('domelement::toggleattribute')) {
+                $className = 'DOMElement';
+                $declaringClassLc = 'domelement';
             }
         }
 

@@ -13,6 +13,7 @@ use PHPCompiler\JIT\Builtin\DomGetElementByIdRuntime;
 use PHPCompiler\JIT\Builtin\DomGetElementsByTagNameRuntime;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
+use PHPCompiler\JIT\Builtin\DomLivingApiRuntime;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLFileRuntime;
 use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
 use PHPCompiler\JIT\Builtin\DomLoadRuntime;
@@ -580,6 +581,84 @@ final class JitDomDocumentMethodKernel
             $context->context->voidType(),
             'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::replaceChildrenStringArgv1',
             '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensureContainsBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_CONTAINS,
+            'dom_node_contains_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomContainsJitHelper::containsArgv',
+            '/ext/dom/DomContainsJitHelper.php'
+        );
+    }
+
+    public static function ensureContainsNullBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_CONTAINS_NULL,
+            'dom_node_contains_null_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomContainsJitHelper::containsNullArgv',
+            '/ext/dom/DomContainsJitHelper.php'
+        );
+    }
+
+    public static function ensureGetRootNodeBridge(Context $context): void
+    {
+        self::ensureContextObjectValueBridge(
+            $context,
+            DomLivingApiRuntime::ABI_GET_ROOT_NODE,
+            'dom_node_get_root_node_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+            ],
+            'PHPCompiler\\ext\\dom\\DomGetRootNodeJitHelper::getRootNodeArgv',
+            '/ext/dom/DomGetRootNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureIsEqualNodeBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_IS_EQUAL_NODE,
+            'dom_node_is_equal_node_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__object__*'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomIsEqualNodeJitHelper::isEqualNodeArgv',
+            '/ext/dom/DomIsEqualNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureToggleAttributeBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomLivingApiRuntime::ABI_TOGGLE_ATTRIBUTE,
+            'dom_element_toggle_attribute_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
+            ],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomToggleAttributeJitHelper::toggleAttributeArgv',
+            '/ext/dom/DomToggleAttributeJitHelper.php'
         );
     }
 
