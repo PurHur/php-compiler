@@ -26,9 +26,9 @@ final class SpaceshipCompareJitHelperTest extends TestCase
         $this->assertStringContainsString('NestedJitCompileScope', $source);
     }
 
-    public function testSpaceshipCompareJitRoutesScalarsThroughHelper(): void
+    public function testSpaceshipCompareKernelRoutesScalarsThroughHelper(): void
     {
-        $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SpaceshipCompareJit.php');
+        $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/JitSpaceshipCompareKernel.php');
         $this->assertStringContainsString('CompareJitHelper::longSpaceship', $source);
         $this->assertStringContainsString('CompareJitHelper::stringSpaceship', $source);
         $this->assertStringContainsString('CompareJitHelper::objectSpaceship', $source);
@@ -41,7 +41,7 @@ final class SpaceshipCompareJitHelperTest extends TestCase
         $this->assertStringNotContainsString('JitFloatCompare', $source);
         $this->assertStringNotContainsString('stringIsNumeric', $source);
         $loc = substr_count($source, "\n") + 1;
-        $this->assertLessThan(950, $loc, 'SpaceshipCompareJit.php LOC after standalone LLVM deletion (#12981)');
+        $this->assertLessThan(950, $loc, 'JitSpaceshipCompareKernel.php LOC after standalone LLVM deletion (#12981)');
     }
 
     public function testCompareJitHelperObjectAndHashtableSemantics(): void

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\JIT\Builtin\SpaceshipCompareJit;
+use PHPCompiler\ext\standard\JitSpaceshipCompareKernel;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
@@ -23,7 +23,7 @@ final class ObjectCompareSpaceship implements Call
         if (\count($args) < 2) {
             throw new \LogicException('compareSpaceship() requires receiver and other object');
         }
-        SpaceshipCompareJit::declareAbiFunctions($context);
+        JitSpaceshipCompareKernel::declareAbiFunctions($context);
         $left = ObjectNestedReceiver::objectFromReceiver($context, $args[0]);
         $right = ObjectNestedReceiver::objectFromReceiver($context, $args[1]);
 

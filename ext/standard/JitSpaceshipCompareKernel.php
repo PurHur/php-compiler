@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\SpaceshipRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\BasicBlock;
@@ -13,12 +14,17 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM spaceship (<=>) dispatch for boxed values, objects, and hashtables (#5185, #9381).
+ * LLVM spaceship (<=>) dispatch for boxed values, objects, and hashtables (#5185, #9381, #19623).
+ *
+ * Quarantined from lib/JIT/Builtin/SpaceshipCompareJit — {@see \PHPCompiler\JIT\Builtin\SpaceshipRuntime}
+ * stays the thin orchestrator (CompareJitHelper PHP SSOT unchanged).
  *
  * Scalar compare semantics route through compiled {@see \PHPCompiler\VM\CompareJitHelper};
  * object/hashtable walks route through CompareJitHelper on JIT embed and standalone AOT (#9476, #12981).
+ *
+ * php-src: Zend/zend_operators.c — compare_function / spaceship
  */
-final class SpaceshipCompareJit
+final class JitSpaceshipCompareKernel
 {
     private const TYPE_NULL = 0;
 
