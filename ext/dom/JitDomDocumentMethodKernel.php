@@ -2,10 +2,31 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DomCreateElementNSRuntime;
+use PHPCompiler\JIT\Builtin\DomCreateElementRuntime;
+use PHPCompiler\JIT\Builtin\DomElementTextContentRuntime;
+use PHPCompiler\JIT\Builtin\DomGetElementByIdRuntime;
+use PHPCompiler\JIT\Builtin\DomGetElementsByTagNameRuntime;
+use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
+use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
+use PHPCompiler\JIT\Builtin\DomLoadHTMLFileRuntime;
+use PHPCompiler\JIT\Builtin\DomLoadHTMLRuntime;
+use PHPCompiler\JIT\Builtin\DomLoadRuntime;
+use PHPCompiler\JIT\Builtin\DomLoadXMLRuntime;
+use PHPCompiler\JIT\Builtin\DomNodeChildPropertyRuntime;
+use PHPCompiler\JIT\Builtin\DomNodeListItemRuntime;
+use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
+use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
+use PHPCompiler\JIT\Builtin\DomSaveHTMLFileRuntime;
+use PHPCompiler\JIT\Builtin\DomSaveHTMLRuntime;
+use PHPCompiler\JIT\Builtin\DomSaveXMLRuntime;
+use PHPCompiler\JIT\Builtin\DomSyncElementIdMapRuntime;
+use PHPCompiler\JIT\Builtin\DomXPathEvaluateRuntime;
+use PHPCompiler\JIT\Builtin\DomXPathQueryRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
@@ -18,9 +39,11 @@ use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
 
 /**
- * User-script standalone AOT: compile DOMDocument::loadHTML helper in the main module (#17954).
+ * User-script standalone AOT: DOM document-method bridges in the main module (#17954, #19496).
+ *
+ * Housed in ext/dom (not lib/JIT/Builtin) — same kernel-move pattern as #19430 / #19471.
  */
-final class DomDocumentMethodUserScriptLlvm
+final class JitDomDocumentMethodKernel
 {
     public static function shouldUse(Context $context): bool
     {

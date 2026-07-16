@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -49,7 +49,7 @@ final class JitDomAttributeNodeNS
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_getattrnodens_cont');
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::invokeGetUserScript($context, ...$args);
         }
 
@@ -76,7 +76,7 @@ final class JitDomAttributeNodeNS
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattrnodens_cont');
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::invokeSetUserScript($context, ...$args);
         }
 
@@ -101,7 +101,7 @@ final class JitDomAttributeNodeNS
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_createattrns_cont');
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::invokeCreateUserScript($context, ...$args);
         }
 

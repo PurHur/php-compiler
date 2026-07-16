@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -27,8 +29,8 @@ final class DomLoadHTMLFileRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureLoadHTMLFileBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureLoadHTMLFileBridge($context);
 
             return;
         }

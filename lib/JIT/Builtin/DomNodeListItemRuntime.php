@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+
 use PHPCompiler\JIT\Context;
 
 /** JIT/AOT link for DOMNodeList::item() via DomNodeListItemJitHelper (#18493). */
@@ -22,8 +24,8 @@ final class DomNodeListItemRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureNodeListItemBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureNodeListItemBridge($context);
 
             return;
         }
@@ -35,6 +37,6 @@ final class DomNodeListItemRuntime
             return;
         }
 
-        DomDocumentMethodUserScriptLlvm::ensureNodeListItemBridge($context);
+        JitDomDocumentMethodKernel::ensureNodeListItemBridge($context);
     }
 }

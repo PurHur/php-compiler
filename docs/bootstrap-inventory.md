@@ -251,6 +251,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomCreateElementNS.php` | 0 | 1 |
 | `ext/dom/JitDomCreateTextNode.php` | 0 | 2 |
 | `ext/dom/JitDomDocumentElement.php` | 0 | 4 |
+| `ext/dom/JitDomDocumentMethodKernel.php` | 0 | 3 |
 | `ext/dom/JitDomElementNavigationProperty.php` | 0 | 3 |
 | `ext/dom/JitDomElementTextContent.php` | 0 | 3 |
 | `ext/dom/JitDomGetElementById.php` | 0 | 5 |
@@ -3542,7 +3543,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DefineRuntime.php` | 0 | 6 |
 | `lib/JIT/Builtin/DomCreateElementNSRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomCreateElementRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php` | 0 | 3 |
 | `lib/JIT/Builtin/DomElementTextContentRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomGetElementByIdRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomGetElementsByTagNameRuntime.php` | 0 | 1 |
@@ -6355,6 +6355,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 98)
 - 4 class method(s)
 
+### `ext/dom/JitDomDocumentMethodKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 1208)
+- 61 class method(s)
+- 1 closure(s)
+
 ### `ext/dom/JitDomElementNavigationProperty.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7148,28 +7155,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 5730)
 - new DomNodeState (line 5734)
 - new Variable (line 5741)
-- new ObjectEntry (line 5941)
-- new DomNodeState (line 5945)
-- new Variable (line 5952)
-- new ObjectEntry (line 5972)
-- new DomNodeState (line 5975)
-- new Variable (line 5983)
-- new Variable (line 6152)
-- new DOMException (line 6259)
-- new DOMException (line 6266)
-- new DOMException (line 6273)
-- new DOMException (line 6277)
-- new DOMException (line 6280)
-- new DOMException (line 6289)
-- new DOMException (line 7236)
-- new Variable (line 7295)
-- new Variable (line 7308)
-- new DOMException (line 7391)
-- new DOMException (line 7418)
-- new DOMException (line 7449)
-- new DOMException (line 7513)
+- new ObjectEntry (line 5949)
+- new DomNodeState (line 5953)
+- new Variable (line 5960)
+- new ObjectEntry (line 5980)
+- new DomNodeState (line 5983)
+- new Variable (line 5991)
+- new Variable (line 6160)
+- new DOMException (line 6267)
+- new DOMException (line 6274)
+- new DOMException (line 6281)
+- new DOMException (line 6285)
+- new DOMException (line 6288)
+- new DOMException (line 6297)
+- new DOMException (line 7244)
+- new Variable (line 7303)
+- new Variable (line 7316)
+- new DOMException (line 7399)
+- new DOMException (line 7426)
+- new DOMException (line 7457)
 - new DOMException (line 7521)
-- new DOMException (line 7530)
+- new DOMException (line 7529)
+- new DOMException (line 7538)
 - 342 class method(s)
 - 2 closure(s)
 
@@ -19501,12 +19508,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmLocale.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 89)
-- new Variable (line 271)
-- new HashTable (line 272)
-- new Variable (line 274)
-- new Variable (line 284)
-- new Variable (line 291)
+- new HashTable (line 85)
+- new Variable (line 267)
+- new HashTable (line 268)
+- new Variable (line 270)
+- new Variable (line 280)
+- new Variable (line 287)
 - 17 class method(s)
 
 ### `ext/standard/VmLocaleCollate.php`
@@ -24164,13 +24171,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/rawurldecode.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/rawurlencode.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/readdir.php`
 
@@ -25466,13 +25473,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/urldecode.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/urlencode.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/user_error.php`
 
@@ -28862,13 +28869,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
-
-### `lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- new JIT (line 1185)
-- 61 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/DomElementTextContentRuntime.php`
 

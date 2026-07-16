@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
+
 use PHPCompiler\JIT\Context;
 
 /** JIT/AOT link for DOMXPath::query() via DomXPathQueryJitHelper (#18493). */
@@ -22,8 +24,8 @@ final class DomXPathQueryRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
-            DomDocumentMethodUserScriptLlvm::ensureXPathQueryBridge($context);
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureXPathQueryBridge($context);
 
             return;
         }
@@ -35,6 +37,6 @@ final class DomXPathQueryRuntime
             return;
         }
 
-        DomDocumentMethodUserScriptLlvm::ensureXPathQueryBridge($context);
+        JitDomDocumentMethodKernel::ensureXPathQueryBridge($context);
     }
 }

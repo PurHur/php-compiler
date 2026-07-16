@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomElementTextContentRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Context;
@@ -22,7 +22,7 @@ final class JitDomElementTextContent
     public static function fetch(Object_ $objectType, Value $obj): JITVariable
     {
         $context = $objectType->jitContext();
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $classId = $objectType->lookup(self::CLASS_ELEMENT);
             if (!$objectType->hasProperty($classId, self::PROP_TEXT_CONTENT)) {
                 $objectType->defineProperty($classId, self::PROP_TEXT_CONTENT, JITVariable::TYPE_STRING);

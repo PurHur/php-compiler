@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\DomImportNodeRuntime;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
@@ -36,7 +36,7 @@ final class JitDomImportNode
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_import_node_cont');
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::invokeUserScriptMaterialize($context, $args[0], $args[1]);
         }
 
@@ -65,7 +65,7 @@ final class JitDomImportNode
 
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_get_attr_cont');
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $nameLit = null;
             if (JITVariable::TYPE_STRING === $args[1]->type) {
                 // Prefer compile-time id for importAttribute parity.

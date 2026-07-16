@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -41,7 +41,7 @@ final class JitDomGetElementById
 
         self::ensureDocumentPropertyLayout($context);
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             $compileTime = self::tryUserScriptCompileTimeLookup($context, $args[0], $args[1]);
             if (null !== $compileTime) {
                 return $compileTime;
@@ -49,7 +49,7 @@ final class JitDomGetElementById
         }
 
         $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context) && null !== $parsed) {
+        if (JitDomDocumentMethodKernel::shouldUse($context) && null !== $parsed) {
             // Pair only on id match — otherwise consult the runtime id map (importNode; #19212).
             $idLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
             if (null === $idLit) {
@@ -75,7 +75,7 @@ final class JitDomGetElementById
         $ht = HashTableHelper::readHashtableFromValueBox($context, $mapVar);
         $foundVar = HashTableHelper::readStringKeyToValueBox($context, $ht, $idStr);
 
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)) {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
             return self::lookupUserScriptWithCacheFallback($context, $foundVar, $idStr);
         }
 

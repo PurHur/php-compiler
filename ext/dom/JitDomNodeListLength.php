@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
-use PHPCompiler\JIT\Builtin\DomDocumentMethodUserScriptLlvm;
+use PHPCompiler\ext\dom\JitDomDocumentMethodKernel;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\Type\ObjectInstancePropertyLlvm;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -25,7 +25,7 @@ final class JitDomNodeListLength
     public static function fetch(Object_ $objectType, Value $obj): JITVariable
     {
         $context = $objectType->jitContext();
-        if (DomDocumentMethodUserScriptLlvm::shouldUse($context)
+        if (JitDomDocumentMethodKernel::shouldUse($context)
             && null !== $context->module->getNamedGlobal(DomUserScriptLiveTagListLlvm::GLOBAL_COUNT)
         ) {
             return new JITVariable(
