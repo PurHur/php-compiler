@@ -15,11 +15,12 @@ final class IntlExtensionPolicyTest extends TestCase
         self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
         self::assertFalse(IntlExtensionPolicy::advertisesIdn());
         self::assertFalse(IntlExtensionPolicy::advertisesNormalizer());
-        self::assertTrue(IntlExtensionPolicy::advertisesLocale());
-        self::assertTrue(IntlExtensionPolicy::advertisesIntlDateFormatter());
-        self::assertTrue(IntlExtensionPolicy::advertisesIntlCalendar());
-        // locale_get_primary_language/region/script are forward-profile parsers on 8.4.0-dev (#17117).
-        self::assertTrue(IntlExtensionPolicy::advertisesLocaleParsers());
+        self::assertFalse(IntlExtensionPolicy::advertisesLocale());
+        self::assertFalse(IntlExtensionPolicy::advertisesIntlDateFormatter());
+        self::assertFalse(IntlExtensionPolicy::advertisesIntlCalendar());
+        self::assertFalse(IntlExtensionPolicy::advertisesNumberFormatter());
+        // locale parsers follow forward profile only once Locale is gated (#19670 / #17072).
+        self::assertFalse(IntlExtensionPolicy::advertisesLocaleParsers());
         $runtime = new Runtime();
         self::assertFalse(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'grapheme_strlen')
@@ -36,46 +37,49 @@ final class IntlExtensionPolicyTest extends TestCase
         self::assertFalse(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'Normalizer')
         );
-        self::assertTrue(
+        self::assertFalse(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_default')
         );
-        self::assertTrue(
-            ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_primary_language')
-        );
-        self::assertTrue(
+        self::assertFalse(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'Locale')
         );
-        self::assertTrue(
+        self::assertFalse(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'IntlDateFormatter')
         );
-        self::assertTrue(
+        self::assertFalse(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'IntlCalendar')
         );
-        self::assertTrue(
+        self::assertFalse(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'IntlTimeZone')
+        );
+        self::assertFalse(
+            ext\standard\VmReflection::classExists($runtime->vmContext, 'NumberFormatter')
+        );
+        self::assertFalse(
+            ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_primary_language')
         );
     }
 
-    public function testLocaleParsersAdvertisedOnDefault84DevProfile(): void
+    public function testLocaleParsersWithheldOnDefault84DevProfileWithoutForwardGate(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            // 8.4.0-dev without PHP_COMPILER_PROFILE=8.4 withholds the forward-profile gate,
-            // but Locale advertisement (#6696) still exposes the BCP-47 parsers.
-            self::assertTrue(IntlExtensionPolicy::advertisesLocale());
-            self::assertTrue(IntlExtensionPolicy::advertisesLocaleParsers());
+            // 8.4.0-dev without PHP_COMPILER_PROFILE=8.4 withholds Locale (#19670) and the
+            // forward-profile BCP-47 parsers (#17072 / #17117).
+            self::assertFalse(IntlExtensionPolicy::advertisesLocale());
+            self::assertFalse(IntlExtensionPolicy::advertisesLocaleParsers());
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             foreach (['locale_get_primary_language', 'locale_get_region', 'locale_get_script'] as $fn) {
-                self::assertTrue(isset($ctx->functions[$fn]));
-                self::assertTrue(
+                self::assertFalse(isset($ctx->functions[$fn]));
+                self::assertFalse(
                     ext\standard\VmReflection::functionExists($ctx, $fn),
-                    $fn.' must be visible via Locale surface (#6696)'
+                    $fn.' must stay gated without Locale or forward 8.4 profile'
                 );
             }
-            self::assertTrue(
+            self::assertFalse(
                 ext\standard\VmReflection::functionExists($ctx, 'locale_get_default')
             );
         } finally {
@@ -95,7 +99,7 @@ final class IntlExtensionPolicyTest extends TestCase
             self::assertTrue(CompilerVersion::supportsLocaleParserForwardProfile());
             self::assertTrue(CompilerVersion::advertisesLocaleParserForwardProfile());
             self::assertTrue(IntlExtensionPolicy::advertisesLocaleParsers());
-            self::assertTrue(IntlExtensionPolicy::advertisesLocale());
+            self::assertFalse(IntlExtensionPolicy::advertisesLocale());
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
@@ -106,7 +110,7 @@ final class IntlExtensionPolicyTest extends TestCase
                     $fn.' must be visible on forward 8.4 profile'
                 );
             }
-            self::assertTrue(
+            self::assertFalse(
                 ext\standard\VmReflection::functionExists($ctx, 'locale_get_default')
             );
         } finally {

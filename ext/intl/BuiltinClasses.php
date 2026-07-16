@@ -9,10 +9,10 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 
 /**
- * Register intl builtin classes (php-src ext/intl/php_intl.c; issues #5774, #6696, #19549, #6151).
+ * Register intl builtin classes (php-src ext/intl/php_intl.c; issues #5774, #6696, #19549, #6151, #19670).
  *
- * Locale / IntlDateFormatter / IntlCalendar / IntlTimeZone / NumberFormatter register as partial surfaces.
- * Normalizer + Collator + IntlException remain gated on {@see IntlExtensionPolicy::advertisesBuiltins()} (#12115, #19594).
+ * Locale / IntlDateFormatter / IntlCalendar / IntlTimeZone / NumberFormatter / Normalizer / Collator /
+ * IntlException all gate on {@see IntlExtensionPolicy} advertisement (no phantom class_exists).
  */
 final class BuiltinClasses
 {

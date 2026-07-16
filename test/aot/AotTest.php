@@ -268,14 +268,26 @@ class AotTest extends BaseTest
                 && !str_contains($name, 'normalizer_phantom')) {
                 continue;
             }
-            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesLocale()
-                && str_contains($name, 'locale_get_default')
-                && !str_contains($name, 'locale_gated')) {
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsLocaleCompliance($name)
+                && (str_contains($name, 'locale_get_default')
+                    || str_contains($name, 'locale_class')
+                    || str_contains($name, 'locale_set_default'))
+                && !str_contains($name, 'locale_gated')
+                && !str_contains($name, 'intl_phantom')) {
                 continue;
             }
             if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsLocaleParserCompliance($name)
                 && str_contains($name, 'locale_get_parts')
-                && !str_contains($name, 'locale_gated')) {
+                && !str_contains($name, 'locale_gated')
+                && !str_contains($name, 'intl_phantom')) {
+                continue;
+            }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsIntlOopCompliance($name)
+                && (str_contains($name, 'intldateformatter')
+                    || str_contains($name, 'numberformatter')
+                    || str_contains($name, 'intlcalendar')
+                    || str_contains($name, 'intl_skeleton'))
+                && !str_contains($name, 'intl_phantom')) {
                 continue;
             }
             if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesBuiltins()

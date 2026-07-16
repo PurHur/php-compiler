@@ -10,23 +10,23 @@ use PHPCompiler\ext\standard\ModuleRegistry;
 /**
  * ext/intl builtin advertisement — php-src ext/intl/php_intl.c module registration (#11768, #11825).
  *
- * Grapheme helpers, IDN converters, Normalizer / normalizer_*, and intl_* error functions require a
- * loaded intl extension on Zend; they stay withheld from function_exists()/class_exists() until
- * {@see ModuleRegistry::extensionLoaded}('intl') (#11472, #17694, #19593, #19594). Locale +
- * IntlDateFormatter + IntlCalendar / IntlTimeZone + NumberFormatter are partial surfaces that
- * advertise without loading intl (#6696, #19549, #6151, #5154).
+ * Grapheme helpers, IDN converters, Normalizer / normalizer_*, Locale / locale_*, IntlDateFormatter,
+ * IntlCalendar / IntlTimeZone, NumberFormatter, and intl_* error functions require a loaded intl
+ * extension on Zend; they stay withheld from function_exists()/class_exists() until
+ * {@see ModuleRegistry::extensionLoaded}('intl') (#11472, #16214, #17694, #19593, #19594, #19670).
+ * Implementations stay in-tree for when intl loads; Zend never splits classes from the module.
  */
 final class IntlExtensionPolicy
 {
     /**
-     * locale_get_default()/Locale — partial PHP surface without extension_loaded('intl') (#6696, #9576).
+     * locale_get_default()/Locale — require loaded ext/intl (php-src ext/intl/locale; #19670, re-#16214).
      *
-     * BCP-47 default/parser OOP is available while grapheme_*, Normalizer, and full ICU classes stay
-     * gated on loaded ext/intl (#16214/#11472/#17694/#19594).
+     * Implementation stays in-tree (#6696 / #9576) but must not phantom-advertise when
+     * extension_loaded('intl') is false.
      */
     public static function advertisesLocale(): bool
     {
-        return true;
+        return self::advertisesBuiltins();
     }
 
     /**
@@ -66,33 +66,55 @@ final class IntlExtensionPolicy
     }
 
     /**
-     * IntlDateFormatter::create()/format() — partial ICU pattern surface without extension_loaded('intl') (#19549).
+     * IntlDateFormatter — require loaded ext/intl (php-src ext/intl/dateformat; #19670).
      *
-     * class_exists without full grapheme/Collator/Normalizer ICU (#11472/#19594).
+     * Implementation stays in-tree (#19549) but must not phantom-advertise when intl is off.
      */
     public static function advertisesIntlDateFormatter(): bool
     {
-        return true;
+        return self::advertisesBuiltins();
     }
 
     /**
-     * IntlCalendar / IntlTimeZone — Gregorian field/timezone subset without extension_loaded('intl') (#6151).
+     * IntlCalendar / IntlTimeZone — require loaded ext/intl (php-src ext/intl/calendar; #19670).
      *
-     * Mirrors {@see advertisesIntlDateFormatter()}: class_exists without full ICU calendar DB.
+     * Implementation stays in-tree (#6151) but must not phantom-advertise when intl is off.
      */
     public static function advertisesIntlCalendar(): bool
     {
-        return true;
+        return self::advertisesBuiltins();
     }
 
     /**
-     * NumberFormatter::create()/format() — DECIMAL/PERCENT locale subset without extension_loaded('intl') (#5154).
+     * NumberFormatter — require loaded ext/intl (php-src ext/intl/formatter; #19670).
      *
-     * Mirrors {@see advertisesIntlDateFormatter()}: class_exists without full ICU NumberFormat.
+     * Implementation stays in-tree (#5154) but must not phantom-advertise when intl is off.
      */
     public static function advertisesNumberFormatter(): bool
     {
-        return true;
+        return self::advertisesBuiltins();
+    }
+
+    /** Run Locale compliance when ext/intl is loaded or a phantom-registration guard matches (#19670). */
+    public static function runsLocaleCompliance(string $testFileName): bool
+    {
+        if (self::advertisesLocale()) {
+            return true;
+        }
+
+        return str_contains($testFileName, 'locale_gated')
+            || str_contains($testFileName, 'intl_phantom');
+    }
+
+    /** Run IntlDateFormatter / NumberFormatter / IntlCalendar compliance (#19670). */
+    public static function runsIntlOopCompliance(string $testFileName): bool
+    {
+        if (self::advertisesIntlDateFormatter()) {
+            return true;
+        }
+
+        return str_contains($testFileName, 'intl_phantom')
+            || str_contains($testFileName, 'intl_skeleton');
     }
 
     /**
@@ -155,14 +177,11 @@ final class IntlExtensionPolicy
     /** Run locale parser compliance when ext/intl is loaded or forward 8.4 profile matches (#17072). */
     public static function runsLocaleParserCompliance(string $testFileName): bool
     {
-        if (self::advertisesLocale()) {
+        if (self::advertisesLocaleParsers()) {
             return true;
         }
-        if (!CompilerVersion::supportsLocaleParserForwardProfile()) {
-            return false;
-        }
-        if (str_contains($testFileName, 'locale_get_parts')
-            || str_contains($testFileName, 'locale_get_primary_language')) {
+        if (str_contains($testFileName, 'locale_gated')
+            || str_contains($testFileName, 'intl_phantom')) {
             return true;
         }
 

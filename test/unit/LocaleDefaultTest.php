@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\intl\IntlExtensionPolicy;
 use PHPCompiler\ext\intl\VmLocale;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
-/** locale_get_default()/Locale partial surface without extension_loaded('intl') (#6696, #9576). */
+/** locale_get_default()/Locale gated on extension_loaded('intl') (#19670, re-#16214). */
 final class LocaleDefaultTest extends TestCase
 {
     protected function tearDown(): void
@@ -16,14 +17,15 @@ final class LocaleDefaultTest extends TestCase
         VmLocale::resetDefaultForTests();
     }
 
-    public function test_locale_default_advertised_without_intl_extension(): void
+    public function test_locale_default_withheld_without_intl_extension(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        self::assertTrue(VmReflection::functionExists($ctx, 'locale_get_default'));
-        self::assertTrue(VmReflection::functionExists($ctx, 'locale_set_default'));
-        self::assertTrue(VmReflection::classExists($ctx, 'Locale'));
+        self::assertFalse(IntlExtensionPolicy::advertisesLocale());
+        self::assertFalse(VmReflection::functionExists($ctx, 'locale_get_default'));
+        self::assertFalse(VmReflection::functionExists($ctx, 'locale_set_default'));
+        self::assertFalse(VmReflection::classExists($ctx, 'Locale'));
         self::assertFalse(VmReflection::functionExists($ctx, 'grapheme_str_contains'));
         self::assertFalse(\PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl'));
 
@@ -37,11 +39,14 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'locale_default.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('0110', ob_get_clean());
+        self::assertSame('0000', ob_get_clean());
     }
 
     public function test_locale_set_default_repro(): void
     {
+        if (!IntlExtensionPolicy::advertisesLocale()) {
+            self::markTestSkipped('locale_* withheld until extension_loaded(\'intl\') (#19670)');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -63,6 +68,9 @@ PHP;
 
     public function test_locale_get_primary_language_and_display_name(): void
     {
+        if (!IntlExtensionPolicy::advertisesLocale()) {
+            self::markTestSkipped('Locale OOP withheld until extension_loaded(\'intl\') (#19670)');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
