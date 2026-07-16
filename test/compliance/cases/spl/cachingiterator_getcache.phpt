@@ -10,8 +10,7 @@ try {
     echo get_class($e), ': ', $e->getMessage(), "\n";
 }
 
-// Pre-bind iterator + flags: nested `new CachingIterator(new ArrayIterator(...), Class::CONST)`
-// currently double-sends the inner New slot (compiler ARG_SEND / #19439 family).
+// Nested new + class-const flags is covered by cachingiterator_nested_full_cache.phpt (#19769).
 $it = new ArrayIterator([1, 2, 3]);
 $flags = CachingIterator::FULL_CACHE;
 $ci2 = new CachingIterator($it, $flags);
