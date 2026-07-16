@@ -8,21 +8,34 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Variable;
 
-/** @internal php-src math.c — E_DEPRECATED before null→0 coercion for Z_PARAM_NUMBER (#16410). */
+/**
+ * @internal php-src math.c / string.c — E_DEPRECATED before null→0 coercion
+ * for Z_PARAM_NUMBER / Z_PARAM_LONG / Z_PARAM_DOUBLE (#16410, #19756).
+ */
 final class VmNullNumberParamDeprecation
 {
-    public static function message(string $function, int $argIndex, string $paramName): string
-    {
+    public static function message(
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'int|float'
+    ): string {
         return sprintf(
-            '%s(): Passing null to parameter #%d ($%s) of type int|float is deprecated',
+            '%s(): Passing null to parameter #%d ($%s) of type %s is deprecated',
             $function,
             $argIndex,
-            $paramName
+            $paramName,
+            $expectedType
         );
     }
 
-    public static function emit(?Frame $frame, string $function, int $argIndex, string $paramName): void
-    {
+    public static function emit(
+        ?Frame $frame,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'int|float'
+    ): void {
         $vm = VM::running();
         if (null === $vm) {
             return;
@@ -35,7 +48,7 @@ final class VmNullNumberParamDeprecation
             }
         }
         $vm->context->errors->internalDeprecated(
-            self::message($function, $argIndex, $paramName),
+            self::message($function, $argIndex, $paramName, $expectedType),
             $vm->context,
             $frame
         );
