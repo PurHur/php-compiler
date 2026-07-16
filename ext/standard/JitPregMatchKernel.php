@@ -2,21 +2,21 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\LibcExtern;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM __compiler_preg_* stubs for user-script standalone AOT (#16075, #16734).
+ * LLVM __compiler_preg_* stubs for user-script standalone AOT (#19399, #16075, #16734).
  *
- * Nested PregJitHelper segfaults after minimal standalone init; route preg_match
+ * Nested {@see PregJitHelper} segfaults after minimal standalone init; route preg_match
  * through thin LLVM bridges instead of nested PHP lowering until execute ABI is fixed.
+ * Housed in ext/standard (not lib/JIT/Builtin) — same kernel-move pattern as #19389.
  * php-src: ext/pcre/php_pcre.c
  */
-final class PregMatchUserScriptLlvm
+final class JitPregMatchKernel
 {
     public static function implement(Context $context): void
     {

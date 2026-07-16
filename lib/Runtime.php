@@ -920,7 +920,7 @@ class Runtime {
             throw new \LogicException('yield in the main script is not supported in AOT yet (issue #3115).');
         }
         if ($needsPregPrelink) {
-            // User-script AOT uses PregMatchUserScriptLlvm stubs — no nested-JIT prelink pass (#16075).
+            // User-script AOT uses JitPregMatchKernel stubs — no nested-JIT prelink pass (#16075, #19399).
             \PHPCompiler\JIT\Builtin\StringPregMatch::ensureLinked($context);
         }
         $context->setMain($this->loadJit()->compile($block));

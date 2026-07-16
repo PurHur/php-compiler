@@ -1535,6 +1535,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitPregMatchAll.php` | 0 | 1 |
 | `ext/standard/JitPregMatchAllEx.php` | 0 | 1 |
 | `ext/standard/JitPregMatchEx.php` | 0 | 1 |
+| `ext/standard/JitPregMatchKernel.php` | 0 | 1 |
 | `ext/standard/JitPregReplace.php` | 0 | 1 |
 | `ext/standard/JitPregReplaceCallback.php` | 0 | 1 |
 | `ext/standard/JitPregReplaceCallbackArray.php` | 0 | 1 |
@@ -3694,7 +3695,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PregEmptyPatternReplaceRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/PregExpandRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/PregMatchRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/PregMatchUserScriptLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessIdentityJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/ProcessOpen.php` | 0 | 1 |
@@ -15035,6 +15035,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/JitPregMatchKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `ext/standard/JitPregReplace.php`
 
 **Warnings** (review for bootstrap subset):
@@ -16990,7 +16995,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PackEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 18 class method(s)
 
 ### `ext/standard/PackEngineEncode.php`
 
@@ -17000,7 +17005,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PackJitEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/standard/PackJitHelper.php`
 
@@ -29588,14 +29593,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PregMatchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 537)
+- new JIT (line 539)
 - 15 class method(s)
 - 2 closure(s)
-
-### `lib/JIT/Builtin/PregMatchUserScriptLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 5 class method(s)
 
 ### `lib/JIT/Builtin/PregReplaceCallbackArrayRuntime.php`
 
