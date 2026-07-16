@@ -3594,6 +3594,63 @@ PHP;
         self::assertSame('obj:1:4096:3', ob_get_clean());
     }
 
+    /**
+     * Issue #19769 — new CachingIterator(new ArrayIterator(...), CachingIterator::FULL_CACHE)
+     * must send New_ for arg0 and FULL_CACHE int for arg1 (not double-send New_).
+     */
+    public function testCachingIteratorNestedNewFullCacheClassConstArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$it = new CachingIterator(new ArrayIterator(['a', 'b']), CachingIterator::FULL_CACHE);
+foreach ($it as $v) {
+    echo "v=$v\n";
+}
+echo "ok\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'cachingiterator_nested_full_cache.php');
+
+        $arrayIteratorSlot = null;
+        $cachingSends = [];
+        $inCaching = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $classSlot = $op->arg2;
+                if (null !== $classSlot && isset($block->constants[$classSlot])) {
+                    $className = $block->constants[$classSlot]->toString();
+                    if ('ArrayIterator' === $className) {
+                        $arrayIteratorSlot = $op->arg1;
+                    }
+                    if ('CachingIterator' === $className) {
+                        $inCaching = true;
+                        $cachingSends = [];
+                    }
+                }
+            }
+            if ($inCaching && OpCode::TYPE_ARG_SEND === $op->type) {
+                $cachingSends[] = $op->arg1;
+            }
+            if ($inCaching && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertNotNull($arrayIteratorSlot, 'ArrayIterator New_ slot');
+        self::assertCount(2, $cachingSends, 'CachingIterator sends='.json_encode($cachingSends));
+        self::assertSame($arrayIteratorSlot, $cachingSends[0], 'arg0 must be ArrayIterator New_');
+        self::assertNotSame($arrayIteratorSlot, $cachingSends[1], 'arg1 must not double-send New_ (#19769)');
+        self::assertTrue(
+            isset($block->constants[$cachingSends[1]]),
+            'arg1 should be folded FULL_CACHE constant slot'
+        );
+        self::assertSame(256, (int) $block->constants[$cachingSends[1]]->toInt());
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("v=a\nv=b\nok\n", ob_get_clean());
+    }
+
     /** Issue #12916 — nested inline new LimitIterator(ArrayIterator) runtime parity. */
     public function testNestedNewConstructorInlineNewRuntime(): void
     {

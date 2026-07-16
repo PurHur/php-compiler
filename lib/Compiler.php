@@ -35205,7 +35205,9 @@ class Compiler {
         $positional = $producers[$argIndex] ?? null;
 
         if ($positional instanceof Op\Expr\New_) {
-            // producers[1] may be the *inner* New_ while arg1 is fn() — require feed (#19771).
+            // producers[argIndex] may be an earlier nested New_ while this arg is a trailing
+            // ClassConstFetch/flag or Closure dead temp — only bind when the call arg is that New_
+            // (#19769 CachingIterator::FULL_CACHE, #19771 CallbackFilterIterator callback).
             return $this->inlineNewProducerFeedsCallArg($positional, $callArg) ? $positional : null;
         }
         if (
@@ -44672,7 +44674,8 @@ class Compiler {
                         && $this->arrayMergeHasLeadingInlineArrayBeforeArrayKeysSibling($block, $cfgCallOp)
                     ) {
                         // array_merge(['a'=>1], array_keys(...)) — arg #0 is leading Array_, not nested keys (#13760, #16418).
-                    } else {
+                    } elseif (!$hoistedEnumPropertyCallArgSlotWired) {
+                        // Keep ClassConstFetch/flag wiring (CachingIterator::FULL_CACHE — #19769).
                         $valueSlot = $adjacentArgSlot;
                     }
                 }
@@ -45181,7 +45184,7 @@ class Compiler {
                                     }
                                 }
                                 $trailingConstSlot = $block->slotForOperand($trailingConst->result);
-                                if (null !== $trailingConstSlot) {
+                                if (null !== $trailingConstSlot && !$hoistedEnumPropertyCallArgSlotWired) {
                                     $valueSlot = (string) $trailingConstSlot;
                                 }
                             } else {
@@ -45199,7 +45202,7 @@ class Compiler {
                                         }
                                     }
                                     $finalProducerSlot = $block->slotForOperand($finalProducer->result);
-                                    if (null !== $finalProducerSlot) {
+                                    if (null !== $finalProducerSlot && !$hoistedEnumPropertyCallArgSlotWired) {
                                         $valueSlot = (string) $finalProducerSlot;
                                     }
                                 }
@@ -45600,7 +45603,9 @@ class Compiler {
                     $cfgCallOp,
                     (int) $argIndex
                 );
-                if (null !== $nestedCallArgSlot) {
+                // Do not clobber a ClassConstFetch/flag already wired for this arg
+                // (new CachingIterator(new ArrayIterator(...), CachingIterator::FULL_CACHE) — #19769).
+                if (null !== $nestedCallArgSlot && !$hoistedEnumPropertyCallArgSlotWired) {
                     $valueSlot = $nestedCallArgSlot;
                 }
             }
@@ -45650,7 +45655,10 @@ class Compiler {
                     false
                 );
                 if (null !== $immediatePropertyOrMethodSlot) {
-                    $valueSlot = $immediatePropertyOrMethodSlot;
+                    // Property/method prelude — do not clobber ClassConstFetch/flag wiring (#19769).
+                    if (!$hoistedEnumPropertyCallArgSlotWired) {
+                        $valueSlot = $immediatePropertyOrMethodSlot;
+                    }
                 } elseif (null !== $block->orig) {
                     if (null === $valueSlot) {
                         $siblingSendSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
@@ -45661,7 +45669,7 @@ class Compiler {
                 }
             } elseif (null !== $cfgCallOp && null !== $block->orig) {
                 $siblingSendSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
-                if (null !== $siblingSendSlot) {
+                if (null !== $siblingSendSlot && !$hoistedEnumPropertyCallArgSlotWired) {
                     $valueSlot = $siblingSendSlot;
                 }
             }
