@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Builtin\StringUcwords;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -26,10 +25,10 @@ final class ucwords extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ucwords() requires one or two arguments');
         }
-        $string = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'ucwords', 'string');
+        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'ucwords', 0, 'string');
         $separators = VmString::TRIM_DEFAULT;
         if (2 === $argc) {
-            $separators = InternalStrictArg::resolveCoercibleStringArg($frame, 1, 'ucwords', 'separators');
+            $separators = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'ucwords', 1, 'separators');
         }
         if (null === $frame->returnVar) {
             return;
@@ -47,7 +46,7 @@ final class ucwords extends Internal
             throw new \LogicException('ucwords() requires one or two arguments');
         }
         StringUcwords::ensureLinked($context);
-        $str = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'ucwords', 0, 'string');
+        $str = self::jitStringArg($context, $args[0], 0, 'string');
         if (1 === $argc) {
             return $context->builder->call(
                 $context->lookupFunction('__string__ucwords'),
@@ -58,7 +57,33 @@ final class ucwords extends Internal
         return $context->builder->call(
             $context->lookupFunction('__string__ucwords_ex'),
             $str,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'ucwords', 1, 'separators')
+            self::jitStringArg($context, $args[1], 1, 'separators')
+        );
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19257, ext/standard/string.c). */
+    private static function jitStringArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'ucwords',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'ucwords',
+            $argIndex,
+            $paramName
         );
     }
 }
