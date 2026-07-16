@@ -7,24 +7,29 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\ObOutputJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** ObOutputRuntime routes standalone + embed through ObOutputJitHelper PHP, not LLVM buffer globals (#9268, #12951). */
+/** ObOutputRuntime routes standalone + embed through ObOutputJitHelper PHP; user-script via JitObOutputKernel (#9268, #12951, #19422). */
 final class ObOutputRuntimeShrinkTest extends TestCase
 {
     public function testObOutputRuntimeUsesHelperNotLlvmStack(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputRuntime.php');
         $this->assertStringContainsString('ObOutputJitBridge::implement', $runtime);
+        $this->assertStringContainsString('JitObOutputKernel', $runtime);
         $this->assertStringNotContainsString('ObOutputStandaloneLlvm', $runtime);
+        $this->assertStringNotContainsString('ObOutputUserScriptLlvm', $runtime);
         $runtimeLines = \substr_count($runtime, "\n") + 1;
         $this->assertLessThan(60, $runtimeLines);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObOutputStandaloneLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObOutputUserScriptLlvm.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitObOutputKernel.php');
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputJitBridge.php');
         $this->assertStringContainsString('ObOutputJitHelper', $bridge);
         $this->assertStringContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $bridge);
-        $this->assertStringContainsString('ObOutputUserScriptLlvm::shouldUse', $bridge);
+        $this->assertStringContainsString('JitObOutputKernel::shouldUse', $bridge);
+        $this->assertStringNotContainsString('ObOutputUserScriptLlvm', $bridge);
         $this->assertStringNotContainsString('ObStorageGlobals::ensureGlobals', $bridge);
         $this->assertStringNotContainsString('GLOBAL_STORAGE', $bridge);
         $this->assertStringNotContainsString('implementPopBuffer', $bridge);
@@ -46,13 +51,21 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $execCaptureRuntime);
         $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
 
-        $userScript = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputUserScriptLlvm.php');
-        $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $userScript);
-        $this->assertStringNotContainsString('EmbedObEchoBridge::implementAll', $userScript);
+        $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitObOutputKernel.php');
+        $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $kernel);
+        $this->assertStringNotContainsString('EmbedObEchoBridge::implementAll', $kernel);
 
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/ObOutputJitHelper.php');
         $this->assertStringNotContainsString('use PHPCompiler\VM\ObStackLimits', $helper);
         $this->assertStringNotContainsString('ObStackLimits::BUF_SIZE', $helper);
+    }
+
+    public function testSpineBundleIncludesObOutputKernel(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitObOutputKernel.php', $spine);
+        $this->assertStringContainsString('ObOutputJitHelper.php', $spine);
+        $this->assertStringNotContainsString('ObOutputUserScriptLlvm.php', $spine);
     }
 
     public function testObOutputJitHelperStackSemantics(): void

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitObOutputKernel;
 use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\ext\standard\ob_end_flush;
 use PHPCompiler\ext\standard\ob_flush;
@@ -18,9 +19,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed + standalone link for ob_* stack via ObOutputJitHelper PHP (#9268, #12951).
+ * JIT/AOT embed + standalone link for ob_* stack via ObOutputJitHelper PHP (#9268, #12951, #19422).
  *
  * Replaces ~1k-line LLVM buffer stack. SSOT: {@see \PHPCompiler\ext\standard\ObOutputJitHelper}.
+ * User-script / bootstrap-aot: {@see JitObOutputKernel} (ext/standard).
  * php-src: ext/standard/output.c
  */
 final class ObOutputJitBridge
@@ -90,8 +92,8 @@ final class ObOutputJitBridge
 
     public static function implement(Context $context): void
     {
-        if (ObOutputUserScriptLlvm::shouldUse($context)) {
-            ObOutputUserScriptLlvm::implement($context);
+        if (JitObOutputKernel::shouldUse($context)) {
+            JitObOutputKernel::implement($context);
 
             return;
         }
@@ -632,14 +634,14 @@ final class ObOutputJitBridge
         }
     }
 
-    /** @internal User-script AOT preamble shared with {@see ObOutputUserScriptLlvm} (#13822). */
+    /** @internal User-script AOT preamble shared with {@see JitObOutputKernel} (#13822, #19422). */
     public static function prepareUserScriptEmit(Context $context): void
     {
         self::ensureExtraGlobals($context);
         self::ensureLibc($context);
     }
 
-    /** @internal User-script AOT epilogue shared with {@see ObOutputUserScriptLlvm} (#13822). */
+    /** @internal User-script AOT epilogue shared with {@see JitObOutputKernel} (#13822, #19422). */
     public static function finishUserScriptEmit(Context $context): void
     {
         self::implementDeferredInventoryStubs($context);
