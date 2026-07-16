@@ -1053,6 +1053,10 @@ final class VmDom
         $state->localName = $localName;
         $state->prefix = '' !== $prefix ? $prefix : null;
         $state->namespaceUri = $namespace;
+        // libxml nsDef on createElementNS — not a NamedNodeMap attribute (php-src; #19397).
+        if (null !== $namespace) {
+            $state->namespaceDeclarations['' !== $prefix ? $prefix : ''] = $namespace;
+        }
         if (null !== $ownerDocument && self::isDocument($ownerDocument)) {
             $state->documentId = $ownerDocument->id;
         }
@@ -1481,7 +1485,7 @@ final class VmDom
             }
         }
         if (self::isXmlnsAttributeName($qualifiedName)) {
-            $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
+            self::refreshNamespaceDeclarations($state);
         }
         if (null !== $state->idAttributeName && $qualifiedName === $state->idAttributeName) {
             self::syncElementIdRegistration($element);
@@ -1708,6 +1712,11 @@ final class VmDom
         $current = $node;
         while (DomRegistry::has($current)) {
             $state = DomRegistry::state($current);
+            if (self::isElement($current) && null !== $state->namespaceUri && $state->namespaceUri === $namespace) {
+                $ownPrefix = $state->prefix ?? '';
+
+                return '' === $ownPrefix ? null : $ownPrefix;
+            }
             foreach ($state->namespaceDeclarations as $prefix => $uri) {
                 if ($uri === $namespace) {
                     return '' === $prefix ? null : $prefix;
@@ -1733,7 +1742,13 @@ final class VmDom
         $current = $node;
         while (DomRegistry::has($current)) {
             $state = DomRegistry::state($current);
-            if (isset($state->namespaceDeclarations[$wantPrefix])) {
+            if (self::isElement($current) && null !== $state->namespaceUri) {
+                $ownPrefix = $state->prefix ?? '';
+                if ($ownPrefix === $wantPrefix) {
+                    return $state->namespaceUri;
+                }
+            }
+            if (\array_key_exists($wantPrefix, $state->namespaceDeclarations)) {
                 return $state->namespaceDeclarations[$wantPrefix];
             }
             $parentId = $state->parentId;
@@ -1959,6 +1974,39 @@ final class VmDom
         }
 
         return $declarations;
+    }
+
+    /**
+     * Rebuild xmlns map from attributes, preserving createElementNS nsDef (#19397).
+     */
+    private static function refreshNamespaceDeclarations(DomNodeState $state): void
+    {
+        $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
+        if (null === $state->namespaceUri) {
+            return;
+        }
+        $ownPrefix = $state->prefix ?? '';
+        $attrName = '' === $ownPrefix ? 'xmlns' : 'xmlns:'.$ownPrefix;
+        if (!\array_key_exists($attrName, $state->attributes)) {
+            $state->namespaceDeclarations[$ownPrefix] = $state->namespaceUri;
+        }
+    }
+
+    /**
+     * In-scope namespace URI from ancestors only (php-src/libxml ns dump; #19397).
+     */
+    private static function parentNamespaceUri(ObjectEntry $entry, string $prefix): ?string
+    {
+        $state = DomRegistry::state($entry);
+        if (null === $state->parentId) {
+            return null;
+        }
+        $parent = DomRegistry::entry($state->parentId);
+        if (null === $parent || self::isDocument($parent)) {
+            return null;
+        }
+
+        return self::lookupNamespaceURI($parent, '' === $prefix ? null : $prefix);
     }
 
     private static function resolveElementNamespaceUri(ObjectEntry $element): void
@@ -5358,7 +5406,7 @@ final class VmDom
     {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
-        $attrPart = self::serializeAttributes($state);
+        $attrPart = self::serializeElementAttributes($entry);
         if ([] === $state->childIds) {
             $tag = $noEmptyTag
                 ? '<'.$name.$attrPart.'></'.$name.'>'
@@ -5389,6 +5437,35 @@ final class VmDom
         $lines[] = $indent.'</'.$name.'>';
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * Emit attributes plus synthetic xmlns from createElementNS nsDef (php-src/libxml; #19397).
+     *
+     * @return non-empty-string|''
+     */
+    private static function serializeElementAttributes(ObjectEntry $entry): string
+    {
+        $state = DomRegistry::state($entry);
+        $parts = [];
+        foreach ($state->namespaceDeclarations as $prefix => $uri) {
+            $attrName = '' === $prefix ? 'xmlns' : 'xmlns:'.$prefix;
+            if (\array_key_exists($attrName, $state->attributes)) {
+                continue;
+            }
+            if (self::parentNamespaceUri($entry, $prefix) === $uri) {
+                continue;
+            }
+            $parts[] = self::escapeName($attrName).'="'.self::escapeAttr($uri).'"';
+        }
+        foreach ($state->attributes as $aname => $avalue) {
+            $parts[] = self::escapeName($aname).'="'.self::escapeAttr($avalue).'"';
+        }
+        if ([] === $parts) {
+            return '';
+        }
+
+        return ' '.implode(' ', $parts);
     }
 
     /** @return non-empty-string */
