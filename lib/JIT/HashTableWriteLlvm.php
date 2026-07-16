@@ -606,15 +606,17 @@ final class HashTableWriteLlvm
         $array->valueBoxHashtable = true;
     }
 
-    /** php-src: float array keys truncate toward zero (zend_dval_to_lval). */
+    /** php-src: float array keys truncate toward zero (zend_dval_to_lval); warn on write (#19730). */
     private static function arrayKeyToIndex(Context $context, Variable $key): Value
     {
         $sizeT = $context->getTypeFromString('size_t');
         if (Variable::TYPE_NATIVE_DOUBLE === $key->type) {
-            return $context->builder->fptosi(
-                $context->helper->loadValue($key),
-                $sizeT
+            $truncated = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning(
+                $context,
+                $context->helper->loadValue($key)
             );
+
+            return $context->builder->truncOrBitCast($truncated, $sizeT);
         }
 
         return $context->builder->truncOrBitCast(
@@ -694,6 +696,28 @@ final class HashTableWriteLlvm
         self::setAtIndex($context, $ht, $index, $element);
         $context->builder->branch($done);
         $context->builder->positionAtEnd($afterLong);
+        $floatBlock = $fn->appendBasicBlock('ht_set_vk_float');
+        $afterFloat = $fn->appendBasicBlock('ht_set_vk_after_float');
+        // Value-box type bytes use VM Variable constants (TYPE_FLOAT=2).
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(\PHPCompiler\VM\Variable::TYPE_FLOAT, false)
+            ),
+            $floatBlock,
+            $afterFloat
+        );
+        $context->builder->positionAtEnd($floatBlock);
+        $doubleVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valPtr);
+        $truncatedLong = \PHPCompiler\ext\standard\JitIntdiv::floatToLongWithPrecisionWarning($context, $doubleVal);
+        $floatIndex = $context->builder->truncOrBitCast(
+            $truncatedLong,
+            $context->getTypeFromString('size_t')
+        );
+        self::setAtIndex($context, $ht, $floatIndex, $element);
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($afterFloat);
         $illegalBlock = $fn->appendBasicBlock('ht_set_vk_illegal');
         $afterObject = $fn->appendBasicBlock('ht_set_vk_after_obj');
         $context->builder->branchIf(

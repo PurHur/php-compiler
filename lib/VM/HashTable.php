@@ -10,6 +10,7 @@
 namespace PHPCompiler\VM;
 
 use php\MaskedArray;
+use PHPCompiler\Frame;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmMath;
 
@@ -469,6 +470,9 @@ final class HashTable {
 
     /**
      * php-src: null array keys coerce to empty string; bool keys to int (zend_hash.c; #5269, #5275).
+     *
+     * Float→int coercion is silent for read/isset/unset (#5123, #16739). Dimension / literal
+     * key writes use {@see normalizeIndexKeyForWrite} so non-integral floats emit E_DEPRECATED (#19730).
      */
     public static function normalizeIndexKey(Variable $index, string $illegalOffsetMessage = 'Illegal offset type'): Variable
     {
@@ -489,7 +493,7 @@ final class HashTable {
             return $intKey;
         }
         if (Variable::TYPE_FLOAT === $index->type) {
-            // Zend zend_hash: float offsets coerce to int keys without deprecation (#5123, #16739).
+            // Silent coerce for read/isset/unset (#5123, #16739); writes warn via normalizeIndexKeyForWrite.
             $intKey = new Variable();
             $intKey->int(VmMath::floatToZendLong($index->toFloat()));
 
@@ -497,6 +501,43 @@ final class HashTable {
         }
 
         return $index;
+    }
+
+    /**
+     * Array key write path: Zend zend_hash float→long with precision-loss E_DEPRECATED (#19730).
+     */
+    public static function normalizeIndexKeyForWrite(
+        Variable $index,
+        Context $vmContext,
+        ?Frame $frame = null,
+        string $illegalOffsetMessage = 'Illegal offset type'
+    ): Variable {
+        $resolved = $index;
+        if (Variable::TYPE_INDIRECT === $resolved->type) {
+            $resolved = $resolved->resolveIndirect();
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type) {
+            VmMath::warnFloatToIntPrecisionLoss($resolved->toFloat(), $vmContext, $frame);
+        }
+
+        return self::normalizeIndexKey($index, $illegalOffsetMessage);
+    }
+
+    /**
+     * Emit float→int precision-loss deprecation when storing under a float key (INIT_ARRAY / dim write).
+     */
+    public static function warnFloatKeyWriteIfNeeded(
+        Variable $index,
+        Context $vmContext,
+        ?Frame $frame = null
+    ): void {
+        $resolved = $index;
+        if (Variable::TYPE_INDIRECT === $resolved->type) {
+            $resolved = $resolved->resolveIndirect();
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type) {
+            VmMath::warnFloatToIntPrecisionLoss($resolved->toFloat(), $vmContext, $frame);
+        }
     }
 
     public function keyExists(Variable $index): bool
@@ -514,8 +555,12 @@ final class HashTable {
         }
     }
 
-    public function findVariable(Variable $index, bool $forWrite): ?Variable {
-        $index = self::normalizeIndexKey($index);
+    public function findVariable(Variable $index, bool $forWrite, ?Context $vmContext = null, ?Frame $frame = null): ?Variable {
+        if ($forWrite && null !== $vmContext) {
+            $index = self::normalizeIndexKeyForWrite($index, $vmContext, $frame);
+        } else {
+            $index = self::normalizeIndexKey($index);
+        }
         switch ($index->type) {
             case Variable::TYPE_INTEGER:
                 $result = $this->findIndex($index->toInt());

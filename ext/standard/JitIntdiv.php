@@ -415,6 +415,17 @@ final class JitIntdiv
         $context->builder->positionAtEnd($afterWarn);
     }
 
+    /**
+     * Truncate float→long like Zend zend_dval_to_lval; emit E_DEPRECATED on precision loss (#19730).
+     */
+    public static function floatToLongWithPrecisionWarning(Context $context, Value $doubleVal): Value
+    {
+        $truncated = $context->builder->fptosi($doubleVal, $context->getTypeFromString('int64'));
+        self::maybeEmitFloatToIntPrecisionWarning($context, $doubleVal, $truncated);
+
+        return $truncated;
+    }
+
     private static function lowerStringOperandFromPtr(
         Context $context,
         Value $strPtr,
