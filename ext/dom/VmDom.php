@@ -4017,6 +4017,7 @@ final class VmDom
 
         $parentState = DomRegistry::state($parent);
         if (DomConstants::XML_DOCUMENT_NODE === $parentState->nodeType) {
+            self::assertNotAncestorOfParent($parent, $child);
             self::appendDocumentChild($ctx, $parent, $child);
             self::syncSubtree($ctx, $parent);
             self::registerSubtreeElementIdsIfConnected($child);
@@ -4031,6 +4032,7 @@ final class VmDom
         }
 
         self::assertSameDocument($parent, $child);
+        self::assertNotAncestorOfParent($parent, $child);
         self::detachNodeIfAttached($ctx, $child);
         $parentState->childIds[] = $child->id;
         self::linkChildToParent($child, $parent);
@@ -4065,6 +4067,7 @@ final class VmDom
         }
         self::assertChildOfParent($parent, $oldChild, 'DOMNode::replaceChild()');
         self::assertSameDocument($parent, $newChild);
+        self::assertNotAncestorOfParent($parent, $newChild);
         self::unregisterSubtreeElementIdsIfConnected($oldChild);
         self::detachNodeIfAttached($ctx, $newChild);
         $parentState = DomRegistry::state($parent);
@@ -4109,6 +4112,7 @@ final class VmDom
             throw new \DOMException('Hierarchy request error');
         }
         self::assertSameDocument($parent, $newChild);
+        self::assertNotAncestorOfParent($parent, $newChild);
         if (null !== $refChild) {
             self::assertChildOfParent($parent, $refChild, 'DOMNode::insertBefore()');
         }
@@ -4689,6 +4693,7 @@ final class VmDom
             throw new \DOMException('Hierarchy request error');
         }
         self::assertSameDocument($parent, $child);
+        self::assertNotAncestorOfParent($parent, $child);
         self::detachNodeIfAttached($ctx, $child);
 
         $parentState = DomRegistry::state($parent);
@@ -4762,6 +4767,7 @@ final class VmDom
             throw new \DOMException('Hierarchy request error');
         }
         self::assertSameDocument($parent, $newChild);
+        self::assertNotAncestorOfParent($parent, $newChild);
         if (null !== $refChild) {
             self::assertChildOfParent($parent, $refChild, 'DOMNode::insertBefore()');
         }
@@ -6538,6 +6544,21 @@ final class VmDom
         $childDocId = self::resolveDocumentId($child);
         if (null !== $parentDocId && null !== $childDocId && $parentDocId !== $childDocId) {
             throw new \DOMException('Wrong Document Error');
+        }
+    }
+
+    /**
+     * Reject inserting a node that is an ancestor of (or identical to) the parent.
+     * Without this guard, detach+relink forms a cycle and syncSubtree hangs (php-src
+     * ext/dom/node.c hierarchy check; #19753).
+     */
+    private static function assertNotAncestorOfParent(ObjectEntry $parent, ObjectEntry $child): void
+    {
+        if (self::contains($child, $parent)) {
+            throw new \DOMException(
+                'Hierarchy Request Error',
+                DomExceptionConstants::HIERARCHY_REQUEST_ERR
+            );
         }
     }
 
