@@ -1,5 +1,5 @@
 --TEST--
-stdlib CurlHandle classes withheld without ext/curl — no phantom class_exists (#12117, ext/curl/interface.c)
+stdlib CurlHandle classes withheld without ext/curl — no phantom class_exists (#12117, #19728, ext/curl/interface.c)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -13,4 +13,4 @@ echo 'share=', (int) class_exists('CurlShareHandle', false), "\n";
 curl_loaded=0
 handle=0
 multi=0
-share=1
+share=0

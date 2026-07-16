@@ -13,7 +13,8 @@ use PHPCompiler\VM;
  *
  * libcurl HTTP client parity tracked in #3325; curl_multi in #3721.
  * Phase 2 keeps introspection helpers in-tree via {@see VmCurlCore}; CURLFile /
- * CURLStringFile / curl_file_create stay withheld until {@see CurlExtensionPolicy::advertisesExtension()}.
+ * CURLStringFile / curl_file_create / curl_share_* stay withheld until
+ * {@see CurlExtensionPolicy::advertisesExtension()} (#19728).
  */
 class Module extends ModuleAbstract
 {

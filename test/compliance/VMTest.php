@@ -538,6 +538,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'curl_file_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::runsCurlShareCompliance($name)
+                && str_contains($name, 'curl_share')
+                && !str_contains($name, 'curl_share_phantom')) {
+                continue;
+            }
+            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesShareHandles()
+                && str_contains($name, 'curl_share_phantom')) {
+                continue;
+            }
             if (!\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
                 && str_contains($name, 'ldap_escape')
                 && !str_contains($name, 'ldap_escape_phantom')) {

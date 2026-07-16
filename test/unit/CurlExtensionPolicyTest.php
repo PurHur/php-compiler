@@ -18,12 +18,12 @@ final class CurlExtensionPolicyTest extends TestCase
         self::assertFalse(CurlExtensionPolicy::advertisesExtension());
         self::assertFalse(CurlExtensionPolicy::advertisesHandleClasses());
         self::assertFalse(CurlExtensionPolicy::advertisesFileClasses());
-        self::assertTrue(CurlExtensionPolicy::advertisesShareHandles());
+        self::assertFalse(CurlExtensionPolicy::advertisesShareHandles());
         self::assertFalse(CurlExtensionPolicy::advertisesEasyHandleStubs());
         self::assertFalse(CurlExtensionPolicy::advertisesIntrospectionFunctions());
     }
 
-    public function testCurlShareHandleClassAdvertisedWithShareBuiltins(): void
+    public function testCurlShareHandleClassWithheldWithoutExtension(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -40,7 +40,8 @@ var_export(class_exists('CURLFile', false));
 PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'curl_handle_classes.php'));
-        self::assertSame("false\nfalse\ntrue\nfalse\nfalse", ob_get_clean());
+        // Share must not outlive curl_init / CurlHandle (#19728, re-#12117).
+        self::assertSame("false\nfalse\nfalse\nfalse\nfalse", ob_get_clean());
     }
 
     public function testCurlHandleClassesWithheldUntilExtensionAdvertised(): void

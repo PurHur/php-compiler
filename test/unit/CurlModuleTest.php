@@ -23,7 +23,8 @@ final class CurlModuleTest extends TestCase
             self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_share_init', 'curl_share_setopt', 'curl_share_close'] as $fn) {
-            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+            // Share APIs stay with curl_init until extension_loaded('curl') (#19728).
+            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep', 'curl_file_create'] as $fn) {
             self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);

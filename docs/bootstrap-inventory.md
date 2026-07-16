@@ -5755,7 +5755,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/CurlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/curl/CurlFileBuiltin.php`
 
@@ -5792,20 +5792,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 47)
-- new curl_escape (line 60)
-- new curl_unescape (line 61)
-- new curl_version (line 62)
-- new curl_strerror (line 63)
-- new curl_multi_strerror (line 64)
-- new curl_upkeep (line 65)
-- new curl_file_create (line 68)
-- new curl_share_init (line 71)
-- new curl_share_setopt (line 72)
-- new curl_share_close (line 73)
-- new curl_init (line 76)
-- new curl_setopt (line 77)
-- new curl_close (line 78)
+- new VM\Variable (line 48)
+- new curl_escape (line 61)
+- new curl_unescape (line 62)
+- new curl_version (line 63)
+- new curl_strerror (line 64)
+- new curl_multi_strerror (line 65)
+- new curl_upkeep (line 66)
+- new curl_file_create (line 69)
+- new curl_share_init (line 72)
+- new curl_share_setopt (line 73)
+- new curl_share_close (line 74)
+- new curl_init (line 77)
+- new curl_setopt (line 78)
+- new curl_close (line 79)
 - 5 class method(s)
 
 ### `ext/curl/VmCurlArg.php`
