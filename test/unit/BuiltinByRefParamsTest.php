@@ -94,6 +94,18 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([2], BuiltinByRefParams::forFunction('PREG_MATCH_ALL'));
     }
 
+    /** Issue #19637 — preg_replace_callback() &$count must be ZEND_SEND_REF like preg_replace(). */
+    public function testPregReplaceFamilyCountByRef(): void
+    {
+        $this->assertSame([4], BuiltinByRefParams::forFunction('preg_replace'));
+        $this->assertSame([4], BuiltinByRefParams::forFunction('preg_filter'));
+        $this->assertSame([4], BuiltinByRefParams::forFunction('preg_replace_callback'));
+        $this->assertSame([4], BuiltinByRefParams::forFunction('PREG_REPLACE_CALLBACK'));
+        $this->assertSame([3], BuiltinByRefParams::forFunction('preg_replace_callback_array'));
+        $this->assertTrue(BuiltinByRefParams::isByRefArg('preg_replace_callback', 4));
+        $this->assertFalse(BuiltinByRefParams::isByRefArg('preg_replace_callback', 3));
+    }
+
     public function testArrayPointerFirstArgument(): void
     {
         foreach (['next', 'prev', 'reset', 'end'] as $fn) {
