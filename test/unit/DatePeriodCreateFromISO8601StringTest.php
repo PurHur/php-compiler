@@ -80,4 +80,44 @@ PHP;
 
         self::assertSame("2020-01-01\n", $out);
     }
+
+    /** Issue #19737 — ISO8601 factory options bitmask matches end-date ctor form. */
+    public function testCreateFromISO8601StringIncludeEndDateOptions(): void
+    {
+        $code = <<<'PHP'
+<?php
+$spec = '2020-01-01/P1D/2020-01-03';
+$out = [];
+foreach (DatePeriod::createFromISO8601String($spec, DatePeriod::INCLUDE_END_DATE) as $d) {
+    $out[] = $d->format('Y-m-d');
+}
+echo implode(',', $out), "\n";
+$out2 = [];
+foreach (DatePeriod::createFromISO8601String(
+    '2020-01-01/P1D/2020-01-04',
+    DatePeriod::EXCLUDE_START_DATE | DatePeriod::INCLUDE_END_DATE
+) as $d) {
+    $out2[] = $d->format('Y-m-d');
+}
+echo implode(',', $out2), "\n";
+PHP;
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($code, 'test.php');
+            ob_start();
+            $runtime->run($block);
+            $out = ob_get_clean();
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+
+        self::assertSame("2020-01-01,2020-01-02,2020-01-03\n2020-01-02,2020-01-03,2020-01-04\n", $out);
+    }
 }

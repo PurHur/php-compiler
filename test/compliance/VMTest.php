@@ -1129,7 +1129,8 @@ class VMTest extends BaseTest {
             }
             if (!CompilerVersion::supportsDatePeriodCreateFromISO8601String()
                 && str_contains($name, 'date_period_create_from_iso8601')
-                && !str_contains($name, 'date_period_create_from_iso8601_phantom')) {
+                && !str_contains($name, 'date_period_create_from_iso8601_phantom')
+                && !str_contains($name, 'date_period_create_from_iso8601_include_end_date_forward_profile')) {
                 continue;
             }
             if (CompilerVersion::supportsDatePeriodCreateFromISO8601String()
