@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** gmdate() — format UTC time (subset; JIT/AOT via __compiler_format_datetime). */
@@ -39,19 +38,9 @@ final class gmdate extends Internal
         return JitDate::formatDate($context, true, ...$args);
     }
 
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19651, ext/date/php_date.c). */
     private static function vmFormatArg(Frame $frame): string
     {
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            InternalStrictArg::requireString($frame, 0, 'gmdate', 'format');
-        }
-
-        return VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'gmdate',
-            0,
-            'format',
-            'string',
-            false
-        );
+        return VmString::zparamStrBuiltinArgForFrame($frame, 0, 'gmdate', 0, 'format');
     }
 }
