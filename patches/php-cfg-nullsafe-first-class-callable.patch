@@ -1,0 +1,14 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -1872,6 +1872,11 @@
+ 
+     protected function parseExpr_NullsafeMethodCall(Expr\NullsafeMethodCall $expr)
+     {
++        // Zend/zend_compile.c: nullsafe + CALLABLE_CONVERT is a compile fatal (#19727).
++        if ($this->isFirstClassCallable($expr->args)) {
++            throw new \CompileError('Cannot combine nullsafe operator with Closure creation');
++        }
++
+         return new Op\Expr\NullsafeMethodCall(
+             $this->readVariable($this->parseExprNode($expr->var)),
+             $this->readVariable($this->parseExprNode($expr->name)),
