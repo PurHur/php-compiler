@@ -1559,6 +1559,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitParseIniMaterializer.php` | 0 | 1 |
 | `ext/standard/JitParseStr.php` | 0 | 1 |
 | `ext/standard/JitParseStrMaterializer.php` | 0 | 1 |
+| `ext/standard/JitParseStrUserScriptCstrKernel.php` | 0 | 1 |
 | `ext/standard/JitParseUrl.php` | 0 | 1 |
 | `ext/standard/JitPassword.php` | 0 | 1 |
 | `ext/standard/JitPasswordAlgo.php` | 0 | 1 |
@@ -3724,7 +3725,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ParamSensitiveLowering.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrNativeOpsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrRuntime.php` | 0 | 7 |
-| `lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrl.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlComponentJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlRuntime.php` | 0 | 3 |
@@ -9780,7 +9780,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_cipher_iv_length.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 35)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_cipher_key_length.php`
@@ -15350,6 +15350,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/standard/JitParseStrUserScriptCstrKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 25 class method(s)
 
 ### `ext/standard/JitParseUrl.php`
 
@@ -29913,18 +29918,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ParseStrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 420)
-- new phpc_native_ht_set_string_key (line 421)
-- new phpc_native_ht_set_string_key_ht (line 422)
-- new phpc_native_ht_set_string_at (line 423)
-- new phpc_native_ht_set_hashtable_at (line 424)
+- new phpc_native_ht_alloc (line 421)
+- new phpc_native_ht_set_string_key (line 422)
+- new phpc_native_ht_set_string_key_ht (line 423)
+- new phpc_native_ht_set_string_at (line 424)
+- new phpc_native_ht_set_hashtable_at (line 425)
 - 21 class method(s)
 - 5 closure(s)
-
-### `lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php`
-
-**Warnings** (review for bootstrap subset):
-- 25 class method(s)
 
 ### `lib/JIT/Builtin/ParseUrl.php`
 

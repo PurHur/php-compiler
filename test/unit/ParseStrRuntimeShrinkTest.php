@@ -69,11 +69,11 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('__phpc_parse_str_parse_delimited_pairs', $userScript);
         $parseStrRuntime = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
         $this->assertStringContainsString('implementUserScriptCstrDelimitedBridge', $parseStrRuntime);
-        $this->assertStringContainsString('ParseStrRuntimeUserScriptCstr', $parseStrRuntime);
+        $this->assertStringContainsString('JitParseStrUserScriptCstrKernel', $parseStrRuntime);
         $this->assertStringContainsString('encodedStringToCstr', $parseStrRuntime);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $parseStrRuntime);
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php');
-        $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php');
+        $this->assertFileExists($this->repoRoot.'/ext/standard/JitParseStrUserScriptCstrKernel.php');
         $stringParseStr = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringParseStr.php');
         $this->assertStringContainsString('ensureUserScriptLinked', $stringParseStr);
         $this->assertStringContainsString('UserScriptAotDeferNestedJit', $stringParseStr);
@@ -86,7 +86,7 @@ final class ParseStrRuntimeShrinkTest extends TestCase
     public function testParseStrUserScriptDelimitedJitDeleted(): void
     {
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php');
-        $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntimeUserScriptCstr.php');
+        $this->assertFileExists($this->repoRoot.'/ext/standard/JitParseStrUserScriptCstrKernel.php');
     }
 
     public function testParseStrRuntimeRoutesUserScriptThroughCstrDelimitedBridge(): void
@@ -94,7 +94,7 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
         $this->assertStringContainsString('implementUserScriptParseBridge', $source);
         $this->assertStringContainsString('implementUserScriptCstrDelimitedBridge', $source);
-        $this->assertStringContainsString('ParseStrRuntimeUserScriptCstr::ensureSubhelpers', $source);
+        $this->assertStringContainsString('JitParseStrUserScriptCstrKernel::ensureSubhelpers', $source);
         $this->assertStringNotContainsString('emitUserScriptDelimitedParse', $source);
         $this->assertStringContainsString('_work_v8', $source);
     }
@@ -122,7 +122,7 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringParseStr.php', $spine);
         $this->assertStringContainsString('ParseStrNativeOpsJit.php', $spine);
         $this->assertStringNotContainsString('ParseStrUserScriptDelimitedJit.php', $spine);
-        $this->assertStringContainsString('ParseStrRuntimeUserScriptCstr.php', $spine);
+        $this->assertStringContainsString('JitParseStrUserScriptCstrKernel.php', $spine);
         $this->assertStringNotContainsString('ParseStrNativeLlvm.php', $spine);
         $this->assertStringContainsString('phpc_native_ht_alloc.php', $spine);
         $this->assertStringNotContainsString('StringParseStrJit.php', $spine);
@@ -162,7 +162,7 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('$early = $fn->appendBasicBlock', $source);
         $this->assertStringNotContainsString('BasicBlockHelper::append($context, \'parse_str_bridge', $source);
         $this->assertStringNotContainsString('emitUserScriptDelimitedParse', $source);
-        $this->assertStringContainsString('ParseStrRuntimeUserScriptCstr::ensureSubhelpers', $source);
+        $this->assertStringContainsString('JitParseStrUserScriptCstrKernel::ensureSubhelpers', $source);
         $this->assertStringContainsString('JitNestedHelperCoerce::coerceArgForHelper', $source);
         $this->assertStringNotContainsString(
             'USER_SCRIPT_HELPER_PATH',
