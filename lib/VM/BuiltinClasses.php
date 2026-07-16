@@ -214,6 +214,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureCalledClass;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureScopeClass;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureThis;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureUsedVariables;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetNamedArguments;
@@ -636,6 +637,8 @@ final class BuiltinClasses
 
         $rfa = new ClassEntry('ReflectionFunctionAbstract');
         $rfa->isAbstract = true;
+        $rfa->methods['getattributes'] = new ReflectionFunctionGetAttributes();
+        $rfa->methodVisibility['getattributes'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION_ABSTRACT] = $rfa;
 
         $rm = new ClassEntry('ReflectionMethod');
