@@ -627,6 +627,71 @@ final class DomDocumentMethodUserScriptLlvm
         );
     }
 
+    public static function ensureFirstElementChildBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_FIRST_ELEMENT_CHILD,
+            'dom_first_element_child_user_script',
+            [$context->getTypeFromString('__object__*')],
+            $context->getTypeFromString('__object__*'),
+            DomNodeChildPropertyRuntime::HELPER_FIRST_ELEMENT,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
+        );
+    }
+
+    public static function ensureLastElementChildBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_LAST_ELEMENT_CHILD,
+            'dom_last_element_child_user_script',
+            [$context->getTypeFromString('__object__*')],
+            $context->getTypeFromString('__object__*'),
+            DomNodeChildPropertyRuntime::HELPER_LAST_ELEMENT,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
+        );
+    }
+
+    public static function ensureChildElementCountBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_CHILD_ELEMENT_COUNT,
+            'dom_child_element_count_user_script',
+            [$context->getTypeFromString('__object__*')],
+            $context->getTypeFromString('int64'),
+            DomNodeChildPropertyRuntime::HELPER_CHILD_ELEMENT_COUNT,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
+        );
+    }
+
+    public static function ensureNextElementSiblingBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_NEXT_ELEMENT_SIBLING,
+            'dom_next_element_sibling_user_script',
+            [$context->getTypeFromString('__object__*')],
+            $context->getTypeFromString('__object__*'),
+            DomNodeChildPropertyRuntime::HELPER_NEXT_ELEMENT,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
+        );
+    }
+
+    public static function ensurePreviousElementSiblingBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomNodeChildPropertyRuntime::ABI_PREVIOUS_ELEMENT_SIBLING,
+            'dom_previous_element_sibling_user_script',
+            [$context->getTypeFromString('__object__*')],
+            $context->getTypeFromString('__object__*'),
+            DomNodeChildPropertyRuntime::HELPER_PREV_ELEMENT,
+            '/ext/dom/DomNodeChildPropertyJitHelper.php'
+        );
+    }
+
     public static function ensureCreateDocumentFragmentBridge(Context $context): void
     {
         self::ensureContextBridge(

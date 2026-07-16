@@ -212,6 +212,9 @@ final class DomNodeLiveMutationRuntime
             $lastArg = $extraArgs[\count($extraArgs) - 1];
             $firstChildObj = null;
             $lastChildObj = null;
+            $firstElementObj = null;
+            $lastElementObj = null;
+            $elementCount = 0;
             foreach ($orderedArgs as $arg) {
                 $appended = self::invokeUserScriptMutationArg($context, $kind, $receiver, $arg);
                 if (Variable::TYPE_STRING === $arg->type) {
@@ -228,10 +231,24 @@ final class DomNodeLiveMutationRuntime
                     if ($arg === $lastArg) {
                         $lastChildObj = $appended;
                     }
+                    if (null === $firstElementObj) {
+                        $firstElementObj = $appended;
+                    }
+                    $lastElementObj = $appended;
+                    ++$elementCount;
                 }
             }
             if (null !== $firstChildObj && null !== $lastChildObj) {
                 self::syncChildLinkSlots($context, $receiver, $firstChildObj, $lastChildObj);
+            }
+            if (null !== $firstElementObj && null !== $lastElementObj && $elementCount > 0) {
+                self::syncElementNavSlots(
+                    $context,
+                    $receiver,
+                    $firstElementObj,
+                    $lastElementObj,
+                    $elementCount
+                );
             }
             self::syncTextContentSlotFromLiteralArgs($context, $receiver, $extraArgs);
 
@@ -304,7 +321,7 @@ final class DomNodeLiveMutationRuntime
     }
 
     /**
-     * Mirror live child links into LLVM property slots for user-script AOT reads (#18951).
+     * Mirror live child links into LLVM property slots for user-script AOT reads (#18951, #19431).
      */
     private static function syncChildLinkSlots(
         Context $context,
@@ -331,6 +348,75 @@ final class DomNodeLiveMutationRuntime
         $objectType->propertyStore(
             $objectType->propertySlotFor($receiverObj, 'DOMNode', VmDom::PROP_LAST_CHILD),
             $lastJit,
+            Variable::TYPE_VALUE
+        );
+    }
+
+    /**
+     * Mirror ParentNode / NonDocumentTypeChildNode element-nav slots (#19431).
+     */
+    private static function syncElementNavSlots(
+        Context $context,
+        Variable $receiver,
+        Value $firstElementObj,
+        Value $lastElementObj,
+        int $elementCount
+    ): void {
+        $objectType = $context->type->object;
+        $elementClassId = $objectType->lookup('DOMElement');
+        foreach ([
+            VmDom::PROP_FIRST_ELEMENT_CHILD,
+            VmDom::PROP_LAST_ELEMENT_CHILD,
+            VmDom::PROP_CHILD_ELEMENT_COUNT,
+            VmDom::PROP_NEXT_ELEMENT_SIBLING,
+            VmDom::PROP_PREVIOUS_ELEMENT_SIBLING,
+        ] as $prop) {
+            if (!$objectType->hasProperty($elementClassId, $prop)) {
+                $objectType->defineProperty(
+                    $elementClassId,
+                    $prop,
+                    VmDom::PROP_CHILD_ELEMENT_COUNT === $prop
+                        ? Variable::TYPE_NATIVE_LONG
+                        : Variable::TYPE_VALUE
+                );
+            }
+        }
+
+        $receiverObj = self::receiverObject($context, $receiver);
+        $firstJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $firstElementObj);
+        $lastJit = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $lastElementObj);
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_FIRST_ELEMENT_CHILD),
+            $firstJit,
+            Variable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_LAST_ELEMENT_CHILD),
+            $lastJit,
+            Variable::TYPE_VALUE
+        );
+        $countJit = new Variable(
+            $context,
+            Variable::TYPE_NATIVE_LONG,
+            Variable::KIND_VALUE,
+            $context->getTypeFromString('int64')->constInt($elementCount, false)
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($receiverObj, 'DOMElement', VmDom::PROP_CHILD_ELEMENT_COUNT),
+            $countJit,
+            Variable::TYPE_NATIVE_LONG
+        );
+        if ($firstElementObj === $lastElementObj || $elementCount < 2) {
+            return;
+        }
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($firstElementObj, 'DOMElement', VmDom::PROP_NEXT_ELEMENT_SIBLING),
+            $lastJit,
+            Variable::TYPE_VALUE
+        );
+        $objectType->propertyStore(
+            $objectType->propertySlotFor($lastElementObj, 'DOMElement', VmDom::PROP_PREVIOUS_ELEMENT_SIBLING),
+            $firstJit,
             Variable::TYPE_VALUE
         );
     }
