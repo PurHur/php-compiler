@@ -56,11 +56,15 @@ class Module extends ModuleAbstract
         $normalizer = IntlExtensionPolicy::advertisesNormalizer()
             ? [new normalizer_normalize(), new normalizer_is_normalized()]
             : [];
+        $idn = IntlExtensionPolicy::advertisesIdn()
+            ? [new idn_to_ascii(), new idn_to_utf8()]
+            : [];
 
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
             return [
                 ...$functions,
                 ...$normalizer,
+                ...$idn,
                 ...IntlExtensionPolicy::profileLocaleParserFunctions(),
             ];
         }
@@ -68,6 +72,7 @@ class Module extends ModuleAbstract
         return [
             ...$functions,
             ...$normalizer,
+            ...$idn,
             new grapheme_strlen(),
             new grapheme_substr(),
             new grapheme_strpos(),

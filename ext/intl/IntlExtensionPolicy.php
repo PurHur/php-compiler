@@ -44,6 +44,16 @@ final class IntlExtensionPolicy
         return true;
     }
 
+    /**
+     * idn_to_ascii()/idn_to_utf8() — partial ext/intl surface when libidn2 or host intl is reachable (#6169).
+     *
+     * Mirrors {@see advertisesNormalizer()}: function_exists without extension_loaded('intl').
+     */
+    public static function advertisesIdn(): bool
+    {
+        return VmIdn::available();
+    }
+
     /** grapheme_strlen/substr/strpos/extract/str_split — require loaded ext/intl (#17694, php-src ext/intl/php_intl.c). */
     public static function advertisesGraphemeCore(): bool
     {

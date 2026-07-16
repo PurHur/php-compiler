@@ -117,6 +117,9 @@ final class BuiltinByRefParams
                 return [2];
             case 'grapheme_extract':
                 return [4];
+            case 'idn_to_ascii':
+            case 'idn_to_utf8':
+                return [3];
             case 'sodium_crypto_secretstream_xchacha20poly1305_push':
             case 'sodium_crypto_secretstream_xchacha20poly1305_pull':
             case 'sodium_crypto_secretstream_xchacha20poly1305_rekey':
