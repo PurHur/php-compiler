@@ -32,12 +32,8 @@ final class mb_ucfirst extends Internal
                 $argc
             ));
         }
-        $string = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_ucfirst',
-            0,
-            'string'
-        );
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19433, mbstring.c).
+        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'mb_ucfirst', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
