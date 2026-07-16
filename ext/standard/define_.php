@@ -8,8 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
@@ -34,7 +32,7 @@ final class define_ extends Internal
         if (count($frame->calledArgs) < 2) {
             throw new \LogicException('define() requires at least two arguments');
         }
-        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'define', 0, 'constant_name');
+        $name = self::vmConstantNameArg($frame);
         self::rejectClassConstantName($name);
         $value = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->vmContext) {
@@ -61,15 +59,23 @@ final class define_ extends Internal
         if (\count($args) < 2) {
             throw new \LogicException('define() requires at least two arguments');
         }
-        if (JITVariable::TYPE_VALUE === $args[0]->type || JITVariable::TYPE_OBJECT === $args[0]->type) {
-            JitStringBuiltinArg::lower($context, $args[0], 'define', 0, 'constant_name');
-        }
         if (\count($args) >= 3
             && (JITVariable::TYPE_NATIVE_BOOL !== $args[2]->type || null === $args[2]->value->value)) {
             throw new \LogicException('define() case_insensitive must be a boolean literal in this compiler build');
         }
 
         return JitDefine::invoke($context, $args[0], $args[1]);
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19652, ext/standard/basic_functions.c). */
+    private static function vmConstantNameArg(Frame $frame): string
+    {
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'define',
+            0,
+            'constant_name'
+        );
     }
 
     public static function invokeLiteral(Context $context, string $name, JITVariable $valueArg): Value
