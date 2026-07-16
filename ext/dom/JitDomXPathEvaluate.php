@@ -41,7 +41,7 @@ final class JitDomXPathEvaluate
                 self::loadStringArg($context, $args[1])
             );
         }
-        if (null !== $expr && preg_match('~^(number|count)\(~i', $expr)) {
+        if (null !== $expr && preg_match('~^(number|count|sum)\(~i', $expr)) {
             DomXPathEvaluateRuntime::ensureDoubleLinked($context);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_xpath_evaluate_double_cont');
 
@@ -62,7 +62,7 @@ final class JitDomXPathEvaluate
             );
         }
 
-        throw new \LogicException('DOMXPath::evaluate() user-script AOT requires boolean()/count()/number()/string() literal');
+        throw new \LogicException('DOMXPath::evaluate() user-script AOT requires boolean()/count()/number()/sum()/string() literal');
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value
