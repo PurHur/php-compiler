@@ -143,8 +143,18 @@ final class DomParseSimpleXmlJitHelper
     /** First descendant element's concatenated text for //tag (#19352). */
     public static function firstTagTextArgv(string $xml, string $tag): ?string
     {
+        return self::nthTagTextArgv($xml, $tag, 1);
+    }
+
+    /** Nth (1-based) descendant element's text for //tag[n] (#19456). */
+    public static function nthTagTextArgv(string $xml, string $tag, int $position): ?string
+    {
+        if ($position < 1) {
+            return null;
+        }
         $tag = strtolower($tag);
         $needle = '<'.$tag;
+        $seen = 0;
         $offset = 0;
         while (false !== ($pos = stripos($xml, $needle, $offset))) {
             $after = $pos + \strlen($needle);
@@ -159,6 +169,11 @@ final class DomParseSimpleXmlJitHelper
             $gt = strpos($xml, '>', $pos);
             if (false === $gt) {
                 break;
+            }
+            ++$seen;
+            if ($seen !== $position) {
+                $offset = $pos + 1;
+                continue;
             }
             if ($gt > $pos && '/' === $xml[$gt - 1]) {
                 return '';

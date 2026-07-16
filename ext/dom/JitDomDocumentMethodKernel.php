@@ -1198,7 +1198,8 @@ final class JitDomDocumentMethodKernel
         }
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).$relativePath;
+        // File lives in ext/dom/ — two levels up is repo root (was 3 when under lib/JIT/Builtin/; #19496).
+        $path = \dirname(__DIR__, 2).$relativePath;
         NestedVmActiveContextLlvm::ensureMethod($context);
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), \basename($path));
