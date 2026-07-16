@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5226 |
-| Phase A inventory files (M2 ratio SSOT) | 5226 |
+| PHP files on vm.php path | 5234 |
+| Phase A inventory files (M2 ratio SSOT) | 5234 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14392 |
+| Source constructs flagged (warnings) | 14427 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3428,6 +3428,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/XsltProcessorTransformToDoc.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorTransformToXml.php` | 0 | 3 |
 | `ext/xsl/XsltRegistry.php` | 0 | 1 |
+| `ext/yaml/Module.php` | 0 | 5 |
+| `ext/yaml/VmYaml.php` | 0 | 23 |
+| `ext/yaml/YamlExtensionPolicy.php` | 0 | 1 |
+| `ext/yaml/YamlFunction.php` | 0 | 1 |
+| `ext/yaml/yaml_emit.php` | 0 | 1 |
+| `ext/yaml/yaml_emit_file.php` | 0 | 1 |
+| `ext/yaml/yaml_parse.php` | 0 | 1 |
+| `ext/yaml/yaml_parse_file.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/Module.php` | 0 | 9 |
 | `ext/zip/VmZipArchive.php` | 0 | 18 |
@@ -4547,7 +4555,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 92 |
+| `lib/Runtime.php` | 0 | 93 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -28019,6 +28027,72 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/yaml/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new yaml_parse (line 33)
+- new yaml_parse_file (line 34)
+- new yaml_emit (line 35)
+- new yaml_emit_file (line 36)
+- 2 class method(s)
+
+### `ext/yaml/VmYaml.php`
+
+**Warnings** (review for bootstrap subset):
+- new YamlSubsetParser (line 25)
+- new YamlParseException (line 234)
+- new YamlParseException (line 259)
+- new YamlParseException (line 267)
+- new YamlParseException (line 299)
+- new YamlParseException (line 339)
+- new YamlParseException (line 363)
+- new YamlParseException (line 368)
+- new YamlParseException (line 400)
+- new YamlParseException (line 404)
+- new YamlParseException (line 411)
+- new YamlFlowParser (line 445)
+- new YamlParseException (line 448)
+- new YamlParseException (line 507)
+- new YamlParseException (line 535)
+- new YamlParseException (line 546)
+- new YamlParseException (line 567)
+- new YamlParseException (line 573)
+- new YamlParseException (line 584)
+- new YamlParseException (line 595)
+- new YamlParseException (line 652)
+- new YamlParseException (line 668)
+- 27 class method(s)
+
+### `ext/yaml/YamlExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/yaml/YamlFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/yaml/yaml_emit.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/yaml/yaml_emit_file.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/yaml/yaml_parse.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/yaml/yaml_parse_file.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/zip/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
@@ -29404,7 +29478,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 194 class method(s)
+- 195 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -35475,30 +35549,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\random\Module (line 262)
 - new ext\igbinary\Module (line 263)
 - new ext\msgpack\Module (line 264)
-- new ext\zstd\Module (line 265)
-- new ext\lzf\Module (line 266)
-- new ext\bz2\Module (line 267)
-- new ext\brotli\Module (line 268)
-- new ext\sodium\Module (line 269)
-- new ext\sqlite3\Module (line 270)
-- new ext\phar\Module (line 271)
-- new ext\uri\Module (line 272)
-- new ext\uuid\Module (line 273)
-- new ext\uploadprogress\Module (line 274)
-- new ext\sysvshm\Module (line 275)
-- new ext\sysvsem\Module (line 276)
-- new ext\sysvmsg\Module (line 277)
-- new ext\standard\Module (line 278)
-- new JIT (line 354)
-- new JITContext (line 368)
-- new SealedClassPreprocessor (line 434)
-- new StaticClassPreprocessor (line 437)
-- new SourcePreprocessor\PropertyHooks (line 440)
-- new State (line 580)
-- new ReflectionProperty (line 607)
-- new ReflectionProperty (line 610)
-- new LintCompiler (line 1021)
-- new Variable (line 1151)
+- new ext\yaml\Module (line 265)
+- new ext\zstd\Module (line 266)
+- new ext\lzf\Module (line 267)
+- new ext\bz2\Module (line 268)
+- new ext\brotli\Module (line 269)
+- new ext\sodium\Module (line 270)
+- new ext\sqlite3\Module (line 271)
+- new ext\phar\Module (line 272)
+- new ext\uri\Module (line 273)
+- new ext\uuid\Module (line 274)
+- new ext\uploadprogress\Module (line 275)
+- new ext\sysvshm\Module (line 276)
+- new ext\sysvsem\Module (line 277)
+- new ext\sysvmsg\Module (line 278)
+- new ext\standard\Module (line 279)
+- new JIT (line 355)
+- new JITContext (line 369)
+- new SealedClassPreprocessor (line 435)
+- new StaticClassPreprocessor (line 438)
+- new SourcePreprocessor\PropertyHooks (line 441)
+- new State (line 581)
+- new ReflectionProperty (line 608)
+- new ReflectionProperty (line 611)
+- new LintCompiler (line 1022)
+- new Variable (line 1152)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
