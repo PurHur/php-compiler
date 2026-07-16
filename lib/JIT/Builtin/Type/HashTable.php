@@ -761,7 +761,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
-        $newNode = $this->context->memory->malloc($nodeType);
+        $newNode = $this->mallocZeroedNode($nodeType);
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_STRING | Refcount::TYPE_INFO_REFCOUNTED,
             false
@@ -871,7 +871,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
-        $newNode = $this->context->memory->malloc($nodeType);
+        $newNode = $this->mallocZeroedNode($nodeType);
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_STRING | Refcount::TYPE_INFO_REFCOUNTED,
             false
@@ -982,7 +982,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
-        $newNode = $this->context->memory->malloc($nodeType);
+        $newNode = $this->mallocZeroedNode($nodeType);
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_STRING | Refcount::TYPE_INFO_REFCOUNTED,
             false
@@ -1093,7 +1093,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
-        $newNode = $this->context->memory->malloc($nodeType);
+        $newNode = $this->mallocZeroedNode($nodeType);
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_STRING | Refcount::TYPE_INFO_REFCOUNTED,
             false
@@ -1204,7 +1204,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
-        $newNode = $this->context->memory->malloc($nodeType);
+        $newNode = $this->mallocZeroedNode($nodeType);
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_STRING | Refcount::TYPE_INFO_REFCOUNTED,
             false
@@ -1312,7 +1312,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
-        $newNode = $this->context->memory->malloc($nodeType);
+        $newNode = $this->mallocZeroedNode($nodeType);
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_STRING | Refcount::TYPE_INFO_REFCOUNTED,
             false
@@ -1420,7 +1420,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__strkey_node__');
-        $newNode = $this->context->memory->malloc($nodeType);
+        $newNode = $this->mallocZeroedNode($nodeType);
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_STRING | Refcount::TYPE_INFO_REFCOUNTED,
             false
@@ -1673,7 +1673,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__objkey_node__');
-        $newNode = $this->context->memory->malloc($nodeType);
+        $newNode = $this->mallocZeroedNode($nodeType);
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
             false
@@ -1747,7 +1747,7 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($prepend);
         $nodeType = $this->context->getTypeFromString('__objkey_node__');
-        $newNode = $this->context->memory->malloc($nodeType);
+        $newNode = $this->mallocZeroedNode($nodeType);
         $typeinfo = $this->context->getTypeFromString('int32')->constInt(
             Refcount::TYPE_INFO_TYPE_OBJECT | Refcount::TYPE_INFO_REFCOUNTED,
             false
@@ -2989,6 +2989,33 @@ class HashTable extends Type
 
         $this->context->builder->positionAtEnd($done);
         $this->context->builder->returnVoid();
+    }
+
+    /**
+     * Fresh strkey/objkey nodes must be zeroed before writeString/writeNull.
+     * Those helpers always valueDelref first; a non-zero garbage type byte
+     * frees an invalid pointer (munmap_chunk) — environ-sensitive (#19627).
+     */
+    private function mallocZeroedNode(PHPLLVM\Type $nodeType): PHPLLVM\Value
+    {
+        $newNode = $this->context->memory->malloc($nodeType);
+        $i8p = $this->context->getTypeFromString('int8*');
+        $zeroI8 = $this->context->getTypeFromString('int8')->constInt(0, false);
+        $size = $this->context->builder->ptrToInt(
+            $this->context->builder->gep(
+                $nodeType->pointerType(0)->constNull(),
+                $this->context->context->int32Type()->constInt(1, false)
+            ),
+            $this->context->getTypeFromString('size_t')
+        );
+        $this->context->intrinsic->memset(
+            $this->context->builder->pointerCast($newNode, $i8p),
+            $zeroI8,
+            $size,
+            false
+        );
+
+        return $newNode;
     }
 
     private function updateIndexMetadata(
