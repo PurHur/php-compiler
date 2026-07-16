@@ -172,7 +172,8 @@ final class VmPrintR
             $lines = ["{$className} Object\n", "{$openSpaces}(\n"];
             foreach ($props as $name => $value) {
                 $formatted = self::formatNested($vm, $value->resolveIndirect(), $level + 1, $frame, $visited);
-                $lines[] = "{$keySpaces}[{$name}] => ".$formatted."\n";
+                $propLabel = VmDebugPropertyName::formatForPrintR((string) $name);
+                $lines[] = "{$keySpaces}{$propLabel} => ".$formatted."\n";
             }
             $lines[] = "{$openSpaces})\n";
 

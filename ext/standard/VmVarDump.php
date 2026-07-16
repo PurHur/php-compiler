@@ -121,7 +121,7 @@ final class VmVarDump
         self::write('object('.$className.')#'.$object->id.' ('.$count.") {\n");
         foreach ($props as $name => $value) {
             self::write(str_repeat(' ', $level));
-            self::write('["'.$name."\"]=>\n");
+            self::write(VmDebugPropertyName::formatForVarDump((string) $name)."=>\n");
             self::dumpVariable($vm, $value, $level + 1, true, $frame);
         }
         if ($level > 1) {
