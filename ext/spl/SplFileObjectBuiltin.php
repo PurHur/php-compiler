@@ -650,12 +650,7 @@ final class SplFileObjectFputcsv extends VmClassMethod
         }
         $fields = VmFputcsv::coerceFieldList($fieldsVar->toArray()->iterate(true));
         $handle = SplFileObjectStorage::handle($object);
-        if ("\n" === $eol) {
-            $written = VmFs::fputcsv($handle, $fields, $separator, $enclosure, $escape);
-        } else {
-            $line = VmCsv::formatLine($fields, $separator, $enclosure, $escape).$eol;
-            $written = VmFs::fwrite($handle, $line);
-        }
+        $written = VmFs::fputcsv($handle, $fields, $separator, $enclosure, $escape, $eol);
         if (false === $written) {
             $frame->returnVar->bool(false);
 

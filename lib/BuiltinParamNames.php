@@ -187,7 +187,7 @@ final class BuiltinParamNames
             case 'fputs':
                 return ['stream', 'data', 'length'];
             case 'fputcsv':
-                return ['stream', 'fields', 'separator', 'enclosure', 'escape'];
+                return ['stream', 'fields', 'separator', 'enclosure', 'escape', 'eol'];
             case 'stream_context_create':
                 return ['options', 'params'];
             case 'stream_copy_to_stream':

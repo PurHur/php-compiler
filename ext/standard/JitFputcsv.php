@@ -21,6 +21,7 @@ final class JitFputcsv
         Value $separatorStr,
         Value $enclosureStr,
         Value $escapeStr,
+        Value $eolStr,
     ): Value {
         $strPtr = $context->getTypeFromString('__string__*');
         $nullStr = $strPtr->constNull();
@@ -42,15 +43,13 @@ final class JitFputcsv
 
         $defaultEnc = $context->builder->load($context->constantStringFromString('"'));
         $defaultEsc = $context->builder->load($context->constantStringFromString('\\'));
+        $defaultEol = $context->builder->load($context->constantStringFromString("\n"));
         $encPhi = self::optionalCsvStringPhi($context, $enclosureStr, $defaultEnc, 'fputcsv_enc');
         $escPhi = self::optionalCsvStringPhi($context, $escapeStr, $defaultEsc, 'fputcsv_esc');
+        $eolPhi = self::optionalCsvStringPhi($context, $eolStr, $defaultEol, 'fputcsv_eol');
 
         $line = FputcsvRuntime::formatFields($context, $fieldsHt, $gluePhi, $encPhi, $escPhi);
-        $lineWithNl = JitStringConcat::concat(
-            $context,
-            $line,
-            $context->builder->load($context->constantStringFromString("\n"))
-        );
+        $lineWithNl = JitStringConcat::concat($context, $line, $eolPhi);
         $i64 = $context->getTypeFromString('int64');
 
         return JitFwrite::invoke($context, $handleLong, $lineWithNl, JitFwrite::lengthWriteAll($context, $lineWithNl));

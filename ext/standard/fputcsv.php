@@ -33,9 +33,9 @@ final class fputcsv extends Internal
             throw new \LogicException('fputcsv() requires at least stream and fields arguments in this compiler build');
         }
         foreach (\array_keys($frame->calledArgs) as $idx) {
-            if ($idx < 0 || $idx > 4) {
+            if ($idx < 0 || $idx > 5) {
                 throw new \ArgumentCountError(\sprintf(
-                    'fputcsv() expects at most 5 arguments, %d given',
+                    'fputcsv() expects at most 6 arguments, %d given',
                     $idx + 1
                 ));
             }
@@ -47,6 +47,7 @@ final class fputcsv extends Internal
         $separator = ',';
         $enclosure = '"';
         $escape = '\\';
+        $eol = "\n";
         if (isset($frame->calledArgs[2])) {
             $separator = VmReflection::stringArg($frame->calledArgs[2], 'fputcsv() separator', 2);
         }
@@ -56,6 +57,9 @@ final class fputcsv extends Internal
         if (isset($frame->calledArgs[4])) {
             $escape = VmReflection::stringArg($frame->calledArgs[4], 'fputcsv() escape', 4);
         }
+        if (isset($frame->calledArgs[5])) {
+            $eol = VmReflection::stringArg($frame->calledArgs[5], 'fputcsv() eol', 5);
+        }
         VmCsvArg::validateFputcsvOptions($separator, $enclosure, $escape);
         $fields = VmFputcsv::coerceFieldList($fieldsHt->iterate(true));
         $written = VmFs::fputcsv(
@@ -63,7 +67,8 @@ final class fputcsv extends Internal
             $fields,
             $separator,
             $enclosure,
-            $escape
+            $escape,
+            $eol
         );
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($written): void {
             if (false === $written) {
@@ -80,8 +85,8 @@ final class fputcsv extends Internal
         if (\count($args) < 2) {
             throw new \LogicException('fputcsv() requires at least stream and fields arguments in this compiler build');
         }
-        if (\count($args) > 5) {
-            throw new \LogicException('fputcsv() expects at most 5 arguments');
+        if (\count($args) > 6) {
+            throw new \LogicException('fputcsv() expects at most 6 arguments');
         }
         $compileTimeFailure = $this->emitCompileTimeCsvValidationFailure($context, ...$args);
         if (null !== $compileTimeFailure) {
@@ -103,6 +108,7 @@ final class fputcsv extends Internal
         $separator = $strPtr->constNull();
         $enclosure = $strPtr->constNull();
         $escape = $strPtr->constNull();
+        $eol = $strPtr->constNull();
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             $separator = JitStringArg::lower($context, $args[2], 'fputcsv() separator');
         }
@@ -112,8 +118,11 @@ final class fputcsv extends Internal
         if (isset($args[4]) && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
             $escape = JitStringArg::lower($context, $args[4], 'fputcsv() escape');
         }
+        if (isset($args[5]) && !NamedOptionalCallArgs::isOmittedOptional($args[5])) {
+            $eol = JitStringArg::lower($context, $args[5], 'fputcsv() eol');
+        }
 
-        return JitFputcsv::invoke($context, $handle, $fields, $separator, $enclosure, $escape);
+        return JitFputcsv::invoke($context, $handle, $fields, $separator, $enclosure, $escape, $eol);
     }
 
     private function loadFields(Context $context, JITVariable $arg): Value
