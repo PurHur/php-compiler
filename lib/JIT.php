@@ -8353,12 +8353,32 @@ class JIT {
                                     $classId
                                 );
                             }
-                            $value = $this->context->type->object->classConstFetch(
-                                $classId,
-                                $nameOp->value,
-                                $block,
-                                $classOp instanceof Operand\Literal && \is_string($classOp->value) ? $classOp->value : null
-                            );
+                            try {
+                                $value = $this->context->type->object->classConstFetch(
+                                    $classId,
+                                    $nameOp->value,
+                                    $block,
+                                    $classOp instanceof Operand\Literal && \is_string($classOp->value) ? $classOp->value : null
+                                );
+                            } catch (\LogicException $e) {
+                                // Runtime Error for missing / non-inherited private parent const (#19615).
+                                if (!str_starts_with($e->getMessage(), 'Undefined constant ')) {
+                                    throw $e;
+                                }
+                                $message = $e->getMessage();
+                                JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
+                                JIT\Builtin\ErrorRaise::ensureLinked($this->context);
+                                $resultOp = $block->getOperand($op->arg1);
+                                $nullLit = new Operand\Literal(null);
+                                $nullLit->type = Type::null();
+                                $this->assignOperand($resultOp, JIT\Variable::fromLiteral($this->context, $nullLit));
+                                if ([] !== $this->context->tryCatch->handlerStack) {
+                                    JIT\TryCatchHelper::emitCatchableErrorMessage($this->context, $this, $message);
+                                } else {
+                                    JIT\Builtin\ErrorRaise::emitRaise($this->context, $message);
+                                }
+                                break;
+                            }
                             $resultOp = $block->getOperand($op->arg1);
                             if ($this->context->type->object->isEnumClassId($classId)
                                 && $classOp instanceof Operand\Literal) {

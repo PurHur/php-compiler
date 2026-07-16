@@ -206,12 +206,32 @@ trait ClassConstFetchHelperTrait
                 }
             }
 
-            return $objectType->classConstFetch(
-                $classId,
-                $literal,
-                $block,
-                $classOp instanceof Operand\Literal && \is_string($classOp->value) ? $classOp->value : null
-            );
+            try {
+                return $objectType->classConstFetch(
+                    $classId,
+                    $literal,
+                    $block,
+                    $classOp instanceof Operand\Literal && \is_string($classOp->value) ? $classOp->value : null
+                );
+            } catch (\LogicException $e) {
+                if (null === $jit || !str_starts_with($e->getMessage(), 'Undefined constant ')) {
+                    throw $e;
+                }
+                // Runtime Error for missing / private-on-parent const (#19615).
+                $context = $objectType->jitContext();
+                ErrorRaise::registerDeclarations($context);
+                ErrorRaise::ensureLinked($context);
+                $nullLit = new \PHPCfg\Operand\Literal(null);
+                $nullLit->type = \PHPTypes\Type::null();
+                $dummy = Variable::fromLiteral($context, $nullLit);
+                if ([] !== $context->tryCatch->handlerStack) {
+                    TryCatchHelper::emitCatchableErrorMessage($context, $jit, $e->getMessage());
+                } else {
+                    ErrorRaise::emitRaise($context, $e->getMessage());
+                }
+
+                return $dummy;
+            }
         }
 
         $context = $objectType->jitContext();

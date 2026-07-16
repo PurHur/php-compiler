@@ -24,13 +24,18 @@ final class ClassConstVisibilityJitGuard
         int $classId,
         string $constName
     ): void {
-        $vis = $objectType->constVisibility($classId, $constName);
+        $holdingId = $objectType->resolveClassConstHoldingId($classId, strtolower($constName));
+        if (null === $holdingId) {
+            // Missing / private-on-parent: classConstFetch throws; JIT.php emits runtime Error (#19615).
+            return;
+        }
+        $vis = $objectType->constVisibility($holdingId, $constName);
         if (MethodVisibility::isPublic($vis)) {
             return;
         }
 
         $context = $objectType->jitContext();
-        $declaringClass = $objectType->classNameForId($classId);
+        $declaringClass = $objectType->classNameForId($holdingId);
         $declaringLc = strtolower(ltrim($declaringClass, '\\'));
         $callerLc = self::callerClassLc($context, $block);
         try {
