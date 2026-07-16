@@ -2011,9 +2011,10 @@ final class VmFs
         string $separator = ',',
         string $enclosure = '"',
         string $escape = '\\',
+        string $eol = "\n",
     ) {
         if (self::isNativeCsvStreamHandle($handle)) {
-            $line = VmCsv::formatLine($fields, $separator, $enclosure, $escape)."\n";
+            $line = VmCsv::formatLine($fields, $separator, $enclosure, $escape).$eol;
             $written = self::fwrite($handle, $line);
             if (false === $written) {
                 return false;
@@ -2025,7 +2026,8 @@ final class VmFs
         if (null === $fp) {
             return false;
         }
-        $written = @\fputcsv($fp, $fields, $separator, $enclosure, $escape);
+        // php-src 8.1+: php_fputcsv(..., eol) — pass through when host supports it (#19368).
+        $written = @\fputcsv($fp, $fields, $separator, $enclosure, $escape, $eol);
         if (false === $written) {
             return false;
         }
