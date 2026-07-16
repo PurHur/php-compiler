@@ -45,6 +45,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_create_element_ns.phpt',
             'dom_create_element_ns.phpt'
         );
+        yield 'dom_create_element_ns_savexml_xmlns.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_create_element_ns_savexml_xmlns.phpt',
+            'dom_create_element_ns_savexml_xmlns.phpt'
+        );
         yield 'dom_element_tag_name.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_element_tag_name.phpt',
             'dom_element_tag_name.phpt'
