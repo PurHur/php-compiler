@@ -2236,6 +2236,12 @@ class Compiler {
                         }
                         $block = $this->compileNullsafePropertyFetch($child, $block);
                         $this->syncNullsafePropertyFetchResultToFollowingFuncCallArg($child, $block);
+                    } elseif (
+                        $child instanceof Op\Expr\NullsafeMethodCall
+                        && $this->shouldSkipNullsafeMethodCallForCoalesce($child, $ops, $i, $block)
+                    ) {
+                        // Lowered inside compileCoalesce nullsafe method eval (#19591).
+                        break;
                     } elseif ($child instanceof Op\Expr\NullsafeMethodCall) {
                         $block = $this->compileNullsafeMethodCall(
                             $child,
@@ -3241,7 +3247,14 @@ class Compiler {
         }
         $coalesces = $this->findEmbeddedCoalesces($op->expr);
         if ([] === $coalesces) {
-            $coalesces = $this->findBlockCoalescesBeforeIndex($ops, $echoIndex);
+            // Block-scan fallback: only pending ?? — already-merged ones rewind CFG to a
+            // prior merge and strand later nullsafe/?? after TYPE_NULLSAFE (#19591 / #18455).
+            foreach ($this->findBlockCoalescesBeforeIndex($ops, $echoIndex) as $candidate) {
+                if (isset($this->coalesceMergeBlocks[spl_object_id($candidate)])) {
+                    continue;
+                }
+                $coalesces[] = $candidate;
+            }
         }
         if ([] === $coalesces) {
             return null;
@@ -5462,6 +5475,38 @@ class Compiler {
     }
 
     /**
+     * php-cfg Temporary.original is often null; locate NullsafeMethodCall by result operand (#19591).
+     *
+     * @return ?Op\Expr\NullsafeMethodCall
+     */
+    protected function findNullsafeMethodCallProducing(?Operand $operand, Block $block): ?Op\Expr\NullsafeMethodCall
+    {
+        if (null === $operand || null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if (
+                $child instanceof Op\Expr\NullsafeMethodCall
+                && (
+                    $child->result === $operand
+                    || $this->operandsChainEqual($child->result, $operand)
+                )
+            ) {
+                return $child;
+            }
+        }
+        if ($operand instanceof Temporary && null !== $operand->original) {
+            if ($operand->original instanceof Op\Expr\NullsafeMethodCall) {
+                return $operand->original;
+            }
+
+            return $this->findNullsafeMethodCallProducing($operand->original, $block);
+        }
+
+        return null;
+    }
+
+    /**
      * @param Op[] $ops
      */
     protected function shouldSkipNullsafePropertyFetchForIssetOrEmpty(
@@ -5519,6 +5564,34 @@ class Compiler {
     }
 
     /**
+     * Defer $a->b?->m() when it feeds a following ?? so coalesce can continue on the
+     * nullsafe merge block (#19591).
+     *
+     * @param Op[] $ops
+     */
+    protected function shouldSkipNullsafeMethodCallForCoalesce(
+        Op\Expr\NullsafeMethodCall $call,
+        array $ops,
+        int $index,
+        Block $block
+    ): bool {
+        for ($j = $index + 1, $count = count($ops); $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
+                return $this->operandsChainEqual($next->left, $call->result)
+                    || $next->left === $call->result;
+            }
+            if ($next instanceof Op\Expr\NullsafePropertyFetch || $next instanceof Op\Expr\NullsafeMethodCall) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
      * php-cfg lowers $a->b?->v as PropertyFetch then NullsafePropertyFetch — skip eager fetch (#16637).
      *
      * @param Op[] $ops
@@ -5533,7 +5606,15 @@ class Compiler {
         }
         $next = $ops[$index + 1];
 
-        return $next instanceof Op\Expr\NullsafePropertyFetch
+        if (
+            $next instanceof Op\Expr\NullsafePropertyFetch
+            && $this->operandsChainEqual($next->var, $fetch->result)
+        ) {
+            return true;
+        }
+
+        // $a->b?->m() — receiver fetch is emitted inside compileNullsafeMethodCall / coalesce (#19591).
+        return $next instanceof Op\Expr\NullsafeMethodCall
             && $this->operandsChainEqual($next->var, $fetch->result);
     }
 
@@ -11171,6 +11252,9 @@ class Compiler {
 
                 return [];
             case Op\Expr\NullsafeMethodCall::class:
+                if (null !== $this->slotForNullsafeResult($block, $expr)) {
+                    return [];
+                }
                 $this->compileNullsafeMethodCall($expr, $block);
 
                 return [];
@@ -11866,14 +11950,28 @@ class Compiler {
             ? $this->collectNullsafePropertyFetchChain($expr->left, $block)
             : [];
         $preEvaluatedNullsafeChain = [] !== $nullsafeChain;
+        $preEvaluatedNullsafeMethod = null;
         if ($preEvaluatedNullsafeChain) {
             $block = $this->compileNullsafePropertyFetchChainEval($nullsafeChain, $block, true);
+        } else {
+            $nullsafeMethod = null !== $expr->left
+                ? $this->findNullsafeMethodCallProducing($expr->left, $block)
+                : null;
+            if (null !== $nullsafeMethod) {
+                $nullsafeId = spl_object_id($nullsafeMethod);
+                if (!isset($this->nullsafeResultSlots[$nullsafeId])) {
+                    $block = $this->compileNullsafeMethodCall($nullsafeMethod, $block);
+                } elseif (isset($this->nullsafeMergeBlocks[$nullsafeId])) {
+                    $block = $this->nullsafeMergeBlocks[$nullsafeId];
+                }
+                $preEvaluatedNullsafeMethod = $nullsafeMethod;
+            }
         }
         // php-cfg may mark the ?? result dead while it is still assigned on branch blocks (#99).
         if ($resultOperand instanceof Operand\Temporary && [] === $resultOperand->usages) {
             $resultOperand->usages[] = $resultOperand;
         }
-        if (null === $expr->left || $preEvaluatedNullsafeChain) {
+        if (null === $expr->left || $preEvaluatedNullsafeChain || null !== $preEvaluatedNullsafeMethod) {
             $propFetch = null;
             $staticPropFetch = null;
             $dimFetch = null;
@@ -11938,6 +12036,8 @@ class Compiler {
             if ($preEvaluatedNullsafeChain) {
                 $lastFetch = $nullsafeChain[count($nullsafeChain) - 1];
                 $evaluatedLeftSlot = $this->compileOperand($lastFetch->result, $block, false);
+            } elseif (null !== $preEvaluatedNullsafeMethod) {
+                $evaluatedLeftSlot = $this->compileOperand($preEvaluatedNullsafeMethod->result, $block, false);
             } else {
                 $evaluatedLeftSlot = $this->compileOperand($expr->left, $block, true);
             }
@@ -12742,10 +12842,12 @@ class Compiler {
         $fetchBlock = new Block($block->orig);
         $fetchBlock->inheritUndefinedLocals = true;
         $fetchBlock->inheritScopeFrom($block);
+        // Use the same receiver slot NULLSAFE branched on — Temporary.original is often
+        // null after type passes, so re-compileOperand($expr->var) can bind a dead slot (#19591).
         $nullsafePropertyFetch = new OpCode(
             OpCode::TYPE_PROPERTY_FETCH,
             $this->compileOperand($expr->result, $fetchBlock, false),
-            $this->compileOperand($expr->var, $fetchBlock, true),
+            $receiverSlot,
             $this->compileOperand($expr->name, $fetchBlock, true)
         );
         $nullsafePropertyFetch->nullsafeFetchPropertyRead = true;
@@ -12792,6 +12894,9 @@ class Compiler {
 
     /**
      * Bind a ?-> receiver without reading typed slots (#5220, $a->b?->v).
+     *
+     * php-cfg Temporary.original is often cleared by type reconstruction; when the preceding
+     * PropertyFetch was skipped (#16637), recover it from the CFG block (#19591).
      */
     private function compileNullsafeReceiverSlot(
         ?Operand $var,
@@ -12802,6 +12907,9 @@ class Compiler {
             throw new \LogicException('Nullsafe property fetch requires a receiver operand');
         }
         $propFetch = $this->unwrapPropertyFetch($var);
+        if (null === $propFetch) {
+            $propFetch = $this->findCoalescePropertyFetch($var, $block);
+        }
         if (null !== $propFetch) {
             $receiverSlot = $this->compileOperand($propFetch->result, $block, false);
             $receiverFetch = new OpCode(
@@ -13004,7 +13112,8 @@ class Compiler {
     ): Block
     {
         $resultSlot = $this->compileOperand($expr->result, $block, false);
-        $receiverSlot = $this->compileOperand($expr->var, $block, true);
+        // Same receiver binding as nullsafe property — Temporary.original is often null (#19591).
+        $receiverSlot = $this->compileNullsafeReceiverSlot($expr->var, $block, false);
 
         $endBlock = new Block($block->orig);
         $endBlock->inheritUndefinedLocals = true;
@@ -13034,7 +13143,7 @@ class Compiler {
         }
         $fetchBlock->addOpCode(new OpCode(
             OpCode::TYPE_METHODCALL_INIT,
-            $this->compileOperand($expr->var, $fetchBlock, true),
+            $receiverSlot,
             $this->compileOperand($expr->name, $fetchBlock, true)
         ));
         foreach ($this->compileCallArgSends($expr->args, $fetchBlock, null, $expr) as $send) {
