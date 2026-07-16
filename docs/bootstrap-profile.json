@@ -441,9 +441,11 @@
         "ext/gd/VmGdAvif.php",
         "ext/gd/VmGdPng.php",
         "ext/gd/VmGdWebp.php",
+        "ext/gd/imagealphablending.php",
         "ext/gd/imageavif.php",
         "ext/gd/imagechar.php",
         "ext/gd/imagecolorallocate.php",
+        "ext/gd/imagecolorallocatealpha.php",
         "ext/gd/imagecolorat.php",
         "ext/gd/imagecopy.php",
         "ext/gd/imagecopymerge.php",
@@ -462,6 +464,7 @@
         "ext/gd/imageflip.php",
         "ext/gd/imageline.php",
         "ext/gd/imagepng.php",
+        "ext/gd/imagesavealpha.php",
         "ext/gd/imagesetpixel.php",
         "ext/gd/imagestring.php",
         "ext/gd/imagesx.php",
@@ -5410,9 +5413,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5176,
+        "inventory_files": 5179,
         "excluded": 0,
-        "eligible": 5176,
+        "eligible": 5179,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
