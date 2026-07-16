@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -36,7 +35,8 @@ final class strtotime extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $time = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'strtotime', 'datetime');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19651, ext/date/php_date.c)
+        $time = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'strtotime', 0, 'datetime');
         $now = null;
         if (2 === $argc) {
             $baseVar = $frame->calledArgs[1]->resolveIndirect();
