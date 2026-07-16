@@ -6,15 +6,27 @@ namespace PHPCompiler\ext\gmp;
 
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
+use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
 
-/** gmp extension module entry (php-src ext/gmp/gmp.c; issues #3341, #19527, #19539). */
+/** gmp extension module entry (php-src ext/gmp/gmp.c; issues #3341, #19527, #19539, #19540). */
 class Module extends ModuleAbstract
 {
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
         VmGmpObject::registerClass($runtime->vmContext);
+        foreach ([
+            'GMP_MSW_FIRST' => VmGmp::GMP_MSW_FIRST,
+            'GMP_LSW_FIRST' => VmGmp::GMP_LSW_FIRST,
+            'GMP_LITTLE_ENDIAN' => VmGmp::GMP_LITTLE_ENDIAN,
+            'GMP_BIG_ENDIAN' => VmGmp::GMP_BIG_ENDIAN,
+            'GMP_NATIVE_ENDIAN' => VmGmp::GMP_NATIVE_ENDIAN,
+        ] as $name => $value) {
+            $var = new VM\Variable();
+            $var->int($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
     }
 
     public static function registerClasses(Context $ctx): void
@@ -50,6 +62,11 @@ class Module extends ModuleAbstract
             new gmp_sqrtrem(),
             new gmp_perfect_square(),
             new gmp_com(),
+            new gmp_random_seed(),
+            new gmp_random_bits(),
+            new gmp_random_range(),
+            new gmp_import(),
+            new gmp_export(),
         ];
     }
 }

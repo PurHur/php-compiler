@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5121 |
-| Phase A inventory files (M2 ratio SSOT) | 5121 |
+| PHP files on vm.php path | 5126 |
+| Phase A inventory files (M2 ratio SSOT) | 5126 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13918 |
+| Source constructs flagged (warnings) | 13934 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -467,7 +467,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gettext/textdomain.php` | 0 | 2 |
 | `ext/gmp/GmpFunction.php` | 0 | 1 |
 | `ext/gmp/GmpToString.php` | 0 | 1 |
-| `ext/gmp/Module.php` | 0 | 26 |
+| `ext/gmp/Module.php` | 0 | 32 |
 | `ext/gmp/VmGmp.php` | 0 | 5 |
 | `ext/gmp/VmGmpObject.php` | 0 | 7 |
 | `ext/gmp/gmp_abs.php` | 0 | 2 |
@@ -478,8 +478,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gmp/gmp_div_q.php` | 0 | 2 |
 | `ext/gmp/gmp_div_qr.php` | 0 | 3 |
 | `ext/gmp/gmp_div_r.php` | 0 | 2 |
+| `ext/gmp/gmp_export.php` | 0 | 2 |
 | `ext/gmp/gmp_fact.php` | 0 | 2 |
 | `ext/gmp/gmp_gcd.php` | 0 | 2 |
+| `ext/gmp/gmp_import.php` | 0 | 2 |
 | `ext/gmp/gmp_init.php` | 0 | 2 |
 | `ext/gmp/gmp_intval.php` | 0 | 2 |
 | `ext/gmp/gmp_lcm.php` | 0 | 2 |
@@ -490,6 +492,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gmp/gmp_perfect_square.php` | 0 | 2 |
 | `ext/gmp/gmp_pow.php` | 0 | 2 |
 | `ext/gmp/gmp_powm.php` | 0 | 2 |
+| `ext/gmp/gmp_random_bits.php` | 0 | 2 |
+| `ext/gmp/gmp_random_range.php` | 0 | 2 |
+| `ext/gmp/gmp_random_seed.php` | 0 | 2 |
 | `ext/gmp/gmp_sqrt.php` | 0 | 2 |
 | `ext/gmp/gmp_sqrtrem.php` | 0 | 2 |
 | `ext/gmp/gmp_strval.php` | 0 | 2 |
@@ -8107,41 +8112,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gmp/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new gmp_init (line 28)
-- new gmp_add (line 29)
-- new gmp_sub (line 30)
-- new gmp_mul (line 31)
-- new gmp_cmp (line 32)
-- new gmp_strval (line 33)
-- new gmp_pow (line 34)
-- new gmp_mod (line 35)
-- new gmp_div_q (line 36)
-- new gmp_div_r (line 37)
-- new gmp_div_qr (line 38)
-- new gmp_abs (line 39)
-- new gmp_neg (line 40)
-- new gmp_and (line 41)
-- new gmp_or (line 42)
-- new gmp_xor (line 43)
-- new gmp_intval (line 44)
-- new gmp_powm (line 45)
-- new gmp_fact (line 46)
-- new gmp_gcd (line 47)
-- new gmp_lcm (line 48)
-- new gmp_sqrt (line 49)
-- new gmp_sqrtrem (line 50)
-- new gmp_perfect_square (line 51)
-- new gmp_com (line 52)
+- new VM\Variable (line 26)
+- new gmp_init (line 40)
+- new gmp_add (line 41)
+- new gmp_sub (line 42)
+- new gmp_mul (line 43)
+- new gmp_cmp (line 44)
+- new gmp_strval (line 45)
+- new gmp_pow (line 46)
+- new gmp_mod (line 47)
+- new gmp_div_q (line 48)
+- new gmp_div_r (line 49)
+- new gmp_div_qr (line 50)
+- new gmp_abs (line 51)
+- new gmp_neg (line 52)
+- new gmp_and (line 53)
+- new gmp_or (line 54)
+- new gmp_xor (line 55)
+- new gmp_intval (line 56)
+- new gmp_powm (line 57)
+- new gmp_fact (line 58)
+- new gmp_gcd (line 59)
+- new gmp_lcm (line 60)
+- new gmp_sqrt (line 61)
+- new gmp_sqrtrem (line 62)
+- new gmp_perfect_square (line 63)
+- new gmp_com (line 64)
+- new gmp_random_seed (line 65)
+- new gmp_random_bits (line 66)
+- new gmp_random_range (line 67)
+- new gmp_import (line 68)
+- new gmp_export (line 69)
 - 3 class method(s)
 
 ### `ext/gmp/VmGmp.php`
 
 **Warnings** (review for bootstrap subset):
-- new DivisionByZeroError (line 253)
-- new DivisionByZeroError (line 281)
-- new DivisionByZeroError (line 359)
-- new DivisionByZeroError (line 715)
-- 53 class method(s)
+- new DivisionByZeroError (line 261)
+- new DivisionByZeroError (line 289)
+- new DivisionByZeroError (line 367)
+- new DivisionByZeroError (line 885)
+- 61 class method(s)
 
 ### `ext/gmp/VmGmpObject.php`
 
@@ -8203,6 +8214,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 22)
 - 1 class method(s)
 
+### `ext/gmp/gmp_export.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_fact.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8213,6 +8230,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_import.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
 - 1 class method(s)
 
 ### `ext/gmp/gmp_init.php`
@@ -8273,6 +8296,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_random_bits.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/gmp/gmp_random_range.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/gmp/gmp_random_seed.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/gmp/gmp_sqrt.php`

@@ -9,17 +9,25 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmStreamArg;
 
 /**
- * GMP integer semantics in PHP (php-src ext/gmp/gmp.c; issues #3341, #19527, #19539).
+ * GMP integer semantics in PHP (php-src ext/gmp/gmp.c; issues #3341, #19527, #19539, #19540).
  *
- * Phase 1: decimal/hex init, add/sub/mul/cmp/strval.
- * Phase 2: pow/mod/div/abs/neg/bitwise/intval.
- * Phase 3: powm/fact/gcd/lcm/sqrt/sqrtrem/perfect_square/com — no runtime/*.c growth.
+ * Phase 1–3: arithmetic + bit ops.
+ * Phase 4: seedable random + import/export — no runtime/*.c growth.
  */
 final class VmGmp
 {
     public const CLASS_LC = 'gmp';
 
     public const PROP_VALUE = 'num';
+
+    public const GMP_MSW_FIRST = 1;
+    public const GMP_LSW_FIRST = 2;
+    public const GMP_LITTLE_ENDIAN = 4;
+    public const GMP_BIG_ENDIAN = 8;
+    public const GMP_NATIVE_ENDIAN = 16;
+
+    /** @var int xorshift64 state (never 0) */
+    private static int $rngState = 1;
 
     public static function isAvailable(): bool
     {
@@ -478,6 +486,168 @@ final class VmGmp
     public static function com(string $a): string
     {
         return self::sub(self::neg($a), '1');
+    }
+
+    public static function randomSeed(string $seed): void
+    {
+        $normalized = self::normalizeSignedDecimal($seed);
+        $bits = self::toTwosComplementBits($normalized, 64);
+        $state = 0;
+        for ($i = 0; $i < 64; ++$i) {
+            $state = ($state << 1) | ('1' === $bits[$i] ? 1 : 0);
+        }
+        if (0 === $state) {
+            $state = 1;
+        }
+        self::$rngState = $state;
+    }
+
+    public static function randomBits(int $bits): string
+    {
+        if ($bits < 1) {
+            throw new \ValueError('gmp_random_bits(): Argument #1 ($bits) must be greater than or equal to 1');
+        }
+        $acc = '0';
+        $remaining = $bits;
+        while ($remaining > 0) {
+            $chunk = min(32, $remaining);
+            $r = self::nextRngUint32();
+            if ($chunk < 32) {
+                $r &= (1 << $chunk) - 1;
+            }
+            $acc = self::add(self::mul($acc, self::pow('2', $chunk)), (string) $r);
+            $remaining -= $chunk;
+        }
+
+        return $acc;
+    }
+
+    public static function randomRange(string $min, string $max): string
+    {
+        $a = self::normalizeSignedDecimal($min);
+        $b = self::normalizeSignedDecimal($max);
+        if (self::cmp($a, $b) > 0) {
+            throw new \ValueError('gmp_random_range(): Argument #1 ($min) must be less than or equal to argument #2 ($max)');
+        }
+        if ($a === $b) {
+            return $a;
+        }
+        $span = self::add(self::sub($b, $a), '1');
+        // Rejection sampling with enough bits for span
+        $bits = max(1, self::bitLengthMagnitude(self::splitSign($span)['mag']));
+        do {
+            $r = self::randomBits($bits);
+        } while (self::cmp($r, $span) >= 0);
+
+        return self::add($a, $r);
+    }
+
+    public static function import(string $data, int $wordSize = 1, int $flags = self::GMP_MSW_FIRST | self::GMP_NATIVE_ENDIAN): string
+    {
+        if ($wordSize < 1) {
+            throw new \ValueError('gmp_import(): Argument #2 ($word_size) must be greater than or equal to 1');
+        }
+        [$order, $endian] = self::parseImportExportFlags($flags);
+        $len = strlen($data);
+        if (0 === $len) {
+            throw new \ValueError('gmp_import(): Argument #1 ($data) must not be empty');
+        }
+        if (0 !== ($len % $wordSize)) {
+            throw new \ValueError('gmp_import(): Argument #1 ($data) must be a multiple of argument #2 ($word_size)');
+        }
+        $words = [];
+        for ($i = 0; $i < $len; $i += $wordSize) {
+            $word = substr($data, $i, $wordSize);
+            if (-1 === $endian || (0 === $endian && self::nativeEndianIsLittle())) {
+                $word = strrev($word);
+            }
+            $words[] = $word;
+        }
+        if (-1 === $order) {
+            $words = array_reverse($words);
+        }
+        $acc = '0';
+        foreach ($words as $word) {
+            for ($j = 0; $j < $wordSize; ++$j) {
+                $acc = self::add(self::mul($acc, '256'), (string) ord($word[$j]));
+            }
+        }
+
+        return $acc;
+    }
+
+    public static function export(string $num, int $wordSize = 1, int $flags = self::GMP_MSW_FIRST | self::GMP_NATIVE_ENDIAN): string
+    {
+        if ($wordSize < 1) {
+            throw new \ValueError('gmp_export(): Argument #2 ($word_size) must be greater than or equal to 1');
+        }
+        [$order, $endian] = self::parseImportExportFlags($flags);
+        $n = self::abs($num);
+        if ('0' === $n) {
+            return '';
+        }
+        $bytes = [];
+        while ('0' !== $n) {
+            [$n, $rem] = self::divModSmall($n, 256);
+            $bytes[] = chr($rem);
+        }
+        $bytes = array_reverse($bytes); // MSW byte first
+        $pad = (count($bytes) % $wordSize);
+        if (0 !== $pad) {
+            $bytes = array_merge(array_fill(0, $wordSize - $pad, "\0"), $bytes);
+        }
+        $words = [];
+        for ($i = 0; $i < count($bytes); $i += $wordSize) {
+            $word = implode('', array_slice($bytes, $i, $wordSize));
+            if (-1 === $endian || (0 === $endian && self::nativeEndianIsLittle())) {
+                $word = strrev($word);
+            }
+            $words[] = $word;
+        }
+        if (-1 === $order) {
+            $words = array_reverse($words);
+        }
+
+        return implode('', $words);
+    }
+
+    /** @return array{0: int, 1: int} order (1=MSW,-1=LSW), endian (1=big,-1=little,0=native) */
+    private static function parseImportExportFlags(int $flags): array
+    {
+        $orderBits = $flags & (self::GMP_LSW_FIRST | self::GMP_MSW_FIRST);
+        $endianBits = $flags & (self::GMP_LITTLE_ENDIAN | self::GMP_BIG_ENDIAN | self::GMP_NATIVE_ENDIAN);
+        $order = match ($orderBits) {
+            self::GMP_LSW_FIRST => -1,
+            self::GMP_MSW_FIRST, 0 => 1,
+            default => throw new \ValueError('gmp_import(): Argument #3 ($flags) cannot use multiple word order options'),
+        };
+        $endian = match ($endianBits) {
+            self::GMP_LITTLE_ENDIAN => -1,
+            self::GMP_BIG_ENDIAN => 1,
+            self::GMP_NATIVE_ENDIAN, 0 => 0,
+            default => throw new \ValueError('gmp_import(): Argument #3 ($flags) cannot use multiple endian options'),
+        };
+
+        return [$order, $endian];
+    }
+
+    private static function nativeEndianIsLittle(): bool
+    {
+        return "\x01\x00" === pack('v', 1);
+    }
+
+    private static function nextRngUint32(): int
+    {
+        $x = self::$rngState;
+        $x ^= ($x << 13);
+        $x ^= ($x >> 7);
+        $x ^= ($x << 17);
+        if (0 === $x) {
+            $x = 1;
+        }
+        self::$rngState = $x;
+
+        return $x & 0xFFFFFFFF;
     }
 
     private static function normalizeSignedDecimal(string $value): string
