@@ -71,7 +71,7 @@ final class VmSem
     /**
      * @return array{0: Variable|false, 1: string}
      */
-    public static function get(Context $ctx, int $key, ?int $maxAcquire, ?int $perm, ?int $autoRelease): array
+    public static function get(Context $ctx, int $key, ?int $maxAcquire, ?int $perm, ?bool $autoRelease): array
     {
         if (!self::available()) {
             return [false, 'sem_get() is not available in this compiler build'];
@@ -84,6 +84,7 @@ final class VmSem
         } elseif (null === $autoRelease) {
             $host = @\sem_get($key, $maxAcquire, $perm);
         } else {
+            // Host stub is bool $auto_release; pass bool under strict_types (#19515).
             $host = @\sem_get($key, $maxAcquire, $perm, $autoRelease);
         }
 
