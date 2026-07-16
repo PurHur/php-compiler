@@ -194,7 +194,7 @@ final class DomActiveContextAotTest extends TestCase
 
     public function testDomInstanceMethodUserScriptRegistersProxiesBeforeHelperCompile(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DomInstanceMethodUserScriptLlvm.php');
+        $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomInstanceMethodKernel.php');
         $bridgePos = strpos($source, 'function ensureBridge');
         $this->assertNotFalse($bridgePos);
         $bridgeBody = substr($source, $bridgePos);

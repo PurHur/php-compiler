@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\dom\JitDomStandaloneAotInitKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 
@@ -32,8 +33,8 @@ final class DomStandaloneAotInitRuntime
             return;
         }
 
-        if (DomStandaloneAotInitUserScriptLlvm::shouldUse($context)) {
-            DomStandaloneAotInitUserScriptLlvm::ensureLinked($context);
+        if (JitDomStandaloneAotInitKernel::shouldUse($context)) {
+            JitDomStandaloneAotInitKernel::ensureLinked($context);
 
             return;
         }

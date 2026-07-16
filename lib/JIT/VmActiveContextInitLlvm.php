@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\DomStandaloneAotInitRuntime;
-use PHPCompiler\JIT\Builtin\DomStandaloneAotInitUserScriptLlvm;
 
 /**
  * Thin standalone user-script AOT: allocate Runtime/vmContext and publish sg_vm_context (#17391).
@@ -49,11 +48,7 @@ final class VmActiveContextInitLlvm
             return;
         }
 
-        if (DomStandaloneAotInitUserScriptLlvm::shouldUse($context)) {
-            DomStandaloneAotInitUserScriptLlvm::ensureLinked($context);
-        } else {
-            DomStandaloneAotInitRuntime::ensureLinked($context);
-        }
+        DomStandaloneAotInitRuntime::ensureLinked($context);
         self::$scheduled = true;
 
         $context->emitInInit(static function (Context $ctx): void {

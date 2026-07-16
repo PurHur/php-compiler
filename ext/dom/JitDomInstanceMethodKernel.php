@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -16,12 +17,13 @@ use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * User-script standalone AOT: compile DOM instance bridge in the main module (#17391).
+ * User-script standalone AOT: compile DOM instance bridge in the main module (#17391, #19487).
  *
  * Split-compilation helper TUs lack per-unit ctor init for ObjectEntry reads (#16075); nested
  * VmDomInstanceInvoke also needs {@see VmActiveContextLlvm} because Superglobals is unset.
+ * Housed in ext/dom (not lib/JIT/Builtin) — same kernel-move pattern as #19430 / #19389.
  */
-final class DomInstanceMethodUserScriptLlvm
+final class JitDomInstanceMethodKernel
 {
     private const HELPER_PATH = '/ext/dom/VmDomInstanceInvoke.php';
 
@@ -116,7 +118,7 @@ final class DomInstanceMethodUserScriptLlvm
         }
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'VmDomInstanceInvoke.php');
             if (null === $block) {

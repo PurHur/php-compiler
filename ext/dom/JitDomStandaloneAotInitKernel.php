@@ -2,9 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin\DomStandaloneAotInitRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -13,9 +14,11 @@ use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * User-script standalone AOT: compile DomStandaloneAotInit in the main module (#17391).
+ * User-script standalone AOT: compile DomStandaloneAotInit in the main module (#17391, #19487).
+ *
+ * Housed in ext/dom (not lib/JIT/Builtin) — same kernel-move pattern as #19430 / #19389.
  */
-final class DomStandaloneAotInitUserScriptLlvm
+final class JitDomStandaloneAotInitKernel
 {
     private const HELPER_PATH = '/ext/dom/DomStandaloneAotInitJitHelper.php';
 
@@ -88,7 +91,7 @@ final class DomStandaloneAotInitUserScriptLlvm
         }
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
         NestedVmActiveContextLlvm::ensureMethod($context);
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'DomStandaloneAotInitJitHelper.php');

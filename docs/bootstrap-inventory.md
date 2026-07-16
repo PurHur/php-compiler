@@ -257,6 +257,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomGetElementsByTagName.php` | 0 | 1 |
 | `ext/dom/JitDomGetElementsByTagNameUserScript.php` | 0 | 2 |
 | `ext/dom/JitDomImportNode.php` | 0 | 3 |
+| `ext/dom/JitDomInstanceMethodKernel.php` | 0 | 3 |
 | `ext/dom/JitDomLoad.php` | 0 | 1 |
 | `ext/dom/JitDomLoadHTML.php` | 0 | 1 |
 | `ext/dom/JitDomLoadHTMLFile.php` | 0 | 1 |
@@ -275,6 +276,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomSaveHTMLUserScript.php` | 0 | 1 |
 | `ext/dom/JitDomSaveXML.php` | 0 | 1 |
 | `ext/dom/JitDomSaveXMLUserScript.php` | 0 | 1 |
+| `ext/dom/JitDomStandaloneAotInitKernel.php` | 0 | 3 |
 | `ext/dom/JitDomXPathEvaluate.php` | 0 | 1 |
 | `ext/dom/JitDomXPathEvaluateUserScript.php` | 0 | 1 |
 | `ext/dom/JitDomXPathQuery.php` | 0 | 1 |
@@ -3546,7 +3548,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DomGetElementsByTagNameRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomImportNodeRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomInstanceMethodRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/DomInstanceMethodUserScriptLlvm.php` | 0 | 3 |
 | `lib/JIT/Builtin/DomLoadHTMLFileRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomLoadHTMLRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomLoadRuntime.php` | 0 | 1 |
@@ -3559,7 +3560,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/DomSaveHTMLRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomSaveXMLRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomStandaloneAotInitRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/DomStandaloneAotInitUserScriptLlvm.php` | 0 | 3 |
 | `lib/JIT/Builtin/DomSyncElementIdMapRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomXPathEvaluateRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/DomXPathQueryRuntime.php` | 0 | 1 |
@@ -6396,6 +6396,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 183)
 - 9 class method(s)
 
+### `ext/dom/JitDomInstanceMethodKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 127)
+- 5 class method(s)
+- 1 closure(s)
+
 ### `ext/dom/JitDomLoad.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6494,6 +6501,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/dom/JitDomStandaloneAotInitKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 101)
+- 4 class method(s)
+- 1 closure(s)
 
 ### `ext/dom/JitDomXPathEvaluate.php`
 
@@ -28881,13 +28895,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
 
-### `lib/JIT/Builtin/DomInstanceMethodUserScriptLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- new JIT (line 125)
-- 5 class method(s)
-- 1 closure(s)
-
 ### `lib/JIT/Builtin/DomLoadHTMLFileRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -28955,13 +28962,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
-
-### `lib/JIT/Builtin/DomStandaloneAotInitUserScriptLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- new JIT (line 98)
-- 4 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/DomSyncElementIdMapRuntime.php`
 
