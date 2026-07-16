@@ -488,6 +488,7 @@ require_once __DIR__.'/../../../ext/hash/HashContextJitHelper.php';
 require_once __DIR__.'/../../../ext/hash/HashContextJitSupport.php';
 require_once __DIR__.'/../../../ext/hash/HashFunction.php';
 require_once __DIR__.'/../../../ext/hash/JitHashAlgos.php';
+require_once __DIR__.'/../../../ext/hash/JitHashAlgosKernel.php';
 require_once __DIR__.'/../../../ext/hash/JitHashContext.php';
 require_once __DIR__.'/../../../ext/hash/MhashRegistry.php';
 require_once __DIR__.'/../../../ext/hash/Module.php';
