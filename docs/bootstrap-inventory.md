@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5171 |
-| Phase A inventory files (M2 ratio SSOT) | 5171 |
+| PHP files on vm.php path | 5176 |
+| Phase A inventory files (M2 ratio SSOT) | 5176 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14101 |
+| Source constructs flagged (warnings) | 14111 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3343,12 +3343,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlrpc/xmlrpc_decode.php` | 0 | 1 |
 | `ext/xmlrpc/xmlrpc_encode.php` | 0 | 2 |
 | `ext/xmlwriter/BuiltinClasses.php` | 0 | 1 |
+| `ext/xmlwriter/JitXmlWriterMethod.php` | 0 | 1 |
+| `ext/xmlwriter/JitXmlWriterUserScript.php` | 0 | 3 |
 | `ext/xmlwriter/Module.php` | 0 | 1 |
-| `ext/xmlwriter/VmXmlWriter.php` | 0 | 20 |
+| `ext/xmlwriter/VmXmlWriter.php` | 0 | 21 |
 | `ext/xmlwriter/XmlWriterClassMethod.php` | 0 | 1 |
 | `ext/xmlwriter/XmlWriterEndDocument.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterEndElement.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterFlush.php` | 0 | 2 |
+| `ext/xmlwriter/XmlWriterFullEndElement.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterOpenMemory.php` | 0 | 2 |
 | `ext/xmlwriter/XmlWriterOpenURI.php` | 0 | 3 |
 | `ext/xmlwriter/XmlWriterOutputMemory.php` | 0 | 2 |
@@ -4304,6 +4307,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/WeakMapMethod.php` | 0 | 2 |
 | `lib/JIT/Call/WeakReferenceCreate.php` | 0 | 1 |
 | `lib/JIT/Call/WeakReferenceGet.php` | 0 | 1 |
+| `lib/JIT/Call/XmlWriterMethod.php` | 0 | 1 |
 | `lib/JIT/CallUnpackCompileTime.php` | 0 | 7 |
 | `lib/JIT/CallUnpackHelper.php` | 0 | 1 |
 | `lib/JIT/CastArrayNativeJit.php` | 0 | 2 |
@@ -4471,6 +4475,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/VmDriverExecuteNative.php` | 0 | 2 |
 | `lib/JIT/VmSpineSmokeNative.php` | 0 | 2 |
 | `lib/JIT/VmUnitProbeExecuteNative.php` | 0 | 2 |
+| `lib/JIT/XmlWriterInstanceMethodJit.php` | 0 | 2 |
 | `lib/JitMcjitEmbed.php` | 0 | 2 |
 | `lib/LanguageProfileScope.php` | 0 | 2 |
 | `lib/LazyPropertyRejector.php` | 0 | 2 |
@@ -7408,8 +7413,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomTokenList.php`
 
 **Warnings** (review for bootstrap subset):
-- new DOMException (line 132)
-- new DOMException (line 138)
+- new DOMException (line 133)
+- new DOMException (line 139)
 - 17 class method(s)
 - 1 closure(s)
 
@@ -15804,7 +15809,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitMultipartKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/JitNetGetInterfaces.php`
 
@@ -27241,6 +27246,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/xmlwriter/JitXmlWriterMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/xmlwriter/JitXmlWriterUserScript.php`
+
+**Warnings** (review for bootstrap subset):
+- new XMLWriter (line 43)
+- new XMLWriter (line 195)
+- 16 class method(s)
+
 ### `ext/xmlwriter/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -27262,13 +27279,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new XmlWriterWriteComment (line 55)
 - new XmlWriterText (line 58)
 - new XmlWriterEndElement (line 61)
-- new XmlWriterEndDocument (line 64)
-- new XmlWriterOutputMemory (line 67)
-- new XmlWriterFlush (line 70)
-- new XmlWriterState (line 90)
-- new Error (line 339)
-- new Error (line 343)
-- 27 class method(s)
+- new XmlWriterFullEndElement (line 64)
+- new XmlWriterEndDocument (line 67)
+- new XmlWriterOutputMemory (line 70)
+- new XmlWriterFlush (line 73)
+- new XmlWriterState (line 93)
+- new Error (line 366)
+- new Error (line 370)
+- 29 class method(s)
 
 ### `ext/xmlwriter/XmlWriterClassMethod.php`
 
@@ -27288,6 +27306,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 closure(s)
 
 ### `ext/xmlwriter/XmlWriterFlush.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/XmlWriterFullEndElement.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -29014,68 +29038,68 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Type (line 10272)
 - new Variable (line 10294)
 - new Type (line 10302)
-- new Variable (line 10430)
-- new Variable (line 10451)
-- new Variable (line 11558)
-- new Variable (line 11583)
-- new Variable (line 11604)
-- new CompileError (line 12351)
-- new CompileError (line 12455)
-- new Variable (line 12506)
-- new Variable (line 12889)
-- new Variable (line 12909)
-- new Variable (line 12930)
-- new Variable (line 12964)
-- new Variable (line 12998)
-- new Variable (line 13090)
-- new Variable (line 13112)
-- new Variable (line 13122)
-- new Variable (line 13274)
-- new Variable (line 13292)
-- new Variable (line 13342)
-- new Variable (line 13369)
-- new Variable (line 13394)
-- new Variable (line 13723)
-- new Variable (line 14091)
-- new Variable (line 14121)
-- new Variable (line 14140)
-- new Variable (line 14170)
-- new Variable (line 14207)
-- new Variable (line 14255)
-- new Variable (line 14298)
-- new VM\Variable (line 14643)
-- new Variable (line 14677)
-- new Variable (line 14728)
+- new Variable (line 10446)
+- new Variable (line 10467)
+- new Variable (line 11574)
+- new Variable (line 11599)
+- new Variable (line 11620)
+- new CompileError (line 12367)
+- new CompileError (line 12471)
+- new Variable (line 12522)
+- new Variable (line 12905)
+- new Variable (line 12925)
+- new Variable (line 12946)
+- new Variable (line 12980)
+- new Variable (line 13014)
+- new Variable (line 13106)
+- new Variable (line 13128)
+- new Variable (line 13138)
+- new Variable (line 13290)
+- new Variable (line 13308)
+- new Variable (line 13358)
+- new Variable (line 13385)
+- new Variable (line 13410)
+- new Variable (line 13739)
+- new Variable (line 14107)
+- new Variable (line 14137)
+- new Variable (line 14156)
+- new Variable (line 14186)
+- new Variable (line 14223)
+- new Variable (line 14271)
+- new Variable (line 14314)
+- new VM\Variable (line 14659)
+- new Variable (line 14693)
 - new Variable (line 14744)
-- new Variable (line 14763)
-- new Variable (line 14770)
-- new OpCode (line 14790)
-- new Variable (line 14791)
-- new Variable (line 14963)
-- new Variable (line 15001)
-- new OpCode (line 15015)
-- new Variable (line 15016)
-- new Variable (line 15075)
-- new OpCode (line 15096)
-- new Variable (line 15097)
-- new Variable (line 15194)
-- new Variable (line 15216)
-- new Variable (line 15284)
-- new Operand\Literal (line 15293)
-- new Variable (line 15308)
-- new Variable (line 15472)
-- new VM\PropertyIsInitializedHandler (line 15554)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15594)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15715)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15802)
-- new JIT\Call\VmCoerceVariableToString (line 15892)
-- new JIT\Call\IncludePathResolverResolve (line 16146)
-- new Variable (line 17202)
-- new VM (line 17246)
-- new VM\Variable (line 17255)
-- new Variable (line 17276)
-- new Variable (line 17322)
-- new Variable (line 17816)
+- new Variable (line 14760)
+- new Variable (line 14779)
+- new Variable (line 14786)
+- new OpCode (line 14806)
+- new Variable (line 14807)
+- new Variable (line 14979)
+- new Variable (line 15017)
+- new OpCode (line 15031)
+- new Variable (line 15032)
+- new Variable (line 15091)
+- new OpCode (line 15112)
+- new Variable (line 15113)
+- new Variable (line 15210)
+- new Variable (line 15232)
+- new Variable (line 15300)
+- new Operand\Literal (line 15309)
+- new Variable (line 15324)
+- new Variable (line 15488)
+- new VM\PropertyIsInitializedHandler (line 15570)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15610)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15739)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15826)
+- new JIT\Call\VmCoerceVariableToString (line 15916)
+- new JIT\Call\IncludePathResolverResolve (line 16170)
+- new Variable (line 17226)
+- new VM (line 17270)
+- new VM\Variable (line 17279)
+- new Variable (line 17300)
+- new Variable (line 17346)
+- new Variable (line 17840)
 - 369 class method(s)
 - 7 closure(s)
 
@@ -33511,6 +33535,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/XmlWriterMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/CallUnpackCompileTime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -34702,6 +34731,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Call\Native (line 59)
 - 2 class method(s)
+
+### `lib/JIT/XmlWriterInstanceMethodJit.php`
+
+**Warnings** (review for bootstrap subset):
+- new Call\XmlWriterMethod (line 47)
+- 3 class method(s)
 
 ### `lib/JitMcjitEmbed.php`
 
