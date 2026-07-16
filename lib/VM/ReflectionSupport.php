@@ -612,6 +612,16 @@ final class ReflectionSupport
         return $obj;
     }
 
+    /**
+     * ReflectionClass and subclasses (ReflectionEnum extends ReflectionClass in php-src, #19740).
+     */
+    public static function isReflectionClassObject(ObjectEntry $obj): bool
+    {
+        $lc = strtolower($obj->class->name);
+
+        return self::REFLECTION_CLASS === $lc || self::REFLECTION_ENUM === $lc;
+    }
+
     public static function requireReflectionClass(Frame $frame, Variable $receiver): ObjectEntry
     {
         $receiver = $receiver->resolveIndirect();
@@ -619,7 +629,7 @@ final class ReflectionSupport
             throw new \LogicException('ReflectionClass method called without object');
         }
         $obj = $receiver->toObject();
-        if (strtolower($obj->class->name) !== self::REFLECTION_CLASS) {
+        if (!self::isReflectionClassObject($obj)) {
             throw new \LogicException('Expected ReflectionClass instance');
         }
 

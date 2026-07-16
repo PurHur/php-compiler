@@ -1122,6 +1122,8 @@ final class BuiltinClasses
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
 
         $renum = new ClassEntry('ReflectionEnum');
+        // php-src: class ReflectionEnum extends ReflectionClass (ext/reflection/php_reflection.stub.php, #19740).
+        $renum->parentLc = ReflectionSupport::REFLECTION_CLASS;
         $renum->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
         $renum->constructor = new ReflectionEnumConstruct();
         $renum->methods['__construct'] = $renum->constructor;
