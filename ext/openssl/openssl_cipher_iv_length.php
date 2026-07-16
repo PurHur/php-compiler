@@ -11,6 +11,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -38,7 +39,7 @@ final class openssl_cipher_iv_length extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $cipher = VmString::coerceStringBuiltinArg(
+        $cipher = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'openssl_cipher_iv_length',
             0,
@@ -63,6 +64,16 @@ final class openssl_cipher_iv_length extends Internal
                 $context,
                 'openssl_cipher_iv_length() expects exactly 1 argument, '.$argc.' given'
             );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'openssl_cipher_iv_length', 0, 'cipher_algo');
             $slot = JitValueBox::alloc($context);
 
             return JitValueBox::pointer($context, $slot);
