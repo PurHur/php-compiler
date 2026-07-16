@@ -197,7 +197,13 @@ final class JitStringBuiltinArg
     ): Value {
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             JitNativeString::ensureInsertBlock($context);
-            if (!$softNullPath && $context->callerStrictTypes) {
+            if (
+                !$softNullPath
+                && (
+                    $context->callerStrictTypes
+                    || self::requiresZparamStrStrictNullOnForwardProfile()
+                )
+            ) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
 
                 return self::unreachableStringPtr($context);
@@ -210,7 +216,18 @@ final class JitStringBuiltinArg
             return $context->builder->load($context->constantStringFromString(''));
         }
 
-        return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
+        // Boxed null / VALUE: same Z_PARAM_PATH 8.4 null TypeError as Z_PARAM_STR (#19256).
+        return self::lower(
+            $context,
+            $arg,
+            $function,
+            $argIndex,
+            $paramName,
+            $expectedType,
+            $arrayExpectedType,
+            false,
+            !$softNullPath
+        );
     }
 
     public static function emitNullStringParamDeprecation(
