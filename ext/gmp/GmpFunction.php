@@ -33,6 +33,11 @@ abstract class GmpFunction extends Internal
     /** @param mixed $result */
     protected function writeReturn(Frame $frame, $result): void
     {
+        if ($result instanceof \PHPCompiler\VM\HashTable) {
+            $frame->returnVar->array($result);
+
+            return;
+        }
         if (\is_int($result)) {
             $frame->returnVar->int($result);
 
