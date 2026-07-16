@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5226 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14386 |
+| Source constructs flagged (warnings) | 14387 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1139,7 +1139,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplArrayUserSortMethod.php` | 0 | 2 |
 | `ext/spl/SplClassConstants.php` | 0 | 2 |
 | `ext/spl/SplDllistSerializeSupport.php` | 0 | 2 |
-| `ext/spl/SplDoublyLinkedListBuiltin.php` | 0 | 22 |
+| `ext/spl/SplDoublyLinkedListBuiltin.php` | 0 | 23 |
 | `ext/spl/SplFileInfoBuiltin.php` | 0 | 4 |
 | `ext/spl/SplFileInfoStorage.php` | 0 | 1 |
 | `ext/spl/SplFileIteratorSerializeDeny.php` | 0 | 3 |
@@ -13330,26 +13330,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 55)
 - new SplDoublyLinkedListConstruct (line 63)
-- new Variable (line 165)
-- new Variable (line 239)
-- new Variable (line 257)
-- new Variable (line 269)
-- new Variable (line 282)
-- new Variable (line 295)
+- new Variable (line 172)
+- new Variable (line 246)
+- new Variable (line 264)
+- new Variable (line 276)
+- new Variable (line 289)
 - new Variable (line 303)
-- new OutOfRangeException (line 326)
-- new Variable (line 328)
-- new OutOfRangeException (line 339)
-- new Variable (line 341)
-- new OutOfRangeException (line 351)
-- new ArgumentCountError (line 420)
-- new ArgumentCountError (line 480)
-- new ArgumentCountError (line 525)
-- new ArgumentCountError (line 552)
-- new ArgumentCountError (line 576)
+- new Variable (line 321)
+- new Variable (line 329)
+- new OutOfRangeException (line 352)
+- new Variable (line 354)
+- new OutOfRangeException (line 365)
+- new Variable (line 367)
+- new OutOfRangeException (line 377)
+- new ArgumentCountError (line 446)
+- new ArgumentCountError (line 506)
 - new ArgumentCountError (line 605)
-- new ArgumentCountError (line 725)
-- 42 class method(s)
+- new ArgumentCountError (line 632)
+- new ArgumentCountError (line 656)
+- new ArgumentCountError (line 685)
+- new ArgumentCountError (line 805)
+- 47 class method(s)
 
 ### `ext/spl/SplFileInfoBuiltin.php`
 

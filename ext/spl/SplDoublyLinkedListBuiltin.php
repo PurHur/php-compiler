@@ -68,6 +68,9 @@ final class SplDoublyLinkedListBuiltin
             'pop' => SplDoublyLinkedListPop::class,
             'shift' => SplDoublyLinkedListShift::class,
             'unshift' => SplDoublyLinkedListUnshift::class,
+            'top' => SplDoublyLinkedListTop::class,
+            'bottom' => SplDoublyLinkedListBottom::class,
+            'isempty' => SplDoublyLinkedListIsEmpty::class,
             'count' => SplDoublyLinkedListCount::class,
             'offsetget' => SplDoublyLinkedListOffsetGet::class,
             'offsetset' => SplDoublyLinkedListOffsetSet::class,
@@ -90,6 +93,7 @@ final class SplDoublyLinkedListBuiltin
         $entry->methodNames['offsetunset'] = 'offsetUnset';
         $entry->methodNames['setiteratormode'] = 'setIteratorMode';
         $entry->methodNames['getiteratormode'] = 'getIteratorMode';
+        $entry->methodNames['isempty'] = 'isEmpty';
 
         $entry->isInternal = true;
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'SplDoublyLinkedList');
@@ -101,6 +105,9 @@ final class SplDoublyLinkedListBuiltin
         return isset(
             $entry->methods['push'],
             $entry->methods['pop'],
+            $entry->methods['top'],
+            $entry->methods['bottom'],
+            $entry->methods['isempty'],
             $entry->methods['offsetget'],
             $entry->methods['rewind'],
             $entry->methods['valid']
@@ -283,6 +290,25 @@ final class SplDoublyLinkedListBuiltin
         $result->copyFrom($last);
 
         return $result;
+    }
+
+    /** php-src spl_dllist_object_bottom — peek first element without removal. */
+    public static function bottom(ObjectEntry $object): Variable
+    {
+        $state = self::state($object);
+        if ([] === $state) {
+            throw new \RuntimeException("Can't peek at an empty datastructure");
+        }
+        $first = $state[0];
+        $result = new Variable();
+        $result->copyFrom($first);
+
+        return $result;
+    }
+
+    public static function isEmpty(ObjectEntry $object): bool
+    {
+        return 0 === self::count($object);
     }
 
     public static function shift(ObjectEntry $object): Variable
@@ -483,6 +509,60 @@ final class SplDoublyLinkedListUnshift extends VmClassMethod
             );
         }
         SplDoublyLinkedListBuiltin::unshift($object, $frame->calledArgs[1]);
+    }
+}
+
+final class SplDoublyLinkedListTop extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('top');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::top()'
+        );
+        SplIteratorSupport::copyReturnFrom($frame, SplDoublyLinkedListBuiltin::top($object));
+    }
+}
+
+final class SplDoublyLinkedListBottom extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('bottom');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::bottom()'
+        );
+        SplIteratorSupport::copyReturnFrom($frame, SplDoublyLinkedListBuiltin::bottom($object));
+    }
+}
+
+final class SplDoublyLinkedListIsEmpty extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isEmpty');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::isEmpty()'
+        );
+        SplIteratorSupport::setReturnBool($frame, SplDoublyLinkedListBuiltin::isEmpty($object));
     }
 }
 
