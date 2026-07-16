@@ -25,13 +25,7 @@ final class WeakMapCount extends VmClassMethod
         }
         $receiver = WeakRefSupport::requireObject($frame->calledArgs[0], 'WeakMap');
         $map = $receiver->toObject();
-        WeakRefSupport::purgeStaleMapEntries($map);
-        $ht = WeakRefSupport::mapTable($map);
-        if (null === $ht) {
-            $frame->returnVar->int(0);
-
-            return;
-        }
-        $frame->returnVar->int($ht->getNumElements());
+        // Count live keys only — raw HT size can retain stale o:<id> buckets after unset (#19369).
+        $frame->returnVar->int(WeakRefSupport::countLiveMapEntries($map));
     }
 }

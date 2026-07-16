@@ -255,29 +255,76 @@ final class WeakRefSupport
             return;
         }
         $keyVar = new Variable(Variable::TYPE_STRING);
+        // iterateKeyed() materializes o:<id> keys to objects via materializeArrayKey (#9871).
+        // Stale referents can still resolve while lacking a strong scope binding (#19369) — treat
+        // both string and materialized object/enum keys, and drop anything !isTargetAlive().
         foreach ($ht->iterateKeyed() as $pair) {
             [$storedKeyVar, $value] = $pair;
-            if (Variable::TYPE_STRING !== $storedKeyVar->type) {
-                continue;
-            }
-            $storedKey = $storedKeyVar->toString();
-            if (str_starts_with($storedKey, 'e:')) {
-                continue;
-            }
-            if (!str_starts_with($storedKey, 'o:')) {
-                continue;
-            }
-            $objectId = (int) substr($storedKey, 2);
+            $storedKey = null;
+            $objectId = null;
             if (
-                !ObjectRegistry::isRegistered($objectId)
-                || WeakRefRegistry::isReferentInvalidated($objectId)
-                || !self::hasStrongScopeBinding($objectId)
+                Variable::TYPE_OBJECT === $storedKeyVar->type
+                || EnumCaseSupport::isEnumCaseVariable($storedKeyVar)
             ) {
-                $keyVar->string($storedKey);
-                $ht->offsetUnset($keyVar);
+                if (self::isTargetAlive($storedKeyVar)) {
+                    continue;
+                }
+                $storedKey = self::objectKey($storedKeyVar);
+                $objectId = self::targetObjectId($storedKeyVar);
+            } elseif (Variable::TYPE_STRING === $storedKeyVar->type) {
+                $storedKey = $storedKeyVar->toString();
+                if (str_starts_with($storedKey, 'e:')) {
+                    continue;
+                }
+                if (!str_starts_with($storedKey, 'o:')) {
+                    continue;
+                }
+                $objectId = (int) substr($storedKey, 2);
+                $resolved = self::resolveMapKeyVariable($storedKey);
+                if (null !== $resolved && self::isTargetAlive($resolved)) {
+                    continue;
+                }
+            } else {
+                continue;
+            }
+            $keyVar->string($storedKey);
+            $ht->offsetUnset($keyVar);
+            if (null !== $objectId) {
                 WeakRefRegistry::unregisterWeakMapEntry($objectId, $weakMap->id, $storedKey);
             }
         }
+    }
+
+    /** Count live WeakMap entries after purge (Countable / count(), #19369). */
+    public static function countLiveMapEntries(ObjectEntry $weakMap): int
+    {
+        self::purgeStaleMapEntries($weakMap);
+        $ht = self::mapTable($weakMap);
+        if (null === $ht) {
+            return 0;
+        }
+        $n = 0;
+        foreach ($ht->iterateKeyed() as $pair) {
+            [$storedKeyVar] = $pair;
+            if (
+                Variable::TYPE_OBJECT === $storedKeyVar->type
+                || EnumCaseSupport::isEnumCaseVariable($storedKeyVar)
+            ) {
+                if (self::isTargetAlive($storedKeyVar)) {
+                    ++$n;
+                }
+                continue;
+            }
+            if (Variable::TYPE_STRING !== $storedKeyVar->type) {
+                continue;
+            }
+            $resolved = self::resolveMapKeyVariable($storedKeyVar->toString());
+            if (null !== $resolved && self::isTargetAlive($resolved)) {
+                ++$n;
+            }
+        }
+
+        return $n;
     }
 
     public static function copyAliveTarget(Variable $dst, Variable $target): void

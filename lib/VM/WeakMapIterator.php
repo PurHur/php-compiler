@@ -23,13 +23,24 @@ final class WeakMapIterator
         if (null === $ht) {
             return;
         }
+        // Keys may arrive as materialized objects (HashTable::materializeArrayKey) or raw o:/e: strings (#19369).
         foreach ($ht->iterateKeyed(true) as $pair) {
             [$storedKeyVar, $value] = $pair;
+            if (
+                Variable::TYPE_OBJECT === $storedKeyVar->type
+                || EnumCaseSupport::isEnumCaseVariable($storedKeyVar)
+            ) {
+                if (!WeakRefSupport::isTargetAlive($storedKeyVar)) {
+                    continue;
+                }
+                $this->pairs[] = [$storedKeyVar, $value];
+                continue;
+            }
             if (Variable::TYPE_STRING !== $storedKeyVar->type) {
                 continue;
             }
             $keyObject = WeakRefSupport::resolveMapKeyVariable($storedKeyVar->toString());
-            if (null === $keyObject) {
+            if (null === $keyObject || !WeakRefSupport::isTargetAlive($keyObject)) {
                 continue;
             }
             $this->pairs[] = [$keyObject, $value];
