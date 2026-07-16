@@ -14,6 +14,7 @@ final class XmlWriterInstanceMethodJit
         'xmlwriter::openmemory' => true,
         'xmlwriter::startdocument' => true,
         'xmlwriter::startelement' => true,
+        'xmlwriter::writeattribute' => true,
         'xmlwriter::text' => true,
         'xmlwriter::fullendelement' => true,
         'xmlwriter::endelement' => true,
