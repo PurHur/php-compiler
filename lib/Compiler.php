@@ -34953,6 +34953,10 @@ class Compiler {
         if ($this->callArgIsNewExpression($callArg)) {
             return true;
         }
+        // new Outer(new Inner(...), fn() => …) — Closure/arrow arg is never an inline New_ (#19771).
+        if ($callArg instanceof Operand && $this->callArgOpsContainInlineClosure($callArg)) {
+            return false;
+        }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
         $argCount = \count($cfgCallOp->args);
         if (null !== $this->matchNestedNewCtorInlineNewProducer($producers, $argIndex, $argCount, $cfgCallOp->args)) {
@@ -35123,7 +35127,62 @@ class Compiler {
     }
 
     /**
+     * True when a dead call-arg temp (or New_ expr) is produced by this inline New_ (#18456, #19771).
+     * Prevents Array_/New_/ArrowFunction producer lists from wiring the inner New_ to a Closure arg.
+     */
+    private function inlineNewProducerFeedsCallArg(Op\Expr\New_ $producer, ?Operand $callArg): bool
+    {
+        if (null === $callArg) {
+            return false;
+        }
+        if ($this->callArgIsNewExpression($callArg)) {
+            $root = $this->unwrapOperandChain($callArg);
+
+            return $root === $producer
+                || (
+                    $root instanceof Op\Expr\New_
+                    && null !== $producer->result
+                    && null !== $root->result
+                    && $this->operandsReferToSameVariable($producer->result, $root->result)
+                );
+        }
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        if (
+            null !== $producer->result
+            && $this->operandsReferToSameVariable($producer->result, $callArg)
+        ) {
+            return true;
+        }
+
+        return isset($callArg->ops)
+            && \is_array($callArg->ops)
+            && \in_array($producer, $callArg->ops, true);
+    }
+
+    /** Dead call-arg temp whose php-cfg ops include an inline Closure/ArrowFunction (#19771). */
+    private function callArgOpsContainInlineClosure(?Operand $callArg): bool
+    {
+        if (!$callArg instanceof Operand) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($callArg);
+        if ($root instanceof Op\Expr\ArrowFunction || $root instanceof Op\Expr\Closure) {
+            return true;
+        }
+        foreach ($callArg->ops ?? [] as $embedded) {
+            if ($embedded instanceof Op\Expr\ArrowFunction || $embedded instanceof Op\Expr\Closure) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * array_key_exists($k, new ArrayObject([...])) — positional New_ with Array_ ctor prelude (#18456).
+     * Must not bind producers[argIndex] New_ when that arg is a Closure/ArrowFunction (#19771).
      *
      * @param list<Op\Expr> $producers
      * @param list<Operand|null> $callArgs
@@ -35146,7 +35205,8 @@ class Compiler {
         $positional = $producers[$argIndex] ?? null;
 
         if ($positional instanceof Op\Expr\New_) {
-            return $positional;
+            // producers[1] may be the *inner* New_ while arg1 is fn() — require feed (#19771).
+            return $this->inlineNewProducerFeedsCallArg($positional, $callArg) ? $positional : null;
         }
         if (
             $positional instanceof Op\Expr\Array_
@@ -35159,7 +35219,7 @@ class Compiler {
             for ($i = $argIndex + 1, $n = \count($producers); $i < $n; ++$i) {
                 $follow = $producers[$i];
                 if ($follow instanceof Op\Expr\New_) {
-                    return $follow;
+                    return $this->inlineNewProducerFeedsCallArg($follow, $callArg) ? $follow : null;
                 }
                 if (
                     $follow instanceof Op\Expr\Array_
@@ -40597,6 +40657,43 @@ class Compiler {
         foreach ($args as $argIndex => $arg) {
             $nameSlot = $this->callArgNameSlot($arg, $block);
             $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
+            // new Outer(new Inner(...), fn() => …) — wire by php-cfg arg ops before legacy
+            // positional New_ matchers steal the inner New_ for the Closure arg (#19771).
+            if (
+                null === $unpackFlag
+                && $cfgCallOp instanceof Op\Expr\New_
+                && null !== $block->orig
+                && \is_array($cfgCallOp->args)
+                && \count($cfgCallOp->args) >= 2
+                && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
+            ) {
+                $ctorCallArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                if ($this->callArgOpsContainInlineClosure($ctorCallArg)) {
+                    $closureSlot = $this->resolveInlineClosureCallArgSlot(
+                        $ctorCallArg,
+                        $block,
+                        $cfgCallOp,
+                        $calleeName
+                    );
+                    if (null === $closureSlot) {
+                        $closureSlot = $this->resolvePrecedingClosureCallArgSlot(
+                            $cfgCallOp,
+                            (int) $argIndex,
+                            $block,
+                            $calleeName
+                        );
+                    }
+                    if (null !== $closureSlot) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            (string) $closureSlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
+                    }
+                }
+            }
             // #19719: MethodCall/FuncCall + trailing PropertyFetch call args (insertBefore(
             // $d->createElement('x'), $r->lastChild)) — wire via producer match before
             // legacy immediate-PropertyFetch paths clobber every dead-temp arg.
