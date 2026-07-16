@@ -617,6 +617,7 @@
         "ext/intl/NormalizerIsNormalized.php",
         "ext/intl/NormalizerNormalize.php",
         "ext/intl/UnicodeCanonical.php",
+        "ext/intl/VmBreakIterator.php",
         "ext/intl/VmCollator.php",
         "ext/intl/VmGrapheme.php",
         "ext/intl/VmIdn.php",
@@ -1827,6 +1828,7 @@
         "ext/standard/JitStreamIoKernel.php",
         "ext/standard/JitStreamIsLocal.php",
         "ext/standard/JitStreamIsatty.php",
+        "ext/standard/JitStreamLibcHandleKernel.php",
         "ext/standard/JitStreamMetaKernel.php",
         "ext/standard/JitStreamNotificationCallback.php",
         "ext/standard/JitStreamPath.php",
@@ -5457,9 +5459,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5223,
+        "inventory_files": 5225,
         "excluded": 0,
-        "eligible": 5223,
+        "eligible": 5225,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
