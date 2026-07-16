@@ -1224,6 +1224,11 @@ final class VmDom
         $elementState->attributeNodeIds[$name] = $attr->id;
         $attrState->ownerElementId = $element->id;
         $attr->getProperty(self::PROP_OWNER_ELEMENT)->object($element);
+        self::ensureNamespaceDeclarationForPrefixedAttribute(
+            $element,
+            $attrState->prefix,
+            $attrState->namespaceUri
+        );
         if (null !== $elementState->idAttributeName && $name === $elementState->idAttributeName) {
             self::syncElementIdRegistration($element);
         }
@@ -1562,6 +1567,9 @@ final class VmDom
         }
         if (self::isXmlnsAttributeName($qualifiedName)) {
             self::refreshNamespaceDeclarations($state);
+        } else {
+            [$attrPrefix] = self::splitQualifiedName($qualifiedName);
+            self::ensureNamespaceDeclarationForPrefixedAttribute($element, '' !== $attrPrefix ? $attrPrefix : null, $namespace);
         }
         if (null !== $state->idAttributeName && $qualifiedName === $state->idAttributeName) {
             self::syncElementIdRegistration($element);
@@ -2050,6 +2058,24 @@ final class VmDom
         }
 
         return $declarations;
+    }
+
+    /**
+     * libxml nsDef for prefixed namespaced attributes (php-src ext/dom/element.c; #19458).
+     */
+    private static function ensureNamespaceDeclarationForPrefixedAttribute(
+        ObjectEntry $element,
+        ?string $prefix,
+        ?string $namespaceUri
+    ): void {
+        if (null === $prefix || '' === $prefix || null === $namespaceUri || '' === $namespaceUri) {
+            return;
+        }
+        if (self::parentNamespaceUri($element, $prefix) === $namespaceUri) {
+            return;
+        }
+        $state = DomRegistry::state($element);
+        $state->namespaceDeclarations[$prefix] = $namespaceUri;
     }
 
     /**
