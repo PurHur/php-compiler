@@ -6,12 +6,12 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** StreamSyncJit must route libc sync + warnings through StreamSyncJitHelper PHP (#9815). */
+/** JitStreamSyncKernel must route libc sync + warnings through StreamSyncJitHelper PHP (#9815, #19660). */
 final class StreamSyncRuntimeShrinkTest extends TestCase
 {
-    public function testStreamSyncJitUsesStreamSyncJitHelperNotLibcFsync(): void
+    public function testStreamSyncKernelUsesStreamSyncJitHelperNotLibcFsync(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamSyncJit.php');
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamSyncKernel.php');
         $this->assertStringContainsString('StreamSyncJitHelper', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
         $this->assertStringNotContainsString('StreamSyncStandaloneLlvm', $source);
@@ -20,7 +20,8 @@ final class StreamSyncRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('__compiler_trigger_error', $source);
         $this->assertStringNotContainsString('emitUnsyncableWarning', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamSyncStandaloneLlvm.php');
-        $this->assertLessThan(260, \substr_count($source, "\n") + 1);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamSyncJit.php');
+        $this->assertLessThan(280, \substr_count($source, "\n") + 1);
     }
 
     public function testStreamSyncJitHelperDelegatesToVmPhpFdStream(): void
