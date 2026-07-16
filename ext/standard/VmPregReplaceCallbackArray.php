@@ -24,7 +24,8 @@ final class VmPregReplaceCallbackArray
         HashTable $patterns,
         Variable $subjectVar,
         int $limit = -1,
-        ?int &$count = null
+        ?int &$count = null,
+        int $flags = 0
     ) {
         $pairs = self::patternCallbackPairs($patterns);
         if ([] === $pairs) {
@@ -42,7 +43,8 @@ final class VmPregReplaceCallbackArray
                     $callback,
                     $subject,
                     $limit,
-                    $partial
+                    $partial,
+                    $flags
                 );
                 if (false === $result) {
                     return false;
@@ -75,7 +77,7 @@ final class VmPregReplaceCallbackArray
             $elem = new Variable();
             $elem->string($value->toString());
             $elemCount = 0;
-            $result = self::invoke($vmContext, $patterns, $elem, $limit, $elemCount);
+            $result = self::invoke($vmContext, $patterns, $elem, $limit, $elemCount, $flags);
             if (false === $result) {
                 return false;
             }

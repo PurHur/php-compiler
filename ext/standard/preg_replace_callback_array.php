@@ -76,6 +76,7 @@ final class preg_replace_callback_array extends Internal
         }
 
         $hasCount = $argc >= 4;
+        $flags = 0;
         if ($argc >= 5) {
             $flagsVar = $frame->calledArgs[4]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsVar->type) {
@@ -85,11 +86,6 @@ final class preg_replace_callback_array extends Internal
                 );
             }
             $flags = $flagsVar->toInt();
-            if (0 !== $flags) {
-                throw new \LogicException(
-                    'preg_replace_callback_array() flags must be 0 in this compiler build'
-                );
-            }
         }
 
         $totalCount = 0;
@@ -98,7 +94,8 @@ final class preg_replace_callback_array extends Internal
             $patternsArg->toArray(),
             $subjectVar,
             $limit,
-            $totalCount
+            $totalCount,
+            $flags
         );
         if ($hasCount) {
             $frame->calledArgs[3]->resolveIndirect()->int($totalCount);
