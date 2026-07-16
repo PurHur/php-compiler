@@ -20,6 +20,11 @@ final class NamedNodeMapKey extends DomClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(VmDom::namedNodeMapKey($receiver));
+        $key = VmDom::namedNodeMapKey($receiver);
+        if (null === $key) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->string($key);
+        }
     }
 }
