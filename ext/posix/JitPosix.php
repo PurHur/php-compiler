@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\JitSleep;
 use PHPCompiler\JIT\Builtin\PosixCtermidRuntime;
 use PHPCompiler\JIT\Builtin\PosixSessionRuntime;
 use PHPCompiler\JIT\Builtin\PosixStrerrorRuntime;
+use PHPCompiler\JIT\Builtin\PosixTerminalRuntime;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringInfo;
 use PHPCompiler\JIT\Context;
@@ -167,6 +168,21 @@ final class JitPosix
     public static function ctermid(Context $context): Value
     {
         return PosixCtermidRuntime::ctermid($context);
+    }
+
+    public static function getlogin(Context $context): Value
+    {
+        return PosixTerminalRuntime::getlogin($context);
+    }
+
+    public static function ttyname(Context $context, JITVariable $fdArg): Value
+    {
+        return PosixTerminalRuntime::ttyname($context, $fdArg);
+    }
+
+    public static function isatty(Context $context, JITVariable $fdArg): Value
+    {
+        return PosixTerminalRuntime::isatty($context, $fdArg);
     }
 
     /** posix_uname() — hashtable of utsname fields or false (#6123 JIT phase). */

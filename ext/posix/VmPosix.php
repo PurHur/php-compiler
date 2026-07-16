@@ -240,6 +240,51 @@ final class VmPosix
         return VmPosixCtermidPure::path();
     }
 
+    /**
+     * posix_getlogin() — login name or false (php-src ext/posix/posix.c; #6504).
+     *
+     * @return string|false
+     */
+    public static function getlogin(): string|false
+    {
+        self::$lastError = 0;
+        $name = VmPosixTerminalPure::getlogin();
+        if (null === $name) {
+            self::$lastError = PosixLibcThinAbi::available()
+                ? VmPosixTerminalPure::lastErrno()
+                : 0;
+
+            return false;
+        }
+
+        return $name;
+    }
+
+    /**
+     * posix_ttyname() — terminal path or false (#6504).
+     *
+     * @return string|false
+     */
+    public static function ttyname(int $fd): string|false
+    {
+        self::$lastError = 0;
+        $name = VmPosixTerminalPure::ttyname($fd);
+        if (null === $name) {
+            self::$lastError = 25; // ENOTTY
+
+            return false;
+        }
+
+        return $name;
+    }
+
+    public static function isatty(int $fd): bool
+    {
+        self::$lastError = 0;
+
+        return VmPosixTerminalPure::isatty($fd);
+    }
+
     public static function getLastError(): int
     {
         return self::$lastError;
