@@ -464,6 +464,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/JitHashAlgos.php` | 0 | 1 |
 | `ext/hash/JitHashAlgosKernel.php` | 0 | 1 |
 | `ext/hash/JitHashContext.php` | 0 | 3 |
+| `ext/hash/JitHashCryptoKernel.php` | 0 | 1 |
 | `ext/hash/MhashRegistry.php` | 0 | 1 |
 | `ext/hash/Module.php` | 0 | 16 |
 | `ext/hash/VmHashContext.php` | 0 | 6 |
@@ -3850,7 +3851,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHashAlgos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCryptoJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringHashCryptoLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCryptoPhp.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHashEquals.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHashHmacAlgos.php` | 0 | 1 |
@@ -6001,7 +6001,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomParseSimpleXmlJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 8 class method(s)
 
 ### `ext/dom/DomRegistry.php`
 
@@ -6057,7 +6057,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomXPathEvaluateJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/dom/DomXPathQueryJitHelper.php`
 
@@ -6426,7 +6426,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomXPathEvaluateUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 7 class method(s)
 
 ### `ext/dom/JitDomXPathQuery.php`
 
@@ -7137,28 +7137,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 138)
 - new Variable (line 144)
 - new Variable (line 150)
-- new DOMException (line 171)
-- new DOMException (line 177)
-- new DOMException (line 220)
-- new DOMException (line 340)
-- new DOMException (line 443)
-- new DOMException (line 463)
-- new DOMException (line 472)
-- new Variable (line 549)
-- new DOMException (line 555)
-- new Error (line 568)
-- new Variable (line 572)
-- new Variable (line 582)
-- new Error (line 608)
-- new Variable (line 641)
-- new Variable (line 647)
-- new Variable (line 653)
-- new Variable (line 659)
-- new Variable (line 667)
-- new Variable (line 679)
-- new Variable (line 702)
-- new Variable (line 711)
-- 31 class method(s)
+- new DOMException (line 172)
+- new DOMException (line 178)
+- new DOMException (line 227)
+- new DOMException (line 447)
+- new DOMException (line 551)
+- new DOMException (line 572)
+- new DOMException (line 582)
+- new Variable (line 661)
+- new DOMException (line 667)
+- new Error (line 680)
+- new Variable (line 684)
+- new Variable (line 694)
+- new Error (line 720)
+- new Variable (line 755)
+- new Variable (line 761)
+- new Variable (line 767)
+- new Variable (line 773)
+- new Variable (line 781)
+- new Variable (line 793)
+- new Variable (line 816)
+- new Variable (line 825)
+- 34 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/XPathConstruct.php`
@@ -7957,6 +7957,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 302)
 - new JITVariable (line 329)
+- 18 class method(s)
+
+### `ext/hash/JitHashCryptoKernel.php`
+
+**Warnings** (review for bootstrap subset):
 - 18 class method(s)
 
 ### `ext/hash/MhashRegistry.php`
@@ -28297,8 +28302,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DomDocumentMethodUserScriptLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 1102)
-- 54 class method(s)
+- new JIT (line 1120)
+- 56 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/DomElementTextContentRuntime.php`
@@ -28413,7 +28418,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DomXPathEvaluateRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/DomXPathQueryRuntime.php`
 
@@ -30441,11 +30446,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
-
-### `lib/JIT/Builtin/StringHashCryptoLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 18 class method(s)
 
 ### `lib/JIT/Builtin/StringHashCryptoPhp.php`
 
