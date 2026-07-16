@@ -81,10 +81,6 @@ final class ArrayObjectBuiltin
         $entry->methodVisibility['append'] = $pub;
         $entry->methods['exchangearray'] = new ArrayObjectExchangeArray();
         $entry->methodVisibility['exchangearray'] = $pub;
-        foreach (['uasort', 'uksort'] as $lc) {
-            $entry->methods[$lc] = new SplArrayUserSortMethod(self::CLASS_LC, $lc);
-            $entry->methodVisibility[$lc] = $pub;
-        }
         foreach ([
             'asort' => true,
             'ksort' => true,
@@ -92,6 +88,10 @@ final class ArrayObjectBuiltin
             'natcasesort' => false,
         ] as $lc => $acceptsFlags) {
             $entry->methods[$lc] = new SplArraySortMethod(self::CLASS_LC, $lc, $acceptsFlags);
+            $entry->methodVisibility[$lc] = $pub;
+        }
+        foreach (['uasort', 'uksort'] as $lc) {
+            $entry->methods[$lc] = new SplArrayUserSortMethod(self::CLASS_LC, $lc);
             $entry->methodVisibility[$lc] = $pub;
         }
 

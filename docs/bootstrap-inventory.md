@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5076 |
-| Phase A inventory files (M2 ratio SSOT) | 5076 |
+| PHP files on vm.php path | 5077 |
+| Phase A inventory files (M2 ratio SSOT) | 5077 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 13760 |
+| Source constructs flagged (warnings) | 13764 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1018,7 +1018,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_unpad.php` | 0 | 1 |
 | `ext/spl/AppendIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/ArrayIteratorBuiltin.php` | 0 | 31 |
-| `ext/spl/ArrayObjectBuiltin.php` | 0 | 26 |
+| `ext/spl/ArrayObjectBuiltin.php` | 0 | 27 |
 | `ext/spl/BuiltinClasses.php` | 0 | 1 |
 | `ext/spl/CachingIteratorBuiltin.php` | 0 | 11 |
 | `ext/spl/CallbackFilterIteratorBuiltin.php` | 0 | 6 |
@@ -1040,6 +1040,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/RecursiveTreeIteratorBuiltin.php` | 0 | 6 |
 | `ext/spl/RegexIteratorBuiltin.php` | 0 | 20 |
 | `ext/spl/SplArraySerializeSupport.php` | 0 | 2 |
+| `ext/spl/SplArraySortMethod.php` | 0 | 3 |
 | `ext/spl/SplArrayStorage.php` | 0 | 19 |
 | `ext/spl/SplArrayUserSortMethod.php` | 0 | 2 |
 | `ext/spl/SplClassConstants.php` | 0 | 2 |
@@ -7148,28 +7149,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 5730)
 - new DomNodeState (line 5734)
 - new Variable (line 5741)
-- new ObjectEntry (line 5941)
-- new DomNodeState (line 5945)
-- new Variable (line 5952)
-- new ObjectEntry (line 5972)
-- new DomNodeState (line 5975)
-- new Variable (line 5983)
-- new Variable (line 6152)
-- new DOMException (line 6259)
-- new DOMException (line 6266)
-- new DOMException (line 6273)
-- new DOMException (line 6277)
-- new DOMException (line 6280)
-- new DOMException (line 6289)
-- new DOMException (line 7236)
-- new Variable (line 7295)
-- new Variable (line 7308)
-- new DOMException (line 7391)
-- new DOMException (line 7418)
-- new DOMException (line 7449)
-- new DOMException (line 7513)
+- new ObjectEntry (line 5949)
+- new DomNodeState (line 5953)
+- new Variable (line 5960)
+- new ObjectEntry (line 5980)
+- new DomNodeState (line 5983)
+- new Variable (line 5991)
+- new Variable (line 6160)
+- new DOMException (line 6267)
+- new DOMException (line 6274)
+- new DOMException (line 6281)
+- new DOMException (line 6285)
+- new DOMException (line 6288)
+- new DOMException (line 6297)
+- new DOMException (line 7244)
+- new Variable (line 7303)
+- new Variable (line 7316)
+- new DOMException (line 7399)
+- new DOMException (line 7426)
+- new DOMException (line 7457)
 - new DOMException (line 7521)
-- new DOMException (line 7530)
+- new DOMException (line 7529)
+- new DOMException (line 7538)
 - 342 class method(s)
 - 2 closure(s)
 
@@ -12032,16 +12033,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArrayObjectOffsetUnset (line 78)
 - new ArrayObjectAppend (line 80)
 - new ArrayObjectExchangeArray (line 82)
-- new SplArrayUserSortMethod (line 85)
-- new HashTable (line 109)
-- new ArgumentCountError (line 211)
-- new ArgumentCountError (line 270)
-- new ArgumentCountError (line 319)
-- new ArgumentCountError (line 349)
-- new ArgumentCountError (line 373)
-- new ArgumentCountError (line 400)
-- new ArgumentCountError (line 424)
-- new ArgumentCountError (line 459)
+- new SplArraySortMethod (line 90)
+- new SplArrayUserSortMethod (line 94)
+- new HashTable (line 118)
+- new ArgumentCountError (line 220)
+- new ArgumentCountError (line 279)
+- new ArgumentCountError (line 328)
+- new ArgumentCountError (line 358)
+- new ArgumentCountError (line 382)
+- new ArgumentCountError (line 409)
+- new ArgumentCountError (line 433)
+- new ArgumentCountError (line 468)
 - 15 class method(s)
 
 ### `ext/spl/BuiltinClasses.php`
@@ -12302,6 +12304,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ObjectEntry (line 64)
 - 3 class method(s)
+
+### `ext/spl/SplArraySortMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 39)
+- new ArgumentCountError (line 52)
+- 1 class method(s)
 
 ### `ext/spl/SplArrayStorage.php`
 
@@ -24164,13 +24173,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/rawurldecode.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/rawurlencode.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/readdir.php`
 
@@ -25466,13 +25475,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/urldecode.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/urlencode.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/user_error.php`
 
