@@ -1941,6 +1941,9 @@ final class VmReflection
     /**
      * Arguments passed to the innermost enclosing user function (excludes $this).
      *
+     * Block::$func is a php-cfg {@see CfgFunc} (not {@see Func\PHP}); zero-arg calls leave
+     * calledArgs empty, so detect user frames via {@see Block::isMainScript()} (#19617).
+     *
      * @return list<Variable>
      */
     public static function userCallArgs(Frame $frame): array
@@ -1948,6 +1951,10 @@ final class VmReflection
         $entryCandidate = null;
         for ($f = $frame->parent; null !== $f; $f = $f->parent) {
             if (null === $f->block || null === $f->block->func || $f->hasHandler()) {
+                continue;
+            }
+            // {main} is never a func_get_args() context (php-src basic_functions.c).
+            if ($f->block->isMainScript()) {
                 continue;
             }
             if ([] !== $f->calledArgs) {
@@ -1958,7 +1965,8 @@ final class VmReflection
 
                 return $args;
             }
-            if ($f->block->func instanceof Func\PHP && $f->block === $f->block->func->block) {
+            // Innermost zero-arg user function / method / closure frame.
+            if (null === $entryCandidate) {
                 $entryCandidate = $f;
             }
         }
