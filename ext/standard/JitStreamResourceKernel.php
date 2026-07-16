@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\JIT\Builtin;
+namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
@@ -10,14 +10,14 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM get_resource_type()/get_resources() helpers (#5179, #3646, #6821).
+ * LLVM get_resource_type()/get_resources() helpers (#5179, #3646, #6821, #19613).
  *
- * Replaces __compiler_get_resource_type / __compiler_get_resources in phpc_stream.c.
- * Handle table stays in C until full #5343 migration.
+ * Quarantined from lib/JIT/Builtin/StreamResourceJit — {@see \PHPCompiler\JIT\Builtin\StreamResource}
+ * stays the thin orchestrator. Handle table stays in C until full #5343 migration.
  *
  * php-src: ext/standard/file.c, ext/standard/basic_functions.c
  */
-final class StreamResourceJit
+final class JitStreamResourceKernel
 {
     private const MAX_HANDLES = 256;
 
@@ -81,7 +81,7 @@ final class StreamResourceJit
         $ft = match ($name) {
             '__compiler_get_resource_type' => $context->context->functionType($strPtr, false, $i64),
             '__compiler_get_resources' => $context->context->functionType($htPtr, false, $strPtr),
-            default => throw new \LogicException('StreamResourceJit: unknown function '.$name),
+            default => throw new \LogicException('JitStreamResourceKernel: unknown function '.$name),
         };
 
         return $context->module->addFunction($name, $ft);
@@ -319,7 +319,7 @@ final class StreamResourceJit
         $zero = $i64->constInt(0, false);
         $global = $context->module->getNamedGlobal($globalName);
         if (null === $global) {
-            throw new \LogicException('StreamResourceJit: '.$globalName.' missing');
+            throw new \LogicException('JitStreamResourceKernel: '.$globalName.' missing');
         }
         $slot = $context->builder->gep($global, $zero, $handle);
 
@@ -333,7 +333,7 @@ final class StreamResourceJit
         $zero = $i64->constInt(0, false);
         $global = $context->module->getNamedGlobal(self::GLOBAL_WAS_USED);
         if (null === $global) {
-            throw new \LogicException('StreamResourceJit: '.self::GLOBAL_WAS_USED.' missing');
+            throw new \LogicException('JitStreamResourceKernel: '.self::GLOBAL_WAS_USED.' missing');
         }
         $slot = $context->builder->gep($global, $zero, $handle);
 
@@ -352,7 +352,7 @@ final class StreamResourceJit
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StreamResourceJit implement');
+                throw new \LogicException($name.' missing after JitStreamResourceKernel implement');
             }
             $context->registerFunction($name, $fn);
         }

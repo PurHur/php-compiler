@@ -4020,7 +4020,7 @@ require_once __DIR__.'/../../../ext/standard/JitStreamReadBridgeKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamReadJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamReadRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamResource.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StreamResourceJit.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamResourceKernel.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSocketAccept.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSocketAcceptRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSocketGetNameRuntime.php';
