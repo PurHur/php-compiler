@@ -28,7 +28,11 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('PregCallbackInvokeJitHelper', $source);
         $this->assertStringNotContainsString('pcre2_compile', $source);
         $this->assertStringNotContainsString('StringPregMatchStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('PregMatchUserScriptLlvm', $source);
+        $this->assertStringContainsString('JitPregMatchKernel', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/PregMatchUserScriptLlvm.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitPregMatchKernel.php');
     }
 
     public function testPregJitHelperDelegatesToVmPregNative(): void
