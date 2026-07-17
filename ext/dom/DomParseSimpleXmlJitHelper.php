@@ -294,4 +294,136 @@ final class DomParseSimpleXmlJitHelper
 
         return null;
     }
+
+    /**
+     * Count XPath namespace-axis nodes from compile-time XML (user-script AOT; #20206).
+     *
+     * Supports {@code //namespace::*}, {@code //tag/namespace::*}, {@code /tag/namespace::prefix}.
+     * Returns null when the expression is not a supported namespace-axis shape.
+     */
+    public static function countNamespaceAxisArgv(string $xml, string $expression): ?int
+    {
+        $expression = trim($expression);
+        $wantPrefix = null;
+        $filterTag = null;
+        $absoluteRootOnly = false;
+
+        if (preg_match('~^//namespace::(\*|[\w.-]+)$~', $expression, $matches)) {
+            $wantPrefix = '*' === $matches[1] ? null : $matches[1];
+        } elseif (preg_match('~^//([*\w][\w:-]*)/namespace::(\*|[\w.-]+)$~', $expression, $matches)) {
+            $filterTag = strtolower($matches[1]);
+            $wantPrefix = '*' === $matches[2] ? null : $matches[2];
+        } elseif (preg_match('~^/([*\w][\w:-]*)/namespace::(\*|[\w.-]+)$~', $expression, $matches)) {
+            $filterTag = strtolower($matches[1]);
+            $wantPrefix = '*' === $matches[2] ? null : $matches[2];
+            $absoluteRootOnly = true;
+        } else {
+            return null;
+        }
+
+        $count = 0;
+        $seenRoot = false;
+        foreach (self::walkElementsInScopeNamespaces($xml) as $element) {
+            $local = strtolower($element['local']);
+            if ($absoluteRootOnly) {
+                if ($seenRoot) {
+                    continue;
+                }
+                $seenRoot = true;
+                if (null !== $filterTag && $local !== $filterTag) {
+                    continue;
+                }
+            } elseif (null !== $filterTag && $local !== $filterTag) {
+                continue;
+            }
+            foreach ($element['inScope'] as $prefix => $_) {
+                if (null !== $wantPrefix && $prefix !== $wantPrefix) {
+                    continue;
+                }
+                ++$count;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * Document-order elements with in-scope prefix→URI maps (xml always present; #20097/#20206).
+     *
+     * @return list<array{local: string, inScope: array<string, string>}>
+     */
+    public static function walkElementsInScopeNamespaces(string $xml): array
+    {
+        $xmlNs = 'http://www.w3.org/XML/1998/namespace';
+        $out = [];
+        $stack = [];
+        $inScope = ['xml' => $xmlNs];
+
+        if (!preg_match_all(
+            '/<\/?([A-Za-z_][\w:.-]*)((?:\s[^>]*)?)\s*(\/?)>/',
+            $xml,
+            $tags,
+            PREG_SET_ORDER
+        )) {
+            return $out;
+        }
+
+        foreach ($tags as $tag) {
+            $full = $tag[0];
+            if (0 === strpos($full, '</')) {
+                if ([] === $stack) {
+                    continue;
+                }
+                array_pop($stack);
+                $inScope = ['xml' => $xmlNs];
+                foreach ($stack as $frame) {
+                    foreach ($frame as $prefix => $uri) {
+                        unset($inScope[$prefix]);
+                        $inScope[$prefix] = $uri;
+                    }
+                }
+                continue;
+            }
+
+            $qname = $tag[1];
+            $attrs = $tag[2] ?? '';
+            $selfClosing = '/' === ($tag[3] ?? '');
+            $colon = strpos($qname, ':');
+            $local = false === $colon ? $qname : substr($qname, $colon + 1);
+
+            $decls = [];
+            if (preg_match_all('/\sxmlns:([A-Za-z_][\w.-]*)\s*=\s*"([^"]*)"/', $attrs, $pairs, PREG_SET_ORDER)) {
+                foreach ($pairs as $pair) {
+                    $decls[$pair[1]] = $pair[2];
+                }
+            }
+            if (preg_match('/\sxmlns\s*=\s*"([^"]*)"/', $attrs, $def)) {
+                $decls[''] = $def[1];
+            }
+
+            foreach ($decls as $prefix => $uri) {
+                unset($inScope[$prefix]);
+                $inScope[$prefix] = $uri;
+            }
+
+            $out[] = [
+                'local' => $local,
+                'inScope' => $inScope,
+            ];
+
+            if ($selfClosing) {
+                $inScope = ['xml' => $xmlNs];
+                foreach ($stack as $frame) {
+                    foreach ($frame as $prefix => $uri) {
+                        unset($inScope[$prefix]);
+                        $inScope[$prefix] = $uri;
+                    }
+                }
+            } else {
+                $stack[] = $decls;
+            }
+        }
+
+        return $out;
+    }
 }

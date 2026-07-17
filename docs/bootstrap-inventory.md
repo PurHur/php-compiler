@@ -6579,7 +6579,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomParseSimpleXmlJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 12 class method(s)
 
 ### `ext/dom/DomRegistry.php`
 
@@ -7115,7 +7115,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomXPathQueryUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 92)
+- new JITVariable (line 101)
 - 4 class method(s)
 
 ### `ext/dom/Module.php`
