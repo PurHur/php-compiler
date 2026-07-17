@@ -8011,6 +8011,33 @@ final class VmDom
 
             return $text;
         }
+        // Comment / PI / EntityReference — mirror cloneNodeEntry (php-src xmlDocCopyNode; #20157).
+        if (self::isCommentNode($node)) {
+            $state = DomRegistry::state($node);
+            $comment = self::createComment($ctx, $state->textContent ?? '', $document);
+            self::linkChildToParent($comment, null);
+
+            return $comment;
+        }
+        if (self::isProcessingInstruction($node)) {
+            $state = DomRegistry::state($node);
+            $pi = self::createProcessingInstruction(
+                $ctx,
+                $state->nodeName,
+                $state->textContent ?? '',
+                $document
+            );
+            self::linkChildToParent($pi, null);
+
+            return $pi;
+        }
+        if (self::isEntityReference($node)) {
+            $state = DomRegistry::state($node);
+            $eref = self::createEntityReference($ctx, $state->nodeName, $document)->toObject();
+            self::linkChildToParent($eref, null);
+
+            return $eref;
+        }
         if (self::isAttr($node)) {
             $state = DomRegistry::state($node);
             $attr = self::createAttributeNS($ctx, $state->namespaceUri, $state->nodeName, $document)->toObject();
