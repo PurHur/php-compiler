@@ -257,8 +257,8 @@ final class VmDomXPath
             return null !== $attr ? [$attr->id] : [];
         }
 
-        // Namespace axis: namespace::* / namespace::prefix (php-src/libxml; #20097).
-        $nsIds = self::tryEvaluateNamespaceAxis($ctx, $context, $expression);
+        // Namespace axis: namespace::* / //namespace::* / path/namespace::* (php-src/libxml; #20097, #20170).
+        $nsIds = self::tryEvaluateNamespaceAxis($ctx, $context, $expression, $state->xpathNamespaces);
         if (null !== $nsIds) {
             return $nsIds;
         }
@@ -326,33 +326,145 @@ final class VmDomXPath
     }
 
     /**
-     * Resolve namespace::* / namespace::prefix to DOMNameSpaceNode ids (in-scope; #20097).
+     * Resolve namespace-axis paths to DOMNameSpaceNode ids (in-scope; #20097, #20170).
+     *
+     * Supports relative `namespace::*` / `namespace::prefix`, descendant `//namespace::*`,
+     * location paths `//tag/namespace::*`, absolute `/a/b/namespace::prefix`, and
+     * relative `tag/namespace::*`. Absolute/`//` forms are document-scoped like libxml
+     * (DOMXPath ignores the context node for leading `/`).
+     *
+     * @param array<string, string> $namespaces
      *
      * @return list<int>|null null when expression is not a namespace-axis path
      */
     private static function tryEvaluateNamespaceAxis(
         Context $ctx,
         ObjectEntry $context,
-        string $expression
+        string $expression,
+        array $namespaces
     ): ?array {
-        if (!preg_match('~^namespace::(\*|[\w.-]+)$~', $expression, $matches)) {
-            return null;
-        }
-        if (!VmDom::isElement($context)) {
-            return [];
+        // Relative: namespace::* / namespace::prefix on the context element (#20097).
+        if (preg_match('~^namespace::(\*|[\w.-]+)$~', $expression, $matches)) {
+            if (!VmDom::isElement($context)) {
+                return [];
+            }
+
+            return self::namespaceAxisNodesForElement($ctx, $context, $matches[1]);
         }
 
-        $wantPrefix = '*' === $matches[1] ? null : $matches[1];
-        $inScope = self::collectInScopeNamespaces($context);
+        // //namespace::* / //namespace::prefix — every element in document order (#20170).
+        if (preg_match('~^//namespace::(\*|[\w.-]+)$~', $expression, $matches)) {
+            return self::namespaceAxisNodesForElementIds(
+                $ctx,
+                self::collectDocumentElementIds($context),
+                $matches[1]
+            );
+        }
+
+        // //tag/namespace::* / //tag/namespace::prefix (#20170).
+        if (preg_match('~^//([*\w][\w:-]*)/namespace::(\*|[\w.-]+)$~', $expression, $matches)) {
+            $document = self::ownerDocumentOrSelf($context);
+            if (null === $document) {
+                return [];
+            }
+
+            return self::namespaceAxisNodesForElementIds(
+                $ctx,
+                self::collectDescendantElements($document, $matches[1], $namespaces),
+                $matches[2]
+            );
+        }
+
+        // /abs/path/namespace::* — evaluate element path then namespace axis (#20170).
+        if (preg_match('~^/(.+)/namespace::(\*|[\w.-]+)$~', $expression, $matches)) {
+            return self::namespaceAxisNodesForElementIds(
+                $ctx,
+                self::evaluateAbsolutePath($context, $matches[1], $namespaces),
+                $matches[2]
+            );
+        }
+
+        // Relative tag/namespace::* from context (#20170).
+        if (preg_match('~^([*\w][\w:-]*)/namespace::(\*|[\w.-]+)$~', $expression, $matches)) {
+            return self::namespaceAxisNodesForElementIds(
+                $ctx,
+                self::collectChildElements($context, $matches[1], $namespaces),
+                $matches[2]
+            );
+        }
+
+        return null;
+    }
+
+    /**
+     * In-scope DOMNameSpaceNode ids for one element (`*` = all prefixes).
+     *
+     * @return list<int>
+     */
+    private static function namespaceAxisNodesForElement(
+        Context $ctx,
+        ObjectEntry $element,
+        string $want
+    ): array {
+        $wantPrefix = '*' === $want ? null : $want;
         $ids = [];
-        foreach ($inScope as $prefix => $uri) {
+        foreach (self::collectInScopeNamespaces($element) as $prefix => $uri) {
             if (null !== $wantPrefix && $prefix !== $wantPrefix) {
                 continue;
             }
-            $ids[] = VmDom::createNameSpaceNode($ctx, $context, $prefix, $uri)->id;
+            $ids[] = VmDom::createNameSpaceNode($ctx, $element, $prefix, $uri)->id;
         }
 
         return $ids;
+    }
+
+    /**
+     * @param list<int> $elementIds
+     *
+     * @return list<int>
+     */
+    private static function namespaceAxisNodesForElementIds(
+        Context $ctx,
+        array $elementIds,
+        string $want
+    ): array {
+        $ids = [];
+        foreach ($elementIds as $elementId) {
+            $element = DomRegistry::entry($elementId);
+            if (null === $element || !VmDom::isElement($element)) {
+                continue;
+            }
+            foreach (self::namespaceAxisNodesForElement($ctx, $element, $want) as $nsId) {
+                $ids[] = $nsId;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * All element ids in the owner document (document order).
+     *
+     * @return list<int>
+     */
+    private static function collectDocumentElementIds(ObjectEntry $context): array
+    {
+        $document = self::ownerDocumentOrSelf($context);
+        if (null === $document) {
+            return [];
+        }
+
+        return VmDom::collectElementsByTagName($document, '*');
+    }
+
+    private static function ownerDocumentOrSelf(ObjectEntry $context): ?ObjectEntry
+    {
+        if (VmDom::isDocument($context)) {
+            return $context;
+        }
+        $document = VmDom::ownerDocumentEntry($context);
+
+        return null !== $document && VmDom::isDocument($document) ? $document : null;
     }
 
     /**
