@@ -549,8 +549,63 @@ final class VmMbstring
      */
     public static function strstr(string $haystack, string $needle, bool $part = false, string $encoding = 'UTF-8')
     {
+        return self::strstrFamily($haystack, $needle, $part, $encoding, false, 'mb_strstr');
+    }
+
+    /**
+     * mb_stristr() — case-insensitive mb_strstr (php-src ext/mbstring/mbstring.c; #20006).
+     *
+     * @return string|false
+     */
+    public static function stristr(string $haystack, string $needle, bool $part = false, string $encoding = 'UTF-8')
+    {
+        return self::strstrFamily($haystack, $needle, $part, $encoding, true, 'mb_stristr');
+    }
+
+    /**
+     * mb_strrchr() — find last occurrence and return haystack from that point (php-src ext/mbstring/mbstring.c; #20006).
+     *
+     * @return string|false
+     */
+    public static function strrchr(string $haystack, string $needle, bool $part = false, string $encoding = 'UTF-8')
+    {
         self::assertSearchEncoding($encoding);
-        $pos = self::utf8Strpos($haystack, $needle, 0, false, $encoding, 'mb_strstr');
+        $pos = self::utf8Strrpos($haystack, $needle, 0, false, $encoding, 'mb_strrchr');
+        if (false === $pos) {
+            return false;
+        }
+        if ($part) {
+            return VmString::utf8CharSubstr($haystack, 0, $pos);
+        }
+
+        return VmString::utf8CharSubstr(
+            $haystack,
+            $pos,
+            VmString::utf8CharLength($haystack) - $pos
+        );
+    }
+
+    /**
+     * @return int|false
+     */
+    public static function strripos(string $haystack, string $needle, int $offset = 0, string $encoding = 'UTF-8')
+    {
+        return self::utf8Strrpos($haystack, $needle, $offset, true, $encoding, 'mb_strripos');
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function strstrFamily(
+        string $haystack,
+        string $needle,
+        bool $part,
+        string $encoding,
+        bool $caseInsensitive,
+        string $function
+    ) {
+        self::assertSearchEncoding($encoding);
+        $pos = self::utf8Strpos($haystack, $needle, 0, $caseInsensitive, $encoding, $function);
         if (false === $pos) {
             return false;
         }

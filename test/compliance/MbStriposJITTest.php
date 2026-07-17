@@ -9,7 +9,7 @@ require_once __DIR__.'/../BaseTest.php';
 /**
  * @group llvm
  */
-/** JIT compliance for mb_stripos()/mb_strrpos()/mb_strrichr() (#7015). */
+/** JIT compliance for mb_stripos()/mb_strrpos()/mb_strrichr() (#7015) + mb_stristr family (#20006). */
 final class MbStriposJITTest extends BaseTest
 {
     protected static string $DIR = __DIR__;
@@ -23,6 +23,10 @@ final class MbStriposJITTest extends BaseTest
         yield 'mb_stripos_enum_typeerror_jit.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/mb_stripos_enum_typeerror_jit.phpt',
             'mb_stripos_enum_typeerror_jit.phpt'
+        );
+        yield 'mb_stristr_family_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/mb_stristr_family_jit.phpt',
+            'mb_stristr_family_jit.phpt'
         );
     }
 
