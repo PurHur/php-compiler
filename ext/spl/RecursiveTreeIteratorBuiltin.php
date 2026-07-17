@@ -216,7 +216,7 @@ final class RecursiveTreeIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             RecursiveTreeIteratorBuiltin::CLASS_LC,
             'RecursiveTreeIterator::__construct()'
