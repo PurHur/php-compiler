@@ -265,6 +265,18 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function removeAttribute(VmContext $ctx, ObjectEntry $element, array $extra): Variable
+    {
+        $name = self::stringArg($extra[0] ?? self::missingArg('removeAttribute', 0), 'removeAttribute', 0);
+        $var = new Variable();
+        $var->bool(VmDom::removeAttributeNS($ctx, $element, null, $name));
+
+        return $var;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function getAttributeNodeNS(VmContext $ctx, ObjectEntry $element, array $extra): Variable
     {
         $namespace = self::nullableStringArg($extra[0] ?? self::missingArg('getAttributeNodeNS', 0), 'getAttributeNodeNS', 0);

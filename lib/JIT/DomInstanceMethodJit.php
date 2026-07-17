@@ -72,6 +72,7 @@ final class DomInstanceMethodJit
         'domelement::getattribute' => true,
         'domnode::getattribute' => true,
         'domelement::setattribute' => true,
+        'domelement::removeattribute' => true,
         'domelement::getattributenode' => true,
         'domelement::getattributenodens' => true,
         'domelement::setattributenodens' => true,
@@ -154,6 +155,11 @@ final class DomInstanceMethodJit
             }
             if ('domelement::setattribute' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomElementSetAttribute();
+
+                return;
+            }
+            if ('domelement::removeattribute' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementRemoveAttribute();
 
                 return;
             }
@@ -371,6 +377,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domelement::getattribute');
             self::ensureProxy($context, 'domnode::getattribute');
             self::ensureProxy($context, 'domelement::setattribute');
+            self::ensureProxy($context, 'domelement::removeattribute');
             self::ensureProxy($context, 'domelement::getattributenode');
             self::ensureProxy($context, 'domelement::getattributenodens');
             self::ensureProxy($context, 'domelement::setattributenodens');
@@ -396,7 +403,7 @@ final class DomInstanceMethodJit
     private const KNOWN_METHODS = [
         'domdocument' => ['createelement', 'appendchild', 'loadhtml', 'getelementbyid'],
         'domnode' => ['appendchild'],
-        'domelement' => ['setattribute'],
+        'domelement' => ['setattribute', 'removeattribute'],
         'domtokenlist' => ['add', 'contains', 'item', 'toggle', 'remove'],
         'domxpath' => ['query', 'evaluate', 'registernamespace'],
         'domnodelist' => ['item'],

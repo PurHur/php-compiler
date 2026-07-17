@@ -4383,6 +4383,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomElementGetAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementGetAttributeNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementGetAttributeNodeNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetAttribute.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomElementRemoveAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetAttributeNodeNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementToggleAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomImplementationCreateDocumentType.php';

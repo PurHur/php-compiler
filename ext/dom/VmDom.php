@@ -1244,6 +1244,8 @@ final class VmDom
         self::detachAttributeFromPreviousOwner($ctx, $attr, $element);
         $elementState = DomRegistry::state($element);
         $replaced = null;
+        $previousIdValue = $elementState->attributes[$name] ?? null;
+        $idBearing = self::elementAttributeIsIdBearing($element, $name);
         if (\array_key_exists($name, $elementState->attributes)) {
             $cachedId = $elementState->attributeNodeIds[$name] ?? null;
             if (null !== $cachedId) {
@@ -1264,9 +1266,8 @@ final class VmDom
             $attrState->prefix,
             $attrState->namespaceUri
         );
-        if (null !== $elementState->idAttributeName && $name === $elementState->idAttributeName) {
-            self::syncElementIdRegistration($element);
-        }
+        // php-src setAttributeNode drops the old ID table entry but does not re-register (#19870).
+        self::rebindElementIdOnAttributeWrite($element, $name, $previousIdValue, false, $idBearing);
         self::syncElementAttributes($ctx, $element);
         $var = new Variable();
         if (null === $replaced) {
@@ -1369,15 +1370,11 @@ final class VmDom
         ) {
             throw new \DOMException('Not Found Error', 8);
         }
+        $previousIdValue = $elementState->attributes[$name] ?? null;
+        $idBearing = self::elementAttributeIsIdBearing($element, $name);
         unset($elementState->attributes[$name], $elementState->attributeNamespaces[$name], $elementState->attributeNodeIds[$name]);
         self::detachAttributeNode($attr);
-        if (null !== $elementState->idAttributeName && $name === $elementState->idAttributeName) {
-            $document = self::ownerDocumentEntry($element);
-            if (null !== $document) {
-                self::unregisterElementId($document, $element);
-            }
-            $elementState->idAttributeName = null;
-        }
+        self::rebindElementIdOnAttributeWrite($element, $name, $previousIdValue, false, $idBearing);
         self::syncElementAttributes($ctx, $element);
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($attr);
@@ -1466,18 +1463,14 @@ final class VmDom
             if ($cachedId !== $attr->id) {
                 continue;
             }
+            $previousIdValue = $prevState->attributes[$qName] ?? null;
+            $idBearing = self::elementAttributeIsIdBearing($prevOwner, $qName);
             unset(
                 $prevState->attributes[$qName],
                 $prevState->attributeNamespaces[$qName],
                 $prevState->attributeNodeIds[$qName]
             );
-            if (null !== $prevState->idAttributeName && $qName === $prevState->idAttributeName) {
-                $document = self::ownerDocumentEntry($prevOwner);
-                if (null !== $document) {
-                    self::unregisterElementId($document, $prevOwner);
-                }
-                $prevState->idAttributeName = null;
-            }
+            self::rebindElementIdOnAttributeWrite($prevOwner, $qName, $previousIdValue, false, $idBearing);
             self::syncElementAttributes($ctx, $prevOwner);
             break;
         }
@@ -1611,8 +1604,11 @@ final class VmDom
 
             return;
         }
-        $state->attributes[$qualifiedName] = $value;
+        $previousIdValue = $state->attributes[$qualifiedName] ?? null;
+        // Apply namespace before the ID-bearing check so xml:id / namespaced id is recognized (#19870).
         $state->attributeNamespaces[$qualifiedName] = $namespace ?? '';
+        $idBearing = self::elementAttributeIsIdBearing($element, $qualifiedName);
+        $state->attributes[$qualifiedName] = $value;
         if (isset($state->attributeNodeIds[$qualifiedName])) {
             $cached = DomRegistry::entry($state->attributeNodeIds[$qualifiedName]);
             if (null !== $cached && self::isAttr($cached)) {
@@ -1624,9 +1620,8 @@ final class VmDom
             [$attrPrefix] = self::splitQualifiedName($qualifiedName);
             self::ensureNamespaceDeclarationForPrefixedAttribute($element, '' !== $attrPrefix ? $attrPrefix : null, $namespace);
         }
-        if (null !== $state->idAttributeName && $qualifiedName === $state->idAttributeName) {
-            self::syncElementIdRegistration($element);
-        }
+        // HTML id / xml:id / setIdAttribute — refresh getElementById map (php-src element.c; #19870).
+        self::rebindElementIdOnAttributeWrite($element, $qualifiedName, $previousIdValue, true, $idBearing);
         if (CompilerVersion::supportsDomTokenList() && 'class' === $qualifiedName) {
             VmDomTokenList::invalidateForElement($element);
         }
@@ -1670,6 +1665,8 @@ final class VmDom
         if (null === $removedQName) {
             return false;
         }
+        $previousIdValue = $state->attributes[$removedQName] ?? null;
+        $idBearing = self::elementAttributeIsIdBearing($element, $removedQName);
         if (isset($state->attributeNodeIds[$removedQName])) {
             $cached = DomRegistry::entry($state->attributeNodeIds[$removedQName]);
             if (null !== $cached && self::isAttr($cached)) {
@@ -1678,13 +1675,8 @@ final class VmDom
             unset($state->attributeNodeIds[$removedQName]);
         }
         unset($state->attributes[$removedQName], $state->attributeNamespaces[$removedQName]);
-        if (null !== $state->idAttributeName && $removedQName === $state->idAttributeName) {
-            $document = self::ownerDocumentEntry($element);
-            if (null !== $document) {
-                self::unregisterElementId($document, $element);
-            }
-            $state->idAttributeName = null;
-        }
+        // Drop ID map entry before clearing setIdAttribute flag (#19870).
+        self::rebindElementIdOnAttributeWrite($element, $removedQName, $previousIdValue, false, $idBearing);
         if (CompilerVersion::supportsDomTokenList() && 'class' === $removedQName) {
             VmDomTokenList::invalidateForElement($element);
         }
@@ -1844,7 +1836,8 @@ final class VmDom
     private static function registerElementId(ObjectEntry $document, ObjectEntry $element): void
     {
         $nodeState = DomRegistry::state($element);
-        $idAttr = $nodeState->idAttributeName;
+        $docState = DomRegistry::state($document);
+        $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
         if (null === $idAttr) {
             return;
         }
@@ -1852,13 +1845,31 @@ final class VmDom
         if (null === $value || '' === $value) {
             return;
         }
-        DomRegistry::state($document)->elementIds[$value] = $element->id;
+        $docState->elementIds[$value] = $element->id;
     }
 
-    private static function unregisterElementId(ObjectEntry $document, ObjectEntry $element): void
-    {
+    /**
+     * @param string|null $valueOverride Previous ID string when attributes already mutated (#19870).
+     */
+    private static function unregisterElementId(
+        ObjectEntry $document,
+        ObjectEntry $element,
+        ?string $valueOverride = null
+    ): void {
+        if (null !== $valueOverride) {
+            if ('' === $valueOverride) {
+                return;
+            }
+            $docState = DomRegistry::state($document);
+            if (($docState->elementIds[$valueOverride] ?? null) === $element->id) {
+                unset($docState->elementIds[$valueOverride]);
+            }
+
+            return;
+        }
         $nodeState = DomRegistry::state($element);
-        $idAttr = $nodeState->idAttributeName;
+        $docState = DomRegistry::state($document);
+        $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
         if (null === $idAttr) {
             return;
         }
@@ -1866,7 +1877,6 @@ final class VmDom
         if (null === $value || '' === $value) {
             return;
         }
-        $docState = DomRegistry::state($document);
         if (($docState->elementIds[$value] ?? null) === $element->id) {
             unset($docState->elementIds[$value]);
         }
@@ -1880,6 +1890,88 @@ final class VmDom
         }
         self::unregisterElementId($document, $element);
         self::registerElementId($document, $element);
+        self::syncElementIdMapProperty($document);
+    }
+
+    /**
+     * Whether $qName is an ID-bearing attribute for this element (HTML id / xml:id / setIdAttribute / DTD).
+     * Does not require the attribute to be present on the element (#19870).
+     */
+    private static function attributeQNameIsIdBearing(
+        ObjectEntry $document,
+        DomNodeState $docState,
+        DomNodeState $nodeState,
+        string $qName
+    ): bool {
+        if (null !== $nodeState->idAttributeName && $qName === $nodeState->idAttributeName) {
+            return true;
+        }
+        if ($docState->isHtmlDocument && 'id' === $qName) {
+            return true;
+        }
+        if (!$docState->isHtmlDocument || self::documentValidateOnParse($document)) {
+            $dtdId = $docState->idAttrByElement[$nodeState->nodeName] ?? null;
+            if (null !== $dtdId && $dtdId === $qName) {
+                return true;
+            }
+        }
+        if (!$docState->isHtmlDocument) {
+            if ('xml:id' === $qName) {
+                return true;
+            }
+            if ('id' === $qName
+                && self::XML_NAMESPACE_URI === ($nodeState->attributeNamespaces[$qName] ?? '')
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function elementAttributeIsIdBearing(ObjectEntry $element, string $qName): bool
+    {
+        $document = self::ownerDocumentEntry($element);
+        if (null === $document) {
+            return false;
+        }
+
+        return self::attributeQNameIsIdBearing(
+            $document,
+            DomRegistry::state($document),
+            DomRegistry::state($element),
+            $qName
+        );
+    }
+
+    /**
+     * Rebind document elementIds after setAttribute / removeAttribute (#19870).
+     * Caller must evaluate {@see attributeQNameIsIdBearing()} before mutating attributes
+     * (remove paths clear namespaces that the check needs).
+     * setAttributeNode only drops the old id (php-src / libxml); setAttribute re-registers.
+     */
+    private static function rebindElementIdOnAttributeWrite(
+        ObjectEntry $element,
+        string $qName,
+        ?string $previousValue,
+        bool $registerNext,
+        bool $isIdBearing
+    ): void {
+        if (!$isIdBearing) {
+            return;
+        }
+        $document = self::ownerDocumentEntry($element);
+        if (null === $document) {
+            return;
+        }
+        $nodeState = DomRegistry::state($element);
+        self::unregisterElementId($document, $element, $previousValue);
+        if ($registerNext) {
+            self::registerElementId($document, $element);
+        } elseif (null !== $nodeState->idAttributeName && $qName === $nodeState->idAttributeName) {
+            $nodeState->idAttributeName = null;
+        }
+        self::syncElementIdMapProperty($document);
     }
 
     public static function lookupPrefix(ObjectEntry $node, ?string $namespace): ?string
@@ -7423,9 +7515,7 @@ final class VmDom
             $name = $state->nodeName;
             $ownerState->attributes[$name] = $value;
             // Bogus Attr named xmlns:* stays in the Attr map; nsDef is separate (#19718).
-            if (null !== $ownerState->idAttributeName && $name === $ownerState->idAttributeName) {
-                self::syncElementIdRegistration($owner);
-            }
+            // php-src Attr value write does not refresh the document ID table (#19870).
             if (CompilerVersion::supportsDomTokenList() && 'class' === $name) {
                 VmDomTokenList::invalidateForElement($owner);
             }
@@ -7755,18 +7845,14 @@ final class VmDom
             if ($cachedId !== $attr->id) {
                 continue;
             }
+            $previousIdValue = $prevState->attributes[$qName] ?? null;
+            $idBearing = self::elementAttributeIsIdBearing($prevOwner, $qName);
             unset(
                 $prevState->attributes[$qName],
                 $prevState->attributeNamespaces[$qName],
                 $prevState->attributeNodeIds[$qName]
             );
-            if (null !== $prevState->idAttributeName && $qName === $prevState->idAttributeName) {
-                $document = self::ownerDocumentEntry($prevOwner);
-                if (null !== $document) {
-                    self::unregisterElementId($document, $prevOwner);
-                }
-                $prevState->idAttributeName = null;
-            }
+            self::rebindElementIdOnAttributeWrite($prevOwner, $qName, $previousIdValue, false, $idBearing);
             self::syncElementAttributes($ctx, $prevOwner);
             break;
         }
@@ -8023,6 +8109,8 @@ final class VmDom
         if (!\array_key_exists($qualifiedName, $state->attributes)) {
             return;
         }
+        $previousIdValue = $state->attributes[$qualifiedName] ?? null;
+        $idBearing = self::elementAttributeIsIdBearing($element, $qualifiedName);
         if (isset($state->attributeNodeIds[$qualifiedName])) {
             $cached = DomRegistry::entry($state->attributeNodeIds[$qualifiedName]);
             if (null !== $cached && self::isAttr($cached)) {
@@ -8031,13 +8119,7 @@ final class VmDom
             unset($state->attributeNodeIds[$qualifiedName]);
         }
         unset($state->attributes[$qualifiedName], $state->attributeNamespaces[$qualifiedName]);
-        if (null !== $state->idAttributeName && $qualifiedName === $state->idAttributeName) {
-            $document = self::ownerDocumentEntry($element);
-            if (null !== $document) {
-                self::unregisterElementId($document, $element);
-            }
-            $state->idAttributeName = null;
-        }
+        self::rebindElementIdOnAttributeWrite($element, $qualifiedName, $previousIdValue, false, $idBearing);
         self::syncElementAttributes($ctx, $element);
     }
 
