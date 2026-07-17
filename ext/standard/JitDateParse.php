@@ -22,11 +22,17 @@ final class JitDateParse
         if (1 !== \count($args)) {
             throw new \LogicException('date_parse() expects exactly 1 argument in this compiler build');
         }
-        $lit = self::compileTimeStringArg($args[0]);
-        if (null === $lit) {
-            throw new \LogicException(
-                'date_parse() requires compile-time string operands in this compiler build (issue #6172)'
-            );
+        // Z_PARAM_STR $datetime — null TypeError on PROFILE=8.4 (#20227).
+        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'date_parse', 0, 'datetime');
+            $lit = '';
+        } else {
+            $lit = self::compileTimeStringArg($args[0]);
+            if (null === $lit) {
+                throw new \LogicException(
+                    'date_parse() requires compile-time string operands in this compiler build (issue #6172)'
+                );
+            }
         }
 
         $parsed = VmDateTimeNative::parseDate($lit);

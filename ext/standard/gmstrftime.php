@@ -54,14 +54,15 @@ final class gmstrftime extends Internal
     /** @return string|false */
     private static function vmFormatArg(Frame $frame): string|false
     {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
-            return InternalStrictArg::requireString($frame, 0, 'gmstrftime', 'format')->toString();
-        }
+        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 (#20227, ext/date/php_date.c).
         $arg = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_NULL === $arg->type) {
+        if (Variable::TYPE_NULL === $arg->type
+            && !InternalStrictArg::isCallerStrict($frame)
+            && !VmString::requiresZparamStrStrictNullOnForwardProfile()
+        ) {
             return false;
         }
 
-        return VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'gmstrftime', 0, 'format');
+        return VmString::zparamStrBuiltinArgForFrame($frame, 0, 'gmstrftime', 0, 'format');
     }
 }

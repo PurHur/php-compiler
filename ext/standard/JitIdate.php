@@ -68,7 +68,8 @@ final class JitIdate
 
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
-        return JitStringBuiltinArg::lowerStrictOrCoercible(
+        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 (#20227).
+        return JitStringBuiltinArg::lowerZparamStr(
             $context,
             $arg,
             'idate',

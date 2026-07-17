@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -79,11 +78,8 @@ final class idate extends Internal
 
     private static function resolveFormatArg(Frame $frame): string
     {
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            InternalStrictArg::requireString($frame, 0, 'idate', 'format');
-        }
-
-        return VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'idate', 0, 'format');
+        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 (#20227, ext/date/php_date.c).
+        return VmString::zparamStrBuiltinArgForFrame($frame, 0, 'idate', 0, 'format');
     }
 
     private function triggerWarning(Frame $frame, string $message): void
