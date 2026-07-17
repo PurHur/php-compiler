@@ -199,6 +199,16 @@ final class BackedEnum
                 $result->int($arg->toInt());
 
                 return $result;
+            case Variable::TYPE_NULL:
+                // Zend zend_enum_from_base: null coerces to 0 under weak types (#20072).
+                $result->int(0);
+
+                return $result;
+            case Variable::TYPE_BOOLEAN:
+                // Same weak path as null/false→0, true→1 (zend_enum.c).
+                $result->int($arg->toBool() ? 1 : 0);
+
+                return $result;
             case Variable::TYPE_FLOAT:
                 $float = $arg->toFloat();
                 if (!is_finite($float) || (float) (int) $float !== $float) {
@@ -246,7 +256,8 @@ final class BackedEnum
 
                 return $result;
             case Variable::TYPE_NULL:
-                $result->string('');
+                // Zend: null→"0" (same as false), not convert_to_string empty (#20072).
+                $result->string('0');
 
                 return $result;
             default:

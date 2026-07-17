@@ -154,7 +154,8 @@ final class BackedEnumFromRuntime
             $typeErrorEmit
         );
         $context->builder->positionAtEnd($nullBlock);
-        $emptyStr = $context->builder->load($context->constantStringFromString(''));
+        // Zend: null→"0" (same as false), not convert_to_string empty (#20072).
+        $nullStr = $context->builder->load($context->constantStringFromString('0'));
         $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -169,8 +170,8 @@ final class BackedEnumFromRuntime
         $phi->addIncoming($intStr, $intEnd);
         $phi->addIncoming($floatStr, $floatEnd);
         $phi->addIncoming($boolStr, $boolEnd);
-        $phi->addIncoming($emptyStr, $nullEnd);
-        $phi->addIncoming($emptyStr, $typeErrorEmit);
+        $phi->addIncoming($nullStr, $nullEnd);
+        $phi->addIncoming($nullStr, $typeErrorEmit);
 
         return $phi;
     }
@@ -188,6 +189,8 @@ final class BackedEnumFromRuntime
         $longBlock = $fn->appendBasicBlock('enum_from_norm_int_long');
         $floatBlock = $fn->appendBasicBlock('enum_from_norm_int_float');
         $stringBlock = $fn->appendBasicBlock('enum_from_norm_int_string');
+        $nullBlock = $fn->appendBasicBlock('enum_from_norm_int_null');
+        $boolBlock = $fn->appendBasicBlock('enum_from_norm_int_bool');
         $doneBlock = $fn->appendBasicBlock('enum_from_norm_int_done');
         $typeErrorEmit = $fn->appendBasicBlock('enum_from_norm_int_type_error');
 
@@ -216,15 +219,45 @@ final class BackedEnumFromRuntime
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterFloat);
+        $afterString = $fn->appendBasicBlock('enum_from_norm_int_after_string');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_STRING, false)),
             $stringBlock,
-            $typeErrorEmit
+            $afterString
         );
         $context->builder->positionAtEnd($stringBlock);
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
         $stringInt = self::stringToInt($context, $stringVal);
         $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterString);
+        $afterNull = $fn->appendBasicBlock('enum_from_norm_int_after_null');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_NULL, false)),
+            $nullBlock,
+            $afterNull
+        );
+        $context->builder->positionAtEnd($nullBlock);
+        // Zend: null→0 under weak types (#20072).
+        $nullInt = $i64->constInt(0, false);
+        $nullEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterNull);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)),
+            $boolBlock,
+            $typeErrorEmit
+        );
+        $context->builder->positionAtEnd($boolBlock);
+        $boolVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $boolInt = $context->builder->select(
+            $context->builder->icmp(Builder::INT_NE, $boolVal, $i64->constInt(0, false)),
+            $i64->constInt(1, false),
+            $i64->constInt(0, false)
+        );
+        $boolEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($typeErrorEmit);
@@ -241,6 +274,8 @@ final class BackedEnumFromRuntime
         $phi->addIncoming($longVal, $longEnd);
         $phi->addIncoming($floatInt, $floatEnd);
         $phi->addIncoming($stringInt, $stringEnd);
+        $phi->addIncoming($nullInt, $nullEnd);
+        $phi->addIncoming($boolInt, $boolEnd);
         $phi->addIncoming($i64->constInt(0, false), $typeErrorEmit);
 
         return $phi;

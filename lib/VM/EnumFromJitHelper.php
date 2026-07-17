@@ -34,7 +34,18 @@ final class EnumFromJitHelper
 
     public static function stringBackingFromNull(): string
     {
-        return '';
+        // Zend zend_enum_from_base: null coerces like false → "0" (#20072).
+        return '0';
+    }
+
+    public static function intBackingFromNull(): int
+    {
+        return 0;
+    }
+
+    public static function intBackingFromBool(bool $value): int
+    {
+        return $value ? 1 : 0;
     }
 
     public static function intBackingFromLong(int $value): int
