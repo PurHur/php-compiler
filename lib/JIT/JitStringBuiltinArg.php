@@ -104,7 +104,11 @@ final class JitStringBuiltinArg
         );
     }
 
-    /** trim/ltrim/rtrim/chop — null coerces with deprecation on forward profile (#19983, php_trim). */
+    /**
+     * Soft-null string args — coerce+deprecate on forward profile (not Z_PARAM_STR TypeError).
+     *
+     * trim/ltrim/rtrim/chop (#19983) and str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998).
+     */
     public static function lowerTrimFamilyString(
         Context $context,
         Variable $arg,

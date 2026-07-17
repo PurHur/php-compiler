@@ -23,7 +23,7 @@ final class str_shuffle extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('str_shuffle() requires exactly one argument');
         }
-        $subject = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'str_shuffle', 0, 'string');
+        $subject = VmString::trimFamilyStringArgForFrame($frame, 0, 'str_shuffle', 0, 'string');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::strShuffle($subject))
@@ -42,13 +42,13 @@ final class str_shuffle extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19257, ext/standard/string.c). */
+    /** Soft-null — coerce+deprecate on forward profile (#19998, ext/standard/string.c). */
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
             return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'str_shuffle', 0, 'string');
         }
 
-        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'str_shuffle', 0, 'string');
+        return JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'str_shuffle', 0, 'string');
     }
 }
