@@ -199,6 +199,12 @@ final class RecursiveDirectoryIteratorBuiltin
         $entry->methods['getchildren'] = new RecursiveDirectoryIteratorGetChildren();
         $entry->methodVisibility['getchildren'] = $pub;
         $entry->methodNames['getchildren'] = 'getChildren';
+        $entry->methods['getsubpath'] = new RecursiveDirectoryIteratorGetSubPath();
+        $entry->methodVisibility['getsubpath'] = $pub;
+        $entry->methodNames['getsubpath'] = 'getSubPath';
+        $entry->methods['getsubpathname'] = new RecursiveDirectoryIteratorGetSubPathname();
+        $entry->methodVisibility['getsubpathname'] = $pub;
+        $entry->methodNames['getsubpathname'] = 'getSubPathname';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -206,7 +212,12 @@ final class RecursiveDirectoryIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['__construct'], $entry->methods['haschildren']);
+        return isset(
+            $entry->methods['__construct'],
+            $entry->methods['haschildren'],
+            $entry->methods['getsubpath'],
+            $entry->methods['getsubpathname']
+        );
     }
 }
 
@@ -400,11 +411,54 @@ final class RecursiveDirectoryIteratorGetChildren extends VmClassMethod
         }
         $path = DirectoryIteratorStorage::pathname($object);
         $flags = DirectoryIteratorStorage::iteratorState($object)['flags'];
+        $subPath = DirectoryIteratorStorage::childSubPath($object);
         $class = $frame->vmContext->classes[RecursiveDirectoryIteratorBuiltin::CLASS_LC];
         $child = new ObjectEntry($class);
         $child->constructed = true;
-        DirectoryIteratorStorage::open($child, $path, $flags);
+        DirectoryIteratorStorage::open($child, $path, $flags, $subPath);
         $frame->returnVar->object($child);
+    }
+}
+
+final class RecursiveDirectoryIteratorGetSubPath extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSubPath');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveDirectoryIteratorBuiltin::CLASS_LC,
+            'RecursiveDirectoryIterator::getSubPath()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(DirectoryIteratorStorage::subPath($object));
+    }
+}
+
+final class RecursiveDirectoryIteratorGetSubPathname extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSubPathname');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveDirectoryIteratorBuiltin::CLASS_LC,
+            'RecursiveDirectoryIterator::getSubPathname()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(DirectoryIteratorStorage::subPathname($object));
     }
 }
 

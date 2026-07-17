@@ -1069,7 +1069,9 @@ final class RecursiveIteratorIteratorGetInnerIterator extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $inner = SplDualIteratorStorage::inner($object);
+        // php-src RecursiveIteratorIterator::getInnerIterator — current stack
+        // sub-iterator (SPL_FETCH_SUB_ELEMENT), not the original root (#20091).
+        $inner = SplDualIteratorStorage::getSubIterator($object, null);
         SplIteratorSupport::ensurePinnedObjectAlive($inner);
         $frame->returnVar->object($inner);
     }
