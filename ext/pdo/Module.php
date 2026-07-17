@@ -45,4 +45,11 @@ class Module extends ModuleAbstract
 
         return [];
     }
+
+    public function getFunctions(): array
+    {
+        return [
+            new pdo_drivers(),
+        ];
+    }
 }
