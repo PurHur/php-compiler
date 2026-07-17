@@ -126,6 +126,107 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, (bool) $ok);
     }
 
+    public static function tryWriteAttributeNS(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1], $args[2], $args[3], $args[4])) {
+            return null;
+        }
+        $prefix = self::nullableCompileTimeString($args[1]);
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        $uri = self::nullableCompileTimeString($args[3]);
+        $content = JitStringBuiltinArg::compileTimeLiteral($args[4]) ?? $args[4]->compileTimeString;
+        if (false === $prefix || false === $uri
+            || null === $name || str_starts_with($name, '__phpc_xw_')
+            || null === $content || str_starts_with($content, '__phpc_xw_')
+        ) {
+            return null;
+        }
+        $ok = $writer->writeAttributeNS($prefix, $name, $uri, $content);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryWriteElementNS(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1], $args[2], $args[3])) {
+            return null;
+        }
+        $prefix = self::nullableCompileTimeString($args[1]);
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        $uri = self::nullableCompileTimeString($args[3]);
+        if (false === $prefix || false === $uri
+            || null === $name || str_starts_with($name, '__phpc_xw_')
+        ) {
+            return null;
+        }
+        if (isset($args[4])) {
+            if (JITVariable::TYPE_NULL === $args[4]->type) {
+                $ok = $writer->writeElementNS($prefix, $name, $uri, null);
+            } else {
+                $content = JitStringBuiltinArg::compileTimeLiteral($args[4]) ?? $args[4]->compileTimeString;
+                if (null === $content || str_starts_with($content, '__phpc_xw_')) {
+                    return null;
+                }
+                $ok = $writer->writeElementNS($prefix, $name, $uri, $content);
+            }
+        } else {
+            $ok = $writer->writeElementNS($prefix, $name, $uri);
+        }
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryWritePI(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1], $args[2])) {
+            return null;
+        }
+        $target = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        $content = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        if (null === $target || str_starts_with($target, '__phpc_xw_')
+            || null === $content || str_starts_with($content, '__phpc_xw_')
+        ) {
+            return null;
+        }
+        $ok = @$writer->writePi($target, $content);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryWriteRaw(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $content = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $content || str_starts_with($content, '__phpc_xw_')) {
+            return null;
+        }
+        $ok = $writer->writeRaw($content);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    /**
+     * @return string|null|false null = PHP null; false = dynamic / cannot fold
+     */
+    private static function nullableCompileTimeString(JITVariable $arg): string|null|false
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || !empty($arg->isNullConstant)) {
+            return null;
+        }
+        $lit = JitStringBuiltinArg::compileTimeLiteral($arg) ?? $arg->compileTimeString;
+        if (null === $lit || str_starts_with($lit, '__phpc_xw_')) {
+            return false;
+        }
+
+        return $lit;
+    }
+
     public static function tryStartAttribute(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);

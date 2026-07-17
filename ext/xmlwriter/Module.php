@@ -23,7 +23,7 @@ class Module extends ModuleAbstract
     public function getFunctions(): array
     {
         // Procedural aliases mirror implemented OOP methods (php-src php_xmlwriter.c; #19514).
-        // Remaining stub aliases (NS/PI/DTD/start_* pairs) tracked in sibling xmlwriter issues.
+        // Remaining stub aliases (DTD/start_* NS pairs) tracked in sibling xmlwriter issues.
         return [
             new xmlwriter_open_memory(),
             new xmlwriter_open_uri(),
