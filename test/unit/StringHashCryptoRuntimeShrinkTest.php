@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\HashCryptoJitHelper;
 use PHPCompiler\ext\standard\VmHash;
 use PHPUnit\Framework\TestCase;
 
-/** StringHashCryptoPhp routes through HashCryptoJitHelper PHP not LLVM digest monolith (#9164). */
+/** StringHashCryptoPhp routes through HashCryptoJitHelper PHP not LLVM digest monolith (#9164, #20065). */
 final class StringHashCryptoRuntimeShrinkTest extends TestCase
 {
     public function testStringHashCryptoPhpRoutesThroughHashCryptoJitHelper(): void
@@ -18,6 +18,7 @@ final class StringHashCryptoRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('__phpc_hc_sha256_transform', $source);
         $this->assertStringNotContainsString('emitMd5Transform', $source);
         $this->assertStringNotContainsString('callDigest', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertLessThan(260, \substr_count($source, "\n") + 1);
     }
 
@@ -26,6 +27,14 @@ final class StringHashCryptoRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHashCryptoJit.php');
         $this->assertStringContainsString('StringHashCryptoPhp', $source);
         $this->assertStringContainsString('JitHashCryptoKernel', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('implementThin', $source);
+        $this->assertStringContainsString('StringHashEquals::ensureLinked', $source);
+        $this->assertStringContainsString('JitHashEqualsKernel', (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHashEquals.php'));
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('implementDeferred', $source);
+        $this->assertStringNotContainsString('ensureDeferredEqualsStub', $source);
+        $this->assertStringNotContainsString('hash_equals_deferred_stub', $source);
         $this->assertStringNotContainsString('StringHashCryptoLlvm', $source);
         $this->assertStringNotContainsString('StringHashCryptoNativeJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHashCryptoLlvm.php');
