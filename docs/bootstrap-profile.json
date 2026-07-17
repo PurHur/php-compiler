@@ -3519,6 +3519,7 @@
         "ext/xmlwriter/XmlWriterEndComment.php",
         "ext/xmlwriter/XmlWriterEndDocument.php",
         "ext/xmlwriter/XmlWriterEndDtd.php",
+        "ext/xmlwriter/XmlWriterEndDtdEntity.php",
         "ext/xmlwriter/XmlWriterEndElement.php",
         "ext/xmlwriter/XmlWriterEndPI.php",
         "ext/xmlwriter/XmlWriterFlush.php",
@@ -3536,6 +3537,7 @@
         "ext/xmlwriter/XmlWriterStartComment.php",
         "ext/xmlwriter/XmlWriterStartDocument.php",
         "ext/xmlwriter/XmlWriterStartDtd.php",
+        "ext/xmlwriter/XmlWriterStartDtdEntity.php",
         "ext/xmlwriter/XmlWriterStartElement.php",
         "ext/xmlwriter/XmlWriterStartElementNS.php",
         "ext/xmlwriter/XmlWriterStartPI.php",
@@ -3549,6 +3551,9 @@
         "ext/xmlwriter/XmlWriterWriteCData.php",
         "ext/xmlwriter/XmlWriterWriteComment.php",
         "ext/xmlwriter/XmlWriterWriteDtd.php",
+        "ext/xmlwriter/XmlWriterWriteDtdAttlist.php",
+        "ext/xmlwriter/XmlWriterWriteDtdElement.php",
+        "ext/xmlwriter/XmlWriterWriteDtdEntity.php",
         "ext/xmlwriter/XmlWriterWriteElement.php",
         "ext/xmlwriter/XmlWriterWriteElementNS.php",
         "ext/xmlwriter/XmlWriterWritePI.php",
@@ -5581,9 +5586,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5347,
+        "inventory_files": 5352,
         "excluded": 0,
-        "eligible": 5347,
+        "eligible": 5352,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
