@@ -21,7 +21,7 @@ final class VmZlib
         }
         $last = error_get_last();
         $message = $fallbackMessage;
-        if (\is_array($last) && isset($last['message'])) {
+        if (\is_array($last) && isset($last['message']) && str_contains($last['message'], 'data error')) {
             $message = $last['message'];
         }
         $frame->vmContext->errors->triggerError(
