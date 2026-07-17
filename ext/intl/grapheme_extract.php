@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -17,7 +18,7 @@ use PHPLLVM\Value;
 /**
  * grapheme_extract() — extract grapheme clusters from UTF-8 (php-src ext/intl/grapheme; #6023).
  *
- * VM: {@see VmGrapheme}; JIT: runtime defer (#6023).
+ * VM: {@see VmGrapheme}; JIT: compile-time fold via {@see JitGrapheme::tryExtractFold} (#6023, #19965).
  */
 final class grapheme_extract extends Internal
 {
@@ -106,9 +107,16 @@ final class grapheme_extract extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('grapheme_extract() requires two to five arguments');
         }
+        $folded = JitGrapheme::tryExtractFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+        if ($argc >= 1) {
+            JitStringBuiltinArg::lower($context, $args[0], 'grapheme_extract', 0, 'haystack');
+        }
 
         throw new \LogicException(
-            'grapheme_extract() JIT runtime lowering is deferred; use VM (#6023)'
+            'grapheme_extract() JIT runtime lowering is deferred; use VM or compile-time literals (#6023)'
         );
     }
 }

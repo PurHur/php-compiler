@@ -82,6 +82,49 @@ final class JitGrapheme
     /**
      * @param JITVariable[] $args
      */
+    public static function tryExtractFold(Context $context, array $args): ?Value
+    {
+        if (isset($args[4])) {
+            return null;
+        }
+        $haystack = self::compileTimeString($args, 0);
+        if (null === $haystack) {
+            return null;
+        }
+        if (!isset($args[1])) {
+            return null;
+        }
+        $size = self::compileTimeInt($args, 1);
+        if (null === $size) {
+            return null;
+        }
+        $extractType = VmGrapheme::EXTR_COUNT;
+        if (isset($args[2])) {
+            $extractTypeCt = self::compileTimeInt($args, 2);
+            if (null === $extractTypeCt) {
+                return null;
+            }
+            $extractType = $extractTypeCt;
+        }
+        $start = 0;
+        if (isset($args[3])) {
+            $startCt = self::compileTimeInt($args, 3);
+            if (null === $startCt) {
+                return null;
+            }
+            $start = $startCt;
+        }
+        $result = VmGrapheme::extract($haystack, $size, $extractType, $start);
+        if (false === $result) {
+            return $context->getTypeFromString('bool')->constInt(0, false);
+        }
+
+        return $context->builder->load($context->constantStringFromString($result));
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
     public static function tryLevenshteinFold(Context $context, array $args): ?Value
     {
         $string1 = self::compileTimeString($args, 0);
