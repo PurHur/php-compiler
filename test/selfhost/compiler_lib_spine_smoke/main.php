@@ -421,6 +421,7 @@ require_once __DIR__.'/../../../ext/dom/TokenListReplace.php';
 require_once __DIR__.'/../../../ext/dom/TokenListSupports.php';
 require_once __DIR__.'/../../../ext/dom/TokenListToggle.php';
 require_once __DIR__.'/../../../ext/dom/VmDom.php';
+require_once __DIR__.'/../../../ext/dom/VmDomCollectionDimension.php';
 require_once __DIR__.'/../../../ext/dom/VmDomInstanceInvoke.php';
 require_once __DIR__.'/../../../ext/dom/VmDomJitDispatch.php';
 require_once __DIR__.'/../../../ext/dom/VmDomJitFrame.php';

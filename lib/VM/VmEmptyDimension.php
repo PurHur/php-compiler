@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\ext\dom\VmDomCollectionDimension;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\Frame;
 
@@ -51,6 +52,12 @@ final class VmEmptyDimension
             $object = $container->toObject();
             if (EnumCaseSupport::isEnumCase($object)) {
                 throw new \TypeError('Illegal offset type in isset or empty');
+            }
+            if (VmDomCollectionDimension::isCollection($object)) {
+                // empty($list[$i]) — has_dimension; nodes are never empty (php-src php_dom.c; #20311).
+                $dst->bool(!VmDomCollectionDimension::hasDimension($object, $dim));
+
+                return null;
             }
             if (!$vm->objectImplementsArrayAccess($object)) {
                 $className = $object->class->name;

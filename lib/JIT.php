@@ -7998,7 +7998,7 @@ class JIT {
                     $dimOp = $block->getOperand($op->arg3);
                     $container = $this->context->getVariableFromOp($containerOp);
                     $dim = $this->context->getVariableFromOp($dimOp);
-                    $emptyResult = EmptyDimensionHelper::compile(
+                    $emptyResult = JIT\EmptyDimensionHelper::compile(
                         $this->context,
                         $container,
                         $dim,
