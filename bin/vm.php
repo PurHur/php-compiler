@@ -19,6 +19,7 @@ function run(string $filename, string $code, array $options): void
     if (is_array($iniOverrides)) {
         php_compiler_cli_apply_ini_overrides($runtime->vmContext, $iniOverrides);
     }
+    php_compiler_cli_sync_host_error_reporting($runtime->vmContext, $options);
     $queryString = $options['-q'] ?? null;
     $postBody = $options['-p'] ?? null;
     $scriptFilename = null;

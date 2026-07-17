@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** CLI -d error_reporting and dynamic property E_DEPRECATED (#11558). */
+/** CLI -d error_reporting and dynamic property E_DEPRECATED (#11558, #19848). */
 final class DynamicPropertyDeprecationCliTest extends TestCase
 {
     public function testVmDashDErrorReportingEmitsDynamicPropertyDeprecation(): void
@@ -35,6 +35,73 @@ final class DynamicPropertyDeprecationCliTest extends TestCase
             'Creation of dynamic property C::$x is deprecated',
             $result['stderr']
         );
+    }
+
+    /**
+     * Host {@code php -d error_reporting=E_ALL bin/vm.php} must enable guest deprecations (#19848).
+     */
+    public function testHostDashDErrorReportingEmitsDynamicPropertyDeprecation(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $vm = realpath($repoRoot.'/bin/vm.php');
+        if (false === $vm) {
+            $this->markTestSkipped('bin/vm.php missing');
+        }
+
+        $script = tempnam(sys_get_temp_dir(), 'dynprop');
+        $this->assertNotFalse($script);
+        file_put_contents($script, "<?php\nclass C {}\n\$c = new C;\n\$c->x = 1;\necho \$c->x, \"\\n\";\n");
+
+        try {
+            $cmd = [
+                PHP_BINARY,
+                '-d',
+                'error_reporting=E_ALL',
+                '-d',
+                'display_errors=0',
+                $vm,
+                $script,
+            ];
+            $result = $this->runCommand($cmd, $repoRoot);
+            $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+            $this->assertStringContainsString(
+                'Creation of dynamic property C::$x is deprecated',
+                $result['stderr']
+            );
+            $this->assertStringContainsString("1\n", $result['stdout']);
+        } finally {
+            @unlink($script);
+        }
+    }
+
+    /**
+     * Compliance host {@code -d error_reporting=0} must not clear guest DEFAULT startup mask (#2055).
+     */
+    public function testHostErrorReportingZeroKeepsGuestDefaultWithoutDeprecationNoise(): void
+    {
+        $repoRoot = dirname(__DIR__, 2);
+        $vm = realpath($repoRoot.'/bin/vm.php');
+        if (false === $vm) {
+            $this->markTestSkipped('bin/vm.php missing');
+        }
+
+        $cmd = [
+            PHP_BINARY,
+            '-d',
+            'error_reporting=0',
+            '-d',
+            'display_errors=0',
+            $vm,
+            '-r',
+            'class C{}; $c=new C; $c->x=1; echo $c->x, "\n";',
+        ];
+        $result = $this->runCommand($cmd, $repoRoot);
+        $this->assertSame(0, $result['code'], $result['stderr']."\n".$result['stdout']);
+        $this->assertStringNotContainsString(
+            'Creation of dynamic property C::$x is deprecated',
+            $result['stderr']
+        );
+        $this->assertStringContainsString("1\n", $result['stdout']);
     }
 
     /**

@@ -142,6 +142,34 @@ if (!function_exists('php_compiler_cli_apply_ini_overrides')) {
     }
 }
 
+if (!function_exists('php_compiler_cli_sync_host_error_reporting')) {
+    /**
+     * Inherit host {@code php -d error_reporting=...} into the guest VM when argv has no override (#19848).
+     *
+     * Guest {@see \PHPCompiler\VM\ErrorReporter::DEFAULT_STARTUP_REPORTING} clears {@code E_DEPRECATED}.
+     * Compliance uses host {@code -d error_reporting=0} (#2055) and must keep that guest default —
+     * only sync when the host level enables deprecations (e.g. {@code E_ALL}).
+     *
+     * @param array<string, mixed> $options
+     */
+    function php_compiler_cli_sync_host_error_reporting(\PHPCompiler\VM\Context $ctx, array $options): void
+    {
+        $overrides = $options['-d'] ?? null;
+        if (is_array($overrides) && array_key_exists('error_reporting', $overrides)) {
+            return;
+        }
+        $raw = getenv('PHP_COMPILER_CLI_HOST_ERROR_REPORTING');
+        if (false === $raw || '' === $raw) {
+            return;
+        }
+        $hostLevel = (int) $raw;
+        if (0 === ($hostLevel & \PHPCompiler\VM\ErrorReporter::E_DEPRECATED)) {
+            return;
+        }
+        \PHPCompiler\ext\standard\VmIni::set($ctx, 'error_reporting', (string) $hostLevel);
+    }
+}
+
 if (!function_exists('php_compiler_cli_resolve_user_path')) {
     /**
      * Resolve a user-supplied relative path against the pre-chdir invocation cwd.

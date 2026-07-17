@@ -168,8 +168,13 @@ if (!function_exists('php_compiler_cli_dispatch')) {
             exit(1);
         }
         ini_set('memory_limit', $memoryLimit);
+        // Capture host `php -d error_reporting=...` before bumping for compiler noise (#19848).
+        $hostErrorReporting = (int) ini_get('error_reporting');
+        putenv('PHP_COMPILER_CLI_HOST_ERROR_REPORTING='.$hostErrorReporting);
+        $_ENV['PHP_COMPILER_CLI_HOST_ERROR_REPORTING'] = (string) $hostErrorReporting;
+        $_SERVER['PHP_COMPILER_CLI_HOST_ERROR_REPORTING'] = (string) $hostErrorReporting;
         // Compliance subprocesses pass -d error_reporting=0; do not re-enable deprecations (#2055).
-        if (0 !== (int) ini_get('error_reporting')) {
+        if (0 !== $hostErrorReporting) {
             error_reporting(E_ALL);
         }
 
