@@ -26,7 +26,7 @@ final class XmlReaderRead extends VmClassMethod
             $frame->calledArgs[0]->resolveIndirect()->toObject(),
             'XMLReader::read()'
         );
-        $ok = VmXmlReader::read($entry);
+        $ok = VmXmlReader::read($frame->vmContext, $entry, $frame);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);
         });

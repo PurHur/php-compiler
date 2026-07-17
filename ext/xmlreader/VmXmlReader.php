@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\dom\VmDom;
+use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\xml\VmXml;
@@ -249,18 +250,22 @@ final class VmXmlReader
         string $data,
         ?Frame $frame
     ): void {
-        $valid = VmXml::validateAndReport($ctx, $data, $frame);
+        $parseErrorRecords = VmXml::validationErrorRecords($data);
+        $valid = [] === $parseErrorRecords;
         $events = [];
         if ($valid) {
             try {
                 $events = self::tokenize($data);
             } catch (\LogicException) {
                 $valid = false;
+                $parseErrorRecords = VmXml::validationErrorRecords($data);
             }
         }
 
         $state = new XmlReaderState();
         $state->uri = $uri;
+        $state->sourceData = $data;
+        $state->parseErrorRecords = $parseErrorRecords;
         $state->valid = $valid;
         $state->events = $events;
         $state->position = -1;
@@ -277,10 +282,17 @@ final class VmXmlReader
         }
     }
 
-    public static function read(ObjectEntry $entry): bool
+    public static function read(Context $ctx, ObjectEntry $entry, ?Frame $frame = null): bool
     {
         $state = XmlReaderRegistry::state($entry);
         if ($state->closed) {
+            return false;
+        }
+        if (!$state->valid && !$state->readParseErrorsEmitted) {
+            $state->readParseErrorsEmitted = true;
+            self::emitReadParseErrors($ctx, $state, $frame);
+            $state->current = null;
+
             return false;
         }
         $state->attributeIndex = null;
@@ -1039,6 +1051,78 @@ final class VmXmlReader
         }
 
         return $pos;
+    }
+
+    /**
+     * libxml triple-warning on first read() for malformed sources (php-src ext/xmlreader/php_xmlreader.c; #19933).
+     */
+    private static function emitReadParseErrors(Context $ctx, XmlReaderState $state, ?Frame $frame): void
+    {
+        $record = $state->parseErrorRecords[0] ?? null;
+        if (null === $record) {
+            return;
+        }
+
+        $prefix = 'XMLReader::read(): ';
+        $location = self::xmlReaderErrorLocation($state);
+        $libxmlMessage = self::xmlReaderLibxmlPrimaryMessage($state->sourceData, $record);
+        VmLibxml::handleError(
+            $ctx,
+            $record,
+            $frame,
+            null,
+            $prefix.$location.': parser error : '.$libxmlMessage
+        );
+
+        $snippet = trim($state->sourceData);
+        VmLibxml::handleError($ctx, $record, $frame, null, $prefix.$snippet);
+
+        $caretColumn = self::xmlReaderCaretColumn($snippet, $record, $libxmlMessage);
+        VmLibxml::handleError($ctx, $record, $frame, null, $prefix.str_repeat(' ', $caretColumn).'^');
+    }
+
+    private static function xmlReaderErrorLocation(XmlReaderState $state): string
+    {
+        if ('' !== $state->uri) {
+            return $state->uri.':1';
+        }
+        $cwd = getcwd();
+        if (false === $cwd || '' === $cwd) {
+            return ':1';
+        }
+
+        return rtrim($cwd, '/\\').'/'.':1';
+    }
+
+    /**
+     * Map VM validation text to libxml xmlTextReader messages where they differ (#19933).
+     *
+     * @param array{level: int, code: int, column: int, message: string, file: string, line: int} $record
+     */
+    private static function xmlReaderLibxmlPrimaryMessage(string $source, array $record): string
+    {
+        $trimmed = trim($source);
+        if (str_contains($record['message'], 'Premature end of data in tag')
+            && preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>$/s', $trimmed)) {
+            return 'Extra content at the end of the document';
+        }
+
+        return $record['message'];
+    }
+
+    /**
+     * @param array{level: int, code: int, column: int, message: string, file: string, line: int} $record
+     */
+    private static function xmlReaderCaretColumn(string $snippet, array $record, string $libxmlMessage): int
+    {
+        if ('Extra content at the end of the document' === $libxmlMessage) {
+            return \strlen($snippet);
+        }
+        if (str_contains($record['message'], "Couldn't find end of Start Tag")) {
+            return \strlen($snippet);
+        }
+
+        return max(0, $record['column'] - 1);
     }
 
     private static function warn(Context $ctx, string $message, ?Frame $frame): void
