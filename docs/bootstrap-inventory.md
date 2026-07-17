@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5317 |
-| Phase A inventory files (M2 ratio SSOT) | 5317 |
+| PHP files on vm.php path | 5321 |
+| Phase A inventory files (M2 ratio SSOT) | 5321 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14835 |
+| Source constructs flagged (warnings) | 14848 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3395,7 +3395,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/xml_set_unparsed_entity_decl_handler.php` | 0 | 2 |
 | `ext/xmlreader/BuiltinClasses.php` | 0 | 1 |
 | `ext/xmlreader/Module.php` | 0 | 1 |
-| `ext/xmlreader/VmXmlReader.php` | 0 | 28 |
+| `ext/xmlreader/VmXmlReader.php` | 0 | 31 |
 | `ext/xmlreader/XmlReaderClose.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderConstants.php` | 0 | 1 |
 | `ext/xmlreader/XmlReaderExpand.php` | 0 | 3 |
@@ -3416,7 +3416,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlreader/XmlReaderOpen.php` | 0 | 4 |
 | `ext/xmlreader/XmlReaderPropertySupport.php` | 0 | 2 |
 | `ext/xmlreader/XmlReaderRead.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderReadInnerXml.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderReadOuterXml.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderReadString.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderRegistry.php` | 0 | 1 |
+| `ext/xmlreader/XmlReaderSubtreeXmlHelper.php` | 0 | 1 |
 | `ext/xmlreader/XmlReaderXML.php` | 0 | 4 |
 | `ext/xmlrpc/JitXmlrpc.php` | 0 | 1 |
 | `ext/xmlrpc/JitXmlrpcCompileTime.php` | 0 | 5 |
@@ -17278,8 +17282,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitSscanf.php`
 
 **Warnings** (review for bootstrap subset):
-- new VMVariable (line 129)
-- new JITVariable (line 207)
+- new VMVariable (line 154)
+- new JITVariable (line 232)
 - 5 class method(s)
 
 ### `ext/standard/JitStat.php`
@@ -24672,8 +24676,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/implode.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 223)
-- new Error (line 243)
+- new Error (line 224)
+- new Error (line 244)
 - 19 class method(s)
 
 ### `ext/standard/in_array.php`
@@ -28046,24 +28050,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new XmlReaderGetAttributeNs (line 70)
 - new XmlReaderIsValid (line 73)
 - new XmlReaderExpand (line 76)
-- new XmlReaderMoveToAttribute (line 79)
-- new XmlReaderMoveToFirstAttribute (line 82)
-- new XmlReaderMoveToNextAttribute (line 85)
-- new XmlReaderMoveToElement (line 88)
-- new XmlReaderNext (line 91)
-- new XmlReaderLookupNamespace (line 94)
-- new XmlReaderFromString (line 99)
-- new XmlReaderFromUri (line 102)
-- new XmlReaderFromStream (line 105)
-- new Variable (line 111)
-- new ObjectEntry (line 152)
-- new Error (line 196)
-- new Error (line 225)
-- new Error (line 230)
-- new XmlReaderState (line 253)
-- new Error (line 561)
-- new XmlReaderEvent (line 870)
-- 44 class method(s)
+- new XmlReaderReadInnerXml (line 79)
+- new XmlReaderReadOuterXml (line 82)
+- new XmlReaderReadString (line 85)
+- new XmlReaderMoveToAttribute (line 88)
+- new XmlReaderMoveToFirstAttribute (line 91)
+- new XmlReaderMoveToNextAttribute (line 94)
+- new XmlReaderMoveToElement (line 97)
+- new XmlReaderNext (line 100)
+- new XmlReaderLookupNamespace (line 103)
+- new XmlReaderFromString (line 108)
+- new XmlReaderFromUri (line 111)
+- new XmlReaderFromStream (line 114)
+- new Variable (line 120)
+- new ObjectEntry (line 161)
+- new Error (line 205)
+- new Error (line 234)
+- new Error (line 239)
+- new XmlReaderState (line 262)
+- new Error (line 637)
+- new XmlReaderEvent (line 946)
+- 48 class method(s)
 
 ### `ext/xmlreader/XmlReaderClose.php`
 
@@ -28202,10 +28209,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 - 1 closure(s)
 
+### `ext/xmlreader/XmlReaderReadInnerXml.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlreader/XmlReaderReadOuterXml.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlreader/XmlReaderReadString.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 1 class method(s)
+- 1 closure(s)
+
 ### `ext/xmlreader/XmlReaderRegistry.php`
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `ext/xmlreader/XmlReaderSubtreeXmlHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
 
 ### `ext/xmlreader/XmlReaderXML.php`
 
@@ -35548,7 +35581,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 409)
+- new Variable (line 440)
 - 27 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`

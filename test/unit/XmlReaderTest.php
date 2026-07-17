@@ -194,6 +194,19 @@ PHP;
         );
     }
 
+    public function test_xmlreader_read_inner_outer_string_repro(): void
+    {
+        $runtime = new Runtime();
+        $code = (string) file_get_contents(__DIR__.'/../repro/maintainer_gap_xmlreader_read_inner_outer_string.php');
+        $block = $runtime->parseAndCompile($code, 'xmlreader_read_inner_outer_string_repro.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "inner=<c>t</c>\nouter=<root><c>t</c></root>\nstr=t\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_xmlreader_tokenizer_matches_zend_event_shape(): void
     {
         $events = VmXmlReader::tokenize('<root><item id="1">a</item></root>');
