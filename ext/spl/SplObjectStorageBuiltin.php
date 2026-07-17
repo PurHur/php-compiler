@@ -85,6 +85,7 @@ final class SplObjectStorageBuiltin
 
         $entry->isInternal = true;
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'SplObjectStorage');
+        $entry->cloneObjectHandler = [self::class, 'cloneInto'];
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
@@ -124,6 +125,37 @@ final class SplObjectStorageBuiltin
     public static function init(ObjectEntry $object): void
     {
         self::$store[$object->id] = ['entries' => [], 'objects' => [], 'order' => [], 'pos' => 0];
+    }
+
+    /**
+     * php-src SplObjectStorage clone_obj — deep-copy object→info map onto the shallow clone (#19805).
+     */
+    public static function cloneInto(ObjectEntry $src, ObjectEntry $dest): void
+    {
+        if (!isset(self::$store[$src->id])) {
+            self::init($dest);
+
+            return;
+        }
+        $state = self::$store[$src->id];
+        $entries = [];
+        $objects = [];
+        foreach ($state['entries'] as $key => $info) {
+            $infoCopy = new Variable();
+            $infoCopy->copyFrom($info->resolveIndirect());
+            $entries[$key] = $infoCopy;
+        }
+        foreach ($state['objects'] as $key => $object) {
+            $objectCopy = new Variable();
+            $objectCopy->copyFrom($object->resolveIndirect());
+            $objects[$key] = $objectCopy;
+        }
+        self::$store[$dest->id] = [
+            'entries' => $entries,
+            'objects' => $objects,
+            'order' => $state['order'],
+            'pos' => $state['pos'],
+        ];
     }
 
     /** @return array{entries: array<string, Variable>, objects: array<string, Variable>, order: list<string>, pos: int} */
