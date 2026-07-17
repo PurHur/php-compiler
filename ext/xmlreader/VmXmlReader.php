@@ -301,6 +301,22 @@ final class VmXmlReader
 
             return false;
         }
+
+        return self::advanceEvent($entry);
+    }
+
+    /**
+     * Advance the pull cursor without VM context (XMLReader::next / nextSibling; #19990).
+     */
+    private static function advanceEvent(ObjectEntry $entry): bool
+    {
+        $state = XmlReaderRegistry::state($entry);
+        if ($state->closed) {
+            return false;
+        }
+        if (!$state->valid && !$state->readParseErrorsEmitted) {
+            return false;
+        }
         $state->attributeIndex = null;
         ++$state->position;
         if ($state->position >= \count($state->events)) {
@@ -596,7 +612,7 @@ final class VmXmlReader
         $current = $state->current;
         $depth = $current->depth;
         if (XmlReaderConstants::ELEMENT === $current->nodeType && !$current->isEmptyElement) {
-            while (self::read($entry)) {
+            while (self::advanceEvent($entry)) {
                 $ev = $state->current;
                 if (null !== $ev
                     && XmlReaderConstants::END_ELEMENT === $ev->nodeType
@@ -609,10 +625,10 @@ final class VmXmlReader
                 return false;
             }
 
-            return self::read($entry);
+            return self::advanceEvent($entry);
         }
 
-        return self::read($entry);
+        return self::advanceEvent($entry);
     }
 
     public static function isValid(ObjectEntry $entry): bool
