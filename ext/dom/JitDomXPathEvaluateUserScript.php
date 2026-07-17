@@ -80,8 +80,105 @@ final class JitDomXPathEvaluateUserScript
 
             return self::boxDouble($context, $sum);
         }
+        // Comparisons / arithmetic / not() / name() — compile-time fold (#20280).
+        if (preg_match('~^not\((.+)\)$~i', $expression, $notWrap)) {
+            $count = self::countForXPath($xml, trim($notWrap[1]));
+            if (null === $count) {
+                return null;
+            }
+
+            return self::boxLong($context, 0 === $count ? 1 : 0);
+        }
+        if (preg_match('~^name\((.+)\)$~i', $expression, $nameWrap)) {
+            $name = self::nameForXPath($xml, trim($nameWrap[1]));
+            if (null === $name) {
+                return null;
+            }
+
+            return self::boxString($context, $name);
+        }
+        $cmp = self::tryCompileTimeComparison($xml, $expression);
+        if (null !== $cmp) {
+            return self::boxLong($context, $cmp ? 1 : 0);
+        }
+        $arith = self::tryCompileTimeArithmetic($xml, $expression);
+        if (null !== $arith) {
+            return self::boxDouble($context, $arith);
+        }
 
         return null;
+    }
+
+    /** First element name for //tag (#20280). */
+    private static function nameForXPath(string $xml, string $inner): ?string
+    {
+        if (!preg_match('~^//([*\w][\w:-]*)$~', $inner, $matches)) {
+            return null;
+        }
+        $tag = $matches[1];
+        if ('*' === $tag) {
+            return null;
+        }
+        $count = DomParseSimpleXmlJitHelper::countTagArgv($xml, $tag);
+
+        return $count > 0 ? $tag : '';
+    }
+
+    private static function tryCompileTimeComparison(string $xml, string $expression): ?bool
+    {
+        if (!preg_match(
+            '~^(count\((.+)\))\s*(=|!=|<=|>=|<|>)\s*([+-]?(?:\d+\.?\d*|\.\d+))$~i',
+            $expression,
+            $m
+        ) && !preg_match(
+            '~^([+-]?(?:\d+\.?\d*|\.\d+))\s*(=|!=|<=|>=|<|>)\s*([+-]?(?:\d+\.?\d*|\.\d+))$~',
+            $expression,
+            $m2
+        )) {
+            return null;
+        }
+        if (isset($m2)) {
+            return self::cmpFloats((float) $m2[1], $m2[2], (float) $m2[3]);
+        }
+        $count = self::countForXPath($xml, trim($m[2]));
+        if (null === $count) {
+            return null;
+        }
+
+        return self::cmpFloats((float) $count, $m[3], (float) $m[4]);
+    }
+
+    private static function tryCompileTimeArithmetic(string $xml, string $expression): ?float
+    {
+        if (preg_match('~^([+-]?(?:\d+\.?\d*|\.\d+))\s*\+\s*([+-]?(?:\d+\.?\d*|\.\d+))$~', $expression, $m)) {
+            return (float) $m[1] + (float) $m[2];
+        }
+        if (preg_match('~^count\((.+)\)\s*\+\s*([+-]?(?:\d+\.?\d*|\.\d+))$~i', $expression, $m)) {
+            $count = self::countForXPath($xml, trim($m[1]));
+            if (null === $count) {
+                return null;
+            }
+
+            return (float) $count + (float) $m[2];
+        }
+        if (preg_match('~^([+-]?(?:\d+\.?\d*|\.\d+))$~', $expression, $m)) {
+            return (float) $m[1];
+        }
+
+        return null;
+    }
+
+    private static function cmpFloats(float $left, string $op, float $right): bool
+    {
+        return match ($op) {
+            '=' => $left === $right,
+            '!=' => $left !== $right,
+            '<' => $left < $right,
+            '<=' => $left <= $right,
+            '>' => $left > $right,
+            '>=' => $left >= $right,
+            default => false,
+        };
     }
 
     /** XPath 1.0 sum(//tag) over compile-time XML (#19682). */

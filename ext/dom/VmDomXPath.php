@@ -966,17 +966,39 @@ final class VmDomXPath
 
     private static function isBooleanExpression(string $expression): bool
     {
-        return (bool) preg_match('~^(true|false|boolean\()~i', $expression);
+        if (preg_match('~^(true|false|boolean\(|not\()~i', $expression)) {
+            return true;
+        }
+
+        // XPath 1.0 comparisons (= != < <= > >=) at top level (#20280).
+        return null !== self::findTopLevelComparison($expression);
     }
 
     private static function isNumericExpression(string $expression): bool
     {
-        return (bool) preg_match('~^(number|count|sum)\(~i', $expression);
+        if (preg_match('~^(number|count|sum)\(~i', $expression)) {
+            return true;
+        }
+        if (self::isNumericLiteral($expression)) {
+            return true;
+        }
+        // Comparisons are boolean, not numeric (#20280).
+        if (null !== self::findTopLevelComparison($expression)) {
+            return false;
+        }
+
+        return null !== self::findTopLevelAdditive($expression)
+            || null !== self::findTopLevelMultiplicative($expression);
     }
 
     private static function isStringExpression(string $expression): bool
     {
-        return (bool) preg_match('~^string\(~i', $expression);
+        return (bool) preg_match('~^(string|name)\(~i', $expression);
+    }
+
+    private static function isNumericLiteral(string $expression): bool
+    {
+        return 1 === preg_match('~^[+-]?(?:\d+\.?\d*|\.\d+)$~', $expression);
     }
 
     private static function evaluateBoolean(
@@ -990,6 +1012,25 @@ final class VmDomXPath
         }
         if (0 === strcasecmp($expression, 'false()')) {
             return false;
+        }
+        if (preg_match('~^not\(~i', $expression)) {
+            $inner = self::wrappedFunctionInner($expression, 'not');
+            if (null === $inner) {
+                throw new \DOMException('Invalid expression');
+            }
+
+            return !self::booleanize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode));
+        }
+        $comparison = self::findTopLevelComparison($expression);
+        if (null !== $comparison) {
+            return self::evaluateComparison(
+                $ctx,
+                $xpath,
+                $comparison['left'],
+                $comparison['op'],
+                $comparison['right'],
+                $contextNode
+            );
         }
         if (preg_match('~^boolean\((.+)\)$~i', $expression, $matches)) {
             $inner = trim($matches[1]);
@@ -1025,16 +1066,17 @@ final class VmDomXPath
         string $expression,
         ?ObjectEntry $contextNode
     ): float {
+        $expression = trim($expression);
+        if (self::isNumericLiteral($expression)) {
+            return (float) $expression;
+        }
         if (preg_match('~^count\((.+)\)$~i', $expression, $matches)) {
             return (float) \count(self::evaluateNodeSet($ctx, $xpath, trim($matches[1]), $contextNode, false));
         }
         if (preg_match('~^number\((.+)\)$~i', $expression, $matches)) {
-            $value = self::evaluateScalar($ctx, $xpath, trim($matches[1]), $contextNode);
-            if (is_numeric($value)) {
-                return (float) $value;
-            }
+            $value = self::evaluateToMixed($ctx, $xpath, trim($matches[1]), $contextNode);
 
-            return NAN;
+            return self::numberize($value);
         }
         // XPath 1.0 sum(node-set): coerce each string-value to number (#19682).
         if (preg_match('~^sum\((.+)\)$~i', $expression, $matches)) {
@@ -1057,6 +1099,31 @@ final class VmDomXPath
 
             return $sum;
         }
+        // Additive / multiplicative at top level (#20280).
+        $additive = self::findTopLevelAdditive($expression);
+        if (null !== $additive) {
+            $left = self::evaluateNumber($ctx, $xpath, $additive['left'], $contextNode);
+            $right = self::evaluateNumber($ctx, $xpath, $additive['right'], $contextNode);
+            if ('+' === $additive['op']) {
+                return $left + $right;
+            }
+
+            return $left - $right;
+        }
+        $multiplicative = self::findTopLevelMultiplicative($expression);
+        if (null !== $multiplicative) {
+            $left = self::evaluateNumber($ctx, $xpath, $multiplicative['left'], $contextNode);
+            $right = self::evaluateNumber($ctx, $xpath, $multiplicative['right'], $contextNode);
+            if ('*' === $multiplicative['op']) {
+                return $left * $right;
+            }
+            if ('div' === $multiplicative['op']) {
+                return 0.0 === $right ? NAN : $left / $right;
+            }
+
+            // mod — XPath 1.0 uses floating remainder toward zero like fmod.
+            return 0.0 === $right ? NAN : fmod($left, $right);
+        }
 
         throw new \DOMException('Invalid expression');
     }
@@ -1067,10 +1134,50 @@ final class VmDomXPath
         string $expression,
         ?ObjectEntry $contextNode
     ): string {
+        if (preg_match('~^name\(~i', $expression)) {
+            $inner = self::wrappedFunctionInner($expression, 'name');
+            if (null === $inner) {
+                throw new \DOMException('Invalid expression');
+            }
+            if ('' === $inner) {
+                // name() with no args — context node name (XPath 1.0).
+                $node = $contextNode;
+                if (null === $node) {
+                    $state = DomRegistry::state($xpath);
+                    $node = DomRegistry::entry($state->xpathDocumentId ?? 0);
+                }
+                if (null === $node || !DomRegistry::has($node)) {
+                    return '';
+                }
+
+                return DomRegistry::state($node)->nodeName ?? '';
+            }
+            $nodeIds = self::evaluateNodeSet($ctx, $xpath, $inner, $contextNode, false);
+            if ([] === $nodeIds) {
+                return '';
+            }
+            $node = DomRegistry::entry($nodeIds[0]);
+            if (null === $node || !DomRegistry::has($node)) {
+                return '';
+            }
+
+            return DomRegistry::state($node)->nodeName ?? '';
+        }
         if (!preg_match('~^string\((.+)\)$~i', $expression, $matches)) {
             throw new \DOMException('Invalid expression');
         }
-        $value = self::evaluateScalar($ctx, $xpath, trim($matches[1]), $contextNode);
+        $value = self::evaluateToMixed($ctx, $xpath, trim($matches[1]), $contextNode);
+        if (is_array($value)) {
+            if ([] === $value) {
+                return '';
+            }
+            $node = DomRegistry::entry($value[0]);
+            if (null === $node) {
+                return '';
+            }
+
+            return VmDom::readNodeValue($node) ?? '';
+        }
         if (is_string($value)) {
             return $value;
         }
@@ -1082,6 +1189,400 @@ final class VmDomXPath
         }
 
         return '';
+    }
+
+    /**
+     * Evaluate an XPath sub-expression to bool|float|string|list<nodeId> (#20280).
+     *
+     * @return bool|float|string|list<int>
+     */
+    private static function evaluateToMixed(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $expression,
+        ?ObjectEntry $contextNode
+    ): mixed {
+        $expression = trim($expression);
+        if ('' === $expression) {
+            throw new \DOMException('Invalid expression');
+        }
+        if (self::isBooleanExpression($expression)) {
+            return self::evaluateBoolean($ctx, $xpath, $expression, $contextNode);
+        }
+        if (self::isNumericExpression($expression)) {
+            return self::evaluateNumber($ctx, $xpath, $expression, $contextNode);
+        }
+        if (self::isStringExpression($expression)) {
+            return self::evaluateString($ctx, $xpath, $expression, $contextNode);
+        }
+
+        return self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, false);
+    }
+
+    /**
+     * XPath 1.0 comparison for the evaluate() surface (#20280).
+     * Number/number and node-set/number paths cover the common count()/literal cases.
+     */
+    private static function evaluateComparison(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $leftExpr,
+        string $op,
+        string $rightExpr,
+        ?ObjectEntry $contextNode
+    ): bool {
+        $left = self::evaluateToMixed($ctx, $xpath, $leftExpr, $contextNode);
+        $right = self::evaluateToMixed($ctx, $xpath, $rightExpr, $contextNode);
+
+        if (is_array($left) || is_array($right)) {
+            return self::compareWithNodeSet($left, $op, $right);
+        }
+
+        // Prefer numeric comparison when either side is numeric (XPath converts both).
+        if (is_float($left) || is_int($left) || is_float($right) || is_int($right)
+            || (is_string($left) && is_numeric($left)) || (is_string($right) && is_numeric($right))) {
+            return self::compareNumbers(self::numberize($left), $op, self::numberize($right));
+        }
+        if (is_bool($left) || is_bool($right)) {
+            return self::compareNumbers(
+                self::booleanize($left) ? 1.0 : 0.0,
+                $op,
+                self::booleanize($right) ? 1.0 : 0.0
+            );
+        }
+
+        $leftStr = is_string($left) ? $left : '';
+        $rightStr = is_string($right) ? $right : '';
+        if ('=' === $op) {
+            return $leftStr === $rightStr;
+        }
+        if ('!=' === $op) {
+            return $leftStr !== $rightStr;
+        }
+
+        return self::compareNumbers(self::numberize($leftStr), $op, self::numberize($rightStr));
+    }
+
+    /**
+     * @param bool|float|string|list<int> $left
+     * @param bool|float|string|list<int> $right
+     */
+    private static function compareWithNodeSet(mixed $left, string $op, mixed $right): bool
+    {
+        $leftNodes = is_array($left) ? $left : null;
+        $rightNodes = is_array($right) ? $right : null;
+        if (null !== $leftNodes && null !== $rightNodes) {
+            foreach ($leftNodes as $leftId) {
+                $leftNode = DomRegistry::entry($leftId);
+                $leftStr = null !== $leftNode ? (VmDom::readNodeValue($leftNode) ?? '') : '';
+                foreach ($rightNodes as $rightId) {
+                    $rightNode = DomRegistry::entry($rightId);
+                    $rightStr = null !== $rightNode ? (VmDom::readNodeValue($rightNode) ?? '') : '';
+                    if (self::compareScalarsAsXPath($leftStr, $op, $rightStr)) {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+        if (null !== $leftNodes) {
+            foreach ($leftNodes as $leftId) {
+                $leftNode = DomRegistry::entry($leftId);
+                $leftStr = null !== $leftNode ? (VmDom::readNodeValue($leftNode) ?? '') : '';
+                if (self::compareScalarsAsXPath($leftStr, $op, $right)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        foreach ($rightNodes ?? [] as $rightId) {
+            $rightNode = DomRegistry::entry($rightId);
+            $rightStr = null !== $rightNode ? (VmDom::readNodeValue($rightNode) ?? '') : '';
+            if (self::compareScalarsAsXPath($left, $op, $rightStr)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function compareScalarsAsXPath(mixed $left, string $op, mixed $right): bool
+    {
+        if (is_float($left) || is_int($left) || is_float($right) || is_int($right)
+            || (is_string($left) && is_numeric($left) && !is_bool($right))
+            || (is_string($right) && is_numeric($right) && !is_bool($left))) {
+            if ('=' === $op || '!=' === $op) {
+                // Node-set vs number: convert node string-value to number (XPath 1.0).
+                $ok = self::compareNumbers(self::numberize($left), '=', self::numberize($right));
+
+                return '!=' === $op ? !$ok : $ok;
+            }
+
+            return self::compareNumbers(self::numberize($left), $op, self::numberize($right));
+        }
+        $leftStr = is_string($left) ? $left : (is_bool($left) ? ($left ? 'true' : 'false') : (string) self::numberize($left));
+        $rightStr = is_string($right) ? $right : (is_bool($right) ? ($right ? 'true' : 'false') : (string) self::numberize($right));
+        if ('=' === $op) {
+            return $leftStr === $rightStr;
+        }
+        if ('!=' === $op) {
+            return $leftStr !== $rightStr;
+        }
+
+        return self::compareNumbers(self::numberize($leftStr), $op, self::numberize($rightStr));
+    }
+
+    private static function compareNumbers(float $left, string $op, float $right): bool
+    {
+        return match ($op) {
+            '=' => $left === $right,
+            '!=' => $left !== $right,
+            '<' => $left < $right,
+            '<=' => $left <= $right,
+            '>' => $left > $right,
+            '>=' => $left >= $right,
+            default => false,
+        };
+    }
+
+    private static function numberize(mixed $value): float
+    {
+        if (is_float($value) || is_int($value)) {
+            return (float) $value;
+        }
+        if (is_bool($value)) {
+            return $value ? 1.0 : 0.0;
+        }
+        if (is_array($value)) {
+            if ([] === $value) {
+                return NAN;
+            }
+            $node = DomRegistry::entry($value[0]);
+            $str = null !== $node ? (VmDom::readNodeValue($node) ?? '') : '';
+
+            return is_numeric($str) ? (float) $str : NAN;
+        }
+        if (is_string($value)) {
+            $trimmed = trim($value);
+            if ('' === $trimmed || !is_numeric($trimmed)) {
+                return NAN;
+            }
+
+            return (float) $trimmed;
+        }
+
+        return NAN;
+    }
+
+    /**
+     * @return array{op: string, left: string, right: string}|null
+     */
+    private static function findTopLevelComparison(string $expression): ?array
+    {
+        $ops = ['<=', '>=', '!=', '=', '<', '>'];
+        $depth = 0;
+        $quote = null;
+        $len = \strlen($expression);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $expression[$i];
+            if (null !== $quote) {
+                if ($ch === $quote) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                continue;
+            }
+            if ('(' === $ch) {
+                ++$depth;
+                continue;
+            }
+            if (')' === $ch) {
+                --$depth;
+                continue;
+            }
+            if (0 !== $depth) {
+                continue;
+            }
+            foreach ($ops as $op) {
+                $opLen = \strlen($op);
+                if ($i + $opLen <= $len && substr($expression, $i, $opLen) === $op) {
+                    // Avoid treating the '=' in '<=' / '>=' / '!=' when shorter ops are listed last.
+                    $left = trim(substr($expression, 0, $i));
+                    $right = trim(substr($expression, $i + $opLen));
+                    if ('' === $left || '' === $right) {
+                        return null;
+                    }
+
+                    return ['op' => $op, 'left' => $left, 'right' => $right];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Leftmost top-level binary + or - (#20280).
+     *
+     * @return array{op: string, left: string, right: string}|null
+     */
+    private static function findTopLevelAdditive(string $expression): ?array
+    {
+        $depth = 0;
+        $quote = null;
+        $len = \strlen($expression);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $expression[$i];
+            if (null !== $quote) {
+                if ($ch === $quote) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                continue;
+            }
+            if ('(' === $ch) {
+                ++$depth;
+                continue;
+            }
+            if (')' === $ch) {
+                --$depth;
+                continue;
+            }
+            if (0 !== $depth || ('+' !== $ch && '-' !== $ch)) {
+                continue;
+            }
+            if (!self::isBinaryAdditiveAt($expression, $i)) {
+                continue;
+            }
+            $left = trim(substr($expression, 0, $i));
+            $right = trim(substr($expression, $i + 1));
+            if ('' === $left || '' === $right) {
+                continue;
+            }
+
+            return ['op' => $ch, 'left' => $left, 'right' => $right];
+        }
+
+        return null;
+    }
+
+    private static function isBinaryAdditiveAt(string $expression, int $index): bool
+    {
+        $op = $expression[$index];
+        $hasSpaceBefore = $index > 0 && 1 === preg_match('/\s/', $expression[$index - 1]);
+        for ($j = $index - 1; $j >= 0; --$j) {
+            $prev = $expression[$j];
+            if (1 === preg_match('/\s/', $prev)) {
+                continue;
+            }
+            // Unary +/− after open paren, comma, or another operator.
+            if ('(' === $prev || ',' === $prev) {
+                return false;
+            }
+            if (in_array($prev, ['+', '-', '*', '=', '<', '>', '!'], true)) {
+                return false;
+            }
+            // Subtraction vs NCName hyphen: `foo-bar` stays a name; `1-2`, `count(//a)-1`,
+            // and `foo - bar` are binary (#20280).
+            if ('-' === $op) {
+                if (')' === $prev || ']' === $prev || ctype_digit($prev) || '.' === $prev) {
+                    return true;
+                }
+
+                return $hasSpaceBefore;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Leftmost top-level * / div / mod (#20280).
+     *
+     * @return array{op: string, left: string, right: string}|null
+     */
+    private static function findTopLevelMultiplicative(string $expression): ?array
+    {
+        $depth = 0;
+        $quote = null;
+        $len = \strlen($expression);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $expression[$i];
+            if (null !== $quote) {
+                if ($ch === $quote) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                continue;
+            }
+            if ('(' === $ch) {
+                ++$depth;
+                continue;
+            }
+            if (')' === $ch) {
+                --$depth;
+                continue;
+            }
+            if (0 !== $depth) {
+                continue;
+            }
+            if ('*' === $ch) {
+                $left = trim(substr($expression, 0, $i));
+                $right = trim(substr($expression, $i + 1));
+                if ('' !== $left && '' !== $right) {
+                    return ['op' => '*', 'left' => $left, 'right' => $right];
+                }
+            }
+            foreach (['div', 'mod'] as $word) {
+                $wordLen = \strlen($word);
+                if ($i + $wordLen > $len || 0 !== substr_compare($expression, $word, $i, $wordLen, true)) {
+                    continue;
+                }
+                $beforeOk = 0 === $i || !preg_match('/[\w.-]/', $expression[$i - 1]);
+                $afterOk = $i + $wordLen >= $len || !preg_match('/[\w.-]/', $expression[$i + $wordLen]);
+                if (!$beforeOk || !$afterOk) {
+                    continue;
+                }
+                $left = trim(substr($expression, 0, $i));
+                $right = trim(substr($expression, $i + $wordLen));
+                if ('' !== $left && '' !== $right) {
+                    return ['op' => strtolower($word), 'left' => $left, 'right' => $right];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Inner text of func(...) when the call spans the whole expression. */
+    private static function wrappedFunctionInner(string $expression, string $funcName): ?string
+    {
+        if (!preg_match('~^'.preg_quote($funcName, '~').'\(~i', $expression)) {
+            return null;
+        }
+        $openParen = strpos($expression, '(');
+        if (false === $openParen) {
+            return null;
+        }
+        $closeParen = self::findMatchingCloseParen($expression, $openParen);
+        if (null === $closeParen || $closeParen !== \strlen($expression) - 1) {
+            return null;
+        }
+
+        return trim(substr($expression, $openParen + 1, $closeParen - $openParen - 1));
     }
 
     private static function evaluateScalar(
