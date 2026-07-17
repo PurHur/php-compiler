@@ -344,6 +344,7 @@ final class JitDomDocumentMethodKernel
             [
                 $context->getTypeFromString('__object__*'),
                 $context->getTypeFromString('__string__*'),
+                $context->getTypeFromString('int64'),
             ],
             $context->getTypeFromString('int1'),
             'PHPCompiler\\ext\\dom\\DomLoadXMLJitHelper::loadXMLArgv',

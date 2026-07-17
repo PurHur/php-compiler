@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -42,6 +43,14 @@ final class JitDomLoadXMLUserScript
     {
         if (\count($args) < 2) {
             return null;
+        }
+
+        // Non-default parse options (e.g. LIBXML_NOENT) need full VmDom::loadXML (#19796).
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
+            $opt = $args[2]->compileTimeLong;
+            if (null === $opt || 0 !== $opt) {
+                return null;
+            }
         }
 
         $lit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;

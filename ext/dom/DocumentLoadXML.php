@@ -5,8 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\Variable;
 
-/** DOMDocument::loadXML() — VM (#11895, php-src ext/dom/document.c). */
+/** DOMDocument::loadXML() — VM (#11895, #19796, php-src ext/dom/document.c). */
 final class DocumentLoadXML extends DomClassMethod
 {
     public function __construct()
@@ -21,10 +22,18 @@ final class DocumentLoadXML extends DomClassMethod
             throw new \LogicException('DOMDocument::loadXML() expects at least 1 argument');
         }
         $xml = $this->stringArg($frame->calledArgs[1], 'DOMDocument::loadXML()', 0);
+        $options = 0;
+        if (isset($frame->calledArgs[2])) {
+            $optionsVar = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $optionsVar->type) {
+                throw new \TypeError('DOMDocument::loadXML(): Argument #2 ($options) must be of type int');
+            }
+            $options = $optionsVar->toInt();
+        }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::loadXML() requires VM context in this compiler build');
         }
-        $ok = VmDom::loadXML($frame->vmContext, $receiver, $xml, $frame);
+        $ok = VmDom::loadXML($frame->vmContext, $receiver, $xml, $frame, $options);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }

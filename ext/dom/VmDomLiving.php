@@ -319,7 +319,7 @@ final class VmDomLiving
         if (null !== $overrideEncoding) {
             DomRegistry::state($document)->encoding = $overrideEncoding;
         }
-        $ok = VmDom::loadXML($ctx, $document, $source, $frame);
+        $ok = VmDom::loadXML($ctx, $document, $source, $frame, $options);
         if (!$ok) {
             throw new \DOMException(
                 'Invalid State Error',
