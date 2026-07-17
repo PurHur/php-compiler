@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5374 |
-| Phase A inventory files (M2 ratio SSOT) | 5374 |
+| PHP files on vm.php path | 5375 |
+| Phase A inventory files (M2 ratio SSOT) | 5375 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15074 |
+| Source constructs flagged (warnings) | 15098 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -623,6 +623,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/VmNumberFormatter.php` | 0 | 11 |
 | `ext/intl/VmResourceBundle.php` | 0 | 12 |
+| `ext/intl/VmSpoofchecker.php` | 0 | 24 |
 | `ext/intl/VmTransliterator.php` | 0 | 10 |
 | `ext/intl/VmUConverter.php` | 0 | 16 |
 | `ext/intl/collator_create.php` | 0 | 3 |
@@ -9181,22 +9182,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 80)
-- new NormalizerNormalize (line 91)
-- new NormalizerIsNormalized (line 92)
-- new NormalizerGetRawDecomposition (line 93)
-- new ClassEntry (line 109)
-- new LocaleGetDefault (line 112)
-- new LocaleSetDefault (line 113)
-- new LocaleGetPrimaryLanguage (line 114)
-- new LocaleGetRegion (line 115)
-- new LocaleGetScript (line 116)
-- new LocaleGetDisplayName (line 117)
-- new ClassEntry (line 133)
-- new IntlDateFormatterCreate (line 144)
-- new IntlDateFormatterFormat (line 147)
-- new ClassEntry (line 220)
-- 16 class method(s)
+- new ClassEntry (line 81)
+- new NormalizerNormalize (line 92)
+- new NormalizerIsNormalized (line 93)
+- new NormalizerGetRawDecomposition (line 94)
+- new ClassEntry (line 110)
+- new LocaleGetDefault (line 113)
+- new LocaleSetDefault (line 114)
+- new LocaleGetPrimaryLanguage (line 115)
+- new LocaleGetRegion (line 116)
+- new LocaleGetScript (line 117)
+- new LocaleGetDisplayName (line 118)
+- new ClassEntry (line 134)
+- new IntlDateFormatterCreate (line 145)
+- new IntlDateFormatterFormat (line 148)
+- new ClassEntry (line 231)
+- 17 class method(s)
 
 ### `ext/intl/GraphemeStrSplitJitHelper.php`
 
@@ -9564,6 +9565,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 420)
 - new Error (line 428)
 - 17 class method(s)
+
+### `ext/intl/VmSpoofchecker.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 92)
+- new Variable (line 96)
+- new SpoofcheckerConstruct (line 102)
+- new SpoofcheckerIsSuspicious (line 106)
+- new SpoofcheckerAreConfusable (line 107)
+- new SpoofcheckerSetAllowedLocales (line 108)
+- new SpoofcheckerSetChecks (line 109)
+- new SpoofcheckerSetRestrictionLevel (line 110)
+- new Error (line 147)
+- new Error (line 186)
+- new Error (line 229)
+- new Error (line 258)
+- new Error (line 294)
+- new Error (line 355)
+- new Error (line 359)
+- new ArgumentCountError (line 606)
+- new ArgumentCountError (line 631)
+- new ArgumentCountError (line 637)
+- new ArgumentCountError (line 666)
+- new ArgumentCountError (line 672)
+- new ArgumentCountError (line 702)
+- new ArgumentCountError (line 725)
+- new ArgumentCountError (line 748)
+- 27 class method(s)
 
 ### `ext/intl/VmTransliterator.php`
 

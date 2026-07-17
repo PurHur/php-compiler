@@ -1,0 +1,80 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler;
+
+use PHPCompiler\ext\intl\BuiltinClasses;
+use PHPCompiler\ext\intl\IntlExtensionPolicy;
+use PHPCompiler\ext\intl\VmSpoofchecker;
+use PHPCompiler\ext\standard\VmReflection;
+use PHPUnit\Framework\TestCase;
+
+/** @group intl_oop */
+final class VmSpoofcheckerTest extends TestCase
+{
+    public function test_withheld_without_intl(): void
+    {
+        $runtime = new Runtime();
+        self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
+        self::assertFalse(VmReflection::classExists($runtime->vmContext, 'Spoofchecker'));
+    }
+
+    public function test_issuspicious_and_confusable_forced_registration(): void
+    {
+        $runtime = new Runtime();
+        BuiltinClasses::registerSpoofchecker($runtime->vmContext);
+
+        $code = <<<'PHP'
+<?php
+echo 'class=', (int) class_exists('Spoofchecker'), "\n";
+$s = new Spoofchecker();
+echo 'clean=', (int) $s->isSuspicious('paypal.com'), "\n";
+// U+0430 CYRILLIC SMALL LETTER A in "pаypal.com"
+$mixed = "p\xD0\xB0ypal.com";
+echo 'mixed=', (int) $s->isSuspicious($mixed), "\n";
+$bits = 0;
+$s->isSuspicious($mixed, $bits);
+echo 'bits=', $bits, "\n";
+echo 'const_ss=', Spoofchecker::SINGLE_SCRIPT, "\n";
+// Greek rho U+03C1 vs Latin p in lookalike pair
+$c1 = 'paypal';
+$c2 = "\xCF\x81aypal"; // ρaypal
+echo 'conf=', (int) $s->areConfusable($c1, $c2), "\n";
+$s->setChecks(Spoofchecker::SINGLE_SCRIPT | Spoofchecker::INVISIBLE);
+$s->setRestrictionLevel(Spoofchecker::MODERATELY_RESTRICTIVE);
+echo 'ok', "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'spoofchecker_basic.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertMatchesRegularExpression(
+            '/^class=1\nclean=0\nmixed=1\nbits=\d+\nconst_ss=16\nconf=1\nok\n$/',
+            $out
+        );
+        self::assertSame(16, VmSpoofchecker::SINGLE_SCRIPT);
+    }
+
+    public function test_set_restriction_level_rejects_invalid(): void
+    {
+        $runtime = new Runtime();
+        BuiltinClasses::registerSpoofchecker($runtime->vmContext);
+
+        $code = <<<'PHP'
+<?php
+$s = new Spoofchecker();
+try {
+    $s->setRestrictionLevel(123);
+    echo "no_throw\n";
+} catch (ValueError $e) {
+    echo "value_error\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'spoofchecker_level.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("value_error\n", $out);
+    }
+}
