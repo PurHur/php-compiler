@@ -180,7 +180,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
     /** @covers issue #16885 */
     public function testMbSearchEncodingNamedParamsResolve(): void
     {
-        foreach (['mb_stripos', 'mb_strpos', 'mb_strrpos'] as $fn) {
+        foreach (['mb_stripos', 'mb_strpos', 'mb_strripos', 'mb_strrpos'] as $fn) {
             $names = BuiltinParamNames::forFunction($fn);
             self::assertSame(['haystack', 'needle', 'offset', 'encoding'], $names, $fn);
             self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'encoding', $fn), $fn);

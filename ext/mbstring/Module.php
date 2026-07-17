@@ -51,9 +51,12 @@ class Module extends ModuleAbstract
             new mb_detect_encoding(),
             new mb_convert_variables(),
             new mb_stripos(),
+            new mb_strripos(),
             new mb_strrpos(),
+            new mb_strrchr(),
             new mb_strrichr(),
             new mb_strstr(),
+            new mb_stristr(),
             ...(CompilerVersion::supportsMbTrimFunctions() ? [
                 new mb_trim(),
                 new mb_ltrim(),
