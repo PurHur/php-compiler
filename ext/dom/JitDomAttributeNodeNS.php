@@ -226,7 +226,8 @@ final class JitDomAttributeNodeNS
         $objectType->markObjectConstructed($obj);
 
         self::storeStringProperty($context, $obj, self::PROP_NODE_NAME, $qualifiedName);
-        self::storeStringProperty($context, $obj, self::PROP_NAME, $qualifiedName);
+        // php-src ext/dom/attr.c: Attr.name is local name (#19754).
+        self::storeStringProperty($context, $obj, self::PROP_NAME, $localName);
         self::storeStringProperty($context, $obj, self::PROP_VALUE, $value);
         self::storeStringProperty($context, $obj, self::PROP_NODE_VALUE, $value);
         self::storeStringProperty($context, $obj, self::PROP_NAMESPACE_URI, $namespace);
