@@ -1,0 +1,15 @@
+--TEST--
+stdlib PDO::sqliteCreateFunction scalar UDF (#19863, ext/pdo_sqlite)
+--FILE--
+<?php
+$pdo = new PDO('sqlite::memory:');
+echo 'has_fn=', method_exists($pdo, 'sqliteCreateFunction') ? 'yes' : 'no', "\n";
+echo 'has_agg=', method_exists($pdo, 'sqliteCreateAggregate') ? 'yes' : 'no', "\n";
+echo 'create=', $pdo->sqliteCreateFunction('dbl', static function ($x) { return $x * 2; }, 1) ? '1' : '0', "\n";
+echo 'dbl=', $pdo->query('SELECT dbl(21)')->fetchColumn(), "\n";
+?>
+--EXPECT--
+has_fn=yes
+has_agg=yes
+create=1
+dbl=42
