@@ -196,6 +196,13 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([0], BuiltinByRefParams::forFunction('SODIUM_MEMZERO'));
     }
 
+    public function testSodiumGenerichashStreamingStateByRef(): void
+    {
+        $this->assertSame([0], BuiltinByRefParams::forFunction('sodium_crypto_generichash_update'));
+        $this->assertSame([0], BuiltinByRefParams::forFunction('sodium_crypto_generichash_final'));
+        $this->assertSame([0], BuiltinByRefParams::forFunction('SODIUM_CRYPTO_GENERICHASH_UPDATE'));
+    }
+
     public function testPcntlWaitpidStatusByRef(): void
     {
         $this->assertSame([0], BuiltinByRefParams::forFunction('pcntl_wait'));

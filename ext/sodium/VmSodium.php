@@ -51,6 +51,9 @@ final class VmSodium
 
     public const CRYPTO_GENERICHASH_KEYBYTES_MAX = 32;
 
+    /** Opaque BLAKE2b state size (libsodium crypto_generichash_statebytes(); #20062). */
+    public const CRYPTO_GENERICHASH_STATEBYTES = 384;
+
     public const CRYPTO_SCALARMULT_BYTES = 32;
 
     public const CRYPTO_SCALARMULT_SCALARBYTES = 32;
@@ -186,20 +189,71 @@ final class VmSodium
 
     public static function generichash(string $message, string $key = '', int $length = self::CRYPTO_GENERICHASH_BYTES): string
     {
-        if ($length < self::CRYPTO_GENERICHASH_BYTES_MIN || $length > self::CRYPTO_GENERICHASH_BYTES_MAX) {
-            self::throwSodium('unsupported output length');
-        }
-        $keyLen = \strlen($key);
-        if (0 !== $keyLen
-            && ($keyLen < self::CRYPTO_GENERICHASH_KEYBYTES_MIN || $keyLen > self::CRYPTO_GENERICHASH_KEYBYTES_MAX)
-        ) {
-            self::throwSodium('unsupported key length');
-        }
+        self::validateGenerichashLength($length);
+        self::validateGenerichashKey($key);
         if (\function_exists('sodium_crypto_generichash')) {
             return \sodium_crypto_generichash($message, $key, $length);
         }
 
         return self::ffiGenerichash($message, $key, $length);
+    }
+
+    /**
+     * sodium_crypto_generichash_init() — streaming BLAKE2b state (php-src ext/sodium/libsodium.c; #20062).
+     */
+    public static function generichashInit(string $key = '', int $length = self::CRYPTO_GENERICHASH_BYTES): string
+    {
+        self::validateGenerichashLength($length);
+        self::validateGenerichashKey($key);
+        if (\function_exists('sodium_crypto_generichash_init')) {
+            return \sodium_crypto_generichash_init($key, $length);
+        }
+
+        return self::ffiGenerichashInit($key, $length);
+    }
+
+    /**
+     * sodium_crypto_generichash_update() — feed chunk into state (php-src ext/sodium/libsodium.c; #20062).
+     */
+    public static function generichashUpdate(string &$state, string $message): bool
+    {
+        self::validateGenerichashState($state);
+        if (\function_exists('sodium_crypto_generichash_update')) {
+            return \sodium_crypto_generichash_update($state, $message);
+        }
+        self::ffiGenerichashUpdate($state, $message);
+
+        return true;
+    }
+
+    /**
+     * sodium_crypto_generichash_final() — finish hash and wipe state (php-src ext/sodium/libsodium.c; #20062).
+     */
+    public static function generichashFinal(string &$state, int $length = self::CRYPTO_GENERICHASH_BYTES): string
+    {
+        self::validateGenerichashLength($length);
+        self::validateGenerichashState($state);
+        if (\function_exists('sodium_crypto_generichash_final')) {
+            $hash = \sodium_crypto_generichash_final($state, $length);
+            // php-src leaves the by-ref state as null after final (not "").
+            $state = \is_string($state) ? $state : '';
+
+            return $hash;
+        }
+
+        return self::ffiGenerichashFinal($state, $length);
+    }
+
+    /**
+     * sodium_crypto_generichash_keygen() — random BLAKE2b key (php-src ext/sodium/libsodium.c; #20062).
+     */
+    public static function generichashKeygen(): string
+    {
+        if (\function_exists('sodium_crypto_generichash_keygen')) {
+            return \sodium_crypto_generichash_keygen();
+        }
+
+        return self::randomKeyBytes(self::CRYPTO_GENERICHASH_KEYBYTES);
     }
 
     public static function scalarmult(string $n, string $p): string
@@ -1070,6 +1124,47 @@ final class VmSodium
         return self::unsignedCharArrayToString($outBuf, $length);
     }
 
+    private static function ffiGenerichashInit(string $key, int $length): string
+    {
+        $ffi = self::requireFfi();
+        $keyLen = \strlen($key);
+        $stateBuf = $ffi->new('unsigned char['.self::CRYPTO_GENERICHASH_STATEBYTES.']');
+        $kBuf = 0 === $keyLen ? $ffi->new('unsigned char[1]') : self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_generichash_init($stateBuf, $kBuf, $keyLen, $length);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($stateBuf, self::CRYPTO_GENERICHASH_STATEBYTES);
+    }
+
+    private static function ffiGenerichashUpdate(string &$state, string $message): void
+    {
+        $ffi = self::requireFfi();
+        $mlen = \strlen($message);
+        $stateBuf = self::stringToUnsignedCharArray($ffi, $state);
+        $mBuf = self::stringToUnsignedCharArray($ffi, $message);
+        $rc = $ffi->crypto_generichash_update($stateBuf, $mBuf, $mlen);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+        $state = self::unsignedCharArrayToString($stateBuf, self::CRYPTO_GENERICHASH_STATEBYTES);
+    }
+
+    private static function ffiGenerichashFinal(string &$state, int $length): string
+    {
+        $ffi = self::requireFfi();
+        $outBuf = $ffi->new('unsigned char['.$length.']');
+        $stateBuf = self::stringToUnsignedCharArray($ffi, $state);
+        $rc = $ffi->crypto_generichash_final($stateBuf, $outBuf, $length);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+        $state = '';
+
+        return self::unsignedCharArrayToString($outBuf, $length);
+    }
+
     private static function ffiScalarmult(string $n, string $p): string
     {
         $ffi = self::requireFfi();
@@ -1804,6 +1899,30 @@ final class VmSodium
         }
     }
 
+    private static function validateGenerichashLength(int $length): void
+    {
+        if ($length < self::CRYPTO_GENERICHASH_BYTES_MIN || $length > self::CRYPTO_GENERICHASH_BYTES_MAX) {
+            self::throwSodium('unsupported output length');
+        }
+    }
+
+    private static function validateGenerichashKey(string $key): void
+    {
+        $keyLen = \strlen($key);
+        if (0 !== $keyLen
+            && ($keyLen < self::CRYPTO_GENERICHASH_KEYBYTES_MIN || $keyLen > self::CRYPTO_GENERICHASH_KEYBYTES_MAX)
+        ) {
+            self::throwSodium('unsupported key length');
+        }
+    }
+
+    private static function validateGenerichashState(string $state): void
+    {
+        if (\strlen($state) !== self::CRYPTO_GENERICHASH_STATEBYTES) {
+            self::throwSodium('incorrect state length');
+        }
+    }
+
     private static function randomKeyBytes(int $length): string
     {
         if (\function_exists('random_bytes')) {
@@ -1932,6 +2051,10 @@ final class VmSodium
                     int sodium_pad(size_t *unpadded_buf_len_p, unsigned char *buf, size_t unpadded_buf_len, size_t blocksize);
                     int sodium_unpad(size_t *unpadded_buf_len_p, const unsigned char *buf, size_t padded_buf_len, size_t blocksize);
                     int crypto_generichash(unsigned char *out, size_t outlen, const unsigned char *in, unsigned long long inlen, const unsigned char *key, size_t keylen);
+                    int crypto_generichash_init(unsigned char *state, const unsigned char *key, const size_t keylen, const size_t outlen);
+                    int crypto_generichash_update(unsigned char *state, const unsigned char *in, unsigned long long inlen);
+                    int crypto_generichash_final(unsigned char *state, unsigned char *out, const size_t outlen);
+                    void crypto_generichash_keygen(unsigned char k[32]);
                     int crypto_scalarmult(unsigned char *q, const unsigned char *n, const unsigned char *p);
                     int crypto_scalarmult_base(unsigned char *q, const unsigned char *n);
                     int crypto_box_keypair(unsigned char *pk, unsigned char *sk);
