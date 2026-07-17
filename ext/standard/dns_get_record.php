@@ -7,13 +7,17 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * dns_get_record() — DNS record lookup (ext/standard/dns.c parity, #6392).
+ *
+ * Z_PARAM_STR $hostname — null TypeError on 8.4 forward profile (#18786, ext/standard/dns.c).
  *
  * VM: VmDns::dnsGetRecord(). JIT/AOT: JitDnsGetRecord compile-time materializer.
  *
@@ -36,7 +40,12 @@ final class dns_get_record extends Internal
             return;
         }
 
-        $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'dns_get_record', 0, 'hostname');
+        $hostname = VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'dns_get_record',
+            0,
+            'hostname'
+        );
         $type = StdlibConstants::DNS_A;
         if ($argc >= 2) {
             $typeVar = $frame->calledArgs[1]->resolveIndirect();
@@ -68,11 +77,30 @@ final class dns_get_record extends Internal
             throw new \LogicException('dns_get_record() requires one to four arguments in this compiler build');
         }
 
-        JitStringBuiltinArg::lower($context, $args[0], 'dns_get_record', 0, 'hostname');
+        $hostnameArg = $args[0];
+        JitStringBuiltinArg::lowerZparamStr($context, $hostnameArg, 'dns_get_record', 0, 'hostname');
 
-        return JitDnsGetRecord::invoke(
+        $literal = JitStringArg::compileTimeLiteral($hostnameArg);
+        if (null === $literal) {
+            $nullOperand = JITVariable::TYPE_NULL === $hostnameArg->type
+                || ($hostnameArg->isNullConstant ?? false);
+            if ($nullOperand) {
+                if (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes) {
+                    $slot = JitValueBox::alloc($context);
+
+                    return JitValueBox::pointer($context, $slot);
+                }
+                $literal = '';
+            } else {
+                throw new \LogicException(
+                    'dns_get_record() requires compile-time string hostname for JIT/AOT in this build'
+                );
+            }
+        }
+
+        return JitDnsGetRecord::invokeLiteral(
             $context,
-            $args[0],
+            $literal,
             $argc >= 2 ? $args[1] : null,
             $argc >= 3 ? $args[2] : null,
             $argc >= 4 ? $args[3] : null
