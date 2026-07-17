@@ -7,13 +7,16 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitFilePutContentsLibc;
 use PHPLLVM\Builder;
 
 /**
  * JIT/AOT link for __compiler_file_put_contents via FilePutContentsJitHelper PHP (#15310, #19966).
  *
- * Always routes through {@see FilePutContentsJitHelper} via nested helper call (#19339).
+ * When JIT modules are registered: helper → {@see phpc_file_put_contents_kernel}.
+ * During Context construction (modules empty): thin {@see JitFilePutContentsLibc} body (#16075).
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::filePutContents()}.
  * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_stream_ex
  */
@@ -32,6 +35,8 @@ final class StringFilePutContents
 
     private const BRIDGE_ENTRY = 'fpc_bridge_entry';
 
+    private const LIBC_ENTRY = 'fpc_libc_entry';
+
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::implement($context);
@@ -44,8 +49,15 @@ final class StringFilePutContents
         }
 
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
+            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::LIBC_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
+
+            return;
+        }
+
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementLibcBody($context, $probe);
 
             return;
         }
@@ -95,4 +107,35 @@ final class StringFilePutContents
             $context->builder->clearInsertionPosition();
         }
     }
+
+    private static function implementLibcBody(Context $context, $probe): void
+    {
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        LibcExtern::register($context);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                self::ABI,
+                $context->context->functionType($i64, false, $strPtr, $strPtr, $i64)
+            );
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::LIBC_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        JitFilePutContentsLibc::emitBody($context, $fn);
+        $context->registerFunction(self::ABI, $fn);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
 }
