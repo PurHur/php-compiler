@@ -142,12 +142,25 @@ final class RegexIteratorBuiltin
 
                 return;
             }
-            if (self::callAccept($frame, $object)) {
+            // php-src spl_filter_it_fetch — invoke accept on object's ce so RRI override runs (#20152).
+            $accepted = self::invokeAccept($frame, $object);
+            if ($accepted) {
                 return;
             }
             self::clearCached($object);
             SplDualIteratorStorage::callInner($frame, $inner, 'next');
         }
+    }
+
+    /** Dispatch accept() via instance method (RecursiveRegexIterator overrides). */
+    public static function invokeAccept(Frame $frame, ObjectEntry $object): bool
+    {
+        if (null === $frame->vmContext || null === $frame->vmContext->runtime) {
+            throw new \LogicException('RegexIterator::accept() requires VM runtime');
+        }
+        $result = $frame->vmContext->runtime->vm->invokeInstanceMethod($object, 'accept')->resolveIndirect();
+
+        return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
     }
 
     public static function callAccept(Frame $frame, ObjectEntry $object): bool
@@ -181,6 +194,24 @@ final class RegexIteratorBuiltin
         }
 
         return $accepted;
+    }
+
+    /**
+     * RecursiveRegexIterator::accept — non-empty arrays accepted so RII can descend (#20152).
+     * php-src: PHP_METHOD(RecursiveRegexIterator, accept)
+     */
+    public static function callAcceptRecursive(Frame $frame, ObjectEntry $object): bool
+    {
+        $inner = SplDualIteratorStorage::inner($object);
+        $current = SplDualIteratorStorage::callInner($frame, $inner, 'current')->resolveIndirect();
+        if (Variable::TYPE_NULL === $current->type) {
+            return false;
+        }
+        if (Variable::TYPE_ARRAY === $current->type) {
+            return $current->toArray()->getNumElements() > 0;
+        }
+
+        return self::callAccept($frame, $object);
     }
 
     /** @param array{regex: string, mode: int, flags: int, pregFlags: int, replacement: string, cached: ?Variable} $state */
@@ -781,7 +812,7 @@ final class RecursiveRegexIteratorBuiltin
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['__construct'])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['accept'])) {
             return;
         }
 
@@ -806,6 +837,9 @@ final class RecursiveRegexIteratorBuiltin
         $entry->methods['getchildren'] = new RecursiveRegexIteratorGetChildren();
         $entry->methodVisibility['getchildren'] = $pub;
         $entry->methodNames['getchildren'] = 'getChildren';
+        // php-src PHP_METHOD(RecursiveRegexIterator, accept) — arrays descend via RII (#20152).
+        $entry->methods['accept'] = new RecursiveRegexIteratorAccept();
+        $entry->methodVisibility['accept'] = $pub;
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -960,6 +994,28 @@ final class RecursiveRegexIteratorGetChildren extends VmClassMethod
                 $childInnerVar->toObject(),
                 $object
             )
+        );
+    }
+}
+
+/** php-src RecursiveRegexIterator::accept — non-empty array currents pass (#20152). */
+final class RecursiveRegexIteratorAccept extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('accept');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveRegexIteratorBuiltin::CLASS_LC,
+            'RecursiveRegexIterator::accept()'
+        );
+        SplIteratorSupport::setReturnBool(
+            $frame,
+            RegexIteratorBuiltin::callAcceptRecursive($frame, $object)
         );
     }
 }
