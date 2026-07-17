@@ -70,6 +70,40 @@ final class PcntlConstants
     public const PRIO_PGRP = 1;
     public const PRIO_USER = 2;
 
+    /** errno values exposed as PCNTL_E* (php-src ext/pcntl/pcntl.c; #20061). */
+    public const PCNTL_EPERM = 1;
+    public const PCNTL_ENOENT = 2;
+    public const PCNTL_ESRCH = 3;
+    public const PCNTL_EINTR = 4;
+    public const PCNTL_EIO = 5;
+    public const PCNTL_E2BIG = 7;
+    public const PCNTL_ENOEXEC = 8;
+    public const PCNTL_ECHILD = 10;
+    public const PCNTL_EAGAIN = 11;
+    public const PCNTL_ENOMEM = 12;
+    public const PCNTL_EACCES = 13;
+    public const PCNTL_EFAULT = 14;
+    public const PCNTL_ENOTDIR = 20;
+    public const PCNTL_EISDIR = 21;
+    public const PCNTL_EINVAL = 22;
+    public const PCNTL_ENFILE = 23;
+    public const PCNTL_EMFILE = 24;
+    public const PCNTL_ETXTBSY = 26;
+    public const PCNTL_ENOSPC = 28;
+    public const PCNTL_ENAMETOOLONG = 36;
+    public const PCNTL_ELOOP = 40;
+    public const PCNTL_ELIBBAD = 80;
+    public const PCNTL_EUSERS = 87;
+
+    /** unshare(2) / clone flags (Linux; php-src sched.h; #20061). */
+    public const CLONE_NEWNS = 0x00020000;
+    public const CLONE_NEWCGROUP = 0x02000000;
+    public const CLONE_NEWUTS = 0x04000000;
+    public const CLONE_NEWIPC = 0x08000000;
+    public const CLONE_NEWUSER = 0x10000000;
+    public const CLONE_NEWPID = 0x20000000;
+    public const CLONE_NEWNET = 0x40000000;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
@@ -77,6 +111,36 @@ final class PcntlConstants
             'PRIO_PROCESS' => self::PRIO_PROCESS,
             'PRIO_PGRP' => self::PRIO_PGRP,
             'PRIO_USER' => self::PRIO_USER,
+            'PCNTL_EPERM' => self::PCNTL_EPERM,
+            'PCNTL_ENOENT' => self::PCNTL_ENOENT,
+            'PCNTL_ESRCH' => self::PCNTL_ESRCH,
+            'PCNTL_EINTR' => self::PCNTL_EINTR,
+            'PCNTL_EIO' => self::PCNTL_EIO,
+            'PCNTL_E2BIG' => self::PCNTL_E2BIG,
+            'PCNTL_ENOEXEC' => self::PCNTL_ENOEXEC,
+            'PCNTL_ECHILD' => self::PCNTL_ECHILD,
+            'PCNTL_EAGAIN' => self::PCNTL_EAGAIN,
+            'PCNTL_ENOMEM' => self::PCNTL_ENOMEM,
+            'PCNTL_EACCES' => self::PCNTL_EACCES,
+            'PCNTL_EFAULT' => self::PCNTL_EFAULT,
+            'PCNTL_ENOTDIR' => self::PCNTL_ENOTDIR,
+            'PCNTL_EISDIR' => self::PCNTL_EISDIR,
+            'PCNTL_EINVAL' => self::PCNTL_EINVAL,
+            'PCNTL_ENFILE' => self::PCNTL_ENFILE,
+            'PCNTL_EMFILE' => self::PCNTL_EMFILE,
+            'PCNTL_ETXTBSY' => self::PCNTL_ETXTBSY,
+            'PCNTL_ENOSPC' => self::PCNTL_ENOSPC,
+            'PCNTL_ENAMETOOLONG' => self::PCNTL_ENAMETOOLONG,
+            'PCNTL_ELOOP' => self::PCNTL_ELOOP,
+            'PCNTL_ELIBBAD' => self::PCNTL_ELIBBAD,
+            'PCNTL_EUSERS' => self::PCNTL_EUSERS,
+            'CLONE_NEWNS' => self::CLONE_NEWNS,
+            'CLONE_NEWCGROUP' => self::CLONE_NEWCGROUP,
+            'CLONE_NEWUTS' => self::CLONE_NEWUTS,
+            'CLONE_NEWIPC' => self::CLONE_NEWIPC,
+            'CLONE_NEWUSER' => self::CLONE_NEWUSER,
+            'CLONE_NEWPID' => self::CLONE_NEWPID,
+            'CLONE_NEWNET' => self::CLONE_NEWNET,
             'WNOHANG' => self::WNOHANG,
             'WUNTRACED' => self::WUNTRACED,
             'WCONTINUED' => self::WCONTINUED,

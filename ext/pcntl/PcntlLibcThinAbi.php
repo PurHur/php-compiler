@@ -276,31 +276,95 @@ final class PcntlLibcThinAbi
         return null !== self::ffi();
     }
 
-    public static function getpriority(?int $pid, int $who): int|false
+    /**
+     * @param-out int $errno
+     */
+    public static function getpriority(?int $pid, int $who, ?int &$errno = null): int|false
     {
         $ffi = self::ffi();
         if (null === $ffi) {
+            $errno = PcntlConstants::PCNTL_EINVAL;
+
             return false;
         }
         $processId = null === $pid ? (int) $ffi->getpid() : $pid;
         self::clearErrno($ffi);
         $pri = (int) $ffi->getpriority($who, $processId);
-        if (0 !== self::errno($ffi)) {
+        $err = self::errno($ffi);
+        if (0 !== $err) {
+            $errno = $err;
+
             return false;
         }
+        $errno = 0;
 
         return $pri;
     }
 
-    public static function setpriority(int $priority, ?int $pid, int $who): bool
+    /**
+     * @param-out int $errno
+     */
+    public static function setpriority(int $priority, ?int $pid, int $who, ?int &$errno = null): bool
     {
         $ffi = self::ffi();
         if (null === $ffi) {
+            $errno = PcntlConstants::PCNTL_EINVAL;
+
             return false;
         }
         $processId = null === $pid ? (int) $ffi->getpid() : $pid;
+        self::clearErrno($ffi);
+        $rc = (int) $ffi->setpriority($who, $processId, $priority);
+        if (0 !== $rc) {
+            $errno = self::errno($ffi);
 
-        return 0 === (int) $ffi->setpriority($who, $processId, $priority);
+            return false;
+        }
+        $errno = 0;
+
+        return true;
+    }
+
+    public static function strerrorAvailable(): bool
+    {
+        return null !== self::ffi();
+    }
+
+    public static function strerror(int $error): string
+    {
+        $ffi = self::ffi();
+        if (null === $ffi || !\method_exists($ffi, 'strerror')) {
+            return 'Unknown error '.$error;
+        }
+        $msg = $ffi->strerror($error);
+
+        return null === $msg ? ('Unknown error '.$error) : (string) $msg;
+    }
+
+    public static function unshareAvailable(): bool
+    {
+        return null !== self::ffi();
+    }
+
+    /**
+     * @param-out int $errno
+     */
+    public static function unshare(int $flags, int &$errno): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi || !\method_exists($ffi, 'unshare')) {
+            $errno = PcntlConstants::PCNTL_EINVAL;
+
+            return false;
+        }
+        self::clearErrno($ffi);
+        $rc = (int) $ffi->unshare($flags);
+        $errno = self::errno($ffi);
+        if (-1 === $rc) {
+            return false;
+        }
+
+        return true;
     }
 
     private static function clearErrno(\FFI $ffi): void
@@ -351,6 +415,8 @@ pid_t getpid(void);
 int getpriority(int which, id_t who);
 int setpriority(int which, id_t who, int prio);
 int *__errno_location(void);
+char *strerror(int errnum);
+int unshare(int flags);
 unsigned int alarm(unsigned int seconds);
 int execv(const char *path, char *const argv[]);
 int execve(const char *path, char *const argv[], char *const envp[]);
