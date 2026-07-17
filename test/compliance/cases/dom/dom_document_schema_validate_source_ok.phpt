@@ -1,5 +1,5 @@
 --TEST--
-DOMDocument::schemaValidateSource() — valid in-memory XSD returns true (#19419, ext/dom/document.c)
+DOMDocument::schemaValidateSource() — valid in-memory XSD returns true; invalid fills libxml_get_errors (#19419, #20181, ext/dom/document.c)
 --FILE--
 <?php
 declare(strict_types=1);
@@ -32,12 +32,20 @@ $bad = $badDoc->schemaValidateSource($xsd);
 restore_error_handler();
 var_export($bad);
 echo "\n";
-echo count($warnings) > 0 ? 'warned' : 'silent';
-echo "\n";
+echo count($warnings), "\n";
+$errs = libxml_get_errors();
+echo count($errs), "\n";
+if (isset($errs[0])) {
+    echo trim($errs[0]->message), "\n";
+    echo (int) $errs[0]->level, "\n";
+}
 ?>
 --EXPECT--
 true
 0
 0
 false
-warned
+0
+1
+Element 'x': No matching global declaration available for the validation root.
+2

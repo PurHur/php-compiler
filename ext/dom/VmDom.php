@@ -8460,7 +8460,6 @@ final class VmDom
     public static function validate(Context $ctx, ObjectEntry $document, ?Frame $frame = null): bool
     {
         self::ensureDocument($document);
-        unset($ctx);
         if (!VmDomValidationNative::available()) {
             self::triggerDomWarning($frame, 'DOMDocument::validate(): not implemented in this compiler build');
 
@@ -8479,9 +8478,12 @@ final class VmDom
         }
 
         $result = VmDomValidationNative::validateDtdDocument($docXml);
-        foreach ($result['errors'] as $error) {
-            self::triggerDomWarning($frame, 'DOMDocument::validate(): '.$error);
-        }
+        self::reportDomLibxmlValidationErrors(
+            $ctx,
+            $frame,
+            'DOMDocument::validate()',
+            $result['errors']
+        );
 
         return $result['valid'];
     }
@@ -8530,7 +8532,7 @@ final class VmDom
         ?Frame $frame = null
     ): bool {
         self::ensureDocument($document);
-        unset($ctx, $flags);
+        unset($flags);
         if ('' === $filename || !is_file($filename)) {
             $schemaPath = $filename;
             if ('' !== $schemaPath && '/' !== $schemaPath[0]) {
@@ -8554,13 +8556,13 @@ final class VmDom
         $docXml = self::saveXML($document);
         $ok = VmDomValidationNative::validateSchemaDocument($docXml, $filename);
         if (!$ok) {
-            $errors = VmDomValidationNative::consumeLastErrors();
-            foreach ($errors as $error) {
-                self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): '.$error);
-            }
-            if ([] === $errors) {
-                self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): Invalid Schema');
-            }
+            self::reportDomLibxmlValidationErrors(
+                $ctx,
+                $frame,
+                'DOMDocument::schemaValidate()',
+                VmDomValidationNative::consumeLastErrors(),
+                'DOMDocument::schemaValidate(): Invalid Schema'
+            );
         }
 
         return $ok;
@@ -8574,7 +8576,6 @@ final class VmDom
         ?Frame $frame = null
     ): bool {
         self::ensureDocument($document);
-        unset($ctx);
         if ('' === $filename || !is_file($filename)) {
             $rngPath = $filename;
             if ('' !== $rngPath && '/' !== $rngPath[0]) {
@@ -8598,19 +8599,19 @@ final class VmDom
         $docXml = self::saveXML($document);
         $ok = VmDomValidationNative::validateRelaxNGDocument($docXml, $filename);
         if (!$ok) {
-            $errors = VmDomValidationNative::consumeLastErrors();
-            foreach ($errors as $error) {
-                self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): '.$error);
-            }
-            if ([] === $errors) {
-                self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): Invalid RelaxNG');
-            }
+            self::reportDomLibxmlValidationErrors(
+                $ctx,
+                $frame,
+                'DOMDocument::relaxNGValidate()',
+                VmDomValidationNative::consumeLastErrors(),
+                'DOMDocument::relaxNGValidate(): Invalid RelaxNG'
+            );
         }
 
         return $ok;
     }
 
-    /** DOMDocument::schemaValidateSource() — in-memory XSD via libxml2 FFI (php-src ext/dom/document.c; #18748, #19419). */
+    /** DOMDocument::schemaValidateSource() — in-memory XSD via libxml2 FFI (php-src ext/dom/document.c; #18748, #19419, #20181). */
     public static function schemaValidateSource(
         Context $ctx,
         ObjectEntry $document,
@@ -8636,13 +8637,13 @@ final class VmDom
         $docXml = self::saveXML($document);
         $ok = VmDomValidationNative::validateSchemaDocumentSource($docXml, $source);
         if (!$ok) {
-            $errors = VmDomValidationNative::consumeLastErrors();
-            foreach ($errors as $error) {
-                self::triggerDomWarning($frame, 'DOMDocument::schemaValidateSource(): '.$error);
-            }
-            if ([] === $errors) {
-                self::triggerDomWarning($frame, 'DOMDocument::schemaValidateSource(): Invalid Schema');
-            }
+            self::reportDomLibxmlValidationErrors(
+                $ctx,
+                $frame,
+                'DOMDocument::schemaValidateSource()',
+                VmDomValidationNative::consumeLastErrors(),
+                'DOMDocument::schemaValidateSource(): Invalid Schema'
+            );
         }
 
         return $ok;
@@ -8673,6 +8674,40 @@ final class VmDom
         }
 
         return false;
+    }
+
+    /**
+     * Route libxml2 validation diagnostics through VmLibxml (php-src php_libxml_error_handler; #20181).
+     *
+     * Under libxml_use_internal_errors(true), errors land in libxml_get_errors(); otherwise PHP warnings
+     * carry the DOMDocument::method(): prefix.
+     *
+     * @param list<array{level: int, code: int, column: int, message: string, file: string, line: int}> $errors
+     */
+    private static function reportDomLibxmlValidationErrors(
+        Context $ctx,
+        ?Frame $frame,
+        string $methodLabel,
+        array $errors,
+        ?string $fallbackWarning = null
+    ): void {
+        if ([] === $errors) {
+            if (null !== $fallbackWarning) {
+                self::triggerDomWarning($frame, $fallbackWarning);
+            }
+
+            return;
+        }
+
+        foreach ($errors as $record) {
+            VmLibxml::handleError(
+                $ctx,
+                $record,
+                $frame,
+                null,
+                $methodLabel.': '.$record['message']
+            );
+        }
     }
 
     /**
