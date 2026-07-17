@@ -172,6 +172,28 @@ PHP;
         );
     }
 
+    public function test_xmlreader_get_attribute_ns_no_repro(): void
+    {
+        $runtime = new Runtime();
+        $code = (string) file_get_contents(__DIR__.'/../repro/maintainer_gap_xmlreader_get_attribute_ns_no.php');
+        $block = $runtime->parseAndCompile($code, 'xmlreader_get_attribute_ns_no_repro.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "a='1'\n"
+            ."ns='2'\n"
+            ."no0='urn:x'\n"
+            ."no1='2'\n"
+            ."no2='1'\n"
+            ."missing=NULL\n"
+            ."xmlnsDecl='urn:x'\n"
+            ."oob=NULL\n"
+            ."emptyName=XMLReader::getAttributeNs(): Argument #1 (\$name) cannot be empty\n"
+            ."emptyNs=XMLReader::getAttributeNs(): Argument #2 (\$namespace) cannot be empty\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_xmlreader_tokenizer_matches_zend_event_shape(): void
     {
         $events = VmXmlReader::tokenize('<root><item id="1">a</item></root>');
