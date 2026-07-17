@@ -13,7 +13,7 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** sodium_bin2hex() — binary to hex (php-src ext/sodium/libsodium.c; #3438). */
+/** sodium_bin2hex() — binary to hex (php-src ext/sodium/libsodium.c; #3438, #20196). */
 final class sodium_bin2hex extends Internal
 {
     public function __construct()
@@ -24,7 +24,8 @@ final class sodium_bin2hex extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, $this->getName(), 1);
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $this->getName(), 0, 'string');
+        // Z_PARAM_STR $string — null TypeError on 8.4 forward profile (#20196, ext/sodium/sodium.c).
+        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'sodium_bin2hex', 0, 'string');
         $result = VmSodium::bin2hex($string);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
             $ret->string($result);
