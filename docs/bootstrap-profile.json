@@ -1557,7 +1557,6 @@
         "ext/standard/JitFile.php",
         "ext/standard/JitFileGetContents.php",
         "ext/standard/JitFilePutContents.php",
-        "ext/standard/JitFilePutContentsKernel.php",
         "ext/standard/JitFileatime.php",
         "ext/standard/JitFilectime.php",
         "ext/standard/JitFilegroup.php",
@@ -1784,7 +1783,6 @@
         "ext/standard/JitRandomIntArg.php",
         "ext/standard/JitReaddir.php",
         "ext/standard/JitReadfile.php",
-        "ext/standard/JitReadfileKernel.php",
         "ext/standard/JitReadgzfile.php",
         "ext/standard/JitReadline.php",
         "ext/standard/JitReadlink.php",
@@ -5573,9 +5571,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5339,
+        "inventory_files": 5337,
         "excluded": 0,
-        "eligible": 5339,
+        "eligible": 5337,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

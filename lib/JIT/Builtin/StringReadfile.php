@@ -5,18 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
-use PHPCompiler\ext\standard\JitReadfileKernel;
+use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_readfile via ReadfileJitHelper PHP (#9188, #19311).
+ * JIT/AOT link for __compiler_readfile via ReadfileJitHelper PHP (#9188, #19966).
  *
- * Embed / non-user-script: {@see ReadfileJitHelper} via {@see JitVmHelperLink}.
- * User-script standalone AOT: thin {@see JitReadfileKernel} libc open/read/write —
- * nested helper TUs skip __init__ under PHP_COMPILER_AOT_USER_SCRIPT (#16075).
+ * Always routes through {@see ReadfileJitHelper} via nested helper call (#19339).
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::readfile()}.
  * php-src: ext/standard/streamsfuncs.c — php_stream_passthru
  */
@@ -35,8 +32,6 @@ final class StringReadfile
 
     private const BRIDGE_ENTRY = 'readfile_bridge_entry';
 
-    private const KERNEL_ENTRY = 'rf_kernel_entry';
-
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -54,37 +49,7 @@ final class StringReadfile
         }
 
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI, $probe);
-
-            return;
-        }
-
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            self::implementUserScriptKernel($context);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI,
-            self::BRIDGE_ENTRY,
-            [$strPtr],
-            $i64,
-            self::READFILE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#9188'
-        );
-    }
-
-    private static function implementUserScriptKernel(Context $context): void
-    {
-        $probe = $context->module->getNamedFunction(self::ABI);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
@@ -96,22 +61,34 @@ final class StringReadfile
         } catch (\Throwable) {
         }
 
-        LibcExtern::register($context);
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#19966');
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($i64, false, $strPtr)
-            );
+            : $context->lookupFunction(self::ABI);
 
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::KERNEL_ENTRY);
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
+        $failBb = $fn->appendBasicBlock('readfile_bridge_fail');
+        $okBb = $fn->appendBasicBlock('readfile_bridge_ok');
         $context->builder->positionAtEnd($entry);
-        JitReadfileKernel::emitBody($context, $fn);
-        $context->registerFunction(self::ABI, $fn);
 
+        $path = $fn->getParam(0);
+        $isNullPath = $context->builder->icmp(Builder::INT_EQ, $path, $strPtr->constNull());
+        $context->builder->branchIf($isNullPath, $failBb, $okBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::READFILE_HELPER, '#19966');
+        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$path]);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($i64->constInt(-1, false));
+
+        $context->registerFunction(self::ABI, $fn);
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
         } else {

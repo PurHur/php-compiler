@@ -5,18 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
-use PHPCompiler\ext\standard\JitFilePutContentsKernel;
+use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_file_put_contents via FilePutContentsJitHelper PHP (#15310, #19294).
+ * JIT/AOT link for __compiler_file_put_contents via FilePutContentsJitHelper PHP (#15310, #19966).
  *
- * Embed / non-user-script: {@see FilePutContentsJitHelper} via {@see JitVmHelperLink}.
- * User-script standalone AOT: thin {@see JitFilePutContentsKernel} libc fopen/fwrite —
- * nested helper TUs skip __init__ under PHP_COMPILER_AOT_USER_SCRIPT (#16075).
+ * Always routes through {@see FilePutContentsJitHelper} via nested helper call (#19339).
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::filePutContents()}.
  * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_stream_ex
  */
@@ -35,8 +32,6 @@ final class StringFilePutContents
 
     private const BRIDGE_ENTRY = 'fpc_bridge_entry';
 
-    private const KERNEL_ENTRY = 'fpc_kernel_entry';
-
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::implement($context);
@@ -49,37 +44,7 @@ final class StringFilePutContents
         }
 
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI, $probe);
-
-            return;
-        }
-
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            self::implementUserScriptKernel($context);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            self::ABI,
-            self::BRIDGE_ENTRY,
-            [$strPtr, $strPtr, $i64],
-            $i64,
-            self::WRITE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#15310'
-        );
-    }
-
-    private static function implementUserScriptKernel(Context $context): void
-    {
-        $probe = $context->module->getNamedFunction(self::ABI);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
@@ -91,22 +56,39 @@ final class StringFilePutContents
         } catch (\Throwable) {
         }
 
-        LibcExtern::register($context);
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#19966');
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($i64, false, $strPtr, $strPtr, $i64)
-            );
+            : $context->lookupFunction(self::ABI);
 
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::KERNEL_ENTRY);
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
+        $failBb = $fn->appendBasicBlock('fpc_bridge_fail');
+        $okBb = $fn->appendBasicBlock('fpc_bridge_ok');
         $context->builder->positionAtEnd($entry);
-        JitFilePutContentsKernel::emitBody($context, $fn);
-        $context->registerFunction(self::ABI, $fn);
 
+        $path = $fn->getParam(0);
+        $data = $fn->getParam(1);
+        $badArgs = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $path, $strPtr->constNull()),
+            $context->builder->icmp(Builder::INT_EQ, $data, $strPtr->constNull())
+        );
+        $context->builder->branchIf($badArgs, $failBb, $okBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::WRITE_HELPER, '#19966');
+        $flags = $fn->getParam(2);
+        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$path, $data, $flags]);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($i64->constInt(-1, false));
+
+        $context->registerFunction(self::ABI, $fn);
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
         } else {
