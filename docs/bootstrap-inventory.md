@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5424 |
-| Phase A inventory files (M2 ratio SSOT) | 5424 |
+| PHP files on vm.php path | 5425 |
+| Phase A inventory files (M2 ratio SSOT) | 5425 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15294 |
+| Source constructs flagged (warnings) | 15297 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -380,11 +380,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/dom_import_simplexml.php` | 0 | 2 |
 | `ext/exif/ExifImagetypeJitHelper.php` | 0 | 1 |
 | `ext/exif/JitExifImagetype.php` | 0 | 2 |
-| `ext/exif/Module.php` | 0 | 3 |
+| `ext/exif/Module.php` | 0 | 4 |
 | `ext/exif/VmExifRead.php` | 0 | 1 |
 | `ext/exif/VmExifWarning.php` | 0 | 1 |
 | `ext/exif/exif_imagetype.php` | 0 | 2 |
 | `ext/exif/exif_read_data.php` | 0 | 5 |
+| `ext/exif/exif_thumbnail.php` | 0 | 2 |
 | `ext/fileinfo/BuiltinClasses.php` | 0 | 7 |
 | `ext/fileinfo/FileinfoConstants.php` | 0 | 1 |
 | `ext/fileinfo/Module.php` | 0 | 7 |
@@ -7856,12 +7857,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new exif_read_data (line 17)
 - new exif_imagetype (line 18)
+- new exif_thumbnail (line 19)
 - 1 class method(s)
 
 ### `ext/exif/VmExifRead.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 17 class method(s)
 
 ### `ext/exif/VmExifWarning.php`
 
@@ -7881,6 +7883,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 40)
 - new HashTable (line 60)
 - new Variable (line 62)
+- 2 class method(s)
+
+### `ext/exif/exif_thumbnail.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 
 ### `ext/fileinfo/BuiltinClasses.php`
