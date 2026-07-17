@@ -32,6 +32,8 @@ final class JitXmlWriterMethod
             'writedtd' => JitXmlWriterUserScript::tryWriteDtd($context, ...$args),
             'writedtdelement' => JitXmlWriterUserScript::tryWriteDtdElement($context, ...$args),
             'writedtdattlist' => JitXmlWriterUserScript::tryWriteDtdAttlist($context, ...$args),
+            'startdtdattlist' => JitXmlWriterUserScript::tryStartDtdAttlist($context, ...$args),
+            'enddtdattlist' => JitXmlWriterUserScript::tryEndDtdAttlist($context, ...$args),
             'startdtdentity' => JitXmlWriterUserScript::tryStartDtdEntity($context, ...$args),
             'enddtdentity' => JitXmlWriterUserScript::tryEndDtdEntity($context, ...$args),
             'writedtdentity' => JitXmlWriterUserScript::tryWriteDtdEntity($context, ...$args),
