@@ -25,7 +25,7 @@ final class inflate_add extends ZlibIncrementalFunction
             VmZlibContext::INFLATE_CLASS_LC,
             'InflateContext'
         );
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'inflate_add', 2, 'data');
+        $data = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'inflate_add', 2, 'data');
         $flush = \ZLIB_NO_FLUSH;
         if (3 === $argc) {
             $flush = VmZlibArg::requireInt($frame->calledArgs[2], 'inflate_add', 3, 'flush');
