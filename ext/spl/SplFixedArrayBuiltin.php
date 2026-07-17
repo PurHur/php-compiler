@@ -85,6 +85,9 @@ final class SplFixedArrayBuiltin
         $entry->methodVisibility['__serialize'] = $pub;
         $entry->methods['__unserialize'] = new SplFixedArrayUnserialize();
         $entry->methodVisibility['__unserialize'] = $pub;
+        $entry->methods['__debuginfo'] = new SplFixedArrayDebugInfo();
+        $entry->methodVisibility['__debuginfo'] = $pub;
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -92,7 +95,7 @@ final class SplFixedArrayBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['count'], $entry->methods['offsetexists'], $entry->methods['fromarray'], $entry->methods['getiterator'], $entry->methods['getsize'], $entry->methods['jsonserialize'], $entry->methods['__serialize']);
+        return isset($entry->methods['count'], $entry->methods['offsetexists'], $entry->methods['fromarray'], $entry->methods['getiterator'], $entry->methods['getsize'], $entry->methods['jsonserialize'], $entry->methods['__serialize'], $entry->methods['__debuginfo']);
     }
 
     public static function hasState(ObjectEntry $object): bool
@@ -361,6 +364,31 @@ final class SplFixedArrayBuiltin
         }
 
         return $resolved->toInt();
+    }
+}
+
+/**
+ * SplFixedArray::__debugInfo() — indexed element map for var_dump/print_r
+ * (php-src spl_fixedarray_object_debug_info; #19783).
+ */
+final class SplFixedArrayDebugInfo extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__debugInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplFixedArrayBuiltin::CLASS_LC,
+            'SplFixedArray::__debugInfo()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(SplFixedArrayBuiltin::toArray($object));
     }
 }
 
