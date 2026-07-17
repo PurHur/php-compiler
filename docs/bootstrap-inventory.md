@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5517 |
-| Phase A inventory files (M2 ratio SSOT) | 5517 |
+| PHP files on vm.php path | 5518 |
+| Phase A inventory files (M2 ratio SSOT) | 5518 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15675 |
+| Source constructs flagged (warnings) | 15679 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -936,11 +936,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pcntl/pcntl_wstopsig.php` | 0 | 4 |
 | `ext/pcntl/pcntl_wtermsig.php` | 0 | 4 |
 | `ext/pdo/BuiltinClasses.php` | 0 | 1 |
-| `ext/pdo/Module.php` | 0 | 1 |
+| `ext/pdo/Module.php` | 0 | 2 |
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
 | `ext/pdo/VmPDO.php` | 0 | 43 |
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
+| `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/phar/BuiltinClasses.php` | 0 | 10 |
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 15 |
@@ -12005,7 +12006,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pdo/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- new pdo_drivers (line 52)
+- 5 class method(s)
 
 ### `ext/pdo/PdoClassMethod.php`
 
@@ -12039,30 +12041,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new PDOErrorInfo (line 68)
 - new PDOSqliteCreateFunction (line 69)
 - new PDOSqliteCreateAggregate (line 70)
-- new PDOException (line 104)
-- new PDOException (line 110)
-- new PdoState (line 112)
-- new PDOException (line 134)
-- new PDOException (line 143)
-- new PDOException (line 170)
-- new HashTable (line 218)
-- new Variable (line 220)
-- new ArgumentCountError (line 281)
-- new ArgumentCountError (line 308)
-- new ArgumentCountError (line 345)
-- new ArgumentCountError (line 382)
-- new ArgumentCountError (line 434)
-- new ArgumentCountError (line 463)
-- new HashTable (line 490)
-- new Variable (line 492)
-- new ArgumentCountError (line 533)
-- new HashTable (line 682)
-- new Variable (line 683)
-- new Variable (line 686)
-- new Variable (line 693)
-- new ArgumentCountError (line 716)
-- new ArgumentCountError (line 769)
-- 30 class method(s)
+- new HashTable (line 97)
+- new Variable (line 99)
+- new PDOException (line 119)
+- new PDOException (line 125)
+- new PdoState (line 127)
+- new PDOException (line 149)
+- new PDOException (line 158)
+- new PDOException (line 185)
+- new HashTable (line 233)
+- new Variable (line 235)
+- new ArgumentCountError (line 296)
+- new ArgumentCountError (line 323)
+- new ArgumentCountError (line 360)
+- new ArgumentCountError (line 397)
+- new ArgumentCountError (line 449)
+- new ArgumentCountError (line 478)
+- new ArgumentCountError (line 542)
+- new HashTable (line 691)
+- new Variable (line 692)
+- new Variable (line 695)
+- new Variable (line 702)
+- new ArgumentCountError (line 725)
+- new ArgumentCountError (line 778)
+- 31 class method(s)
 
 ### `ext/pdo/VmPDOStatement.php`
 
@@ -12104,6 +12106,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 896)
 - new HashTable (line 898)
 - 31 class method(s)
+
+### `ext/pdo/pdo_drivers.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 43)
+- 2 class method(s)
 
 ### `ext/phar/BuiltinClasses.php`
 

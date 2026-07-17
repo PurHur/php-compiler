@@ -1008,6 +1008,7 @@ require_once __DIR__.'/../../../ext/pdo/PdoExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/pdo/VmPDO.php';
 require_once __DIR__.'/../../../ext/pdo/VmPDOStatement.php';
 require_once __DIR__.'/../../../ext/pdo/bootstrap_pdoexception.php';
+require_once __DIR__.'/../../../ext/pdo/pdo_drivers.php';
 require_once __DIR__.'/../../../ext/phar/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/phar/Module.php';
 require_once __DIR__.'/../../../ext/phar/PharDataBuiltin.php';

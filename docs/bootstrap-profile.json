@@ -886,6 +886,7 @@
         "ext/openssl/openssl_get_cipher_methods.php",
         "ext/openssl/openssl_get_curve_names.php",
         "ext/openssl/openssl_get_md_methods.php",
+        "ext/openssl/openssl_get_publickey.php",
         "ext/openssl/openssl_open.php",
         "ext/openssl/openssl_pbkdf2.php",
         "ext/openssl/openssl_pkcs12_export.php",
@@ -897,7 +898,9 @@
         "ext/openssl/openssl_pkcs7_verify.php",
         "ext/openssl/openssl_pkey_derive.php",
         "ext/openssl/openssl_pkey_export.php",
+        "ext/openssl/openssl_pkey_get_details.php",
         "ext/openssl/openssl_pkey_get_private.php",
+        "ext/openssl/openssl_pkey_get_public.php",
         "ext/openssl/openssl_pkey_new.php",
         "ext/openssl/openssl_private_decrypt.php",
         "ext/openssl/openssl_private_encrypt.php",
@@ -951,6 +954,7 @@
         "ext/pdo/VmPDO.php",
         "ext/pdo/VmPDOStatement.php",
         "ext/pdo/bootstrap_pdoexception.php",
+        "ext/pdo/pdo_drivers.php",
         "ext/phar/BuiltinClasses.php",
         "ext/phar/Module.php",
         "ext/phar/PharDataBuiltin.php",
@@ -5748,9 +5752,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5514,
+        "inventory_files": 5518,
         "excluded": 0,
-        "eligible": 5514,
+        "eligible": 5518,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

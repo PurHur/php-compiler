@@ -89,6 +89,21 @@ final class VmPDO
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
+    /**
+     * Driver name list for PDO::getAvailableDrivers() / pdo_drivers() (php-src ext/pdo/pdo.c; #20239).
+     */
+    public static function availableDriversHashTable(): HashTable
+    {
+        $ht = new HashTable();
+        if (PdoExtensionPolicy::advertisesSqliteDriver()) {
+            $slot = new Variable();
+            $slot->string('sqlite');
+            $ht->add('0', $slot);
+        }
+
+        return $ht;
+    }
+
     public static function stateById(int $id): PdoState
     {
         if (!isset(self::$store[$id])) {
@@ -487,13 +502,7 @@ final class PDOGetAvailableDrivers extends PdoClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $ht = new HashTable();
-        if (PdoExtensionPolicy::advertisesSqliteDriver()) {
-            $slot = new Variable();
-            $slot->string('sqlite');
-            $ht->add('0', $slot);
-        }
-        $frame->returnVar->array($ht);
+        $frame->returnVar->array(VmPDO::availableDriversHashTable());
     }
 }
 
