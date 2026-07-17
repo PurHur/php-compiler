@@ -1,5 +1,5 @@
 <?php
-// Repro #20007 — strlen/case/rev/bin2hex null coerce under PHP_COMPILER_PROFILE=8.4
+// Repro #20007/#20154 — strlen/case/rev soft-null; bin2hex TypeError under PROFILE=8.4
 foreach (['strlen', 'strtolower', 'strtoupper', 'strrev', 'bin2hex'] as $f) {
     try {
         $r = $f(null);

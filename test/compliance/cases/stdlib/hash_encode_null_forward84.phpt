@@ -1,5 +1,5 @@
 --TEST--
-stdlib bin2hex() soft-null coerce; base64_encode()/hash()/hash_hmac() null TypeError on 8.4 forward (#20007/#19275)
+stdlib bin2hex()/base64_encode()/hash()/hash_hmac() null TypeError on 8.4 forward (#20154/#19275)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -20,7 +20,7 @@ foreach ([
 echo var_export(hash('md5', ''), true), "\n";
 ?>
 --EXPECT--
-bin2hex: uncaught ''
+bin2hex(): Argument #1 ($string) must be of type string, null given
 base64_encode(): Argument #1 ($string) must be of type string, null given
 hash(): Argument #2 ($data) must be of type string, null given
 hash_hmac(): Argument #2 ($data) must be of type string, null given
