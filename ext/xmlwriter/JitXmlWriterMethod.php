@@ -18,6 +18,8 @@ final class JitXmlWriterMethod
             'startdocument' => JitXmlWriterUserScript::tryStartDocument($context, ...$args),
             'startelement' => JitXmlWriterUserScript::tryStartElement($context, ...$args),
             'writeattribute' => JitXmlWriterUserScript::tryWriteAttribute($context, ...$args),
+            'startattribute' => JitXmlWriterUserScript::tryStartAttribute($context, ...$args),
+            'endattribute' => JitXmlWriterUserScript::tryEndAttribute($context, ...$args),
             'text' => JitXmlWriterUserScript::tryText($context, ...$args),
             'fullendelement' => JitXmlWriterUserScript::tryFullEndElement($context, ...$args),
             'endelement' => JitXmlWriterUserScript::tryEndElement($context, ...$args),

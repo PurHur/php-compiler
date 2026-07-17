@@ -22,6 +22,9 @@ final class XmlWriterState
     /** True while the current element's start tag is still open (`<name` …). */
     public bool $startTagOpen = false;
 
+    /** True while a streaming attribute is open (` name="` … pending `"`). */
+    public bool $attributeOpen = false;
+
     public bool $documentStarted = false;
 
     public ?string $version = null;

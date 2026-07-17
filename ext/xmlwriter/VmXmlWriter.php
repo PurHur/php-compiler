@@ -46,6 +46,12 @@ final class VmXmlWriter
         $entry->methods['writeattribute'] = new XmlWriterWriteAttribute();
         $entry->methodVisibility['writeattribute'] = $pub;
         $entry->methodNames['writeattribute'] = 'writeAttribute';
+        $entry->methods['startattribute'] = new XmlWriterStartAttribute();
+        $entry->methodVisibility['startattribute'] = $pub;
+        $entry->methodNames['startattribute'] = 'startAttribute';
+        $entry->methods['endattribute'] = new XmlWriterEndAttribute();
+        $entry->methodVisibility['endattribute'] = $pub;
+        $entry->methodNames['endattribute'] = 'endAttribute';
         $entry->methods['writeelement'] = new XmlWriterWriteElement();
         $entry->methodVisibility['writeelement'] = $pub;
         $entry->methodNames['writeelement'] = 'writeElement';
@@ -199,7 +205,47 @@ final class VmXmlWriter
                 var_export($name, true)
             ));
         }
+        self::endOpenAttributeIfNeeded($state);
         $state->buffer .= ' '.self::escapeElementName($name).'="'.self::escapeAttribute($value).'"';
+
+        return true;
+    }
+
+    /**
+     * Begin a streaming attribute (` name="`); content via text(); close with endAttribute().
+     * php-src: zim_XMLWriter_startAttribute / xmlTextWriterStartAttribute (#19820).
+     */
+    public static function startAttribute(ObjectEntry $entry, string $name): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::startAttribute()');
+        if (!$state->startTagOpen || [] === $state->elementStack) {
+            return false;
+        }
+        if (!self::isValidAttributeName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::startAttribute(): Argument #1 ($name) must be a valid attribute name, %s given',
+                var_export($name, true)
+            ));
+        }
+        self::endOpenAttributeIfNeeded($state);
+        $state->buffer .= ' '.self::escapeElementName($name).'="';
+        $state->attributeOpen = true;
+
+        return true;
+    }
+
+    /**
+     * Close a streaming attribute opened by startAttribute().
+     * php-src: zim_XMLWriter_endAttribute / xmlTextWriterEndAttribute (#19820).
+     */
+    public static function endAttribute(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::endAttribute()');
+        if (!$state->attributeOpen) {
+            return false;
+        }
+        $state->buffer .= '"';
+        $state->attributeOpen = false;
 
         return true;
     }
@@ -239,6 +285,11 @@ final class VmXmlWriter
     public static function text(ObjectEntry $entry, string $content): bool
     {
         $state = self::requireOpen($entry, 'XMLWriter::text()');
+        if ($state->attributeOpen) {
+            $state->buffer .= self::escapeAttribute($content);
+
+            return true;
+        }
         self::closeStartTagIfOpen($state);
         $state->buffer .= self::escapeText($content);
 
@@ -252,6 +303,7 @@ final class VmXmlWriter
             return false;
         }
         if ($state->startTagOpen) {
+            self::endOpenAttributeIfNeeded($state);
             $state->buffer .= '/>';
             array_pop($state->elementStack);
             $state->startTagOpen = false;
@@ -273,6 +325,7 @@ final class VmXmlWriter
             return false;
         }
         if ($state->startTagOpen) {
+            self::endOpenAttributeIfNeeded($state);
             $state->buffer .= '>';
             $state->startTagOpen = false;
         }
@@ -366,6 +419,7 @@ final class VmXmlWriter
         $state->buffer = '';
         $state->elementStack = [];
         $state->startTagOpen = false;
+        $state->attributeOpen = false;
         $state->documentStarted = false;
         $state->version = null;
         $state->encoding = null;
@@ -387,8 +441,17 @@ final class VmXmlWriter
         return $state;
     }
 
+    private static function endOpenAttributeIfNeeded(XmlWriterState $state): void
+    {
+        if ($state->attributeOpen) {
+            $state->buffer .= '"';
+            $state->attributeOpen = false;
+        }
+    }
+
     private static function closeStartTagIfOpen(XmlWriterState $state): void
     {
+        self::endOpenAttributeIfNeeded($state);
         if ($state->startTagOpen) {
             $state->buffer .= '>';
             $state->startTagOpen = false;
