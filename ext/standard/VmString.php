@@ -418,7 +418,7 @@ final class VmString
                     self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null')
                 );
             }
-            if (!$softNullPath && !self::requiresForwardProfileStrictStringNull()) {
+            if (!self::requiresForwardProfileStrictStringNull()) {
                 VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
             }
 

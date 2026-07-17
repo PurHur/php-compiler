@@ -21,17 +21,7 @@ final class JitPathinfo
 {
     public static function invoke(Context $context, JITVariable $path, ?JITVariable $flags = null): Value
     {
-        $pathVal = JitFilestatArg::lowerFilename($context, $path, 'pathinfo', 0, 'path');
-        // Compile-time null already emitted TypeError+abort via lowerFilename (#19256).
-        if (
-            (JITVariable::TYPE_NULL === $path->type || ($path->isNullConstant ?? false))
-            && (
-                $context->callerStrictTypes
-                || \PHPCompiler\JIT\JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-            )
-        ) {
-            return self::buildAllArray($context, []);
-        }
+        $pathVal = JitFilestatArg::lowerPathComponentFilename($context, $path, 'pathinfo', 0, 'path');
         $maskConst = 15;
         if (null !== $flags) {
             $resolved = self::tryResolveFlags($context, $flags);
