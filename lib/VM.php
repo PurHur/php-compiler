@@ -1774,7 +1774,10 @@ class VM {
     /**
      * Properties for var_dump / print_r when __debugInfo is defined (Zend parity, #3259, #6604).
      *
-     * @return array<string, Variable>
+     * Integer HashTable keys stay ints so var_dump prints `[0]=>` not `["0"]=>`
+     * (php-src zend_array / php_var_dump; SplFixedArray #19783).
+     *
+     * @return array<int|string, Variable>
      */
     public function getObjectDebugProperties(ObjectEntry $object, ?Frame $frame = null): array
     {
@@ -1793,9 +1796,9 @@ class VM {
             }
             $props = [];
             foreach ($result->toArray()->iterateKeyed(true) as [$key, $value]) {
-                $name = Variable::TYPE_STRING === $key->type
-                    ? $key->toString()
-                    : (string) $key->toInt();
+                $name = Variable::TYPE_INTEGER === $key->type
+                    ? $key->toInt()
+                    : $key->toString();
                 $copy = new Variable();
                 $copy->copyFrom($value->resolveIndirect());
                 $props[$name] = $copy;
@@ -9076,6 +9079,8 @@ restart:
             return $this->dispatchVmOutOfBoundsException($e, $callerFrame);
         } catch (\UnexpectedValueException $e) {
             return $this->dispatchVmUnexpectedValueException($e, $callerFrame);
+        } catch (\PDOException $e) {
+            return $this->dispatchVmPDOException($e, $callerFrame);
         } catch (\RuntimeException $e) {
             return $this->dispatchVmRuntimeException($e, $callerFrame);
         } catch (\InvalidArgumentException $e) {
@@ -9226,6 +9231,21 @@ restart:
             $error->getMessage(),
             $file,
             $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native PDOException from ext/pdo builtins into user catch handlers (#19830, re-#3367). */
+    private function dispatchVmPDOException(\PDOException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializePDOException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line,
+            $error->getCode()
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);

@@ -8,7 +8,7 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #3211 */
+/** @covers issue #3211, #19822 */
 final class OverrideAttributeTest extends TestCase
 {
     private function requireOverrideValidation(): void
@@ -16,6 +16,41 @@ final class OverrideAttributeTest extends TestCase
         if (!CompilerVersion::supportsOverrideAttribute()) {
             $this->markTestSkipped('Override validation disabled on reference profile');
         }
+    }
+
+    /**
+     * @return false|string previous PHP_COMPILER_PROFILE getenv() value
+     */
+    private function pushCompilerProfile(string $profile): string|false
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE='.$profile);
+
+        return $prev;
+    }
+
+    /** @param false|string $prev */
+    private function popCompilerProfile(string|false $prev): void
+    {
+        if (false === $prev) {
+            putenv('PHP_COMPILER_PROFILE');
+        } else {
+            putenv('PHP_COMPILER_PROFILE='.$prev);
+        }
+    }
+
+    /** Issue #19822 snippet — invalid #[\Override] on B::g with parent A::f only. */
+    private function issue19822InvalidOverrideSource(): string
+    {
+        return <<<'PHP'
+<?php
+class A { public function f(): int { return 1; } }
+class B extends A {
+  #[\Override]
+  public function g(): int { return 2; }
+}
+echo "ok\n";
+PHP;
     }
 
     public function testOverrideWithoutParentCompilesOnReferenceProfile(): void
@@ -37,6 +72,97 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'override_no_parent_ref.php'));
         $this->assertSame("ok\n", ob_get_clean());
+    }
+
+    /**
+     * #19822: default / 8.2 reference profile must treat #[\Override] as inert (Zend 8.2).
+     * Forced via putenv so this always runs even when the harness exports a forward profile.
+     */
+    public function testIssue19822InvalidOverrideCompilesOnProfile82(): void
+    {
+        $prev = $this->pushCompilerProfile('8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsOverrideAttribute());
+            $runtime = new Runtime();
+            ob_start();
+            $runtime->run($runtime->parseAndCompile(
+                $this->issue19822InvalidOverrideSource(),
+                'issue_19822_override_82.php'
+            ));
+            $this->assertSame("ok\n", ob_get_clean());
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
+    }
+
+    /**
+     * #19822: PHP_COMPILER_PROFILE=8.3 must CompileError like Zend 8.3+ (even on 8.4.0-dev host).
+     */
+    public function testIssue19822InvalidOverrideFailsOnProfile83(): void
+    {
+        $prev = $this->pushCompilerProfile('8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
+            $runtime = new Runtime();
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'B::g() has #[\Override] attribute, but no matching parent method exists'
+            );
+            $runtime->parseAndCompile(
+                $this->issue19822InvalidOverrideSource(),
+                'issue_19822_override_83.php'
+            );
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
+    }
+
+    /**
+     * #19822: PHP_COMPILER_PROFILE=8.4 must CompileError like Zend 8.3+.
+     */
+    public function testIssue19822InvalidOverrideFailsOnProfile84(): void
+    {
+        $prev = $this->pushCompilerProfile('8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
+            $runtime = new Runtime();
+            $this->expectException(\CompileError::class);
+            $this->expectExceptionMessage(
+                'B::g() has #[\Override] attribute, but no matching parent method exists'
+            );
+            $runtime->parseAndCompile(
+                $this->issue19822InvalidOverrideSource(),
+                'issue_19822_override_84.php'
+            );
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
+    }
+
+    /**
+     * #19822: valid override still accepted under forward 8.4 profile.
+     */
+    public function testIssue19822ValidOverrideCompilesOnProfile84(): void
+    {
+        $prev = $this->pushCompilerProfile('8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsOverrideAttribute());
+            $runtime = new Runtime();
+            $code = <<<'PHP'
+<?php
+class A { public function f(): int { return 1; } }
+class B extends A {
+  #[\Override]
+  public function f(): int { return 2; }
+}
+echo "ok\n";
+PHP;
+            ob_start();
+            $runtime->run($runtime->parseAndCompile($code, 'issue_19822_override_valid_84.php'));
+            $this->assertSame("ok\n", ob_get_clean());
+        } finally {
+            $this->popCompilerProfile($prev);
+        }
     }
 
     public function testInvalidOverrideFailsAtCompileTime(): void
