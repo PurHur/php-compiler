@@ -20,7 +20,7 @@ final class VmZlibContext
 
     public const INFLATE_CLASS_LC = 'inflatecontext';
 
-    /** @var array<int, array{kind: string, encoding: int, native?: object, buffer?: string, finished?: bool, level?: int}> */
+    /** @var array<int, array{kind: string, encoding: int, native?: object, buffer?: string, finished?: bool, level?: int, status?: int, total_in?: int}> */
     private static array $store = [];
 
     private static int $nativeNest = 0;
@@ -151,6 +151,8 @@ final class VmZlibContext
                 'kind' => 'inflate',
                 'encoding' => $encoding,
                 'native' => $native,
+                'status' => 0,
+                'total_in' => 0,
             ];
         } else {
             self::$store[$entry->id] = [
@@ -158,6 +160,8 @@ final class VmZlibContext
                 'encoding' => $encoding,
                 'buffer' => '',
                 'finished' => false,
+                'status' => 0,
+                'total_in' => 0,
             ];
         }
 
@@ -171,10 +175,20 @@ final class VmZlibContext
     {
         $state = self::requireContext($entry, 'inflate_add', 1, self::INFLATE_CLASS_LC, 'InflateContext');
         if (isset($state['native'])) {
-            return self::nativeInflateAdd($state['native'], $data, $flush);
+            $result = self::nativeInflateAdd($state['native'], $data, $flush);
+            // Keep php-src total_in/status mirrors for getters when host getters are unavailable.
+            $state['total_in'] = ($state['total_in'] ?? 0) + \strlen($data);
+            if (false !== $result && \ZLIB_FINISH === $flush) {
+                $state['status'] = 1; // ZLIB_STREAM_END
+                $state['finished'] = true;
+            }
+            self::$store[$entry->id] = $state;
+
+            return $result;
         }
 
         $state['buffer'] .= $data;
+        $state['total_in'] = ($state['total_in'] ?? 0) + \strlen($data);
         if (\ZLIB_NO_FLUSH === $flush) {
             $partial = self::tryDecompressPartial($state['encoding'], $state['buffer']);
             self::$store[$entry->id] = $state;
@@ -184,15 +198,46 @@ final class VmZlibContext
 
         $plain = self::decompressBuffered($state['encoding'], $state['buffer']);
         if (false === $plain) {
+            self::$store[$entry->id] = $state;
+
             return false;
         }
         $state['buffer'] = '';
         if (\ZLIB_FINISH === $flush) {
             $state['finished'] = true;
+            $state['status'] = 1; // ZLIB_STREAM_END
         }
         self::$store[$entry->id] = $state;
 
         return $plain;
+    }
+
+    /** php-src PHP_FUNCTION(inflate_get_status) — usually ZLIB_OK (0) or ZLIB_STREAM_END (1) (#20008). */
+    public static function inflateGetStatus(ObjectEntry $entry): int
+    {
+        $state = self::requireContext($entry, 'inflate_get_status', 1, self::INFLATE_CLASS_LC, 'InflateContext');
+        if (isset($state['native'])) {
+            $native = self::nativeInflateGetStatus($state['native']);
+            if (null !== $native) {
+                return $native;
+            }
+        }
+
+        return (int) ($state['status'] ?? 0);
+    }
+
+    /** php-src PHP_FUNCTION(inflate_get_read_len) — z_stream.total_in (#20008). */
+    public static function inflateGetReadLen(ObjectEntry $entry): int
+    {
+        $state = self::requireContext($entry, 'inflate_get_read_len', 1, self::INFLATE_CLASS_LC, 'InflateContext');
+        if (isset($state['native'])) {
+            $native = self::nativeInflateGetReadLen($state['native']);
+            if (null !== $native) {
+                return $native;
+            }
+        }
+
+        return (int) ($state['total_in'] ?? 0);
     }
 
     public static function requireZlibContext(
@@ -368,6 +413,40 @@ final class VmZlibContext
         }
     }
 
+    private static function nativeInflateGetStatus(object $native): ?int
+    {
+        if (!\function_exists('inflate_get_status')) {
+            return null;
+        }
+        if (++self::$nativeNest > 1) {
+            --self::$nativeNest;
+
+            return null;
+        }
+        try {
+            return (int) \inflate_get_status($native);
+        } finally {
+            --self::$nativeNest;
+        }
+    }
+
+    private static function nativeInflateGetReadLen(object $native): ?int
+    {
+        if (!\function_exists('inflate_get_read_len')) {
+            return null;
+        }
+        if (++self::$nativeNest > 1) {
+            --self::$nativeNest;
+
+            return null;
+        }
+        try {
+            return (int) \inflate_get_read_len($native);
+        } finally {
+            --self::$nativeNest;
+        }
+    }
+
     private static function compressBuffered(int $encoding, string $data, int $level): string|false
     {
         if (\ZLIB_ENCODING_GZIP === $encoding || 16 === $encoding) {
@@ -400,7 +479,7 @@ final class VmZlibContext
     }
 
     /**
-     * @return array{kind: string, encoding: int, native?: object, buffer?: string, finished?: bool, level?: int}
+     * @return array{kind: string, encoding: int, native?: object, buffer?: string, finished?: bool, level?: int, status?: int, total_in?: int}
      */
     private static function requireContext(
         ObjectEntry $entry,
