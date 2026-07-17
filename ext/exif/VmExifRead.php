@@ -39,6 +39,162 @@ final class VmExifRead
     }
 
     /**
+     * exif_thumbnail() — embedded JPEG/TIFF thumbnail bytes (php-src ext/exif/exif.c; #20027).
+     *
+     * @param-out int|null $width
+     * @param-out int|null $height
+     * @param-out int|null $imageType
+     * @return string|false
+     */
+    public static function thumbnail(
+        string $filename,
+        ?int &$width = null,
+        ?int &$height = null,
+        ?int &$imageType = null
+    ): string|false {
+        $bytes = \PHPCompiler\ext\standard\VmFs::fileGetContents($filename);
+        if (false === $bytes) {
+            return false;
+        }
+
+        return self::thumbnailFromBytes($bytes, $width, $height, $imageType);
+    }
+
+    /**
+     * @param-out int|null $width
+     * @param-out int|null $height
+     * @param-out int|null $imageType
+     * @return string|false
+     */
+    public static function thumbnailFromBytes(
+        string $bytes,
+        ?int &$width = null,
+        ?int &$height = null,
+        ?int &$imageType = null
+    ): string|false {
+        $segment = self::extractJpegExifSegment($bytes);
+        if (null === $segment) {
+            return false;
+        }
+        $thumb = self::extractIfd1Thumbnail($segment);
+        if (null === $thumb) {
+            return false;
+        }
+        $width = $thumb['width'];
+        $height = $thumb['height'];
+        $data = $thumb['data'];
+        $detected = VmImage::getImageSizeFromBytes($data);
+        if (false !== $detected) {
+            $imageType = (int) $detected[2];
+            if (null === $width) {
+                $width = (int) $detected[0];
+            }
+            if (null === $height) {
+                $height = (int) $detected[1];
+            }
+        } else {
+            $imageType = null;
+        }
+
+        return $data;
+    }
+
+    /**
+     * @return array{data: string, width: ?int, height: ?int}|null
+     */
+    private static function extractIfd1Thumbnail(string $tiff): ?array
+    {
+        $len = \strlen($tiff);
+        if ($len < 8) {
+            return null;
+        }
+        $le = 'II' === \substr($tiff, 0, 2);
+        $be = 'MM' === \substr($tiff, 0, 2);
+        if (!$le && !$be) {
+            return null;
+        }
+        $version = self::readUint16($tiff, 2, $le);
+        if (0x002A !== $version) {
+            return null;
+        }
+        $ifd0Offset = self::readUint32($tiff, 4, $le);
+        if ($ifd0Offset >= $len) {
+            return null;
+        }
+        $ifd1Offset = self::readNextIfdOffset($tiff, $ifd0Offset, $le);
+        if (null === $ifd1Offset || 0 === $ifd1Offset || $ifd1Offset >= $len) {
+            return null;
+        }
+        $raw = self::readIfdRawTags($tiff, $ifd1Offset, $le);
+        // JPEGInterchangeFormat / Length (IFD1 compressed thumbnail)
+        if (isset($raw[0x0201], $raw[0x0202])) {
+            $off = (int) $raw[0x0201];
+            $size = (int) $raw[0x0202];
+            if ($off <= 0 || $size <= 0 || $off + $size > $len) {
+                return null;
+            }
+            $data = \substr($tiff, $off, $size);
+            $width = isset($raw[0x0100]) ? (int) $raw[0x0100] : null;
+            $height = isset($raw[0x0101]) ? (int) $raw[0x0101] : null;
+
+            return ['data' => $data, 'width' => $width, 'height' => $height];
+        }
+
+        return null;
+    }
+
+    private static function readNextIfdOffset(string $tiff, int $ifdOffset, bool $le): ?int
+    {
+        $len = \strlen($tiff);
+        if ($ifdOffset + 2 > $len) {
+            return null;
+        }
+        $count = self::readUint16($tiff, $ifdOffset, $le);
+        $nextOffset = $ifdOffset + 2 + ($count * 12);
+        if ($nextOffset + 4 > $len) {
+            return null;
+        }
+
+        return self::readUint32($tiff, $nextOffset, $le);
+    }
+
+    /**
+     * Raw IFD tag → integer value map (for thumbnail offset/length tags).
+     *
+     * @return array<int, int>
+     */
+    private static function readIfdRawTags(string $tiff, int $offset, bool $le): array
+    {
+        $len = \strlen($tiff);
+        if ($offset + 2 > $len) {
+            return [];
+        }
+        $count = self::readUint16($tiff, $offset, $le);
+        $result = [];
+        $entryBase = $offset + 2;
+        for ($i = 0; $i < $count; ++$i) {
+            $entryOffset = $entryBase + ($i * 12);
+            if ($entryOffset + 12 > $len) {
+                break;
+            }
+            $tag = self::readUint16($tiff, $entryOffset, $le);
+            $type = self::readUint16($tiff, $entryOffset + 2, $le);
+            $componentCount = self::readUint32($tiff, $entryOffset + 4, $le);
+            $valueOffset = self::readUint32($tiff, $entryOffset + 8, $le);
+            if (1 !== $componentCount) {
+                continue;
+            }
+            if (self::TIFF_TYPE_SHORT === $type) {
+                $result[$tag] = $valueOffset & 0xffff;
+            } elseif (self::TIFF_TYPE_LONG === $type || self::TIFF_TYPE_SLONG === $type) {
+                $result[$tag] = $valueOffset;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * exif_read_data() — IFD0 tag map keyed by tag name (#3400).
      *
      * @return array<string, int|string>|false

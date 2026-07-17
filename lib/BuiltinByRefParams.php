@@ -177,6 +177,9 @@ final class BuiltinByRefParams
             case 'ftp_alloc':
                 // php-src ext/ftp/ftp.stub.php — &$result (#20060)
                 return [2];
+            case 'exif_thumbnail':
+                // php-src ext/exif/exif.stub.php — &$width, &$height, &$image_type (#20027)
+                return [1, 2, 3];
         }
 
         return [];

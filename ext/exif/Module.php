@@ -16,6 +16,7 @@ class Module extends ModuleAbstract
         return [
             new exif_read_data(),
             new exif_imagetype(),
+            new exif_thumbnail(),
         ];
     }
 }
