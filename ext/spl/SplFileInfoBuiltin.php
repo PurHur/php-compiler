@@ -74,6 +74,7 @@ final class SplFileInfoBuiltin
             'setfileclass' => SplFileInfoSetFileClass::class,
             'setinfoclass' => SplFileInfoSetInfoClass::class,
             '__debuginfo' => SplFileInfoDebugInfo::class,
+            '_bad_state_ex' => SplFileInfoBadStateEx::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -102,6 +103,7 @@ final class SplFileInfoBuiltin
         $entry->methodNames['setfileclass'] = 'setFileClass';
         $entry->methodNames['setinfoclass'] = 'setInfoClass';
         $entry->methodNames['__debuginfo'] = '__debugInfo';
+        $entry->methodNames['_bad_state_ex'] = '_bad_state_ex';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -124,7 +126,8 @@ final class SplFileInfoBuiltin
             $entry->methods['openfile'],
             $entry->methods['setfileclass'],
             $entry->methods['setinfoclass'],
-            $entry->methods['__debuginfo']
+            $entry->methods['__debuginfo'],
+            $entry->methods['_bad_state_ex']
         );
     }
 
@@ -1133,5 +1136,24 @@ final class SplFileInfoDebugInfo extends VmClassMethod
             return;
         }
         $frame->returnVar->array(SplFileInfoBuiltin::debugInfoTable($object));
+    }
+}
+
+/** php-src SplFileInfo::_bad_state_ex — invalid parent-constructor state (#20109). */
+final class SplFileInfoBadStateEx extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('_bad_state_ex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::_bad_state_ex()'
+        );
+        throw new \Error('The parent constructor was not called: the object is in an invalid state');
     }
 }
