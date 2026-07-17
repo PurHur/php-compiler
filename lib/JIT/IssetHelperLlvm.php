@@ -145,14 +145,17 @@ final class IssetHelperLlvm
             }
         }
         if (Variable::TYPE_OBJECT === $container->type) {
-            $arrayAccessIsset = ArrayAccessHelper::tryCompileOffsetIsSet(
-                $context,
-                $container,
-                $dim,
-                $containerOp
-            );
-            if (null !== $arrayAccessIsset) {
-                return $arrayAccessIsset;
+            // isset($obj->prop) must not use ArrayAccess::offsetExists (#19707).
+            if (!$issetOnProperty) {
+                $arrayAccessIsset = ArrayAccessHelper::tryCompileOffsetIsSet(
+                    $context,
+                    $container,
+                    $dim,
+                    $containerOp
+                );
+                if (null !== $arrayAccessIsset) {
+                    return $arrayAccessIsset;
+                }
             }
             $htVar = self::hashtableFromObjectContainer($context, $container, $containerOp);
             $containerUserType = '';

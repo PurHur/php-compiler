@@ -1044,6 +1044,7 @@ require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementChildren.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementConstruct.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementCount.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementGet.php';
+require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementIsset.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementGetDocNamespaces.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementGetName.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementGetNamespaces.php';

@@ -43,6 +43,8 @@ final class VmSimpleXml
         $entry->methodVisibility['__construct'] = $pub;
         $entry->methods['__get'] = new SimpleXmlElementGet();
         $entry->methodVisibility['__get'] = $pub;
+        $entry->methods['__isset'] = new SimpleXmlElementIsset();
+        $entry->methodVisibility['__isset'] = $pub;
         $entry->methods['__tostring'] = new SimpleXmlElementToString();
         $entry->methodVisibility['__tostring'] = $pub;
         $entry->methodNames['__tostring'] = '__toString';
@@ -197,6 +199,34 @@ final class VmSimpleXml
         }
 
         return self::wrapView($ctx, $entry->class, $elements, $docKey);
+    }
+
+    /**
+     * isset($sxe->child) — true when a matching child element exists (#19707, sxe.c has_property).
+     */
+    public static function childPropertyExists(ObjectEntry $entry, string $name): bool
+    {
+        return [] !== self::matchingElements($entry, $name);
+    }
+
+    /**
+     * empty($sxe->child) — missing child, or present child whose string cast is empty (#19707).
+     *
+     * php-src sxe has_property with ZEND_ISEMPTY checks the concatenated text of matching
+     * children (not object truthiness — SimpleXMLElement objects are always truthy).
+     */
+    public static function childPropertyIsEmpty(ObjectEntry $entry, string $name): bool
+    {
+        $elements = self::matchingElements($entry, $name);
+        if ([] === $elements) {
+            return true;
+        }
+        $text = '';
+        foreach ($elements as $node) {
+            $text .= $node->text;
+        }
+
+        return '' === $text || '0' === $text;
     }
 
     public static function offsetGet(Context $ctx, ObjectEntry $entry, Variable $offset): Variable

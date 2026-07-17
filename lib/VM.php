@@ -1176,6 +1176,15 @@ class VM {
 
             return null;
         }
+        // SimpleXMLElement: empty($s->child) uses string cast of matching children (#19707, sxe.c).
+        if (
+            ext\simplexml\VmSimpleXml::CLASS_LC === strtolower($object->class->name)
+            && ext\simplexml\SimpleXmlRegistry::has($object)
+        ) {
+            $dst->bool(ext\simplexml\VmSimpleXml::childPropertyIsEmpty($object, $propName));
+
+            return null;
+        }
         $catchFrame = $this->enforceWriteOnlyVirtualPropertyRead($object, $propName, $frame);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -7126,7 +7135,11 @@ restart:
                                 $dst->bool(EnumCaseSupport::propertyExistsOnCase($object->class, $propName));
                                 break;
                             }
-                            if ($this->objectImplementsArrayAccess($object)) {
+                            if (
+                                !$op->issetOnProperty
+                                && $this->objectImplementsArrayAccess($object)
+                            ) {
+                                // isset($obj[$k]) via ArrayAccess::offsetExists — not isset($obj->prop) (#19707).
                                 $existsOut = new Variable();
                                 $catchFrame = $this->invokeArrayAccessOffsetExists(
                                     $object,
