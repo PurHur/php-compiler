@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5514 |
-| Phase A inventory files (M2 ratio SSOT) | 5514 |
+| PHP files on vm.php path | 5515 |
+| Phase A inventory files (M2 ratio SSOT) | 5515 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15664 |
+| Source constructs flagged (warnings) | 15667 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -425,7 +425,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/BuiltinClasses.php` | 0 | 1 |
 | `ext/ftp/FtpConstants.php` | 0 | 1 |
 | `ext/ftp/FtpExtensionPolicy.php` | 0 | 1 |
-| `ext/ftp/Module.php` | 0 | 36 |
+| `ext/ftp/Module.php` | 0 | 37 |
 | `ext/ftp/VmFtpArg.php` | 0 | 1 |
 | `ext/ftp/VmFtpConnection.php` | 0 | 2 |
 | `ext/ftp/VmFtpCore.php` | 0 | 9 |
@@ -448,6 +448,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/ftp_mlsd.php` | 0 | 2 |
 | `ext/ftp/ftp_nb_continue.php` | 0 | 2 |
 | `ext/ftp/ftp_nb_fget.php` | 0 | 2 |
+| `ext/ftp/ftp_nb_fput.php` | 0 | 2 |
 | `ext/ftp/ftp_nb_get.php` | 0 | 2 |
 | `ext/ftp/ftp_nb_put.php` | 0 | 2 |
 | `ext/ftp/ftp_nlist.php` | 0 | 2 |
@@ -8297,30 +8298,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ftp_systype (line 65)
 - new ftp_nb_continue (line 66)
 - new ftp_nb_fget (line 67)
-- new ftp_nb_get (line 68)
-- new ftp_nb_put (line 69)
-- new ftp_pasv (line 70)
-- new ftp_get (line 71)
-- new ftp_put (line 72)
-- new ftp_nlist (line 73)
-- new ftp_rawlist (line 74)
-- new ftp_chdir (line 75)
-- new ftp_pwd (line 76)
-- new ftp_cdup (line 77)
-- new ftp_mkdir (line 78)
-- new ftp_delete (line 79)
-- new ftp_rename (line 80)
-- new ftp_rmdir (line 81)
-- new ftp_size (line 82)
-- new ftp_mdtm (line 83)
-- new ftp_append (line 84)
-- new ftp_alloc (line 85)
-- new ftp_chmod (line 86)
-- new ftp_raw (line 87)
-- new ftp_site (line 88)
-- new ftp_exec (line 89)
-- new ftp_set_option (line 90)
-- new ftp_get_option (line 91)
+- new ftp_nb_fput (line 68)
+- new ftp_nb_get (line 69)
+- new ftp_nb_put (line 70)
+- new ftp_pasv (line 71)
+- new ftp_get (line 72)
+- new ftp_put (line 73)
+- new ftp_nlist (line 74)
+- new ftp_rawlist (line 75)
+- new ftp_chdir (line 76)
+- new ftp_pwd (line 77)
+- new ftp_cdup (line 78)
+- new ftp_mkdir (line 79)
+- new ftp_delete (line 80)
+- new ftp_rename (line 81)
+- new ftp_rmdir (line 82)
+- new ftp_size (line 83)
+- new ftp_mdtm (line 84)
+- new ftp_append (line 85)
+- new ftp_alloc (line 86)
+- new ftp_chmod (line 87)
+- new ftp_raw (line 88)
+- new ftp_site (line 89)
+- new ftp_exec (line 90)
+- new ftp_set_option (line 91)
+- new ftp_get_option (line 92)
 - 4 class method(s)
 
 ### `ext/ftp/VmFtpArg.php`
@@ -8343,9 +8345,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 211)
 - new HashTable (line 212)
 - new Variable (line 214)
-- new HashTable (line 673)
-- new Variable (line 675)
-- 54 class method(s)
+- new HashTable (line 699)
+- new Variable (line 701)
+- 55 class method(s)
 
 ### `ext/ftp/ftp_alloc.php`
 
@@ -8456,6 +8458,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/ftp/ftp_nb_fget.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+
+### `ext/ftp/ftp_nb_fput.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
@@ -23583,8 +23591,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1771)
-- new Error (line 1782)
+- new Error (line 1772)
+- new Error (line 1783)
 - 219 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -28318,7 +28326,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/substr_compare.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/substr_count.php`
 

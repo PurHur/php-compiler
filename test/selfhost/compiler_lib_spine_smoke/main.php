@@ -506,6 +506,7 @@ require_once __DIR__.'/../../../ext/ftp/ftp_mkdir.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_mlsd.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_nb_continue.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_nb_fget.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_nb_fput.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_nb_get.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_nb_put.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_nlist.php';
