@@ -29,14 +29,6 @@ final class VmMath
     }
 
     /**
-     * Z_PARAM_NUMBER null rejection on PHP 8.4 forward profile (ext/standard/math.c abs/round; #18924).
-     */
-    public static function requiresForwardProfileStrictNumberNull(): bool
-    {
-        return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
-    }
-
-    /**
      * Z_PARAM_DOUBLE null rejection on PHP 8.4 forward profile (ext/standard/math.c fpow/fadd; #19182).
      */
     public static function requiresForwardProfileStrictDoubleNull(): bool
@@ -255,9 +247,6 @@ final class VmMath
             return $var->toBool() ? 1 : 0;
         }
         if (Variable::TYPE_NULL === $var->type) {
-            if (self::requiresForwardProfileStrictNumberNull()) {
-                throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'null'));
-            }
             if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
                 throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'null'));
             }
