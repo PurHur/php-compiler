@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5504 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15595 |
+| Source constructs flagged (warnings) | 15606 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1268,7 +1268,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/ArrayIteratorBuiltin.php` | 0 | 33 |
 | `ext/spl/ArrayObjectBuiltin.php` | 0 | 31 |
 | `ext/spl/BuiltinClasses.php` | 0 | 1 |
-| `ext/spl/CachingIteratorBuiltin.php` | 0 | 11 |
+| `ext/spl/CachingIteratorBuiltin.php` | 0 | 22 |
 | `ext/spl/CallbackFilterIteratorBuiltin.php` | 0 | 6 |
 | `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/EmptyIteratorBuiltin.php` | 0 | 8 |
@@ -14618,15 +14618,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 52)
 - new CachingIteratorConstruct (line 70)
-- new HashTable (line 146)
-- new HashTable (line 173)
-- new Variable (line 193)
-- new Variable (line 206)
-- new Variable (line 309)
-- new BadMethodCallException (line 354)
-- new ArgumentCountError (line 396)
-- new ArgumentCountError (line 624)
-- 36 class method(s)
+- new HashTable (line 156)
+- new HashTable (line 183)
+- new Variable (line 203)
+- new Variable (line 216)
+- new Variable (line 304)
+- new Variable (line 310)
+- new Variable (line 375)
+- new Variable (line 430)
+- new Variable (line 436)
+- new Variable (line 442)
+- new Variable (line 448)
+- new Variable (line 454)
+- new BadMethodCallException (line 467)
+- new ArgumentCountError (line 509)
+- new ArgumentCountError (line 737)
+- new ArgumentCountError (line 847)
+- new ArgumentCountError (line 877)
+- new ArgumentCountError (line 908)
+- new ArgumentCountError (line 937)
+- 46 class method(s)
 
 ### `ext/spl/CallbackFilterIteratorBuiltin.php`
 
