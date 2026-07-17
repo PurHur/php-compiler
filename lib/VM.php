@@ -2546,7 +2546,12 @@ class VM {
     }
 
     /**
-     * Reject []= / dim-write on a value produced by __get (#4673).
+     * Reject []= / dim-write on a non-object value produced by __get (#4673, #20005).
+     *
+     * php-src zend_object_handlers.c: arrays returned by value from __get cannot be
+     * written back (Indirect modification … has no effect). Objects from __get —
+     * including SimpleXMLElement / ArrayAccess — keep write_dimension on the live
+     * instance, so $sxe->child["attr"] = … must reach offsetSet (#20005, sxe_prop_dim_write).
      */
     protected function rejectMagicGetIndirectModify(Variable $containerSlot, bool $forWrite, Frame $frame): ?Frame
     {
@@ -2554,6 +2559,10 @@ class VM {
             return null;
         }
         if (null === $containerSlot->magicGetOverloadedTarget || null === $containerSlot->magicGetOverloadedName) {
+            return null;
+        }
+        $resolved = $containerSlot->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $resolved->type) {
             return null;
         }
         $class = $containerSlot->magicGetOverloadedTarget->class->name;
@@ -3782,17 +3791,31 @@ restart:
                         goto restart;
                     }
                     if ($container->isArrayAccessOffset()) {
-                        if ($forWrite || is_null($op->arg3)) {
-                            $this->context->errors->indirectModificationOfOverloadedElement(
-                                $container->arrayAccessOffsetClassName(),
-                                $this->context,
-                                $frame,
-                                '' !== $frame->scriptPath ? $frame->scriptPath : null
-                            );
-                            $arg1->null();
-                            break;
+                        // Nested dim through ArrayAccess (#5460 / #20005): materialize via
+                        // offsetGet. Objects (SimpleXMLElement, ArrayObject, …) accept further
+                        // write_dimension; arrays returned by value cannot be written back.
+                        try {
+                            $materialized = $container->readArrayAccessOffsetValue();
+                        } catch (VM\ArrayAccessOffsetSignal $signal) {
+                            $frame = $signal->catchFrame;
+                            goto restart;
                         }
-                        $container = $container->readArrayAccessOffsetValue();
+                        if ($forWrite || is_null($op->arg3)) {
+                            if (Variable::TYPE_OBJECT === $materialized->type) {
+                                $container = $materialized;
+                            } else {
+                                $this->context->errors->indirectModificationOfOverloadedElement(
+                                    $container->arrayAccessOffsetClassName(),
+                                    $this->context,
+                                    $frame,
+                                    '' !== $frame->scriptPath ? $frame->scriptPath : null
+                                );
+                                $arg1->null();
+                                break;
+                            }
+                        } else {
+                            $container = $materialized;
+                        }
                     }
                     $isGlobals = Variable::TYPE_ARRAY === $container->type
                         && $this->context->isGlobalsTable($container);

@@ -13,7 +13,7 @@ $c = new C();
 $c['a']['b'] = 2;
 var_dump($c['a']);
 --EXPECTF--
-PHP Notice:  Indirect modification of overloaded element of C has no effect
+PHP Notice:  Indirect modification of overloaded element of C has no effect in %s on line %d
 array(1) {
   ["b"]=>
   int(1)

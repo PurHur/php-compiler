@@ -7671,6 +7671,7 @@ class JIT {
                         $forWrite
                         && null !== $value->magicGetOverloadedClass
                         && null !== $value->magicGetOverloadedName
+                        && Variable::TYPE_OBJECT !== $value->type
                     ) {
                         JIT\MagicMethodDispatch::emitMagicGetIndirectModifyError(
                             $this->context,

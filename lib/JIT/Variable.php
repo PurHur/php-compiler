@@ -171,7 +171,7 @@ final class Variable {
 
     public ?string $magicSetName = null;
 
-    /** __get return value; dim-write must error (#4673). */
+    /** __get return value; non-object dim-write must error (#4673). Objects may write_dimension (#20005). */
     public ?string $magicGetOverloadedClass = null;
 
     public ?string $magicGetOverloadedName = null;
