@@ -21,6 +21,12 @@ final class XmlReaderEvent
         public string $localName,
         public string $prefix,
         public string $namespaceUri,
+        /**
+         * In-scope prefix → URI map at this node (php-src xmlTextReaderLookupNamespace / xmlSearchNs).
+         *
+         * @var array<string, string>
+         */
+        public array $nsScope = [],
     ) {
     }
 }
