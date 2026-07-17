@@ -2166,18 +2166,226 @@ final class VmDom
         return null;
     }
 
+    /**
+     * DOMNode::$baseURI — libxml xmlNodeGetBase / php-src dom_node_base_uri_read (#14453, #20199).
+     *
+     * Resolves HTML {@code <base href>} (HTML docs) and in-scope {@code xml:base} against
+     * {@see DomNodeState::$documentUri}.
+     */
     public static function readBaseUri(ObjectEntry $node): string
     {
+        if (!DomRegistry::has($node)) {
+            return '';
+        }
+        $state = DomRegistry::state($node);
+        if (DomConstants::XML_DOCUMENT_NODE === $state->nodeType) {
+            return $state->documentUri ?? '';
+        }
+
         $doc = self::ownerDocumentEntry($node);
         if (null === $doc) {
             return '';
         }
         $docState = DomRegistry::state($doc);
-        if (null !== $docState->documentUri && '' !== $docState->documentUri) {
-            return $docState->documentUri;
+        $base = $docState->documentUri ?? '';
+        if ($docState->isHtmlDocument) {
+            $htmlBase = self::findHtmlBaseHref($doc);
+            if (null !== $htmlBase && '' !== $htmlBase) {
+                $base = self::resolveUri($base, $htmlBase);
+            }
         }
 
-        return '';
+        $target = $node;
+        if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
+            if (null === $state->ownerElementId) {
+                return $base;
+            }
+            $owner = DomRegistry::entry($state->ownerElementId);
+            if (null === $owner) {
+                return $base;
+            }
+            $target = $owner;
+        } elseif (DomConstants::XML_ELEMENT_NODE !== $state->nodeType) {
+            $parentId = $state->parentId;
+            $target = null;
+            while (null !== $parentId) {
+                $parent = DomRegistry::entry($parentId);
+                if (null === $parent) {
+                    break;
+                }
+                $ps = DomRegistry::state($parent);
+                if (DomConstants::XML_ELEMENT_NODE === $ps->nodeType) {
+                    $target = $parent;
+                    break;
+                }
+                if (DomConstants::XML_DOCUMENT_NODE === $ps->nodeType) {
+                    return $base;
+                }
+                $parentId = $ps->parentId;
+            }
+            if (null === $target) {
+                return $base;
+            }
+        }
+
+        /** @var list<ObjectEntry> $chain */
+        $chain = [];
+        $current = $target;
+        while (null !== $current) {
+            $cs = DomRegistry::state($current);
+            if (DomConstants::XML_DOCUMENT_NODE === $cs->nodeType) {
+                break;
+            }
+            if (DomConstants::XML_ELEMENT_NODE === $cs->nodeType) {
+                array_unshift($chain, $current);
+            }
+            if (null === $cs->parentId) {
+                break;
+            }
+            $current = DomRegistry::entry($cs->parentId);
+        }
+
+        foreach ($chain as $el) {
+            $xmlBase = self::readXmlBaseAttribute($el);
+            if (null !== $xmlBase && '' !== $xmlBase) {
+                $base = self::resolveUri($base, $xmlBase);
+            }
+        }
+
+        return $base;
+    }
+
+    /** First HTML {@code <base href>} in document order (libxml HTML base). */
+    private static function findHtmlBaseHref(ObjectEntry $document): ?string
+    {
+        foreach (self::collectElementsByTagName($document, 'base') as $baseId) {
+            $baseEl = DomRegistry::entry($baseId);
+            if (null === $baseEl) {
+                continue;
+            }
+            $href = self::getAttribute($baseEl, 'href');
+            if ('' !== $href) {
+                return $href;
+            }
+        }
+
+        return null;
+    }
+
+    /** {@code xml:base} via qName or XML namespace (http://www.w3.org/XML/1998/namespace). */
+    private static function readXmlBaseAttribute(ObjectEntry $element): ?string
+    {
+        if (!self::isElement($element)) {
+            return null;
+        }
+        $qName = self::getAttribute($element, 'xml:base');
+        if ('' !== $qName) {
+            return $qName;
+        }
+        $ns = self::getAttributeNS($element, DomConstants::XML_NS_URI, 'base');
+        if ('' !== $ns) {
+            return $ns;
+        }
+
+        return null;
+    }
+
+    /** RFC 3986 relative-ref resolution against a base URI/path (libxml xmlBuildURI subset). */
+    private static function resolveUri(string $base, string $ref): string
+    {
+        if ('' === $ref) {
+            return $base;
+        }
+        if (1 === preg_match('#^[a-zA-Z][a-zA-Z0-9+.-]*:#', $ref)) {
+            return $ref;
+        }
+        $b = parse_url($base);
+        if (!\is_array($b)) {
+            $b = [];
+        }
+        if (str_starts_with($ref, '//')) {
+            $scheme = $b['scheme'] ?? null;
+
+            return (null !== $scheme && '' !== $scheme ? $scheme.':' : '').$ref;
+        }
+        if (isset($ref[0]) && '/' === $ref[0]) {
+            return self::buildUri(
+                $b['scheme'] ?? null,
+                $b['host'] ?? null,
+                isset($b['port']) ? (int) $b['port'] : null,
+                $ref
+            );
+        }
+
+        $basePath = $b['path'] ?? '';
+        if ('' === $basePath) {
+            $basePath = '/';
+        }
+        if (!str_ends_with($basePath, '/')) {
+            $slash = strrpos($basePath, '/');
+            $basePath = false === $slash ? '/' : substr($basePath, 0, $slash + 1);
+        }
+        $merged = self::removeDotSegments($basePath.$ref);
+
+        return self::buildUri(
+            $b['scheme'] ?? null,
+            $b['host'] ?? null,
+            isset($b['port']) ? (int) $b['port'] : null,
+            $merged
+        );
+    }
+
+    private static function buildUri(?string $scheme, ?string $host, ?int $port, string $path): string
+    {
+        if (null === $scheme || '' === $scheme) {
+            if (null === $host || '' === $host) {
+                return $path;
+            }
+
+            return '//'.$host.(null !== $port ? ':'.$port : '').$path;
+        }
+        if (null === $host || '' === $host) {
+            return $scheme.':'.$path;
+        }
+
+        return $scheme.'://'.$host.(null !== $port ? ':'.$port : '').$path;
+    }
+
+    /** RFC 3986 §5.2.4 remove_dot_segments. */
+    private static function removeDotSegments(string $path): string
+    {
+        $input = $path;
+        $output = '';
+        while ('' !== $input) {
+            if (str_starts_with($input, '../')) {
+                $input = substr($input, 3);
+            } elseif (str_starts_with($input, './')) {
+                $input = substr($input, 2);
+            } elseif (str_starts_with($input, '/./')) {
+                $input = '/'.substr($input, 3);
+            } elseif ('/.' === $input) {
+                $input = '/';
+            } elseif (str_starts_with($input, '/../')) {
+                $input = '/'.substr($input, 4);
+                $output = preg_replace('#/[^/]*$#', '', $output) ?? '';
+            } elseif ('/..' === $input) {
+                $input = '/';
+                $output = preg_replace('#/[^/]*$#', '', $output) ?? '';
+            } elseif ('.' === $input || '..' === $input) {
+                $input = '';
+            } else {
+                if (1 === preg_match('#^(/?[^/]*)#', $input, $m)) {
+                    $segment = $m[1];
+                    $input = substr($input, \strlen($segment));
+                    $output .= $segment;
+                } else {
+                    $output .= $input;
+                    $input = '';
+                }
+            }
+        }
+
+        return $output;
     }
 
     public static function readNamespaceUri(ObjectEntry $node): ?string
@@ -5624,11 +5832,14 @@ final class VmDom
                 continue;
             }
             if ('>' === $ch) {
+                $tagLc = strtolower($tag);
+
                 return [
                     'tag' => $tag,
                     'attrs' => substr($content, $attrStart, $i - $attrStart),
                     'end' => $i + 1,
-                    'selfClose' => false,
+                    // HTML5 void elements are implicitly empty (libxml htmlReadMemory; #20199).
+                    'selfClose' => self::isHtmlVoidElement($tagLc),
                 ];
             }
             if ('/' === $ch && isset($content[$i + 1]) && '>' === $content[$i + 1]) {
@@ -5643,6 +5854,33 @@ final class VmDom
         }
 
         return null;
+    }
+
+    /**
+     * HTML5 void elements — no end tag; treat as self-closing in the pure-PHP scanner (#20199).
+     *
+     * @see https://html.spec.whatwg.org/multipage/syntax.html#void-elements
+     */
+    private static function isHtmlVoidElement(string $tagLc): bool
+    {
+        return 'area' === $tagLc
+            || 'base' === $tagLc
+            || 'basefont' === $tagLc
+            || 'bgsound' === $tagLc
+            || 'br' === $tagLc
+            || 'col' === $tagLc
+            || 'embed' === $tagLc
+            || 'frame' === $tagLc
+            || 'hr' === $tagLc
+            || 'img' === $tagLc
+            || 'input' === $tagLc
+            || 'keygen' === $tagLc
+            || 'link' === $tagLc
+            || 'meta' === $tagLc
+            || 'param' === $tagLc
+            || 'source' === $tagLc
+            || 'track' === $tagLc
+            || 'wbr' === $tagLc;
     }
 
     /** @return null|array{tag:string, end:int} */
