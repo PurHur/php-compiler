@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\JIT\Builtin\DomLoadXMLRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for DOMDocument::loadXML() (#18268). */
+/** LLVM lowering for DOMDocument::loadXML() (#18268, #19796). */
 final class JitDomLoadXML
 {
     public static function invoke(Context $context, JITVariable ...$args): Value
@@ -36,10 +38,15 @@ final class JitDomLoadXML
 
         $document = self::loadObjectArg($context, $args[0]);
         $xmlStr = self::loadStringArg($context, $args[1]);
+        $options = $context->getTypeFromString('int64')->constInt(0, false);
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
+            $options = JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'DOMDocument::loadXML()', 2, 'options');
+        }
         $raw = $context->builder->call(
             $context->lookupFunction(DomLoadXMLRuntime::ABI_NAME),
             $document,
-            $xmlStr
+            $xmlStr,
+            $options
         );
         $slot = JitValueBox::alloc($context);
         $i32 = $context->getTypeFromString('int32');

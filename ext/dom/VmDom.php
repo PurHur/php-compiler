@@ -2597,8 +2597,13 @@ final class VmDom
         return true;
     }
 
-    public static function loadXML(Context $ctx, ObjectEntry $document, string $xml, ?\PHPCompiler\Frame $frame = null): bool
-    {
+    public static function loadXML(
+        Context $ctx,
+        ObjectEntry $document,
+        string $xml,
+        ?\PHPCompiler\Frame $frame = null,
+        int $options = 0
+    ): bool {
         self::ensureDocument($document);
         self::rejectEmptyLoadSource($xml, 'DOMDocument::loadXML()');
 
@@ -2606,6 +2611,7 @@ final class VmDom
         $decl = self::parseXmlDeclaration($trimmed);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
         $generalEntities = self::parseDoctypeGeneralEntities($trimmed);
+        $substituteEntities = 0 !== ($options & LibxmlConstants::LIBXML_NOENT);
         $parts = self::splitXmlDocumentParts($trimmed);
         if (null === $parts) {
             // Prefer libxml-shaped diagnostics (e.g. unclosed start tag) over a generic
@@ -2631,7 +2637,14 @@ final class VmDom
 
             return false;
         }
-        $root = self::parseElementTree($ctx, $elementXml, $trimmed, $elementOffset, $generalEntities);
+        $root = self::parseElementTree(
+            $ctx,
+            $elementXml,
+            $trimmed,
+            $elementOffset,
+            $generalEntities,
+            $substituteEntities
+        );
         if (null === $root) {
             return false;
         }
@@ -2693,7 +2706,6 @@ final class VmDom
         int $options = 0,
         ?\PHPCompiler\Frame $frame = null
     ): bool {
-        unset($options);
         $contents = VmFsReadNative::read($filename);
         if (false === $contents) {
             VmLibxml::handleError($ctx, [
@@ -2708,7 +2720,7 @@ final class VmDom
             return false;
         }
 
-        return self::loadXML($ctx, $document, $contents, $frame);
+        return self::loadXML($ctx, $document, $contents, $frame, $options);
     }
 
     public static function loadHTMLFile(
@@ -3568,13 +3580,17 @@ final class VmDom
 
     /**
      * @param array<string, string> $generalEntities
+     *
+     * With LIBXML_NOENT (XML_PARSE_NOENT), general entity refs become text like libxml2
+     * (#19796, php-src ext/dom/document.c). Adjacent text + substituted entities merge.
      */
     private static function appendParsedTextOrEntityRefs(
         Context $ctx,
         ObjectEntry $parent,
         string $text,
         ?ObjectEntry $ownerDocument,
-        array $generalEntities
+        array $generalEntities,
+        bool $substituteEntities = false
     ): void {
         if ('' === $text) {
             return;
@@ -3599,20 +3615,28 @@ final class VmDom
             }
             $refName = substr($text, $amp + 1, $semi - $amp - 1);
             if (isset($generalEntities[$refName])) {
-                if ('' !== $buffer) {
-                    $textNode = self::createTextNode($ctx, self::decodePredefinedXmlEntities($buffer), $ownerDocument);
-                    $state->childIds[] = $textNode->id;
-                    self::linkChildToParent($textNode, $parent);
-                    $buffer = '';
+                if ($substituteEntities) {
+                    // Fold replacement into the text buffer (libxml NOENT merge).
+                    $buffer .= self::expandGeneralEntityReplacement(
+                        $generalEntities[$refName],
+                        $generalEntities
+                    );
+                } else {
+                    if ('' !== $buffer) {
+                        $textNode = self::createTextNode($ctx, self::decodePredefinedXmlEntities($buffer), $ownerDocument);
+                        $state->childIds[] = $textNode->id;
+                        self::linkChildToParent($textNode, $parent);
+                        $buffer = '';
+                    }
+                    $entityRef = self::createEntityReferenceFromLoad(
+                        $ctx,
+                        $refName,
+                        $generalEntities[$refName],
+                        $ownerDocument
+                    );
+                    $state->childIds[] = $entityRef->id;
+                    self::linkChildToParent($entityRef, $parent);
                 }
-                $entityRef = self::createEntityReferenceFromLoad(
-                    $ctx,
-                    $refName,
-                    $generalEntities[$refName],
-                    $ownerDocument
-                );
-                $state->childIds[] = $entityRef->id;
-                self::linkChildToParent($entityRef, $parent);
             } else {
                 $decoded = self::decodePredefinedXmlEntity($refName);
                 if (null !== $decoded) {
@@ -3628,6 +3652,53 @@ final class VmDom
             $state->childIds[] = $textNode->id;
             self::linkChildToParent($textNode, $parent);
         }
+    }
+
+    /**
+     * Expand nested general-entity refs inside a DTD replacement string (LIBXML_NOENT).
+     *
+     * @param array<string, string> $generalEntities
+     */
+    private static function expandGeneralEntityReplacement(string $replacement, array $generalEntities): string
+    {
+        if ('' === $replacement || !str_contains($replacement, '&')) {
+            return $replacement;
+        }
+        $pos = 0;
+        $len = \strlen($replacement);
+        $out = '';
+        $guard = 0;
+        while ($pos < $len) {
+            if (++$guard > 1024) {
+                $out .= substr($replacement, $pos);
+                break;
+            }
+            $amp = strpos($replacement, '&', $pos);
+            if (false === $amp) {
+                $out .= substr($replacement, $pos);
+                break;
+            }
+            if ($amp > $pos) {
+                $out .= substr($replacement, $pos, $amp - $pos);
+            }
+            $semi = strpos($replacement, ';', $amp + 1);
+            if (false === $semi) {
+                $out .= substr($replacement, $amp);
+                break;
+            }
+            $refName = substr($replacement, $amp + 1, $semi - $amp - 1);
+            if (isset($generalEntities[$refName])) {
+                $out .= self::expandGeneralEntityReplacement($generalEntities[$refName], $generalEntities);
+            } else {
+                $decoded = self::decodePredefinedXmlEntity($refName);
+                $out .= null !== $decoded
+                    ? $decoded
+                    : substr($replacement, $amp, $semi - $amp + 1);
+            }
+            $pos = $semi + 1;
+        }
+
+        return $out;
     }
 
     private static function createEntityReferenceFromLoad(
@@ -5549,7 +5620,8 @@ final class VmDom
         string $elementXml,
         string $sourceXml,
         int $baseOffset,
-        array $generalEntities = []
+        array $generalEntities = [],
+        bool $substituteEntities = false
     ): ?ObjectEntry {
         $trimmed = trim($elementXml);
         if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
@@ -5584,7 +5656,14 @@ final class VmDom
             if ('<' !== $inner[$pos]) {
                 $next = strpos($inner, '<', $pos);
                 $text = false === $next ? substr($inner, $pos) : substr($inner, $pos, $next - $pos);
-                self::appendParsedTextOrEntityRefs($ctx, $entry, $text, null, $generalEntities);
+                self::appendParsedTextOrEntityRefs(
+                    $ctx,
+                    $entry,
+                    $text,
+                    null,
+                    $generalEntities,
+                    $substituteEntities
+                );
                 $pos = false === $next ? $len : $next;
 
                 continue;
@@ -5622,7 +5701,14 @@ final class VmDom
                 return null;
             }
             $childXml = substr($inner, $pos, $end - $pos);
-            $child = self::parseElementTree($ctx, $childXml, $sourceXml, $innerBase + $pos, $generalEntities);
+            $child = self::parseElementTree(
+                $ctx,
+                $childXml,
+                $sourceXml,
+                $innerBase + $pos,
+                $generalEntities,
+                $substituteEntities
+            );
             if (null === $child) {
                 return null;
             }
