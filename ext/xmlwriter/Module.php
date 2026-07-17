@@ -43,6 +43,8 @@ class Module extends ModuleAbstract
             new xmlwriter_text(),
             new xmlwriter_start_dtd_attlist(),
             new xmlwriter_end_dtd_attlist(),
+            new xmlwriter_start_dtd_element(),
+            new xmlwriter_end_dtd_element(),
             new xmlwriter_output_memory(),
             new xmlwriter_flush(),
         ];

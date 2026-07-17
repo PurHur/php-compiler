@@ -71,6 +71,12 @@ final class XmlWriterState
     /** True after the first text() inside the open ATTLIST (leading space; #20025). */
     public bool $dtdAttlistHasContent = false;
 
+    /** Inside startDtdElement() … endDtdElement() (php-src xmlTextWriterStartDTDElement; #20032). */
+    public bool $inDtdElement = false;
+
+    /** True after the first text() inside the open ELEMENT (leading space; #20032). */
+    public bool $dtdElementHasContent = false;
+
     /**
      * Namespace decls from writeAttributeNS, flushed when the start tag closes
      * (php-src/libxml defers xmlns onto the open element; #19371).
