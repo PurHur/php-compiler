@@ -664,6 +664,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'curl_share_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::runsCurlEasyCompliance($name)
+                && str_contains($name, 'curl_setopt_array')
+                && !str_contains($name, 'curl_easy_phantom')) {
+                continue;
+            }
+            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesEasyHandleStubs()
+                && str_contains($name, 'curl_easy_phantom')) {
+                continue;
+            }
             if (!\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
                 && str_contains($name, 'ldap_escape')
                 && !str_contains($name, 'ldap_escape_phantom')) {
