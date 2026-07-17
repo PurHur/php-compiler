@@ -17,6 +17,7 @@ use PHPLLVM\Value;
  * getenv() — read process environment (VM; JIT/AOT via GetenvJitHelper / VmEnv, #3710, #5075, #9092).
  *
  * php-src: ext/standard/basic_functions.c — zif_getenv
+ * Z_PARAM_STR_OR_NULL name: coerce scalars when caller is not strict_types (#4177); TypeError under strict (#17765).
  */
 final class getenv_ extends Internal
 {
@@ -49,7 +50,9 @@ final class getenv_ extends Internal
         if (2 === $argc) {
             $localOnly = $frame->calledArgs[1]->resolveIndirect()->toBool();
         }
-        $name = VmString::coerceTypedNullableStringBuiltinArg($frame->calledArgs[0], 'getenv', 0, 'name');
+        // Z_PARAM_STR_OR_NULL: coerce int/float/bool when caller is not strict_types (#4177).
+        // Always-typed rejection (#17765) only applies under caller strict_types (php-src-strict).
+        $name = VmString::typedNullableStringBuiltinArgForFrame($frame, 0, 'getenv', 0, 'name');
         if (null === $name) {
             $frame->returnVar->array(VmEnv::getAllEnvironmentTable());
 
@@ -86,7 +89,14 @@ final class getenv_ extends Internal
 
         return JitEnv::getenv(
             $context,
-            JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'getenv', 0, 'name', '?string'),
+            JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $args[0],
+                'getenv',
+                0,
+                'name',
+                '?string'
+            ),
             $localOnlyI8
         );
     }

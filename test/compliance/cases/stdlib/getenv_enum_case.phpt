@@ -19,5 +19,5 @@ foreach ([
 }
 ?>
 --EXPECT--
-getenv: getenv(): Argument #1 ($name) must be of type string, E given
+getenv: getenv(): Argument #1 ($name) must be of type ?string, E given
 putenv: putenv(): Argument #1 ($assignment) must be of type string, E given
