@@ -1058,9 +1058,6 @@ class Context {
             }
             Builtin\StringJsonEncode::ensureStandaloneBodies($this);
             Builtin\StringJsonDecode::ensureStandaloneBodies($this);
-            Builtin\StringGetenv::ensureDeferredStubsForInventoryEmit($this);
-            Builtin\StringGetenv::ensureStandaloneBodies($this);
-            Builtin\StringGetenvAll::ensureStandaloneBodies($this);
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
             Builtin\StringRandomBytes::implement($this);
             Builtin\ScalarDimFetchRuntime::ensureStandaloneBodies($this);
@@ -1093,6 +1090,10 @@ class Context {
         } finally {
             Builtin\StreamIoRuntime::endStandaloneInitPhase();
         }
+        // After init-phase: NestedJIT GetenvJitHelper (always-helper, #20156) — not during
+        // standaloneInitPhase where StreamIo defer forced the former libc kernel path.
+        Builtin\StringGetenv::ensureStandaloneBodies($this);
+        Builtin\StringGetenvAll::ensureStandaloneBodies($this);
     }
 
     public function compileToFile(string $file) {
