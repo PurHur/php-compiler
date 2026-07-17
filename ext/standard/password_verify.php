@@ -24,8 +24,9 @@ final class password_verify extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('password_verify() requires exactly two arguments');
         }
-        $password = VmString::stringBuiltinArgForFrame($frame, 0, 'password_verify', 0, 'password');
-        $hash = VmString::stringBuiltinArgForFrame($frame, 1, 'password_verify', 1, 'hash');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20174, ext/standard/password.c)
+        $password = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'password_verify', 0, 'password');
+        $hash = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'password_verify', 1, 'hash');
         if (null === $frame->returnVar) {
             return;
         }
@@ -42,8 +43,9 @@ final class password_verify extends Internal
 
         return JitPassword::verify(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'password_verify', 0, 'password'),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'password_verify', 1, 'hash')
+            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20174, ext/standard/password.c)
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'password_verify', 0, 'password'),
+            JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'password_verify', 1, 'hash')
         );
     }
 }
