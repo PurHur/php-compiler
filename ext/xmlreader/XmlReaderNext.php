@@ -41,7 +41,7 @@ final class XmlReaderNext extends VmClassMethod
                 $name = $nameVar->toString();
             }
         }
-        $ok = VmXmlReader::next($entry, $name);
+        $ok = VmXmlReader::next($frame->vmContext, $entry, $name, $frame);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ok): void {
             $ret->bool($ok);
         });

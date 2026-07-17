@@ -565,12 +565,12 @@ final class VmXmlReader
      * Skips the current node subtree to the following sibling-level node. Optional $name
      * keeps advancing until a node with that name is found (any node type).
      */
-    public static function next(ObjectEntry $entry, ?string $name = null): bool
+    public static function next(Context $ctx, ObjectEntry $entry, ?string $name = null, ?Frame $frame = null): bool
     {
         if (null === $name) {
-            return self::nextSibling($entry);
+            return self::nextSibling($ctx, $entry, $frame);
         }
-        while (self::nextSibling($entry)) {
+        while (self::nextSibling($ctx, $entry, $frame)) {
             $view = self::currentEvent($entry);
             if (null !== $view && $name === $view->name) {
                 return true;
@@ -583,7 +583,7 @@ final class VmXmlReader
     /**
      * Advance past the current node (and descendants) to the following document-order node.
      */
-    private static function nextSibling(ObjectEntry $entry): bool
+    private static function nextSibling(Context $ctx, ObjectEntry $entry, ?Frame $frame = null): bool
     {
         $state = XmlReaderRegistry::state($entry);
         if ($state->closed || null === $state->current) {
@@ -596,7 +596,7 @@ final class VmXmlReader
         $current = $state->current;
         $depth = $current->depth;
         if (XmlReaderConstants::ELEMENT === $current->nodeType && !$current->isEmptyElement) {
-            while (self::read($entry)) {
+            while (self::read($ctx, $entry, $frame)) {
                 $ev = $state->current;
                 if (null !== $ev
                     && XmlReaderConstants::END_ELEMENT === $ev->nodeType
@@ -609,10 +609,10 @@ final class VmXmlReader
                 return false;
             }
 
-            return self::read($entry);
+            return self::read($ctx, $entry, $frame);
         }
 
-        return self::read($entry);
+        return self::read($ctx, $entry, $frame);
     }
 
     public static function isValid(ObjectEntry $entry): bool
