@@ -70,7 +70,8 @@ final class JitMbStrwidth
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_strimwidth', 0, 'string');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20225).
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'mb_strimwidth', 0, 'string');
         $from = JitStrictIntArg::lower($context, $args[1], 'mb_strimwidth', 2, 'start');
         $width = JitStrictIntArg::lower($context, $args[2], 'mb_strimwidth', 3, 'width');
         if ($argc >= 4) {

@@ -33,7 +33,8 @@ final class JitMbStrcut
             );
         }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_strcut', 0, 'string');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20225).
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'mb_strcut', 0, 'string');
         $from = JitStrictIntArg::lower($context, $args[1], 'mb_strcut', 2, 'start');
         $i64 = $context->getTypeFromString('int64');
         if ($argc >= 3) {
