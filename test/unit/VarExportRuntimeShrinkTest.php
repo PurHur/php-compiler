@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** StringVarExport JIT/AOT path uses VarExportJitHelper PHP + ext kernel for user-script (#9189, #13349, #19430). */
+/** StringVarExport JIT/AOT path uses VarExportJitHelper PHP + thin kernel (#9189, #13349, #19430, #20077). */
 final class VarExportRuntimeShrinkTest extends TestCase
 {
     public function testStringVarExportUsesVarExportJitHelperForJitPath(): void
@@ -14,7 +14,8 @@ final class VarExportRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringVarExport.php');
         $this->assertStringContainsString('VarExportJitHelper', $source);
         $this->assertStringContainsString('JitVarExportKernel', $source);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StringVarExportJit', $source);
         $this->assertStringNotContainsString('StringVarExportUserScriptLlvm', $source);
         $this->assertLessThan(160, \substr_count($source, "\n"), 'StringVarExport must be a thin bridge (#9189)');

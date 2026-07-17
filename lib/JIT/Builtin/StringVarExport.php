@@ -8,17 +8,16 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPCompiler\ext\standard\JitVarExportKernel;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_var_export via VarExportJitHelper PHP (#9189, #13349, #19430).
+ * JIT/AOT link for __compiler_var_export via VarExportJitHelper PHP (#9189, #13349, #19430, #20077).
  *
- * Embed and standalone AOT compile {@see VarExportJitHelper}; thin LLVM bridges forward the ABI.
- * User-script defer: {@see JitVarExportKernel} (ext/standard) — same kernel-move as #19389/#19399.
+ * Embed / non-thin: compile {@see VarExportJitHelper}; thin LLVM bridges forward the ABI.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20065 shape): {@see JitVarExportKernel}.
  * php-src: ext/standard/var.c — php_var_export_ex
  */
 final class StringVarExport
@@ -49,7 +48,7 @@ final class StringVarExport
 
     public static function implement(Context $context): void
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             JitVarExportKernel::implement($context);
 
             return;

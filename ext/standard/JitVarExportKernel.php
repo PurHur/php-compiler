@@ -13,11 +13,12 @@ use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 
 /**
- * User-script standalone AOT bridge for __compiler_var_export (#19430, #17316, #16075).
+ * Thin standalone AOT bridge for __compiler_var_export (#19430, #17316, #16075, #20077).
  *
- * Nested VarExportJitHelper from user-main emit segfaults; link bridge during lowering
- * after VmActiveContextInit publishes sg_vm_context (#17391). Housed in ext/standard
- * (not lib/JIT/Builtin) — same kernel-move pattern as #19389 / #19399.
+ * Used when {@see \PHPCompiler\JIT\Context::isThinStandaloneAotMain()} (user-script AOT and
+ * bootstrap-aot-link). Nested VarExportJitHelper from user-main emit segfaults; link bridge
+ * during lowering after VmActiveContextInit publishes sg_vm_context (#17391). Housed in
+ * ext/standard (not lib/JIT/Builtin) — same kernel-move pattern as #19389 / #19399 / #20065.
  * php-src: ext/standard/var.c — php_var_export_ex
  */
 final class JitVarExportKernel
