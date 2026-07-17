@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5525 |
-| Phase A inventory files (M2 ratio SSOT) | 5525 |
+| PHP files on vm.php path | 5526 |
+| Phase A inventory files (M2 ratio SSOT) | 5526 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15713 |
+| Source constructs flagged (warnings) | 15718 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -831,7 +831,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 59 |
+| `ext/openssl/Module.php` | 0 | 60 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
@@ -906,6 +906,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_x509_export.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_export_to_file.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_fingerprint.php` | 0 | 2 |
+| `ext/openssl/openssl_x509_free.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_parse.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_verify.php` | 0 | 2 |
@@ -1095,7 +1096,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/soap/SoapFaultConstruct.php` | 0 | 1 |
 | `ext/soap/VmSoapClient.php` | 0 | 46 |
 | `ext/soap/VmSoapEncoding.php` | 0 | 32 |
-| `ext/soap/VmSoapServer.php` | 0 | 42 |
+| `ext/soap/VmSoapServer.php` | 0 | 44 |
 | `ext/soap/bootstrap_soapfault.php` | 0 | 1 |
 | `ext/soap/is_soap_fault.php` | 0 | 2 |
 | `ext/soap/use_soap_error_handler.php` | 0 | 3 |
@@ -11283,21 +11284,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_cms_decrypt (line 75)
 - new openssl_cms_read (line 76)
 - new openssl_x509_verify (line 77)
-- new openssl_csr_new (line 78)
-- new openssl_csr_export (line 79)
-- new openssl_csr_export_to_file (line 80)
-- new openssl_csr_sign (line 81)
-- new openssl_csr_get_subject (line 82)
-- new openssl_csr_get_public_key (line 83)
-- new openssl_free_key (line 84)
-- new openssl_pkey_free (line 85)
-- new openssl_spki_new (line 86)
-- new openssl_spki_verify (line 87)
-- new openssl_spki_export (line 88)
-- new openssl_spki_export_challenge (line 89)
-- new openssl_seal (line 90)
-- new openssl_open (line 91)
-- new openssl_error_string (line 92)
+- new openssl_x509_free (line 78)
+- new openssl_csr_new (line 79)
+- new openssl_csr_export (line 80)
+- new openssl_csr_export_to_file (line 81)
+- new openssl_csr_sign (line 82)
+- new openssl_csr_get_subject (line 83)
+- new openssl_csr_get_public_key (line 84)
+- new openssl_free_key (line 85)
+- new openssl_pkey_free (line 86)
+- new openssl_spki_new (line 87)
+- new openssl_spki_verify (line 88)
+- new openssl_spki_export (line 89)
+- new openssl_spki_export_challenge (line 90)
+- new openssl_seal (line 91)
+- new openssl_open (line 92)
+- new openssl_error_string (line 93)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -11759,6 +11761,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
 - 2 class method(s)
+
+### `ext/openssl/openssl_x509_free.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- 3 class method(s)
 
 ### `ext/openssl/openssl_x509_parse.php`
 
@@ -13292,51 +13300,51 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/VmSoapClient.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 36)
-- new SoapClientConstruct (line 40)
-- new SoapClientSoapCall (line 45)
-- new SoapClientDoRequest (line 46)
-- new SoapClientGetFunctions (line 47)
-- new SoapClientGetTypes (line 48)
-- new SoapClientGetLastRequest (line 49)
-- new SoapClientGetLastResponse (line 50)
-- new SoapClientGetLastRequestHeaders (line 51)
-- new SoapClientGetLastResponseHeaders (line 52)
-- new SoapClientSetCookie (line 53)
-- new SoapClientGetCookies (line 54)
-- new SoapClientSetLocation (line 55)
-- new SoapClientSetSoapHeaders (line 56)
-- new SoapClientCall (line 57)
-- new SoapClientState (line 81)
-- new SoapFault (line 111)
-- new SoapFault (line 217)
-- new SoapFault (line 228)
-- new SoapFault (line 247)
-- new SoapFault (line 344)
-- new DOMDocument (line 346)
-- new SoapFault (line 348)
-- new DOMXPath (line 350)
-- new DOMDocument (line 526)
-- new SoapFault (line 528)
-- new DOMXPath (line 530)
-- new SoapFault (line 553)
-- new Variable (line 630)
-- new Variable (line 638)
-- new HashTable (line 665)
-- new ObjectEntry (line 683)
-- new ArgumentCountError (line 767)
-- new ArgumentCountError (line 805)
-- new ArgumentCountError (line 833)
-- new ArgumentCountError (line 861)
-- new HashTable (line 890)
-- new Variable (line 893)
-- new HashTable (line 915)
-- new Variable (line 918)
-- new ArgumentCountError (line 1018)
-- new HashTable (line 1048)
-- new Variable (line 1050)
-- new ArgumentCountError (line 1069)
-- new ArgumentCountError (line 1099)
+- new ClassEntry (line 38)
+- new SoapClientConstruct (line 42)
+- new SoapClientSoapCall (line 47)
+- new SoapClientDoRequest (line 48)
+- new SoapClientGetFunctions (line 49)
+- new SoapClientGetTypes (line 50)
+- new SoapClientGetLastRequest (line 51)
+- new SoapClientGetLastResponse (line 52)
+- new SoapClientGetLastRequestHeaders (line 53)
+- new SoapClientGetLastResponseHeaders (line 54)
+- new SoapClientSetCookie (line 55)
+- new SoapClientGetCookies (line 56)
+- new SoapClientSetLocation (line 57)
+- new SoapClientSetSoapHeaders (line 58)
+- new SoapClientCall (line 59)
+- new SoapClientState (line 83)
+- new SoapFault (line 118)
+- new SoapFault (line 243)
+- new SoapFault (line 254)
+- new SoapFault (line 273)
+- new SoapFault (line 370)
+- new DOMDocument (line 372)
+- new SoapFault (line 374)
+- new DOMXPath (line 376)
+- new DOMDocument (line 552)
+- new SoapFault (line 554)
+- new DOMXPath (line 556)
+- new SoapFault (line 579)
+- new Variable (line 656)
+- new Variable (line 664)
+- new HashTable (line 691)
+- new ObjectEntry (line 709)
+- new ArgumentCountError (line 796)
+- new ArgumentCountError (line 834)
+- new ArgumentCountError (line 862)
+- new ArgumentCountError (line 890)
+- new HashTable (line 919)
+- new Variable (line 922)
+- new HashTable (line 944)
+- new Variable (line 947)
+- new ArgumentCountError (line 1047)
+- new HashTable (line 1077)
+- new Variable (line 1079)
+- new ArgumentCountError (line 1098)
+- new ArgumentCountError (line 1128)
 - 39 class method(s)
 
 ### `ext/soap/VmSoapEncoding.php`
@@ -13391,34 +13399,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SoapServerGetLastResponse (line 63)
 - new SoapServerState (line 82)
 - new SoapFault (line 99)
-- new SoapFault (line 190)
-- new SoapFault (line 263)
-- new SoapFault (line 296)
-- new DOMDocument (line 304)
-- new SoapFault (line 306)
-- new DOMXPath (line 308)
-- new SoapFault (line 314)
-- new SoapFault (line 318)
-- new Variable (line 340)
-- new HashTable (line 372)
-- new SoapFault (line 403)
-- new ObjectEntry (line 410)
-- new SoapFault (line 425)
-- new SoapFault (line 437)
-- new SoapFault (line 446)
-- new SoapFault (line 698)
-- new DOMDocument (line 700)
-- new SoapFault (line 702)
-- new DOMXPath (line 704)
-- new SoapFault (line 804)
-- new ArgumentCountError (line 821)
-- new ArgumentCountError (line 858)
-- new ArgumentCountError (line 876)
-- new HashTable (line 899)
-- new Variable (line 903)
-- new ArgumentCountError (line 947)
-- new ArgumentCountError (line 997)
-- new ArgumentCountError (line 1021)
+- new SoapFault (line 192)
+- new SoapFault (line 265)
+- new SoapFault (line 298)
+- new DOMDocument (line 306)
+- new SoapFault (line 308)
+- new DOMXPath (line 310)
+- new SoapFault (line 316)
+- new SoapFault (line 320)
+- new Variable (line 342)
+- new HashTable (line 374)
+- new SoapFault (line 405)
+- new ObjectEntry (line 414)
+- new Variable (line 417)
+- new SoapFault (line 438)
+- new SoapFault (line 450)
+- new SoapFault (line 459)
+- new SoapFault (line 711)
+- new DOMDocument (line 713)
+- new SoapFault (line 715)
+- new DOMXPath (line 717)
+- new SoapFault (line 820)
+- new ArgumentCountError (line 837)
+- new ArgumentCountError (line 874)
+- new Variable (line 880)
+- new ArgumentCountError (line 899)
+- new HashTable (line 922)
+- new Variable (line 926)
+- new ArgumentCountError (line 970)
+- new ArgumentCountError (line 1020)
+- new ArgumentCountError (line 1044)
 - 34 class method(s)
 
 ### `ext/soap/bootstrap_soapfault.php`
