@@ -9168,6 +9168,8 @@ final class VmDom
      * Orphans, removeChild results, cloneNode results, and fragment-only nodes
      * yield an empty string (even when ownerDocument is set).
      *
+     * When $xpath is non-null, uses xmlC14NDocSaveTo-equivalent nodeset filtering (#20257).
+     *
      * @param ?array<mixed> $xpath
      * @param ?array<mixed> $nsPrefixes
      */
@@ -9179,11 +9181,10 @@ final class VmDom
         ?array $xpath,
         ?array $nsPrefixes
     ): string|false {
-        unset($ctx);
-        // XPath node-set / prefix list filters are not implemented yet (php-src uses libxml C14N).
-        if (null !== $xpath || null !== $nsPrefixes) {
-            return false;
+        if (null !== $xpath) {
+            return self::c14nWithXPathNodeset($ctx, $node, $exclusive, $withComments, $xpath, $nsPrefixes);
         }
+        unset($ctx, $nsPrefixes);
         if (!DomRegistry::has($node)) {
             return false;
         }
@@ -9202,6 +9203,195 @@ final class VmDom
         }
 
         return self::c14nSerializeNode($node, $withComments, $exclusive, []);
+    }
+
+    /**
+     * C14N with xpath nodeset filter (php-src dom_canonicalization + xmlC14NDocSaveTo; #20257).
+     *
+     * @param array<mixed> $xpath
+     * @param ?array<mixed> $nsPrefixes
+     */
+    private static function c14nWithXPathNodeset(
+        Context $ctx,
+        ObjectEntry $node,
+        bool $exclusive,
+        bool $withComments,
+        array $xpath,
+        ?array $nsPrefixes
+    ): string|false {
+        if (!\array_key_exists('query', $xpath)) {
+            throw new \ValueError('DOMNode::C14N(): Argument #3 ($xpath) must have a "query" key');
+        }
+        $query = $xpath['query'];
+        if (!\is_string($query)) {
+            throw new \TypeError(\sprintf(
+                'DOMNode::C14N(): Argument #3 ($xpath) "query" option must be a string, %s given',
+                get_debug_type($query)
+            ));
+        }
+        if (!DomRegistry::has($node)) {
+            return false;
+        }
+        $document = self::isDocument($node) ? $node : self::ownerDocumentEntry($node);
+        if (null === $document || !self::isDocument($document)) {
+            return false;
+        }
+        $xpathObj = VmDomXPath::create($ctx, $document);
+        if (isset($xpath['namespaces']) && \is_array($xpath['namespaces'])) {
+            foreach ($xpath['namespaces'] as $prefix => $uri) {
+                if (\is_string($prefix) && \is_string($uri)) {
+                    VmDomXPath::registerNamespace($xpathObj, $prefix, $uri);
+                }
+            }
+        }
+        $contextNode = self::isDocument($node) ? null : $node;
+        $listVar = VmDomXPath::query($ctx, $xpathObj, $query, $contextNode, false);
+        $listVar = $listVar->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $listVar->type) {
+            throw new \Error('XPath query did not return a nodeset');
+        }
+        $list = $listVar->toObject();
+        if (!self::isNodeList($list)) {
+            throw new \Error('XPath query did not return a nodeset');
+        }
+        $inSet = [];
+        foreach (DomRegistry::state($list)->listNodeIds as $id) {
+            $inSet[$id] = true;
+        }
+        unset($exclusive, $nsPrefixes);
+
+        return self::c14nSerializeDocumentNodeset($document, $inSet, $withComments);
+    }
+
+    /**
+     * Walk the document emitting only nodes in $inSet (libxml xmlC14NDocSaveTo; #20257).
+     *
+     * @param array<int, true> $inSet
+     */
+    private static function c14nSerializeDocumentNodeset(
+        ObjectEntry $document,
+        array $inSet,
+        bool $withComments
+    ): string {
+        if ([] === $inSet) {
+            return '';
+        }
+        $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $rootVar->type) {
+            return '';
+        }
+
+        return self::c14nSerializeNodesetNode($rootVar->toObject(), $inSet, $withComments);
+    }
+
+    /**
+     * @param array<int, true> $inSet
+     */
+    private static function c14nSerializeNodesetNode(
+        ObjectEntry $entry,
+        array $inSet,
+        bool $withComments
+    ): string {
+        if (!DomRegistry::has($entry)) {
+            return '';
+        }
+        if (self::isElement($entry)) {
+            $state = DomRegistry::state($entry);
+            if (isset($inSet[$entry->id])) {
+                $name = self::escapeName($state->nodeName);
+                $attrPart = self::c14nSerializeAttributesInNodeset($entry, $inSet);
+                $parts = ['<'.$name.$attrPart.'>'];
+                foreach ($state->childIds as $childId) {
+                    $child = DomRegistry::entry($childId);
+                    if (null !== $child) {
+                        $parts[] = self::c14nSerializeNodesetNode($child, $inSet, $withComments);
+                    }
+                }
+                $parts[] = '</'.$name.'>';
+
+                return implode('', $parts);
+            }
+            $parts = [self::c14nSerializeAttributesInNodeset($entry, $inSet)];
+            foreach ($state->childIds as $childId) {
+                $child = DomRegistry::entry($childId);
+                if (null !== $child) {
+                    $parts[] = self::c14nSerializeNodesetNode($child, $inSet, $withComments);
+                }
+            }
+
+            return implode('', $parts);
+        }
+        if (!isset($inSet[$entry->id])) {
+            return '';
+        }
+        if (self::isTextNode($entry)) {
+            return self::escapeText(DomRegistry::state($entry)->textContent ?? '');
+        }
+        if (self::isCdataNode($entry)) {
+            return DomRegistry::state($entry)->textContent ?? '';
+        }
+        if (self::isCommentNode($entry)) {
+            if (!$withComments) {
+                return '';
+            }
+
+            return '<!--'.(DomRegistry::state($entry)->textContent ?? '').'-->';
+        }
+        if (self::isEntityReference($entry)) {
+            return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
+        }
+        if (self::isAttr($entry)) {
+            $state = DomRegistry::state($entry);
+
+            return ' '.self::escapeName($state->nodeName).'="'.self::escapeAttr($state->textContent ?? '').'"';
+        }
+
+        return '';
+    }
+
+    /**
+     * Attributes on $element that are members of the C14N nodeset (#20257).
+     *
+     * @param array<int, true> $inSet
+     */
+    private static function c14nSerializeAttributesInNodeset(ObjectEntry $element, array $inSet): string
+    {
+        $state = DomRegistry::state($element);
+        $entries = [];
+        foreach ($state->attributes as $aname => $avalue) {
+            if (self::isXmlnsAttributeName($aname)) {
+                continue;
+            }
+            $attrId = $state->attributeNodeIds[$aname] ?? null;
+            if (null === $attrId || !isset($inSet[$attrId])) {
+                continue;
+            }
+            $entries[] = [
+                'name' => $aname,
+                'value' => $avalue,
+                'ns' => $state->attributeNamespaces[$aname] ?? '',
+                'nsDecl' => false,
+            ];
+        }
+        if ([] === $entries) {
+            return '';
+        }
+        $n = \count($entries);
+        for ($i = 1; $i < $n; ++$i) {
+            $key = $entries[$i];
+            $j = $i - 1;
+            while ($j >= 0 && self::c14nAttrCompare($entries[$j], $key) > 0) {
+                $entries[$j + 1] = $entries[$j];
+                --$j;
+            }
+            $entries[$j + 1] = $key;
+        }
+        $parts = [];
+        foreach ($entries as $attr) {
+            $parts[] = self::escapeName($attr['name']).'="'.self::escapeAttr($attr['value']).'"';
+        }
+
+        return ' '.implode(' ', $parts);
     }
 
     /**
