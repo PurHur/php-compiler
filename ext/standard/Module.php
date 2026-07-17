@@ -811,6 +811,7 @@ class Module extends ModuleAbstract
             new gzwrite(),
             new gzputs(),
             new gzread(),
+            new gzgetc(),
             new gzgets(),
             new gzseek(),
             new gztell(),
