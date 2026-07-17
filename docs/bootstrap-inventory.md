@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5400 |
-| Phase A inventory files (M2 ratio SSOT) | 5400 |
+| PHP files on vm.php path | 5401 |
+| Phase A inventory files (M2 ratio SSOT) | 5401 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15188 |
+| Source constructs flagged (warnings) | 15193 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3447,7 +3447,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/xml_set_unparsed_entity_decl_handler.php` | 0 | 2 |
 | `ext/xmlreader/BuiltinClasses.php` | 0 | 1 |
 | `ext/xmlreader/Module.php` | 0 | 1 |
-| `ext/xmlreader/VmXmlReader.php` | 0 | 41 |
+| `ext/xmlreader/VmXmlReader.php` | 0 | 43 |
 | `ext/xmlreader/XmlReaderClose.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderConstants.php` | 0 | 1 |
 | `ext/xmlreader/XmlReaderExpand.php` | 0 | 3 |
@@ -3477,6 +3477,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlreader/XmlReaderRegistry.php` | 0 | 1 |
 | `ext/xmlreader/XmlReaderSetParserProperty.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderSetRelaxNGSchema.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderSetRelaxNGSchemaSource.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderSetSchema.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderSubtreeXmlHelper.php` | 0 | 1 |
 | `ext/xmlreader/XmlReaderXML.php` | 0 | 4 |
@@ -7729,8 +7730,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomValidationNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
-- 2 closure(s)
+- 14 class method(s)
+- 4 closure(s)
 
 ### `ext/dom/VmDomXPath.php`
 
@@ -28587,22 +28588,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new XmlReaderGetParserProperty (line 117)
 - new XmlReaderSetSchema (line 120)
 - new XmlReaderSetRelaxNGSchema (line 123)
-- new XmlReaderFromString (line 128)
-- new XmlReaderFromUri (line 131)
-- new XmlReaderFromStream (line 134)
-- new Variable (line 140)
-- new ObjectEntry (line 181)
-- new Error (line 225)
-- new Error (line 254)
-- new Error (line 259)
-- new XmlReaderState (line 284)
-- new Error (line 675)
-- new Error (line 699)
-- new Error (line 719)
-- new Error (line 781)
-- new Error (line 962)
-- new XmlReaderEvent (line 1271)
-- 60 class method(s)
+- new XmlReaderSetRelaxNGSchemaSource (line 126)
+- new XmlReaderFromString (line 131)
+- new XmlReaderFromUri (line 134)
+- new XmlReaderFromStream (line 137)
+- new Variable (line 143)
+- new ObjectEntry (line 184)
+- new Error (line 228)
+- new Error (line 257)
+- new Error (line 262)
+- new XmlReaderState (line 287)
+- new Error (line 678)
+- new Error (line 702)
+- new Error (line 722)
+- new Error (line 784)
+- new Error (line 848)
+- new Error (line 1031)
+- new XmlReaderEvent (line 1340)
+- 61 class method(s)
 
 ### `ext/xmlreader/XmlReaderClose.php`
 
@@ -28796,6 +28799,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 closure(s)
 
 ### `ext/xmlreader/XmlReaderSetRelaxNGSchema.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/xmlreader/XmlReaderSetRelaxNGSchemaSource.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 23)
