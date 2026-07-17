@@ -4,21 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\LibcExtern;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\ext\standard\JitStreamIoKernel;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT stream I/O ABI via StreamIoJitHelper PHP (#10326, #12956).
+ * JIT/AOT stream I/O ABI via StreamIoJitHelper PHP (#10326, #12956, #20229).
  *
+ * Embed / non-thin: NestedJIT helper via {@see JitVmHelperLink}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`): {@see JitStreamIoKernel} libc path (#16075).
  * SSOT: {@see \PHPCompiler\ext\standard\StreamIoJitHelper}
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */
@@ -84,14 +84,14 @@ final class StreamIoRuntime
     }
 
     /**
-     * User-script standalone must link real stream I/O when fopen/tmpfile appear in lowering (#9142, #19462).
+     * Thin/user-script standalone must link real stream I/O when fopen/tmpfile appear in lowering (#9142, #19462, #20229).
      *
-     * Inventory init defers heavy emitters; user-script AOT cannot nested-JIT VmFs (#16075) —
+     * Inventory init defers heavy emitters; thin AOT cannot nested-JIT VmFs (#16075) —
      * upgrade via {@see JitStreamIoKernel} libc + handle-table bridges instead.
      */
     public static function ensureLinkedForUserScriptLowering(Context $context): void
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             JitStreamIoKernel::implementForUserScriptLowering($context);
 
             return;
@@ -524,65 +524,13 @@ final class StreamIoRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $deferUserScript = UserScriptAotDeferNestedJit::shouldDefer($context);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $deferUserScript): void {
-            $prevUser = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-            $prevSelf = getenv('PHP_COMPILER_SELFHOST_AOT');
-            if ($deferUserScript && \function_exists('putenv')) {
-                putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
-                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
-                putenv('PHP_COMPILER_SELFHOST_AOT=0');
-                $_ENV['PHP_COMPILER_SELFHOST_AOT'] = '0';
-                $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = '0';
-            }
-            try {
-                LibcExtern::register($context);
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamIoJitHelper.php');
-                if (null === $block) {
-                    throw new \LogicException('StreamIoJitHelper.php parseAndCompile failed (#10326)');
-                }
-                $jit = new JIT($context);
-                $jit->compile($block);
-            } finally {
-                if ($deferUserScript && \function_exists('putenv')) {
-                    if (false === $prevUser || '' === (string) $prevUser) {
-                        putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
-                        unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
-                    } else {
-                        putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prevUser);
-                        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUser;
-                        $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prevUser;
-                    }
-                    if (false === $prevSelf || '' === (string) $prevSelf) {
-                        putenv('PHP_COMPILER_SELFHOST_AOT=');
-                        unset($_ENV['PHP_COMPILER_SELFHOST_AOT'], $_SERVER['PHP_COMPILER_SELFHOST_AOT']);
-                    } else {
-                        putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelf);
-                        $_ENV['PHP_COMPILER_SELFHOST_AOT'] = $prevSelf;
-                        $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = $prevSelf;
-                    }
-                }
-            }
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT stream I/O (#10326)');
-            }
-        }
+        LibcExtern::register($context);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#10326'
+        );
     }
 
     private static function registerIoRuntime(Context $context): void
