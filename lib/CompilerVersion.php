@@ -2640,4 +2640,16 @@ final class CompilerVersion
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
+
+    /**
+     * PHP 8.4+ XMLReader::{fromString,fromUri,fromStream} static factories
+     * (ext/xmlreader/php_xmlreader.c, #19607).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 method_exists gate).
+     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     */
+    public static function supportsXmlReaderFactories(): bool
+    {
+        return self::supportsDomApiSince('8.4.0');
+    }
 }

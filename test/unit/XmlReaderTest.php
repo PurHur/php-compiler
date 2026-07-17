@@ -98,6 +98,54 @@ PHP;
         self::assertSame("XMLReader::XML(): Argument #1 (\$source) cannot be empty\n", ob_get_clean());
     }
 
+    public function test_xmlreader_from_factories_withheld_on_reference_profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        unset($_ENV['PHP_COMPILER_PROFILE'], $_SERVER['PHP_COMPILER_PROFILE']);
+        try {
+            $runtime = new Runtime();
+            $class = $runtime->vmContext->classes[VmXmlReader::CLASS_LC];
+            self::assertArrayNotHasKey('fromstring', $class->methods);
+            self::assertArrayNotHasKey('fromuri', $class->methods);
+            self::assertArrayNotHasKey('fromstream', $class->methods);
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE'], $_SERVER['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+                $_SERVER['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
+    public function test_xmlreader_from_factories_under_84_profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        $_SERVER['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            $runtime = new Runtime();
+            $code = (string) file_get_contents(__DIR__.'/../repro/maintainer_gap_xmlreader_from_factories.php');
+            $block = $runtime->parseAndCompile($code, 'xmlreader_from_factories.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame("read=1 name=root\n", ob_get_clean());
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE'], $_SERVER['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+                $_SERVER['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
     public function test_xmlreader_tokenizer_matches_zend_event_shape(): void
     {
         $events = VmXmlReader::tokenize('<root><item id="1">a</item></root>');
