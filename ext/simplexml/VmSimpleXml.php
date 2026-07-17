@@ -689,7 +689,13 @@ final class VmSimpleXml
     public static function directElementChildren(ObjectEntry $entry): array
     {
         if (SimpleXmlRegistry::isAttributesView($entry)) {
-            return [];
+            $out = [];
+            foreach (SimpleXmlRegistry::state($entry)->attributes as $name => $value) {
+                // php-src sxe.c: attributes() foreach yields name => attribute SimpleXMLElement (#19351).
+                $out[] = new SimpleXmlNodeState($name, [], [], $value);
+            }
+
+            return $out;
         }
         if (SimpleXmlRegistry::isView($entry)) {
             return SimpleXmlRegistry::view($entry);
