@@ -395,6 +395,16 @@ final class VmSoapServer
         $state = self::state($object);
         $lc = \strtolower($opName);
 
+        // php-src WSDL mode: only SDL operations are valid (#20314).
+        if (
+            null !== $state->wsdl
+            && '' !== $state->wsdl
+            && $state->wsdlOperationIndex !== []
+            && !isset($state->wsdlOperationIndex[$lc])
+        ) {
+            throw new \SoapFault('Client', 'Function "'.$opName.'" doesn\'t exist');
+        }
+
         if (null !== $state->object) {
             return $ctx->runtime->vm->invokeInstanceMethod($state->object, $opName, ...$args);
         }
@@ -723,6 +733,7 @@ final class VmSoapServer
             $name = $op->getAttribute('name');
             if ('' !== $name) {
                 $state->wsdlOperations[] = $name;
+                $state->wsdlOperationIndex[\strtolower($name)] = $name;
             }
         }
         foreach ($xpath->query('//wsdl:definitions') ?: [] as $defs) {
@@ -758,6 +769,9 @@ final class SoapServerState
 
     /** @var list<string> */
     public array $wsdlOperations = [];
+
+    /** @var array<string, string> lowercase op name → original (#20314). */
+    public array $wsdlOperationIndex = [];
 
     public ?string $className = null;
 
