@@ -12,7 +12,6 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\ext\standard\JitPregMatchKernel;
 use PHPLLVM\Builder;
 use PHPLLVM\LLVMAbstract\Builder as LLVMBuilderImpl;
@@ -23,8 +22,9 @@ use llvm\LLVMValueRef_ptr;
 /**
  * JIT/AOT embed link for __compiler_preg_* via PregJitHelper PHP (#9542).
  *
- * Standalone AOT preg_* routes through PregMatchRuntime + PregJitHelper PHP (#9542, #12982, #13736).
- * User-script defer: thin {@see JitPregMatchKernel} stubs (#19399, #16075).
+ * Embed / non-thin: PregMatchRuntime + PregJitHelper PHP (#9542, #12982, #13736).
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20178 / #20169 shape): {@see JitPregMatchKernel}
+ * stubs (NestedJIT of PregJitHelper segfaults under user-script AOT — #19399, #16075).
  * preg_replace_callback uses PHP match loop + thin LLVM callback invoke (#13736).
  * php-src: ext/pcre/php_pcre.c
  */
@@ -95,7 +95,7 @@ final class PregMatchRuntime
 
     public static function implement(Context $context): void
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             JitPregMatchKernel::implement($context);
             self::registerLinkedRuntime($context);
 

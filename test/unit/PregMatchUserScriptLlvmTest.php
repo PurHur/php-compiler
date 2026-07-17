@@ -6,14 +6,18 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** User-script AOT preg routes through ext/standard JitPregMatchKernel (#16075, #19399). */
+/**
+ * Thin standalone AOT preg routes through ext/standard JitPregMatchKernel
+ * via isThinStandaloneAotMain (#16075, #19399, #20178).
+ */
 final class PregMatchUserScriptLlvmTest extends TestCase
 {
-    public function testPregMatchRuntimeDefersNestedJitForUserScript(): void
+    public function testPregMatchRuntimeUsesThinStandaloneGateNotNestedJitDefer(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PregMatchRuntime.php');
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('JitPregMatchKernel::implement', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('PregMatchUserScriptLlvm', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/PregMatchUserScriptLlvm.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitPregMatchKernel.php');

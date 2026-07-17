@@ -30,6 +30,8 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringPregMatchStandaloneLlvm', $source);
         $this->assertStringNotContainsString('PregMatchUserScriptLlvm', $source);
         $this->assertStringContainsString('JitPregMatchKernel', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/PregMatchUserScriptLlvm.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitPregMatchKernel.php');
@@ -40,7 +42,7 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/PregJitHelper.php');
         $this->assertStringContainsString('VmPregNative::pregMatch', $source);
         $this->assertStringContainsString('VmPregNative::pregReplace', $source);
-        $this->assertStringContainsString('VmPregNative::pregReplaceCallbackJit', $source);
+        $this->assertStringContainsString('VmPregNative::pregReplaceCallbackByFnAddr', $source);
         $this->assertStringContainsString('VmPregMatches::hostMatchesToHashTable', $source);
     }
 
