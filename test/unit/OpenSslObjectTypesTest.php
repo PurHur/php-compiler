@@ -139,4 +139,36 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'openssl_free_key.php'));
         self::assertSame("ok\n", ob_get_clean());
     }
+
+    public function test_openssl_pkey_free_deprecated_noop(): void
+    {
+        $runtime = new Runtime();
+        self::assertTrue(VmReflection::functionExists($runtime->vmContext, 'openssl_pkey_free'));
+
+        $code = <<<'PHP'
+<?php
+$key = openssl_pkey_new(['private_key_bits' => 512, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+if (false === $key) {
+    echo "gen-fail\n";
+    exit(1);
+}
+$prev = error_reporting(E_ALL);
+try {
+    $r = @openssl_pkey_free($key);
+    var_export($r);
+    echo "\n";
+} finally {
+    error_reporting($prev);
+}
+try {
+    openssl_pkey_free(null);
+    echo "null-ok\n";
+} catch (TypeError $e) {
+    echo "null-type\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'openssl_pkey_free.php'));
+        self::assertSame("NULL\nnull-type\n", ob_get_clean());
+    }
 }
