@@ -70,7 +70,15 @@ final class JitNumberFormat
 
         self::rejectNullNum($context, $args[0]);
 
-        $number = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'number_format', 'float');
+        $number = JitFdiv::lowerSingleOperand(
+            $context,
+            $args[0],
+            1,
+            'num',
+            'number_format',
+            'float',
+            true
+        );
         $i64 = $context->getTypeFromString('int64');
         $decimals = ($argc >= 2 && !NamedOptionalCallArgs::isOmittedOptional($args[1]))
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'number_format', 2, 'decimals')
@@ -116,7 +124,7 @@ final class JitNumberFormat
 
     private static function rejectNullNum(Context $context, JITVariable $arg): void
     {
-        if (!$context->callerStrictTypes && !VmMath::requiresForwardProfileStrictLongNull()) {
+        if (!$context->callerStrictTypes) {
             return;
         }
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
