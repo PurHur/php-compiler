@@ -34,6 +34,12 @@ final class SoapConstants
     public const WSDL_CACHE_MEMORY = 0x2;
     public const WSDL_CACHE_BOTH = 0x3;
 
+    // php-src ext/soap/php_soap.h — SOAP SSL method constants (#20295)
+    public const SOAP_SSL_METHOD_TLS = 0;
+    public const SOAP_SSL_METHOD_SSLv2 = 1;
+    public const SOAP_SSL_METHOD_SSLv3 = 2;
+    public const SOAP_SSL_METHOD_SSLv23 = 3;
+
     // php-src ext/soap/php_encoding.h — core XSD / SOAP_ENC type ids for SoapVar.
     public const XSD_STRING = 101;
     public const XSD_BOOLEAN = 102;
@@ -86,6 +92,10 @@ final class SoapConstants
             'WSDL_CACHE_DISK' => self::WSDL_CACHE_DISK,
             'WSDL_CACHE_MEMORY' => self::WSDL_CACHE_MEMORY,
             'WSDL_CACHE_BOTH' => self::WSDL_CACHE_BOTH,
+            'SOAP_SSL_METHOD_TLS' => self::SOAP_SSL_METHOD_TLS,
+            'SOAP_SSL_METHOD_SSLv2' => self::SOAP_SSL_METHOD_SSLv2,
+            'SOAP_SSL_METHOD_SSLv3' => self::SOAP_SSL_METHOD_SSLv3,
+            'SOAP_SSL_METHOD_SSLv23' => self::SOAP_SSL_METHOD_SSLv23,
             'XSD_STRING' => self::XSD_STRING,
             'XSD_BOOLEAN' => self::XSD_BOOLEAN,
             'XSD_DECIMAL' => self::XSD_DECIMAL,

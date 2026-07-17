@@ -1,5 +1,5 @@
 --TEST--
-stdlib soap WSDL_CACHE_* / AUTH / COMPRESSION constants (#20220, ext/soap/php_soap.h)
+stdlib soap WSDL_CACHE_* / AUTH / COMPRESSION / SSL_METHOD constants (#20220, #20295, ext/soap/php_soap.h)
 --FILE--
 <?php
 $expect = [
@@ -12,6 +12,10 @@ $expect = [
     'SOAP_COMPRESSION_ACCEPT' => 32,
     'SOAP_COMPRESSION_GZIP' => 0,
     'SOAP_COMPRESSION_DEFLATE' => 16,
+    'SOAP_SSL_METHOD_TLS' => 0,
+    'SOAP_SSL_METHOD_SSLv2' => 1,
+    'SOAP_SSL_METHOD_SSLv3' => 2,
+    'SOAP_SSL_METHOD_SSLv23' => 3,
 ];
 $ok = 1;
 foreach ($expect as $name => $val) {
@@ -22,7 +26,9 @@ foreach ($expect as $name => $val) {
 }
 echo 'ok=', $ok, "\n";
 echo 'none=', WSDL_CACHE_NONE, "\n";
+echo 'tls=', SOAP_SSL_METHOD_TLS, "\n";
 ?>
 --EXPECT--
 ok=1
 none=0
+tls=0
