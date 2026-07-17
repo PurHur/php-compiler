@@ -20,7 +20,7 @@ final class dirname extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('dirname() expects 1 or 2 arguments');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'dirname', 0, 'path', $frame);
+        $path = VmFilestatArg::pathComponentFilenameArgForFrame($frame, 0, 'dirname', 'path');
         if (null === $frame->returnVar) {
             return;
         }
@@ -42,7 +42,7 @@ final class dirname extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('dirname() expects 1 or 2 arguments');
         }
-        $path = JitFilestatArg::lowerFilename($context, $args[0], 'dirname', 0, 'path');
+        $path = JitFilestatArg::lowerPathComponentFilename($context, $args[0], 'dirname', 0, 'path');
         if (1 === $argc) {
             return JitPath::dirname($context, $path);
         }
