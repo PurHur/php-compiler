@@ -5,18 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\phar;
 
 /**
- * Minimal ustar read/write for PharData (.tar) — php-src ext/phar/tar.c subset (#6490).
- *
- * PHP-in-PHP; no libarchive C runtime.
+ * Minimal ustar read/write for PharData (.tar) — php-src ext/phar/tar.c subset (#6490, #19893).
  */
 final class VmPharTar
 {
     /**
-     * @return array<string, string> localname => contents
+     * @return array{files: array<string, string>, dirs: array<string, true>}
      */
-    public static function readArchive(string $binary): array
+    public static function readArchiveEntries(string $binary): array
     {
         $files = [];
+        $dirs = [];
         $len = \strlen($binary);
         $offset = 0;
         while ($offset + 512 <= $len) {
@@ -33,23 +32,39 @@ final class VmPharTar
             if ('' === $name) {
                 continue;
             }
-            // Regular file (or old POSIX '0'/'\0').
-            if ('0' === $typeflag || "\0" === $typeflag || '' === $typeflag) {
+            $name = \rtrim($name, '/');
+            if ('5' === $typeflag) {
+                $dirs[$name] = true;
+            } elseif ('0' === $typeflag || "\0" === $typeflag || '' === $typeflag) {
                 $files[$name] = $payload;
             }
         }
 
-        return $files;
+        return ['files' => $files, 'dirs' => $dirs];
+    }
+
+    /** @return array<string, string> */
+    public static function readArchive(string $binary): array
+    {
+        return self::readArchiveEntries($binary)['files'];
     }
 
     /**
      * @param array<string, string> $files
+     * @param array<string, true>   $dirs
      */
-    public static function writeArchive(array $files): string
+    public static function writeArchive(array $files, array $dirs = []): string
     {
         $out = '';
+        foreach ($dirs as $name => $_) {
+            $name = \rtrim(\str_replace('\\', '/', (string) $name), '/');
+            if ('' === $name) {
+                continue;
+            }
+            $out .= self::buildHeader($name, '', true);
+        }
         foreach ($files as $name => $contents) {
-            $out .= self::buildHeader($name, $contents);
+            $out .= self::buildHeader((string) $name, $contents, false);
             $out .= $contents;
             $pad = (512 - (\strlen($contents) % 512)) % 512;
             if ($pad > 0) {
@@ -87,12 +102,14 @@ final class VmPharTar
         return (int) \octdec($field);
     }
 
-    private static function buildHeader(string $name, string $contents): string
+    private static function buildHeader(string $name, string $contents, bool $isDir): string
     {
         $name = \str_replace('\\', '/', $name);
+        if ($isDir) {
+            $name = \rtrim($name, '/');
+        }
         $prefix = '';
         if (\strlen($name) > 100) {
-            // Split at last slash within prefix/name limits when possible.
             $slash = \strrpos(\substr($name, 0, 155), '/');
             if (false !== $slash && \strlen($name) - $slash - 1 <= 100) {
                 $prefix = \substr($name, 0, $slash);
@@ -104,13 +121,13 @@ final class VmPharTar
 
         $header = \str_repeat("\0", 512);
         self::poke($header, 0, self::padName($name, 100));
-        self::poke($header, 100, self::octal(0644, 8));
+        self::poke($header, 100, self::octal($isDir ? 0755 : 0644, 8));
         self::poke($header, 108, self::octal(0, 8));
         self::poke($header, 116, self::octal(0, 8));
-        self::poke($header, 124, self::octal(\strlen($contents), 12));
+        self::poke($header, 124, self::octal($isDir ? 0 : \strlen($contents), 12));
         self::poke($header, 136, self::octal(\time(), 12));
-        self::poke($header, 148, '        '); // checksum blank
-        $header[156] = '0';
+        self::poke($header, 148, '        ');
+        $header[156] = $isDir ? '5' : '0';
         self::poke($header, 257, "ustar\0");
         self::poke($header, 263, '00');
         if ('' !== $prefix) {
