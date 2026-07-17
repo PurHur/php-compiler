@@ -85,6 +85,21 @@ final class VmXmlWriter
         $entry->methods['writecomment'] = new XmlWriterWriteComment();
         $entry->methodVisibility['writecomment'] = $pub;
         $entry->methodNames['writecomment'] = 'writeComment';
+        $entry->methods['startcomment'] = new XmlWriterStartComment();
+        $entry->methodVisibility['startcomment'] = $pub;
+        $entry->methodNames['startcomment'] = 'startComment';
+        $entry->methods['endcomment'] = new XmlWriterEndComment();
+        $entry->methodVisibility['endcomment'] = $pub;
+        $entry->methodNames['endcomment'] = 'endComment';
+        $entry->methods['startdtd'] = new XmlWriterStartDtd();
+        $entry->methodVisibility['startdtd'] = $pub;
+        $entry->methodNames['startdtd'] = 'startDtd';
+        $entry->methods['enddtd'] = new XmlWriterEndDtd();
+        $entry->methodVisibility['enddtd'] = $pub;
+        $entry->methodNames['enddtd'] = 'endDtd';
+        $entry->methods['writedtd'] = new XmlWriterWriteDtd();
+        $entry->methodVisibility['writedtd'] = $pub;
+        $entry->methodNames['writedtd'] = 'writeDtd';
         $entry->methods['text'] = new XmlWriterText();
         $entry->methodVisibility['text'] = $pub;
         $entry->methodNames['text'] = 'text';
@@ -515,6 +530,129 @@ final class VmXmlWriter
         return true;
     }
 
+    /**
+     * XMLWriter::startComment — open a comment (php-src zim_XMLWriter_startComment; #19386).
+     */
+    public static function startComment(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::startComment()');
+        if ($state->inComment || $state->inCdata || $state->inPi || $state->inDtd) {
+            return false;
+        }
+        self::closeStartTagIfOpen($state);
+        $state->buffer .= '<!--';
+        $state->inComment = true;
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::endComment — close a comment (php-src zim_XMLWriter_endComment; #19386).
+     */
+    public static function endComment(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::endComment()');
+        if (!$state->inComment) {
+            return false;
+        }
+        $state->buffer .= '-->';
+        $state->inComment = false;
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::startDtd — open a DOCTYPE (php-src zim_XMLWriter_startDtd; #19386).
+     */
+    public static function startDtd(
+        ObjectEntry $entry,
+        string $qualifiedName,
+        ?string $publicId = null,
+        ?string $systemId = null
+    ): bool {
+        $state = self::requireOpen($entry, 'XMLWriter::startDtd()');
+        if ('' === $qualifiedName || $state->inDtd || $state->inComment || $state->inCdata || $state->inPi) {
+            return false;
+        }
+        if (null !== $publicId && (null === $systemId || '' === $systemId)) {
+            // libxml: PUBLIC requires a system identifier (php-src xmlTextWriterStartDTD).
+            self::closeStartTagIfOpen($state);
+            $state->buffer .= '<!DOCTYPE '.self::escapeElementName($qualifiedName);
+            @\trigger_error(
+                'XMLWriter::startDtd(): xmlTextWriterStartDTD : system identifier needed!',
+                \E_WARNING
+            );
+
+            return false;
+        }
+        self::closeStartTagIfOpen($state);
+        $state->buffer .= '<!DOCTYPE '.self::escapeElementName($qualifiedName);
+        if (null !== $publicId) {
+            $state->buffer .= ' PUBLIC "'.self::escapeAttribute($publicId).'" "'.self::escapeAttribute((string) $systemId).'"';
+        } elseif (null !== $systemId && '' !== $systemId) {
+            $state->buffer .= ' SYSTEM "'.self::escapeAttribute($systemId).'"';
+        }
+        $state->inDtd = true;
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::endDtd — close a DOCTYPE (php-src zim_XMLWriter_endDtd; #19386).
+     * Zend returns true with no write when no DTD is open (same as endPI).
+     */
+    public static function endDtd(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::endDtd()');
+        if (!$state->inDtd) {
+            return true;
+        }
+        $state->buffer .= '>';
+        $state->inDtd = false;
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::writeDtd — one-shot DOCTYPE (php-src zim_XMLWriter_writeDtd; #19386).
+     * Parameter name `$content` matches the stub (internal subset).
+     */
+    public static function writeDtd(
+        ObjectEntry $entry,
+        string $name,
+        ?string $publicId = null,
+        ?string $systemId = null,
+        ?string $content = null
+    ): bool {
+        $state = self::requireOpen($entry, 'XMLWriter::writeDtd()');
+        if ('' === $name || $state->inDtd || $state->inComment || $state->inCdata || $state->inPi) {
+            return false;
+        }
+        if (null !== $publicId && (null === $systemId || '' === $systemId)) {
+            self::closeStartTagIfOpen($state);
+            $state->buffer .= '<!DOCTYPE '.self::escapeElementName($name);
+            @\trigger_error(
+                'XMLWriter::writeDtd(): xmlTextWriterStartDTD : system identifier needed!',
+                \E_WARNING
+            );
+
+            return false;
+        }
+        self::closeStartTagIfOpen($state);
+        $state->buffer .= '<!DOCTYPE '.self::escapeElementName($name);
+        if (null !== $publicId) {
+            $state->buffer .= ' PUBLIC "'.self::escapeAttribute($publicId).'" "'.self::escapeAttribute((string) $systemId).'"';
+        } elseif (null !== $systemId && '' !== $systemId) {
+            $state->buffer .= ' SYSTEM "'.self::escapeAttribute($systemId).'"';
+        }
+        if (null !== $content) {
+            $state->buffer .= ' ['.$content.']';
+        }
+        $state->buffer .= '>';
+
+        return true;
+    }
+
     public static function text(ObjectEntry $entry, string $content): bool
     {
         $state = self::requireOpen($entry, 'XMLWriter::text()');
@@ -523,7 +661,7 @@ final class VmXmlWriter
 
             return true;
         }
-        if ($state->inCdata) {
+        if ($state->inCdata || $state->inComment) {
             $state->buffer .= $content;
 
             return true;
@@ -685,6 +823,8 @@ final class VmXmlWriter
         $state->inCdata = false;
         $state->inPi = false;
         $state->piHasContent = false;
+        $state->inComment = false;
+        $state->inDtd = false;
         $state->pendingNsDecls = [];
     }
 

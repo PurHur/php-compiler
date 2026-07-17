@@ -290,6 +290,104 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, (bool) $ok);
     }
 
+    public static function tryStartComment(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer) {
+            return null;
+        }
+        $ok = $writer->startComment();
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryEndComment(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer) {
+            return null;
+        }
+        $ok = $writer->endComment();
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryStartDtd(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $name || str_starts_with($name, '__phpc_xw_')) {
+            return null;
+        }
+        $publicId = null;
+        $systemId = null;
+        if (isset($args[2])) {
+            $publicId = self::nullableCompileTimeString($args[2]);
+            if (false === $publicId) {
+                return null;
+            }
+        }
+        if (isset($args[3])) {
+            $systemId = self::nullableCompileTimeString($args[3]);
+            if (false === $systemId) {
+                return null;
+            }
+        }
+        $ok = @$writer->startDtd($name, $publicId, $systemId);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryEndDtd(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer) {
+            return null;
+        }
+        $ok = $writer->endDtd();
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryWriteDtd(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $name || str_starts_with($name, '__phpc_xw_')) {
+            return null;
+        }
+        $publicId = null;
+        $systemId = null;
+        $content = null;
+        if (isset($args[2])) {
+            $publicId = self::nullableCompileTimeString($args[2]);
+            if (false === $publicId) {
+                return null;
+            }
+        }
+        if (isset($args[3])) {
+            $systemId = self::nullableCompileTimeString($args[3]);
+            if (false === $systemId) {
+                return null;
+            }
+        }
+        if (isset($args[4])) {
+            $content = self::nullableCompileTimeString($args[4]);
+            if (false === $content) {
+                return null;
+            }
+        }
+        $ok = @$writer->writeDtd($name, $publicId, $systemId, $content);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
     public static function tryStartPI(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);

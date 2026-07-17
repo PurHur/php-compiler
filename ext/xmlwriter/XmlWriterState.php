@@ -44,6 +44,12 @@ final class XmlWriterState
     /** True after any text() inside the current PI (controls leading space before content). */
     public bool $piHasContent = false;
 
+    /** Inside startComment() … endComment() (php-src xmlTextWriterStartComment; #19386). */
+    public bool $inComment = false;
+
+    /** Inside startDtd() … endDtd() (php-src xmlTextWriterStartDTD; #19386). */
+    public bool $inDtd = false;
+
     /**
      * Namespace decls from writeAttributeNS, flushed when the start tag closes
      * (php-src/libxml defers xmlns onto the open element; #19371).
