@@ -9076,6 +9076,8 @@ restart:
             return $this->dispatchVmOutOfBoundsException($e, $callerFrame);
         } catch (\UnexpectedValueException $e) {
             return $this->dispatchVmUnexpectedValueException($e, $callerFrame);
+        } catch (\PDOException $e) {
+            return $this->dispatchVmPDOException($e, $callerFrame);
         } catch (\RuntimeException $e) {
             return $this->dispatchVmRuntimeException($e, $callerFrame);
         } catch (\InvalidArgumentException $e) {
@@ -9226,6 +9228,21 @@ restart:
             $error->getMessage(),
             $file,
             $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native PDOException from ext/pdo builtins into user catch handlers (#19830, re-#3367). */
+    private function dispatchVmPDOException(\PDOException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializePDOException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line,
+            $error->getCode()
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
