@@ -11,8 +11,8 @@ use PHPLLVM\Value;
 /**
  * LLVM lowering for phpc_fpow_kernel() — thin libc pow(3) (#19259).
  *
- * Used inside FpowJitHelper / MathFpow user-script kernels so nested helper
- * units do not recurse through the fpow()/pow() builtin bridge.
+ * Used inside FpowJitHelper and thin standalone AOT (`isThinStandaloneAotMain`)
+ * so nested helper units do not recurse through the fpow()/pow() builtin bridge.
  * php-src: ext/standard/math.c — PHP_FUNCTION(fpow)
  */
 final class JitFpowKernel

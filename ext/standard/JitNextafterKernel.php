@@ -11,8 +11,8 @@ use PHPLLVM\Value;
 /**
  * LLVM lowering for phpc_nextafter_kernel() — thin libc nextafter(3) (#19259).
  *
- * Used inside NextafterJitHelper / MathNextafter user-script kernels so nested
- * helper units do not recurse through the nextafter() builtin bridge.
+ * Used inside NextafterJitHelper and thin standalone AOT (`isThinStandaloneAotMain`)
+ * so nested helper units do not recurse through the nextafter() builtin bridge.
  * php-src: ext/standard/math.c — PHP_FUNCTION(nextafter)
  */
 final class JitNextafterKernel

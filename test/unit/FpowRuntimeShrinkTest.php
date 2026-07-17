@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\FpowJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** fpow()/pow float JIT routes through FpowJitHelper PHP + JitFpowKernel (#15189, #19259). */
+/** fpow()/pow float JIT: PHP helper for embed; thin libc via isThinStandaloneAotMain (#15189, #20034). */
 final class FpowRuntimeShrinkTest extends TestCase
 {
     public function testFpowUsesJitHelperNotLibcPow(): void
@@ -22,13 +22,15 @@ final class FpowRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('invokeLibc', $jitPow);
     }
 
-    public function testMathFpowUserScriptKernelAndEmbedHelper(): void
+    public function testMathFpowThinKernelAndEmbedHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathFpow.php');
         $this->assertStringContainsString('JitFpowKernel', $source);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('FpowJitHelper', $source);
+        $this->assertStringContainsString('fpow_kernel_entry', $source);
         $this->assertStringNotContainsString('invokeLibcPow', $source);
         $this->assertStringNotContainsString("lookupFunction('pow')", $source);
         $this->assertStringNotContainsString("addFunction('pow'", $source);
