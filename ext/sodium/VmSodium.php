@@ -146,6 +146,36 @@ final class VmSodium
 
     public const CRYPTO_KDF_KEYBYTES = 32;
 
+    /** Argon2 password hashing (php-src crypto_pwhash_*; #20048). */
+    public const CRYPTO_PWHASH_ALG_ARGON2I13 = 1;
+
+    public const CRYPTO_PWHASH_ALG_ARGON2ID13 = 2;
+
+    public const CRYPTO_PWHASH_ALG_DEFAULT = 2;
+
+    public const CRYPTO_PWHASH_SALTBYTES = 16;
+
+    public const CRYPTO_PWHASH_STRPREFIX = '$argon2id$';
+
+    public const CRYPTO_PWHASH_OPSLIMIT_INTERACTIVE = 2;
+
+    public const CRYPTO_PWHASH_MEMLIMIT_INTERACTIVE = 67108864;
+
+    public const CRYPTO_PWHASH_OPSLIMIT_MODERATE = 3;
+
+    public const CRYPTO_PWHASH_MEMLIMIT_MODERATE = 268435456;
+
+    public const CRYPTO_PWHASH_OPSLIMIT_SENSITIVE = 4;
+
+    public const CRYPTO_PWHASH_MEMLIMIT_SENSITIVE = 1073741824;
+
+    /** Internal: crypto_pwhash_STRBYTES / OPSLIMIT_MIN / MEMLIMIT_MIN (not advertised as SODIUM_*). */
+    private const CRYPTO_PWHASH_STRBYTES = 128;
+
+    private const CRYPTO_PWHASH_OPSLIMIT_MIN = 1;
+
+    private const CRYPTO_PWHASH_MEMLIMIT_MIN = 8192;
+
     private static ?\FFI $ffi = null;
 
     private static bool $ffiUnavailable = false;
@@ -167,6 +197,7 @@ final class VmSodium
             || \function_exists('sodium_crypto_secretstream_xchacha20poly1305_keygen')
             || \function_exists('sodium_crypto_shorthash')
             || \function_exists('sodium_crypto_kdf_derive_from_key')
+            || \function_exists('sodium_crypto_pwhash')
             || null !== self::ffi();
     }
 
@@ -1032,6 +1063,67 @@ final class VmSodium
         return self::ffiKdfDeriveFromKey($subkeyLength, $subkeyId, $context, $key);
     }
 
+    /**
+     * sodium_crypto_pwhash() (php-src ext/sodium/libsodium.c; #20048).
+     */
+    public static function pwhash(
+        int $length,
+        string $password,
+        string $salt,
+        int $opslimit,
+        int $memlimit,
+        int $algo
+    ): string {
+        self::validatePwhash($length, $password, $salt, $opslimit, $memlimit, $algo);
+        if (\function_exists('sodium_crypto_pwhash')) {
+            return \sodium_crypto_pwhash($length, $password, $salt, $opslimit, $memlimit, $algo);
+        }
+
+        return self::ffiPwhash($length, $password, $salt, $opslimit, $memlimit, $algo);
+    }
+
+    /**
+     * sodium_crypto_pwhash_str() (php-src ext/sodium/libsodium.c; #20048).
+     */
+    public static function pwhashStr(string $password, int $opslimit, int $memlimit): string
+    {
+        self::validatePwhashStr($password, $opslimit, $memlimit);
+        if (\function_exists('sodium_crypto_pwhash_str')) {
+            return \sodium_crypto_pwhash_str($password, $opslimit, $memlimit);
+        }
+
+        return self::ffiPwhashStr($password, $opslimit, $memlimit);
+    }
+
+    /**
+     * sodium_crypto_pwhash_str_verify() (php-src ext/sodium/libsodium.c; #20048).
+     */
+    public static function pwhashStrVerify(string $hash, string $password): bool
+    {
+        if (\strlen($password) >= 0xffffffff) {
+            self::throwSodium(
+                'sodium_crypto_pwhash_str_verify(): Argument #2 ($password) is too long'
+            );
+        }
+        if (\function_exists('sodium_crypto_pwhash_str_verify')) {
+            return \sodium_crypto_pwhash_str_verify($hash, $password);
+        }
+
+        return self::ffiPwhashStrVerify($hash, $password);
+    }
+
+    /**
+     * sodium_crypto_pwhash_str_needs_rehash() (php-src ext/sodium/libsodium.c; #20048).
+     */
+    public static function pwhashStrNeedsRehash(string $hash, int $opslimit, int $memlimit): bool
+    {
+        if (\function_exists('sodium_crypto_pwhash_str_needs_rehash')) {
+            return \sodium_crypto_pwhash_str_needs_rehash($hash, $opslimit, $memlimit);
+        }
+
+        return self::ffiPwhashStrNeedsRehash($hash, $opslimit, $memlimit);
+    }
+
     public static function authVerify(string $mac, string $message, string $key): bool
     {
         if (\function_exists('sodium_crypto_auth_verify')) {
@@ -1342,6 +1434,163 @@ final class VmSodium
         }
 
         return self::unsignedCharArrayToString($outBuf, $subkeyLength);
+    }
+
+    private static function validatePwhash(
+        int $length,
+        string $password,
+        string $salt,
+        int $opslimit,
+        int $memlimit,
+        int $algo
+    ): void {
+        if ($length <= 0) {
+            self::throwSodium(
+                'sodium_crypto_pwhash(): Argument #1 ($length) must be greater than 0'
+            );
+        }
+        if ($length >= 0xffffffff) {
+            self::throwSodium(
+                'sodium_crypto_pwhash(): Argument #1 ($length) is too large'
+            );
+        }
+        if (\strlen($password) >= 0xffffffff) {
+            self::throwSodium(
+                'sodium_crypto_pwhash(): Argument #2 ($password) is too long'
+            );
+        }
+        if ($opslimit <= 0) {
+            self::throwSodium(
+                'sodium_crypto_pwhash(): Argument #4 ($opslimit) must be greater than 0'
+            );
+        }
+        if ($memlimit <= 0) {
+            self::throwSodium(
+                'sodium_crypto_pwhash(): Argument #5 ($memlimit) must be greater than 0'
+            );
+        }
+        if (
+            $algo !== self::CRYPTO_PWHASH_ALG_ARGON2I13
+            && $algo !== self::CRYPTO_PWHASH_ALG_ARGON2ID13
+            && $algo !== self::CRYPTO_PWHASH_ALG_DEFAULT
+        ) {
+            self::throwSodium('unsupported password hashing algorithm');
+        }
+        if (\strlen($salt) !== self::CRYPTO_PWHASH_SALTBYTES) {
+            self::throwSodium(
+                'sodium_crypto_pwhash(): Argument #3 ($salt) must be SODIUM_CRYPTO_PWHASH_SALTBYTES bytes long'
+            );
+        }
+        if ($opslimit < self::CRYPTO_PWHASH_OPSLIMIT_MIN) {
+            self::throwSodium(\sprintf(
+                'sodium_crypto_pwhash(): Argument #4 ($opslimit) must be greater than or equal to %d',
+                self::CRYPTO_PWHASH_OPSLIMIT_MIN
+            ));
+        }
+        if ($memlimit < self::CRYPTO_PWHASH_MEMLIMIT_MIN) {
+            self::throwSodium(\sprintf(
+                'sodium_crypto_pwhash(): Argument #5 ($memlimit) must be greater than or equal to %d',
+                self::CRYPTO_PWHASH_MEMLIMIT_MIN
+            ));
+        }
+    }
+
+    private static function validatePwhashStr(string $password, int $opslimit, int $memlimit): void
+    {
+        if ($opslimit <= 0) {
+            self::throwSodium(
+                'sodium_crypto_pwhash_str(): Argument #2 ($opslimit) must be greater than 0'
+            );
+        }
+        if ($memlimit <= 0) {
+            self::throwSodium(
+                'sodium_crypto_pwhash_str(): Argument #3 ($memlimit) must be greater than 0'
+            );
+        }
+        if (\strlen($password) >= 0xffffffff) {
+            self::throwSodium(
+                'sodium_crypto_pwhash_str(): Argument #1 ($password) is too long'
+            );
+        }
+        if ($opslimit < self::CRYPTO_PWHASH_OPSLIMIT_MIN) {
+            self::throwSodium(\sprintf(
+                'sodium_crypto_pwhash_str(): Argument #2 ($opslimit) must be greater than or equal to %d',
+                self::CRYPTO_PWHASH_OPSLIMIT_MIN
+            ));
+        }
+        if ($memlimit < self::CRYPTO_PWHASH_MEMLIMIT_MIN) {
+            self::throwSodium(\sprintf(
+                'sodium_crypto_pwhash_str(): Argument #3 ($memlimit) must be greater than or equal to %d',
+                self::CRYPTO_PWHASH_MEMLIMIT_MIN
+            ));
+        }
+    }
+
+    private static function ffiPwhash(
+        int $length,
+        string $password,
+        string $salt,
+        int $opslimit,
+        int $memlimit,
+        int $algo
+    ): string {
+        $ffi = self::requireFfi();
+        $outBuf = $ffi->new('unsigned char['.$length.']');
+        $passBuf = self::stringToUnsignedCharArray($ffi, $password);
+        $saltBuf = self::stringToUnsignedCharArray($ffi, $salt);
+        $rc = $ffi->crypto_pwhash(
+            $outBuf,
+            $length,
+            $passBuf,
+            \strlen($password),
+            $saltBuf,
+            $opslimit,
+            $memlimit,
+            $algo
+        );
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($outBuf, $length);
+    }
+
+    private static function ffiPwhashStr(string $password, int $opslimit, int $memlimit): string
+    {
+        $ffi = self::requireFfi();
+        $outBuf = $ffi->new('char['.self::CRYPTO_PWHASH_STRBYTES.']');
+        $passBuf = self::stringToUnsignedCharArray($ffi, $password);
+        $rc = $ffi->crypto_pwhash_str($outBuf, $passBuf, \strlen($password), $opslimit, $memlimit);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+        $out = '';
+        for ($i = 0; $i < self::CRYPTO_PWHASH_STRBYTES; ++$i) {
+            $ch = (int) $outBuf[$i];
+            if (0 === $ch) {
+                break;
+            }
+            $out .= \chr($ch);
+        }
+
+        return $out;
+    }
+
+    private static function ffiPwhashStrVerify(string $hash, string $password): bool
+    {
+        $ffi = self::requireFfi();
+        $hashBuf = self::stringToUnsignedCharArray($ffi, $hash."\0");
+        $passBuf = self::stringToUnsignedCharArray($ffi, $password);
+
+        return 0 === $ffi->crypto_pwhash_str_verify($hashBuf, $passBuf, \strlen($password));
+    }
+
+    private static function ffiPwhashStrNeedsRehash(string $hash, int $opslimit, int $memlimit): bool
+    {
+        $ffi = self::requireFfi();
+        $hashBuf = self::stringToUnsignedCharArray($ffi, $hash."\0");
+
+        return 0 !== $ffi->crypto_pwhash_str_needs_rehash($hashBuf, $opslimit, $memlimit);
     }
 
     private static function ffiAuthVerify(string $mac, string $message, string $key): bool
@@ -2752,6 +3001,10 @@ final class VmSodium
                     int crypto_auth_verify(const unsigned char *h, const unsigned char *in, unsigned long long inlen, const unsigned char *k);
                     int crypto_shorthash(unsigned char *out, const unsigned char *in, unsigned long long inlen, const unsigned char *k);
                     int crypto_kdf_derive_from_key(unsigned char *subkey, size_t subkey_len, uint64_t subkey_id, const char *ctx, const unsigned char *key);
+                    int crypto_pwhash(unsigned char *out, unsigned long long outlen, const char *passwd, unsigned long long passwdlen, const unsigned char *salt, unsigned long long opslimit, size_t memlimit, int alg);
+                    int crypto_pwhash_str(char out[128], const char *passwd, unsigned long long passwdlen, unsigned long long opslimit, size_t memlimit);
+                    int crypto_pwhash_str_verify(const char *str, const char *passwd, unsigned long long passwdlen);
+                    int crypto_pwhash_str_needs_rehash(const char *str, unsigned long long opslimit, size_t memlimit);
                     int crypto_stream(unsigned char *c, unsigned long long clen, const unsigned char *n, const unsigned char *k);
                     int crypto_stream_xor(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n, const unsigned char *k);
                     int crypto_stream_xchacha20(unsigned char *c, unsigned long long clen, const unsigned char *n, const unsigned char *k);
