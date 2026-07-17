@@ -14,10 +14,11 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmJson;
 
 /**
- * SoapClient VM class — v1 local WSDL + file/HTTP transport (php-src ext/soap/soap.c; #20037).
+ * SoapClient VM class — v1 local WSDL + file/HTTP transport (php-src ext/soap/soap.c; #20037, #20183).
  *
  * Fixture mode: options['location'] may be a local filesystem path or file:// URL; __doRequest
  * returns that file's contents (no network). HTTP locations use host file_get_contents POST.
+ * With options['trace'], __getLastRequestHeaders / __getLastResponseHeaders capture HTTP header blocks.
  */
 final class VmSoapClient
 {
@@ -47,6 +48,8 @@ final class VmSoapClient
             '__gettypes' => new SoapClientGetTypes(),
             '__getlastrequest' => new SoapClientGetLastRequest(),
             '__getlastresponse' => new SoapClientGetLastResponse(),
+            '__getlastrequestheaders' => new SoapClientGetLastRequestHeaders(),
+            '__getlastresponseheaders' => new SoapClientGetLastResponseHeaders(),
             '__call' => new SoapClientCall(),
         ];
         foreach ($methods as $name => $method) {
@@ -59,6 +62,8 @@ final class VmSoapClient
         $entry->methodNames['__gettypes'] = '__getTypes';
         $entry->methodNames['__getlastrequest'] = '__getLastRequest';
         $entry->methodNames['__getlastresponse'] = '__getLastResponse';
+        $entry->methodNames['__getlastrequestheaders'] = '__getLastRequestHeaders';
+        $entry->methodNames['__getlastresponseheaders'] = '__getLastResponseHeaders';
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -70,6 +75,7 @@ final class VmSoapClient
         $state->options = $options;
         $state->location = isset($options['location']) ? (string) $options['location'] : '';
         $state->uri = isset($options['uri']) ? (string) $options['uri'] : '';
+        $state->trace = !empty($options['trace']);
         $state->soapVersion = isset($options['soap_version'])
             ? (int) $options['soap_version']
             : SoapConstants::SOAP_1_1;
@@ -154,6 +160,11 @@ final class VmSoapClient
         $state = self::state($object);
         $state->lastRequest = $request;
 
+        $requestHeaders = self::buildHttpRequestHeaders($location, $action, \strlen($request));
+        if ($state->trace) {
+            $state->lastRequestHeaders = $requestHeaders;
+        }
+
         $path = self::localPathFromLocation($location);
         if (null !== $path) {
             $body = @\file_get_contents($path);
@@ -161,6 +172,9 @@ final class VmSoapClient
                 throw new \SoapFault('HTTP', 'Could not read SOAP response fixture: '.$path);
             }
             $state->lastResponse = $body;
+            if ($state->trace) {
+                $state->lastResponseHeaders = self::synthesizeFixtureResponseHeaders(\strlen($body));
+            }
 
             return $body;
         }
@@ -185,8 +199,46 @@ final class VmSoapClient
             throw new \SoapFault('HTTP', 'Could not connect to host');
         }
         $state->lastResponse = $body;
+        if ($state->trace) {
+            // file_get_contents populates $http_response_header in local scope (php-src HTTP wrapper).
+            if (isset($http_response_header) && \is_array($http_response_header) && $http_response_header !== []) {
+                $state->lastResponseHeaders = \implode("\r\n", $http_response_header)."\r\n";
+            } else {
+                $state->lastResponseHeaders = self::synthesizeFixtureResponseHeaders(\strlen($body));
+            }
+        }
 
         return $body;
+    }
+
+    /**
+     * Build Zend-shaped HTTP request header block for trace (php-src soap_client).
+     */
+    private static function buildHttpRequestHeaders(string $location, string $action, int $contentLength): string
+    {
+        $path = '/';
+        $host = 'localhost';
+        if (\preg_match('#^https?://([^/]+)(/.*)?$#i', $location, $m)) {
+            $host = $m[1];
+            $path = isset($m[2]) && '' !== $m[2] ? $m[2] : '/';
+        } elseif ('' !== $location) {
+            $path = $location;
+        }
+
+        return 'POST '.$path." HTTP/1.1\r\n".
+            'Host: '.$host."\r\n".
+            "Connection: Keep-Alive\r\n".
+            'User-Agent: PHP-SOAP/'.\PHP_VERSION."\r\n".
+            "Content-Type: text/xml; charset=utf-8\r\n".
+            'SOAPAction: "'.$action."\"\r\n".
+            'Content-Length: '.$contentLength."\r\n";
+    }
+
+    private static function synthesizeFixtureResponseHeaders(int $contentLength): string
+    {
+        return "HTTP/1.1 200 OK\r\n".
+            "Content-Type: text/xml; charset=utf-8\r\n".
+            'Content-Length: '.$contentLength."\r\n";
     }
 
     private static function localPathFromLocation(string $location): ?string
@@ -532,6 +584,8 @@ final class SoapClientState
 
     public string $uri = '';
 
+    public bool $trace = false;
+
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
     public int $style = SoapConstants::SOAP_RPC;
@@ -550,6 +604,10 @@ final class SoapClientState
     public string $lastRequest = '';
 
     public string $lastResponse = '';
+
+    public ?string $lastRequestHeaders = null;
+
+    public ?string $lastResponseHeaders = null;
 }
 
 final class SoapClientConstruct extends SoapClassMethod
@@ -755,5 +813,51 @@ final class SoapClientGetLastResponse extends SoapClassMethod
             return;
         }
         $frame->returnVar->string(VmSoapClient::state($receiver)->lastResponse);
+    }
+}
+
+final class SoapClientGetLastRequestHeaders extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__getLastRequestHeaders');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'SoapClient::__getLastRequestHeaders()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $headers = VmSoapClient::state($receiver)->lastRequestHeaders;
+        if (null === $headers || '' === $headers) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->string($headers);
+    }
+}
+
+final class SoapClientGetLastResponseHeaders extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__getLastResponseHeaders');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'SoapClient::__getLastResponseHeaders()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $headers = VmSoapClient::state($receiver)->lastResponseHeaders;
+        if (null === $headers || '' === $headers) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->string($headers);
     }
 }
