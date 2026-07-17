@@ -384,6 +384,9 @@ final class VmDom
         $attr->properties[] = new ClassProperty(self::PROP_NAME, null, $strProto);
         $attr->properties[] = new ClassProperty(self::PROP_VALUE, null, $strProto);
         $attr->properties[] = new ClassProperty(self::PROP_OWNER_ELEMENT, $nullProto, $objProto);
+        $attr->methods['isid'] = new AttrIsId();
+        $attr->methodVisibility['isid'] = $pub;
+        $attr->methodNames['isid'] = 'isId';
         $ctx->classes[self::CLASS_ATTR] = $attr;
 
         // DOMNameSpaceNode — standalone (no DOMNode parent); php-src php_dom.stub.php (#20097).
@@ -2043,6 +2046,30 @@ final class VmDom
             DomRegistry::state($element),
             $qName
         );
+    }
+
+    /**
+     * DOMAttr::isId() — true when attrp->atype == XML_ATTRIBUTE_ID (php-src ext/dom/attr.c; #20129).
+     *
+     * Orphan attributes (no ownerElement) are never IDs. Attached attrs follow
+     * {@see elementAttributeIsIdBearing()} (setIdAttribute* / HTML id / xml:id / DTD).
+     */
+    public static function attrIsId(ObjectEntry $attr): bool
+    {
+        if (!self::isAttr($attr)) {
+            throw new \TypeError('DOMAttr::isId() must be called on a DOMAttr');
+        }
+        $attrState = DomRegistry::state($attr);
+        $ownerElementId = $attrState->ownerElementId;
+        if (null === $ownerElementId) {
+            return false;
+        }
+        $owner = DomRegistry::entry($ownerElementId);
+        if (null === $owner || !self::isElement($owner)) {
+            return false;
+        }
+
+        return self::elementAttributeIsIdBearing($owner, $attrState->nodeName);
     }
 
     /**

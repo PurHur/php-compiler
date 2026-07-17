@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5503 |
-| Phase A inventory files (M2 ratio SSOT) | 5503 |
+| PHP files on vm.php path | 5486 |
+| Phase A inventory files (M2 ratio SSOT) | 5486 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15588 |
+| Source constructs flagged (warnings) | 15559 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -143,6 +143,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_strerror.php` | 0 | 2 |
 | `ext/curl/curl_unescape.php` | 0 | 3 |
 | `ext/curl/curl_version.php` | 0 | 2 |
+| `ext/dom/AttrIsId.php` | 0 | 2 |
 | `ext/dom/BuiltinClasses.php` | 0 | 1 |
 | `ext/dom/CharacterDataAppendData.php` | 0 | 1 |
 | `ext/dom/CharacterDataDeleteData.php` | 0 | 1 |
@@ -361,9 +362,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListReplace.php` | 0 | 1 |
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 378 |
+| `ext/dom/VmDom.php` | 0 | 379 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
-| `ext/dom/VmDomJitDispatch.php` | 0 | 31 |
+| `ext/dom/VmDomJitDispatch.php` | 0 | 35 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
 | `ext/dom/VmDomLiving.php` | 0 | 13 |
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
@@ -1130,7 +1131,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_strerror.php` | 0 | 3 |
 | `ext/sockets/socket_write.php` | 0 | 3 |
 | `ext/sodium/JitSodium.php` | 0 | 1 |
-| `ext/sodium/Module.php` | 0 | 94 |
+| `ext/sodium/Module.php` | 0 | 79 |
 | `ext/sodium/SodiumAeadDecryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumAeadEncryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumAuthFunction.php` | 0 | 4 |
@@ -1151,8 +1152,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/SodiumKeygenFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumKxSessionKeysFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumMemcmpFunction.php` | 0 | 4 |
-| `ext/sodium/SodiumOneStringBoolFunction.php` | 0 | 2 |
-| `ext/sodium/SodiumOneStringFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumPadFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumPwhashFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumPwhashStrFunction.php` | 0 | 3 |
@@ -1168,7 +1167,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/SodiumStreamLengthFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumStreamXorFunction.php` | 0 | 4 |
 | `ext/sodium/SodiumStreamXorIcFunction.php` | 0 | 3 |
-| `ext/sodium/SodiumTwoStringFunction.php` | 0 | 2 |
 | `ext/sodium/VmSodium.php` | 0 | 18 |
 | `ext/sodium/VmSodiumSecretstream.php` | 0 | 2 |
 | `ext/sodium/sodium_add.php` | 0 | 2 |
@@ -1197,19 +1195,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_crypto_box_seal.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_box_seal_open.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_box_secretkey.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_add.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_from_hash.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_is_valid_point.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_random.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_scalar_add.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_scalar_complement.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_scalar_invert.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_scalar_mul.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_scalar_negate.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_scalar_random.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_scalar_reduce.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_scalar_sub.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_core_ristretto255_sub.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_generichash.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_generichash_final.php` | 0 | 2 |
 | `ext/sodium/sodium_crypto_generichash_init.php` | 0 | 2 |
@@ -1229,8 +1214,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_crypto_pwhash_str_verify.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_scalarmult.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_scalarmult_base.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_scalarmult_ristretto255.php` | 0 | 1 |
-| `ext/sodium/sodium_crypto_scalarmult_ristretto255_base.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_secretbox.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_secretbox_keygen.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_secretbox_open.php` | 0 | 1 |
@@ -6195,6 +6178,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 24)
 - 1 class method(s)
 
+### `ext/dom/AttrIsId.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+
 ### `ext/dom/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7478,76 +7467,74 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 384)
 - new ClassProperty (line 385)
 - new ClassProperty (line 386)
-- new ClassEntry (line 390)
-- new ClassProperty (line 392)
-- new ClassProperty (line 393)
-- new ClassProperty (line 394)
+- new AttrIsId (line 387)
+- new ClassEntry (line 393)
 - new ClassProperty (line 395)
 - new ClassProperty (line 396)
 - new ClassProperty (line 397)
 - new ClassProperty (line 398)
 - new ClassProperty (line 399)
-- new ClassEntry (line 402)
-- new ClassProperty (line 411)
-- new NodeListItem (line 412)
-- new NodeListCount (line 414)
-- new NodeListRewind (line 416)
-- new NodeListValid (line 418)
-- new NodeListCurrent (line 420)
-- new NodeListKey (line 422)
-- new NodeListNext (line 424)
-- new ClassEntry (line 428)
-- new ClassProperty (line 437)
-- new NamedNodeMapItem (line 438)
-- new NamedNodeMapGetNamedItem (line 440)
-- new NamedNodeMapGetNamedItemNS (line 443)
-- new NamedNodeMapCount (line 446)
-- new NamedNodeMapRewind (line 448)
-- new NamedNodeMapValid (line 450)
-- new NamedNodeMapCurrent (line 452)
-- new NamedNodeMapKey (line 454)
-- new NamedNodeMapNext (line 456)
-- new ClassEntry (line 461)
-- new ClassProperty (line 464)
-- new ClassProperty (line 465)
-- new TokenListAdd (line 466)
-- new TokenListRemove (line 468)
-- new TokenListContains (line 470)
-- new TokenListToggle (line 472)
-- new TokenListItem (line 474)
-- new TokenListReplace (line 476)
-- new TokenListSupports (line 478)
-- new TokenListCount (line 480)
-- new ClassEntry (line 485)
-- new XPathConstruct (line 487)
-- new XPathQuery (line 491)
-- new XPathEvaluate (line 493)
-- new XPathRegisterNamespace (line 495)
-- new XPathRegisterPhpFunctions (line 498)
-- new XPathRegisterPhpFunctionNS (line 502)
-- new XPathQuote (line 508)
-- new ClassEntry (line 513)
-- new ImplementationCreateDocument (line 515)
-- new ImplementationCreateDocumentType (line 517)
-- new ImplementationGetFeature (line 519)
-- new ImplementationHasFeature (line 521)
-- new ClassEntry (line 526)
-- new ClassProperty (line 529)
-- new ClassProperty (line 530)
-- new ClassProperty (line 531)
+- new ClassProperty (line 400)
+- new ClassProperty (line 401)
+- new ClassProperty (line 402)
+- new ClassEntry (line 405)
+- new ClassProperty (line 414)
+- new NodeListItem (line 415)
+- new NodeListCount (line 417)
+- new NodeListRewind (line 419)
+- new NodeListValid (line 421)
+- new NodeListCurrent (line 423)
+- new NodeListKey (line 425)
+- new NodeListNext (line 427)
+- new ClassEntry (line 431)
+- new ClassProperty (line 440)
+- new NamedNodeMapItem (line 441)
+- new NamedNodeMapGetNamedItem (line 443)
+- new NamedNodeMapGetNamedItemNS (line 446)
+- new NamedNodeMapCount (line 449)
+- new NamedNodeMapRewind (line 451)
+- new NamedNodeMapValid (line 453)
+- new NamedNodeMapCurrent (line 455)
+- new NamedNodeMapKey (line 457)
+- new NamedNodeMapNext (line 459)
+- new ClassEntry (line 464)
+- new ClassProperty (line 467)
+- new ClassProperty (line 468)
+- new TokenListAdd (line 469)
+- new TokenListRemove (line 471)
+- new TokenListContains (line 473)
+- new TokenListToggle (line 475)
+- new TokenListItem (line 477)
+- new TokenListReplace (line 479)
+- new TokenListSupports (line 481)
+- new TokenListCount (line 483)
+- new ClassEntry (line 488)
+- new XPathConstruct (line 490)
+- new XPathQuery (line 494)
+- new XPathEvaluate (line 496)
+- new XPathRegisterNamespace (line 498)
+- new XPathRegisterPhpFunctions (line 501)
+- new XPathRegisterPhpFunctionNS (line 505)
+- new XPathQuote (line 511)
+- new ClassEntry (line 516)
+- new ImplementationCreateDocument (line 518)
+- new ImplementationCreateDocumentType (line 520)
+- new ImplementationGetFeature (line 522)
+- new ImplementationHasFeature (line 524)
+- new ClassEntry (line 529)
 - new ClassProperty (line 532)
 - new ClassProperty (line 533)
 - new ClassProperty (line 534)
-- new ClassEntry (line 537)
-- new ClassProperty (line 540)
-- new ClassProperty (line 541)
-- new ClassProperty (line 542)
+- new ClassProperty (line 535)
+- new ClassProperty (line 536)
+- new ClassProperty (line 537)
+- new ClassEntry (line 540)
 - new ClassProperty (line 543)
-- new ClassEntry (line 546)
-- new DocumentConstruct (line 549)
-- new ClassProperty (line 553)
-- new ClassProperty (line 554)
-- new ClassProperty (line 555)
+- new ClassProperty (line 544)
+- new ClassProperty (line 545)
+- new ClassProperty (line 546)
+- new ClassEntry (line 549)
+- new DocumentConstruct (line 552)
 - new ClassProperty (line 556)
 - new ClassProperty (line 557)
 - new ClassProperty (line 558)
@@ -7559,224 +7546,227 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 564)
 - new ClassProperty (line 565)
 - new ClassProperty (line 566)
+- new ClassProperty (line 567)
 - new ClassProperty (line 568)
 - new ClassProperty (line 569)
-- new ClassProperty (line 570)
-- new DocumentLoadXML (line 571)
-- new DocumentLoad (line 573)
-- new DocumentLoadHTML (line 575)
-- new DocumentLoadHTMLFile (line 578)
-- new DocumentCreateElement (line 581)
-- new DocumentCreateElementNS (line 583)
-- new DocumentCreateAttributeNS (line 585)
-- new DocumentCreateAttribute (line 587)
-- new DocumentCreateDocumentFragment (line 589)
-- new DocumentCreateEntityReference (line 591)
-- new DocumentCreateTextNode (line 594)
-- new DocumentCreateComment (line 597)
-- new DocumentCreateCDATASection (line 600)
-- new DocumentCreateProcessingInstruction (line 603)
-- new DocumentAppendChild (line 606)
-- new DocumentSaveXML (line 608)
-- new DocumentSave (line 610)
-- new DocumentSaveHTML (line 612)
-- new DocumentSaveHTMLFile (line 615)
-- new DocumentGetElementsByTagName (line 618)
-- new DocumentGetElementsByTagNameNS (line 620)
-- new DocumentGetElementById (line 623)
-- new DocumentImportNode (line 625)
-- new DocumentAdoptNode (line 627)
-- new DocumentRegisterNodeClass (line 630)
-- new DocumentNormalizeDocument (line 633)
-- new DocumentXInclude (line 636)
-- new DocumentSchemaValidate (line 638)
-- new DocumentRelaxNGValidate (line 641)
-- new DocumentSchemaValidateSource (line 644)
-- new DocumentRelaxNGValidateSource (line 647)
-- new DocumentValidate (line 650)
-- new ClassEntry (line 654)
-- new ClassProperty (line 657)
-- new ClassProperty (line 658)
-- new ClassProperty (line 659)
+- new ClassProperty (line 571)
+- new ClassProperty (line 572)
+- new ClassProperty (line 573)
+- new DocumentLoadXML (line 574)
+- new DocumentLoad (line 576)
+- new DocumentLoadHTML (line 578)
+- new DocumentLoadHTMLFile (line 581)
+- new DocumentCreateElement (line 584)
+- new DocumentCreateElementNS (line 586)
+- new DocumentCreateAttributeNS (line 588)
+- new DocumentCreateAttribute (line 590)
+- new DocumentCreateDocumentFragment (line 592)
+- new DocumentCreateEntityReference (line 594)
+- new DocumentCreateTextNode (line 597)
+- new DocumentCreateComment (line 600)
+- new DocumentCreateCDATASection (line 603)
+- new DocumentCreateProcessingInstruction (line 606)
+- new DocumentAppendChild (line 609)
+- new DocumentSaveXML (line 611)
+- new DocumentSave (line 613)
+- new DocumentSaveHTML (line 615)
+- new DocumentSaveHTMLFile (line 618)
+- new DocumentGetElementsByTagName (line 621)
+- new DocumentGetElementsByTagNameNS (line 623)
+- new DocumentGetElementById (line 626)
+- new DocumentImportNode (line 628)
+- new DocumentAdoptNode (line 630)
+- new DocumentRegisterNodeClass (line 633)
+- new DocumentNormalizeDocument (line 636)
+- new DocumentXInclude (line 639)
+- new DocumentSchemaValidate (line 641)
+- new DocumentRelaxNGValidate (line 644)
+- new DocumentSchemaValidateSource (line 647)
+- new DocumentRelaxNGValidateSource (line 650)
+- new DocumentValidate (line 653)
+- new ClassEntry (line 657)
+- new ClassProperty (line 660)
 - new ClassProperty (line 661)
 - new ClassProperty (line 662)
-- new ClassProperty (line 663)
 - new ClassProperty (line 664)
 - new ClassProperty (line 665)
-- new ElementAppendChild (line 666)
-- new ElementGetAttribute (line 668)
-- new ElementGetAttributeNode (line 670)
-- new ElementGetAttributeNodeNS (line 672)
-- new ElementGetAttributeNS (line 675)
-- new ElementHasAttribute (line 677)
-- new ElementHasAttributeNS (line 679)
-- new ElementRemoveAttribute (line 681)
-- new ElementRemoveAttributeNode (line 683)
-- new ElementSetAttribute (line 685)
-- new ElementSetAttributeNode (line 687)
-- new ElementSetAttributeNodeNS (line 689)
-- new ElementSetAttributeNS (line 692)
-- new ElementRemoveAttributeNS (line 694)
-- new ElementSetIdAttribute (line 696)
-- new ElementSetIdAttributeNS (line 699)
-- new ElementSetIdAttributeNode (line 702)
-- new ElementGetElementsByTagName (line 705)
-- new ElementGetElementsByTagNameNS (line 707)
-- new ElementGetAttributeNames (line 711)
-- new ElementInsertAdjacentHTML (line 716)
-- new ElementInsertAdjacentElement (line 721)
-- new ElementInsertAdjacentText (line 726)
-- new ElementToggleAttribute (line 731)
-- new ElementGetInnerHTML (line 736)
-- new ElementGetOuterHTML (line 739)
-- new ClassProperty (line 744)
-- new ClassEntry (line 748)
-- new FragmentConstruct (line 751)
-- new ClassProperty (line 755)
-- new ClassProperty (line 757)
+- new ClassProperty (line 666)
+- new ClassProperty (line 667)
+- new ClassProperty (line 668)
+- new ElementAppendChild (line 669)
+- new ElementGetAttribute (line 671)
+- new ElementGetAttributeNode (line 673)
+- new ElementGetAttributeNodeNS (line 675)
+- new ElementGetAttributeNS (line 678)
+- new ElementHasAttribute (line 680)
+- new ElementHasAttributeNS (line 682)
+- new ElementRemoveAttribute (line 684)
+- new ElementRemoveAttributeNode (line 686)
+- new ElementSetAttribute (line 688)
+- new ElementSetAttributeNode (line 690)
+- new ElementSetAttributeNodeNS (line 692)
+- new ElementSetAttributeNS (line 695)
+- new ElementRemoveAttributeNS (line 697)
+- new ElementSetIdAttribute (line 699)
+- new ElementSetIdAttributeNS (line 702)
+- new ElementSetIdAttributeNode (line 705)
+- new ElementGetElementsByTagName (line 708)
+- new ElementGetElementsByTagNameNS (line 710)
+- new ElementGetAttributeNames (line 714)
+- new ElementInsertAdjacentHTML (line 719)
+- new ElementInsertAdjacentElement (line 724)
+- new ElementInsertAdjacentText (line 729)
+- new ElementToggleAttribute (line 734)
+- new ElementGetInnerHTML (line 739)
+- new ElementGetOuterHTML (line 742)
+- new ClassProperty (line 747)
+- new ClassEntry (line 751)
+- new FragmentConstruct (line 754)
 - new ClassProperty (line 758)
-- new ClassProperty (line 759)
-- new FragmentAppendChild (line 760)
-- new FragmentAppendXML (line 762)
-- new ObjectEntry (line 776)
-- new DomNodeState (line 778)
-- new Variable (line 792)
-- new ObjectEntry (line 815)
-- new DomNodeState (line 820)
-- new Variable (line 846)
-- new ObjectEntry (line 874)
-- new DomNodeState (line 895)
-- new Variable (line 935)
-- new HashTable (line 946)
-- new Variable (line 947)
-- new HashTable (line 959)
-- new Variable (line 966)
-- new DomNodeState (line 989)
-- new DomNodeState (line 1038)
-- new ObjectEntry (line 1062)
-- new DomNodeState (line 1070)
-- new Variable (line 1088)
-- new ObjectEntry (line 1104)
-- new DomNodeState (line 1112)
-- new Variable (line 1135)
-- new Variable (line 1156)
-- new ObjectEntry (line 1174)
-- new DomNodeState (line 1183)
-- new Variable (line 1195)
-- new ObjectEntry (line 1229)
-- new DomNodeState (line 1245)
-- new DOMException (line 1292)
-- new Variable (line 1296)
-- new Variable (line 1302)
-- new DOMException (line 1311)
-- new Variable (line 1348)
-- new DOMException (line 1368)
-- new Variable (line 1371)
-- new DOMException (line 1390)
-- new Variable (line 1422)
-- new DOMException (line 1434)
-- new DOMException (line 1447)
-- new Variable (line 1455)
-- new DOMException (line 1559)
-- new DOMException (line 1611)
-- new DOMException (line 1624)
-- new DOMException (line 1647)
-- new DOMException (line 1661)
-- new DOMException (line 1722)
-- new DOMException (line 1774)
-- new DOMException (line 1830)
-- new DOMException (line 1834)
-- new DOMException (line 1847)
-- new DOMException (line 1851)
-- new DOMException (line 1863)
-- new DOMException (line 1876)
-- new DOMException (line 1886)
-- new DOMException (line 2407)
-- new DOMException (line 2423)
-- new ObjectEntry (line 2510)
-- new DomNodeState (line 2515)
-- new ObjectEntry (line 2531)
-- new DomNodeState (line 2536)
-- new ObjectEntry (line 2552)
-- new DomNodeState (line 2557)
-- new DOMException (line 2596)
-- new DOMException (line 2606)
-- new DOMException (line 2619)
-- new DOMException (line 2638)
-- new ObjectEntry (line 2726)
-- new DomNodeState (line 2731)
-- new Variable (line 2740)
-- new ObjectEntry (line 2750)
-- new DomNodeState (line 2755)
-- new Variable (line 2761)
-- new ObjectEntry (line 3487)
-- new DomNodeState (line 3489)
-- new ObjectEntry (line 3685)
-- new DomNodeState (line 3687)
-- new ObjectEntry (line 3715)
-- new DomNodeState (line 3717)
-- new ObjectEntry (line 3905)
-- new DomNodeState (line 3910)
-- new DOMException (line 4281)
-- new DOMException (line 4297)
-- new Variable (line 4315)
-- new DOMException (line 4329)
-- new DOMException (line 4332)
-- new DOMException (line 4342)
-- new Error (line 4372)
-- new DOMException (line 4378)
-- new DOMException (line 4392)
-- new DOMException (line 4590)
-- new DOMException (line 4787)
-- new DOMException (line 4791)
-- new DOMException (line 4880)
-- new DOMException (line 4884)
-- new DOMException (line 4942)
-- new DOMException (line 4959)
-- new DOMException (line 4991)
-- new DOMException (line 5033)
+- new ClassProperty (line 760)
+- new ClassProperty (line 761)
+- new ClassProperty (line 762)
+- new FragmentAppendChild (line 763)
+- new FragmentAppendXML (line 765)
+- new ObjectEntry (line 779)
+- new DomNodeState (line 781)
+- new Variable (line 795)
+- new ObjectEntry (line 818)
+- new DomNodeState (line 823)
+- new Variable (line 849)
+- new ObjectEntry (line 877)
+- new DomNodeState (line 898)
+- new Variable (line 938)
+- new HashTable (line 949)
+- new Variable (line 950)
+- new HashTable (line 962)
+- new Variable (line 969)
+- new DomNodeState (line 992)
+- new DomNodeState (line 1041)
+- new ObjectEntry (line 1065)
+- new DomNodeState (line 1073)
+- new Variable (line 1091)
+- new ObjectEntry (line 1107)
+- new DomNodeState (line 1115)
+- new Variable (line 1138)
+- new Variable (line 1159)
+- new ObjectEntry (line 1177)
+- new DomNodeState (line 1186)
+- new Variable (line 1198)
+- new ObjectEntry (line 1232)
+- new DomNodeState (line 1248)
+- new DOMException (line 1295)
+- new Variable (line 1299)
+- new Variable (line 1305)
+- new DOMException (line 1314)
+- new Variable (line 1351)
+- new DOMException (line 1371)
+- new Variable (line 1374)
+- new DOMException (line 1393)
+- new Variable (line 1425)
+- new DOMException (line 1437)
+- new DOMException (line 1450)
+- new Variable (line 1458)
+- new DOMException (line 1562)
+- new DOMException (line 1614)
+- new DOMException (line 1627)
+- new DOMException (line 1650)
+- new DOMException (line 1664)
+- new DOMException (line 1725)
+- new DOMException (line 1777)
+- new DOMException (line 1833)
+- new DOMException (line 1837)
+- new DOMException (line 1850)
+- new DOMException (line 1854)
+- new DOMException (line 1866)
+- new DOMException (line 1879)
+- new DOMException (line 1889)
+- new DOMException (line 2434)
+- new DOMException (line 2450)
+- new ObjectEntry (line 2537)
+- new DomNodeState (line 2542)
+- new ObjectEntry (line 2558)
+- new DomNodeState (line 2563)
+- new ObjectEntry (line 2579)
+- new DomNodeState (line 2584)
+- new DOMException (line 2623)
+- new DOMException (line 2633)
+- new DOMException (line 2646)
+- new DOMException (line 2665)
+- new ObjectEntry (line 2753)
+- new DomNodeState (line 2758)
+- new Variable (line 2767)
+- new ObjectEntry (line 2777)
+- new DomNodeState (line 2782)
+- new Variable (line 2788)
+- new ObjectEntry (line 3514)
+- new DomNodeState (line 3516)
+- new ObjectEntry (line 3712)
+- new DomNodeState (line 3714)
+- new ObjectEntry (line 3742)
+- new DomNodeState (line 3744)
+- new ObjectEntry (line 3932)
+- new DomNodeState (line 3937)
+- new DOMException (line 4308)
+- new DOMException (line 4324)
+- new Variable (line 4342)
+- new DOMException (line 4356)
+- new DOMException (line 4359)
+- new DOMException (line 4369)
+- new Error (line 4399)
+- new DOMException (line 4405)
+- new DOMException (line 4419)
+- new DOMException (line 4617)
+- new DOMException (line 4814)
+- new DOMException (line 4818)
+- new DOMException (line 4907)
+- new DOMException (line 4911)
+- new DOMException (line 4969)
+- new DOMException (line 4986)
+- new DOMException (line 5018)
 - new DOMException (line 5060)
-- new DOMException (line 5732)
-- new Variable (line 5760)
-- new DOMException (line 6021)
-- new DOMException (line 6133)
-- new DOMException (line 6175)
-- new ObjectEntry (line 6260)
-- new DomNodeState (line 6264)
-- new Variable (line 6271)
-- new ObjectEntry (line 6483)
-- new DomNodeState (line 6487)
-- new Variable (line 6494)
-- new ObjectEntry (line 6514)
-- new DomNodeState (line 6517)
-- new Variable (line 6525)
-- new Variable (line 6694)
-- new DOMException (line 6801)
-- new DOMException (line 6808)
-- new DOMException (line 6815)
-- new DOMException (line 6819)
-- new DOMException (line 6822)
-- new DOMException (line 6831)
-- new DOMException (line 6843)
-- new DOMException (line 7790)
-- new Variable (line 7849)
-- new Variable (line 7862)
-- new Variable (line 7900)
-- new DOMException (line 7911)
-- new Variable (line 7913)
-- new DOMException (line 8042)
+- new DOMException (line 5087)
+- new DOMException (line 5759)
+- new Variable (line 5787)
+- new DOMException (line 6048)
+- new DOMException (line 6160)
+- new DOMException (line 6202)
+- new ObjectEntry (line 6287)
+- new DomNodeState (line 6291)
+- new Variable (line 6298)
+- new ObjectEntry (line 6510)
+- new DomNodeState (line 6514)
+- new Variable (line 6521)
+- new ObjectEntry (line 6541)
+- new DomNodeState (line 6544)
+- new Variable (line 6552)
+- new Variable (line 6721)
+- new DOMException (line 6828)
+- new DOMException (line 6835)
+- new DOMException (line 6842)
+- new DOMException (line 6846)
+- new DOMException (line 6849)
+- new DOMException (line 6858)
+- new DOMException (line 6870)
+- new DOMException (line 7817)
+- new Variable (line 7876)
+- new Variable (line 7889)
+- new Variable (line 7927)
+- new DOMException (line 7938)
+- new Variable (line 7940)
 - new DOMException (line 8069)
-- new DOMException (line 8100)
-- new DOMException (line 8164)
-- new DOMException (line 8172)
-- new DOMException (line 8181)
-- 370 class method(s)
+- new DOMException (line 8096)
+- new DOMException (line 8127)
+- new DOMException (line 8191)
+- new DOMException (line 8199)
+- new DOMException (line 8208)
+- 371 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomInstanceInvoke.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 99)
+- new Error (line 102)
 - 6 class method(s)
 
 ### `ext/dom/VmDomJitDispatch.php`
@@ -7794,25 +7784,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 245)
 - new Variable (line 259)
 - new Variable (line 271)
-- new Variable (line 326)
-- new Variable (line 338)
-- new Variable (line 350)
-- new Variable (line 362)
-- new Error (line 376)
+- new Variable (line 319)
+- new Variable (line 348)
+- new Variable (line 375)
+- new ArgumentCountError (line 389)
 - new Variable (line 393)
-- new Variable (line 416)
-- new Variable (line 437)
-- new Variable (line 464)
-- new Variable (line 490)
-- new Variable (line 502)
-- new Variable (line 514)
-- new Variable (line 551)
-- new Variable (line 563)
-- new Variable (line 580)
-- new Variable (line 605)
+- new Variable (line 405)
+- new Variable (line 417)
+- new Variable (line 429)
+- new Error (line 443)
+- new Variable (line 460)
+- new Variable (line 483)
+- new Variable (line 504)
+- new Variable (line 531)
+- new Variable (line 557)
+- new Variable (line 569)
+- new Variable (line 581)
+- new Variable (line 618)
+- new Variable (line 630)
 - new Variable (line 647)
-- new ArgumentCountError (line 696)
-- 45 class method(s)
+- new Variable (line 672)
+- new Variable (line 714)
+- new ArgumentCountError (line 763)
+- 48 class method(s)
 
 ### `ext/dom/VmDomJitFrame.php`
 
@@ -13699,61 +13693,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new sodium_crypto_generichash_keygen (line 77)
 - new sodium_crypto_scalarmult (line 78)
 - new sodium_crypto_scalarmult_base (line 79)
-- new sodium_crypto_core_ristretto255_is_valid_point (line 80)
-- new sodium_crypto_core_ristretto255_random (line 81)
-- new sodium_crypto_core_ristretto255_from_hash (line 82)
-- new sodium_crypto_core_ristretto255_add (line 83)
-- new sodium_crypto_core_ristretto255_sub (line 84)
-- new sodium_crypto_core_ristretto255_scalar_random (line 85)
-- new sodium_crypto_core_ristretto255_scalar_invert (line 86)
-- new sodium_crypto_core_ristretto255_scalar_negate (line 87)
-- new sodium_crypto_core_ristretto255_scalar_complement (line 88)
-- new sodium_crypto_core_ristretto255_scalar_add (line 89)
-- new sodium_crypto_core_ristretto255_scalar_sub (line 90)
-- new sodium_crypto_core_ristretto255_scalar_mul (line 91)
-- new sodium_crypto_core_ristretto255_scalar_reduce (line 92)
-- new sodium_crypto_scalarmult_ristretto255 (line 93)
-- new sodium_crypto_scalarmult_ristretto255_base (line 94)
-- new sodium_crypto_box_keypair (line 95)
-- new sodium_crypto_box_publickey (line 96)
-- new sodium_crypto_box_secretkey (line 97)
-- new sodium_crypto_box (line 98)
-- new sodium_crypto_box_open (line 99)
-- new sodium_crypto_box_keypair_from_secretkey_and_publickey (line 100)
-- new sodium_crypto_box_publickey_from_secretkey (line 101)
-- new sodium_crypto_box_seal (line 102)
-- new sodium_crypto_box_seal_open (line 103)
-- new sodium_crypto_kx_keypair (line 104)
-- new sodium_crypto_kx_publickey (line 105)
-- new sodium_crypto_kx_secretkey (line 106)
-- new sodium_crypto_kx_seed_keypair (line 107)
-- new sodium_crypto_kx_client_session_keys (line 108)
-- new sodium_crypto_kx_server_session_keys (line 109)
-- new sodium_crypto_aead_aes256gcm_is_available (line 110)
-- new sodium_crypto_aead_aes256gcm_encrypt (line 111)
-- new sodium_crypto_aead_aes256gcm_decrypt (line 112)
-- new sodium_crypto_sign_keypair (line 113)
-- new sodium_crypto_sign_publickey (line 114)
-- new sodium_crypto_sign_secretkey (line 115)
-- new sodium_crypto_sign_publickey_from_secretkey (line 116)
-- new sodium_crypto_sign (line 117)
-- new sodium_crypto_sign_open (line 118)
-- new sodium_crypto_sign_detached (line 119)
-- new sodium_crypto_sign_verify_detached (line 120)
-- new sodium_crypto_secretstream_xchacha20poly1305_keygen (line 121)
-- new sodium_crypto_secretstream_xchacha20poly1305_init_push (line 122)
-- new sodium_crypto_secretstream_xchacha20poly1305_init_pull (line 123)
-- new sodium_crypto_secretstream_xchacha20poly1305_push (line 124)
-- new sodium_crypto_secretstream_xchacha20poly1305_pull (line 125)
-- new sodium_crypto_secretstream_xchacha20poly1305_rekey (line 126)
-- new sodium_crypto_shorthash (line 127)
-- new sodium_crypto_shorthash_keygen (line 128)
-- new sodium_crypto_kdf_keygen (line 129)
-- new sodium_crypto_kdf_derive_from_key (line 130)
-- new sodium_crypto_pwhash (line 131)
-- new sodium_crypto_pwhash_str (line 132)
-- new sodium_crypto_pwhash_str_verify (line 133)
-- new sodium_crypto_pwhash_str_needs_rehash (line 134)
+- new sodium_crypto_box_keypair (line 80)
+- new sodium_crypto_box_publickey (line 81)
+- new sodium_crypto_box_secretkey (line 82)
+- new sodium_crypto_box (line 83)
+- new sodium_crypto_box_open (line 84)
+- new sodium_crypto_box_keypair_from_secretkey_and_publickey (line 85)
+- new sodium_crypto_box_publickey_from_secretkey (line 86)
+- new sodium_crypto_box_seal (line 87)
+- new sodium_crypto_box_seal_open (line 88)
+- new sodium_crypto_kx_keypair (line 89)
+- new sodium_crypto_kx_publickey (line 90)
+- new sodium_crypto_kx_secretkey (line 91)
+- new sodium_crypto_kx_seed_keypair (line 92)
+- new sodium_crypto_kx_client_session_keys (line 93)
+- new sodium_crypto_kx_server_session_keys (line 94)
+- new sodium_crypto_aead_aes256gcm_is_available (line 95)
+- new sodium_crypto_aead_aes256gcm_encrypt (line 96)
+- new sodium_crypto_aead_aes256gcm_decrypt (line 97)
+- new sodium_crypto_sign_keypair (line 98)
+- new sodium_crypto_sign_publickey (line 99)
+- new sodium_crypto_sign_secretkey (line 100)
+- new sodium_crypto_sign_publickey_from_secretkey (line 101)
+- new sodium_crypto_sign (line 102)
+- new sodium_crypto_sign_open (line 103)
+- new sodium_crypto_sign_detached (line 104)
+- new sodium_crypto_sign_verify_detached (line 105)
+- new sodium_crypto_secretstream_xchacha20poly1305_keygen (line 106)
+- new sodium_crypto_secretstream_xchacha20poly1305_init_push (line 107)
+- new sodium_crypto_secretstream_xchacha20poly1305_init_pull (line 108)
+- new sodium_crypto_secretstream_xchacha20poly1305_push (line 109)
+- new sodium_crypto_secretstream_xchacha20poly1305_pull (line 110)
+- new sodium_crypto_secretstream_xchacha20poly1305_rekey (line 111)
+- new sodium_crypto_shorthash (line 112)
+- new sodium_crypto_shorthash_keygen (line 113)
+- new sodium_crypto_kdf_keygen (line 114)
+- new sodium_crypto_kdf_derive_from_key (line 115)
+- new sodium_crypto_pwhash (line 116)
+- new sodium_crypto_pwhash_str (line 117)
+- new sodium_crypto_pwhash_str_verify (line 118)
+- new sodium_crypto_pwhash_str_needs_rehash (line 119)
 - 2 class method(s)
 
 ### `ext/sodium/SodiumAeadDecryptFunction.php`
@@ -13887,18 +13866,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 - 1 closure(s)
 
-### `ext/sodium/SodiumOneStringBoolFunction.php`
-
-**Warnings** (review for bootstrap subset):
-- 4 class method(s)
-- 1 closure(s)
-
-### `ext/sodium/SodiumOneStringFunction.php`
-
-**Warnings** (review for bootstrap subset):
-- 4 class method(s)
-- 1 closure(s)
-
 ### `ext/sodium/SodiumPadFunction.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13997,33 +13964,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 3 class method(s)
 - 1 closure(s)
 
-### `ext/sodium/SodiumTwoStringFunction.php`
-
-**Warnings** (review for bootstrap subset):
-- 5 class method(s)
-- 1 closure(s)
-
 ### `ext/sodium/VmSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 1563)
-- new Exception (line 1575)
-- new Exception (line 1584)
-- new Exception (line 1600)
-- new Exception (line 2423)
-- new Exception (line 2440)
-- new Exception (line 2455)
-- new Exception (line 2472)
-- new Exception (line 2489)
-- new Exception (line 2525)
-- new Exception (line 2603)
-- new Exception (line 2681)
-- new Exception (line 2759)
-- new Exception (line 3255)
-- new Exception (line 3258)
-- new SodiumException (line 3368)
-- new Exception (line 3370)
-- 205 class method(s)
+- new Exception (line 1367)
+- new Exception (line 1379)
+- new Exception (line 1388)
+- new Exception (line 1404)
+- new Exception (line 2021)
+- new Exception (line 2038)
+- new Exception (line 2053)
+- new Exception (line 2070)
+- new Exception (line 2087)
+- new Exception (line 2123)
+- new Exception (line 2201)
+- new Exception (line 2279)
+- new Exception (line 2357)
+- new Exception (line 2853)
+- new Exception (line 2856)
+- new SodiumException (line 2966)
+- new Exception (line 2968)
+- 172 class method(s)
 
 ### `ext/sodium/VmSodiumSecretstream.php`
 
@@ -14165,71 +14126,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
-### `ext/sodium/sodium_crypto_core_ristretto255_add.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_from_hash.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_is_valid_point.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_random.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_scalar_add.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_scalar_complement.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_scalar_invert.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_scalar_mul.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_scalar_negate.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_scalar_random.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_scalar_reduce.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_scalar_sub.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
-### `ext/sodium/sodium_crypto_core_ristretto255_sub.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
 ### `ext/sodium/sodium_crypto_generichash.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14328,16 +14224,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
-
-### `ext/sodium/sodium_crypto_scalarmult_ristretto255.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
-### `ext/sodium/sodium_crypto_scalarmult_ristretto255_base.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
 
 ### `ext/sodium/sodium_crypto_secretbox.php`
 
@@ -32127,16 +32013,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 15527)
 - new VM\PropertyIsInitializedHandler (line 15609)
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15649)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15784)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15871)
-- new JIT\Call\VmCoerceVariableToString (line 15961)
-- new JIT\Call\IncludePathResolverResolve (line 16222)
-- new Variable (line 17278)
-- new VM (line 17322)
-- new VM\Variable (line 17331)
-- new Variable (line 17352)
-- new Variable (line 17398)
-- new Variable (line 17892)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15790)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15877)
+- new JIT\Call\VmCoerceVariableToString (line 15967)
+- new JIT\Call\IncludePathResolverResolve (line 16228)
+- new Variable (line 17284)
+- new VM (line 17328)
+- new VM\Variable (line 17337)
+- new Variable (line 17358)
+- new Variable (line 17404)
+- new Variable (line 17898)
 - 369 class method(s)
 - 7 closure(s)
 

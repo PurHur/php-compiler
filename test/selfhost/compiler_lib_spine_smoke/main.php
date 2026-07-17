@@ -305,6 +305,7 @@ require_once __DIR__.'/../../../ext/dom/ElementSetAttributeNodeNS.php';
 require_once __DIR__.'/../../../ext/dom/ElementSetIdAttribute.php';
 require_once __DIR__.'/../../../ext/dom/ElementSetIdAttributeNS.php';
 require_once __DIR__.'/../../../ext/dom/ElementSetIdAttributeNode.php';
+require_once __DIR__.'/../../../ext/dom/AttrIsId.php';
 require_once __DIR__.'/../../../ext/dom/ElementToggleAttribute.php';
 require_once __DIR__.'/../../../ext/dom/FragmentAppendChild.php';
 require_once __DIR__.'/../../../ext/dom/FragmentAppendXML.php';
