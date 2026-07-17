@@ -9312,19 +9312,25 @@ restart:
         return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
-    /** Bridge native SoapFault from ext/soap builtins (#20124). */
+    /** Bridge native SoapFault from ext/soap builtins (#20124, #20219). */
     private function dispatchVmSoapFault(\SoapFault $error, Frame $frame): ?Frame
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $faultcode = isset($error->faultcode) ? (string) $error->faultcode : '';
         $faultstring = isset($error->faultstring) ? (string) $error->faultstring : $error->getMessage();
+        $faultactor = isset($error->faultactor) ? (string) $error->faultactor : '';
+        $detail = $error->detail ?? null;
+        $name = isset($error->_name) ? (string) $error->_name : '';
         $thrown = VM\BuiltinExceptionSupport::materializeSoapFault(
             $this->context,
             $error->getMessage(),
             $file,
             $line,
             $faultcode,
-            $faultstring
+            $faultstring,
+            $faultactor,
+            $detail,
+            $name
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);

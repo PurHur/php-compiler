@@ -229,15 +229,27 @@ final class VmSoapServer
         }
     }
 
-    public static function fault(ObjectEntry $object, string $code, string $string): void
-    {
+    public static function fault(
+        ObjectEntry $object,
+        string $code,
+        string $string,
+        string $actor = '',
+        mixed $details = null,
+        string $name = ''
+    ): void {
         $state = self::state($object);
         // Zend soap_server_fault_ex: in-handler fault is serialized into the response
-        // buffer; outside handle() the SoapFault escapes to user code (#20194).
+        // buffer; outside handle() the SoapFault escapes to user code (#20194, #20219).
         if (self::$handleDepth > 0) {
-            $state->pendingFault = ['code' => $code, 'string' => $string];
+            $state->pendingFault = [
+                'code' => $code,
+                'string' => $string,
+                'actor' => $actor,
+                'details' => $details,
+                'name' => $name,
+            ];
         }
-        throw new \SoapFault($code, $string);
+        throw new \SoapFault($code, $string, '' !== $actor ? $actor : null, $details, '' !== $name ? $name : null);
     }
 
     /**
@@ -495,8 +507,11 @@ final class VmSoapServer
     {
         $code = (string) ($e->faultcode ?? 'Server');
         $string = (string) ($e->faultstring !== '' ? $e->faultstring : $e->getMessage());
+        $actor = isset($e->faultactor) ? (string) $e->faultactor : '';
+        $details = $e->detail ?? null;
+        $name = isset($e->_name) ? (string) $e->_name : '';
 
-        return self::buildFaultEnvelope($code, $string);
+        return self::buildFaultEnvelope($code, $string, $actor, $details, $name);
     }
 
     private static function buildFaultFromPending(SoapServerState $state): string
@@ -506,20 +521,65 @@ final class VmSoapServer
             return self::buildFaultEnvelope('Server', 'Unknown');
         }
 
-        return self::buildFaultEnvelope($pending['code'], $pending['string']);
+        return self::buildFaultEnvelope(
+            $pending['code'],
+            $pending['string'],
+            $pending['actor'] ?? '',
+            $pending['details'] ?? null,
+            $pending['name'] ?? ''
+        );
     }
 
-    private static function buildFaultEnvelope(string $code, string $string): string
-    {
+    private static function buildFaultEnvelope(
+        string $code,
+        string $string,
+        string $actor = '',
+        mixed $details = null,
+        string $name = ''
+    ): string {
+        $body = '      <faultcode>'.\htmlspecialchars($code, \ENT_XML1).'</faultcode>'."\n".
+            '      <faultstring>'.\htmlspecialchars($string, \ENT_XML1).'</faultstring>'."\n";
+        if ('' !== $actor) {
+            $body .= '      <faultactor>'.\htmlspecialchars($actor, \ENT_XML1).'</faultactor>'."\n";
+        }
+        if (null !== $details) {
+            $detailInner = self::encodeFaultDetail($details, $name);
+            $body .= '      <detail>'.$detailInner.'</detail>'."\n";
+        }
+
         return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
             '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">'."\n".
             '  <SOAP-ENV:Body>'."\n".
             '    <SOAP-ENV:Fault>'."\n".
-            '      <faultcode>'.\htmlspecialchars($code, \ENT_XML1).'</faultcode>'."\n".
-            '      <faultstring>'.\htmlspecialchars($string, \ENT_XML1).'</faultstring>'."\n".
+            $body.
             '    </SOAP-ENV:Fault>'."\n".
             '  </SOAP-ENV:Body>'."\n".
             '</SOAP-ENV:Envelope>';
+    }
+
+    private static function encodeFaultDetail(mixed $details, string $name): string
+    {
+        $tag = '' !== $name
+            ? (\preg_replace('/[^A-Za-z0-9_.-]/', '_', $name) ?: 'detail')
+            : null;
+        if (\is_string($details) || \is_numeric($details) || \is_bool($details)) {
+            $text = \htmlspecialchars((string) $details, \ENT_XML1);
+            if (null !== $tag) {
+                return '<'.$tag.'>'.$text.'</'.$tag.'>';
+            }
+
+            return $text;
+        }
+        if (null === $details) {
+            return '';
+        }
+        // Non-scalar v1: stringify.
+        $text = \htmlspecialchars((string) $details, \ENT_XML1);
+        if (null !== $tag) {
+            return '<'.$tag.'>'.$text.'</'.$tag.'>';
+        }
+
+        return $text;
     }
 
     private static function loadWsdlFunctions(SoapServerState $state, string $wsdl): void
@@ -589,9 +649,9 @@ final class SoapServerState
     public string $lastResponse = '';
 
     /**
-     * In-handler SoapServer::fault() payload (php-src soap_server_fault_ex; #20194).
+     * In-handler SoapServer::fault() payload (php-src soap_server_fault_ex; #20194, #20219).
      *
-     * @var array{code: string, string: string}|null
+     * @var array{code: string, string: string, actor?: string, details?: mixed, name?: string}|null
      */
     public ?array $pendingFault = null;
 }
@@ -767,7 +827,38 @@ final class SoapServerFault extends SoapClassMethod
         }
         $code = $this->stringArg($frame->calledArgs[1], 'SoapServer::fault', 0, 'code');
         $string = $this->stringArg($frame->calledArgs[2], 'SoapServer::fault', 1, 'string');
-        VmSoapServer::fault($receiver, $code, $string);
+        $actor = '';
+        if (\array_key_exists(3, $frame->calledArgs)) {
+            $a = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $a->type) {
+                $actor = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'SoapServer::fault', 3, 'actor');
+            }
+        }
+        $details = null;
+        if (\array_key_exists(4, $frame->calledArgs)) {
+            $d = $frame->calledArgs[4]->resolveIndirect();
+            if (Variable::TYPE_NULL === $d->type) {
+                $details = null;
+            } elseif (Variable::TYPE_STRING === $d->type) {
+                $details = $d->toString();
+            } elseif (Variable::TYPE_INTEGER === $d->type) {
+                $details = $d->toInt();
+            } elseif (Variable::TYPE_BOOLEAN === $d->type) {
+                $details = $d->toBool();
+            } elseif (Variable::TYPE_FLOAT === $d->type) {
+                $details = $d->toFloat();
+            } else {
+                $details = $d->toString();
+            }
+        }
+        $name = '';
+        if (\array_key_exists(5, $frame->calledArgs)) {
+            $n = $frame->calledArgs[5]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $n->type) {
+                $name = VmString::coerceStringBuiltinArg($frame->calledArgs[5], 'SoapServer::fault', 5, 'name');
+            }
+        }
+        VmSoapServer::fault($receiver, $code, $string, $actor, $details, $name);
     }
 }
 
