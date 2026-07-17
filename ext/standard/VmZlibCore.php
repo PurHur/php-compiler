@@ -145,6 +145,10 @@ final class VmZlibCore
 
     public static function zlib_decode(string $data, int $maxLength = 0): string|false
     {
+        if ('' === $data) {
+            return false;
+        }
+
         $result = self::inflateAuto($data, $maxLength);
         if (false !== $result) {
             return $result;

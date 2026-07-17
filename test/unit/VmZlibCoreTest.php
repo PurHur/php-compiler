@@ -53,6 +53,12 @@ final class VmZlibCoreTest extends TestCase
         }
     }
 
+    /** Issue #19907 — empty/null-coerced data must fail like Zend (not rawInflate empty string). */
+    public function testZlibDecodeEmptyReturnsFalse(): void
+    {
+        $this->assertFalse(VmZlibCore::zlib_decode(''));
+    }
+
     public function testIssueReproCompressesRepeatingPayload(): void
     {
         $data = str_repeat('abc', 100);

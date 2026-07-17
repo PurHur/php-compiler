@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStrictIntArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -26,7 +25,7 @@ final class zlib_decode extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('zlib_decode() expects one or two arguments in this compiler build');
         }
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'zlib_decode', 0, 'data');
+        $data = VmZlibArg::resolveDataString($frame, 'zlib_decode');
         $maxLength = 0;
         if (2 === $argc) {
             $maxLength = VmZlibArg::requireInt($frame->calledArgs[1], 'zlib_decode', 2, 'max_length');
@@ -58,7 +57,7 @@ final class zlib_decode extends Internal
 
         return JitZlib::zlibDecode(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'zlib_decode', 0, 'data'),
+            VmZlibArg::jitDataString($context, $args[0], 'zlib_decode'),
             $maxLength
         );
     }
