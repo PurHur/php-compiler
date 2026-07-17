@@ -236,6 +236,23 @@ final class VmSqlite3Native
         return $out;
     }
 
+    /**
+     * PDO sqlite quoter — sqlite3_mprintf("%Q", …) (escaped + surrounding quotes).
+     * php-src: ext/pdo_sqlite/sqlite_driver.c sqlite_handle_quoter.
+     */
+    public static function quoteSqlLiteral(string $value): string
+    {
+        $ffi = self::requireFfi();
+        $ret = $ffi->sqlite3_mprintf('%Q', $value);
+        if (null === $ret) {
+            return "''";
+        }
+        $out = self::ffiString($ret);
+        $ffi->sqlite3_free($ret);
+
+        return $out;
+    }
+
     public static function columnTypeAt(\FFI\CData $stmt, int $index): int
     {
         return (int) self::requireFfi()->sqlite3_column_type($stmt, $index);

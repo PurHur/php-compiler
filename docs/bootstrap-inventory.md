@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5298 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14719 |
+| Source constructs flagged (warnings) | 14732 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -868,7 +868,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/Module.php` | 0 | 1 |
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
-| `ext/pdo/VmPDO.php` | 0 | 26 |
+| `ext/pdo/VmPDO.php` | 0 | 39 |
 | `ext/pdo/VmPDOStatement.php` | 0 | 22 |
 | `ext/phar/BuiltinClasses.php` | 0 | 3 |
 | `ext/phar/Module.php` | 0 | 1 |
@@ -11225,23 +11225,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new PDOSetAttribute (line 55)
 - new PDOGetAttribute (line 56)
 - new PDOGetAvailableDrivers (line 57)
-- new PDOException (line 83)
-- new PDOException (line 89)
-- new PdoState (line 91)
-- new PDOException (line 113)
-- new PDOException (line 122)
-- new PDOException (line 139)
-- new HashTable (line 165)
-- new Variable (line 167)
-- new ArgumentCountError (line 212)
-- new ArgumentCountError (line 239)
-- new ArgumentCountError (line 272)
-- new ArgumentCountError (line 305)
-- new ArgumentCountError (line 353)
-- new ArgumentCountError (line 382)
-- new HashTable (line 409)
-- new Variable (line 411)
-- 17 class method(s)
+- new PDOLastInsertId (line 58)
+- new PDOQuote (line 59)
+- new PDOBeginTransaction (line 60)
+- new PDOCommit (line 61)
+- new PDORollBack (line 62)
+- new PDOInTransaction (line 63)
+- new PDOErrorCode (line 64)
+- new PDOErrorInfo (line 65)
+- new PDOException (line 97)
+- new PDOException (line 103)
+- new PdoState (line 105)
+- new PDOException (line 127)
+- new PDOException (line 136)
+- new PDOException (line 163)
+- new HashTable (line 200)
+- new Variable (line 202)
+- new ArgumentCountError (line 256)
+- new ArgumentCountError (line 283)
+- new ArgumentCountError (line 317)
+- new ArgumentCountError (line 351)
+- new ArgumentCountError (line 400)
+- new ArgumentCountError (line 429)
+- new HashTable (line 456)
+- new Variable (line 458)
+- new ArgumentCountError (line 499)
+- new HashTable (line 648)
+- new Variable (line 649)
+- new Variable (line 652)
+- new Variable (line 659)
+- 27 class method(s)
 
 ### `ext/pdo/VmPDOStatement.php`
 
@@ -14000,7 +14013,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SQLite3Exception (line 92)
 - new SQLite3Exception (line 139)
 - new SQLite3Exception (line 183)
-- 30 class method(s)
+- 31 class method(s)
 
 ### `ext/standard/AbsJitHelper.php`
 

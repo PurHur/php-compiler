@@ -55,6 +55,14 @@ final class VmPDO
             'setattribute' => new PDOSetAttribute(),
             'getattribute' => new PDOGetAttribute(),
             'getavailabledrivers' => new PDOGetAvailableDrivers(),
+            'lastinsertid' => new PDOLastInsertId(),
+            'quote' => new PDOQuote(),
+            'begintransaction' => new PDOBeginTransaction(),
+            'commit' => new PDOCommit(),
+            'rollback' => new PDORollBack(),
+            'intransaction' => new PDOInTransaction(),
+            'errorcode' => new PDOErrorCode(),
+            'errorinfo' => new PDOErrorInfo(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -63,6 +71,12 @@ final class VmPDO
         $entry->methodNames['setattribute'] = 'setAttribute';
         $entry->methodNames['getattribute'] = 'getAttribute';
         $entry->methodNames['getavailabledrivers'] = 'getAvailableDrivers';
+        $entry->methodNames['lastinsertid'] = 'lastInsertId';
+        $entry->methodNames['begintransaction'] = 'beginTransaction';
+        $entry->methodNames['rollback'] = 'rollBack';
+        $entry->methodNames['intransaction'] = 'inTransaction';
+        $entry->methodNames['errorcode'] = 'errorCode';
+        $entry->methodNames['errorinfo'] = 'errorInfo';
         $entry->methodVisibility['getavailabledrivers'] = CfgFunc::FLAG_STATIC | $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -133,15 +147,36 @@ final class VmPDO
         return $path;
     }
 
-    public static function raise(PdoState $state, string $message, string $sqlState = 'HY000'): void
+    public static function clearError(PdoState $state): void
     {
+        $state->errorCode = '00000';
+        $state->errorDriverCode = null;
+        $state->errorMessage = null;
+    }
+
+    public static function raise(PdoState $state, string $message, string $sqlState = 'HY000', ?int $driverCode = null): void
+    {
+        $state->errorCode = $sqlState;
+        $state->errorDriverCode = $driverCode;
+        $state->errorMessage = $message;
         if (PdoConstants::ERRMODE_EXCEPTION === $state->errMode) {
             $ex = new \PDOException($message);
-            $ex->errorInfo = [$sqlState, null, $message];
+            $ex->errorInfo = [$sqlState, $driverCode, $message];
             throw $ex;
         }
         if (PdoConstants::ERRMODE_WARNING === $state->errMode) {
             trigger_error('SQLSTATE['.$sqlState.']: '.$message, E_USER_WARNING);
+        }
+    }
+
+    /** Run a sqlite exec and map SQLite3Exception through {@see raise()}. */
+    public static function execSql(PdoState $state, \FFI\CData $db, string $sql): void
+    {
+        try {
+            VmSqlite3Native::exec($db, $sql);
+            self::clearError($state);
+        } catch (\SQLite3Exception $e) {
+            self::raise($state, $e->getMessage(), 'HY000', (int) $e->getCode());
         }
     }
 
@@ -197,6 +232,15 @@ final class PdoState
     public int $errMode = PdoConstants::ERRMODE_EXCEPTION;
 
     public int $fetchMode = PdoConstants::FETCH_BOTH;
+
+    /** Active txn flag (php-src pdo_dbh_t.in_txn). */
+    public bool $inTransaction = false;
+
+    public string $errorCode = '00000';
+
+    public ?int $errorDriverCode = null;
+
+    public ?string $errorMessage = null;
 }
 
 final class PDOConstruct extends PdoClassMethod
@@ -243,9 +287,10 @@ final class PDOExec extends PdoClassMethod
         $db = VmPDO::requireDb($receiver);
         try {
             VmSqlite3Native::exec($db, $sql);
+            VmPDO::clearError($state);
             $changes = VmSqlite3Native::changes($db);
         } catch (\SQLite3Exception $e) {
-            VmPDO::raise($state, $e->getMessage());
+            VmPDO::raise($state, $e->getMessage(), 'HY000', (int) $e->getCode());
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(false);
             }
@@ -276,8 +321,9 @@ final class PDOPrepare extends PdoClassMethod
         $db = VmPDO::requireDb($receiver);
         try {
             $stmt = VmSqlite3Native::prepare($db, $sql);
+            VmPDO::clearError($state);
         } catch (\SQLite3Exception $e) {
-            VmPDO::raise($state, $e->getMessage());
+            VmPDO::raise($state, $e->getMessage(), 'HY000', (int) $e->getCode());
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(false);
             }
@@ -324,8 +370,9 @@ final class PDOQuery extends PdoClassMethod
             $rowCount = VmPDOStatement::rowCountAfterStep($stmt, $db, $rc);
             // Rewind so Iterator/fetch can re-step from the start.
             VmSqlite3Native::reset($stmt);
+            VmPDO::clearError($state);
         } catch (\SQLite3Exception $e) {
-            VmPDO::raise($state, $e->getMessage());
+            VmPDO::raise($state, $e->getMessage(), 'HY000', (int) $e->getCode());
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(false);
             }
@@ -412,6 +459,210 @@ final class PDOGetAvailableDrivers extends PdoClassMethod
             $slot->string('sqlite');
             $ht->add('0', $slot);
         }
+        $frame->returnVar->array($ht);
+    }
+}
+
+/** PDO::lastInsertId(?string $name = null): string|false — php-src zim_PDO_lastInsertId (#19861). */
+final class PDOLastInsertId extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('lastInsertId');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDO::lastInsertId()');
+        // Optional $name ignored for sqlite (php-src pdo_sqlite last_insert_id).
+        $db = VmPDO::requireDb($receiver);
+        $state = VmPDO::state($receiver);
+        VmPDO::clearError($state);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string((string) VmSqlite3Native::lastInsertRowId($db));
+        }
+    }
+}
+
+/** PDO::quote(string $string, int $type = PARAM_STR): string|false — sqlite %Q (#19861). */
+final class PDOQuote extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('quote');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDO::quote()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('PDO::quote() expects at least 1 argument, 0 given');
+        }
+        $value = $this->stringArg($frame->calledArgs[1], 'PDO::quote', 0, 'string');
+        // $type (arg 2) ignored for sqlite string quoting.
+        VmPDO::requireDb($receiver);
+        $state = VmPDO::state($receiver);
+        VmPDO::clearError($state);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmSqlite3Native::quoteSqlLiteral($value));
+        }
+    }
+}
+
+/** PDO::beginTransaction(): bool — php-src zim_PDO_beginTransaction (#19861). */
+final class PDOBeginTransaction extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('beginTransaction');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDO::beginTransaction()');
+        $state = VmPDO::state($receiver);
+        $db = VmPDO::requireDb($receiver);
+        if ($state->inTransaction) {
+            VmPDO::raise($state, 'There is already an active transaction');
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        VmPDO::execSql($state, $db, 'BEGIN');
+        $state->inTransaction = true;
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+}
+
+/** PDO::commit(): bool — php-src zim_PDO_commit (#19861). */
+final class PDOCommit extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('commit');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDO::commit()');
+        $state = VmPDO::state($receiver);
+        $db = VmPDO::requireDb($receiver);
+        if (!$state->inTransaction) {
+            VmPDO::raise($state, 'There is no active transaction');
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        VmPDO::execSql($state, $db, 'COMMIT');
+        $state->inTransaction = false;
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+}
+
+/** PDO::rollBack(): bool — php-src zim_PDO_rollBack (#19861). */
+final class PDORollBack extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('rollBack');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDO::rollBack()');
+        $state = VmPDO::state($receiver);
+        $db = VmPDO::requireDb($receiver);
+        if (!$state->inTransaction) {
+            VmPDO::raise($state, 'There is no active transaction');
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        VmPDO::execSql($state, $db, 'ROLLBACK');
+        $state->inTransaction = false;
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+}
+
+/** PDO::inTransaction(): bool — php-src zim_PDO_inTransaction (#19861). */
+final class PDOInTransaction extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('inTransaction');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDO::inTransaction()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmPDO::state($receiver)->inTransaction);
+        }
+    }
+}
+
+/** PDO::errorCode(): ?string — php-src zim_PDO_errorCode (#19861). */
+final class PDOErrorCode extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('errorCode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDO::errorCode()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmPDO::state($receiver)->errorCode);
+        }
+    }
+}
+
+/** PDO::errorInfo(): array — php-src zim_PDO_errorInfo (#19861). */
+final class PDOErrorInfo extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('errorInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDO::errorInfo()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $state = VmPDO::state($receiver);
+        $ht = new HashTable();
+        $c0 = new Variable();
+        $c0->string($state->errorCode);
+        $ht->add('0', $c0);
+        $c1 = new Variable();
+        if (null === $state->errorDriverCode) {
+            $c1->null();
+        } else {
+            $c1->int($state->errorDriverCode);
+        }
+        $ht->add('1', $c1);
+        $c2 = new Variable();
+        if (null === $state->errorMessage) {
+            $c2->null();
+        } else {
+            $c2->string($state->errorMessage);
+        }
+        $ht->add('2', $c2);
         $frame->returnVar->array($ht);
     }
 }
