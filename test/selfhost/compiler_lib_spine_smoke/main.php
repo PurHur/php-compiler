@@ -5496,4 +5496,8 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterEndDtdElement.php';
+require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartDtdElement.php';
+require_once __DIR__.'/../../../ext/xmlwriter/xmlwriter_end_dtd_element.php';
+require_once __DIR__.'/../../../ext/xmlwriter/xmlwriter_start_dtd_element.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

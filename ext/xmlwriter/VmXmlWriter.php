@@ -113,6 +113,12 @@ final class VmXmlWriter
         $entry->methods['writedtdelement'] = new XmlWriterWriteDtdElement();
         $entry->methodVisibility['writedtdelement'] = $pub;
         $entry->methodNames['writedtdelement'] = 'writeDtdElement';
+        $entry->methods['startdtdelement'] = new XmlWriterStartDtdElement();
+        $entry->methodVisibility['startdtdelement'] = $pub;
+        $entry->methodNames['startdtdelement'] = 'startDtdElement';
+        $entry->methods['enddtdelement'] = new XmlWriterEndDtdElement();
+        $entry->methodVisibility['enddtdelement'] = $pub;
+        $entry->methodNames['enddtdelement'] = 'endDtdElement';
         $entry->methods['writedtdattlist'] = new XmlWriterWriteDtdAttlist();
         $entry->methodVisibility['writedtdattlist'] = $pub;
         $entry->methodNames['writedtdattlist'] = 'writeDtdAttlist';
@@ -732,7 +738,7 @@ final class VmXmlWriter
     public static function startComment(ObjectEntry $entry): bool
     {
         $state = self::requireOpen($entry, 'XMLWriter::startComment()');
-        if ($state->inComment || $state->inCdata || $state->inPi || $state->inDtd || $state->inDtdEntity || $state->inDtdAttlist) {
+        if ($state->inComment || $state->inCdata || $state->inPi || $state->inDtd || $state->inDtdEntity || $state->inDtdAttlist || $state->inDtdElement) {
             return false;
         }
         self::closeStartTagIfOpen($state);
@@ -767,7 +773,7 @@ final class VmXmlWriter
         ?string $systemId = null
     ): bool {
         $state = self::requireOpen($entry, 'XMLWriter::startDtd()');
-        if ('' === $qualifiedName || $state->inDtd || $state->inComment || $state->inCdata || $state->inPi || $state->inDtdEntity || $state->inDtdAttlist) {
+        if ('' === $qualifiedName || $state->inDtd || $state->inComment || $state->inCdata || $state->inPi || $state->inDtdEntity || $state->inDtdAttlist || $state->inDtdElement) {
             return false;
         }
         if (null !== $publicId && (null === $systemId || '' === $systemId)) {
@@ -809,6 +815,9 @@ final class VmXmlWriter
         }
         if ($state->inDtdAttlist) {
             self::finishOpenDtdAttlist($state);
+        }
+        if ($state->inDtdElement) {
+            self::finishOpenDtdElement($state);
         }
         if ($state->dtdSubsetOpen) {
             $state->buffer .= ']';
@@ -872,7 +881,7 @@ final class VmXmlWriter
                 var_export($name, true)
             ));
         }
-        if ($state->inDtdEntity || $state->inDtdAttlist || $state->inComment || $state->inCdata || $state->inPi) {
+        if ($state->inDtdEntity || $state->inDtdAttlist || $state->inDtdElement || $state->inComment || $state->inCdata || $state->inPi) {
             return false;
         }
         self::closeStartTagIfOpen($state);
@@ -894,7 +903,7 @@ final class VmXmlWriter
                 var_export($name, true)
             ));
         }
-        if ($state->inDtdEntity || $state->inDtdAttlist || $state->inComment || $state->inCdata || $state->inPi) {
+        if ($state->inDtdEntity || $state->inDtdAttlist || $state->inDtdElement || $state->inComment || $state->inCdata || $state->inPi) {
             return false;
         }
         self::closeStartTagIfOpen($state);
@@ -917,7 +926,7 @@ final class VmXmlWriter
                 var_export($name, true)
             ));
         }
-        if ($state->inDtdAttlist || $state->inDtdEntity || $state->inComment || $state->inCdata || $state->inPi) {
+        if ($state->inDtdAttlist || $state->inDtdElement || $state->inDtdEntity || $state->inComment || $state->inCdata || $state->inPi) {
             return false;
         }
         self::closeStartTagIfOpen($state);
@@ -944,6 +953,45 @@ final class VmXmlWriter
     }
 
     /**
+     * XMLWriter::startDtdElement — open `<!ELEMENT name` (php-src zim_XMLWriter_startDtdElement; #20032).
+     * First text() inserts a leading space before content (libxml xmlTextWriterWriteString).
+     */
+    public static function startDtdElement(ObjectEntry $entry, string $name): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::startDtdElement()');
+        if (!self::isValidElementName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::startDtdElement(): Argument #1 ($name) must be a valid element name, %s given',
+                var_export($name, true)
+            ));
+        }
+        if ($state->inDtdElement || $state->inDtdAttlist || $state->inDtdEntity || $state->inComment || $state->inCdata || $state->inPi) {
+            return false;
+        }
+        self::closeStartTagIfOpen($state);
+        self::ensureDtdSubsetOpen($state);
+        $state->buffer .= '<!ELEMENT '.self::escapeElementName($name);
+        $state->inDtdElement = true;
+        $state->dtdElementHasContent = false;
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::endDtdElement — close open ELEMENT with `>` (php-src zim_XMLWriter_endDtdElement; #20032).
+     */
+    public static function endDtdElement(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::endDtdElement()');
+        if (!$state->inDtdElement) {
+            return false;
+        }
+        self::finishOpenDtdElement($state);
+
+        return true;
+    }
+
+    /**
      * XMLWriter::startDtdEntity — open `<!ENTITY …` (php-src zim_XMLWriter_startDtdEntity; #19468).
      */
     public static function startDtdEntity(ObjectEntry $entry, string $name, bool $isParam): bool
@@ -955,7 +1003,7 @@ final class VmXmlWriter
                 var_export($name, true)
             ));
         }
-        if ($state->inDtdEntity || $state->inDtdAttlist || $state->inComment || $state->inCdata || $state->inPi) {
+        if ($state->inDtdEntity || $state->inDtdAttlist || $state->inDtdElement || $state->inComment || $state->inCdata || $state->inPi) {
             return false;
         }
         self::closeStartTagIfOpen($state);
@@ -1005,7 +1053,7 @@ final class VmXmlWriter
                 var_export($name, true)
             ));
         }
-        if ($state->inDtdEntity || $state->inDtdAttlist || $state->inComment || $state->inCdata || $state->inPi) {
+        if ($state->inDtdEntity || $state->inDtdAttlist || $state->inDtdElement || $state->inComment || $state->inCdata || $state->inPi) {
             return false;
         }
         self::closeStartTagIfOpen($state);
@@ -1076,6 +1124,16 @@ final class VmXmlWriter
             if (!$state->dtdAttlistHasContent) {
                 $state->buffer .= ' ';
                 $state->dtdAttlistHasContent = true;
+            }
+            $state->buffer .= $content;
+
+            return true;
+        }
+        if ($state->inDtdElement) {
+            // libxml: first text() inside ELEMENT inserts a leading space (#20032).
+            if (!$state->dtdElementHasContent) {
+                $state->buffer .= ' ';
+                $state->dtdElementHasContent = true;
             }
             $state->buffer .= $content;
 
@@ -1270,6 +1328,8 @@ final class VmXmlWriter
         $state->dtdEntityHasContent = false;
         $state->inDtdAttlist = false;
         $state->dtdAttlistHasContent = false;
+        $state->inDtdElement = false;
+        $state->dtdElementHasContent = false;
         $state->pendingNsDecls = [];
     }
 
@@ -1301,6 +1361,14 @@ final class VmXmlWriter
         $state->buffer .= '>';
         $state->inDtdAttlist = false;
         $state->dtdAttlistHasContent = false;
+    }
+
+    /** Finish `<!ELEMENT …>` started by startDtdElement / endDtd auto-close (#20032). */
+    private static function finishOpenDtdElement(XmlWriterState $state): void
+    {
+        $state->buffer .= '>';
+        $state->inDtdElement = false;
+        $state->dtdElementHasContent = false;
     }
 
     private static function requireOpen(ObjectEntry $entry, string $label): XmlWriterState

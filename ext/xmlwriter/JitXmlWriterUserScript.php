@@ -406,6 +406,32 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, (bool) $ok);
     }
 
+    public static function tryStartDtdElement(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $name || str_starts_with($name, '__phpc_xw_')) {
+            return null;
+        }
+        $ok = @$writer->startDtdElement($name);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryEndDtdElement(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer) {
+            return null;
+        }
+        $ok = $writer->endDtdElement();
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
     public static function tryWriteDtdAttlist(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);
