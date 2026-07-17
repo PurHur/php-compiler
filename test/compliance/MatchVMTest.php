@@ -27,6 +27,7 @@ final class MatchVMTest extends BaseTest
                 'match_enum_unhandled.phpt',
                 'match_object_unhandled.phpt',
                 'is_object_enum_case.phpt',
+                '../stdlib/is_int_object_enum.phpt',
                 'match_strict_arms_4371.phpt',
                 'match_enum_case.phpt',
                 'match_enum_case_scalar.phpt',
