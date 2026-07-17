@@ -38,6 +38,8 @@ final class VmSession
 
     public const ACTIVE_ID_CHANGE_WARNING = 'session_id(): Session ID cannot be changed when a session is active';
 
+    public const HEADERS_SENT_ID_CHANGE_WARNING = 'session_id(): Session ID cannot be changed after headers have already been sent';
+
     public const ACTIVE_NAME_CHANGE_WARNING = 'session_name(): Session name cannot be changed when a session is active';
 
     public const HEADERS_SENT_NAME_CHANGE_WARNING = 'session_name(): Session name cannot be changed after headers have already been sent';
@@ -381,6 +383,22 @@ final class VmSession
         }
         if (SapiOutput::headersSent()) {
             self::triggerSessionWarning($frame, self::HEADERS_SENT_NAME_CHANGE_WARNING);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function canChangeId(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_ID_CHANGE_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_ID_CHANGE_WARNING);
 
             return false;
         }
