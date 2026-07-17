@@ -104,6 +104,10 @@ final class ArrayIteratorBuiltin
 
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'ArrayIterator');
 
+        $entry->methods['__debuginfo'] = new ArrayIteratorDebugInfo();
+        $entry->methodVisibility['__debuginfo'] = $pub;
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
+
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
@@ -145,6 +149,39 @@ final class ArrayIteratorBuiltin
     public static function count(ObjectEntry $object): int
     {
         return SplArrayStorage::count($object);
+    }
+}
+
+/**
+ * ArrayIterator::__debugInfo() — private storage bag + dynamic props (php-src spl_array_object_debug_info; #19782).
+ */
+final class ArrayIteratorDebugInfo extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__debugInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::__debugInfo()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($object->getRawProperties() as $name => $prop) {
+            $copy = new Variable();
+            $copy->copyFrom($prop->resolveIndirect());
+            $ht->addNew((string) $name, $copy);
+        }
+        $storage = new Variable();
+        $storage->array(SplArrayStorage::getArrayCopy($object));
+        $ht->addNew("\0ArrayIterator\0storage", $storage);
+        $frame->returnVar->array($ht);
     }
 }
 
