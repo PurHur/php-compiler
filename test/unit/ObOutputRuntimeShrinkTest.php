@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\ObOutputJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** ObOutputRuntime routes standalone + embed through ObOutputJitHelper PHP; user-script via JitObOutputKernel (#9268, #12951, #19422). */
+/** ObOutputRuntime routes standalone + embed through ObOutputJitHelper PHP; thin AOT via isThinStandaloneAotMain + JitObOutputKernel (#9268, #12951, #19422, #20169). */
 final class ObOutputRuntimeShrinkTest extends TestCase
 {
     public function testObOutputRuntimeUsesHelperNotLlvmStack(): void
@@ -48,7 +48,9 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('implementGetContents', $execCaptureRuntime);
         $this->assertStringContainsString('ensureReadApiLinked', $execCaptureRuntime);
         $this->assertStringContainsString('JitObOutputExecCaptureKernel::ensureLinked', $execCaptureRuntime);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $execCaptureRuntime);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $execCaptureRuntime);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $execCaptureRuntime);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $execCaptureRuntime);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObOutputExecCaptureLlvm.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitObOutputExecCaptureKernel.php');
 
