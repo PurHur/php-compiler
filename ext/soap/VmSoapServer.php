@@ -511,17 +511,18 @@ final class VmSoapServer
         $details = $e->detail ?? null;
         $name = isset($e->_name) ? (string) $e->_name : '';
 
-        return self::buildFaultEnvelope($code, $string, $actor, $details, $name);
+        return self::buildFaultEnvelope($state->soapVersion, $code, $string, $actor, $details, $name);
     }
 
     private static function buildFaultFromPending(SoapServerState $state): string
     {
         $pending = $state->pendingFault;
         if (null === $pending) {
-            return self::buildFaultEnvelope('Server', 'Unknown');
+            return self::buildFaultEnvelope($state->soapVersion, 'Server', 'Unknown');
         }
 
         return self::buildFaultEnvelope(
+            $state->soapVersion,
             $pending['code'],
             $pending['string'],
             $pending['actor'] ?? '',
@@ -531,12 +532,17 @@ final class VmSoapServer
     }
 
     private static function buildFaultEnvelope(
+        int $soapVersion,
         string $code,
         string $string,
         string $actor = '',
         mixed $details = null,
         string $name = ''
     ): string {
+        if (SoapConstants::SOAP_1_2 === $soapVersion) {
+            return self::buildSoap12FaultEnvelope($code, $string, $actor, $details, $name);
+        }
+
         $body = '      <faultcode>'.\htmlspecialchars($code, \ENT_XML1).'</faultcode>'."\n".
             '      <faultstring>'.\htmlspecialchars($string, \ENT_XML1).'</faultstring>'."\n";
         if ('' !== $actor) {
@@ -555,6 +561,48 @@ final class VmSoapServer
             '    </SOAP-ENV:Fault>'."\n".
             '  </SOAP-ENV:Body>'."\n".
             '</SOAP-ENV:Envelope>';
+    }
+
+    /**
+     * SOAP 1.2 Fault envelope (php-src serialize_response_call SOAP_1_2 branch; #20221).
+     */
+    private static function buildSoap12FaultEnvelope(
+        string $code,
+        string $string,
+        string $actor = '',
+        mixed $details = null,
+        string $name = ''
+    ): string {
+        // php-src soap_error: Client→Sender, Server→Receiver under SOAP_1_2.
+        if ('Client' === $code) {
+            $code = 'Sender';
+        } elseif ('Server' === $code) {
+            $code = 'Receiver';
+        }
+        $ns = 'http://www.w3.org/2003/05/soap-envelope';
+        $pfx = 'env';
+        $value = $pfx.':'.\htmlspecialchars($code, \ENT_XML1);
+        $body = '      <'.$pfx.':Code><'.$pfx.':Value>'.$value.'</'.$pfx.':Value></'.$pfx.':Code>'."\n".
+            '      <'.$pfx.':Reason><'.$pfx.':Text xml:lang="en">'.
+            \htmlspecialchars($string, \ENT_XML1).
+            '</'.$pfx.':Text></'.$pfx.':Reason>'."\n";
+        // SOAP 1.2 uses Role instead of faultactor.
+        if ('' !== $actor) {
+            $body .= '      <'.$pfx.':Role>'.\htmlspecialchars($actor, \ENT_XML1).'</'.$pfx.':Role>'."\n";
+        }
+        if (null !== $details) {
+            $detailInner = self::encodeFaultDetail($details, $name);
+            $body .= '      <'.$pfx.':Detail>'.$detailInner.'</'.$pfx.':Detail>'."\n";
+        }
+
+        return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
+            '<'.$pfx.':Envelope xmlns:'.$pfx.'="'.$ns.'">'."\n".
+            '  <'.$pfx.':Body>'."\n".
+            '    <'.$pfx.':Fault>'."\n".
+            $body.
+            '    </'.$pfx.':Fault>'."\n".
+            '  </'.$pfx.':Body>'."\n".
+            '</'.$pfx.':Envelope>';
     }
 
     private static function encodeFaultDetail(mixed $details, string $name): string
