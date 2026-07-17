@@ -50,6 +50,8 @@ final class VmSoapClient
             '__getlastresponse' => new SoapClientGetLastResponse(),
             '__getlastrequestheaders' => new SoapClientGetLastRequestHeaders(),
             '__getlastresponseheaders' => new SoapClientGetLastResponseHeaders(),
+            '__setcookie' => new SoapClientSetCookie(),
+            '__getcookies' => new SoapClientGetCookies(),
             '__call' => new SoapClientCall(),
         ];
         foreach ($methods as $name => $method) {
@@ -64,6 +66,8 @@ final class VmSoapClient
         $entry->methodNames['__getlastresponse'] = '__getLastResponse';
         $entry->methodNames['__getlastrequestheaders'] = '__getLastRequestHeaders';
         $entry->methodNames['__getlastresponseheaders'] = '__getLastResponseHeaders';
+        $entry->methodNames['__setcookie'] = '__setCookie';
+        $entry->methodNames['__getcookies'] = '__getCookies';
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -129,6 +133,25 @@ final class VmSoapClient
         return self::state($object)->types;
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public static function getCookies(ObjectEntry $object): array
+    {
+        return self::state($object)->cookies;
+    }
+
+    public static function setCookie(ObjectEntry $object, string $name, ?string $value): void
+    {
+        $state = self::state($object);
+        if (null === $value) {
+            unset($state->cookies[$name]);
+
+            return;
+        }
+        $state->cookies[$name] = $value;
+    }
+
     public static function soapCall(
         ObjectEntry $object,
         string $name,
@@ -160,7 +183,8 @@ final class VmSoapClient
         $state = self::state($object);
         $state->lastRequest = $request;
 
-        $requestHeaders = self::buildHttpRequestHeaders($location, $action, \strlen($request));
+        $cookieHeader = self::formatCookieHeader($state->cookies);
+        $requestHeaders = self::buildHttpRequestHeaders($location, $action, \strlen($request), $cookieHeader);
         if ($state->trace) {
             $state->lastRequestHeaders = $requestHeaders;
         }
@@ -185,6 +209,9 @@ final class VmSoapClient
 
         $headers = "Content-Type: text/xml; charset=utf-8\r\n".
             'SOAPAction: "'.$action."\"\r\n";
+        if ('' !== $cookieHeader) {
+            $headers .= 'Cookie: '.$cookieHeader."\r\n";
+        }
         $ctx = \stream_context_create([
             'http' => [
                 'method' => 'POST',
@@ -212,10 +239,30 @@ final class VmSoapClient
     }
 
     /**
+     * @param array<string, string> $cookies
+     */
+    private static function formatCookieHeader(array $cookies): string
+    {
+        if ($cookies === []) {
+            return '';
+        }
+        $parts = [];
+        foreach ($cookies as $name => $value) {
+            $parts[] = $name.'='.$value;
+        }
+
+        return \implode('; ', $parts);
+    }
+
+    /**
      * Build Zend-shaped HTTP request header block for trace (php-src soap_client).
      */
-    private static function buildHttpRequestHeaders(string $location, string $action, int $contentLength): string
-    {
+    private static function buildHttpRequestHeaders(
+        string $location,
+        string $action,
+        int $contentLength,
+        string $cookieHeader = ''
+    ): string {
         $path = '/';
         $host = 'localhost';
         if (\preg_match('#^https?://([^/]+)(/.*)?$#i', $location, $m)) {
@@ -225,13 +272,18 @@ final class VmSoapClient
             $path = $location;
         }
 
-        return 'POST '.$path." HTTP/1.1\r\n".
+        $hdr = 'POST '.$path." HTTP/1.1\r\n".
             'Host: '.$host."\r\n".
             "Connection: Keep-Alive\r\n".
             'User-Agent: PHP-SOAP/'.\PHP_VERSION."\r\n".
             "Content-Type: text/xml; charset=utf-8\r\n".
             'SOAPAction: "'.$action."\"\r\n".
             'Content-Length: '.$contentLength."\r\n";
+        if ('' !== $cookieHeader) {
+            $hdr .= 'Cookie: '.$cookieHeader."\r\n";
+        }
+
+        return $hdr;
     }
 
     private static function synthesizeFixtureResponseHeaders(int $contentLength): string
@@ -608,6 +660,9 @@ final class SoapClientState
     public ?string $lastRequestHeaders = null;
 
     public ?string $lastResponseHeaders = null;
+
+    /** @var array<string, string> */
+    public array $cookies = [];
 }
 
 final class SoapClientConstruct extends SoapClassMethod
@@ -859,5 +914,56 @@ final class SoapClientGetLastResponseHeaders extends SoapClassMethod
             return;
         }
         $frame->returnVar->string($headers);
+    }
+}
+
+final class SoapClientSetCookie extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__setCookie');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(
+                'SoapClient::__setCookie() expects at least 1 argument and at most 2, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'SoapClient::__setCookie()');
+        $name = $this->stringArg($frame->calledArgs[1], 'SoapClient::__setCookie', 0, 'name');
+        $value = null;
+        if ($argc >= 3) {
+            $valVar = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $valVar->type) {
+                $value = $this->stringArg($frame->calledArgs[2], 'SoapClient::__setCookie', 1, 'value');
+            }
+        }
+        VmSoapClient::setCookie($receiver, $name, $value);
+    }
+}
+
+final class SoapClientGetCookies extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__getCookies');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'SoapClient::__getCookies()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ht = new HashTable();
+        foreach (VmSoapClient::getCookies($receiver) as $name => $value) {
+            $slot = new Variable();
+            $slot->string($value);
+            $ht->add((string) $name, $slot);
+        }
+        $frame->returnVar->array($ht);
     }
 }
