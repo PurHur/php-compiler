@@ -13,8 +13,10 @@ final class ReadfileRuntimeShrinkTest extends TestCase
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringReadfile.php');
         $this->assertStringContainsString('ReadfileJitHelper', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
         $this->assertStringContainsString('JitReadfileKernel', $bridge);
         $this->assertStringContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('ensureJitHelperCompiled', $bridge);
         $this->assertStringNotContainsString('StringReadfileLibc', $bridge);
         $this->assertStringNotContainsString("lookupFunction('open')", $bridge);
         $this->assertStringNotContainsString("lookupFunction('read')", $bridge);

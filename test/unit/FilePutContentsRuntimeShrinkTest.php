@@ -14,8 +14,10 @@ final class FilePutContentsRuntimeShrinkTest extends TestCase
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFilePutContents.php');
         $this->assertStringContainsString('FilePutContentsJitHelper', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
         $this->assertStringContainsString('JitFilePutContentsKernel', $bridge);
         $this->assertStringContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('ensureJitHelperCompiled', $bridge);
         $this->assertStringNotContainsString('StringFilePutContentsLibc', $bridge);
         $this->assertStringNotContainsString("lookupFunction('fopen')", $bridge);
         $this->assertStringNotContainsString("lookupFunction('fwrite')", $bridge);
