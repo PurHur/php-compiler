@@ -13,9 +13,10 @@ use PHPLLVM\BasicBlock;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for include_path builtins via IncludePathJitHelper PHP (#9245).
+ * JIT/AOT link for include_path builtins via IncludePathJitHelper PHP (#9245, #20308).
  *
- * User-script standalone AOT: thin stubs without nested JIT (#13571, #13678).
+ * Embed / non-thin: NestedJIT {@see IncludePathJitHelper} / {@see IncludePathResolveJitHelper}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20229 / #20132 shape): thin stubs without nested JIT (#13571, #13678).
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmIncludePath} / {@see \PHPCompiler\ext\standard\VmFs}
  * php-src: ext/standard/basic_functions.c — php_get_include_path / php_set_include_path
  * php-src: ext/standard/streams.c — php_stream_resolve_include_path
@@ -76,7 +77,7 @@ final class IncludePathRuntime
 
         $savedBlock = self::captureInsertBlock($context);
 
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             self::implementThinStandaloneStubs($context);
         } else {
             self::ensureStackHelperCompiled($context);
@@ -91,7 +92,7 @@ final class IncludePathRuntime
         self::restoreInsertBlock($context, $savedBlock);
     }
 
-    /** User-script / inventory emit: thin LLVM stubs without nested IncludePathJitHelper (#13678). */
+    /** Thin standalone AOT: LLVM stubs without nested IncludePathJitHelper (#13678, #20308). */
     public static function implementThinStandaloneStubs(Context $context): void
     {
         self::implementInitNoop($context);
