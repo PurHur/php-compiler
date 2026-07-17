@@ -1447,6 +1447,7 @@ final class BuiltinClasses
         $objProto = new Variable(Variable::TYPE_OBJECT);
         $nullProto = new Variable(Variable::TYPE_NULL);
         $dp = new ClassEntry('DatePeriod');
+        DatePeriodSupport::registerClassConstants($dp);
         $dp->interfaces = ['iterator'];
         $dp->properties[] = new ClassProperty('start', null, $objProto);
         $dp->properties[] = new ClassProperty('current', null, $nullProto);

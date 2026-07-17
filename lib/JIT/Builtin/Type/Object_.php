@@ -2853,6 +2853,13 @@ class Object_ extends Type {
                 'document_position_implementation_specific' => DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC,
             ]);
         }
+        if ('dateperiod' === $lcname) {
+            // php-src REGISTER_DATEPERIOD_CLASS_CONST_LONG (#20071, ext/date/php_date.c).
+            $this->seedExternalClassConstants($id, [
+                'exclude_start_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_EXCLUDE_START_DATE,
+                'include_end_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_INCLUDE_END_DATE,
+            ]);
+        }
     }
 
     private function seedExternalClassConstants(int $id, array $constants): void
@@ -3023,6 +3030,11 @@ class Object_ extends Type {
         if ('dateperiod' === $lcname) {
             $this->ensureTraversableBuiltinInterfaces();
             $this->setClassInterfaces($displayName, ['Iterator']);
+            // php-src REGISTER_DATEPERIOD_CLASS_CONST_LONG (#20071, ext/date/php_date.c).
+            $this->seedExternalClassConstants($id, [
+                'exclude_start_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_EXCLUDE_START_DATE,
+                'include_end_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_INCLUDE_END_DATE,
+            ]);
             foreach (['start', 'current', 'end', 'interval'] as $prop) {
                 $this->defineProperty($id, $prop, Variable::TYPE_OBJECT);
             }
