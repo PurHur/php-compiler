@@ -119,6 +119,7 @@ final class VmSoapServer
         $state = self::state($object);
         $state->className = $className;
         $state->object = null;
+        $state->classInstance = null;
     }
 
     public static function setObject(ObjectEntry $object, ObjectEntry $service): void
@@ -126,6 +127,7 @@ final class VmSoapServer
         $state = self::state($object);
         $state->object = $service;
         $state->className = null;
+        $state->classInstance = null;
         foreach ($service->class->methods as $lc => $_) {
             if (\str_starts_with($lc, '__')) {
                 continue;
@@ -133,6 +135,29 @@ final class VmSoapServer
             $display = $service->class->methodNames[$lc] ?? $lc;
             $state->functions[] = $display;
             $state->functionIndex[\strtolower($display)] = $display;
+        }
+    }
+
+    public static function addSoapHeader(ObjectEntry $object, ObjectEntry $header): void
+    {
+        if ('soapheader' !== \strtolower($header->class->name)) {
+            throw new \TypeError('SoapServer::addSoapHeader(): Argument #1 ($header) must be of type SoapHeader');
+        }
+        self::state($object)->responseHeaders[] = $header;
+    }
+
+    public static function setPersistence(ObjectEntry $object, int $mode): void
+    {
+        if (
+            SoapConstants::SOAP_PERSISTENCE_SESSION !== $mode
+            && SoapConstants::SOAP_PERSISTENCE_REQUEST !== $mode
+        ) {
+            throw new \SoapFault('Server', 'Invalid persistence mode');
+        }
+        $state = self::state($object);
+        $state->persistence = $mode;
+        if (SoapConstants::SOAP_PERSISTENCE_REQUEST === $mode) {
+            $state->classInstance = null;
         }
     }
 
@@ -284,10 +309,16 @@ final class VmSoapServer
             if (!isset($ctx->classes[$classLc])) {
                 throw new \SoapFault('Server', 'SoapServer::setClass(): class "'.$state->className.'" does not exist');
             }
-            $instance = new ObjectEntry($ctx->classes[$classLc]);
-            $instance->constructed = true;
-            if (null !== $ctx->classes[$classLc]->constructor) {
-                // Leave default-constructed; v1 does not pass setClass ctor args.
+            $instance = $state->classInstance;
+            if (
+                null === $instance
+                || SoapConstants::SOAP_PERSISTENCE_SESSION !== $state->persistence
+            ) {
+                $instance = new ObjectEntry($ctx->classes[$classLc]);
+                $instance->constructed = true;
+                if (SoapConstants::SOAP_PERSISTENCE_SESSION === $state->persistence) {
+                    $state->classInstance = $instance;
+                }
             }
 
             return $ctx->runtime->vm->invokeInstanceMethod($instance, $opName, ...$args);
@@ -312,6 +343,15 @@ final class VmSoapServer
         $respName = $opName.'Response';
         $inner = self::encodeReturn($result);
 
+        $headerXml = '';
+        if ($state->responseHeaders !== []) {
+            $headerXml = '  <'.$prefix.':Header>'."\n";
+            foreach ($state->responseHeaders as $hdr) {
+                $headerXml .= self::encodeSoapHeaderElement($hdr, $prefix);
+            }
+            $headerXml .= '  </'.$prefix.':Header>'."\n";
+        }
+
         return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
             '<'.$prefix.':Envelope xmlns:'.$prefix.'="'.$envelopeNs.'"'.
             ' xmlns:ns1="'.\htmlspecialchars($ns, \ENT_XML1).'"'.
@@ -319,10 +359,55 @@ final class VmSoapServer
             ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'.
             ' xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"'.
             ' SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'."\n".
+            $headerXml.
             '  <'.$prefix.':Body>'."\n".
             '    <ns1:'.$respName.'>'.$inner.'</ns1:'.$respName.'>'."\n".
             '  </'.$prefix.':Body>'."\n".
             '</'.$prefix.':Envelope>';
+    }
+
+    private static function encodeSoapHeaderElement(ObjectEntry $header, string $prefix): string
+    {
+        $ns = $header->hasProperty('namespace')
+            ? $header->getProperty('namespace')->resolveIndirect()->toString()
+            : '';
+        $name = $header->hasProperty('name')
+            ? $header->getProperty('name')->resolveIndirect()->toString()
+            : 'Header';
+        $tag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $name) ?: 'Header';
+        $must = false;
+        if ($header->hasProperty('mustUnderstand')) {
+            $mu = $header->getProperty('mustUnderstand')->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $mu->type) {
+                $must = $mu->toBool();
+            } elseif (Variable::TYPE_INTEGER === $mu->type) {
+                $must = 0 !== $mu->toInt();
+            }
+        }
+        $attrs = '';
+        if ('' !== $ns) {
+            $attrs .= ' xmlns="'.\htmlspecialchars($ns, \ENT_XML1).'"';
+        }
+        if ($must) {
+            $attrs .= ' '.$prefix.':mustUnderstand="1"';
+        }
+        $inner = '';
+        if ($header->hasProperty('data')) {
+            $dataVar = $header->getProperty('data')->resolveIndirect();
+            if (Variable::TYPE_NULL !== $dataVar->type) {
+                if (Variable::TYPE_STRING === $dataVar->type) {
+                    $inner = \htmlspecialchars($dataVar->toString(), \ENT_XML1);
+                } elseif (Variable::TYPE_INTEGER === $dataVar->type) {
+                    $inner = (string) $dataVar->toInt();
+                } elseif (Variable::TYPE_BOOLEAN === $dataVar->type) {
+                    $inner = $dataVar->toBool() ? 'true' : 'false';
+                } else {
+                    $inner = \htmlspecialchars($dataVar->toString(), \ENT_XML1);
+                }
+            }
+        }
+
+        return '    <'.$tag.$attrs.'>'.$inner.'</'.$tag.'>'."\n";
     }
 
     private static function encodeReturn(Variable $result): string
@@ -439,6 +524,14 @@ final class SoapServerState
     public ?string $className = null;
 
     public ?ObjectEntry $object = null;
+
+    /** Cached setClass instance when SOAP_PERSISTENCE_SESSION (in-process v1). */
+    public ?ObjectEntry $classInstance = null;
+
+    public int $persistence = SoapConstants::SOAP_PERSISTENCE_REQUEST;
+
+    /** @var list<ObjectEntry> */
+    public array $responseHeaders = [];
 
     public string $lastResponse = '';
 }
@@ -627,8 +720,18 @@ final class SoapServerAddSoapHeader extends SoapClassMethod
 
     public function execute(Frame $frame): void
     {
-        $this->receiver($frame, 'SoapServer::addSoapHeader()');
-        // v1: accepted / no-op storage (headers not emitted yet).
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'SoapServer::addSoapHeader() expects exactly 1 argument, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'SoapServer::addSoapHeader()');
+        $hdrVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $hdrVar->type) {
+            throw new \TypeError('SoapServer::addSoapHeader(): Argument #1 ($header) must be of type SoapHeader');
+        }
+        VmSoapServer::addSoapHeader($receiver, $hdrVar->toObject());
     }
 }
 
@@ -641,8 +744,15 @@ final class SoapServerSetPersistence extends SoapClassMethod
 
     public function execute(Frame $frame): void
     {
-        $this->receiver($frame, 'SoapServer::setPersistence()');
-        // v1: no session persistence.
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'SoapServer::setPersistence() expects exactly 1 argument, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'SoapServer::setPersistence()');
+        $mode = (int) $frame->calledArgs[1]->resolveIndirect()->toInt();
+        VmSoapServer::setPersistence($receiver, $mode);
     }
 }
 
