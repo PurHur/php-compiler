@@ -1852,6 +1852,7 @@ require_once __DIR__.'/../../../ext/standard/JitStreamContextCreate.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamContextGetDefault.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamContextGetOptions.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamContextGetParams.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamContextKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamContextOptionalArg.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamContextRepresentation.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamContextRequiredArg.php';

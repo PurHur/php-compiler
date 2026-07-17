@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5272 |
-| Phase A inventory files (M2 ratio SSOT) | 5272 |
+| PHP files on vm.php path | 5273 |
+| Phase A inventory files (M2 ratio SSOT) | 5273 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14608 |
+| Source constructs flagged (warnings) | 14609 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1788,6 +1788,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamContextGetDefault.php` | 0 | 1 |
 | `ext/standard/JitStreamContextGetOptions.php` | 0 | 1 |
 | `ext/standard/JitStreamContextGetParams.php` | 0 | 1 |
+| `ext/standard/JitStreamContextKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamContextOptionalArg.php` | 0 | 1 |
 | `ext/standard/JitStreamContextRepresentation.php` | 0 | 1 |
 | `ext/standard/JitStreamContextRequiredArg.php` | 0 | 1 |
@@ -3988,7 +3989,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamCaps.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCapsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCapsRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/StreamContextRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StreamContextRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamEnableCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamFilter.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamFstat.php` | 0 | 1 |
@@ -17174,6 +17175,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/standard/JitStreamContextKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 291)
+- 13 class method(s)
+- 7 closure(s)
 
 ### `ext/standard/JitStreamContextOptionalArg.php`
 
@@ -32139,9 +32147,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamContextRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 289)
-- 13 class method(s)
-- 7 closure(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StreamEnableCrypto.php`
 
