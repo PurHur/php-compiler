@@ -90,6 +90,58 @@ final class NodeC14N extends DomClassMethod
             ));
         }
 
-        return $var->toArray();
+        return self::variableHashToPhpArray($var->toArray());
+    }
+
+    /**
+     * Convert a VM array/hashtable Variable to a PHP array (#20257).
+     *
+     * @return array<mixed>
+     */
+    public static function phpArrayFromVariable(Variable $var): array
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $var->type) {
+            throw new \TypeError(sprintf(
+                'Expected array, %s given',
+                VmDom::typeLabel($var)
+            ));
+        }
+
+        return self::variableHashToPhpArray($var->toArray());
+    }
+
+    /**
+     * Convert a VM HashTable to a PHP array (string/int keys; nested arrays preserved).
+     *
+     * @return array<mixed>
+     */
+    private static function variableHashToPhpArray(\PHPCompiler\VM\HashTable $ht): array
+    {
+        $out = [];
+        foreach ($ht->exportKeyValuePairs(true) as [$keyVar, $valueVar]) {
+            $keyVar = $keyVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $keyVar->type || Variable::TYPE_FLOAT === $keyVar->type) {
+                $key = $keyVar->toInt();
+            } else {
+                $key = $keyVar->toString();
+            }
+            $valueVar = $valueVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $valueVar->type) {
+                $out[$key] = self::variableHashToPhpArray($valueVar->toArray());
+            } elseif (Variable::TYPE_NULL === $valueVar->type) {
+                $out[$key] = null;
+            } elseif (Variable::TYPE_BOOLEAN === $valueVar->type) {
+                $out[$key] = $valueVar->toBool();
+            } elseif (Variable::TYPE_INTEGER === $valueVar->type) {
+                $out[$key] = $valueVar->toInt();
+            } elseif (Variable::TYPE_FLOAT === $valueVar->type) {
+                $out[$key] = $valueVar->toFloat();
+            } else {
+                $out[$key] = $valueVar->toString();
+            }
+        }
+
+        return $out;
     }
 }

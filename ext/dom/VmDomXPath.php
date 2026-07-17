@@ -247,6 +247,28 @@ final class VmDomXPath
             self::registerContextNodeNamespaces($xpath, $context);
         }
 
+        // Union: a|b — document order, unique (#20257; C14N nodeset + attrs).
+        if (str_contains($expression, '|')) {
+            return self::evaluateUnionNodeSet($ctx, $xpath, $expression, $context, $registerNodeNS);
+        }
+
+        // Relative location paths: `.` / `.//…` / `./…` (XPath 1.0; #20257).
+        if ('.' === $expression) {
+            return DomRegistry::has($context) ? [$context->id] : [];
+        }
+        if (str_starts_with($expression, './/')) {
+            return self::evaluateRelativeDescendantPath(
+                $ctx,
+                $xpath,
+                substr($expression, 3),
+                $context,
+                $state->xpathNamespaces
+            );
+        }
+        if (str_starts_with($expression, './')) {
+            return self::evaluateNodeSet($ctx, $xpath, substr($expression, 2), $context, false);
+        }
+
         // Relative attribute axis: @attr on context element (needed for NS php preds; #20119).
         if (preg_match('~^@([\w.-]+)$~', $expression, $attrMatch)) {
             if (!VmDom::isElement($context)) {
@@ -322,7 +344,156 @@ final class VmDomXPath
             return self::collectChildElements($context, $matches[1], $state->xpathNamespaces);
         }
 
+        // //text() — all text nodes under context (document when context is doc; #20257).
+        if ('//text()' === $expression) {
+            return self::collectDescendantTextNodes($context, false);
+        }
+
         throw new \DOMException('Invalid expression');
+    }
+
+    /**
+     * Evaluate `a|b|…` unions; results unique in first-seen order (#20257).
+     *
+     * @return list<int>
+     */
+    private static function evaluateUnionNodeSet(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $expression,
+        ObjectEntry $context,
+        bool $registerNodeNS
+    ): array {
+        $parts = preg_split('/\|/', $expression) ?: [];
+        $seen = [];
+        $ids = [];
+        foreach ($parts as $part) {
+            $part = trim($part);
+            if ('' === $part) {
+                continue;
+            }
+            foreach (self::evaluateNodeSet($ctx, $xpath, $part, $context, $registerNodeNS) as $id) {
+                if (isset($seen[$id])) {
+                    continue;
+                }
+                $seen[$id] = true;
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
+    }
+
+    /**
+     * `.//inner` — descendant axis from context (excludes context self for element tests; #20257).
+     *
+     * @param array<string, string> $namespaces
+     *
+     * @return list<int>
+     */
+    private static function evaluateRelativeDescendantPath(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $inner,
+        ObjectEntry $context,
+        array $namespaces
+    ): array {
+        $inner = trim($inner);
+        if ('' === $inner) {
+            throw new \DOMException('Invalid expression');
+        }
+        if ('text()' === $inner) {
+            return self::collectDescendantTextNodes($context, true);
+        }
+        // .//@attr / .//tag/@attr — attribute axis under context descendants.
+        $attrIds = self::tryEvaluateAttributeAxis($ctx, $context, '//'.$inner, $namespaces);
+        if (null !== $attrIds) {
+            // //@attr via collectDescendantElements includes context when it matches; exclude
+            // attributes whose owner is the context only when inner is bare @attr? Keep as-is —
+            // .//@id should include attrs on context element (descendant-or-self for attrs).
+            return $attrIds;
+        }
+        // .//tag[@a='v'] / .//tag[n] / .//tag / .//*
+        if (preg_match(
+            '~^([*\w][\w:-]*)(?:\[(?:@([^\]=]+)=["\']([^"\']*)["\']|(\d+))\])?$~',
+            $inner,
+            $matches
+        )) {
+            $tag = $matches[1];
+            $attr = isset($matches[2]) && '' !== $matches[2] ? $matches[2] : null;
+            $attrValue = $matches[3] ?? '';
+            $position = isset($matches[4]) && '' !== $matches[4] ? (int) $matches[4] : null;
+            $nodeIds = self::collectDescendantElements($context, $tag, $namespaces);
+            // `.//y` ≡ descendant::y — exclude context even when it matches the tag.
+            $nodeIds = array_values(array_filter(
+                $nodeIds,
+                static fn (int $id): bool => $id !== $context->id
+            ));
+            if (null !== $attr) {
+                $nodeIds = array_values(array_filter(
+                    $nodeIds,
+                    static fn (int $id): bool => self::elementAttributeEquals(
+                        DomRegistry::entry($id),
+                        $attr,
+                        $attrValue,
+                        $namespaces
+                    )
+                ));
+            }
+            if (null !== $position) {
+                if ($position < 1 || $position > \count($nodeIds)) {
+                    return [];
+                }
+
+                return [$nodeIds[$position - 1]];
+            }
+
+            return $nodeIds;
+        }
+        unset($xpath);
+
+        throw new \DOMException('Invalid expression');
+    }
+
+    /**
+     * Collect text nodes under $context (optionally excluding walking into non-elements first).
+     *
+     * @return list<int>
+     */
+    private static function collectDescendantTextNodes(ObjectEntry $context, bool $descendantsOnly): array
+    {
+        $ids = [];
+        self::collectDescendantTextNodesRecursive($context, $ids, $descendantsOnly ? false : true);
+
+        return $ids;
+    }
+
+    /**
+     * @param list<int> $ids
+     */
+    private static function collectDescendantTextNodesRecursive(
+        ObjectEntry $node,
+        array &$ids,
+        bool $includeSelf
+    ): void {
+        if ($includeSelf && DomRegistry::has($node) && VmDom::isTextNode($node)) {
+            $ids[] = $node->id;
+        }
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            if (VmDom::isTextNode($child)) {
+                $ids[] = $child->id;
+            }
+            if (VmDom::isElement($child)) {
+                self::collectDescendantTextNodesRecursive($child, $ids, false);
+            }
+        }
     }
 
     /**

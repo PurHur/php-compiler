@@ -688,26 +688,26 @@ final class VmDomJitDispatch
         if (isset($extra[2])) {
             $xpathVar = $extra[2]->resolveIndirect();
             if (Variable::TYPE_NULL !== $xpathVar->type) {
-                if (Variable::TYPE_ARRAY !== $xpathVar->type && Variable::TYPE_HASHTABLE !== $xpathVar->type) {
+                if (Variable::TYPE_ARRAY !== $xpathVar->type) {
                     throw new \TypeError(
                         'DOMNode::C14N(): Argument #3 ($xpath) must be of type ?array, '
                         .VmDom::typeLabel($xpathVar).' given'
                     );
                 }
-                $xpath = $xpathVar->toArray();
+                $xpath = NodeC14N::phpArrayFromVariable($xpathVar);
             }
         }
         $nsPrefixes = null;
         if (isset($extra[3])) {
             $nsVar = $extra[3]->resolveIndirect();
             if (Variable::TYPE_NULL !== $nsVar->type) {
-                if (Variable::TYPE_ARRAY !== $nsVar->type && Variable::TYPE_HASHTABLE !== $nsVar->type) {
+                if (Variable::TYPE_ARRAY !== $nsVar->type) {
                     throw new \TypeError(
                         'DOMNode::C14N(): Argument #4 ($ns_prefixes) must be of type ?array, '
                         .VmDom::typeLabel($nsVar).' given'
                     );
                 }
-                $nsPrefixes = $nsVar->toArray();
+                $nsPrefixes = NodeC14N::phpArrayFromVariable($nsVar);
             }
         }
         $payload = VmDom::c14n($ctx, $node, $exclusive, $withComments, $xpath, $nsPrefixes);
@@ -728,7 +728,7 @@ final class VmDomJitDispatch
     {
         $extra = [];
         $args = $argsTable->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $args->type && Variable::TYPE_HASHTABLE !== $args->type) {
+        if (Variable::TYPE_ARRAY !== $args->type) {
             return $extra;
         }
         $ht = $args->toArray();

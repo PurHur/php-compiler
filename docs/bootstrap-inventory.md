@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5518 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15679 |
+| Source constructs flagged (warnings) | 15683 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -363,7 +363,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListReplace.php` | 0 | 1 |
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 379 |
+| `ext/dom/VmDom.php` | 0 | 381 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 35 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
@@ -371,7 +371,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
 | `ext/dom/VmDomTokenList.php` | 0 | 4 |
 | `ext/dom/VmDomValidationNative.php` | 0 | 2 |
-| `ext/dom/VmDomXPath.php` | 0 | 32 |
+| `ext/dom/VmDomXPath.php` | 0 | 34 |
 | `ext/dom/XPathConstruct.php` | 0 | 2 |
 | `ext/dom/XPathEvaluate.php` | 0 | 1 |
 | `ext/dom/XPathQuery.php` | 0 | 1 |
@@ -7210,7 +7210,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/NodeC14N.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 6 class method(s)
 
 ### `ext/dom/NodeC14NFile.php`
 
@@ -7799,7 +7799,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 8606)
 - new DOMException (line 8614)
 - new DOMException (line 8623)
-- 381 class method(s)
+- new Error (line 9251)
+- new Error (line 9255)
+- 385 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomInstanceInvoke.php`
@@ -7901,31 +7903,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 211)
 - new DOMException (line 233)
 - new DOMException (line 239)
-- new DOMException (line 325)
-- new DOMException (line 744)
-- new DOMException (line 848)
-- new DOMException (line 890)
-- new DOMException (line 900)
-- new Variable (line 979)
-- new DOMException (line 985)
-- new Error (line 998)
-- new Variable (line 1002)
-- new Variable (line 1012)
-- new Variable (line 1138)
-- new DOMException (line 1145)
-- new Error (line 1199)
-- new Variable (line 1234)
-- new Variable (line 1240)
-- new Variable (line 1246)
-- new Variable (line 1252)
-- new Variable (line 1261)
-- new HashTable (line 1272)
-- new Variable (line 1278)
-- new Variable (line 1282)
-- new Variable (line 1299)
-- new Variable (line 1308)
-- 46 class method(s)
-- 1 closure(s)
+- new DOMException (line 352)
+- new DOMException (line 403)
+- new DOMException (line 455)
+- new DOMException (line 915)
+- new DOMException (line 1019)
+- new DOMException (line 1061)
+- new DOMException (line 1071)
+- new Variable (line 1150)
+- new DOMException (line 1156)
+- new Error (line 1169)
+- new Variable (line 1173)
+- new Variable (line 1183)
+- new Variable (line 1309)
+- new DOMException (line 1316)
+- new Error (line 1370)
+- new Variable (line 1405)
+- new Variable (line 1411)
+- new Variable (line 1417)
+- new Variable (line 1423)
+- new Variable (line 1432)
+- new HashTable (line 1443)
+- new Variable (line 1449)
+- new Variable (line 1453)
+- new Variable (line 1470)
+- new Variable (line 1479)
+- 50 class method(s)
+- 3 closure(s)
 
 ### `ext/dom/XPathConstruct.php`
 
