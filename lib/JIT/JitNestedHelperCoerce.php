@@ -298,6 +298,26 @@ final class JitNestedHelperCoerce
         return $context->builder->bitcast($raw, $strPtr);
     }
 
+    /**
+     * NestedJIT *JitHelper methods returning int may box as {@see __value__}; ABI bridges want bare i64 (#20266).
+     *
+     * Scoped extract (like {@see extractStringPtrFromHelperResult}) — do not put readLong in
+     * {@see coerceHelperScalarResult}: bool boxes segfault on readLong (#8555) and broke vm-driver-probe.
+     */
+    public static function extractLongFromHelperResult(Context $context, Value $raw, Type $toType): Value
+    {
+        if (self::isValueBox($context, $raw)) {
+            $long = $context->builder->call(
+                $context->lookupFunction('__value__readLong'),
+                self::valueBoxPtrFromHelperResult($context, $raw)
+            );
+
+            return self::coerceHelperScalarResult($context, $long, $toType);
+        }
+
+        return self::coerceHelperScalarResult($context, $raw, $toType);
+    }
+
     public static function coerceBridgeResult(Context $context, Value $raw, Type $wantTy): Value
     {
         $haveTy = $raw->typeOf();

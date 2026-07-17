@@ -94,7 +94,7 @@ final class StringFilePutContents
         $flags = $fn->getParam(2);
         $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$path, $data, $flags]);
         $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+            JitNestedHelperCoerce::extractLongFromHelperResult($context, $raw, $i64)
         );
 
         $context->builder->positionAtEnd($failBb);
