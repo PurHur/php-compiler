@@ -64,9 +64,6 @@ final class VmNumberFormat
         }
         switch ($value->type) {
             case Variable::TYPE_NULL:
-                if (VmMath::requiresForwardProfileStrictLongNull()) {
-                    throw new \TypeError(self::numTypeError('null'));
-                }
                 if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
                     throw new \TypeError(self::numTypeError('null'));
                 }
