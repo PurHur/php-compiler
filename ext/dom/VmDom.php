@@ -5650,13 +5650,23 @@ final class VmDom
                 $frame
             );
         }
-        $closePos = strrpos(substr($trimmed, 0, $end), '</');
-        if (false === $closePos) {
-            return null;
-        }
-        $close = self::scanHtmlCloseTagAt($trimmed, $closePos);
+        $segment = substr($trimmed, 0, $end);
+        $closePos = strrpos($segment, '</');
+        $close = false === $closePos ? null : self::scanHtmlCloseTagAt($trimmed, $closePos);
         if (null === $close || strtolower($close['tag']) !== strtolower($open['tag'])) {
-            return null;
+            // Optional end tag omitted — element ends at $end (libxml htmlReadMemory; #20247).
+            $inner = substr($trimmed, $open['end'], $end - $open['end']);
+            $entry = self::createHtmlElementFromTag(
+                $ctx,
+                $open['tag'],
+                $open['attrs'],
+                $inner,
+                $ownerDocument,
+                $frame
+            );
+            self::syncSubtree($ctx, $entry);
+
+            return $entry;
         }
         $inner = substr($trimmed, $open['end'], $closePos - $open['end']);
         // libxml HTML_PARSE_NOIMPLIED: markup after the first root element nests under it
@@ -5774,6 +5784,26 @@ final class VmDom
             $close = self::scanHtmlCloseTagAt($content, $scan);
             if (null !== $close) {
                 $name = strtolower($close['tag']);
+                if (end($stack) === $name) {
+                    array_pop($stack);
+                    $scan = $close['end'];
+                    if ([] === $stack) {
+                        return $scan;
+                    }
+
+                    continue;
+                }
+                // Ancestor/other close: imply optional end tags first (libxml; #20247).
+                while ([] !== $stack && end($stack) !== $name) {
+                    if (!self::htmlElementHasOptionalEndTag((string) end($stack))) {
+                        return null;
+                    }
+                    array_pop($stack);
+                    if ([] === $stack) {
+                        // Closed the element we were scanning — leave this close tag for the parent.
+                        return $scan;
+                    }
+                }
                 if ([] === $stack || end($stack) !== $name) {
                     return null;
                 }
@@ -5788,7 +5818,15 @@ final class VmDom
             $nested = self::scanHtmlOpenTagAt($content, $scan);
             if (null !== $nested) {
                 if (!$nested['selfClose']) {
-                    $stack[] = strtolower($nested['tag']);
+                    $nestedTag = strtolower($nested['tag']);
+                    while ([] !== $stack && self::htmlStartTagClosesOpenElement($nestedTag, (string) end($stack))) {
+                        array_pop($stack);
+                        if ([] === $stack) {
+                            // Implied end before a sibling/ancestor start tag (#20247).
+                            return $scan;
+                        }
+                    }
+                    $stack[] = $nestedTag;
                 }
                 $scan = $nested['end'];
 
@@ -5797,7 +5835,110 @@ final class VmDom
             ++$scan;
         }
 
-        return null;
+        // EOF: omit optional end tags (html/body/p/…) like libxml htmlReadMemory (#20247).
+        while ([] !== $stack && self::htmlElementHasOptionalEndTag((string) end($stack))) {
+            array_pop($stack);
+        }
+
+        return [] === $stack ? $len : null;
+    }
+
+    /**
+     * HTML elements whose end tag may be omitted (WHATWG optional tags; #20247).
+     *
+     * @see https://html.spec.whatwg.org/multipage/syntax.html#optional-tags
+     */
+    private static function htmlElementHasOptionalEndTag(string $tagLc): bool
+    {
+        return 'html' === $tagLc
+            || 'head' === $tagLc
+            || 'body' === $tagLc
+            || 'p' === $tagLc
+            || 'li' === $tagLc
+            || 'dt' === $tagLc
+            || 'dd' === $tagLc
+            || 'rt' === $tagLc
+            || 'rp' === $tagLc
+            || 'optgroup' === $tagLc
+            || 'option' === $tagLc
+            || 'colgroup' === $tagLc
+            || 'caption' === $tagLc
+            || 'thead' === $tagLc
+            || 'tbody' === $tagLc
+            || 'tfoot' === $tagLc
+            || 'tr' === $tagLc
+            || 'td' === $tagLc
+            || 'th' === $tagLc;
+    }
+
+    /**
+     * Whether starting $newTag implies closing an open $openTag (optional end tags; #20247).
+     */
+    private static function htmlStartTagClosesOpenElement(string $newTag, string $openTag): bool
+    {
+        if ($openTag === $newTag) {
+            return 'p' === $openTag
+                || 'li' === $openTag
+                || 'dt' === $openTag
+                || 'dd' === $openTag
+                || 'option' === $openTag
+                || 'optgroup' === $openTag
+                || 'tr' === $openTag
+                || 'td' === $openTag
+                || 'th' === $openTag
+                || 'rt' === $openTag
+                || 'rp' === $openTag;
+        }
+        if ('p' === $openTag) {
+            return self::htmlStartTagClosesParagraph($newTag);
+        }
+        if (('td' === $openTag || 'th' === $openTag) && ('td' === $newTag || 'th' === $newTag)) {
+            return true;
+        }
+        if (('dt' === $openTag || 'dd' === $openTag) && ('dt' === $newTag || 'dd' === $newTag)) {
+            return true;
+        }
+        if (('thead' === $openTag || 'tbody' === $openTag || 'tfoot' === $openTag)
+            && ('thead' === $newTag || 'tbody' === $newTag || 'tfoot' === $newTag)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** Start tags that close an open &lt;p&gt; (HTML5 "a p element's end tag can be omitted if…"). */
+    private static function htmlStartTagClosesParagraph(string $newTag): bool
+    {
+        return 'address' === $newTag
+            || 'article' === $newTag
+            || 'aside' === $newTag
+            || 'blockquote' === $newTag
+            || 'details' === $newTag
+            || 'div' === $newTag
+            || 'dl' === $newTag
+            || 'fieldset' === $newTag
+            || 'figcaption' === $newTag
+            || 'figure' === $newTag
+            || 'footer' === $newTag
+            || 'form' === $newTag
+            || 'h1' === $newTag
+            || 'h2' === $newTag
+            || 'h3' === $newTag
+            || 'h4' === $newTag
+            || 'h5' === $newTag
+            || 'h6' === $newTag
+            || 'header' === $newTag
+            || 'hgroup' === $newTag
+            || 'hr' === $newTag
+            || 'main' === $newTag
+            || 'menu' === $newTag
+            || 'nav' === $newTag
+            || 'ol' === $newTag
+            || 'p' === $newTag
+            || 'pre' === $newTag
+            || 'section' === $newTag
+            || 'table' === $newTag
+            || 'ul' === $newTag;
     }
 
     /**
