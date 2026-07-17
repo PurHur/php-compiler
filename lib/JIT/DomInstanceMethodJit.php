@@ -38,6 +38,8 @@ final class DomInstanceMethodJit
     /** @var array<string, true> */
     private const USER_SCRIPT_GENERIC_DOM_METHODS = [
         'domxpath::registernamespace' => true,
+        'domxpath::registerphpfunctions' => true,
+        'domxpath::registerphpfunctionns' => true,
         'domnode::comparedocumentposition' => true,
     ];
 
@@ -384,6 +386,8 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::createattributens');
             self::ensureProxy($context, 'domnode::comparedocumentposition');
             self::ensureProxy($context, 'domxpath::registernamespace');
+            self::ensureProxy($context, 'domxpath::registerphpfunctions');
+            self::ensureProxy($context, 'domxpath::registerphpfunctionns');
             self::ensureProxy($context, 'domimplementation::createdocumenttype');
             self::ensureProxy($context, 'dom\\htmldocument::queryselector');
             self::ensureProxy($context, 'dom\\htmldocument::queryselectorall');
@@ -405,7 +409,7 @@ final class DomInstanceMethodJit
         'domnode' => ['appendchild'],
         'domelement' => ['setattribute', 'removeattribute'],
         'domtokenlist' => ['add', 'contains', 'item', 'toggle', 'remove'],
-        'domxpath' => ['query', 'evaluate', 'registernamespace'],
+        'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item'],
     ];
 

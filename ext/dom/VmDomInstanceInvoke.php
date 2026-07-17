@@ -89,6 +89,7 @@ final class VmDomInstanceInvoke
             'evaluate' => VmDomJitDispatch::xpathEvaluate($ctx, $self, $extra),
             'registernamespace' => VmDomJitDispatch::xpathRegisterNamespace($self, $extra),
             'registerphpfunctions' => VmDomJitDispatch::xpathRegisterPhpFunctions($self, $extra),
+            'registerphpfunctionns' => VmDomJitDispatch::xpathRegisterPhpFunctionNS($ctx, $self, $extra),
             'comparedocumentposition' => VmDomJitDispatch::compareDocumentPosition($self, $extra),
             'c14n' => VmDomJitDispatch::c14n($ctx, $self, $extra),
             'queryselector' => VmDomJitDispatch::querySelector($self, $extra),

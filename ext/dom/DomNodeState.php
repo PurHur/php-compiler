@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\VM\Variable;
+
 /**
  * Internal DOM node state keyed by VM object id (php-src ext/dom/php_dom.c; issue #6140).
  */
@@ -133,6 +135,16 @@ final class DomNodeState
      * @var array<string, true>
      */
     public array $xpathPhpFunctions = [];
+
+    /**
+     * Namespaced XPath PHP callables from registerPhpFunctionNS() (#20119).
+     *
+     * Map: namespace URI → local name → callable Variable (string / Closure / FCC).
+     * php-src: ext/dom/xpath_callbacks.c — php_dom_xpath_callbacks.namespaces
+     *
+     * @var array<string, array<string, Variable>>
+     */
+    public array $xpathPhpFunctionNs = [];
 
     /**
      * Ordered unique tokens for {@see DomConstants::XML_TOKENLIST} (#16876).
