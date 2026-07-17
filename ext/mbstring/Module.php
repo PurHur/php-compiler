@@ -73,6 +73,8 @@ class Module extends ModuleAbstract
             new mb_decode_mimeheader(),
             new mb_send_mail(),
             new mb_http_output(),
+            new mb_get_info(),
+            new mb_output_handler(),
             new mb_internal_encoding(),
             new mb_language(),
             new mb_http_input(),

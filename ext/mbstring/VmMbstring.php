@@ -181,6 +181,181 @@ final class VmMbstring
         return $var->toString();
     }
 
+    public static function coerceGetInfoTypeArg(Variable $var, string $function, int $argIndex = 0): string
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($type) must be of type string, %s given',
+                $function,
+                $argIndex + 1,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($type) must be of type string, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($var)
+            ));
+        }
+
+        return $var->toString();
+    }
+
+    public static function coerceOutputHandlerStringArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0
+    ): string {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($string) must be of type string, %s given',
+                $function,
+                $argIndex + 1,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($string) must be of type string, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($var)
+            ));
+        }
+
+        return $var->toString();
+    }
+
+    public static function coerceOutputHandlerStatusArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 1
+    ): int {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($status) must be of type int, %s given',
+                $function,
+                $argIndex + 1,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #%d ($status) must be of type int, %s given',
+                $function,
+                $argIndex + 1,
+                self::typeLabel($var)
+            ));
+        }
+
+        return $var->toInt();
+    }
+
+    /**
+     * Assign mb_get_info() result onto a VM return slot (#20014).
+     *
+     * @param array<string, mixed>|string|int|false|null $result
+     */
+    public static function assignGetInfoResult(Variable $returnVar, array|string|int|false|null $result): void
+    {
+        if (null === $result) {
+            $returnVar->null();
+
+            return;
+        }
+        if (false === $result) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        if (\is_int($result)) {
+            $returnVar->int($result);
+
+            return;
+        }
+        if (\is_string($result)) {
+            $returnVar->string($result);
+
+            return;
+        }
+        $returnVar->array(self::getInfoToHashTable($result));
+    }
+
+    /**
+     * @param array<string, mixed> $info
+     */
+    public static function getInfoToHashTable(array $info): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($info as $key => $value) {
+            $slot = new Variable();
+            if (\is_array($value)) {
+                $slot->array(MbstringState::hashTableFromStringList($value));
+            } elseif (\is_int($value)) {
+                $slot->int($value);
+            } elseif (\is_bool($value)) {
+                $slot->bool($value);
+            } else {
+                $slot->string((string) $value);
+            }
+            $ht->add((string) $key, $slot);
+        }
+
+        return $ht;
+    }
+
+    /**
+     * mb_output_handler() — convert buffer chunk to http_output encoding
+     * (php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_output_handler); #20014).
+     *
+     * VM OB callbacks currently pass PHP_OUTPUT_HANDLER_END only ({@see VmObOutput});
+     * treat END-only as a one-shot START|END when conversion is not yet enabled so
+     * `ob_start('mb_output_handler')` still converts like a web SAPI with a matching
+     * Content-Type / default mimetype.
+     */
+    public static function outputHandler(string $string, int $status): string
+    {
+        $httpOutput = MbstringState::httpOutput();
+        if (0 === strcasecmp($httpOutput, 'pass')) {
+            return $string;
+        }
+
+        $start = 0 !== ($status & \PHP_OUTPUT_HANDLER_START);
+        $end = 0 !== ($status & (\PHP_OUTPUT_HANDLER_END | \PHP_OUTPUT_HANDLER_FINAL));
+
+        if ($start) {
+            MbstringState::setOutconvEnabled(true);
+        } elseif ($end && !MbstringState::outconvEnabled()) {
+            // Single-shot flush without START (VM ob_start string callback).
+            MbstringState::setOutconvEnabled(true);
+        }
+
+        if (!MbstringState::outconvEnabled()) {
+            return $string;
+        }
+
+        $from = MbstringState::internalEncoding();
+        if (0 === strcasecmp($from, $httpOutput)) {
+            $converted = $string;
+        } else {
+            $converted = self::convertEncoding($string, $httpOutput, $from);
+            if (false === $converted) {
+                $converted = $string;
+            }
+        }
+
+        if ($end) {
+            MbstringState::setOutconvEnabled(false);
+        }
+
+        return $converted;
+    }
+
     public static function validateMode(int $mode, string $function, int $argIndex = 1): int
     {
         if ($mode < MbstringConstants::MB_CASE_UPPER || $mode > MbstringConstants::MB_CASE_TITLE) {

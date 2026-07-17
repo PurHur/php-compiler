@@ -37,6 +37,15 @@ final class MbstringState
 
     private static int $substituteCodepoint = 63;
 
+    /** php-src MBSTRG(illegalchars) — cumulative illegal-byte count for mb_get_info. */
+    private static int $illegalChars = 0;
+
+    /** php-src mbstring.http_output_conv_mimetypes default. */
+    private static string $httpOutputConvMimetypes = '^(text/|application/xhtml\\+xml)';
+
+    /** php-src MBSTRG(outconv_enabled) for mb_output_handler. */
+    private static bool $outconvEnabled = false;
+
     private static string $regexEncoding = 'UTF-8';
 
     private static string $regexOptions = 'pr';
@@ -147,6 +156,132 @@ final class MbstringState
         self::$httpOutput = $canonical;
 
         return true;
+    }
+
+    public static function illegalChars(): int
+    {
+        return self::$illegalChars;
+    }
+
+    public static function addIllegalChars(int $count): void
+    {
+        if ($count > 0) {
+            self::$illegalChars += $count;
+        }
+    }
+
+    public static function httpOutputConvMimetypes(): string
+    {
+        return self::$httpOutputConvMimetypes;
+    }
+
+    public static function outconvEnabled(): bool
+    {
+        return self::$outconvEnabled;
+    }
+
+    public static function setOutconvEnabled(bool $enabled): void
+    {
+        self::$outconvEnabled = $enabled;
+    }
+
+    /**
+     * mb_get_info() state dump (php-src ext/mbstring/mbstring.c PHP_FUNCTION(mb_get_info); #20014).
+     *
+     * @return array<string, mixed>|string|int|false|null
+     */
+    public static function getInfo(string $type = 'all'): array|string|int|false|null
+    {
+        if (0 === strcasecmp($type, 'all')) {
+            $info = [
+                'internal_encoding' => self::$internalEncoding,
+                'http_output' => self::$httpOutput,
+                'http_output_conv_mimetypes' => self::$httpOutputConvMimetypes,
+            ];
+            $mail = self::mailInfo();
+            $info['mail_charset'] = $mail['charset'];
+            $info['mail_header_encoding'] = $mail['header'];
+            $info['mail_body_encoding'] = $mail['body'];
+            $info['illegal_chars'] = self::$illegalChars;
+            $info['encoding_translation'] = 'Off';
+            $info['language'] = self::$language;
+            $info['detect_order'] = self::$detectOrder;
+            $info['substitute_character'] = self::substituteCharacter();
+            $info['strict_detection'] = 'Off';
+
+            return $info;
+        }
+        if (0 === strcasecmp($type, 'internal_encoding')) {
+            return self::$internalEncoding;
+        }
+        if (0 === strcasecmp($type, 'http_input')) {
+            return null;
+        }
+        if (0 === strcasecmp($type, 'http_output')) {
+            return self::$httpOutput;
+        }
+        if (0 === strcasecmp($type, 'http_output_conv_mimetypes')) {
+            return self::$httpOutputConvMimetypes;
+        }
+        if (0 === strcasecmp($type, 'mail_charset')) {
+            return self::mailInfo()['charset'];
+        }
+        if (0 === strcasecmp($type, 'mail_header_encoding')) {
+            return self::mailInfo()['header'];
+        }
+        if (0 === strcasecmp($type, 'mail_body_encoding')) {
+            return self::mailInfo()['body'];
+        }
+        if (0 === strcasecmp($type, 'illegal_chars')) {
+            return self::$illegalChars;
+        }
+        if (0 === strcasecmp($type, 'encoding_translation')) {
+            return 'Off';
+        }
+        if (0 === strcasecmp($type, 'language')) {
+            return self::$language;
+        }
+        if (0 === strcasecmp($type, 'detect_order')) {
+            return self::$detectOrder;
+        }
+        if (0 === strcasecmp($type, 'substitute_character')) {
+            return self::substituteCharacter();
+        }
+        if (0 === strcasecmp($type, 'strict_detection')) {
+            return 'Off';
+        }
+        if (0 === strcasecmp($type, 'func_overload')) {
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * Mail charset/transfer encodings for mb_get_info (mbfl encoding names).
+     *
+     * @return array{charset: string, header: string, body: string}
+     */
+    public static function mailInfo(): array
+    {
+        $profile = MbstringMailProfile::forLanguage(self::$language);
+
+        return [
+            'charset' => $profile['charset'],
+            'header' => self::mailEncodingDisplayName($profile['header']),
+            'body' => self::mailEncodingDisplayName($profile['body']),
+        ];
+    }
+
+    private static function mailEncodingDisplayName(string $name): string
+    {
+        return match (strtolower($name)) {
+            'base64' => 'BASE64',
+            'quoted-printable' => 'Quoted-Printable',
+            '7bit' => '7bit',
+            '8bit' => '8bit',
+            default => $name,
+        };
     }
 
     /**
