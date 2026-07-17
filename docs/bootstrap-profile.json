@@ -1025,6 +1025,7 @@
         "ext/simplexml/SimpleXmlElementGetDocNamespaces.php",
         "ext/simplexml/SimpleXmlElementGetName.php",
         "ext/simplexml/SimpleXmlElementGetNamespaces.php",
+        "ext/simplexml/SimpleXmlElementIsset.php",
         "ext/simplexml/SimpleXmlElementIterator.php",
         "ext/simplexml/SimpleXmlElementOffsetExists.php",
         "ext/simplexml/SimpleXmlElementOffsetGet.php",
@@ -1805,6 +1806,7 @@
         "ext/standard/JitSessionEncode.php",
         "ext/standard/JitSessionGc.php",
         "ext/standard/JitSessionId.php",
+        "ext/standard/JitSessionLifecycleKernel.php",
         "ext/standard/JitSessionModuleName.php",
         "ext/standard/JitSessionName.php",
         "ext/standard/JitSessionRegenerateId.php",
@@ -5538,9 +5540,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5304,
+        "inventory_files": 5306,
         "excluded": 0,
-        "eligible": 5304,
+        "eligible": 5306,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

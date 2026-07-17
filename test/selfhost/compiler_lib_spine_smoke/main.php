@@ -1828,6 +1828,7 @@ require_once __DIR__.'/../../../ext/standard/JitSessionDestroy.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionEncode.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionGc.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionId.php';
+require_once __DIR__.'/../../../ext/standard/JitSessionLifecycleKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionModuleName.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionName.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionRegenerateId.php';

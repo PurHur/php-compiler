@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5305 |
-| Phase A inventory files (M2 ratio SSOT) | 5305 |
+| PHP files on vm.php path | 5306 |
+| Phase A inventory files (M2 ratio SSOT) | 5306 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14788 |
+| Source constructs flagged (warnings) | 14789 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1761,6 +1761,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitSessionEncode.php` | 0 | 1 |
 | `ext/standard/JitSessionGc.php` | 0 | 1 |
 | `ext/standard/JitSessionId.php` | 0 | 1 |
+| `ext/standard/JitSessionLifecycleKernel.php` | 0 | 2 |
 | `ext/standard/JitSessionModuleName.php` | 0 | 1 |
 | `ext/standard/JitSessionName.php` | 0 | 1 |
 | `ext/standard/JitSessionRegenerateId.php` | 0 | 1 |
@@ -3982,7 +3983,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SessionEncodeRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SessionGcRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SessionId.php` | 0 | 1 |
-| `lib/JIT/Builtin/SessionLifecycleRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/SessionLifecycleRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionModuleName.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionName.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionNameRejectRuntime.php` | 0 | 3 |
@@ -17137,6 +17138,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/standard/JitSessionLifecycleKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 16 class method(s)
+- 5 closure(s)
 
 ### `ext/standard/JitSessionModuleName.php`
 
@@ -32273,8 +32280,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SessionLifecycleRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 16 class method(s)
-- 5 closure(s)
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/SessionModuleName.php`
 
