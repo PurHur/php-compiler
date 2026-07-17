@@ -22378,11 +22378,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_diff_assoc.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new HashTable (line 45)
-- new Variable (line 50)
-- new ArgumentCountError (line 64)
-- 2 class method(s)
+- new ArgumentCountError (line 28)
+- new HashTable (line 43)
+- new Variable (line 48)
+- new ArgumentCountError (line 62)
+- 3 class method(s)
 
 ### `ext/standard/array_diff_key.php`
 
@@ -22459,11 +22459,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_intersect_assoc.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- new HashTable (line 45)
-- new Variable (line 50)
-- new ArgumentCountError (line 64)
-- 2 class method(s)
+- new ArgumentCountError (line 28)
+- new HashTable (line 43)
+- new Variable (line 48)
+- new ArgumentCountError (line 62)
+- 3 class method(s)
 
 ### `ext/standard/array_intersect_key.php`
 
@@ -35701,25 +35701,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 524)
 - new Variable (line 555)
 - new Variable (line 598)
-- new Variable (line 612)
-- new Variable (line 632)
-- new self (line 650)
-- new self (line 661)
-- new self (line 670)
-- new self (line 683)
-- new self (line 690)
-- new self (line 697)
-- new self (line 710)
-- new self (line 720)
-- new Variable (line 856)
-- new Variable (line 865)
-- new Variable (line 895)
-- new Variable (line 941)
-- new Variable (line 963)
-- new Variable (line 977)
-- new Variable (line 1021)
-- new Variable (line 1039)
-- new Variable (line 1061)
+- new Variable (line 617)
+- new Variable (line 637)
+- new self (line 655)
+- new self (line 666)
+- new self (line 675)
+- new self (line 688)
+- new self (line 695)
+- new self (line 702)
+- new self (line 715)
+- new self (line 725)
+- new Variable (line 861)
+- new Variable (line 870)
+- new Variable (line 900)
+- new Variable (line 946)
+- new Variable (line 968)
+- new Variable (line 982)
+- new Variable (line 1026)
+- new Variable (line 1044)
+- new Variable (line 1066)
 - 20 class method(s)
 
 ### `lib/JIT/VariableFunctionCallHelper.php`

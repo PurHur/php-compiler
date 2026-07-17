@@ -100,15 +100,15 @@ final class VmArrayAssocSetOps
     }
 
     /**
+     * Zend TypeError for non-array operands (php-src arginfo `array $array` on arg #1;
+     * later variadic args omit ($param) in the message — same as array_diff()).
+     *
      * @param list<\PHPCompiler\VM\Variable> $calledArgs
      */
     public static function guardSetOpOperands(Frame $frame, array $calledArgs, string $fn): void
     {
-        $first = $calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $first->type) {
-            throw new \LogicException($fn.'() first argument must be an array in this compiler build');
-        }
-        $tables = [$first->toArray()];
+        $first = VmArray::requireArrayParam($calledArgs[0], $fn, 1, 'array');
+        $tables = [$first];
         if (\count($calledArgs) > 1) {
             $tables = array_merge($tables, self::collectOtherHashTables($calledArgs, $fn));
         }
@@ -124,11 +124,7 @@ final class VmArrayAssocSetOps
     {
         $others = [];
         for ($i = 1, $n = \count($calledArgs); $i < $n; ++$i) {
-            $arg = $calledArgs[$i]->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $arg->type) {
-                throw new \LogicException($fn.'() arguments must be arrays in this compiler build');
-            }
-            $others[] = $arg->toArray();
+            $others[] = VmArray::requireArrayArgNum($calledArgs[$i], $fn, $i + 1);
         }
 
         return $others;

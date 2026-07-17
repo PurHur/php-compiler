@@ -601,6 +601,11 @@ final class Variable {
                     Variable::KIND_VARIABLE,
                     $slot
                 );
+                if (null === $op->value) {
+                    // By-value null literals are lowered as TYPE_VALUE boxes; keep the
+                    // compile-time null flag so builtins can TypeError like TYPE_NULL (#19845).
+                    $var->isNullConstant = true;
+                }
                 if (isset($literal)) {
                     $var->compileTimeString = $literal;
                 }
