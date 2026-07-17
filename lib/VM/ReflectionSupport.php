@@ -777,6 +777,10 @@ final class ReflectionSupport
 
     public static function classNameFromReflection(ObjectEntry $reflection): string
     {
+        // Enum case wrappers store the case name on PROP_CLASS_NAME (#10000); class is PROP_ENUM_CLASS_NAME.
+        if (self::isReflectionEnumCaseObject($reflection)) {
+            return self::enumClassNameFromReflection($reflection);
+        }
         $propName = self::isReflectionMethodObject($reflection)
             ? self::PROP_REFLECTION_METHOD_CLASS
             : self::PROP_CLASS_NAME;
@@ -1032,7 +1036,11 @@ final class ReflectionSupport
         }
         $obj = $receiver->toObject();
         $classLc = strtolower($obj->class->name);
-        if (self::REFLECTION_CLASS_CONSTANT !== $classLc && self::REFLECTION_CONSTANT !== $classLc) {
+        // php-src: ReflectionEnumUnitCase / ReflectionEnumBackedCase extend ReflectionClassConstant (#19785).
+        if (self::REFLECTION_CLASS_CONSTANT !== $classLc
+            && self::REFLECTION_CONSTANT !== $classLc
+            && !self::isReflectionEnumCaseObject($obj)
+        ) {
             throw new \LogicException('Expected ReflectionClassConstant instance');
         }
 
@@ -1223,6 +1231,9 @@ final class ReflectionSupport
 
     public static function constantNameFromReflection(ObjectEntry $reflection): string
     {
+        if (self::isReflectionEnumCaseObject($reflection)) {
+            return self::enumCaseNameFromReflection($reflection);
+        }
         $nameVar = $reflection->getProperty(self::PROP_CONSTANT_NAME)->resolveIndirect();
         if (Variable::TYPE_STRING !== $nameVar->type) {
             throw new \LogicException('ReflectionConstant missing constant name');
@@ -2783,6 +2794,37 @@ final class ReflectionSupport
         $rc->getProperty(self::PROP_CLASS_NAME)->string($entry->name);
 
         return $rc;
+    }
+
+    /**
+     * Build a constructed ReflectionEnum for an enum class name (#19785, ext/reflection/php_reflection.c).
+     */
+    public static function newReflectionEnumObjectForName(Context $ctx, string $enumClassName): ObjectEntry
+    {
+        $entry = VmReflection::resolveClassEntry($ctx, $enumClassName);
+        if (null === $entry || !$entry->isEnum) {
+            self::throwReflectionException(self::classNotEnumMessage($enumClassName));
+        }
+        $reClass = $ctx->classes[self::REFLECTION_ENUM] ?? null;
+        if (null === $reClass) {
+            throw new \LogicException('ReflectionEnum is not registered in this compiler build');
+        }
+        $re = new ObjectEntry($reClass);
+        $re->constructed = true;
+        $re->getProperty(self::PROP_CLASS_NAME)->string($entry->name);
+
+        return $re;
+    }
+
+    /**
+     * ReflectionEnumUnitCase::__toString() — php-src reflection_class_constant_to_string (#19785).
+     */
+    public static function enumCaseReflectionToString(ObjectEntry $reflection): string
+    {
+        $enumName = self::enumClassNameFromReflection($reflection);
+        $caseName = self::enumCaseNameFromReflection($reflection);
+
+        return sprintf("Constant [ public %s %s ] { Object }\n", $enumName, $caseName);
     }
 
     /** php-src: closure_func->common.scope (definition site). */
