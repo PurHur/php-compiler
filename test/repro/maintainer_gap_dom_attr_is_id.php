@@ -1,0 +1,27 @@
+<?php
+$d = new DOMDocument();
+$e = $d->createElement('x');
+$d->appendChild($e);
+$e->setAttribute('id', 'foo');
+$e->setIdAttribute('id', true);
+$attr = $e->getAttributeNode('id');
+var_export(method_exists(DOMAttr::class, 'isId'));
+echo "\n";
+var_export($attr->isId());
+echo "\n";
+$e->setIdAttribute('id', false);
+var_export($attr->isId());
+echo "\n";
+$e->setAttributeNS('http://example.com', 'ex:aid', 'bar');
+$e->setIdAttributeNS('http://example.com', 'aid', true);
+$a2 = $e->getAttributeNodeNS('http://example.com', 'aid');
+var_export($a2->isId());
+echo "\n";
+$e->setAttribute('id2', 'baz');
+$a3 = $e->getAttributeNode('id2');
+$e->setIdAttributeNode($a3, true);
+var_export($a3->isId());
+echo "\n";
+$e->setAttribute('class', 'c');
+var_export($e->getAttributeNode('class')->isId());
+echo "\n";

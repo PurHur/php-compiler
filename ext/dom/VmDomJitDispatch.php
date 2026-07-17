@@ -303,6 +303,55 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMElement::setIdAttribute() — JIT/AOT (#20129, php-src ext/dom/node.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function setIdAttribute(ObjectEntry $element, array $extra): Variable
+    {
+        $name = self::stringArg($extra[0] ?? self::missingArg('setIdAttribute', 0), 'setIdAttribute', 0);
+        $isId = self::optionalBoolArg(
+            $extra[1] ?? self::missingArg('setIdAttribute', 1),
+            'setIdAttribute',
+            1
+        );
+        VmDom::setIdAttribute($element, $name, $isId);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * DOMElement::setIdAttributeNS() — JIT/AOT (#20129, php-src ext/dom/element.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function setIdAttributeNS(ObjectEntry $element, array $extra): Variable
+    {
+        $namespace = self::nullableStringArg(
+            $extra[0] ?? self::missingArg('setIdAttributeNS', 0),
+            'setIdAttributeNS',
+            0
+        );
+        $localName = self::stringArg(
+            $extra[1] ?? self::missingArg('setIdAttributeNS', 1),
+            'setIdAttributeNS',
+            1
+        );
+        $isId = self::optionalBoolArg(
+            $extra[2] ?? self::missingArg('setIdAttributeNS', 2),
+            'setIdAttributeNS',
+            2
+        );
+        VmDom::setIdAttributeNS($element, $namespace, $localName, $isId);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
      * DOMElement::setIdAttributeNode() — JIT/AOT (#20123, php-src ext/dom/element.c).
      *
      * @param list<Variable> $extra
@@ -327,6 +376,24 @@ final class VmDomJitDispatch
         $null->null();
 
         return $null;
+    }
+
+    /**
+     * DOMAttr::isId() — JIT/AOT (#20129, php-src ext/dom/attr.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function attrIsId(ObjectEntry $attr, array $extra): Variable
+    {
+        if (\count($extra) > 0) {
+            throw new \ArgumentCountError(
+                'DOMAttr::isId() expects exactly 0 arguments, '.\count($extra).' given'
+            );
+        }
+        $result = new Variable();
+        $result->bool(VmDom::attrIsId($attr));
+
+        return $result;
     }
 
     /**

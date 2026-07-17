@@ -15713,6 +15713,12 @@ class JIT {
             } elseif ('toggleattribute' === $methodLc && $this->context->functionIsRegistered('domelement::toggleattribute')) {
                 $className = 'DOMElement';
                 $declaringClassLc = 'domelement';
+            } elseif ('isid' === $methodLc) {
+                JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domattr::isid');
+                if ($this->context->functionIsRegistered('domattr::isid')) {
+                    $className = 'DOMAttr';
+                    $declaringClassLc = 'domattr';
+                }
             } elseif (\in_array($methodLc, ['queryselector', 'queryselectorall', 'savehtml', 'getelementbyid'], true)) {
                 JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\htmldocument::'.$methodLc);
                 if ($this->context->functionIsRegistered('dom\\htmldocument::'.$methodLc)) {
