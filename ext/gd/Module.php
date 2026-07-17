@@ -74,6 +74,10 @@ class Module extends ModuleAbstract
             $functions[] = new imagefilledrectangle();
             $functions[] = new imagestring();
             $functions[] = new imagechar();
+            if (VmGdFreeType::available()) {
+                $functions[] = new imagettftext();
+                $functions[] = new imagettfbbox();
+            }
             $functions[] = new imagefilter();
             $functions[] = new imageflip();
             $functions[] = new imagecrop();

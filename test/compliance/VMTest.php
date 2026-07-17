@@ -13,6 +13,11 @@ class VMTest extends BaseTest {
     public static function providePHPTests(): \Generator
     {
         foreach (parent::providePHPTests() as $name => $case) {
+            // FreeType FFI optional (#6532); skip when libfreetype is not on the host image.
+            if (str_contains($name, 'imagettftext')
+                && !\PHPCompiler\ext\gd\VmGdFreeType::available()) {
+                continue;
+            }
             if (!CompilerVersion::supportsStrIncrement()
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))
                 && !str_contains($name, 'str_increment_phantom')) {
