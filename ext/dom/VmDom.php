@@ -498,6 +498,11 @@ final class VmDom
         $xpath->methods['registerphpfunctions'] = new XPathRegisterPhpFunctions();
         $xpath->methodVisibility['registerphpfunctions'] = $pub;
         $xpath->methodNames['registerphpfunctions'] = 'registerPhpFunctions';
+        if (CompilerVersion::supportsDomXPathRegisterPhpFunctionNS()) {
+            $xpath->methods['registerphpfunctionns'] = new XPathRegisterPhpFunctionNS();
+            $xpath->methodVisibility['registerphpfunctionns'] = $pub;
+            $xpath->methodNames['registerphpfunctionns'] = 'registerPhpFunctionNS';
+        }
         if (CompilerVersion::supportsDomXPathQuote()) {
             $pubStatic = $pub | CfgFunc::FLAG_STATIC;
             $xpath->methods['quote'] = new XPathQuote();

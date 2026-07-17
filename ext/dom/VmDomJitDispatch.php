@@ -540,6 +540,23 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMXPath::registerPhpFunctionNS() — php-src ext/dom/xpath.c (#20119).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function xpathRegisterPhpFunctionNS(VmContext $ctx, ObjectEntry $xpath, array $extra): Variable
+    {
+        $namespaceUri = self::stringArg($extra[0] ?? self::missingArg('registerPhpFunctionNS', 0), 'registerPhpFunctionNS', 0);
+        $name = self::stringArg($extra[1] ?? self::missingArg('registerPhpFunctionNS', 1), 'registerPhpFunctionNS', 1);
+        $callable = $extra[2] ?? self::missingArg('registerPhpFunctionNS', 2);
+        VmDomXPath::registerPhpFunctionNS($ctx, $xpath, $namespaceUri, $name, $callable);
+        $result = new Variable(Variable::TYPE_NULL);
+        $result->null();
+
+        return $result;
+    }
+
+    /**
      * @param list<Variable> $extra
      */
     public static function compareDocumentPosition(ObjectEntry $node, array $extra): Variable

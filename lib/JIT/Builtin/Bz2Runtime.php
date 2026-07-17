@@ -8,13 +8,13 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /**
- * JIT/AOT link for __compiler_bzcompress/__compiler_bzdecompress via Bz2JitHelper PHP (#8868, #12827, #16853).
+ * JIT/AOT link for __compiler_bzcompress/__compiler_bzdecompress via Bz2JitHelper PHP (#8868, #12827, #16853, #20117).
  *
- * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\bz2\Bz2JitHelper}; thin LLVM bridges
- * forward the ABI. SSOT: {@see \PHPCompiler\ext\bz2\VmBz2Native}.
+ * Always {@see JitVmHelperLink} → {@see \PHPCompiler\ext\bz2\Bz2JitHelper}
+ * (no user-script NestedJIT defer early-return — thin/user-script AOT must still link bridges).
+ * SSOT: {@see \PHPCompiler\ext\bz2\VmBz2Native}.
  * php-src: ext/bz2/bz2.c
  */
 final class Bz2Runtime
@@ -53,10 +53,6 @@ final class Bz2Runtime
 
     public static function implement(Context $context): void
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            return;
-        }
-
         if (NestedJitCompileScope::isActive()) {
             return;
         }
