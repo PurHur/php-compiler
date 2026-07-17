@@ -157,7 +157,36 @@ final class JitDomGetElementById
         JITVariable $foundVar,
         Value $idStr
     ): Value {
+        // When the loadHTML element cache is live, it wins over PROP_ELEMENT_ID_MAP so
+        // setAttribute/removeAttribute id rebinds are visible (#19870).
+        $cacheActive = DomUserScriptElementCacheLlvm::isActive($context);
+        $cacheOnlyBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_only');
+        $mapBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_map_path');
+        $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_done');
+        $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $context->builder->branchIf($cacheActive, $cacheOnlyBlock, $mapBlock);
+
+        $context->builder->positionAtEnd($cacheOnlyBlock);
+        $cached = DomUserScriptElementCacheLlvm::lookupObject($context, $idStr);
         $objPtr = $context->getTypeFromString('__object__*');
+        $isNullObj = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $cached,
+            $objPtr->constNull()
+        );
+        $cacheNullBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_null');
+        $cacheObjBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_obj');
+        $context->builder->branchIf($isNullObj, $cacheNullBlock, $cacheObjBlock);
+        $context->builder->positionAtEnd($cacheNullBlock);
+        $nullBoxed = self::boxNullResult($context);
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $nullBoxed), $resultSlot);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($cacheObjBlock);
+        $objBoxed = self::boxObjectResult($context, $cached);
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $objBoxed), $resultSlot);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($mapBlock);
         $valPtr = JitValueBox::valuePtrFromVariable($context, $foundVar);
         $valueMap = $context->structFieldMap['__value__'];
         $i8 = $context->getTypeFromString('int8');
@@ -169,40 +198,31 @@ final class JitDomGetElementById
             $typeByte,
             $i8->constInt(JITVariable::TYPE_OBJECT, false)
         );
-        $mapBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_map');
-        $cacheBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache');
-        $doneBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_done');
-        $resultSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
-        $context->builder->branchIf($isObject, $mapBlock, $cacheBlock);
+        $mapHitBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_map_hit');
+        $mapMissBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_map_miss');
+        $context->builder->branchIf($isObject, $mapHitBlock, $mapMissBlock);
 
-        $context->builder->positionAtEnd($mapBlock);
+        $context->builder->positionAtEnd($mapHitBlock);
         $context->builder->store(JitValueBox::normalizeValuePtr($context, $valPtr), $resultSlot);
         $context->builder->branch($doneBlock);
 
-        $context->builder->positionAtEnd($cacheBlock);
-        $cached = DomUserScriptElementCacheLlvm::lookupObject($context, $idStr);
-        $objPtr = $context->getTypeFromString('__object__*');
-        $isNullObj = $context->builder->icmp(
+        $context->builder->positionAtEnd($mapMissBlock);
+        $cached2 = DomUserScriptElementCacheLlvm::lookupObject($context, $idStr);
+        $isNullObj2 = $context->builder->icmp(
             \PHPLLVM\Builder::INT_EQ,
-            $cached,
+            $cached2,
             $objPtr->constNull()
         );
-        $cacheNullBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_null');
-        $cacheObjBlock = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_obj');
-        $cacheBoxDone = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache_box_done');
-        $cacheBoxSlot = \PHPCompiler\JIT\BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
-        $context->builder->branchIf($isNullObj, $cacheNullBlock, $cacheObjBlock);
-        $context->builder->positionAtEnd($cacheNullBlock);
-        $nullBoxed = self::boxNullResult($context);
-        $context->builder->store(JitValueBox::normalizeValuePtr($context, $nullBoxed), $cacheBoxSlot);
-        $context->builder->branch($cacheBoxDone);
-        $context->builder->positionAtEnd($cacheObjBlock);
-        $objBoxed = self::boxObjectResult($context, $cached);
-        $context->builder->store(JitValueBox::normalizeValuePtr($context, $objBoxed), $cacheBoxSlot);
-        $context->builder->branch($cacheBoxDone);
-        $context->builder->positionAtEnd($cacheBoxDone);
-        $boxed = $context->builder->load($cacheBoxSlot);
-        $context->builder->store(JitValueBox::normalizeValuePtr($context, $boxed), $resultSlot);
+        $cacheNullBlock2 = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache2_null');
+        $cacheObjBlock2 = \PHPCompiler\JIT\BasicBlockHelper::append($context, 'dom_gei_us_cache2_obj');
+        $context->builder->branchIf($isNullObj2, $cacheNullBlock2, $cacheObjBlock2);
+        $context->builder->positionAtEnd($cacheNullBlock2);
+        $nullBoxed2 = self::boxNullResult($context);
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $nullBoxed2), $resultSlot);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($cacheObjBlock2);
+        $objBoxed2 = self::boxObjectResult($context, $cached2);
+        $context->builder->store(JitValueBox::normalizeValuePtr($context, $objBoxed2), $resultSlot);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);

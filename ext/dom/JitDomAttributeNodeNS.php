@@ -453,6 +453,7 @@ final class JitDomAttributeNodeNS
 
     /**
      * DOMElement::setAttribute() — user-script AOT live Attr cache (#19281).
+     * HTML id rebind updates getElementById map (#19870).
      */
     public static function invokeSetAttribute(Context $context, JITVariable ...$args): Value
     {
@@ -466,6 +467,14 @@ final class JitDomAttributeNodeNS
             $attr = self::materializeAttrFromLiterals($context, '', $nameLit, $valueLit);
             DomUserScriptAttributeCacheLlvm::rememberCreate('', $nameLit);
             DomUserScriptAttributeCacheLlvm::storeLiteral($context, '', $nameLit, $attr);
+            if ('id' === $nameLit) {
+                DomUserScriptElementCacheLlvm::rebindId($context, $valueLit);
+                $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+                if (null !== $parsed) {
+                    $parsed['id'] = $valueLit;
+                    JitDomLoadHTMLUserScript::rememberCompileTimeParsed($parsed);
+                }
+            }
 
             return self::boxNullResult($context);
         }
@@ -474,6 +483,32 @@ final class JitDomAttributeNodeNS
         $attr = self::materializeAttrFromRuntime($context, $context->builder->load($context->constantStringFromString('')), $name, $value);
         // Runtime name: cannot key the compile-time cache; still materialize Attr for property writes.
         return self::boxNullResult($context);
+    }
+
+    /**
+     * DOMElement::removeAttribute() — user-script AOT (#19870).
+     */
+    public static function invokeRemoveAttribute(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2) {
+            throw new \LogicException('DOMElement::removeAttribute() expects receiver and name');
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattr_cont');
+        $nameLit = self::compileTimeStringArg($args[1]);
+        if (null !== $nameLit && 'id' === $nameLit) {
+            DomUserScriptElementCacheLlvm::clearId($context);
+            $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
+            if (null !== $parsed) {
+                $parsed['id'] = '';
+                JitDomLoadHTMLUserScript::rememberCompileTimeParsed($parsed);
+            }
+        }
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(1, false));
+
+        return JitValueBox::normalizeValuePtr($context, $ptr);
     }
 
     /**

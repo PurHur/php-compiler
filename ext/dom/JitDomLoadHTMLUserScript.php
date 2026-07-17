@@ -220,7 +220,7 @@ final class JitDomLoadHTMLUserScript
     /** Keep id-map/cache writes when loadHTML() return is discarded (#17954). */
     private static function pinUserScriptLoadSideEffects(Context $context): void
     {
-        foreach (['__phpc_dom_us_ok', '__phpc_dom_us_id', '__phpc_dom_us_elem'] as $globalName) {
+        foreach (['__phpc_dom_us_ok', '__phpc_dom_us_id', '__phpc_dom_us_elem', '__phpc_dom_us_doc'] as $globalName) {
             $global = $context->module->getNamedGlobal($globalName);
             if (null === $global) {
                 continue;

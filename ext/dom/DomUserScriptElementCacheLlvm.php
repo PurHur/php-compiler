@@ -15,6 +15,7 @@ use PHPLLVM\Value;
  *
  * Bridges pure-LLVM loadHTML until PROP_ELEMENT_ID_MAP persistence matches across
  * method-call receiver temps after DomDocumentLoadHTML scope restore.
+ * setAttribute/removeAttribute id rebind updates the cache + document id map (#19870).
  */
 final class DomUserScriptElementCacheLlvm
 {
@@ -23,6 +24,8 @@ final class DomUserScriptElementCacheLlvm
     private const GLOBAL_ID = '__phpc_dom_us_id';
 
     private const GLOBAL_ELEM = '__phpc_dom_us_elem';
+
+    private const GLOBAL_DOC = '__phpc_dom_us_doc';
 
     public static function store(
         Context $context,
@@ -41,6 +44,60 @@ final class DomUserScriptElementCacheLlvm
         );
         $context->builder->store($ownedId, $context->module->getNamedGlobal(self::GLOBAL_ID));
         $context->builder->store($element, $context->module->getNamedGlobal(self::GLOBAL_ELEM));
+        $context->builder->store($document, $context->module->getNamedGlobal(self::GLOBAL_DOC));
+    }
+
+    /** Rekey cache after setAttribute('id', …) (#19870). */
+    public static function rebindId(Context $context, string $newIdLit): void
+    {
+        self::ensureGlobals($context);
+        $i1 = $context->getTypeFromString('int1');
+
+        $storedOk = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_OK));
+        $hasStore = $context->builder->icmp(Builder::INT_EQ, $storedOk, $i1->constInt(1, false));
+        $skipBlock = BasicBlockHelper::append($context, 'dom_us_rebind_skip');
+        $doBlock = BasicBlockHelper::append($context, 'dom_us_rebind_do');
+        $doneBlock = BasicBlockHelper::append($context, 'dom_us_rebind_done');
+        $context->builder->branchIf($hasStore, $doBlock, $skipBlock);
+
+        $context->builder->positionAtEnd($skipBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doBlock);
+        $newIdStr = $context->builder->load($context->constantStringFromString($newIdLit));
+        $ownedId = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $newIdStr
+        );
+        $context->builder->store($ownedId, $context->module->getNamedGlobal(self::GLOBAL_ID));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
+    /** Invalidate id after removeAttribute('id') while keeping cache authoritative (#19870). */
+    public static function clearId(Context $context): void
+    {
+        self::ensureGlobals($context);
+        $i1 = $context->getTypeFromString('int1');
+        // Keep OK=1 so PROP_ELEMENT_ID_MAP (still keyed by loadHTML id) is ignored.
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $ownedId = $context->builder->call(
+            $context->lookupFunction('__string__separate'),
+            $empty
+        );
+        $context->builder->store($i1->constInt(1, false), $context->module->getNamedGlobal(self::GLOBAL_OK));
+        $context->builder->store($ownedId, $context->module->getNamedGlobal(self::GLOBAL_ID));
+    }
+
+    /** Whether the loadHTML element-id cache is live (authoritative over PROP_ELEMENT_ID_MAP; #19870). */
+    public static function isActive(Context $context): Value
+    {
+        self::ensureGlobals($context);
+        $i1 = $context->getTypeFromString('int1');
+        $storedOk = $context->builder->load($context->module->getNamedGlobal(self::GLOBAL_OK));
+
+        return $context->builder->icmp(Builder::INT_EQ, $storedOk, $i1->constInt(1, false));
     }
 
     /** @return Value {@see __object__*} element or null */
@@ -48,7 +105,6 @@ final class DomUserScriptElementCacheLlvm
     {
         self::ensureGlobals($context);
         $objPtr = $context->getTypeFromString('__object__*');
-        $i32 = $context->getTypeFromString('int32');
         $nullObj = $objPtr->constNull();
         $i1 = $context->getTypeFromString('int1');
 
@@ -103,6 +159,10 @@ final class DomUserScriptElementCacheLlvm
         }
         if (null === $context->module->getNamedGlobal(self::GLOBAL_ELEM)) {
             $g = $context->module->addGlobal($objPtr, self::GLOBAL_ELEM);
+            $g->setInitializer($objPtr->constNull());
+        }
+        if (null === $context->module->getNamedGlobal(self::GLOBAL_DOC)) {
+            $g = $context->module->addGlobal($objPtr, self::GLOBAL_DOC);
             $g->setInitializer($objPtr->constNull());
         }
     }
