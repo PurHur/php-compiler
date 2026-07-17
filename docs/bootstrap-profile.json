@@ -1642,6 +1642,7 @@
         "ext/standard/JitGzclose.php",
         "ext/standard/JitGzeof.php",
         "ext/standard/JitGzfile.php",
+        "ext/standard/JitGzgetc.php",
         "ext/standard/JitGzgets.php",
         "ext/standard/JitGzopen.php",
         "ext/standard/JitGzpassthru.php",
@@ -2670,6 +2671,7 @@
         "ext/standard/date_get_last_errors.php",
         "ext/standard/date_interval_create_from_date_string.php",
         "ext/standard/date_interval_format.php",
+        "ext/standard/date_isodate_set.php",
         "ext/standard/date_modify.php",
         "ext/standard/date_offset_get.php",
         "ext/standard/date_parse.php",
@@ -2857,6 +2859,7 @@
         "ext/standard/gzencode.php",
         "ext/standard/gzeof.php",
         "ext/standard/gzfile.php",
+        "ext/standard/gzgetc.php",
         "ext/standard/gzgets.php",
         "ext/standard/gzinflate.php",
         "ext/standard/gzopen.php",
@@ -5591,9 +5594,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5357,
+        "inventory_files": 5360,
         "excluded": 0,
-        "eligible": 5357,
+        "eligible": 5360,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
