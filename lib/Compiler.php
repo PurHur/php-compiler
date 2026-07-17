@@ -35106,10 +35106,17 @@ class Compiler {
             // (new Outer(new Inner(..., Class::C), …)); skip via the offset walk (#19439).
         }
         $offset = $argIndex;
+        $callArg = [] !== $callArgs ? ($callArgs[$argIndex] ?? null) : null;
         while ($offset < \count($producers)) {
             $candidate = $producers[$offset];
             if ($candidate instanceof Op\Expr\New_) {
-                return $candidate;
+                // Triple-nested `new Outer(new Mid(new Inner([...])), …)` — producers list the
+                // innermost New_ first; only bind the New_ that feeds this call arg (#19770).
+                if (null === $callArg || $this->inlineNewProducerFeedsCallArg($candidate, $callArg)) {
+                    return $candidate;
+                }
+                ++$offset;
+                continue;
             }
             if (
                 $candidate instanceof Op\Expr\Array_

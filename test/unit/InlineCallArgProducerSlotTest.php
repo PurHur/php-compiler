@@ -3668,6 +3668,60 @@ PHP;
     }
 
     /**
+     * Issue #19770 — new LimitIterator(new InfiniteIterator(new ArrayIterator([...])), 0, n)
+     * must send InfiniteIterator New_ (not innermost ArrayIterator) to LimitIterator arg0.
+     */
+    public function testLimitIteratorInfiniteIteratorNestedNewArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$it = new LimitIterator(new InfiniteIterator(new ArrayIterator([7, 8])), 0, 5);
+echo implode(',', iterator_to_array($it, false));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'limititerator_infinite_nested.php');
+
+        $arrayIteratorSlot = null;
+        $infiniteIteratorSlot = null;
+        $limitSends = [];
+        $inLimit = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $classSlot = $op->arg2;
+                if (null !== $classSlot && isset($block->constants[$classSlot])) {
+                    $className = $block->constants[$classSlot]->toString();
+                    if ('ArrayIterator' === $className) {
+                        $arrayIteratorSlot = $op->arg1;
+                    }
+                    if ('InfiniteIterator' === $className) {
+                        $infiniteIteratorSlot = $op->arg1;
+                    }
+                    if ('LimitIterator' === $className) {
+                        $inLimit = true;
+                        $limitSends = [];
+                    }
+                }
+            }
+            if ($inLimit && OpCode::TYPE_ARG_SEND === $op->type) {
+                $limitSends[] = $op->arg1;
+            }
+            if ($inLimit && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertNotNull($arrayIteratorSlot, 'ArrayIterator New_ slot');
+        self::assertNotNull($infiniteIteratorSlot, 'InfiniteIterator New_ slot');
+        self::assertCount(3, $limitSends, 'LimitIterator sends='.json_encode($limitSends));
+        self::assertSame($infiniteIteratorSlot, $limitSends[0], 'arg0 must be InfiniteIterator New_ (#19770)');
+        self::assertNotSame($arrayIteratorSlot, $limitSends[0], 'arg0 must not be innermost ArrayIterator');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('7,8,7,8,7', ob_get_clean());
+    }
+
+    /**
      * Issue #19771 — new CallbackFilterIterator(new ArrayIterator([...]), fn() => …)
      * must send Closure slot for arg #1, not the inner New_ object.
      */
