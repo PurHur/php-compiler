@@ -196,11 +196,6 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'json_validate_function_exists_profile')) {
                 continue;
             }
-            if (CompilerVersion::supportsJsonValidate()
-                && (str_contains($name, 'json_validate_phantom')
-                    || str_contains($name, 'json_validate_function_exists_profile'))) {
-                continue;
-            }
             if (!CompilerVersion::supportsSortingEnum()
                 && str_contains($name, 'sort_sorting_enum')
                 && !str_contains($name, 'sorting_enum_phantom')) {

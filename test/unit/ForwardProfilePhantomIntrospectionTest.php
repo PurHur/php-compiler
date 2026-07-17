@@ -351,7 +351,6 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
         putenv('PHP_COMPILER_PROFILE');
         try {
             foreach ([
-                'json_validate',
                 'array_any',
                 'fpow',
                 'stream_supports',
@@ -366,7 +365,6 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
             foreach ([
-                'json_validate',
                 'array_any',
                 'fpow',
                 'stream_supports',
