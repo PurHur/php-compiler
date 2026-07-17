@@ -92,7 +92,8 @@ class AotTest extends BaseTest
             if (!CompilerVersion::supportsPhp84ReflectionProbeBuiltins()
                 && (str_contains($name, 'attribute_exists')
                     || str_contains($name, 'class_meth_exists')
-                    || str_contains($name, 'unitenum_exists'))
+                    || str_contains($name, 'unitenum_exists')
+                    || str_contains($name, 'is_anonymous_class'))
                 && !str_contains($name, 'reflection_probe_builtins_phantom')) {
                 continue;
             }

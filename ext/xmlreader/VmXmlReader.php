@@ -89,6 +89,12 @@ final class VmXmlReader
         $entry->methods['movetoattribute'] = new XmlReaderMoveToAttribute();
         $entry->methodVisibility['movetoattribute'] = $pub;
         $entry->methodNames['movetoattribute'] = 'moveToAttribute';
+        $entry->methods['movetoattributeno'] = new XmlReaderMoveToAttributeNo();
+        $entry->methodVisibility['movetoattributeno'] = $pub;
+        $entry->methodNames['movetoattributeno'] = 'moveToAttributeNo';
+        $entry->methods['movetoattributens'] = new XmlReaderMoveToAttributeNs();
+        $entry->methodVisibility['movetoattributens'] = $pub;
+        $entry->methodNames['movetoattributens'] = 'moveToAttributeNs';
         $entry->methods['movetofirstattribute'] = new XmlReaderMoveToFirstAttribute();
         $entry->methodVisibility['movetofirstattribute'] = $pub;
         $entry->methodNames['movetofirstattribute'] = 'moveToFirstAttribute';
@@ -447,6 +453,54 @@ final class VmXmlReader
         $state->attributeIndex = $idx;
 
         return true;
+    }
+
+    /**
+     * XMLReader::moveToAttributeNo() — php-src zim_XMLReader_moveToAttributeNo / xmlTextReaderMoveToAttributeNo (#19939).
+     */
+    public static function moveToAttributeNo(ObjectEntry $entry, int $index): bool
+    {
+        $state = XmlReaderRegistry::state($entry);
+        $current = $state->current;
+        if (null === $current || XmlReaderConstants::ELEMENT !== $current->nodeType) {
+            return false;
+        }
+        if ($index < 0) {
+            $index = 0;
+        }
+        $keys = array_keys($current->attributes);
+        if (!isset($keys[$index])) {
+            return false;
+        }
+        $state->attributeIndex = $index;
+
+        return true;
+    }
+
+    /**
+     * XMLReader::moveToAttributeNs() — php-src zim_XMLReader_moveToAttributeNs / xmlTextReaderMoveToAttributeNs (#19939).
+     */
+    public static function moveToAttributeNs(ObjectEntry $entry, string $localName, string $namespaceUri): bool
+    {
+        $state = XmlReaderRegistry::state($entry);
+        $current = $state->current;
+        if (null === $current || XmlReaderConstants::ELEMENT !== $current->nodeType) {
+            return false;
+        }
+        $keys = array_keys($current->attributes);
+        foreach ($keys as $idx => $attrName) {
+            if (self::attributeLocalName($attrName) !== $localName) {
+                continue;
+            }
+            if (self::attributeNamespaceUri($attrName, $current->nsScope) !== $namespaceUri) {
+                continue;
+            }
+            $state->attributeIndex = $idx;
+
+            return true;
+        }
+
+        return false;
     }
 
     /**

@@ -3492,6 +3492,8 @@ require_once __DIR__.'/../../../ext/xmlreader/XmlReaderGetAttributeNs.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderIsValid.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderLookupNamespace.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderMoveToAttribute.php';
+require_once __DIR__.'/../../../ext/xmlreader/XmlReaderMoveToAttributeNo.php';
+require_once __DIR__.'/../../../ext/xmlreader/XmlReaderMoveToAttributeNs.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderMoveToElement.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderMoveToFirstAttribute.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderMoveToNextAttribute.php';

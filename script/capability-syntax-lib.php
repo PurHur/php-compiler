@@ -1289,6 +1289,13 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/standard/attribute_exists_.php',
         ],
         [
+            'names' => ['isAnonymousClass'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsPhp84ReflectionProbeBuiltins'],
+            'since' => '8.4.0',
+            'module' => 'reflection',
+            'relPath' => 'ext/reflection/is_anonymous_class.php',
+        ],
+        [
             'names' => ['readonly'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsReadonlyBuiltin'],
             'since' => '8.4.0',
