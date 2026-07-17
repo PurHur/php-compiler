@@ -68,8 +68,6 @@ final class JitFdiv
                 } elseif ('float' === $expectedType) {
                     JitInternalStrictArg::requireFloat($context, $arg, $function, $paramName, $argIndex);
                 }
-            } elseif ('number' === $expectedType && VmMath::requiresForwardProfileStrictNumberNull()) {
-                self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
             } elseif ('number' === $expectedType) {
                 self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'int|float');
             } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull()) {
@@ -196,8 +194,6 @@ final class JitFdiv
         if ($context->callerStrictTypes && 'number' === $expectedType) {
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
         } elseif ($context->callerStrictTypes && 'float' === $expectedType) {
-            self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
-        } elseif ('number' === $expectedType && VmMath::requiresForwardProfileStrictNumberNull()) {
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
         } elseif (!$context->callerStrictTypes && 'number' === $expectedType) {
             self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'int|float');
