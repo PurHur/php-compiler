@@ -13,18 +13,14 @@ use PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for multipart POST populate in user-script CGI refresh (#15624, #19454).
  *
- * User-script thin AOT uses {@see MultipartNativeJitHelper} (no nested MultipartParser JIT).
- * Deferred RPB multipart LLVM lives in {@see JitMultipartKernel} (ext/standard) —
- * general rfc1867 boundaries via strncmp-walk (#19628), not Nested MultipartNativeJitHelper.
+ * User-script CGI refresh uses {@see JitMultipartKernel} LLVM parse (#19628, #19979).
+ * {@see MultipartNativeJitHelper} remains for request_parse_body fixture tests (#5965).
  * php-src: main/rfc1867.c
  */
 final class MultipartRuntime
@@ -175,13 +171,6 @@ final class MultipartRuntime
         ParseStrRuntime::ensureUserScriptLinked($context);
         self::ensureFilesystemPrerequisites($context);
         self::ensureNativeHtInternalProxies($context);
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            [self::POPULATE_POST_BODY_NATIVE],
-            '#15624'
-        );
-        $context->registerFunction('strlen', $libcStrlen);
         JitMultipartKernel::ensureLinked($context);
         $context->registerFunction('strlen', $libcStrlen);
         self::implementLegacyIfNeeded($context);
@@ -259,34 +248,6 @@ final class MultipartRuntime
             $bodyCstr
         );
         $context->builder->returnVoid();
-    }
-
-    private static function cstrDirectToPhpcString(Context $context, Value $cstr): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->zExt(
-                $context->builder->call($context->lookupFunction('strlen'), $cstr),
-                $i64
-            ),
-            $cstr
-        );
-    }
-
-    private static function cstrToPhpcString(Context $context, Value $cstr): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->zExt(
-                $context->builder->call($context->lookupFunction('strlen'), $cstr),
-                $i64
-            ),
-            $cstr
-        );
     }
 
     private static function clearFunctionBody(LlvmFunction $fn): void
