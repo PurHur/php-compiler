@@ -23,6 +23,17 @@ final class SoapConstants
     public const SOAP_SINGLE_ELEMENT_ARRAYS = 1;
     public const SOAP_USE_XSI_ARRAY_TYPE = 2;
 
+    // php-src ext/soap/php_soap.h (#20220)
+    public const SOAP_COMPRESSION_ACCEPT = 0x20;
+    public const SOAP_COMPRESSION_GZIP = 0x00;
+    public const SOAP_COMPRESSION_DEFLATE = 0x10;
+    public const SOAP_AUTHENTICATION_BASIC = 0;
+    public const SOAP_AUTHENTICATION_DIGEST = 1;
+    public const WSDL_CACHE_NONE = 0x0;
+    public const WSDL_CACHE_DISK = 0x1;
+    public const WSDL_CACHE_MEMORY = 0x2;
+    public const WSDL_CACHE_BOTH = 0x3;
+
     // php-src ext/soap/php_encoding.h — core XSD / SOAP_ENC type ids for SoapVar.
     public const XSD_STRING = 101;
     public const XSD_BOOLEAN = 102;
@@ -66,6 +77,15 @@ final class SoapConstants
             'SOAP_WAIT_ONE_WAY_CALLS' => self::SOAP_WAIT_ONE_WAY_CALLS,
             'SOAP_SINGLE_ELEMENT_ARRAYS' => self::SOAP_SINGLE_ELEMENT_ARRAYS,
             'SOAP_USE_XSI_ARRAY_TYPE' => self::SOAP_USE_XSI_ARRAY_TYPE,
+            'SOAP_COMPRESSION_ACCEPT' => self::SOAP_COMPRESSION_ACCEPT,
+            'SOAP_COMPRESSION_GZIP' => self::SOAP_COMPRESSION_GZIP,
+            'SOAP_COMPRESSION_DEFLATE' => self::SOAP_COMPRESSION_DEFLATE,
+            'SOAP_AUTHENTICATION_BASIC' => self::SOAP_AUTHENTICATION_BASIC,
+            'SOAP_AUTHENTICATION_DIGEST' => self::SOAP_AUTHENTICATION_DIGEST,
+            'WSDL_CACHE_NONE' => self::WSDL_CACHE_NONE,
+            'WSDL_CACHE_DISK' => self::WSDL_CACHE_DISK,
+            'WSDL_CACHE_MEMORY' => self::WSDL_CACHE_MEMORY,
+            'WSDL_CACHE_BOTH' => self::WSDL_CACHE_BOTH,
             'XSD_STRING' => self::XSD_STRING,
             'XSD_BOOLEAN' => self::XSD_BOOLEAN,
             'XSD_DECIMAL' => self::XSD_DECIMAL,
