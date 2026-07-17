@@ -91,6 +91,6 @@ final class SplTempFileObjectConstruct extends VmClassMethod
             throw new \RuntimeException('SplTempFileObject::__construct(): Failed to open temp stream');
         }
         SplFileInfoStorage::init($object, 'php://temp');
-        SplFileObjectStorage::setHandle($object, $handle);
+        SplFileObjectStorage::setHandle($object, $handle, 'w+b');
     }
 }

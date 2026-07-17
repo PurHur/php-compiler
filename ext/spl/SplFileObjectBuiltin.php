@@ -202,7 +202,7 @@ final class SplFileObjectConstruct extends VmClassMethod
             );
         }
         SplFileInfoStorage::init($object, $pathname);
-        SplFileObjectStorage::setHandle($object, $handle);
+        SplFileObjectStorage::setHandle($object, $handle, $mode);
     }
 
     /** php-src streams.c — prefer host fopen reason (invalid mode vs missing path). */
