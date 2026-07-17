@@ -44,6 +44,78 @@ final class VmDomValidationNative
     }
 
     /**
+     * Parse an XSD file without validating a document (XMLReader::setSchema attach; #19553).
+     */
+    public static function parseSchemaFile(string $schemaPath): bool
+    {
+        self::$lastErrors = [];
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $prev = libxml_use_internal_errors(true);
+        libxml_clear_errors();
+        try {
+            $parser = $ffi->xmlSchemaNewParserCtxt($schemaPath);
+            if (null === $parser) {
+                self::captureLibxmlErrors();
+
+                return false;
+            }
+            $schema = $ffi->xmlSchemaParse($parser);
+            $ffi->xmlSchemaFreeParserCtxt($parser);
+            if (null === $schema) {
+                self::captureLibxmlErrors();
+
+                return false;
+            }
+            $ffi->xmlSchemaFree($schema);
+
+            return true;
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($prev);
+        }
+    }
+
+    /**
+     * Parse a RelaxNG file without validating a document (XMLReader::setRelaxNGSchema; #19553).
+     */
+    public static function parseRelaxNGFile(string $rngPath): bool
+    {
+        self::$lastErrors = [];
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $prev = libxml_use_internal_errors(true);
+        libxml_clear_errors();
+        try {
+            $parser = $ffi->xmlRelaxNGNewParserCtxt($rngPath);
+            if (null === $parser) {
+                self::captureLibxmlErrors();
+
+                return false;
+            }
+            $grammar = $ffi->xmlRelaxNGParse($parser);
+            $ffi->xmlRelaxNGFreeParserCtxt($parser);
+            if (null === $grammar) {
+                self::captureLibxmlErrors();
+
+                return false;
+            }
+            $ffi->xmlRelaxNGFree($grammar);
+
+            return true;
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($prev);
+        }
+    }
+
+    /**
      * In-memory XSD validation (php-src dom_document_schema_validate_source / xmlSchemaNewMemParserCtxt; #19419).
      */
     public static function validateSchemaDocumentSource(string $docXml, string $schemaSource): bool
