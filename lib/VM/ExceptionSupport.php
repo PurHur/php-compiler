@@ -577,6 +577,36 @@ final class ExceptionSupport
                     $file,
                     $line ?? 0
                 );
+            } elseif ('soapfault' === $lc && \class_exists('SoapFault', false)) {
+                // Preserve SoapFault actor/detail/_name across VM→native rematerialize (#20219).
+                $code = self::readOptionalStringProperty($entry, 'faultcode') ?? '';
+                $string = self::readOptionalStringProperty($entry, 'faultstring') ?? $message;
+                $actor = self::readOptionalStringProperty($entry, 'faultactor');
+                $detailVar = $entry->hasProperty('detail')
+                    ? $entry->getProperty('detail')->resolveIndirect()
+                    : null;
+                $detail = null;
+                if (null !== $detailVar && Variable::TYPE_NULL !== $detailVar->type) {
+                    if (Variable::TYPE_STRING === $detailVar->type) {
+                        $detail = $detailVar->toString();
+                    } elseif (Variable::TYPE_INTEGER === $detailVar->type) {
+                        $detail = $detailVar->toInt();
+                    } elseif (Variable::TYPE_BOOLEAN === $detailVar->type) {
+                        $detail = $detailVar->toBool();
+                    } elseif (Variable::TYPE_FLOAT === $detailVar->type) {
+                        $detail = $detailVar->toFloat();
+                    } else {
+                        $detail = $detailVar->toString();
+                    }
+                }
+                $name = self::readOptionalStringProperty($entry, '_name');
+                $native = new \SoapFault(
+                    '' !== $code ? $code : null,
+                    $string,
+                    $actor,
+                    $detail,
+                    $name
+                );
             } else {
                 $native = new $nativeClass($message);
             }

@@ -182,14 +182,17 @@ final class BuiltinExceptionSupport
         return $var;
     }
 
-    /** Bridge native SoapFault from ext/soap builtins (#20124). */
+    /** Bridge native SoapFault from ext/soap builtins (#20124, #20219). */
     public static function materializeSoapFault(
         Context $ctx,
         string $message,
         string $file = '',
         int $line = 0,
         string $faultcode = '',
-        string $faultstring = ''
+        string $faultstring = '',
+        string $faultactor = '',
+        mixed $detail = null,
+        string $name = ''
     ): Variable {
         if (!isset($ctx->classes[self::CLASS_SOAP_FAULT])) {
             return self::materializeException($ctx, $message, $file, $line);
@@ -201,6 +204,25 @@ final class BuiltinExceptionSupport
         }
         $fs = '' !== $faultstring ? $faultstring : $message;
         $obj->getProperty('faultstring')->string($fs);
+        if ('' !== $faultactor) {
+            $obj->getProperty('faultactor')->string($faultactor);
+        }
+        if (null !== $detail) {
+            if (\is_string($detail)) {
+                $obj->getProperty('detail')->string($detail);
+            } elseif (\is_int($detail)) {
+                $obj->getProperty('detail')->int($detail);
+            } elseif (\is_bool($detail)) {
+                $obj->getProperty('detail')->bool($detail);
+            } elseif (\is_float($detail)) {
+                $obj->getProperty('detail')->float($detail);
+            } else {
+                $obj->getProperty('detail')->string((string) $detail);
+            }
+        }
+        if ('' !== $name) {
+            $obj->getProperty('_name')->string($name);
+        }
 
         return $var;
     }
