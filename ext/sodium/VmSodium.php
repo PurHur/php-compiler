@@ -39,6 +39,24 @@ final class VmSodium
 
     public const CRYPTO_AEAD_XCHACHA20POLY1305_IETF_ABYTES = 16;
 
+    /** Classic ChaCha20-Poly1305 AEAD (8-byte nonce; php-src #20031). */
+    public const CRYPTO_AEAD_CHACHA20POLY1305_KEYBYTES = 32;
+
+    public const CRYPTO_AEAD_CHACHA20POLY1305_NPUBBYTES = 8;
+
+    public const CRYPTO_AEAD_CHACHA20POLY1305_NSECRETBYTES = 0;
+
+    public const CRYPTO_AEAD_CHACHA20POLY1305_ABYTES = 16;
+
+    /** IETF ChaCha20-Poly1305 AEAD (12-byte nonce; php-src #20031). */
+    public const CRYPTO_AEAD_CHACHA20POLY1305_IETF_KEYBYTES = 32;
+
+    public const CRYPTO_AEAD_CHACHA20POLY1305_IETF_NPUBBYTES = 12;
+
+    public const CRYPTO_AEAD_CHACHA20POLY1305_IETF_NSECRETBYTES = 0;
+
+    public const CRYPTO_AEAD_CHACHA20POLY1305_IETF_ABYTES = 16;
+
     public const CRYPTO_GENERICHASH_BYTES = 32;
 
     public const CRYPTO_GENERICHASH_BYTES_MIN = 16;
@@ -168,6 +186,7 @@ final class VmSodium
             || \function_exists('sodium_crypto_auth')
             || \function_exists('sodium_crypto_stream')
             || \function_exists('sodium_crypto_aead_xchacha20poly1305_ietf_encrypt')
+            || \function_exists('sodium_crypto_aead_chacha20poly1305_encrypt')
             || \function_exists('sodium_pad')
             || \function_exists('sodium_crypto_generichash')
             || \function_exists('sodium_crypto_scalarmult')
@@ -646,6 +665,96 @@ final class VmSodium
         }
 
         return self::ffiAeadXchacha20poly1305IetfDecrypt($ciphertext, $additionalData, $nonce, $key);
+    }
+
+    /**
+     * sodium_crypto_aead_chacha20poly1305_keygen() — random classic AEAD key (php-src #20031).
+     */
+    public static function aeadChacha20poly1305Keygen(): string
+    {
+        if (\function_exists('sodium_crypto_aead_chacha20poly1305_keygen')) {
+            return \sodium_crypto_aead_chacha20poly1305_keygen();
+        }
+
+        return self::randomKeyBytes(self::CRYPTO_AEAD_CHACHA20POLY1305_KEYBYTES);
+    }
+
+    public static function aeadChacha20poly1305Encrypt(
+        string $message,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string {
+        if (\function_exists('sodium_crypto_aead_chacha20poly1305_encrypt')) {
+            self::validateAeadChacha20poly1305KeyNonce($key, $nonce, 'sodium_crypto_aead_chacha20poly1305_encrypt', 3, 4);
+
+            return \sodium_crypto_aead_chacha20poly1305_encrypt($message, $additionalData, $nonce, $key);
+        }
+
+        return self::ffiAeadChacha20poly1305Encrypt($message, $additionalData, $nonce, $key);
+    }
+
+    /**
+     * @return string|false
+     */
+    public static function aeadChacha20poly1305Decrypt(
+        string $ciphertext,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string|false {
+        if (\function_exists('sodium_crypto_aead_chacha20poly1305_decrypt')) {
+            self::validateAeadChacha20poly1305KeyNonce($key, $nonce, 'sodium_crypto_aead_chacha20poly1305_decrypt', 3, 4);
+
+            return \sodium_crypto_aead_chacha20poly1305_decrypt($ciphertext, $additionalData, $nonce, $key);
+        }
+
+        return self::ffiAeadChacha20poly1305Decrypt($ciphertext, $additionalData, $nonce, $key);
+    }
+
+    /**
+     * sodium_crypto_aead_chacha20poly1305_ietf_keygen() — random IETF AEAD key (php-src #20031).
+     */
+    public static function aeadChacha20poly1305IetfKeygen(): string
+    {
+        if (\function_exists('sodium_crypto_aead_chacha20poly1305_ietf_keygen')) {
+            return \sodium_crypto_aead_chacha20poly1305_ietf_keygen();
+        }
+
+        return self::randomKeyBytes(self::CRYPTO_AEAD_CHACHA20POLY1305_IETF_KEYBYTES);
+    }
+
+    public static function aeadChacha20poly1305IetfEncrypt(
+        string $message,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string {
+        if (\function_exists('sodium_crypto_aead_chacha20poly1305_ietf_encrypt')) {
+            self::validateAeadChacha20poly1305IetfKeyNonce($key, $nonce, 'sodium_crypto_aead_chacha20poly1305_ietf_encrypt', 3, 4);
+
+            return \sodium_crypto_aead_chacha20poly1305_ietf_encrypt($message, $additionalData, $nonce, $key);
+        }
+
+        return self::ffiAeadChacha20poly1305IetfEncrypt($message, $additionalData, $nonce, $key);
+    }
+
+    /**
+     * @return string|false
+     */
+    public static function aeadChacha20poly1305IetfDecrypt(
+        string $ciphertext,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string|false {
+        if (\function_exists('sodium_crypto_aead_chacha20poly1305_ietf_decrypt')) {
+            self::validateAeadChacha20poly1305IetfKeyNonce($key, $nonce, 'sodium_crypto_aead_chacha20poly1305_ietf_decrypt', 3, 4);
+
+            return \sodium_crypto_aead_chacha20poly1305_ietf_decrypt($ciphertext, $additionalData, $nonce, $key);
+        }
+
+        return self::ffiAeadChacha20poly1305IetfDecrypt($ciphertext, $additionalData, $nonce, $key);
     }
 
     public static function aeadAes256gcmEncrypt(
@@ -2059,6 +2168,162 @@ final class VmSodium
         return self::unsignedCharArrayToString($mBuf, $mlen);
     }
 
+    private static function ffiAeadChacha20poly1305Encrypt(
+        string $message,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string {
+        $ffi = self::requireFfi();
+        self::validateAeadChacha20poly1305KeyNonce($key, $nonce, 'sodium_crypto_aead_chacha20poly1305_encrypt', 3, 4);
+        $mlen = \strlen($message);
+        $adlen = \strlen($additionalData);
+        $clen = $mlen + self::CRYPTO_AEAD_CHACHA20POLY1305_ABYTES;
+        $cBuf = $ffi->new('unsigned char['.$clen.']');
+        $clenOut = $ffi->new('unsigned long long');
+        $mBuf = self::stringToUnsignedCharArray($ffi, $message);
+        $adBuf = self::stringToUnsignedCharArray($ffi, $additionalData);
+        $nsecBuf = $ffi->new('unsigned char[0]');
+        $npubBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_aead_chacha20poly1305_encrypt(
+            $cBuf,
+            $clenOut,
+            $mBuf,
+            $mlen,
+            $adBuf,
+            $adlen,
+            $nsecBuf,
+            $npubBuf,
+            $kBuf
+        );
+        if (0 !== $rc) {
+            throw new \Exception('sodium_crypto_aead_chacha20poly1305_encrypt(): internal error');
+        }
+
+        return self::unsignedCharArrayToString($cBuf, $clen);
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function ffiAeadChacha20poly1305Decrypt(
+        string $ciphertext,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string|false {
+        $ffi = self::requireFfi();
+        self::validateAeadChacha20poly1305KeyNonce($key, $nonce, 'sodium_crypto_aead_chacha20poly1305_decrypt', 3, 4);
+        $clen = \strlen($ciphertext);
+        if ($clen < self::CRYPTO_AEAD_CHACHA20POLY1305_ABYTES) {
+            return false;
+        }
+        $mlen = $clen - self::CRYPTO_AEAD_CHACHA20POLY1305_ABYTES;
+        $mBuf = $ffi->new('unsigned char['.$mlen.']');
+        $mlenOut = $ffi->new('unsigned long long');
+        $nsecBuf = $ffi->new('unsigned char[0]');
+        $cBuf = self::stringToUnsignedCharArray($ffi, $ciphertext);
+        $adBuf = self::stringToUnsignedCharArray($ffi, $additionalData);
+        $adlen = \strlen($additionalData);
+        $npubBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_aead_chacha20poly1305_decrypt(
+            $mBuf,
+            $mlenOut,
+            $nsecBuf,
+            $cBuf,
+            $clen,
+            $adBuf,
+            $adlen,
+            $npubBuf,
+            $kBuf
+        );
+        if (0 !== $rc) {
+            return false;
+        }
+
+        return self::unsignedCharArrayToString($mBuf, $mlen);
+    }
+
+    private static function ffiAeadChacha20poly1305IetfEncrypt(
+        string $message,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string {
+        $ffi = self::requireFfi();
+        self::validateAeadChacha20poly1305IetfKeyNonce($key, $nonce, 'sodium_crypto_aead_chacha20poly1305_ietf_encrypt', 3, 4);
+        $mlen = \strlen($message);
+        $adlen = \strlen($additionalData);
+        $clen = $mlen + self::CRYPTO_AEAD_CHACHA20POLY1305_IETF_ABYTES;
+        $cBuf = $ffi->new('unsigned char['.$clen.']');
+        $clenOut = $ffi->new('unsigned long long');
+        $mBuf = self::stringToUnsignedCharArray($ffi, $message);
+        $adBuf = self::stringToUnsignedCharArray($ffi, $additionalData);
+        $nsecBuf = $ffi->new('unsigned char[0]');
+        $npubBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_aead_chacha20poly1305_ietf_encrypt(
+            $cBuf,
+            $clenOut,
+            $mBuf,
+            $mlen,
+            $adBuf,
+            $adlen,
+            $nsecBuf,
+            $npubBuf,
+            $kBuf
+        );
+        if (0 !== $rc) {
+            throw new \Exception('sodium_crypto_aead_chacha20poly1305_ietf_encrypt(): internal error');
+        }
+
+        return self::unsignedCharArrayToString($cBuf, $clen);
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function ffiAeadChacha20poly1305IetfDecrypt(
+        string $ciphertext,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string|false {
+        $ffi = self::requireFfi();
+        self::validateAeadChacha20poly1305IetfKeyNonce($key, $nonce, 'sodium_crypto_aead_chacha20poly1305_ietf_decrypt', 3, 4);
+        $clen = \strlen($ciphertext);
+        if ($clen < self::CRYPTO_AEAD_CHACHA20POLY1305_IETF_ABYTES) {
+            return false;
+        }
+        $mlen = $clen - self::CRYPTO_AEAD_CHACHA20POLY1305_IETF_ABYTES;
+        $mBuf = $ffi->new('unsigned char['.$mlen.']');
+        $mlenOut = $ffi->new('unsigned long long');
+        $nsecBuf = $ffi->new('unsigned char[0]');
+        $cBuf = self::stringToUnsignedCharArray($ffi, $ciphertext);
+        $adBuf = self::stringToUnsignedCharArray($ffi, $additionalData);
+        $adlen = \strlen($additionalData);
+        $npubBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_aead_chacha20poly1305_ietf_decrypt(
+            $mBuf,
+            $mlenOut,
+            $nsecBuf,
+            $cBuf,
+            $clen,
+            $adBuf,
+            $adlen,
+            $npubBuf,
+            $kBuf
+        );
+        if (0 !== $rc) {
+            return false;
+        }
+
+        return self::unsignedCharArrayToString($mBuf, $mlen);
+    }
+
     private static function ffiAeadAes256gcmEncrypt(
         string $message,
         string $additionalData,
@@ -2437,6 +2702,52 @@ final class VmSodium
         }
     }
 
+    private static function validateAeadChacha20poly1305KeyNonce(
+        string $key,
+        string $nonce,
+        string $fn,
+        int $nonceArg,
+        int $keyArg
+    ): void {
+        if (\strlen($nonce) !== self::CRYPTO_AEAD_CHACHA20POLY1305_NPUBBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($nonce) must be SODIUM_CRYPTO_AEAD_CHACHA20POLY1305_NPUBBYTES bytes long',
+                $fn,
+                $nonceArg
+            ));
+        }
+        if (\strlen($key) !== self::CRYPTO_AEAD_CHACHA20POLY1305_KEYBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($key) must be SODIUM_CRYPTO_AEAD_CHACHA20POLY1305_KEYBYTES bytes long',
+                $fn,
+                $keyArg
+            ));
+        }
+    }
+
+    private static function validateAeadChacha20poly1305IetfKeyNonce(
+        string $key,
+        string $nonce,
+        string $fn,
+        int $nonceArg,
+        int $keyArg
+    ): void {
+        if (\strlen($nonce) !== self::CRYPTO_AEAD_CHACHA20POLY1305_IETF_NPUBBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($nonce) must be SODIUM_CRYPTO_AEAD_CHACHA20POLY1305_IETF_NPUBBYTES bytes long',
+                $fn,
+                $nonceArg
+            ));
+        }
+        if (\strlen($key) !== self::CRYPTO_AEAD_CHACHA20POLY1305_IETF_KEYBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($key) must be SODIUM_CRYPTO_AEAD_CHACHA20POLY1305_IETF_KEYBYTES bytes long',
+                $fn,
+                $keyArg
+            ));
+        }
+    }
+
     private static function validateAeadAes256gcmKeyNonce(
         string $key,
         string $nonce,
@@ -2701,6 +3012,10 @@ final class VmSodium
                     int crypto_stream_xchacha20_xor_ic(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n, const unsigned char k[32], unsigned long long ic);
                     int crypto_aead_xchacha20poly1305_ietf_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k);
                     int crypto_aead_xchacha20poly1305_ietf_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);
+                    int crypto_aead_chacha20poly1305_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k);
+                    int crypto_aead_chacha20poly1305_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);
+                    int crypto_aead_chacha20poly1305_ietf_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k);
+                    int crypto_aead_chacha20poly1305_ietf_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);
                     int sodium_memcmp(const unsigned char *s1, const unsigned char *s2, size_t len);
                     void sodium_increment(unsigned char *n, size_t nlen);
                     void sodium_add(unsigned char *a, const unsigned char *b, size_t len);
