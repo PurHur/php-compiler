@@ -49,6 +49,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -5377,6 +5378,9 @@ require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterWriteAttributeNS.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterWriteElementNS.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterWritePI.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterWriteRaw.php';
+require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterToMemory.php';
+require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterToStream.php';
+require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterToUri.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
