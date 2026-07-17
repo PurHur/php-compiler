@@ -27,6 +27,8 @@ final class GzStreamRuntime
 
     private const GZREAD = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzreadArgv';
 
+    private const GZGETC = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzgetcArgv';
+
     private const GZGETS = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzgetsArgv';
 
     private const GZCLOSE = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzcloseArgv';
@@ -48,6 +50,7 @@ final class GzStreamRuntime
         self::GZOPEN,
         self::GZWRITE,
         self::GZREAD,
+        self::GZGETC,
         self::GZGETS,
         self::GZCLOSE,
         self::GZSEEK,
@@ -63,6 +66,7 @@ final class GzStreamRuntime
         '__compiler_gzopen',
         '__compiler_gzwrite',
         '__compiler_gzread',
+        '__compiler_gzgetc',
         '__compiler_gzgets',
         '__compiler_gzclose',
         '__compiler_gzseek',
@@ -106,6 +110,7 @@ final class GzStreamRuntime
         self::implementIfMissing($context, '__compiler_gzopen', static fn (Context $ctx, LlvmFunction $fn) => self::emitGzopenBridge($ctx, $fn));
         self::implementIfMissing($context, '__compiler_gzwrite', static fn (Context $ctx, LlvmFunction $fn) => self::emitGzwriteBridge($ctx, $fn));
         self::implementIfMissing($context, '__compiler_gzread', static fn (Context $ctx, LlvmFunction $fn) => self::emitNullableStringBridge($ctx, $fn, self::GZREAD, 2));
+        self::implementIfMissing($context, '__compiler_gzgetc', static fn (Context $ctx, LlvmFunction $fn) => self::emitNullableStringBridge($ctx, $fn, self::GZGETC, 1));
         self::implementIfMissing($context, '__compiler_gzgets', static fn (Context $ctx, LlvmFunction $fn) => self::emitNullableStringBridge($ctx, $fn, self::GZGETS, 2));
         self::implementIfMissing($context, '__compiler_gzclose', static fn (Context $ctx, LlvmFunction $fn) => self::emitI32Bridge($ctx, $fn, self::GZCLOSE, 1));
         self::implementIfMissing($context, '__compiler_gzseek', static fn (Context $ctx, LlvmFunction $fn) => self::emitI64Bridge($ctx, $fn, self::GZSEEK, 3));
@@ -142,7 +147,7 @@ final class GzStreamRuntime
             '__compiler_gzopen' => $context->context->functionType($i64, false, $strPtr, $strPtr, $i64),
             '__compiler_gzwrite' => $context->context->functionType($i64, false, $i64, $strPtr, $i64),
             '__compiler_gzread', '__compiler_gzgets' => $context->context->functionType($strPtr, false, $i64, $i64),
-            '__compiler_gz_read_all' => $context->context->functionType($strPtr, false, $i64),
+            '__compiler_gzgetc', '__compiler_gz_read_all' => $context->context->functionType($strPtr, false, $i64),
             '__compiler_gzclose' => $context->context->functionType($i32, false, $i64),
             '__compiler_gzseek' => $context->context->functionType($i64, false, $i64, $i64, $i64),
             '__compiler_gztell' => $context->context->functionType($i64, false, $i64),

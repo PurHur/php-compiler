@@ -47,6 +47,16 @@ final class GzStreamJitHelper
         return (string) $result;
     }
 
+    public static function gzgetcArgv(int $handle): ?string
+    {
+        $result = VmGzStream::gzgetc($handle);
+        if (false === $result) {
+            return null;
+        }
+
+        return (string) $result;
+    }
+
     public static function gzgetsArgv(int $handle, int $length): ?string
     {
         $result = VmGzStream::gzgets($handle, $length);

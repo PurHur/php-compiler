@@ -51,6 +51,19 @@ final class VmGzStream
     }
 
     /**
+     * gzgetc() — one decompressed character (php-src ext/zlib; often gzread($zp, 1) with empty→false; #20017).
+     */
+    public static function gzgetc(int $handle): string|false
+    {
+        $ch = self::gzread($handle, 1);
+        if (false === $ch || '' === $ch) {
+            return false;
+        }
+
+        return $ch;
+    }
+
+    /**
      * gzgets() — read a line from gzip stream (php-src ext/zlib/zlib.c PHP_FUNCTION(gzgets); #6290).
      */
     public static function gzgets(int $handle, int $length = 8192): string|false
