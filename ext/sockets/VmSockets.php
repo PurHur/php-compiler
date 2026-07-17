@@ -661,6 +661,93 @@ final class VmSockets
     }
 
     /**
+     * php-src: PHP_FUNCTION(socket_send) — connected send(2) with flags (#20238).
+     *
+     * @return int|false bytes written
+     */
+    public static function send(
+        ObjectEntry $object,
+        string $buf,
+        int $length,
+        int $flags,
+        Frame $frame
+    ): int|false {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+        if ($length < 0) {
+            throw new \ValueError('socket_send(): Argument #3 ($length) must be greater than or equal to 0');
+        }
+        if ($length > \strlen($buf)) {
+            $length = \strlen($buf);
+        }
+        $n = SocketsLibcThinAbi::send($fd, $buf, $length, $flags);
+        if ($n < 0) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError($object, $errno);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_send(): Unable to write to socket [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
+
+            return false;
+        }
+        self::$socketErrors[$object->id] = 0;
+
+        return $n;
+    }
+
+    /**
+     * php-src: PHP_FUNCTION(socket_recv) — connected recv(2) with flags (#20238).
+     *
+     * Returns false on error (caller assigns null to &$data and returns false).
+     * Returns array{0: ?string, 1: int} on success — null data means EOF (0 bytes).
+     *
+     * @return array{0: ?string, 1: int}|false
+     */
+    public static function recv(
+        ObjectEntry $object,
+        int $length,
+        int $flags,
+        Frame $frame
+    ): array|false {
+        $fd = VmSocket::fdForObject($object);
+        if (null === $fd) {
+            return false;
+        }
+        // php-src: if ((len + 1) < 2) RETURN_FALSE; — length < 1
+        if ($length < 1) {
+            return false;
+        }
+        $data = SocketsLibcThinAbi::recv($fd, $length, $flags);
+        if (false === $data) {
+            $errno = SocketsLibcThinAbi::readErrno();
+            self::recordError($object, $errno);
+            self::triggerWarning(
+                $frame,
+                \sprintf(
+                    'socket_recv(): Unable to read from socket [%d]: %s',
+                    $errno,
+                    SocketsLibcThinAbi::strerror($errno)
+                )
+            );
+
+            return false;
+        }
+        self::$socketErrors[$object->id] = 0;
+        if ('' === $data) {
+            return [null, 0];
+        }
+
+        return [$data, \strlen($data)];
+    }
+
+    /**
      * @return string|false
      */
     public static function read(ObjectEntry $object, int $length, int $type = self::PHP_BINARY_READ): string|false
