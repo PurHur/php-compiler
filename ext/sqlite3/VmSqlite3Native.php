@@ -246,6 +246,44 @@ final class VmSqlite3Native
         return (int) self::requireFfi()->sqlite3_bind_parameter_count($stmt);
     }
 
+    /** 1-based index, or 0 when the name is unknown (sqlite3_bind_parameter_index). */
+    public static function bindParameterIndex(\FFI\CData $stmt, string $name): int
+    {
+        return (int) self::requireFfi()->sqlite3_bind_parameter_index($stmt, $name);
+    }
+
+    public static function sql(\FFI\CData $stmt): string
+    {
+        $sql = self::requireFfi()->sqlite3_sql($stmt);
+
+        return null === $sql ? '' : self::ffiString($sql);
+    }
+
+    /** Requires SQLite ≥ 3.14; caller must free via sqlite3_free. */
+    public static function expandedSql(\FFI\CData $stmt): ?string
+    {
+        $ffi = self::requireFfi();
+        $sql = $ffi->sqlite3_expanded_sql($stmt);
+        if (null === $sql) {
+            return null;
+        }
+        $out = self::ffiString($sql);
+        $ffi->sqlite3_free($sql);
+
+        return $out;
+    }
+
+    public static function stmtReadonly(\FFI\CData $stmt): bool
+    {
+        return 0 !== (int) self::requireFfi()->sqlite3_stmt_readonly($stmt);
+    }
+
+    /** Columns in the current row; 0 before first step / after reset (php-src columnType). */
+    public static function dataCount(\FFI\CData $stmt): int
+    {
+        return (int) self::requireFfi()->sqlite3_data_count($stmt);
+    }
+
     public const STEP_ROW = 100;
 
     public const STEP_DONE = 101;
@@ -352,6 +390,11 @@ int sqlite3_changes(sqlite3 *db);
 sqlite3_int64 sqlite3_last_insert_rowid(sqlite3 *db);
 char *sqlite3_mprintf(const char *zFormat, ...);
 int sqlite3_bind_parameter_count(sqlite3_stmt *pStmt);
+int sqlite3_bind_parameter_index(sqlite3_stmt *pStmt, const char *zName);
+const char *sqlite3_sql(sqlite3_stmt *pStmt);
+char *sqlite3_expanded_sql(sqlite3_stmt *pStmt);
+int sqlite3_stmt_readonly(sqlite3_stmt *pStmt);
+int sqlite3_data_count(sqlite3_stmt *pStmt);
 CDEF;
 
         foreach (['libsqlite3.so.0', 'libsqlite3.so'] as $lib) {

@@ -240,6 +240,14 @@ final class SQLite3ResultColumnType extends SQLite3ResultMethod
 
             return;
         }
+        // php-src: RETURN_FALSE when !sqlite3_data_count (no current row after reset).
+        if (VmSqlite3Native::dataCount($st->stmt) <= 0) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->int(VmSqlite3Native::columnTypeAt($st->stmt, $column));
         }

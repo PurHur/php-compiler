@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5289 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14679 |
+| Source constructs flagged (warnings) | 14683 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1191,7 +1191,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/Sqlite3ExtensionPolicy.php` | 0 | 1 |
 | `ext/sqlite3/VmSQLite3.php` | 0 | 14 |
 | `ext/sqlite3/VmSQLite3Result.php` | 0 | 12 |
-| `ext/sqlite3/VmSQLite3Stmt.php` | 0 | 11 |
+| `ext/sqlite3/VmSQLite3Stmt.php` | 0 | 15 |
 | `ext/sqlite3/VmSqlite3Native.php` | 0 | 6 |
 | `ext/standard/AbsJitHelper.php` | 0 | 1 |
 | `ext/standard/AcosJitHelper.php` | 0 | 1 |
@@ -13968,16 +13968,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 34)
-- new SQLite3StmtBindValue (line 38)
-- new SQLite3StmtClear (line 39)
-- new SQLite3StmtClose (line 40)
-- new SQLite3StmtExecute (line 41)
-- new SQLite3StmtParamCount (line 42)
-- new SQLite3StmtReset (line 43)
-- new ObjectEntry (line 63)
-- new Sqlite3StmtState (line 64)
-- new ArgumentCountError (line 137)
-- 11 class method(s)
+- new SQLite3StmtBindParam (line 38)
+- new SQLite3StmtBindValue (line 39)
+- new SQLite3StmtClear (line 40)
+- new SQLite3StmtClose (line 41)
+- new SQLite3StmtExecute (line 42)
+- new SQLite3StmtGetSQL (line 43)
+- new SQLite3StmtParamCount (line 44)
+- new SQLite3StmtReadOnly (line 45)
+- new SQLite3StmtReset (line 46)
+- new ObjectEntry (line 69)
+- new Sqlite3StmtState (line 70)
+- new ArgumentCountError (line 227)
+- new ArgumentCountError (line 266)
+- 17 class method(s)
 
 ### `ext/sqlite3/VmSqlite3Native.php`
 
@@ -13987,7 +13991,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SQLite3Exception (line 92)
 - new SQLite3Exception (line 139)
 - new SQLite3Exception (line 183)
-- 25 class method(s)
+- 30 class method(s)
 
 ### `ext/standard/AbsJitHelper.php`
 
