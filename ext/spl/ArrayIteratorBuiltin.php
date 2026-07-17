@@ -107,6 +107,7 @@ final class ArrayIteratorBuiltin
         $entry->methods['__debuginfo'] = new ArrayIteratorDebugInfo();
         $entry->methodVisibility['__debuginfo'] = $pub;
         $entry->methodNames['__debuginfo'] = '__debugInfo';
+        $entry->cloneObjectHandler = [SplArrayStorage::class, 'cloneInto'];
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }

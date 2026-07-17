@@ -56,6 +56,24 @@ final class SplArrayStorage
         ];
     }
 
+    /**
+     * php-src spl_array_object_clone — deep-copy HashTable + flags onto the shallow-cloned object (#19803).
+     */
+    public static function cloneInto(ObjectEntry $src, ObjectEntry $dest): void
+    {
+        if (!isset(self::$store[$src->id])) {
+            return;
+        }
+        $state = self::$store[$src->id];
+        self::$store[$dest->id] = [
+            'flags' => $state['flags'],
+            'table' => $state['table']->duplicate(),
+            'propList' => $state['propList'],
+            'iteratorClass' => $state['iteratorClass'],
+            'pos' => $state['pos'],
+        ];
+    }
+
     /** @return array{flags: int, table: HashTable, propList: array<int|string, mixed>, iteratorClass: ?string, pos: int} */
     public static function state(ObjectEntry $object): array
     {
