@@ -125,6 +125,12 @@ final class RecursiveIteratorIteratorBuiltin
             'getinneriterator' => RecursiveIteratorIteratorGetInnerIterator::class,
             'callhaschildren' => RecursiveIteratorIteratorCallHasChildren::class,
             'callgetchildren' => RecursiveIteratorIteratorCallGetChildren::class,
+            // php-src traversal hooks — empty on base; subclasses override (#20146).
+            'beginiteration' => RecursiveIteratorIteratorBeginIteration::class,
+            'enditeration' => RecursiveIteratorIteratorEndIteration::class,
+            'beginchildren' => RecursiveIteratorIteratorBeginChildren::class,
+            'endchildren' => RecursiveIteratorIteratorEndChildren::class,
+            'nextelement' => RecursiveIteratorIteratorNextElement::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -136,6 +142,11 @@ final class RecursiveIteratorIteratorBuiltin
         $entry->methodNames['getinneriterator'] = 'getInnerIterator';
         $entry->methodNames['callhaschildren'] = 'callHasChildren';
         $entry->methodNames['callgetchildren'] = 'callGetChildren';
+        $entry->methodNames['beginiteration'] = 'beginIteration';
+        $entry->methodNames['enditeration'] = 'endIteration';
+        $entry->methodNames['beginchildren'] = 'beginChildren';
+        $entry->methodNames['endchildren'] = 'endChildren';
+        $entry->methodNames['nextelement'] = 'nextElement';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -143,7 +154,13 @@ final class RecursiveIteratorIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['rewind'], $entry->methods['valid'], $entry->methods['getdepth']);
+        return isset(
+            $entry->methods['rewind'],
+            $entry->methods['valid'],
+            $entry->methods['getdepth'],
+            $entry->methods['beginchildren'],
+            $entry->methods['nextelement']
+        );
     }
 }
 
@@ -160,12 +177,18 @@ final class SplDualIteratorStorage
 
     private const RS_NEXT = 4;
 
-    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool, innerPinKey: string}> */
+    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool, inIteration: bool, innerPinKey: string}> */
     private static array $store = [];
 
     public static function hasStateFor(ObjectEntry $object): bool
     {
         return isset(self::$store[$object->id]);
+    }
+
+    /** True when wrapper uses recursive walk (RII / RecursiveTreeIterator / subclasses). */
+    public static function usesRecursiveWalk(ObjectEntry $object): bool
+    {
+        return isset(self::$store[$object->id]) && self::$store[$object->id]['recursive'];
     }
 
     /**
@@ -191,6 +214,7 @@ final class SplDualIteratorStorage
             'maxDepth' => -1,
             'rewound' => false,
             'noRewind' => false,
+            'inIteration' => false,
             'innerPinKey' => $pinKey,
         ]);
     }
@@ -207,6 +231,7 @@ final class SplDualIteratorStorage
             'maxDepth' => -1,
             'rewound' => true,
             'noRewind' => true,
+            'inIteration' => false,
             'innerPinKey' => $pinKey,
         ]);
     }
@@ -227,12 +252,13 @@ final class SplDualIteratorStorage
             'maxDepth' => -1,
             'rewound' => false,
             'noRewind' => false,
+            'inIteration' => false,
             'innerPinKey' => $pinKey,
         ]);
     }
 
     /**
-     * @param array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool, innerPinKey: string} $state
+     * @param array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool, inIteration: bool, innerPinKey: string} $state
      */
     private static function replaceStore(int $objectId, array $state): void
     {
@@ -378,11 +404,28 @@ final class SplDualIteratorStorage
     {
         $state = &self::$store[$object->id];
         $state['rewound'] = true;
+        // php-src spl_recursive_it_rewind_ex — endChildren while unwinding nested levels (#20146).
+        while (\count($state['stack']) > 1) {
+            self::callTraversalHook($frame, $object, 'endChildren');
+            $popIndex = \count($state['stack']) - 1;
+            $popped = \array_pop($state['stack']);
+            if (null !== $popped && $popped['iterator']->id !== $state['inner']->id) {
+                SplIteratorSupport::unpinObject(
+                    $popped['iterator'],
+                    'dual-stack:'.$popped['iterator']->id.':'.$popIndex
+                );
+            }
+        }
         self::clearStackKeepingInner($object->id);
         $state['stack'] = [
             ['iterator' => $state['inner'], 'state' => self::RS_START],
         ];
         self::invokeInner($frame, $state['inner'], 'rewind');
+        // php-src: beginIteration only when not already in iteration.
+        if (!$state['inIteration']) {
+            self::callTraversalHook($frame, $object, 'beginIteration');
+        }
+        $state['inIteration'] = true;
         self::advanceToYield($frame, $object);
     }
 
@@ -402,11 +445,18 @@ final class SplDualIteratorStorage
     public static function validRecursive(Frame $frame, ObjectEntry $object): bool
     {
         $top = self::stackTop($object);
-        if (null === $top) {
+        if (null === $top || !self::isIteratorValid($frame, $top)) {
+            $state = &self::$store[$object->id];
+            // php-src spl_recursive_it_valid_ex — endIteration when valid first fails (#20146).
+            if ($state['inIteration']) {
+                self::callTraversalHook($frame, $object, 'endIteration');
+                $state['inIteration'] = false;
+            }
+
             return false;
         }
 
-        return self::isIteratorValid($frame, $top);
+        return true;
     }
 
     public static function currentRecursive(Frame $frame, ObjectEntry $object): Variable
@@ -536,6 +586,10 @@ final class SplDualIteratorStorage
                         self::invokeInner($frame, $iterator, 'next');
                     }
                     if (!self::isIteratorValid($frame, $iterator)) {
+                        // php-src: endChildren before pop while depth still at child level (#20146).
+                        if (\count($state['stack']) > 1) {
+                            self::callTraversalHook($frame, $object, 'endChildren');
+                        }
                         $popIndex = \count($state['stack']) - 1;
                         $popped = \array_pop($state['stack']);
                         if (null !== $popped && $popped['iterator']->id !== $state['inner']->id) {
@@ -565,6 +619,7 @@ final class SplDualIteratorStorage
                         if (self::canDescend($state, $level)) {
                             if (IteratorIteratorBuiltin::SELF_FIRST === $mode) {
                                 $entry['state'] = self::RS_CHILD;
+                                self::callTraversalHook($frame, $object, 'nextElement');
 
                                 return;
                             }
@@ -577,9 +632,11 @@ final class SplDualIteratorStorage
                         }
                     }
                     $entry['state'] = self::RS_NEXT;
+                    self::callTraversalHook($frame, $object, 'nextElement');
 
                     return;
                 case self::RS_SELF:
+                    self::callTraversalHook($frame, $object, 'nextElement');
                     if (IteratorIteratorBuiltin::SELF_FIRST === self::traversalMode($state['mode'])) {
                         $entry['state'] = self::RS_CHILD;
                     } else {
@@ -609,6 +666,21 @@ final class SplDualIteratorStorage
             $entry['state'] = self::RS_NEXT;
         }
         $state['stack'][] = ['iterator' => $child, 'state' => self::RS_START];
+        // php-src: beginChildren after child is on the stack (#20146).
+        self::callTraversalHook($frame, $object, 'beginChildren');
+    }
+
+    /** Invoke RII/RTI traversal hook (base stubs are no-ops; subclasses override). */
+    private static function callTraversalHook(Frame $frame, ObjectEntry $object, string $method): void
+    {
+        if (null === $frame->vmContext || null === $frame->vmContext->runtime) {
+            return;
+        }
+        $vm = $frame->vmContext->runtime->vm;
+        if (!$vm->hasInstanceMethod($object->class, strtolower($method))) {
+            return;
+        }
+        $vm->invokeInstanceMethod($object, $method);
     }
 
     private static function traversalMode(int $mode): int
@@ -776,7 +848,7 @@ final class RecursiveIteratorIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             RecursiveIteratorIteratorBuiltin::CLASS_LC,
             'RecursiveIteratorIterator::__construct()'
@@ -856,7 +928,7 @@ final class IteratorIteratorValid extends VmClassMethod
             IteratorIteratorBuiltin::CLASS_LC,
             'IteratorIterator::valid()'
         );
-        $valid = strcasecmp($object->class->name, 'RecursiveIteratorIterator') === 0
+        $valid = SplDualIteratorStorage::usesRecursiveWalk($object)
             ? SplDualIteratorStorage::validRecursive($frame, $object)
             : SplDualIteratorStorage::validSimple($frame, $object);
         SplIteratorSupport::setReturnBool($frame, $valid);
@@ -877,7 +949,7 @@ final class IteratorIteratorCurrent extends VmClassMethod
             IteratorIteratorBuiltin::CLASS_LC,
             'IteratorIterator::current()'
         );
-        $current = strcasecmp($object->class->name, 'RecursiveIteratorIterator') === 0
+        $current = SplDualIteratorStorage::usesRecursiveWalk($object)
             ? SplDualIteratorStorage::currentRecursive($frame, $object)
             : SplDualIteratorStorage::currentSimple($frame, $object);
         SplIteratorSupport::copyReturnFrom($frame, $current);
@@ -898,7 +970,7 @@ final class IteratorIteratorKey extends VmClassMethod
             IteratorIteratorBuiltin::CLASS_LC,
             'IteratorIterator::key()'
         );
-        $key = strcasecmp($object->class->name, 'RecursiveIteratorIterator') === 0
+        $key = SplDualIteratorStorage::usesRecursiveWalk($object)
             ? SplDualIteratorStorage::keyRecursive($frame, $object)
             : SplDualIteratorStorage::keySimple($frame, $object);
         SplIteratorSupport::copyReturnFrom($frame, $key);
@@ -919,7 +991,7 @@ final class IteratorIteratorNext extends VmClassMethod
             IteratorIteratorBuiltin::CLASS_LC,
             'IteratorIterator::next()'
         );
-        if (strcasecmp($object->class->name, 'RecursiveIteratorIterator') === 0) {
+        if (SplDualIteratorStorage::usesRecursiveWalk($object)) {
             SplDualIteratorStorage::nextRecursive($frame, $object);
         } else {
             SplDualIteratorStorage::nextSimple($frame, $object);
@@ -1117,5 +1189,95 @@ final class RecursiveIteratorIteratorCallGetChildren extends VmClassMethod
         }
         $child = SplDualIteratorStorage::callGetChildren($frame, $object);
         $frame->returnVar->object($child);
+    }
+}
+
+/** php-src empty hook — overridden by user subclasses (#20146). */
+final class RecursiveIteratorIteratorBeginIteration extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('beginIteration');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::beginIteration()'
+        );
+    }
+}
+
+/** php-src empty hook — overridden by user subclasses (#20146). */
+final class RecursiveIteratorIteratorEndIteration extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('endIteration');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::endIteration()'
+        );
+    }
+}
+
+/** php-src empty hook — overridden by user subclasses (#20146). */
+final class RecursiveIteratorIteratorBeginChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('beginChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::beginChildren()'
+        );
+    }
+}
+
+/** php-src empty hook — overridden by user subclasses (#20146). */
+final class RecursiveIteratorIteratorEndChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('endChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::endChildren()'
+        );
+    }
+}
+
+/** php-src empty hook — overridden by user subclasses (#20146). */
+final class RecursiveIteratorIteratorNextElement extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('nextElement');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::nextElement()'
+        );
     }
 }
