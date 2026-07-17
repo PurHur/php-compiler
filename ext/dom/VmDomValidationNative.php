@@ -19,7 +19,7 @@ final class VmDomValidationNative
 
     private static bool $ffiUnavailable = false;
 
-    /** @var list<string> */
+    /** @var list<array{level: int, code: int, column: int, message: string, file: string, line: int}> */
     private static array $lastErrors = [];
 
     public static function available(): bool
@@ -27,7 +27,9 @@ final class VmDomValidationNative
         return null !== self::ffi();
     }
 
-    /** @return list<string> */
+    /**
+     * @return list<array{level: int, code: int, column: int, message: string, file: string, line: int}>
+     */
     public static function consumeLastErrors(): array
     {
         $errors = self::$lastErrors;
@@ -225,7 +227,7 @@ final class VmDomValidationNative
     }
 
     /**
-     * @return array{valid: bool, errors: list<string>}
+     * @return array{valid: bool, errors: list<array{level: int, code: int, column: int, message: string, file: string, line: int}>}
      */
     public static function validateDtdDocument(string $docXml): array
     {
@@ -353,9 +355,17 @@ final class VmDomValidationNative
         $errors = libxml_get_errors();
         foreach ($errors as $error) {
             $message = trim($error->message);
-            if ('' !== $message) {
-                self::$lastErrors[] = $message;
+            if ('' === $message) {
+                continue;
             }
+            self::$lastErrors[] = [
+                'level' => (int) $error->level,
+                'code' => (int) $error->code,
+                'column' => (int) $error->column,
+                'message' => $message,
+                'file' => (string) $error->file,
+                'line' => (int) $error->line,
+            ];
         }
         libxml_clear_errors();
     }
