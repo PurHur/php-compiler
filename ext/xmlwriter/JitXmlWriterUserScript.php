@@ -167,6 +167,54 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, (bool) $ok);
     }
 
+    public static function tryStartCData(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer) {
+            return null;
+        }
+        $ok = $writer->startCData();
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryEndCData(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer) {
+            return null;
+        }
+        $ok = $writer->endCData();
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryStartPI(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $target = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $target || str_starts_with($target, '__phpc_xw_')) {
+            return null;
+        }
+        $ok = $writer->startPI($target);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryEndPI(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer) {
+            return null;
+        }
+        $ok = $writer->endPI();
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
     public static function tryFullEndElement(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);

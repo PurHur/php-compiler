@@ -58,6 +58,18 @@ final class VmXmlWriter
         $entry->methods['writecdata'] = new XmlWriterWriteCData();
         $entry->methodVisibility['writecdata'] = $pub;
         $entry->methodNames['writecdata'] = 'writeCData';
+        $entry->methods['startcdata'] = new XmlWriterStartCData();
+        $entry->methodVisibility['startcdata'] = $pub;
+        $entry->methodNames['startcdata'] = 'startCData';
+        $entry->methods['endcdata'] = new XmlWriterEndCData();
+        $entry->methodVisibility['endcdata'] = $pub;
+        $entry->methodNames['endcdata'] = 'endCData';
+        $entry->methods['startpi'] = new XmlWriterStartPI();
+        $entry->methodVisibility['startpi'] = $pub;
+        $entry->methodNames['startpi'] = 'startPI';
+        $entry->methods['endpi'] = new XmlWriterEndPI();
+        $entry->methodVisibility['endpi'] = $pub;
+        $entry->methodNames['endpi'] = 'endPI';
         $entry->methods['writecomment'] = new XmlWriterWriteComment();
         $entry->methodVisibility['writecomment'] = $pub;
         $entry->methodNames['writecomment'] = 'writeComment';
@@ -273,6 +285,82 @@ final class VmXmlWriter
         return true;
     }
 
+    /**
+     * XMLWriter::startCData — open a CDATA section (php-src zim_XMLWriter_startCData; #19457).
+     */
+    public static function startCData(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::startCData()');
+        if ($state->inCdata) {
+            @\trigger_error(
+                'XMLWriter::startCdata(): xmlTextWriterStartCDATA : CDATA not allowed in this context!',
+                \E_WARNING
+            );
+
+            return false;
+        }
+        self::closeStartTagIfOpen($state);
+        $state->buffer .= '<![CDATA[';
+        $state->inCdata = true;
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::endCData — close a CDATA section (php-src zim_XMLWriter_endCData; #19457).
+     */
+    public static function endCData(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::endCData()');
+        if (!$state->inCdata) {
+            return false;
+        }
+        $state->buffer .= ']]>';
+        $state->inCdata = false;
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::startPI — open a processing instruction (php-src zim_XMLWriter_startPI; #19457).
+     */
+    public static function startPI(ObjectEntry $entry, string $target): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::startPI()');
+        if (!self::isValidPiTarget($target)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::startPi(): Argument #2 must be a valid PI target, %s given',
+                var_export($target, true)
+            ));
+        }
+        if ($state->inCdata) {
+            return false;
+        }
+        self::closeStartTagIfOpen($state);
+        $state->buffer .= '<?'.self::escapeElementName($target);
+        $state->inPi = true;
+        $state->piHasContent = false;
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::endPI — close a processing instruction (php-src zim_XMLWriter_endPI; #19457).
+     * Zend returns true with no write when no PI is open.
+     */
+    public static function endPI(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::endPI()');
+        if (!$state->inPi) {
+            return true;
+        }
+        $state->buffer .= '?>';
+        $state->inPi = false;
+        $state->piHasContent = false;
+
+        return true;
+    }
+
     public static function writeComment(ObjectEntry $entry, string $content): bool
     {
         $state = self::requireOpen($entry, 'XMLWriter::writeComment()');
@@ -287,6 +375,21 @@ final class VmXmlWriter
         $state = self::requireOpen($entry, 'XMLWriter::text()');
         if ($state->attributeOpen) {
             $state->buffer .= self::escapeAttribute($content);
+
+            return true;
+        }
+        if ($state->inCdata) {
+            $state->buffer .= $content;
+
+            return true;
+        }
+        if ($state->inPi) {
+            // libxml inserts a single space before the first text() of a PI (#19457).
+            if (!$state->piHasContent) {
+                $state->buffer .= ' ';
+                $state->piHasContent = true;
+            }
+            $state->buffer .= $content;
 
             return true;
         }
@@ -426,6 +529,9 @@ final class VmXmlWriter
         // indent flags persist across openMemory in Zend? Reset for clean writers.
         $state->indent = false;
         $state->indentString = ' ';
+        $state->inCdata = false;
+        $state->inPi = false;
+        $state->piHasContent = false;
     }
 
     private static function requireOpen(ObjectEntry $entry, string $label): XmlWriterState
@@ -473,6 +579,15 @@ final class VmXmlWriter
     private static function isValidAttributeName(string $name): bool
     {
         return self::isValidElementName($name);
+    }
+
+    private static function isValidPiTarget(string $target): bool
+    {
+        if ('' === $target) {
+            return false;
+        }
+        // XML Name without spaces (php-src / libxml PI target check).
+        return (bool) preg_match('/^[A-Za-z_][A-Za-z0-9._-]*$/', $target);
     }
 
     private static function escapeElementName(string $name): string

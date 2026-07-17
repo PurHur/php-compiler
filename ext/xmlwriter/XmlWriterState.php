@@ -34,4 +34,13 @@ final class XmlWriterState
     public bool $indent = false;
 
     public string $indentString = ' ';
+
+    /** Inside startCData() … endCData() (php-src xmlTextWriterStartCDATA; #19457). */
+    public bool $inCdata = false;
+
+    /** Inside startPI() … endPI() (php-src xmlTextWriterStartPI; #19457). */
+    public bool $inPi = false;
+
+    /** True after any text() inside the current PI (controls leading space before content). */
+    public bool $piHasContent = false;
 }
