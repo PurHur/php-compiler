@@ -85,6 +85,9 @@ final class VmXmlReader
         $entry->methods['next'] = new XmlReaderNext();
         $entry->methodVisibility['next'] = $pub;
         $entry->methodNames['next'] = 'next';
+        $entry->methods['lookupnamespace'] = new XmlReaderLookupNamespace();
+        $entry->methodVisibility['lookupnamespace'] = $pub;
+        $entry->methodNames['lookupnamespace'] = 'lookupNamespace';
 
         if (CompilerVersion::supportsXmlReaderFactories()) {
             $entry->methods['fromstring'] = new XmlReaderFromString();
@@ -302,6 +305,20 @@ final class VmXmlReader
         }
 
         return $current->attributes[$name] ?? null;
+    }
+
+    /**
+     * XMLReader::lookupNamespace() — php-src zim_XMLReader_lookupNamespace / xmlTextReaderLookupNamespace (#19396).
+     */
+    public static function lookupNamespace(ObjectEntry $entry, string $prefix): ?string
+    {
+        $state = XmlReaderRegistry::state($entry);
+        $current = $state->current;
+        if (null === $current) {
+            return null;
+        }
+
+        return $current->nsScope[$prefix] ?? null;
     }
 
     /**
@@ -530,7 +547,8 @@ final class VmXmlReader
             [],
             $current->depth + 1,
             false,
-            $nameParts
+            $nameParts,
+            $current->nsScope
         );
         $event->hasValue = true;
 
@@ -548,6 +566,8 @@ final class VmXmlReader
 
         $pos = 0;
         $len = \strlen($trimmed);
+        /** @var list<array<string, string>> */
+        $nsStack = [];
         while ($pos < $len) {
             $pos = self::skipWhitespace($trimmed, $pos);
             if ($pos >= $len) {
@@ -568,7 +588,7 @@ final class VmXmlReader
                     continue;
                 }
                 if (str_starts_with(substr($trimmed, $pos), '<![CDATA[')) {
-                    self::tokenizeCdata($trimmed, $pos, $events, 0);
+                    self::tokenizeCdata($trimmed, $pos, $events, 0, $nsStack);
 
                     continue;
                 }
@@ -582,16 +602,17 @@ final class VmXmlReader
                 throw new \LogicException('XMLReader: unexpected end tag');
             }
 
-            self::tokenizeElement($trimmed, $pos, $events, 0);
+            self::tokenizeElement($trimmed, $pos, $events, 0, $nsStack);
         }
 
         return $events;
     }
 
     /**
-     * @param list<XmlReaderEvent> $events
+     * @param list<XmlReaderEvent>        $events
+     * @param list<array<string, string>> $nsStack
      */
-    private static function tokenizeElement(string $data, int &$pos, array &$events, int $depth): void
+    private static function tokenizeElement(string $data, int &$pos, array &$events, int $depth, array &$nsStack): void
     {
         if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?(\/?)>/s', $data, $open, 0, $pos)) {
             throw new \LogicException('XMLReader: malformed element');
@@ -602,6 +623,12 @@ final class VmXmlReader
         $selfClose = isset($open[3]) && '/' === $open[3];
         $attrs = self::parseAttributes($attrSpec);
         $nameParts = self::splitQName($rawName);
+        $decls = self::extractNamespaceDecls($attrs);
+        $nsStack[] = $decls;
+        $scope = self::mergeNamespaceScope($nsStack);
+        $nameParts['uri'] = '' !== $nameParts['prefix']
+            ? ($scope[$nameParts['prefix']] ?? '')
+            : ($scope[''] ?? '');
         $events[] = self::makeEvent(
             XmlReaderConstants::ELEMENT,
             $rawName,
@@ -609,11 +636,13 @@ final class VmXmlReader
             $attrs,
             $depth,
             $selfClose,
-            $nameParts
+            $nameParts,
+            $scope
         );
 
         $contentStart = $pos + \strlen($open[0]);
         if ($selfClose) {
+            array_pop($nsStack);
             $pos = $contentStart;
 
             return;
@@ -646,7 +675,8 @@ final class VmXmlReader
                         [],
                         $depth + 1,
                         false,
-                        ['local' => '#text', 'prefix' => '', 'uri' => '']
+                        ['local' => '#text', 'prefix' => '', 'uri' => ''],
+                        $scope
                     );
                 }
                 $scan = $textEnd;
@@ -655,7 +685,7 @@ final class VmXmlReader
             }
             if ($scan + 1 < $innerEnd && '!' === $data[$scan + 1]) {
                 if (str_starts_with(substr($data, $scan), '<![CDATA[')) {
-                    self::tokenizeCdata($data, $scan, $events, $depth + 1);
+                    self::tokenizeCdata($data, $scan, $events, $depth + 1, $nsStack);
 
                     continue;
                 }
@@ -665,7 +695,7 @@ final class VmXmlReader
                     continue;
                 }
             }
-            self::tokenizeElement($data, $scan, $events, $depth + 1);
+            self::tokenizeElement($data, $scan, $events, $depth + 1, $nsStack);
         }
 
         $events[] = self::makeEvent(
@@ -675,15 +705,18 @@ final class VmXmlReader
             [],
             $depth,
             false,
-            $nameParts
+            $nameParts,
+            $scope
         );
+        array_pop($nsStack);
         $pos = $end;
     }
 
     /**
-     * @param list<XmlReaderEvent> $events
+     * @param list<XmlReaderEvent>        $events
+     * @param list<array<string, string>> $nsStack
      */
-    private static function tokenizeCdata(string $data, int &$pos, array &$events, int $depth): void
+    private static function tokenizeCdata(string $data, int &$pos, array &$events, int $depth, array &$nsStack): void
     {
         $parsed = VmXml::parseCdataSectionAt($data, $pos);
         if (null === $parsed) {
@@ -696,7 +729,8 @@ final class VmXmlReader
             [],
             $depth,
             false,
-            ['local' => '#cdata-section', 'prefix' => '', 'uri' => '']
+            ['local' => '#cdata-section', 'prefix' => '', 'uri' => ''],
+            self::mergeNamespaceScope($nsStack)
         );
         $pos = $parsed['end'];
     }
@@ -729,8 +763,9 @@ final class VmXmlReader
     }
 
     /**
-     * @param array<string, string> $attrs
+     * @param array<string, string>                       $attrs
      * @param array{local: string, prefix: string, uri: string} $nameParts
+     * @param array<string, string>                       $nsScope
      */
     private static function makeEvent(
         int $nodeType,
@@ -739,7 +774,8 @@ final class VmXmlReader
         array $attrs,
         int $depth,
         bool $isEmptyElement,
-        array $nameParts
+        array $nameParts,
+        array $nsScope = []
     ): XmlReaderEvent {
         $hasValue = '' !== $value;
         $attrCount = \count($attrs);
@@ -756,8 +792,48 @@ final class VmXmlReader
             $attrCount,
             $nameParts['local'],
             $nameParts['prefix'],
-            $nameParts['uri']
+            $nameParts['uri'],
+            $nsScope
         );
+    }
+
+    /**
+     * @param array<string, string> $attrs
+     *
+     * @return array<string, string> prefix → URI ('' key = default xmlns)
+     */
+    private static function extractNamespaceDecls(array $attrs): array
+    {
+        $decls = [];
+        foreach ($attrs as $name => $value) {
+            if ('xmlns' === $name) {
+                $decls[''] = $value;
+
+                continue;
+            }
+            if (str_starts_with($name, 'xmlns:')) {
+                $decls[substr($name, 6)] = $value;
+            }
+        }
+
+        return $decls;
+    }
+
+    /**
+     * @param list<array<string, string>> $nsStack
+     *
+     * @return array<string, string>
+     */
+    private static function mergeNamespaceScope(array $nsStack): array
+    {
+        $scope = [];
+        foreach ($nsStack as $decls) {
+            foreach ($decls as $prefix => $uri) {
+                $scope[$prefix] = $uri;
+            }
+        }
+
+        return $scope;
     }
 
     /** @return array{local: string, prefix: string, uri: string} */

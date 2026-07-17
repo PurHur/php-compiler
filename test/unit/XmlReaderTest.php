@@ -159,6 +159,19 @@ PHP;
         );
     }
 
+    public function test_xmlreader_lookup_namespace_repro(): void
+    {
+        $runtime = new Runtime();
+        $code = (string) file_get_contents(__DIR__.'/../repro/maintainer_gap_xmlreader_lookup_namespace.php');
+        $block = $runtime->parseAndCompile($code, 'xmlreader_lookup_namespace_repro.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "lookupNs='urn:x'\nunknown=NULL\nonC_p='urn:x'\nonC_q='urn:q'\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_xmlreader_tokenizer_matches_zend_event_shape(): void
     {
         $events = VmXmlReader::tokenize('<root><item id="1">a</item></root>');
