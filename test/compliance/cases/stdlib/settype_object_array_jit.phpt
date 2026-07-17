@@ -1,5 +1,5 @@
 --TEST--
-stdlib settype() object to array JIT — property hash not index-0 wrap (#9963, ext/standard/type.c)
+stdlib settype() object to array JIT — property hash not index-0 wrap (#9963, #10009, ext/standard/type.c)
 --JIT--
 --FILE--
 <?php
