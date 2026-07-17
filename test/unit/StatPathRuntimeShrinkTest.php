@@ -6,7 +6,9 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** JitStat routes through StatPathJitHelper/StatFieldsJitHelper PHP, not glibc struct stat LLVM (#9112). */
+/**
+ * StatPath NestedJIT ABI bridges quarantined in ext/standard (#9112, #19849).
+ */
 final class StatPathRuntimeShrinkTest extends TestCase
 {
     public function testJitStatUsesStatPathRuntimeNotGlibcOffsets(): void
@@ -22,16 +24,51 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $this->assertLessThan(400, \substr_count($source, "\n"), 'JitStat must shrink after PHP bridge migration');
     }
 
-    public function testStatPathRuntimeUsesJitHelpers(): void
+    public function testBuiltinStatPathRuntimeIsThinOrchestrator(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StatPathRuntime.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitStatPathKernel.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StatPathRuntime.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StatPathRuntimeLibc.php');
+
+        $orchestrator = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StatPathRuntime.php');
+        $this->assertStringContainsString('JitStatPathKernel', $orchestrator);
+        $this->assertStringContainsString('JitStatPathKernel::ensureLinked', $orchestrator);
+        $this->assertStringContainsString('JitStatPathKernel::ensureStandaloneBodies', $orchestrator);
+        $this->assertStringContainsString('JitStatPathKernel::implement', $orchestrator);
+        $this->assertStringContainsString('FN_EXISTS = JitStatPathKernel::FN_EXISTS', $orchestrator);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $orchestrator);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $orchestrator);
+        $this->assertStringNotContainsString('implementPathBoolBridge', $orchestrator);
+        $this->assertStringNotContainsString('StatPathJitHelper', $orchestrator);
+        $this->assertLessThan(60, \substr_count($orchestrator, "\n") + 1);
+    }
+
+    public function testKernelPresent(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStatPathKernel.php');
+        $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
+        $this->assertStringContainsString('final class JitStatPathKernel', $source);
+        $this->assertStringContainsString('__phpc_jit_path_exists', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
         $this->assertStringContainsString('StatPathJitHelper', $source);
         $this->assertStringContainsString('StatFieldsJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringContainsString('JitStatKernel', $source);
-        $this->assertStringNotContainsString('StatPathRuntimeLibc', $source);
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StatPathRuntimeLibc.php');
+        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
+        $this->assertLessThan(420, \substr_count($source, "\n") + 1);
+    }
+
+    public function testSpineBundleIncludesKernelAndOrchestrator(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitStatPathKernel.php', $spine);
+        $this->assertStringContainsString('StatPathRuntime.php', $spine);
+        $kernelPos = strpos($spine, 'JitStatPathKernel.php');
+        $orchPos = strpos($spine, 'lib/JIT/Builtin/StatPathRuntime.php');
+        $this->assertNotFalse($kernelPos);
+        $this->assertNotFalse($orchPos);
+        $this->assertLessThan($orchPos, $kernelPos, 'kernel must load before thin orchestrator');
     }
 
     public function testStatPathJitHelperUsesStatModeKernelNotExternalVmStatPath(): void

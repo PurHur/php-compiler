@@ -46,6 +46,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -1837,6 +1838,7 @@ require_once __DIR__.'/../../../ext/standard/JitSscanf.php';
 require_once __DIR__.'/../../../ext/standard/JitStat.php';
 require_once __DIR__.'/../../../ext/standard/JitStatArray.php';
 require_once __DIR__.'/../../../ext/standard/JitStatKernel.php';
+require_once __DIR__.'/../../../ext/standard/JitStatPathKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitStrGetcsv.php';
 require_once __DIR__.'/../../../ext/standard/JitStrIreplace.php';
 require_once __DIR__.'/../../../ext/standard/JitStrIreplaceMulti.php';
@@ -5305,6 +5307,36 @@ require_once __DIR__.'/../../../ext/yaml/yaml_emit_file.php';
 require_once __DIR__.'/../../../ext/yaml/yaml_parse.php';
 require_once __DIR__.'/../../../ext/yaml/yaml_parse_file.php';
 require_once __DIR__.'/../../../lib/VM/NativeRequestParseBodyException.php';
+require_once __DIR__.'/../../../ext/sqlite3/SQLite3Changes.php';
+require_once __DIR__.'/../../../ext/sqlite3/SQLite3EscapeString.php';
+require_once __DIR__.'/../../../ext/sqlite3/SQLite3LastInsertRowID.php';
+require_once __DIR__.'/../../../ext/sqlite3/SQLite3Prepare.php';
+require_once __DIR__.'/../../../ext/sqlite3/SQLite3Query.php';
+require_once __DIR__.'/../../../ext/sqlite3/VmSQLite3Result.php';
+require_once __DIR__.'/../../../ext/sqlite3/VmSQLite3Stmt.php';
+require_once __DIR__.'/../../../ext/redis/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/redis/Module.php';
+require_once __DIR__.'/../../../ext/redis/RedisClassMethod.php';
+require_once __DIR__.'/../../../ext/redis/RedisClose.php';
+require_once __DIR__.'/../../../ext/redis/RedisConnect.php';
+require_once __DIR__.'/../../../ext/redis/RedisConstants.php';
+require_once __DIR__.'/../../../ext/redis/RedisConstruct.php';
+require_once __DIR__.'/../../../ext/redis/RedisExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/redis/RedisGet.php';
+require_once __DIR__.'/../../../ext/redis/RedisSet.php';
+require_once __DIR__.'/../../../ext/redis/RedisState.php';
+require_once __DIR__.'/../../../ext/redis/VmRedis.php';
+require_once __DIR__.'/../../../ext/redis/VmRedisNative.php';
+require_once __DIR__.'/../../../ext/redis/bootstrap_redisexception.php';
+require_once __DIR__.'/../../../ext/standard/VmDebugPropertyName.php';
+require_once __DIR__.'/../../../ext/pdo/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/pdo/Module.php';
+require_once __DIR__.'/../../../ext/pdo/PdoClassMethod.php';
+require_once __DIR__.'/../../../ext/pdo/PdoConstants.php';
+require_once __DIR__.'/../../../ext/pdo/PdoExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/pdo/VmPDO.php';
+require_once __DIR__.'/../../../ext/pdo/VmPDOStatement.php';
+require_once __DIR__.'/../../../ext/pdo/bootstrap_pdoexception.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -5337,27 +5369,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../ext/redis/BuiltinClasses.php';
-require_once __DIR__.'/../../../ext/redis/Module.php';
-require_once __DIR__.'/../../../ext/redis/RedisClassMethod.php';
-require_once __DIR__.'/../../../ext/redis/RedisClose.php';
-require_once __DIR__.'/../../../ext/redis/RedisConnect.php';
-require_once __DIR__.'/../../../ext/redis/RedisConstants.php';
-require_once __DIR__.'/../../../ext/redis/RedisConstruct.php';
-require_once __DIR__.'/../../../ext/redis/RedisExtensionPolicy.php';
-require_once __DIR__.'/../../../ext/redis/RedisGet.php';
-require_once __DIR__.'/../../../ext/redis/RedisSet.php';
-require_once __DIR__.'/../../../ext/redis/RedisState.php';
-require_once __DIR__.'/../../../ext/redis/VmRedis.php';
-require_once __DIR__.'/../../../ext/redis/VmRedisNative.php';
-require_once __DIR__.'/../../../ext/redis/bootstrap_redisexception.php';
-require_once __DIR__.'/../../../ext/standard/VmDebugPropertyName.php';
-require_once __DIR__.'/../../../ext/pdo/BuiltinClasses.php';
-require_once __DIR__.'/../../../ext/pdo/Module.php';
-require_once __DIR__.'/../../../ext/pdo/PdoClassMethod.php';
-require_once __DIR__.'/../../../ext/pdo/PdoConstants.php';
-require_once __DIR__.'/../../../ext/pdo/PdoExtensionPolicy.php';
-require_once __DIR__.'/../../../ext/pdo/VmPDO.php';
-require_once __DIR__.'/../../../ext/pdo/VmPDOStatement.php';
-require_once __DIR__.'/../../../ext/pdo/bootstrap_pdoexception.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5288 |
-| Phase A inventory files (M2 ratio SSOT) | 5288 |
+| PHP files on vm.php path | 5289 |
+| Phase A inventory files (M2 ratio SSOT) | 5289 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14678 |
+| Source constructs flagged (warnings) | 14679 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1779,6 +1779,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStat.php` | 0 | 1 |
 | `ext/standard/JitStatArray.php` | 0 | 1 |
 | `ext/standard/JitStatKernel.php` | 0 | 1 |
+| `ext/standard/JitStatPathKernel.php` | 0 | 3 |
 | `ext/standard/JitStrGetcsv.php` | 0 | 1 |
 | `ext/standard/JitStrIreplace.php` | 0 | 1 |
 | `ext/standard/JitStrIreplaceMulti.php` | 0 | 1 |
@@ -3994,7 +3995,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StatCache.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatCacheRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StatPath.php` | 0 | 1 |
-| `lib/JIT/Builtin/StatPathRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StatPathRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/Stats.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamBucket.php` | 0 | 1 |
@@ -17171,6 +17172,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/standard/JitStatPathKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 371)
+- 12 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/JitStrGetcsv.php`
 
@@ -32239,9 +32247,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StatPathRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 368)
-- 12 class method(s)
-- 1 closure(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/Stats.php`
 
