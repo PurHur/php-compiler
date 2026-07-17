@@ -8,27 +8,27 @@ use PHPCompiler\ext\standard\FilePutContentsJitHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
- * __compiler_file_put_contents shrink guards (#15310, #19966, #20266).
+ * __compiler_file_put_contents shrink guards (#15310, #19966, #20266, #20290).
  *
- * Thin standalone libc fork remains until NestedJIT emits phpc_*_kernel libc under
- * always-helper (user-script fopen NestedJIT aborts; Internal::call leaf missing).
- * Embed/helper path unwraps boxed ints via extractLongFromHelperResult.
+ * Always-helper via JitVmHelperLink; libc leaf only from phpc_*_kernel (JitFilePutContentsLibc emitBody).
  */
 final class FilePutContentsRuntimeShrinkTest extends TestCase
 {
-    public function testStringFilePutContentsHelperPathUsesLongExtract(): void
+    public function testStringFilePutContentsAlwaysHelperNoThinFork(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFilePutContents.php');
         $this->assertStringContainsString('FilePutContentsJitHelper', $bridge);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
         $this->assertStringContainsString('extractLongFromHelperResult', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $bridge);
+        $this->assertStringNotContainsString('implementLibcBody', $bridge);
+        $this->assertStringNotContainsString('JitFilePutContentsLibc', $bridge);
         $this->assertStringNotContainsString('JitFilePutContentsKernel', $bridge);
         $this->assertStringNotContainsString('StringFilePutContentsLibc', $bridge);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFilePutContentsLibc.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitFilePutContentsKernel.php');
-        // Thin fork still load-bearing for user-script AOT (#20266).
-        $this->assertStringContainsString('isThinStandaloneAotMain', $bridge);
+        // Kernel emitBody still owns thin libc IR (#20290).
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitFilePutContentsLibc.php');
         $this->assertFileExists(__DIR__.'/../../ext/standard/phpc_file_put_contents_kernel.php');
     }
@@ -79,5 +79,14 @@ final class FilePutContentsRuntimeShrinkTest extends TestCase
         } else {
             $this->fail('coerceHelperScalarResult not found');
         }
+    }
+
+    public function testContextResolvesFpcKernelsFromRuntimeModulesBeforeRegister(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('isPreRegisterModuleNestedJitKernel', $source);
+        $this->assertStringContainsString('phpc_file_put_contents_kernel', $source);
+        $this->assertStringContainsString('phpc_readfile_kernel', $source);
+        $this->assertStringContainsString('runtime->modules', $source);
     }
 }

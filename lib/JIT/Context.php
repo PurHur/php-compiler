@@ -717,7 +717,40 @@ class Context {
             }
         }
 
+        // Pre-registerModule NestedJIT (#15417): Context->modules is still empty so most
+        // builtins stay ExternalMethod stubs. Allow only known *JitHelper kernel leaves
+        // from Runtime modules so always-helper user-script AOT emits libc (#20290).
+        if ([] === $this->modules
+            && NestedJitCompileScope::isActive()
+            && self::isPreRegisterModuleNestedJitKernel($lc)
+            && [] !== $this->runtime->modules
+        ) {
+            foreach ($this->runtime->modules as $module) {
+                foreach ($module->getFunctions() as $func) {
+                    if (!$func instanceof FuncInternal) {
+                        continue;
+                    }
+                    if (strtolower($func->getName()) === $lc) {
+                        return $func;
+                    }
+                }
+            }
+        }
+
         return null;
+    }
+
+    /**
+     * Kernels safe to resolve from Runtime modules during NestedJIT before
+     * {@see registerModule()} — must not open the full stdlib Internal surface (#15417).
+     */
+    private static function isPreRegisterModuleNestedJitKernel(string $lc): bool
+    {
+        return match ($lc) {
+            'phpc_file_put_contents_kernel',
+            'phpc_readfile_kernel' => true,
+            default => false,
+        };
     }
 
     public function recordExternalMethodStub(string $proxyName): void
@@ -794,6 +827,7 @@ class Context {
 
     public function registerModule(Module $module): void {
         $this->modules[] = $module;
+        $this->registeredBuiltinLookup = null;
         $module->jitInit($this);
     }
 
