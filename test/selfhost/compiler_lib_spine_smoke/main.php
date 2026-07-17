@@ -5462,4 +5462,5 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartAttributeNS.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartElementNS.php';
+require_once __DIR__.'/../../../ext/intl/VmSpoofchecker.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
