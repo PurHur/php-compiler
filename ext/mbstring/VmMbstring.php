@@ -542,6 +542,26 @@ final class VmMbstring
         return self::utf8Strpos($haystack, $needle, $offset, false, $encoding, 'mb_strpos');
     }
 
+    /**
+     * mb_strstr() — find first occurrence and return haystack from that point (php-src ext/mbstring/mbstring.c).
+     *
+     * @return string|false
+     */
+    public static function strstr(string $haystack, string $needle, bool $part = false, string $encoding = 'UTF-8')
+    {
+        self::assertSearchEncoding($encoding);
+        $pos = self::utf8Strpos($haystack, $needle, 0, false, $encoding, 'mb_strstr');
+        if (false === $pos) {
+            return false;
+        }
+        if ($part) {
+            return VmString::utf8CharSubstr($haystack, 0, $pos);
+        }
+        $charLen = VmString::utf8CharLength($haystack);
+
+        return VmString::utf8CharSubstr($haystack, $pos, $charLen - $pos);
+    }
+
     public static function substr(
         string $string,
         int $start,

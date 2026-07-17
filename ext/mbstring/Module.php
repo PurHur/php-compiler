@@ -53,6 +53,7 @@ class Module extends ModuleAbstract
             new mb_stripos(),
             new mb_strrpos(),
             new mb_strrichr(),
+            new mb_strstr(),
             ...(CompilerVersion::supportsMbTrimFunctions() ? [
                 new mb_trim(),
                 new mb_ltrim(),
