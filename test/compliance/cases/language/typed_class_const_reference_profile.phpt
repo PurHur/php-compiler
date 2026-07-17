@@ -5,10 +5,13 @@ Language: typed class constants rejected on PHP 8.2 reference profile (#15662, Z
 if (!class_exists('PHPCompiler\\CompilerVersion')) {
     require __DIR__ . '/../../../../vendor/autoload.php';
 }
+putenv('PHP_COMPILER_PROFILE=8.2');
 if (PHPCompiler\CompilerVersion::supportsTypedClassConstants()) {
-    die('skip typed class constants enabled on forward profile');
+    die('skip PHP_COMPILER_PROFILE=8.2 unexpectedly enables typed class constants');
 }
 ?>
+--ENV--
+PHP_COMPILER_PROFILE=8.2
 --FILE--
 <?php
 class Foo
