@@ -20,6 +20,7 @@ final class BuiltinClasses
     {
         self::registerPhar($ctx);
         PharDataBuiltin::register($ctx);
+        VmPharFileInfo::register($ctx);
     }
 
     public static function registerPhar(Context $ctx): void
