@@ -82,12 +82,16 @@ final class DirectoryIteratorBuiltin
 /** @internal */
 final class DirectoryIteratorStorage
 {
-    /** @var array<int, array{dirPath: string, handle: int, filename: string|false, index: int, flags: int}> */
+    /** @var array<int, array{dirPath: string, handle: int, filename: string|false, index: int, flags: int, subPath: string}> */
     private static array $store = [];
 
     public const FLAG_SKIP_DOTS = 4096;
 
-    public static function open(ObjectEntry $object, string $path, int $flags = 0): void
+    /**
+     * @param string $subPath Relative path from the original RecursiveDirectoryIterator
+     *                       constructor path to this iterator's directory (php-src u.dir.sub_path).
+     */
+    public static function open(ObjectEntry $object, string $path, int $flags = 0, string $subPath = ''): void
     {
         $handle = VmDir::opendir($path);
         if (false === $handle) {
@@ -101,6 +105,7 @@ final class DirectoryIteratorStorage
             'filename' => false,
             'index' => 0,
             'flags' => $flags,
+            'subPath' => $subPath,
         ];
         self::rewind($object);
     }
@@ -204,7 +209,7 @@ final class DirectoryIteratorStorage
         return self::joinPath($state['dirPath'], $state['filename']);
     }
 
-    /** @return array{dirPath: string, handle: int, filename: string|false, index: int, flags: int} */
+    /** @return array{dirPath: string, handle: int, filename: string|false, index: int, flags: int, subPath: string} */
     public static function iteratorState(ObjectEntry $object): array
     {
         return self::state($object);
@@ -213,6 +218,60 @@ final class DirectoryIteratorStorage
     public static function getFlags(ObjectEntry $object): int
     {
         return self::state($object)['flags'];
+    }
+
+    /**
+     * RecursiveDirectoryIterator::getSubPath — relative path of the current directory
+     * under the iterator root (php-src spl_filesystem_object_get_sub_path).
+     */
+    public static function subPath(ObjectEntry $object): string
+    {
+        return self::state($object)['subPath'];
+    }
+
+    /**
+     * RecursiveDirectoryIterator::getSubPathname — subPath + filename
+     * (php-src RecursiveDirectoryIterator::getSubPathname).
+     */
+    public static function subPathname(ObjectEntry $object): string
+    {
+        $state = self::state($object);
+        $filename = $state['filename'];
+        if (false === $filename) {
+            return $state['subPath'];
+        }
+        if ('' === $state['subPath']) {
+            return $filename;
+        }
+
+        return $state['subPath'].self::pathSeparator($state['flags']).$filename;
+    }
+
+    /**
+     * Sub-path for a getChildren() iterator opened on the current entry
+     * (php-src RecursiveDirectoryIterator::getChildren).
+     */
+    public static function childSubPath(ObjectEntry $object): string
+    {
+        $state = self::state($object);
+        $filename = $state['filename'];
+        if (false === $filename) {
+            return $state['subPath'];
+        }
+        if ('' === $state['subPath']) {
+            return $filename;
+        }
+
+        return $state['subPath'].self::pathSeparator($state['flags']).$filename;
+    }
+
+    private static function pathSeparator(int $flags): string
+    {
+        if (0 !== ($flags & FilesystemIteratorBuiltin::UNIX_PATHS)) {
+            return '/';
+        }
+
+        return \DIRECTORY_SEPARATOR;
     }
 
     public static function isDot(ObjectEntry $object): bool
@@ -254,7 +313,7 @@ final class DirectoryIteratorStorage
         self::rewind($object);
     }
 
-    /** @return array{dirPath: string, handle: int, filename: string|false, index: int, flags: int} */
+    /** @return array{dirPath: string, handle: int, filename: string|false, index: int, flags: int, subPath: string} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
