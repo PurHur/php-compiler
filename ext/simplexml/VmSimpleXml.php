@@ -555,13 +555,15 @@ final class VmSimpleXml
                 return false;
             }
 
-            return $includeDeclaration ? '<?xml version="1.0"?>'."\n".$body : $body;
+            // php-src sxe_as_xml: document serialization ends with trailing newline (#19934, re-#19681).
+        return $includeDeclaration ? '<?xml version="1.0"?>'."\n".$body."\n" : $body;
         }
 
         $state = SimpleXmlRegistry::state($entry);
         $body = self::serializeNode($state);
 
-        return $includeDeclaration ? '<?xml version="1.0"?>'."\n".$body : $body;
+        // php-src sxe_as_xml: document serialization ends with trailing newline (#19934, re-#19681).
+        return $includeDeclaration ? '<?xml version="1.0"?>'."\n".$body."\n" : $body;
     }
 
     public static function addChild(
