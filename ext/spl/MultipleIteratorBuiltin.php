@@ -71,6 +71,7 @@ final class MultipleIteratorBuiltin
             'current' => MultipleIteratorCurrent::class,
             'key' => MultipleIteratorKey::class,
             'next' => MultipleIteratorNext::class,
+            '__debuginfo' => MultipleIteratorDebugInfo::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -81,6 +82,7 @@ final class MultipleIteratorBuiltin
         $entry->methodNames['countiterators'] = 'countIterators';
         $entry->methodNames['setflags'] = 'setFlags';
         $entry->methodNames['getflags'] = 'getFlags';
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
 
         SplClassConstants::registerIntConstants($entry, [
             'MIT_NEED_ANY' => self::MIT_NEED_ANY,
@@ -95,7 +97,12 @@ final class MultipleIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['attachiterator'], $entry->methods['rewind'], $entry->methods['valid']);
+        return isset(
+            $entry->methods['attachiterator'],
+            $entry->methods['rewind'],
+            $entry->methods['valid'],
+            $entry->methods['__debuginfo']
+        );
     }
 
     public static function init(ObjectEntry $object, int $flags = self::DEFAULT_FLAGS): void
@@ -264,6 +271,46 @@ final class MultipleIteratorBuiltin
         foreach (self::$store[$object->id]['iterators'] as $entry) {
             SplDualIteratorStorage::callInner($frame, $entry['iterator'], 'next');
         }
+    }
+
+    /**
+     * php-src MultipleIterator::__debugInfo — SplObjectStorage-shaped private storage bag (#20144).
+     */
+    public static function debugInfoTable(ObjectEntry $object): HashTable
+    {
+        self::ensureState($object);
+        $rows = [];
+        foreach (self::$store[$object->id]['iterators'] as $entry) {
+            $row = new HashTable();
+            $obj = new Variable(Variable::TYPE_OBJECT);
+            $obj->object($entry['iterator']);
+            $row->addNew('obj', $obj);
+            $inf = new Variable();
+            $info = $entry['info'];
+            if (null === $info) {
+                $inf->null();
+            } elseif (\is_int($info)) {
+                $inf->int($info);
+            } else {
+                $inf->string($info);
+            }
+            $row->addNew('inf', $inf);
+            $rowVar = new Variable();
+            $rowVar->array($row);
+            $rows[] = $rowVar;
+        }
+        $storageBag = new Variable();
+        $storageHt = new HashTable();
+        if ([] !== $rows) {
+            $storageHt->assignPackedList($rows);
+        }
+        $storageBag->array($storageHt);
+
+        $ht = new HashTable();
+        // Zend reuses the SplObjectStorage private property name for MI debug output.
+        $ht->addNew("\0SplObjectStorage\0storage", $storageBag);
+
+        return $ht;
     }
 
     private static function infoKey(int|string|null $info): string
@@ -615,5 +662,27 @@ final class MultipleIteratorNext extends VmClassMethod
             'MultipleIterator::next()'
         );
         MultipleIteratorBuiltin::next($frame, $object);
+    }
+}
+
+/** php-src MultipleIterator::__debugInfo — SplObjectStorage-shaped bag (#20144). */
+final class MultipleIteratorDebugInfo extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__debugInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            MultipleIteratorBuiltin::CLASS_LC,
+            'MultipleIterator::__debugInfo()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(MultipleIteratorBuiltin::debugInfoTable($object));
     }
 }
