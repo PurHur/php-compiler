@@ -17,6 +17,14 @@ final class DOMImplementationVMTest extends BaseTest
             __DIR__.'/cases/dom/implementation_create_document.phpt',
             'implementation_create_document.phpt'
         );
+        yield 'implementation_create_document_type_optional_args.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/implementation_create_document_type_optional_args.phpt',
+            'implementation_create_document_type_optional_args.phpt'
+        );
+        yield 'document_type_properties.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/document_type_properties.phpt',
+            'document_type_properties.phpt'
+        );
     }
 
     public function setUp(): void

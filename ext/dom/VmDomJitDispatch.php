@@ -205,6 +205,37 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMImplementation::createDocumentType() — php-src ext/dom/domimplementation.stub.php (#19797).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function createDocumentType(VmContext $ctx, ObjectEntry $implementation, array $extra): Variable
+    {
+        unset($implementation);
+        $argc = \count($extra);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(
+                'DOMImplementation::createDocumentType() expects at least 1 argument, 0 given'
+            );
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(sprintf(
+                'DOMImplementation::createDocumentType() expects at most 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $qualifiedName = self::stringArg($extra[0], 'DOMImplementation::createDocumentType', 0);
+        $publicId = isset($extra[1])
+            ? self::stringArg($extra[1], 'DOMImplementation::createDocumentType', 1)
+            : '';
+        $systemId = isset($extra[2])
+            ? self::stringArg($extra[2], 'DOMImplementation::createDocumentType', 2)
+            : '';
+
+        return VmDom::createDocumentType($ctx, $qualifiedName, $publicId, $systemId);
+    }
+
+    /**
      * @param list<Variable> $extra
      */
     public static function getAttribute(ObjectEntry $element, array $extra): Variable

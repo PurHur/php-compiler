@@ -89,6 +89,7 @@ final class DomInstanceMethodJit
         'dom\\htmldocument::queryselectorall' => true,
         'dom\\htmldocument::getelementbyid' => true,
         'dom\\htmldocument::savehtml' => true,
+        'domimplementation::createdocumenttype' => true,
     ];
 
     /** User-script AOT: nested VmDomInstanceInvoke JIT aborts — use VmClassMethod lowering (#15407, #17391). */
@@ -276,6 +277,11 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domimplementation::createdocumenttype' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomImplementationCreateDocumentType();
+
+                return;
+            }
             if ('domxpath::query' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomXPathQuery();
 
@@ -371,6 +377,7 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domdocument::createattributens');
             self::ensureProxy($context, 'domnode::comparedocumentposition');
             self::ensureProxy($context, 'domxpath::registernamespace');
+            self::ensureProxy($context, 'domimplementation::createdocumenttype');
             self::ensureProxy($context, 'dom\\htmldocument::queryselector');
             self::ensureProxy($context, 'dom\\htmldocument::queryselectorall');
             self::ensureProxy($context, 'dom\\htmldocument::getelementbyid');
