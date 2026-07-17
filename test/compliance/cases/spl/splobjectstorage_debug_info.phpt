@@ -1,5 +1,5 @@
 --TEST--
-SPL SplObjectStorage::__debugInfo() — var_dump shows private storage (#19826, ext/spl/spl_observer.c)
+SPL object storage __debugInfo() — var_dump shows private storage (#19826, ext/spl/spl_observer.c)
 --FILE--
 <?php
 $s = new SplObjectStorage();
