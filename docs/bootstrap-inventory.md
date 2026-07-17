@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5457 |
-| Phase A inventory files (M2 ratio SSOT) | 5457 |
+| PHP files on vm.php path | 5463 |
+| Phase A inventory files (M2 ratio SSOT) | 5463 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15408 |
+| Source constructs flagged (warnings) | 15422 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1122,7 +1122,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_strerror.php` | 0 | 3 |
 | `ext/sockets/socket_write.php` | 0 | 3 |
 | `ext/sodium/JitSodium.php` | 0 | 1 |
-| `ext/sodium/Module.php` | 0 | 63 |
+| `ext/sodium/Module.php` | 0 | 69 |
 | `ext/sodium/SodiumAeadDecryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumAeadEncryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumAuthFunction.php` | 0 | 4 |
@@ -1153,7 +1153,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/SodiumStreamLengthFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumStreamXorFunction.php` | 0 | 4 |
 | `ext/sodium/SodiumStreamXorIcFunction.php` | 0 | 3 |
-| `ext/sodium/VmSodium.php` | 0 | 16 |
+| `ext/sodium/VmSodium.php` | 0 | 18 |
 | `ext/sodium/VmSodiumSecretstream.php` | 0 | 2 |
 | `ext/sodium/sodium_add.php` | 0 | 2 |
 | `ext/sodium/sodium_bin2hex.php` | 0 | 2 |
@@ -1161,6 +1161,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_crypto_aead_aes256gcm_decrypt.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_aead_aes256gcm_encrypt.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_aead_aes256gcm_is_available.php` | 0 | 2 |
+| `ext/sodium/sodium_crypto_aead_chacha20poly1305_decrypt.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_aead_chacha20poly1305_encrypt.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_aead_chacha20poly1305_ietf_decrypt.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_aead_chacha20poly1305_ietf_encrypt.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_aead_chacha20poly1305_ietf_keygen.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_aead_chacha20poly1305_keygen.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_decrypt.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_encrypt.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_auth.php` | 0 | 1 |
@@ -13509,45 +13515,51 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new sodium_crypto_stream_xchacha20_keygen (line 58)
 - new sodium_crypto_aead_xchacha20poly1305_ietf_encrypt (line 59)
 - new sodium_crypto_aead_xchacha20poly1305_ietf_decrypt (line 60)
-- new sodium_pad (line 61)
-- new sodium_unpad (line 62)
-- new sodium_crypto_generichash (line 63)
-- new sodium_crypto_generichash_init (line 64)
-- new sodium_crypto_generichash_update (line 65)
-- new sodium_crypto_generichash_final (line 66)
-- new sodium_crypto_generichash_keygen (line 67)
-- new sodium_crypto_scalarmult (line 68)
-- new sodium_crypto_scalarmult_base (line 69)
-- new sodium_crypto_box_keypair (line 70)
-- new sodium_crypto_box_publickey (line 71)
-- new sodium_crypto_box_secretkey (line 72)
-- new sodium_crypto_box (line 73)
-- new sodium_crypto_box_open (line 74)
-- new sodium_crypto_box_keypair_from_secretkey_and_publickey (line 75)
-- new sodium_crypto_box_publickey_from_secretkey (line 76)
-- new sodium_crypto_box_seal (line 77)
-- new sodium_crypto_box_seal_open (line 78)
-- new sodium_crypto_aead_aes256gcm_is_available (line 79)
-- new sodium_crypto_aead_aes256gcm_encrypt (line 80)
-- new sodium_crypto_aead_aes256gcm_decrypt (line 81)
-- new sodium_crypto_sign_keypair (line 82)
-- new sodium_crypto_sign_publickey (line 83)
-- new sodium_crypto_sign_secretkey (line 84)
-- new sodium_crypto_sign_publickey_from_secretkey (line 85)
-- new sodium_crypto_sign (line 86)
-- new sodium_crypto_sign_open (line 87)
-- new sodium_crypto_sign_detached (line 88)
-- new sodium_crypto_sign_verify_detached (line 89)
-- new sodium_crypto_secretstream_xchacha20poly1305_keygen (line 90)
-- new sodium_crypto_secretstream_xchacha20poly1305_init_push (line 91)
-- new sodium_crypto_secretstream_xchacha20poly1305_init_pull (line 92)
-- new sodium_crypto_secretstream_xchacha20poly1305_push (line 93)
-- new sodium_crypto_secretstream_xchacha20poly1305_pull (line 94)
-- new sodium_crypto_secretstream_xchacha20poly1305_rekey (line 95)
-- new sodium_crypto_shorthash (line 96)
-- new sodium_crypto_shorthash_keygen (line 97)
-- new sodium_crypto_kdf_keygen (line 98)
-- new sodium_crypto_kdf_derive_from_key (line 99)
+- new sodium_crypto_aead_chacha20poly1305_keygen (line 61)
+- new sodium_crypto_aead_chacha20poly1305_encrypt (line 62)
+- new sodium_crypto_aead_chacha20poly1305_decrypt (line 63)
+- new sodium_crypto_aead_chacha20poly1305_ietf_keygen (line 64)
+- new sodium_crypto_aead_chacha20poly1305_ietf_encrypt (line 65)
+- new sodium_crypto_aead_chacha20poly1305_ietf_decrypt (line 66)
+- new sodium_pad (line 67)
+- new sodium_unpad (line 68)
+- new sodium_crypto_generichash (line 69)
+- new sodium_crypto_generichash_init (line 70)
+- new sodium_crypto_generichash_update (line 71)
+- new sodium_crypto_generichash_final (line 72)
+- new sodium_crypto_generichash_keygen (line 73)
+- new sodium_crypto_scalarmult (line 74)
+- new sodium_crypto_scalarmult_base (line 75)
+- new sodium_crypto_box_keypair (line 76)
+- new sodium_crypto_box_publickey (line 77)
+- new sodium_crypto_box_secretkey (line 78)
+- new sodium_crypto_box (line 79)
+- new sodium_crypto_box_open (line 80)
+- new sodium_crypto_box_keypair_from_secretkey_and_publickey (line 81)
+- new sodium_crypto_box_publickey_from_secretkey (line 82)
+- new sodium_crypto_box_seal (line 83)
+- new sodium_crypto_box_seal_open (line 84)
+- new sodium_crypto_aead_aes256gcm_is_available (line 85)
+- new sodium_crypto_aead_aes256gcm_encrypt (line 86)
+- new sodium_crypto_aead_aes256gcm_decrypt (line 87)
+- new sodium_crypto_sign_keypair (line 88)
+- new sodium_crypto_sign_publickey (line 89)
+- new sodium_crypto_sign_secretkey (line 90)
+- new sodium_crypto_sign_publickey_from_secretkey (line 91)
+- new sodium_crypto_sign (line 92)
+- new sodium_crypto_sign_open (line 93)
+- new sodium_crypto_sign_detached (line 94)
+- new sodium_crypto_sign_verify_detached (line 95)
+- new sodium_crypto_secretstream_xchacha20poly1305_keygen (line 96)
+- new sodium_crypto_secretstream_xchacha20poly1305_init_push (line 97)
+- new sodium_crypto_secretstream_xchacha20poly1305_init_pull (line 98)
+- new sodium_crypto_secretstream_xchacha20poly1305_push (line 99)
+- new sodium_crypto_secretstream_xchacha20poly1305_pull (line 100)
+- new sodium_crypto_secretstream_xchacha20poly1305_rekey (line 101)
+- new sodium_crypto_shorthash (line 102)
+- new sodium_crypto_shorthash_keygen (line 103)
+- new sodium_crypto_kdf_keygen (line 104)
+- new sodium_crypto_kdf_derive_from_key (line 105)
 - 2 class method(s)
 
 ### `ext/sodium/SodiumAeadDecryptFunction.php`
@@ -13749,22 +13761,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/VmSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 1048)
-- new Exception (line 1060)
-- new Exception (line 1069)
-- new Exception (line 1085)
-- new Exception (line 1545)
-- new Exception (line 1562)
-- new Exception (line 1577)
-- new Exception (line 1594)
-- new Exception (line 1611)
-- new Exception (line 1647)
-- new Exception (line 1725)
-- new Exception (line 2175)
-- new Exception (line 2178)
-- new SodiumException (line 2240)
-- new Exception (line 2242)
-- 141 class method(s)
+- new Exception (line 1157)
+- new Exception (line 1169)
+- new Exception (line 1178)
+- new Exception (line 1194)
+- new Exception (line 1654)
+- new Exception (line 1671)
+- new Exception (line 1686)
+- new Exception (line 1703)
+- new Exception (line 1720)
+- new Exception (line 1756)
+- new Exception (line 1834)
+- new Exception (line 1912)
+- new Exception (line 1990)
+- new Exception (line 2486)
+- new Exception (line 2489)
+- new SodiumException (line 2551)
+- new Exception (line 2553)
+- 153 class method(s)
 
 ### `ext/sodium/VmSodiumSecretstream.php`
 
@@ -13805,6 +13819,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 - 1 closure(s)
+
+### `ext/sodium/sodium_crypto_aead_chacha20poly1305_decrypt.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_aead_chacha20poly1305_encrypt.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_aead_chacha20poly1305_ietf_decrypt.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_aead_chacha20poly1305_ietf_encrypt.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_aead_chacha20poly1305_ietf_keygen.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_aead_chacha20poly1305_keygen.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_decrypt.php`
 
