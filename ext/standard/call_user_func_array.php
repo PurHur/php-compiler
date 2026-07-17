@@ -43,7 +43,8 @@ final class call_user_func_array extends Internal
         $result = VmCallable::invokeWithArgEntries(
             $ctx,
             $frame->calledArgs[0],
-            VmCallable::arrayVariableToArgEntries($params)
+            VmCallable::arrayVariableToArgEntries($params),
+            'call_user_func_array'
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($result);

@@ -39,33 +39,45 @@ final class VmCallable
 
     public static function invoke(Context $ctx, Variable $callback, Variable ...$args): Variable
     {
+        return self::invokeAs('call_user_func', $ctx, $callback, ...$args);
+    }
+
+    /**
+     * Like {@see invoke()} but TypeError messages name $function (php-src-strict, #19837).
+     */
+    public static function invokeAs(string $function, Context $ctx, Variable $callback, Variable ...$args): Variable
+    {
         $callback = $callback->resolveIndirect();
         if (VmClosureCall::isClosure($callback)) {
             return VmClosureCall::invoke($ctx, VmClosureCall::resolve($callback), ...$args);
         }
         if (Variable::TYPE_STRING === $callback->type) {
-            return self::invokeStringCallable($ctx, $callback->toString(), ...$args);
+            return self::invokeStringCallable($ctx, $callback->toString(), $function, ...$args);
         }
         if (Variable::TYPE_ARRAY === $callback->type) {
-            return self::invokeArrayCallable($ctx, $callback, ...$args);
+            return self::invokeArrayCallable($ctx, $callback, $function, ...$args);
         }
         if (Variable::TYPE_OBJECT === $callback->type) {
             $object = $callback->toObject();
             if (null !== $object->closureState) {
-                throw new \TypeError(self::invalidCallbackTypeError());
+                throw new \TypeError(self::invalidCallbackTypeError($function));
             }
 
             return $ctx->runtime->vm->invokeInstanceMethod($object, '__invoke', ...$args);
         }
 
-        throw new \TypeError(self::invalidCallbackTypeError());
+        throw new \TypeError(self::invalidCallbackTypeError($function));
     }
 
     /**
      * @param list<array{0: string, 1?: mixed, 2?: Variable}> $entries
      */
-    public static function invokeWithArgEntries(Context $ctx, Variable $callback, array $entries): Variable
-    {
+    public static function invokeWithArgEntries(
+        Context $ctx,
+        Variable $callback,
+        array $entries,
+        string $function = 'call_user_func'
+    ): Variable {
         $callback = $callback->resolveIndirect();
         if (VmClosureCall::isClosure($callback)) {
             $state = VmClosureCall::resolve($callback);
@@ -79,24 +91,24 @@ final class VmCallable
             return VmClosureCall::invoke($ctx, $state, ...$resolved);
         }
         if (Variable::TYPE_STRING === $callback->type) {
-            return self::invokeStringCallableWithEntries($ctx, $callback->toString(), $entries);
+            return self::invokeStringCallableWithEntries($ctx, $callback->toString(), $entries, $function);
         }
         if (Variable::TYPE_ARRAY === $callback->type) {
             $resolved = self::resolveEntriesToPositional($entries);
 
-            return self::invokeArrayCallable($ctx, $callback, ...$resolved);
+            return self::invokeArrayCallable($ctx, $callback, $function, ...$resolved);
         }
         if (Variable::TYPE_OBJECT === $callback->type) {
             $object = $callback->toObject();
             if (null !== $object->closureState) {
-                throw new \TypeError(self::invalidCallbackTypeError());
+                throw new \TypeError(self::invalidCallbackTypeError($function));
             }
             $resolved = self::resolveEntriesToPositional($entries);
 
             return $ctx->runtime->vm->invokeInstanceMethod($object, '__invoke', ...$resolved);
         }
 
-        throw new \TypeError(self::invalidCallbackTypeError());
+        throw new \TypeError(self::invalidCallbackTypeError($function));
     }
 
     /**
@@ -134,12 +146,21 @@ final class VmCallable
     /**
      * @param list<Variable> $params
      */
-    public static function invokeArrayParams(Context $ctx, Variable $callback, array $params): Variable
-    {
+    public static function invokeArrayParams(
+        Context $ctx,
+        Variable $callback,
+        array $params,
+        string $function = 'call_user_func'
+    ): Variable {
         if (1 === \count($params)) {
             $sole = $params[0]->resolveIndirect();
             if (Variable::TYPE_ARRAY === $sole->type) {
-                return self::invokeWithArgEntries($ctx, $callback, self::arrayVariableToArgEntries($sole));
+                return self::invokeWithArgEntries(
+                    $ctx,
+                    $callback,
+                    self::arrayVariableToArgEntries($sole),
+                    $function
+                );
             }
         }
 
@@ -150,18 +171,29 @@ final class VmCallable
             $copies[] = $copy;
         }
 
-        return self::invoke($ctx, $callback, ...$copies);
+        return self::invokeAs($function, $ctx, $callback, ...$copies);
     }
 
-    public static function invalidCallbackTypeError(): string
-    {
-        return 'call_user_func(): Argument #1 ($callback) must be a valid callback, no array or string given';
-    }
-
-    public static function invalidStringCallbackTypeError(string $name): string
+    /**
+     * Zend call_user_func* / shared callable TypeError when callback is not array|string|object (#19837).
+     *
+     * php-src: Zend/zend_execute_API.c — zend_is_callable_ex / FCC validation
+     */
+    public static function invalidCallbackTypeError(string $function = 'call_user_func'): string
     {
         return sprintf(
-            'call_user_func(): Argument #1 ($callback) must be a valid callback, function "%s" not found or invalid function name',
+            '%s(): Argument #1 ($callback) must be a valid callback, no array or string given',
+            $function
+        );
+    }
+
+    public static function invalidStringCallbackTypeError(
+        string $name,
+        string $function = 'call_user_func'
+    ): string {
+        return sprintf(
+            '%s(): Argument #1 ($callback) must be a valid callback, function "%s" not found or invalid function name',
+            $function,
             $name
         );
     }
@@ -345,12 +377,16 @@ final class VmCallable
         );
     }
 
-    private static function invokeStringCallable(Context $ctx, string $name, Variable ...$args): Variable
-    {
+    private static function invokeStringCallable(
+        Context $ctx,
+        string $name,
+        string $function,
+        Variable ...$args
+    ): Variable {
         if (str_contains($name, '::')) {
             [$class, $method] = explode('::', $name, 2);
             if ('' === $class || '' === $method) {
-                throw new \TypeError(self::invalidCallbackTypeError());
+                throw new \TypeError(self::invalidCallbackTypeError($function));
             }
 
             return $ctx->runtime->vm->invokeStaticWithCalledScope($class, $method, ...$args);
@@ -362,7 +398,7 @@ final class VmCallable
             try {
                 $fn = VmUserCall::resolveStringCallback($ctx, $name);
             } catch (\LogicException) {
-                throw new \TypeError(self::invalidStringCallbackTypeError($name));
+                throw new \TypeError(self::invalidStringCallbackTypeError($name, $function));
             }
 
             return $ctx->runtime->vm->invokePhpFunction($fn, ...$args);
@@ -374,12 +410,16 @@ final class VmCallable
     /**
      * @param list<array{0: string, 1?: mixed, 2?: Variable}> $entries
      */
-    private static function invokeStringCallableWithEntries(Context $ctx, string $name, array $entries): Variable
-    {
+    private static function invokeStringCallableWithEntries(
+        Context $ctx,
+        string $name,
+        array $entries,
+        string $function
+    ): Variable {
         if (str_contains($name, '::')) {
             $resolved = self::resolveEntriesToPositional($entries);
 
-            return self::invokeStringCallable($ctx, $name, ...$resolved);
+            return self::invokeStringCallable($ctx, $name, $function, ...$resolved);
         }
         try {
             $internal = VmInternalCall::resolveStringCallback($name);
@@ -388,7 +428,7 @@ final class VmCallable
             try {
                 $fn = VmUserCall::resolveStringCallback($ctx, $name);
             } catch (\LogicException) {
-                throw new \TypeError(self::invalidStringCallbackTypeError($name));
+                throw new \TypeError(self::invalidStringCallbackTypeError($name, $function));
             }
 
             return $ctx->runtime->vm->invokePhpFunctionWithArgEntries($fn, $entries);
@@ -444,20 +484,24 @@ final class VmCallable
         return $out;
     }
 
-    private static function invokeArrayCallable(Context $ctx, Variable $callback, Variable ...$args): Variable
-    {
+    private static function invokeArrayCallable(
+        Context $ctx,
+        Variable $callback,
+        string $function,
+        Variable ...$args
+    ): Variable {
         $table = $callback->toArray();
         $idx0 = new Variable(Variable::TYPE_INTEGER);
         $idx0->int(0);
         $idx1 = new Variable(Variable::TYPE_INTEGER);
         $idx1->int(1);
         if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
-            throw new \TypeError(self::invalidCallbackTypeError());
+            throw new \TypeError(self::invalidCallbackTypeError($function));
         }
         $target = $table->findVariable($idx0, false)->resolveIndirect();
         $methodName = $table->findVariable($idx1, false)->resolveIndirect()->toString();
         if ('' === $methodName) {
-            throw new \TypeError(self::invalidCallbackTypeError());
+            throw new \TypeError(self::invalidCallbackTypeError($function));
         }
         if (Variable::TYPE_OBJECT === $target->type) {
             return $ctx->runtime->vm->invokeInstanceMethod($target->toObject(), $methodName, ...$args);
@@ -465,13 +509,13 @@ final class VmCallable
         if (Variable::TYPE_STRING === $target->type) {
             $class = $target->toString();
             if ('' === $class) {
-                throw new \TypeError(self::invalidCallbackTypeError());
+                throw new \TypeError(self::invalidCallbackTypeError($function));
             }
 
             return $ctx->runtime->vm->invokeStaticWithCalledScope($class, $methodName, ...$args);
         }
 
-        throw new \TypeError(self::invalidCallbackTypeError());
+        throw new \TypeError(self::invalidCallbackTypeError($function));
     }
 
     private static function writeCallableName(Variable $ref, string $name): void
