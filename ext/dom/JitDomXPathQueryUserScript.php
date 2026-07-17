@@ -40,6 +40,15 @@ final class JitDomXPathQueryUserScript
         if (null === $xml) {
             return null;
         }
+
+        // Namespace axis lengths at compile time (#20206) — avoid ABI fallback segfault.
+        $nsCount = DomParseSimpleXmlJitHelper::countNamespaceAxisArgv($xml, $exprLit);
+        if (null !== $nsCount) {
+            self::$lastCacheKey = null;
+
+            return self::boxNodeList($context, $nsCount);
+        }
+
         if (!preg_match(
             '~^//([*\w][\w:-]*)(?:\[@([^\]=]+)=["\']([^"\']*)["\']\])?$~',
             trim($exprLit),

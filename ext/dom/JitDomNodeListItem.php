@@ -64,7 +64,7 @@ final class JitDomNodeListItem
 
     private static function loadIntArg(Context $context, JITVariable $arg): Value
     {
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type || JITVariable::TYPE_INTEGER === $arg->type) {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
             return $context->helper->loadValue($arg);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
