@@ -9,6 +9,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\WeakRefSupport;
@@ -83,6 +84,10 @@ final class SplObjectStorageBuiltin
         $entry->methodNames['removeall'] = 'removeAll';
         $entry->methodNames['removeallexcept'] = 'removeAllExcept';
 
+        $entry->methods['__debuginfo'] = new SplObjectStorageDebugInfo();
+        $entry->methodVisibility['__debuginfo'] = $pub;
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
+
         $entry->isInternal = true;
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'SplObjectStorage');
         $entry->cloneObjectHandler = [self::class, 'cloneInto'];
@@ -99,7 +104,8 @@ final class SplObjectStorageBuiltin
             $entry->methods['removeallexcept'],
             $entry->methods['detach'],
             $entry->methods['rewind'],
-            $entry->methods['getinfo']
+            $entry->methods['getinfo'],
+            $entry->methods['__debuginfo']
         );
     }
 
@@ -261,6 +267,37 @@ final class SplObjectStorageBuiltin
         }
 
         return $out;
+    }
+
+    /**
+     * Private storage bag for var_dump (php-src spl_object_storage_debug_info; #19826).
+     */
+    public static function debugInfoTable(ObjectEntry $storage): HashTable
+    {
+        $rows = [];
+        foreach (self::exportSerializeEntries($storage) as [$objectVar, $infoVar]) {
+            $row = new HashTable();
+            $obj = new Variable();
+            $obj->copyFrom($objectVar->resolveIndirect());
+            $row->addNew('obj', $obj);
+            $inf = new Variable();
+            $inf->copyFrom($infoVar->resolveIndirect());
+            $row->addNew('inf', $inf);
+            $rowVar = new Variable();
+            $rowVar->array($row);
+            $rows[] = $rowVar;
+        }
+        $storageBag = new Variable();
+        $storageHt = new HashTable();
+        if ([] !== $rows) {
+            $storageHt->assignPackedList($rows);
+        }
+        $storageBag->array($storageHt);
+
+        $ht = new HashTable();
+        $ht->addNew("\0SplObjectStorage\0storage", $storageBag);
+
+        return $ht;
     }
 
     public static function offsetGet(ObjectEntry $storage, Variable $object): Variable
@@ -440,6 +477,30 @@ final class SplObjectStorageBuiltin
         $out->null();
 
         return $out;
+    }
+}
+
+/**
+ * SplObjectStorage::__debugInfo() — private storage rows {obj,inf} (#19826).
+ */
+final class SplObjectStorageDebugInfo extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__debugInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::__debugInfo()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(SplObjectStorageBuiltin::debugInfoTable($object));
     }
 }
 

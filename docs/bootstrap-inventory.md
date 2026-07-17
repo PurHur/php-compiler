@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5269 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14584 |
+| Source constructs flagged (warnings) | 14592 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1168,7 +1168,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplHeapBuiltin.php` | 0 | 48 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 3 |
 | `ext/spl/SplLegacySerializableMethods.php` | 0 | 5 |
-| `ext/spl/SplObjectStorageBuiltin.php` | 0 | 28 |
+| `ext/spl/SplObjectStorageBuiltin.php` | 0 | 36 |
 | `ext/spl/SplObjectStorageSerializeSupport.php` | 0 | 3 |
 | `ext/spl/SplQueueSplStackBuiltin.php` | 0 | 11 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
@@ -13732,33 +13732,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplObjectStorageBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 45)
-- new SplObjectStorageConstruct (line 48)
-- new Variable (line 144)
-- new Variable (line 149)
-- new Variable (line 220)
-- new Variable (line 224)
-- new Variable (line 227)
-- new UnexpectedValueException (line 271)
-- new Variable (line 273)
-- new Variable (line 361)
-- new Variable (line 373)
-- new Variable (line 385)
-- new Variable (line 439)
-- new ArgumentCountError (line 479)
-- new ArgumentCountError (line 504)
-- new ArgumentCountError (line 529)
-- new ArgumentCountError (line 554)
-- new ArgumentCountError (line 617)
-- new ArgumentCountError (line 667)
-- new ArgumentCountError (line 694)
-- new ArgumentCountError (line 718)
-- new ArgumentCountError (line 747)
-- new ArgumentCountError (line 870)
-- new ArgumentCountError (line 894)
-- new ArgumentCountError (line 918)
-- new ArgumentCountError (line 947)
-- 53 class method(s)
+- new ClassEntry (line 46)
+- new SplObjectStorageConstruct (line 49)
+- new SplObjectStorageDebugInfo (line 87)
+- new Variable (line 150)
+- new Variable (line 155)
+- new Variable (line 226)
+- new Variable (line 230)
+- new Variable (line 233)
+- new HashTable (line 279)
+- new Variable (line 280)
+- new Variable (line 283)
+- new Variable (line 286)
+- new Variable (line 290)
+- new HashTable (line 291)
+- new HashTable (line 297)
+- new UnexpectedValueException (line 308)
+- new Variable (line 310)
+- new Variable (line 398)
+- new Variable (line 410)
+- new Variable (line 422)
+- new Variable (line 476)
+- new ArgumentCountError (line 540)
+- new ArgumentCountError (line 565)
+- new ArgumentCountError (line 590)
+- new ArgumentCountError (line 615)
+- new ArgumentCountError (line 678)
+- new ArgumentCountError (line 728)
+- new ArgumentCountError (line 755)
+- new ArgumentCountError (line 779)
+- new ArgumentCountError (line 808)
+- new ArgumentCountError (line 931)
+- new ArgumentCountError (line 955)
+- new ArgumentCountError (line 979)
+- new ArgumentCountError (line 1008)
+- 55 class method(s)
 - 1 closure(s)
 
 ### `ext/spl/SplObjectStorageSerializeSupport.php`
