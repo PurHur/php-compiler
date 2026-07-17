@@ -41,7 +41,10 @@ final class EnumFromJitHelperTest extends TestCase
     {
         $this->assertSame('1', EnumFromJitHelper::stringBackingFromBool(true));
         $this->assertSame('0', EnumFromJitHelper::stringBackingFromBool(false));
-        $this->assertSame('', EnumFromJitHelper::stringBackingFromNull());
+        $this->assertSame('0', EnumFromJitHelper::stringBackingFromNull());
+        $this->assertSame(0, EnumFromJitHelper::intBackingFromNull());
+        $this->assertSame(1, EnumFromJitHelper::intBackingFromBool(true));
+        $this->assertSame(0, EnumFromJitHelper::intBackingFromBool(false));
         $this->assertSame('42', EnumFromJitHelper::stringBackingFromLong(42));
     }
 

@@ -142,6 +142,42 @@ PHP;
         $runtime->run($block);
     }
 
+    /** Issue #20072 — null coerces to backing 0 / "0" under weak types (zend_enum.c). */
+    public function testBackedEnumFromNullCoercesLikeZend(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: string { case A = 'a'; }
+enum I: int { case A = 1; }
+foreach ([
+    fn() => E::from(null),
+    fn() => I::from(null),
+    fn() => I::tryFrom(null),
+    fn() => E::tryFrom(null),
+] as $fn) {
+    try {
+        var_export($fn());
+        echo "\n";
+    } catch (Throwable $e) {
+        echo get_class($e), ': ', $e->getMessage(), "\n";
+    }
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'enum_from_null_coerce.php');
+        ob_start();
+        $runtime->run($block);
+        $output = ob_get_clean();
+
+        $this->assertSame(
+            "ValueError: \"0\" is not a valid backing value for enum E\n"
+            ."ValueError: 0 is not a valid backing value for enum I\n"
+            ."NULL\n"
+            ."NULL\n",
+            $output
+        );
+    }
+
     /** Issue #9603 — exact maintainer repro: valid backing values resolve to enum cases. */
     public function testIssue9603EnumFromTryFromRepro(): void
     {
