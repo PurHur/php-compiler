@@ -31,7 +31,8 @@ final class JitDomXPathEvaluate
 
         $exprLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         $expr = null !== $exprLit ? trim($exprLit) : null;
-        if (null !== $expr && preg_match('~^boolean\(~i', $expr)) {
+        // Bool: boolean()/not()/comparisons; double: count/sum/number/arithmetic; string: string()/name() (#20280).
+        if (null !== $expr && self::isBoolEvaluateExpr($expr)) {
             DomXPathEvaluateRuntime::ensureBoolLinked($context);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_xpath_evaluate_bool_cont');
 
@@ -41,7 +42,7 @@ final class JitDomXPathEvaluate
                 self::loadStringArg($context, $args[1])
             );
         }
-        if (null !== $expr && preg_match('~^(number|count|sum)\(~i', $expr)) {
+        if (null !== $expr && self::isDoubleEvaluateExpr($expr)) {
             DomXPathEvaluateRuntime::ensureDoubleLinked($context);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_xpath_evaluate_double_cont');
 
@@ -51,7 +52,7 @@ final class JitDomXPathEvaluate
                 self::loadStringArg($context, $args[1])
             );
         }
-        if (null !== $expr && preg_match('~^string\(~i', $expr)) {
+        if (null !== $expr && preg_match('~^(string|name)\(~i', $expr)) {
             DomXPathEvaluateRuntime::ensureStringLinked($context);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_xpath_evaluate_string_cont');
 
@@ -62,7 +63,34 @@ final class JitDomXPathEvaluate
             );
         }
 
-        throw new \LogicException('DOMXPath::evaluate() user-script AOT requires boolean()/count()/number()/sum()/string() literal');
+        throw new \LogicException('DOMXPath::evaluate() user-script AOT requires boolean/not/compare, count/sum/number/arithmetic, or string/name() literal');
+    }
+
+    private static function isBoolEvaluateExpr(string $expr): bool
+    {
+        if (preg_match('~^(true|false|boolean\(|not\()~i', $expr)) {
+            return true;
+        }
+
+        return 1 === preg_match('~[=<>]~', $expr);
+    }
+
+    private static function isDoubleEvaluateExpr(string $expr): bool
+    {
+        if (preg_match('~^(number|count|sum)\(~i', $expr)) {
+            return true;
+        }
+        if (1 === preg_match('~^[+-]?(?:\d+\.?\d*|\.\d+)$~', $expr)) {
+            return true;
+        }
+        if (1 === preg_match('~[=<>]~', $expr)) {
+            return false;
+        }
+
+        return str_contains($expr, '+')
+            || 1 === preg_match('~(?<=[\d).])\s*-|^\d+\s*-|\s+-\s+~', $expr)
+            || str_contains($expr, '*')
+            || 1 === preg_match('~\bdiv\b|\bmod\b~i', $expr);
     }
 
     private static function loadObjectArg(Context $context, JITVariable $arg): Value
