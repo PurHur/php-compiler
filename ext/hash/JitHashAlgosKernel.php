@@ -11,10 +11,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM lowering for user-script AOT hash_algos / hash_hmac_algos — registry loops (#19355).
+ * LLVM lowering for thin standalone AOT hash_algos / hash_hmac_algos — registry loops (#19355, #20050).
  *
- * Nested {@see HashAlgosJitHelper} is deferred under PHP_COMPILER_AOT_USER_SCRIPT
- * (#16075 / #3357); this kernel keeps the thin hashtable build in ext/ not lib/JIT/Builtin/.
+ * Nested {@see HashAlgosJitHelper} is skipped when {@see \PHPCompiler\JIT\Context::isThinStandaloneAotMain()}
+ * (#20028 Rename shape); this kernel keeps the thin hashtable build in ext/ not lib/JIT/Builtin/.
  * php-src: ext/hash/hash.c — php_hash_algos() / php_hash_hmac_algos()
  */
 final class JitHashAlgosKernel

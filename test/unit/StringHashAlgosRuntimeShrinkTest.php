@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** hash_algos JIT: PHP helper for embed; ext kernel for user-script AOT (#14909, #19355). */
+/** hash_algos JIT: PHP helper for embed; thin kernel for standalone AOT (#14909, #19355, #20050). */
 final class StringHashAlgosRuntimeShrinkTest extends TestCase
 {
     public function testStringHashAlgosUsesJitHelperAndExtKernel(): void
@@ -14,9 +14,12 @@ final class StringHashAlgosRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHashAlgos.php');
         $this->assertStringContainsString('HashAlgosJitHelper', $runtime);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit::shouldDefer', $runtime);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $runtime);
         $this->assertStringContainsString('JitHashAlgosKernel', $runtime);
         $this->assertStringContainsString('hash_algos_kernel_entry', $runtime);
+        $this->assertStringContainsString('implementThinKernel', $runtime);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
+        $this->assertStringNotContainsString('implementUserScriptKernel', $runtime);
         $this->assertStringNotContainsString('implementInlineRegistry', $runtime);
         $this->assertStringNotContainsString('HashAlgosRegistry::ALL_ALGOS', $runtime);
         $this->assertStringNotContainsString('__hashtable__setStringAt', $runtime);
