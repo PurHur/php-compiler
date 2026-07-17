@@ -187,6 +187,12 @@ final class VmDomXPath
             self::registerContextNodeNamespaces($xpath, $context);
         }
 
+        // Namespace axis: namespace::* / namespace::prefix (php-src/libxml; #20097).
+        $nsIds = self::tryEvaluateNamespaceAxis($ctx, $context, $expression);
+        if (null !== $nsIds) {
+            return $nsIds;
+        }
+
         // Attribute axis: //@id, //a/@id, //a[1]/@id (php-src/libxml string-value of Attr; #19352).
         $attrIds = self::tryEvaluateAttributeAxis($ctx, $context, $expression, $state->xpathNamespaces);
         if (null !== $attrIds) {
@@ -235,6 +241,77 @@ final class VmDomXPath
         }
 
         throw new \DOMException('Invalid expression');
+    }
+
+    /**
+     * Resolve namespace::* / namespace::prefix to DOMNameSpaceNode ids (in-scope; #20097).
+     *
+     * @return list<int>|null null when expression is not a namespace-axis path
+     */
+    private static function tryEvaluateNamespaceAxis(
+        Context $ctx,
+        ObjectEntry $context,
+        string $expression
+    ): ?array {
+        if (!preg_match('~^namespace::(\*|[\w.-]+)$~', $expression, $matches)) {
+            return null;
+        }
+        if (!VmDom::isElement($context)) {
+            return [];
+        }
+
+        $wantPrefix = '*' === $matches[1] ? null : $matches[1];
+        $inScope = self::collectInScopeNamespaces($context);
+        $ids = [];
+        foreach ($inScope as $prefix => $uri) {
+            if (null !== $wantPrefix && $prefix !== $wantPrefix) {
+                continue;
+            }
+            $ids[] = VmDom::createNameSpaceNode($ctx, $context, $prefix, $uri)->id;
+        }
+
+        return $ids;
+    }
+
+    /**
+     * In-scope prefix→URI map at $context (xml always present; nearer decls win).
+     *
+     * Order matches libxml nsDef (reverse document order per element, root→context;
+     * redeclared prefixes move to the end). php-src/libxml; #20097.
+     *
+     * @return array<string, string>
+     */
+    private static function collectInScopeNamespaces(ObjectEntry $context): array
+    {
+        $chain = [];
+        $current = $context;
+        while (DomRegistry::has($current)) {
+            if (VmDom::isElement($current)) {
+                $chain[] = $current;
+            }
+            $state = DomRegistry::state($current);
+            if (null === $state->parentId) {
+                break;
+            }
+            $parent = DomRegistry::entry($state->parentId);
+            if (null === $parent || VmDom::isDocument($parent)) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        $inScope = ['xml' => DomConstants::XML_NS_URI];
+        for ($i = \count($chain) - 1; $i >= 0; --$i) {
+            $decls = DomRegistry::state($chain[$i])->namespaceDeclarations;
+            // libxml nsDef is a prepend list → reverse document order.
+            $prefixes = array_reverse(array_keys($decls));
+            foreach ($prefixes as $prefix) {
+                unset($inScope[$prefix]);
+                $inScope[$prefix] = $decls[$prefix];
+            }
+        }
+
+        return $inScope;
     }
 
     /**
