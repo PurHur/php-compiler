@@ -1203,6 +1203,7 @@
         "ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_decrypt.php",
         "ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_encrypt.php",
         "ext/sodium/sodium_crypto_auth.php",
+        "ext/sodium/sodium_crypto_auth_keygen.php",
         "ext/sodium/sodium_crypto_auth_verify.php",
         "ext/sodium/sodium_crypto_box.php",
         "ext/sodium/sodium_crypto_box_keypair.php",
@@ -5681,9 +5682,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5447,
+        "inventory_files": 5448,
         "excluded": 0,
-        "eligible": 5447,
+        "eligible": 5448,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -1223,6 +1223,7 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aes256gcm_is_avail
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_decrypt.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_encrypt.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_auth.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_auth_keygen.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_auth_verify.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_keypair.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_publickey.php';

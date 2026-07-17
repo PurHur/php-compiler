@@ -667,6 +667,18 @@ final class VmSodium
     }
 
     /**
+     * sodium_crypto_auth_keygen() — random auth key (php-src ext/sodium/libsodium.c; #20082).
+     */
+    public static function authKeygen(): string
+    {
+        if (\function_exists('sodium_crypto_auth_keygen')) {
+            return \sodium_crypto_auth_keygen();
+        }
+
+        return self::randomKeyBytes(self::CRYPTO_AUTH_KEYBYTES);
+    }
+
+    /**
      * sodium_crypto_shorthash() — SipHash-2-4 (php-src ext/sodium/libsodium.c; #20063).
      */
     public static function shorthash(string $message, string $key): string

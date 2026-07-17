@@ -41,6 +41,7 @@ class Module extends ModuleAbstract
             new sodium_crypto_secretbox_keygen(),
             new sodium_crypto_auth(),
             new sodium_crypto_auth_verify(),
+            new sodium_crypto_auth_keygen(),
             new sodium_memcmp(),
             new sodium_bin2hex(),
             new sodium_hex2bin(),
