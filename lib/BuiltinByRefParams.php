@@ -139,6 +139,8 @@ final class BuiltinByRefParams
             case 'sodium_crypto_secretstream_xchacha20poly1305_push':
             case 'sodium_crypto_secretstream_xchacha20poly1305_pull':
             case 'sodium_crypto_secretstream_xchacha20poly1305_rekey':
+            case 'sodium_crypto_generichash_update':
+            case 'sodium_crypto_generichash_final':
                 return [0];
             case 'sodium_memzero':
                 return [0];
