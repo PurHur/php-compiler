@@ -10,7 +10,7 @@ var_export($r);
 echo "\n";
 ?>
 --EXPECTF--
-hi
 PHP Deprecated:  zlib_decode(): Passing null to parameter #1 ($data) of type string is deprecated in %s on line %d
 PHP Warning:  zlib_decode(): data error in %s on line %d
+hi
 false
