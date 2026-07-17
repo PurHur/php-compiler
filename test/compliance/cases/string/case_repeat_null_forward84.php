@@ -1,6 +1,4 @@
 <?php
-declare(strict_types=1);
-
 $cases = [
     'str_repeat' => static fn () => str_repeat(null, 1),
     'str_shuffle' => static fn () => str_shuffle(null),
@@ -10,8 +8,8 @@ $cases = [
 ];
 foreach ($cases as $name => $call) {
     try {
-        $call();
-        echo "$name: uncaught\n";
+        $r = $call();
+        echo "$name: uncaught ", var_export($r, true), "\n";
     } catch (TypeError $e) {
         echo "$name: ", $e->getMessage(), "\n";
     }

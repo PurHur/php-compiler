@@ -31,7 +31,7 @@ final class str_repeat extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('str_repeat() requires exactly two arguments');
         }
-        $input = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'str_repeat', 0, 'string');
+        $input = VmString::trimFamilyStringArgForFrame($frame, 0, 'str_repeat', 0, 'string');
         $times = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_repeat', 2, 'times');
         $result = VmString::repeat($input, $times);
         if (null === $frame->returnVar) {
@@ -55,13 +55,13 @@ final class str_repeat extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19257, ext/standard/string.c). */
+    /** Soft-null — coerce+deprecate on forward profile (#19998, ext/standard/string.c). */
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
             return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'str_repeat', 0, 'string');
         }
 
-        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'str_repeat', 0, 'string');
+        return JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'str_repeat', 0, 'string');
     }
 }

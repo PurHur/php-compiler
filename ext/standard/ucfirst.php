@@ -30,7 +30,7 @@ final class ucfirst extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('ucfirst() requires exactly one argument');
         }
-        $subject = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'ucfirst', 0, 'string');
+        $subject = VmString::trimFamilyStringArgForFrame($frame, 0, 'ucfirst', 0, 'string');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->string(VmString::asciiUcfirst($subject))
@@ -52,13 +52,13 @@ final class ucfirst extends Internal
         return $copy;
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19257, ext/standard/string.c). */
+    /** Soft-null — coerce+deprecate on forward profile (#19998, ext/standard/string.c). */
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
             return JitStringBuiltinArg::lowerStrictOrCoercible($context, $arg, 'ucfirst', 0, 'string');
         }
 
-        return JitStringBuiltinArg::lowerZparamStr($context, $arg, 'ucfirst', 0, 'string');
+        return JitStringBuiltinArg::lowerTrimFamilyString($context, $arg, 'ucfirst', 0, 'string');
     }
 }

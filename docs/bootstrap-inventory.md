@@ -16000,8 +16000,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFilestatArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 211)
-- 14 class method(s)
+- new JITVariable (line 222)
+- 15 class method(s)
 
 ### `ext/standard/JitFiletype.php`
 
@@ -20650,8 +20650,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFilestatArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 150)
-- 17 class method(s)
+- new Variable (line 169)
+- 18 class method(s)
 
 ### `ext/standard/VmFilestatFailure.php`
 
@@ -22265,9 +22265,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1738)
-- new Error (line 1749)
-- 217 class method(s)
+- new Error (line 1774)
+- new Error (line 1785)
+- 219 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -28186,9 +28186,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 241)
 - new Error (line 246)
 - new XmlReaderState (line 271)
-- new Error (line 703)
-- new XmlReaderEvent (line 1012)
-- 54 class method(s)
+- new Error (line 719)
+- new XmlReaderEvent (line 1028)
+- 55 class method(s)
 
 ### `ext/xmlreader/XmlReaderClose.php`
 
@@ -33785,7 +33785,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrRepeat.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 120)
+- new JIT (line 128)
 - 7 class method(s)
 - 1 closure(s)
 
@@ -35800,8 +35800,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 440)
-- 27 class method(s)
+- new Variable (line 455)
+- 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
 
