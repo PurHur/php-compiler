@@ -13,4 +13,14 @@ final class Sqlite3State
     public bool $closed = false;
 
     public string $filename = '';
+
+    /** php-src sqlite3_db.exceptions (#19862). Default off. */
+    public bool $exceptions = false;
+
+    /**
+     * Registered scalar UDFs (name lc => entry).
+     *
+     * @var array<string, array{callback: \PHPCompiler\VM\Variable, closure: ?\PHPCompiler\VM\ClosureState, argc: int, ctx: \PHPCompiler\VM\Context}>
+     */
+    public array $functions = [];
 }

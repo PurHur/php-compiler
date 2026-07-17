@@ -309,6 +309,14 @@ final class VmSqlite3Native
         return null === $name ? '' : self::ffiString($name);
     }
 
+    /** php-src SQLite3::busyTimeout — sqlite3_busy_timeout (#19862). */
+    public static function busyTimeout(\FFI\CData $db, int $milliseconds): bool
+    {
+        $rc = (int) self::requireFfi()->sqlite3_busy_timeout($db, $milliseconds);
+
+        return self::SQLITE_OK === $rc;
+    }
+
     public const STEP_ROW = 100;
 
     public const STEP_DONE = 101;
@@ -421,6 +429,7 @@ char *sqlite3_expanded_sql(sqlite3_stmt *pStmt);
 int sqlite3_stmt_readonly(sqlite3_stmt *pStmt);
 int sqlite3_data_count(sqlite3_stmt *pStmt);
 const char *sqlite3_column_decltype(sqlite3_stmt *pStmt, int N);
+int sqlite3_busy_timeout(sqlite3 *db, int ms);
 CDEF;
 
         foreach (['libsqlite3.so.0', 'libsqlite3.so'] as $lib) {

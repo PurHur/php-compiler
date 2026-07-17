@@ -55,6 +55,9 @@ final class VmSQLite3
             'changes' => new SQLite3Changes(),
             'lastinsertrowid' => new SQLite3LastInsertRowID(),
             'escapestring' => new SQLite3EscapeString(),
+            'busytimeout' => new SQLite3BusyTimeout(),
+            'enableexceptions' => new SQLite3EnableExceptions(),
+            'createfunction' => new SQLite3CreateFunction(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -140,10 +143,10 @@ final class VmSQLite3
         if (Variable::TYPE_INTEGER === $resolved->type) {
             return $resolved->toInt();
         }
-        if (Variable::TYPE_DOUBLE === $resolved->type) {
+        if (Variable::TYPE_FLOAT === $resolved->type) {
             return (int) $resolved->toFloat();
         }
-        if (Variable::TYPE_BOOL === $resolved->type) {
+        if (Variable::TYPE_BOOLEAN === $resolved->type) {
             return $resolved->toBool() ? 1 : 0;
         }
         if (Variable::TYPE_STRING === $resolved->type) {
@@ -165,7 +168,7 @@ final class VmSQLite3
             return $default;
         }
         $resolved = $var->resolveIndirect();
-        if (Variable::TYPE_BOOL === $resolved->type) {
+        if (Variable::TYPE_BOOLEAN === $resolved->type) {
             return $resolved->toBool();
         }
         if (Variable::TYPE_INTEGER === $resolved->type) {
@@ -217,8 +220,35 @@ final class VmSQLite3
             'querysingle' => 'querySingle',
             'lastinsertrowid' => 'lastInsertRowID',
             'escapestring' => 'escapeString',
+            'busytimeout' => 'busyTimeout',
+            'enableexceptions' => 'enableExceptions',
+            'createfunction' => 'createFunction',
             default => $lc,
         };
+    }
+
+    /** Expand registered scalar UDFs in SQL (PHP 8.2 path / always for literal args). */
+    public static function expandSql(ObjectEntry $entry, string $sql): string
+    {
+        $state = self::state($entry);
+        if ([] === $state->functions) {
+            return $sql;
+        }
+
+        return VmSqlite3Udf::expandSql($sql, $state->functions);
+    }
+
+    /**
+     * Map SQLite3Exception through exception-mode policy (php-src sqlite3_report_error).
+     * Returns true when the error was swallowed (caller should return false).
+     */
+    public static function handleException(ObjectEntry $entry, \SQLite3Exception $e): bool
+    {
+        if (self::state($entry)->exceptions) {
+            throw $e;
+        }
+
+        return true;
     }
 
     private static function typeLabel(Variable $var): string
@@ -227,9 +257,9 @@ final class VmSQLite3
 
         return match ($resolved->type) {
             Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOL => 'bool',
+            Variable::TYPE_BOOLEAN => 'bool',
             Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_FLOAT => 'float',
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_ARRAY => 'array',
             Variable::TYPE_OBJECT => $resolved->toObject()->class->name,
