@@ -1532,6 +1532,7 @@ require_once __DIR__.'/../../../ext/standard/JitDnsGetRecord.php';
 require_once __DIR__.'/../../../ext/standard/JitDnsGetRecordMaterializer.php';
 require_once __DIR__.'/../../../ext/standard/JitEnumExists.php';
 require_once __DIR__.'/../../../ext/standard/JitEnv.php';
+require_once __DIR__.'/../../../ext/standard/JitEnvLocalKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitEnvironMirrorKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitErrorGetLast.php';
 require_once __DIR__.'/../../../ext/standard/JitErrorHandler.php';

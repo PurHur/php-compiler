@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5260 |
-| Phase A inventory files (M2 ratio SSOT) | 5260 |
+| PHP files on vm.php path | 5261 |
+| Phase A inventory files (M2 ratio SSOT) | 5261 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14510 |
+| Source constructs flagged (warnings) | 14511 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1461,6 +1461,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitDnsGetRecordMaterializer.php` | 0 | 1 |
 | `ext/standard/JitEnumExists.php` | 0 | 1 |
 | `ext/standard/JitEnv.php` | 0 | 1 |
+| `ext/standard/JitEnvLocalKernel.php` | 0 | 3 |
 | `ext/standard/JitEnvironMirrorKernel.php` | 0 | 1 |
 | `ext/standard/JitErrorGetLast.php` | 0 | 1 |
 | `ext/standard/JitErrorHandler.php` | 0 | 1 |
@@ -3741,7 +3742,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/EmbedObEchoBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnumCasesRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/EnvLocalRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/EnvLocalRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnvironMirrorRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandlerJitRuntime.php` | 0 | 2 |
@@ -15392,6 +15393,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `ext/standard/JitEnvLocalKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 356)
+- 14 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/JitEnvironMirrorKernel.php`
 
@@ -30617,9 +30625,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/EnvLocalRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 357)
-- 14 class method(s)
-- 1 closure(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/EnvironMirrorRuntime.php`
 
