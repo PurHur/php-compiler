@@ -947,14 +947,9 @@ class Context {
         $this->ensureMinimalUserStandaloneBodies();
     }
 
-    private function isUserScriptAot(): bool
+    public function isUserScriptAot(): bool
     {
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
-            return true;
-        }
-
-        return false;
+        return UserScriptAotEnv::isActive();
     }
 
     /** bootstrap-aot-link: thin LLVM during Context init — defer nested php-in-PHP JIT (#14459, #13245). */

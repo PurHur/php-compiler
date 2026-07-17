@@ -4858,6 +4858,7 @@
         "lib/JIT/UndefinedVariableHelper.php",
         "lib/JIT/UnsetHelper.php",
         "lib/JIT/UnsetHelperLlvm.php",
+        "lib/JIT/UserScriptAotEnv.php",
         "lib/JIT/UsortCallbackPolicy.php",
         "lib/JIT/ValueEchoHelper.php",
         "lib/JIT/VarFetchHelper.php",
@@ -5752,9 +5753,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5518,
+        "inventory_files": 5519,
         "excluded": 0,
-        "eligible": 5518,
+        "eligible": 5519,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

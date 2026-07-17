@@ -98,12 +98,7 @@ final class DomInstanceMethodJit
     /** User-script AOT: nested VmDomInstanceInvoke JIT aborts — use VmClassMethod lowering (#15407, #17391). */
     public static function shouldDeferToVmClassMethodLowering(): bool
     {
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
-            return true;
-        }
-
-        return false;
+        return UserScriptAotEnv::isActive();
     }
 
     public static function ensureProxy(Context $context, string $proxyName): void

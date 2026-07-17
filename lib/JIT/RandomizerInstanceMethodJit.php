@@ -25,9 +25,7 @@ final class RandomizerInstanceMethodJit
 
     public static function isUserScriptAot(): bool
     {
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-
-        return '1' === $userScript || 'true' === strtolower((string) $userScript);
+        return UserScriptAotEnv::isActive();
     }
 
     public static function ensureProxy(Context $context, string $proxyName): void

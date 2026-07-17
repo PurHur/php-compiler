@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\LibcExtern;
+use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\ext\standard\JitStreamIoKernel;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -573,8 +574,7 @@ final class StreamIoRuntime
                 return true;
             }
         }
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
+        if (UserScriptAotEnv::isActive()) {
             return true;
         }
 
