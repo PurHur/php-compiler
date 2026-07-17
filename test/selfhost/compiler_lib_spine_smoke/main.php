@@ -2684,6 +2684,7 @@ require_once __DIR__.'/../../../ext/standard/date_format.php';
 require_once __DIR__.'/../../../ext/standard/date_get_last_errors.php';
 require_once __DIR__.'/../../../ext/standard/date_interval_create_from_date_string.php';
 require_once __DIR__.'/../../../ext/standard/date_interval_format.php';
+require_once __DIR__.'/../../../ext/standard/date_isodate_set.php';
 require_once __DIR__.'/../../../ext/standard/date_modify.php';
 require_once __DIR__.'/../../../ext/standard/date_offset_get.php';
 require_once __DIR__.'/../../../ext/standard/date_parse.php';
