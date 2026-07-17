@@ -7,18 +7,13 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
-use PHPCompiler\ext\standard\JitFileGetContentsKernel;
 use PHPLLVM\Builder;
 
 /**
- * JIT/AOT link for __compiler_file_get_contents via FileGetContentsJitHelper PHP (#15309, #19279).
+ * JIT/AOT link for __compiler_file_get_contents via FileGetContentsJitHelper PHP (#15309, #19339).
  *
- * Embed / non-user-script: {@see FileGetContentsJitHelper} via {@see JitVmHelperLink}.
- * User-script standalone AOT: thin {@see JitFileGetContentsKernel} libc open/read — nested
- * helper TUs skip __init__ under PHP_COMPILER_AOT_USER_SCRIPT (#16075).
+ * Always routes through {@see FileGetContentsJitHelper} via {@see JitVmHelperLink}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::fileGetContents()}.
  * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_mem
  */
@@ -37,8 +32,6 @@ final class StringFileGetContents
 
     private const BRIDGE_ENTRY = 'fgc_bridge_entry';
 
-    private const KERNEL_ENTRY = 'fgc_kernel_entry';
-
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -49,37 +42,26 @@ final class StringFileGetContents
         self::implement($context);
     }
 
-    public static function implement(Context $context): void
+    private static function implement(Context $context): void
     {
         if (NestedJitCompileScope::isActive()) {
             return;
         }
 
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
         }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            self::implementUserScriptKernel($context);
-
-            return;
-        }
-
-        self::implementPhpBridge($context, $probe);
-    }
-
-    private static function implementPhpBridge(Context $context, ?\PHPLLVM\Value\Function_ $probe): void
-    {
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
         } catch (\Throwable) {
         }
 
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#15309');
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#19339');
 
         $strPtr = $context->getTypeFromString('__string__*');
         $fn = null !== $probe
@@ -96,7 +78,7 @@ final class StringFileGetContents
         $context->builder->branchIf($isNullPath, $failBb, $okBb);
 
         $context->builder->positionAtEnd($okBb);
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::READ_HELPER, '#15309');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::READ_HELPER, '#19339');
         $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$path]);
         $isNullResult = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
         $failResultBb = $fn->appendBasicBlock('fgc_bridge_result_fail');
@@ -114,43 +96,6 @@ final class StringFileGetContents
         $context->builder->returnValue($strPtr->constNull());
 
         $context->registerFunction(self::ABI, $fn);
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function implementUserScriptKernel(Context $context): void
-    {
-        $probe = $context->module->getNamedFunction(self::ABI);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
-            $context->registerFunction(self::ABI, $probe);
-
-            return;
-        }
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        LibcExtern::register($context);
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($strPtr, false, $strPtr)
-            );
-
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::KERNEL_ENTRY);
-        $context->builder->positionAtEnd($entry);
-        JitFileGetContentsKernel::emitBody($context, $fn);
-        $context->registerFunction(self::ABI, $fn);
-
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
         } else {
