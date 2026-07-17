@@ -16,6 +16,7 @@ use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\NoDiscardMetadata;
 use PHPCompiler\Compiler\SourceLocation;
 use PHPCompiler\Func;
+use PHPCompiler\ext\dom\VmDomCollectionDimension;
 use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\ext\standard\VmForwardStaticCall;
 use PHPCompiler\ext\standard\VmIteratorWalk;
@@ -3978,6 +3979,37 @@ restart:
                         }
                     } elseif (
                         Variable::TYPE_OBJECT === $container->type
+                        && VmDomCollectionDimension::isCollection($container->toObject())
+                    ) {
+                        // DOMNodeList / DOMNamedNodeMap read_dimension (php-src php_dom.c; #20311).
+                        // Not ArrayAccess — writes stay "Cannot use object of type … as array".
+                        if ($forWrite) {
+                            $className = $container->toObject()->class->name;
+                            $catchFrame = $this->dispatchVmError(
+                                'Cannot use object of type ' . $className . ' as array',
+                                $frame
+                            );
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
+                        }
+                        try {
+                            VmDomCollectionDimension::readDimension(
+                                $container->toObject(),
+                                $arg3,
+                                $arg1
+                            );
+                        } catch (\ValueError $e) {
+                            $catchFrame = $this->dispatchVmValueError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                        }
+                    } elseif (
+                        Variable::TYPE_OBJECT === $container->type
                         && $this->objectImplementsArrayAccess($container->toObject())
                     ) {
                         $object = $container->toObject();
@@ -7199,6 +7231,17 @@ restart:
                                     goto restart;
                                 }
                                 $dst->bool(EnumCaseSupport::propertyExistsOnCase($object->class, $propName));
+                                break;
+                            }
+                            if (
+                                !$op->issetOnProperty
+                                && VmDomCollectionDimension::isCollection($object)
+                            ) {
+                                // isset($list[$i]) via DOM has_dimension (php-src php_dom.c; #20311).
+                                $dst->bool(VmDomCollectionDimension::hasDimension(
+                                    $object,
+                                    $frame->scope[$op->arg3]
+                                ));
                                 break;
                             }
                             if (
