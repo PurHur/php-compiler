@@ -755,9 +755,12 @@
         "ext/mbstring/mb_strcut.php",
         "ext/mbstring/mb_strimwidth.php",
         "ext/mbstring/mb_stripos.php",
+        "ext/mbstring/mb_stristr.php",
         "ext/mbstring/mb_strlen.php",
         "ext/mbstring/mb_strpos.php",
+        "ext/mbstring/mb_strrchr.php",
         "ext/mbstring/mb_strrichr.php",
+        "ext/mbstring/mb_strripos.php",
         "ext/mbstring/mb_strrpos.php",
         "ext/mbstring/mb_strstr.php",
         "ext/mbstring/mb_strtolower.php",
@@ -2903,6 +2906,8 @@
         "ext/standard/inet_ntop.php",
         "ext/standard/inet_pton.php",
         "ext/standard/inflate_add.php",
+        "ext/standard/inflate_get_read_len.php",
+        "ext/standard/inflate_get_status.php",
         "ext/standard/inflate_init.php",
         "ext/standard/ini_get_.php",
         "ext/standard/ini_get_all.php",
@@ -5586,9 +5591,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5352,
+        "inventory_files": 5357,
         "excluded": 0,
-        "eligible": 5352,
+        "eligible": 5357,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
