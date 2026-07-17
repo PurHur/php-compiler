@@ -181,10 +181,14 @@ use PHPCompiler\VM\Builtin\ReflectionEnumHasCase;
 use PHPCompiler\VM\Builtin\ReflectionEnumIsBacked;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseConstruct;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetAttributes;
+use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetDeclaringClass;
+use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetDocComment;
+use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetEnum;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetName;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsBacked;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsDeprecated;
+use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseToString;
 use PHPCompiler\VM\Builtin\ReflectionExtensionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetClasses;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetConstants;
@@ -1151,6 +1155,8 @@ final class BuiltinClasses
         $ctx->classes[ReflectionSupport::REFLECTION_ENUM] = $renum;
 
         $reuc = new ClassEntry('ReflectionEnumUnitCase');
+        // php-src: class ReflectionEnumUnitCase extends ReflectionClassConstant (#19785).
+        $reuc->parentLc = ReflectionSupport::REFLECTION_CLASS_CONSTANT;
         $reuc->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
         $reuc->properties[] = new ClassProperty(ReflectionSupport::PROP_ENUM_CLASS_NAME, null, $strProto);
         $reuc->constructor = new ReflectionEnumUnitCaseConstruct();
@@ -1162,6 +1168,14 @@ final class BuiltinClasses
         $reuc->methodVisibility['getname'] = $pub;
         $reuc->methods['getvalue'] = new ReflectionEnumUnitCaseGetValue();
         $reuc->methodVisibility['getvalue'] = $pub;
+        $reuc->methods['getenum'] = new ReflectionEnumUnitCaseGetEnum();
+        $reuc->methodVisibility['getenum'] = $pub;
+        $reuc->methods['getdeclaringclass'] = new ReflectionEnumUnitCaseGetDeclaringClass();
+        $reuc->methodVisibility['getdeclaringclass'] = $pub;
+        $reuc->methods['getdoccomment'] = new ReflectionEnumUnitCaseGetDocComment();
+        $reuc->methodVisibility['getdoccomment'] = $pub;
+        $reuc->methods['__tostring'] = new ReflectionEnumUnitCaseToString();
+        $reuc->methodVisibility['__tostring'] = $pub;
         if (CompilerVersion::supportsReflectionEnumCaseIsBacked()) {
             $reuc->methods['isbacked'] = new ReflectionEnumUnitCaseIsBacked();
             $reuc->methodVisibility['isbacked'] = $pub;

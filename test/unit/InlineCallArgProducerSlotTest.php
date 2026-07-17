@@ -8623,7 +8623,7 @@ PHP;
             $block = $runtime->parseAndCompile($code, 'reflection_enum_unit_case_isdeprecated.php');
             ob_start();
             $runtime->run($block);
-            self::assertSame("bool(true)\nbool(true)\nbool(false)\n", ob_get_clean());
+            self::assertSame("bool(true)\nbool(true)\nbool(false)\ndeprecated\n", ob_get_clean());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
