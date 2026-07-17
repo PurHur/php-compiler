@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5303 |
-| Phase A inventory files (M2 ratio SSOT) | 5303 |
+| PHP files on vm.php path | 5304 |
+| Phase A inventory files (M2 ratio SSOT) | 5304 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14765 |
+| Source constructs flagged (warnings) | 14766 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1767,6 +1767,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitSessionStart.php` | 0 | 1 |
 | `ext/standard/JitSessionStartOptions.php` | 0 | 1 |
 | `ext/standard/JitSessionStatus.php` | 0 | 1 |
+| `ext/standard/JitSessionStorageKernel.php` | 0 | 3 |
 | `ext/standard/JitSessionUnset.php` | 0 | 1 |
 | `ext/standard/JitSessionWriteClose.php` | 0 | 1 |
 | `ext/standard/JitSetcookie.php` | 0 | 1 |
@@ -3988,7 +3989,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SessionStart.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionStartOptionsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionStorageGlobals.php` | 0 | 1 |
-| `lib/JIT/Builtin/SessionStorageRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/SessionStorageRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionUnset.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionWriteClose.php` | 0 | 1 |
 | `lib/JIT/Builtin/SettypeRuntime.php` | 0 | 1 |
@@ -17164,6 +17165,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitSessionStorageKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 487)
+- 23 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/JitSessionUnset.php`
 
@@ -32281,9 +32289,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SessionStorageRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 479)
-- 23 class method(s)
-- 1 closure(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/SessionUnset.php`
 
