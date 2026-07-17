@@ -123,6 +123,9 @@ final class VmXmlReader
         $entry->methods['setrelaxngschema'] = new XmlReaderSetRelaxNGSchema();
         $entry->methodVisibility['setrelaxngschema'] = $pub;
         $entry->methodNames['setrelaxngschema'] = 'setRelaxNGSchema';
+        $entry->methods['setrelaxngschemasource'] = new XmlReaderSetRelaxNGSchemaSource();
+        $entry->methodVisibility['setrelaxngschemasource'] = $pub;
+        $entry->methodNames['setrelaxngschemasource'] = 'setRelaxNGSchemaSource';
 
         if (CompilerVersion::supportsXmlReaderFactories()) {
             $entry->methods['fromstring'] = new XmlReaderFromString();
@@ -788,6 +791,7 @@ final class VmXmlReader
         }
         if (null === $filename) {
             $state->relaxNgPath = null;
+            $state->relaxNgSource = null;
             if (null === $state->schemaPath) {
                 $state->schemaModeActive = false;
             }
@@ -822,6 +826,7 @@ final class VmXmlReader
             return false;
         }
         $state->relaxNgPath = $filename;
+        $state->relaxNgSource = null;
         $state->schemaPath = null;
         $state->schemaModeActive = true;
         $state->schemaCheckDone = false;
@@ -831,7 +836,57 @@ final class VmXmlReader
     }
 
     /**
-     * Apply deferred XSD / RelaxNG / DTD validation after the first read() (#19553).
+     * XMLReader::setRelaxNGSchemaSource() — php-src zim_XMLReader_setRelaxNGSchemaSource (#19940).
+     */
+    public static function setRelaxNGSchemaSource(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?string $source,
+        ?Frame $frame = null
+    ): bool {
+        if (!XmlReaderRegistry::has($entry)) {
+            throw new \Error('Schema must be set prior to reading');
+        }
+        $state = XmlReaderRegistry::state($entry);
+        if ($state->position >= 0) {
+            self::warn($ctx, 'XMLReader::setRelaxNGSchemaSource(): Schema contains errors', $frame);
+
+            return false;
+        }
+        if (null === $source) {
+            $state->relaxNgPath = null;
+            $state->relaxNgSource = null;
+            if (null === $state->schemaPath) {
+                $state->schemaModeActive = false;
+            }
+            $state->schemaCheckDone = false;
+            $state->schemaValid = true;
+
+            return true;
+        }
+        if ('' === $source) {
+            throw new \ValueError('XMLReader::setRelaxNGSchemaSource(): Argument #1 ($source) cannot be empty');
+        }
+        if (!VmDomValidationNative::available() || !VmDomValidationNative::parseRelaxNGSource($source)) {
+            foreach (VmDomValidationNative::consumeLastErrors() as $error) {
+                self::warn($ctx, 'XMLReader::setRelaxNGSchemaSource(): '.$error, $frame);
+            }
+            self::warn($ctx, 'XMLReader::setRelaxNGSchemaSource(): Schema contains errors', $frame);
+
+            return false;
+        }
+        $state->relaxNgSource = $source;
+        $state->relaxNgPath = null;
+        $state->schemaPath = null;
+        $state->schemaModeActive = true;
+        $state->schemaCheckDone = false;
+        $state->schemaValid = true;
+
+        return true;
+    }
+
+    /**
+     * Apply deferred XSD / RelaxNG / DTD validation after the first read() (#19553 / #19940).
      */
     private static function ensureSchemaValidation(ObjectEntry $entry): void
     {
@@ -849,6 +904,20 @@ final class VmXmlReader
             $state->schemaValid = VmDomValidationNative::validateSchemaDocument(
                 $state->sourceData,
                 $state->schemaPath
+            );
+            VmDomValidationNative::consumeLastErrors();
+
+            return;
+        }
+        if (null !== $state->relaxNgSource) {
+            if (!VmDomValidationNative::available()) {
+                $state->schemaValid = false;
+
+                return;
+            }
+            $state->schemaValid = VmDomValidationNative::validateRelaxNGDocumentSource(
+                $state->sourceData,
+                $state->relaxNgSource
             );
             VmDomValidationNative::consumeLastErrors();
 

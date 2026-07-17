@@ -116,6 +116,42 @@ final class VmDomValidationNative
     }
 
     /**
+     * Parse an in-memory RelaxNG grammar (XMLReader::setRelaxNGSchemaSource; #19940).
+     */
+    public static function parseRelaxNGSource(string $rngSource): bool
+    {
+        self::$lastErrors = [];
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $prev = libxml_use_internal_errors(true);
+        libxml_clear_errors();
+        try {
+            $parser = $ffi->xmlRelaxNGNewMemParserCtxt($rngSource, \strlen($rngSource));
+            if (null === $parser) {
+                self::captureLibxmlErrors();
+
+                return false;
+            }
+            $grammar = $ffi->xmlRelaxNGParse($parser);
+            $ffi->xmlRelaxNGFreeParserCtxt($parser);
+            if (null === $grammar) {
+                self::captureLibxmlErrors();
+
+                return false;
+            }
+            $ffi->xmlRelaxNGFree($grammar);
+
+            return true;
+        } finally {
+            libxml_clear_errors();
+            libxml_use_internal_errors($prev);
+        }
+    }
+
+    /**
      * In-memory XSD validation (php-src dom_document_schema_validate_source / xmlSchemaNewMemParserCtxt; #19419).
      */
     public static function validateSchemaDocumentSource(string $docXml, string $schemaSource): bool
@@ -234,6 +270,26 @@ final class VmDomValidationNative
 
     public static function validateRelaxNGDocument(string $docXml, string $rngPath): bool
     {
+        return self::validateRelaxNGAgainstDoc($docXml, static function ($ffi) use ($rngPath) {
+            return $ffi->xmlRelaxNGNewParserCtxt($rngPath);
+        });
+    }
+
+    /**
+     * In-memory RelaxNG validation (XMLReader::setRelaxNGSchemaSource; #19940).
+     */
+    public static function validateRelaxNGDocumentSource(string $docXml, string $rngSource): bool
+    {
+        return self::validateRelaxNGAgainstDoc($docXml, static function ($ffi) use ($rngSource) {
+            return $ffi->xmlRelaxNGNewMemParserCtxt($rngSource, \strlen($rngSource));
+        });
+    }
+
+    /**
+     * @param callable(\FFI): mixed $newParserCtxt returns xmlRelaxNGParserCtxt*|null
+     */
+    private static function validateRelaxNGAgainstDoc(string $docXml, callable $newParserCtxt): bool
+    {
         self::$lastErrors = [];
         $ffi = self::ffi();
         if (null === $ffi) {
@@ -250,7 +306,7 @@ final class VmDomValidationNative
                 return false;
             }
 
-            $parser = $ffi->xmlRelaxNGNewParserCtxt($rngPath);
+            $parser = $newParserCtxt($ffi);
             if (null === $parser) {
                 self::captureLibxmlErrors();
                 $ffi->xmlFreeDoc($doc);
@@ -346,6 +402,7 @@ int xmlSchemaValidateDoc(xmlSchemaValidCtxt* ctxt, xmlDoc* doc);
 void xmlSchemaFreeValidCtxt(xmlSchemaValidCtxt* ctxt);
 
 xmlRelaxNGParserCtxt* xmlRelaxNGNewParserCtxt(const char* URL);
+xmlRelaxNGParserCtxt* xmlRelaxNGNewMemParserCtxt(const char* buffer, int size);
 xmlRelaxNG* xmlRelaxNGParse(xmlRelaxNGParserCtxt* ctxt);
 void xmlRelaxNGFreeParserCtxt(xmlRelaxNGParserCtxt* ctxt);
 void xmlRelaxNGFree(xmlRelaxNG* schema);

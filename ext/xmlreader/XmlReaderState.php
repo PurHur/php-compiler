@@ -57,6 +57,9 @@ final class XmlReaderState
     /** RelaxNG file path when {@see VmXmlReader::setRelaxNGSchema} attached a grammar; null = none. */
     public ?string $relaxNgPath = null;
 
+    /** In-memory RelaxNG source when {@see VmXmlReader::setRelaxNGSchemaSource} attached a grammar; null = none. */
+    public ?string $relaxNgSource = null;
+
     /** True when an XSD or RelaxNG schema is attached (affects {@see VmXmlReader::isValid}). */
     public bool $schemaModeActive = false;
 
