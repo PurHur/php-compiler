@@ -45,6 +45,9 @@ final class SplArraySortMethod extends VmClassMethod
                 $flags = VmInternalCompare::resolveFrameSortFlags($frame, $method, 1);
             }
             SplArrayStorage::sortBacking($object, $this->methodLc, $flags);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(true);
+            }
 
             return;
         }
@@ -54,5 +57,8 @@ final class SplArraySortMethod extends VmClassMethod
             );
         }
         SplArrayStorage::sortBacking($object, $this->methodLc);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
     }
 }
