@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlwriter;
 
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -23,6 +26,7 @@ final class VmXmlWriter
         }
 
         $pub = \PHPCfg\Func::FLAG_PUBLIC;
+        $pubStatic = $pub | \PHPCfg\Func::FLAG_STATIC;
 
         $entry = new ClassEntry('XMLWriter');
         $entry->methods['openmemory'] = new XmlWriterOpenMemory();
@@ -119,6 +123,18 @@ final class VmXmlWriter
         $entry->methodVisibility['flush'] = $pub;
         $entry->methodNames['flush'] = 'flush';
 
+        if (CompilerVersion::supportsXmlWriterFactories()) {
+            $entry->methods['tomemory'] = new XmlWriterToMemory();
+            $entry->methodVisibility['tomemory'] = $pubStatic;
+            $entry->methodNames['tomemory'] = 'toMemory';
+            $entry->methods['touri'] = new XmlWriterToUri();
+            $entry->methodVisibility['touri'] = $pubStatic;
+            $entry->methodNames['touri'] = 'toUri';
+            $entry->methods['tostream'] = new XmlWriterToStream();
+            $entry->methodVisibility['tostream'] = $pubStatic;
+            $entry->methodNames['tostream'] = 'toStream';
+        }
+
         $ctx->classes[self::CLASS_LC] = $entry;
         $ctx->classes[self::CLASS_LC]->isInternal = true;
     }
@@ -146,6 +162,80 @@ final class VmXmlWriter
     {
         $state = self::ensureState($entry);
         self::resetState($state, 'memory', null);
+
+        return true;
+    }
+
+    public static function newWriter(Context $ctx): ObjectEntry
+    {
+        $class = $ctx->classes[self::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('XMLWriter is not registered in this compiler build');
+        }
+
+        return new ObjectEntry($class);
+    }
+
+    /**
+     * XMLWriter::toMemory() — static in-memory factory (php-src zim_XMLWriter_toMemory; #19606).
+     */
+    public static function toMemory(Context $ctx): ObjectEntry
+    {
+        $entry = self::newWriter($ctx);
+        self::openMemory($entry);
+
+        return $entry;
+    }
+
+    /**
+     * XMLWriter::toUri() — static URI factory (php-src zim_XMLWriter_toUri; #19606).
+     */
+    public static function toUri(Context $ctx, string $uri): ObjectEntry
+    {
+        if ('' === $uri) {
+            throw new \ValueError('XMLWriter::toUri(): Argument #1 ($uri) cannot be empty');
+        }
+        $entry = self::newWriter($ctx);
+        if (!self::openURI($entry, $uri)) {
+            throw new \Error('XMLWriter::toUri(): Unable to open URI');
+        }
+
+        return $entry;
+    }
+
+    /**
+     * XMLWriter::toStream() — static stream factory (php-src zim_XMLWriter_toStream; #19606).
+     */
+    public static function toStream(Context $ctx, Variable $streamVar): ObjectEntry
+    {
+        $entry = self::newWriter($ctx);
+        if (!self::openStream($entry, $streamVar)) {
+            throw new \Error('XMLWriter::toStream(): Unable to open stream');
+        }
+
+        return $entry;
+    }
+
+    public static function openStream(ObjectEntry $entry, Variable $streamVar): bool
+    {
+        if (!$streamVar->isStreamResource()) {
+            throw new \TypeError(
+                'XMLWriter::toStream(): Argument #1 ($stream) must be of type resource'
+            );
+        }
+        if (!ResourceSupport::isOpenStreamResource($streamVar)) {
+            throw new \ValueError(
+                'XMLWriter::toStream(): Argument #1 ($stream) is not an open stream resource'
+            );
+        }
+        $handle = ResourceSupport::resolveHandle($streamVar);
+        if (null === $handle) {
+            return false;
+        }
+
+        $state = self::ensureState($entry);
+        self::resetState($state, 'stream', null);
+        $state->streamHandle = $handle;
 
         return true;
     }
@@ -755,6 +845,12 @@ final class VmXmlWriter
                 return false;
             }
         }
+        if ('stream' === $state->mode && null !== $state->streamHandle && '' !== $state->buffer) {
+            if (false === VmFs::fwrite($state->streamHandle, $state->buffer)) {
+                return false;
+            }
+            $state->buffer = '';
+        }
 
         return true;
     }
@@ -790,6 +886,18 @@ final class VmXmlWriter
 
             return $out;
         }
+        if ('stream' === $state->mode && null !== $state->streamHandle) {
+            if ('' === $state->buffer) {
+                return 0;
+            }
+            $written = VmFs::fwrite($state->streamHandle, $state->buffer);
+            if (false === $written) {
+                return 0;
+            }
+            $state->buffer = '';
+
+            return $written;
+        }
         if (null === $state->uri) {
             return 0;
         }
@@ -810,6 +918,7 @@ final class VmXmlWriter
         $state->open = true;
         $state->mode = $mode;
         $state->uri = $uri;
+        $state->streamHandle = null;
         $state->buffer = '';
         $state->elementStack = [];
         $state->startTagOpen = false;

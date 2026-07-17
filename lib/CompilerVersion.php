@@ -2652,4 +2652,16 @@ final class CompilerVersion
     {
         return self::supportsDomApiSince('8.4.0');
     }
+
+    /**
+     * PHP 8.4+ XMLWriter::{toMemory,toUri,toStream} static factories
+     * (ext/xmlwriter/php_xmlwriter.c, #19606).
+     *
+     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 method_exists gate).
+     * Enable via stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     */
+    public static function supportsXmlWriterFactories(): bool
+    {
+        return self::supportsDomApiSince('8.4.0');
+    }
 }
