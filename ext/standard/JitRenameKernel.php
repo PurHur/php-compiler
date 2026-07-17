@@ -9,10 +9,10 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for phpc_rename_kernel() — thin libc rename(2) (#19215).
+ * LLVM lowering for phpc_rename_kernel() — thin libc rename(2) (#19215, #20028).
  *
- * Used inside RenameJitHelper / VmFsPathPure so nested helper units do not
- * recurse through the rename() builtin bridge.
+ * Nested leaf inside RenameJitHelper / VmFsPathPure, and thin standalone AOT
+ * ABI body via {@see \PHPCompiler\JIT\Builtin\StringRename} (FilePutContents shape).
  */
 final class JitRenameKernel
 {

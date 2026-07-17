@@ -8,16 +8,15 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\ext\standard\JitRenameKernel;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for rename() (#15533, #19215).
+ * JIT/AOT link for rename() (#15533, #19215, #20028).
  *
- * Embed / non-user-script: {@see RenameJitHelper} via {@see JitVmHelperLink}.
- * User-script standalone AOT: thin {@see JitRenameKernel} libc rename(2) — nested
- * helper TUs poison string/echo constants when ensureCompiled mid-bridge (#19215).
+ * Embed / non-thin: {@see RenameJitHelper} via {@see JitVmHelperLink}.
+ * Thin standalone AOT main: {@see JitRenameKernel} libc body (#19966 FilePutContents shape).
  * php-src: ext/standard/filestat.c — php_rename
  */
 final class StringRename
@@ -34,6 +33,8 @@ final class StringRename
     ];
 
     private const BRIDGE_ENTRY = 'rename_bridge_entry';
+
+    private const LIBC_ENTRY = 'rename_libc_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -58,8 +59,16 @@ final class StringRename
             return;
         }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            self::implementUserScriptKernel($context);
+        $probe = $context->module->getNamedFunction(self::ABI);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
+            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::LIBC_ENTRY)) {
+            $context->registerFunction(self::ABI, $probe);
+
+            return;
+        }
+
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementLibcBody($context, $probe);
 
             return;
         }
@@ -75,19 +84,12 @@ final class StringRename
             self::INVOKE_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#19215'
+            '#20028'
         );
     }
 
-    private static function implementUserScriptKernel(Context $context): void
+    private static function implementLibcBody(Context $context, ?LlvmFunction $probe): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
-            $context->registerFunction(self::ABI, $probe);
-
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
@@ -105,7 +107,7 @@ final class StringRename
                 $context->context->functionType($i1, false, $strPtr, $strPtr)
             );
 
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::LIBC_ENTRY);
         $context->builder->positionAtEnd($entry);
         $ok = JitRenameKernel::invoke($context, $fn->getParam(0), $fn->getParam(1));
         $context->builder->returnValue($ok);
