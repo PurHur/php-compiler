@@ -49,4 +49,32 @@ final class XsltHostBridge
 
         return $result;
     }
+
+    public static function setParameter(\XSLTProcessor $proc, string $namespace, string $name, string $value): bool
+    {
+        return $proc->setParameter($namespace, $name, $value);
+    }
+
+    public static function getParameter(\XSLTProcessor $proc, string $namespace, string $name): string
+    {
+        return $proc->getParameter($namespace, $name);
+    }
+
+    public static function removeParameter(\XSLTProcessor $proc, string $namespace, string $name): bool
+    {
+        return $proc->removeParameter($namespace, $name);
+    }
+
+    /**
+     * @param null|string|list<string> $restrict
+     */
+    public static function registerPHPFunctions(\XSLTProcessor $proc, null|string|array $restrict = null): void
+    {
+        if (null === $restrict) {
+            $proc->registerPHPFunctions();
+
+            return;
+        }
+        $proc->registerPHPFunctions($restrict);
+    }
 }
