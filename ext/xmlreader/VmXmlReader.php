@@ -64,6 +64,12 @@ final class VmXmlReader
         $entry->methods['getattribute'] = new XmlReaderGetAttribute();
         $entry->methodVisibility['getattribute'] = $pub;
         $entry->methodNames['getattribute'] = 'getAttribute';
+        $entry->methods['getattributeno'] = new XmlReaderGetAttributeNo();
+        $entry->methodVisibility['getattributeno'] = $pub;
+        $entry->methodNames['getattributeno'] = 'getAttributeNo';
+        $entry->methods['getattributens'] = new XmlReaderGetAttributeNs();
+        $entry->methodVisibility['getattributens'] = $pub;
+        $entry->methodNames['getattributens'] = 'getAttributeNs';
         $entry->methods['isvalid'] = new XmlReaderIsValid();
         $entry->methodVisibility['isvalid'] = $pub;
         $entry->methodNames['isvalid'] = 'isValid';
@@ -305,6 +311,87 @@ final class VmXmlReader
         }
 
         return $current->attributes[$name] ?? null;
+    }
+
+    /**
+     * XMLReader::getAttributeNo() — php-src zim_XMLReader_getAttributeNo / xmlTextReaderGetAttributeNo (#19412).
+     */
+    public static function getAttributeNo(ObjectEntry $entry, int $index): ?string
+    {
+        $state = XmlReaderRegistry::state($entry);
+        if (null !== $state->attributeIndex) {
+            // Positioned on an attribute node — libxml does not consult the parent element.
+            return null;
+        }
+        $current = $state->current;
+        if (null === $current || XmlReaderConstants::ELEMENT !== $current->nodeType) {
+            return null;
+        }
+        // Negative indexes behave like 0 under libxml xmlTextReaderGetAttributeNo.
+        if ($index < 0) {
+            $index = 0;
+        }
+        $keys = array_keys($current->attributes);
+        if (!isset($keys[$index])) {
+            return null;
+        }
+
+        return $current->attributes[$keys[$index]];
+    }
+
+    /**
+     * XMLReader::getAttributeNs() — php-src zim_XMLReader_getAttributeNs / xmlTextReaderGetAttributeNs (#19412).
+     */
+    public static function getAttributeNs(ObjectEntry $entry, string $localName, string $namespaceUri): ?string
+    {
+        $state = XmlReaderRegistry::state($entry);
+        if (null !== $state->attributeIndex) {
+            return null;
+        }
+        $current = $state->current;
+        if (null === $current || XmlReaderConstants::ELEMENT !== $current->nodeType) {
+            return null;
+        }
+        foreach ($current->attributes as $attrName => $value) {
+            if (self::attributeLocalName($attrName) !== $localName) {
+                continue;
+            }
+            if (self::attributeNamespaceUri($attrName, $current->nsScope) !== $namespaceUri) {
+                continue;
+            }
+
+            return $value;
+        }
+
+        return null;
+    }
+
+    private const XMLNS_NAMESPACE_URI = 'http://www.w3.org/2000/xmlns/';
+
+    private static function attributeLocalName(string $attrName): string
+    {
+        if ('xmlns' === $attrName) {
+            return 'xmlns';
+        }
+        if (str_starts_with($attrName, 'xmlns:')) {
+            return substr($attrName, 6);
+        }
+
+        return self::splitQName($attrName)['local'];
+    }
+
+    /** @param array<string, string> $nsScope */
+    private static function attributeNamespaceUri(string $attrName, array $nsScope): string
+    {
+        if ('xmlns' === $attrName || str_starts_with($attrName, 'xmlns:')) {
+            return self::XMLNS_NAMESPACE_URI;
+        }
+        $parts = self::splitQName($attrName);
+        if ('' === $parts['prefix']) {
+            return '';
+        }
+
+        return $nsScope[$parts['prefix']] ?? '';
     }
 
     /**
