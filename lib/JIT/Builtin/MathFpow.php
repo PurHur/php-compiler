@@ -7,15 +7,16 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\ext\standard\JitFpowKernel;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for fpow() / float pow() via FpowJitHelper PHP (#15189, #19259).
+ * JIT/AOT link for fpow() / float pow() via FpowJitHelper PHP (#15189, #19259, #20034).
  *
- * Embed / non-user-script: {@see FpowJitHelper} via {@see JitVmHelperLink}.
- * User-script standalone AOT + nested leaf: thin {@see JitFpowKernel} libc pow(3).
+ * Embed / non-thin: {@see FpowJitHelper} via {@see JitVmHelperLink}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20011): {@see JitFpowKernel} libc pow(3).
+ * Nested helper compile: libc leaf without re-entering FpowJitHelper (#17279).
  * php-src: ext/standard/math.c — PHP_FUNCTION(fpow)
  */
 final class MathFpow
@@ -32,6 +33,8 @@ final class MathFpow
     ];
 
     private const BRIDGE_ENTRY = 'fpow_bridge_entry';
+
+    private const KERNEL_ENTRY = 'fpow_kernel_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -66,8 +69,16 @@ final class MathFpow
             return;
         }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            self::implementUserScriptKernel($context);
+        $probe = $context->module->getNamedFunction(self::ABI_FPOW);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
+            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
+            $context->registerFunction(self::ABI_FPOW, $probe);
+
+            return;
+        }
+
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementKernelBody($context, $probe);
 
             return;
         }
@@ -82,19 +93,12 @@ final class MathFpow
             self::FPOW_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#19259'
+            '#20034'
         );
     }
 
-    private static function implementUserScriptKernel(Context $context): void
+    private static function implementKernelBody(Context $context, ?LlvmFunction $probe): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI_FPOW);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
-            $context->registerFunction(self::ABI_FPOW, $probe);
-
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
@@ -109,7 +113,7 @@ final class MathFpow
                 $context->context->functionType($double, false, $double, $double)
             );
 
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::KERNEL_ENTRY);
         $context->builder->positionAtEnd($entry);
         $result = JitFpowKernel::invoke($context, $fn->getParam(0), $fn->getParam(1));
         $context->builder->returnValue($result);

@@ -7,15 +7,16 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\ext\standard\JitNextafterKernel;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for nextafter() via NextafterJitHelper PHP (#15062, #19259).
+ * JIT/AOT link for nextafter() via NextafterJitHelper PHP (#15062, #19259, #20034).
  *
- * Embed / non-user-script: {@see NextafterJitHelper} via {@see JitVmHelperLink}.
- * User-script standalone AOT + nested leaf: thin {@see JitNextafterKernel} libc.
+ * Embed / non-thin: {@see NextafterJitHelper} via {@see JitVmHelperLink}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20011): {@see JitNextafterKernel} libc.
+ * Nested helper compile: libc leaf without re-entering NextafterJitHelper.
  * php-src: ext/standard/math.c — PHP_FUNCTION(nextafter)
  */
 final class MathNextafter
@@ -32,6 +33,8 @@ final class MathNextafter
     ];
 
     private const BRIDGE_ENTRY = 'nextafter_bridge_entry';
+
+    private const KERNEL_ENTRY = 'nextafter_kernel_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -64,8 +67,16 @@ final class MathNextafter
             return;
         }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            self::implementUserScriptKernel($context);
+        $probe = $context->module->getNamedFunction(self::ABI_NEXTAFTER);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
+            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
+            $context->registerFunction(self::ABI_NEXTAFTER, $probe);
+
+            return;
+        }
+
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementKernelBody($context, $probe);
 
             return;
         }
@@ -80,19 +91,12 @@ final class MathNextafter
             self::NEXTAFTER_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#19259'
+            '#20034'
         );
     }
 
-    private static function implementUserScriptKernel(Context $context): void
+    private static function implementKernelBody(Context $context, ?LlvmFunction $probe): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI_NEXTAFTER);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
-            $context->registerFunction(self::ABI_NEXTAFTER, $probe);
-
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
@@ -107,7 +111,7 @@ final class MathNextafter
                 $context->context->functionType($double, false, $double, $double)
             );
 
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::BRIDGE_ENTRY);
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::KERNEL_ENTRY);
         $context->builder->positionAtEnd($entry);
         $result = JitNextafterKernel::invoke($context, $fn->getParam(0), $fn->getParam(1));
         $context->builder->returnValue($result);
