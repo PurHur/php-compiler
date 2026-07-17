@@ -36,9 +36,11 @@ final class array_walk extends Internal
             throw new \LogicException('array_walk() requires two or three arguments in this compiler build');
         }
         $subject = $frame->calledArgs[0]->resolveIndirect();
+        // Objects are accepted (php_array_walk), but Zend TypeError text is "array" only
+        // (php-src ext/standard/array.c / Zend 8.2+ observable message) — #19836.
         if (Variable::TYPE_ARRAY !== $subject->type && Variable::TYPE_OBJECT !== $subject->type) {
             throw new \TypeError(
-                'array_walk(): Argument #1 ($array) must be of type array|object, '
+                'array_walk(): Argument #1 ($array) must be of type array, '
                 .self::valueTypeName($subject).' given'
             );
         }
@@ -66,6 +68,13 @@ final class array_walk extends Internal
         $argc = \count($args);
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_walk() requires two or three arguments in this compiler build');
+        }
+        // Objects are accepted, but Zend TypeError text for invalid subjects is "array" (#19836).
+        $badSubject = self::jitKnownBadArraySubjectLabel($args[0]);
+        if (null !== $badSubject) {
+            throw new \TypeError(
+                'array_walk(): Argument #1 ($array) must be of type array, '.$badSubject.' given'
+            );
         }
         if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
             throw new \TypeError(
@@ -234,6 +243,29 @@ final class array_walk extends Internal
                 return 'object';
             default:
                 return 'mixed';
+        }
+    }
+
+    /**
+     * Compile-time-known invalid array_walk subjects (null/scalars).
+     * Hashtable / object / boxed value remain for runtime/object paths.
+     */
+    private static function jitKnownBadArraySubjectLabel(JITVariable $subject): ?string
+    {
+        if (JITVariable::TYPE_NULL === $subject->type || ($subject->isNullConstant ?? false)) {
+            return 'null';
+        }
+        switch ($subject->type) {
+            case JITVariable::TYPE_NATIVE_LONG:
+                return 'int';
+            case JITVariable::TYPE_NATIVE_DOUBLE:
+                return 'float';
+            case JITVariable::TYPE_NATIVE_BOOL:
+                return 'bool';
+            case JITVariable::TYPE_STRING:
+                return 'string';
+            default:
+                return null;
         }
     }
 }
