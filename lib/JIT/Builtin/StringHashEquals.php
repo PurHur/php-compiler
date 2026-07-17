@@ -4,15 +4,18 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
+use PHPCompiler\ext\hash\JitHashEqualsKernel;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_hash_equals via HashEqualsJitHelper PHP (#9164).
+ * JIT/AOT link for __compiler_hash_equals via HashEqualsJitHelper PHP (#9164, #20065).
  *
- * Replaces timing-safe compare LLVM loop; SSOT {@see \PHPCompiler\ext\standard\VmHash::equals}.
+ * Embed / non-thin: {@see HashEqualsJitHelper} via {@see JitVmHelperLink}.
+ * Thin standalone AOT: {@see JitHashEqualsKernel} timing-safe XOR (#20050 shape).
+ * SSOT {@see \PHPCompiler\ext\standard\VmHash::equals}.
  * php-src: ext/hash/hash.c — hash_equals()
  */
 final class StringHashEquals
@@ -20,6 +23,8 @@ final class StringHashEquals
     private const HELPER_PATH = '/ext/standard/HashEqualsJitHelper.php';
 
     private const EQUALS_HELPER = 'PHPCompiler\\ext\\standard\\HashEqualsJitHelper::equals';
+
+    private const KERNEL_ENTRY = 'hash_equals_kernel_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -33,10 +38,26 @@ final class StringHashEquals
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $abiName = '__compiler_hash_equals';
         $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'hash_equals_bridge_entry')
+            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        if ($context->isThinStandaloneAotMain()) {
+            JitHashEqualsKernel::implement($context);
 
             return;
         }
@@ -52,7 +73,7 @@ final class StringHashEquals
                 $context->context->functionType($i32, false, $strPtr, $strPtr)
             );
 
-        $entry = $fn->appendBasicBlock('hash_equals_bridge_entry');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, 'hash_equals_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $result = $context->builder->call(
             self::helperFunction($context, self::EQUALS_HELPER),
@@ -67,43 +88,17 @@ final class StringHashEquals
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after HashEqualsJitHelper compile (#9164)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#20065');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'HashEqualsJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('HashEqualsJitHelper.php parseAndCompile failed (#9164)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9164)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20065'
+        );
     }
 }

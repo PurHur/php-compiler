@@ -27,16 +27,20 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('emitHkdf', $llvm);
         $this->assertStringNotContainsString('hc_llvm_hkdf_stub', $llvm);
         $this->assertStringContainsString('JitHashCryptoKernel', $llvm);
-        $jitDeferred = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoJit.php');
-        $this->assertStringContainsString('JitHashCryptoKernel', $jitDeferred);
-        $this->assertStringNotContainsString('StringHashCryptoLlvm', $jitDeferred);
+        $jitThin = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringHashCryptoJit.php');
+        $this->assertStringContainsString('JitHashCryptoKernel', $jitThin);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $jitThin);
+        $this->assertStringContainsString('implementThin', $jitThin);
+        $this->assertStringNotContainsString('StringHashCryptoLlvm', $jitThin);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $jitThin);
+        $this->assertStringNotContainsString('implementDeferred', $jitThin);
+        $this->assertStringNotContainsString('ensureDeferredEqualsStub', $jitThin);
+        $this->assertStringNotContainsString('hash_equals_deferred_stub', $jitThin);
         $this->assertStringContainsString('__compiler_hash', $jit);
         $this->assertStringContainsString('StringHashEquals', $jit);
         $this->assertStringContainsString('StringHashHmacAlgos', $jit);
         $this->assertStringContainsString('StringHashAlgos', $jit);
         $this->assertStringContainsString('StringHashCryptoPhp', $jit);
-        $this->assertStringContainsString('implementDeferred', $jit);
-        $this->assertStringContainsString('ensureDeferredEqualsStub', $jit);
         $this->assertStringNotContainsString('StringHashCryptoNativeJit', $jit);
         $this->assertStringNotContainsString('ensureBitcode', $jit);
         $this->assertStringNotContainsString('hash_crypto_jit_runtime.c', $jit);
@@ -71,6 +75,36 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn, $name);
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
+        }
+    }
+
+    public function testThinUserScriptLinksRealHashEqualsKernel(): void
+    {
+        $prev = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        try {
+            $runtime = new Runtime(Runtime::MODE_AOT);
+            $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+            StringHashCrypto::ensureLinked($ctx);
+            $fn = $ctx->lookupFunction('__compiler_hash_equals');
+            $this->assertNotNull($fn);
+            $this->assertGreaterThan(0, $fn->countBasicBlocks());
+            $this->assertTrue(
+                \PHPCompiler\JIT\JitVmHelperLink::hasNamedBridgeEntry($fn, 'hash_equals_kernel_entry'),
+                'thin user-script AOT must emit real hash_equals kernel, not deferred stub'
+            );
+            $this->assertFalse(
+                \PHPCompiler\JIT\JitVmHelperLink::hasNamedBridgeEntry($fn, 'hash_equals_deferred_stub')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT');
+                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT']);
+            } else {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prev);
+                $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prev;
+            }
         }
     }
 }

@@ -8,7 +8,6 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
