@@ -28,9 +28,113 @@ final class VmPcntl
     /** @var list<int> */
     private static array $pending = [];
 
+    /** Last errno from a failed pcntl_* call (php-src PCNTL_G(last_error); #20061). */
+    private static int $lastError = 0;
+
     public static function available(): bool
     {
         return true;
+    }
+
+    public static function getLastError(): int
+    {
+        return self::$lastError;
+    }
+
+    public static function setLastError(int $errno): void
+    {
+        self::$lastError = $errno;
+    }
+
+    public static function syncLastErrorFromHost(): void
+    {
+        if (\function_exists('pcntl_get_last_error')) {
+            self::$lastError = (int) \pcntl_get_last_error();
+        }
+    }
+
+    /**
+     * php-src pcntl_strerror() — strerror(3) (ext/pcntl/pcntl.c; #20061).
+     */
+    public static function strerror(int $error): string
+    {
+        if (PcntlHostBridge::strerrorAvailable()) {
+            return PcntlHostBridge::strerror($error);
+        }
+        if (PcntlLibcThinAbi::strerrorAvailable()) {
+            return PcntlLibcThinAbi::strerror($error);
+        }
+
+        return self::strerrorFallback($error);
+    }
+
+    /**
+     * php-src pcntl_unshare() — unshare(2) (ext/pcntl/pcntl.c; #20061).
+     */
+    public static function unshare(int $flags): bool
+    {
+        if (PcntlHostBridge::unshareAvailable()) {
+            try {
+                $ok = PcntlHostBridge::unshare($flags);
+            } catch (\ValueError $e) {
+                self::syncLastErrorFromHost();
+                throw $e;
+            }
+            if (!$ok) {
+                self::syncLastErrorFromHost();
+            }
+
+            return $ok;
+        }
+        if (PcntlLibcThinAbi::unshareAvailable()) {
+            $errno = 0;
+            $ok = PcntlLibcThinAbi::unshare($flags, $errno);
+            if (!$ok) {
+                self::$lastError = $errno;
+                if (PcntlConstants::PCNTL_EINVAL === $errno) {
+                    throw new \ValueError(
+                        'pcntl_unshare(): Argument #1 ($flags) must be a combination of CLONE_* flags, or at least one flag is unsupported by the kernel'
+                    );
+                }
+            }
+
+            return $ok;
+        }
+
+        throw new \Error('pcntl_unshare() is not available in this compiler build');
+    }
+
+    /** Locale-stable English fallbacks for PCNTL_E* when host/FFI strerror is unavailable. */
+    private static function strerrorFallback(int $error): string
+    {
+        static $map = [
+            0 => 'Success',
+            1 => 'Operation not permitted',
+            2 => 'No such file or directory',
+            3 => 'No such process',
+            4 => 'Interrupted system call',
+            5 => 'Input/output error',
+            7 => 'Argument list too long',
+            8 => 'Exec format error',
+            10 => 'No child processes',
+            11 => 'Resource temporarily unavailable',
+            12 => 'Cannot allocate memory',
+            13 => 'Permission denied',
+            14 => 'Bad address',
+            20 => 'Not a directory',
+            21 => 'Is a directory',
+            22 => 'Invalid argument',
+            23 => 'Too many open files in system',
+            24 => 'Too many open files',
+            26 => 'Text file busy',
+            28 => 'No space left on device',
+            36 => 'File name too long',
+            40 => 'Too many levels of symbolic links',
+            80 => 'Accessing a corrupted shared library',
+            87 => 'Too many users',
+        ];
+
+        return $map[$error] ?? ('Unknown error '.$error);
     }
 
     public static function processAvailable(): bool
@@ -186,10 +290,21 @@ final class VmPcntl
             );
         }
         if (PcntlHostBridge::priorityAvailable()) {
-            return PcntlHostBridge::getpriority($pid, $who);
+            $result = PcntlHostBridge::getpriority($pid, $who);
+            if (false === $result) {
+                self::syncLastErrorFromHost();
+            }
+
+            return $result;
         }
         if (PcntlLibcThinAbi::priorityAvailable()) {
-            return PcntlLibcThinAbi::getpriority($pid, $who);
+            $errno = 0;
+            $result = PcntlLibcThinAbi::getpriority($pid, $who, $errno);
+            if (false === $result) {
+                self::$lastError = $errno;
+            }
+
+            return $result;
         }
 
         throw new \Error('pcntl_getpriority() is not available in this compiler build');
@@ -206,10 +321,21 @@ final class VmPcntl
             );
         }
         if (PcntlHostBridge::priorityAvailable()) {
-            return PcntlHostBridge::setpriority($priority, $pid, $who);
+            $ok = PcntlHostBridge::setpriority($priority, $pid, $who);
+            if (!$ok) {
+                self::syncLastErrorFromHost();
+            }
+
+            return $ok;
         }
         if (PcntlLibcThinAbi::priorityAvailable()) {
-            return PcntlLibcThinAbi::setpriority($priority, $pid, $who);
+            $errno = 0;
+            $ok = PcntlLibcThinAbi::setpriority($priority, $pid, $who, $errno);
+            if (!$ok) {
+                self::$lastError = $errno;
+            }
+
+            return $ok;
         }
 
         throw new \Error('pcntl_setpriority() is not available in this compiler build');

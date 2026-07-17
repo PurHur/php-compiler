@@ -183,19 +183,39 @@ final class PcntlHostBridge
     public static function getpriority(?int $pid, int $who): int|false
     {
         if (null === $pid) {
-            return \pcntl_getpriority(null, $who);
+            return @\pcntl_getpriority(null, $who);
         }
 
-        return \pcntl_getpriority($pid, $who);
+        return @\pcntl_getpriority($pid, $who);
     }
 
     public static function setpriority(int $priority, ?int $pid, int $who): bool
     {
         if (null === $pid) {
-            return (bool) \pcntl_setpriority($priority, null, $who);
+            return (bool) @\pcntl_setpriority($priority, null, $who);
         }
 
-        return (bool) \pcntl_setpriority($priority, $pid, $who);
+        return (bool) @\pcntl_setpriority($priority, $pid, $who);
+    }
+
+    public static function strerrorAvailable(): bool
+    {
+        return \function_exists('pcntl_strerror');
+    }
+
+    public static function strerror(int $error): string
+    {
+        return (string) \pcntl_strerror($error);
+    }
+
+    public static function unshareAvailable(): bool
+    {
+        return \function_exists('pcntl_unshare');
+    }
+
+    public static function unshare(int $flags): bool
+    {
+        return (bool) @\pcntl_unshare($flags);
     }
 
     private static function ffiCallbackAvailable(): bool

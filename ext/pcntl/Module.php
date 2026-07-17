@@ -44,6 +44,9 @@ class Module extends ModuleAbstract
             new pcntl_waitid(),
             new pcntl_getpriority(),
             new pcntl_setpriority(),
+            new pcntl_unshare(),
+            new pcntl_strerror(),
+            new pcntl_get_last_error(),
         ];
     }
 }
