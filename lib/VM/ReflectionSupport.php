@@ -39,6 +39,9 @@ final class ReflectionSupport
 {
     public const REFLECTION_CLASS = 'reflectionclass';
 
+    /** php-src: class ReflectionObject extends ReflectionClass (#20098). */
+    public const REFLECTION_OBJECT = 'reflectionobject';
+
     public const REFLECTION_METHOD = 'reflectionmethod';
 
     public const REFLECTION_PROPERTY = 'reflectionproperty';
@@ -126,6 +129,9 @@ final class ReflectionSupport
 
     /** Wrapped Generator object on ReflectionGenerator instances (#5964). */
     public const PROP_GENERATOR_TARGET = 'generator';
+
+    /** Wrapped instance on ReflectionObject — dynamic props / getProperties (#20098). */
+    public const PROP_OBJECT_TARGET = 'object';
 
     public const PROP_PARAM_INDEX = 'paramIndex';
 
@@ -665,13 +671,15 @@ final class ReflectionSupport
     }
 
     /**
-     * ReflectionClass and subclasses (ReflectionEnum extends ReflectionClass in php-src, #19740).
+     * ReflectionClass and subclasses (ReflectionEnum / ReflectionObject in php-src, #19740, #20098).
      */
     public static function isReflectionClassObject(ObjectEntry $obj): bool
     {
         $lc = strtolower($obj->class->name);
 
-        return self::REFLECTION_CLASS === $lc || self::REFLECTION_ENUM === $lc;
+        return self::REFLECTION_CLASS === $lc
+            || self::REFLECTION_ENUM === $lc
+            || self::REFLECTION_OBJECT === $lc;
     }
 
     public static function requireReflectionClass(Frame $frame, Variable $receiver): ObjectEntry
@@ -686,6 +694,37 @@ final class ReflectionSupport
         }
 
         return $obj;
+    }
+
+    public static function requireReflectionObject(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionObject method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_OBJECT) {
+            throw new \LogicException('Expected ReflectionObject instance');
+        }
+
+        return $obj;
+    }
+
+    /** Instance stored by ReflectionObject::__construct, or null. */
+    public static function objectTargetFromReflectionObject(ObjectEntry $reflection): ?ObjectEntry
+    {
+        if (strtolower($reflection->class->name) !== self::REFLECTION_OBJECT) {
+            return null;
+        }
+        if (!$reflection->hasProperty(self::PROP_OBJECT_TARGET)) {
+            return null;
+        }
+        $slot = $reflection->getProperty(self::PROP_OBJECT_TARGET)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $slot->type) {
+            return null;
+        }
+
+        return $slot->toObject();
     }
 
     public static function requireReflectionMethod(Frame $frame, Variable $receiver): ObjectEntry
@@ -870,8 +909,7 @@ final class ReflectionSupport
         }
         if (Variable::TYPE_OBJECT === $arg->type) {
             $obj = $arg->toObject();
-            $lc = strtolower($obj->class->name);
-            if (self::REFLECTION_CLASS !== $lc && self::REFLECTION_ENUM !== $lc) {
+            if (!self::isReflectionClassObject($obj)) {
                 throw new \TypeError(
                     'ReflectionClass::'.$method.'(): Argument #1 ($'.$param.') must be of type string|ReflectionClass, '
                     .$obj->class->name.' given'

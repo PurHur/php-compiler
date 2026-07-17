@@ -100,6 +100,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassConstantIsPrivate;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsProtected;
 use PHPCompiler\VM\Builtin\ReflectionClassConstantIsPublic;
 use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
+use PHPCompiler\VM\Builtin\ReflectionObjectConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstructor;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstant;
@@ -1125,6 +1126,17 @@ final class BuiltinClasses
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS_CONSTANT] = $rcc;
 
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
+
+        $objProto = new Variable(Variable::TYPE_OBJECT);
+        $ro = new ClassEntry('ReflectionObject');
+        // php-src: class ReflectionObject extends ReflectionClass (ext/reflection/php_reflection.stub.php, #20098).
+        $ro->parentLc = ReflectionSupport::REFLECTION_CLASS;
+        $ro->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
+        $ro->properties[] = new ClassProperty(ReflectionSupport::PROP_OBJECT_TARGET, null, $objProto);
+        $ro->constructor = new ReflectionObjectConstruct();
+        $ro->methods['__construct'] = $ro->constructor;
+        $ro->methodVisibility['__construct'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_OBJECT] = $ro;
 
         $renum = new ClassEntry('ReflectionEnum');
         // php-src: class ReflectionEnum extends ReflectionClass (ext/reflection/php_reflection.stub.php, #19740).
