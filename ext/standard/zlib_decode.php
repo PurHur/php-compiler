@@ -28,7 +28,7 @@ final class zlib_decode extends Internal
         $data = VmZlibArg::resolveDataString($frame, 'zlib_decode');
         $maxLength = 0;
         if (2 === $argc) {
-            $maxLength = VmZlibArg::requireInt($frame->calledArgs[1], 'zlib_decode', 2, 'max_length');
+            $maxLength = VmZlibArg::coerceInt($frame, 1, 'zlib_decode', 2, 'max_length');
         }
         if (null === $frame->returnVar) {
             return;

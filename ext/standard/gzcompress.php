@@ -29,10 +29,10 @@ final class gzcompress extends Internal
         $level = -1;
         $encoding = \ZLIB_ENCODING_DEFLATE;
         if ($argc >= 2) {
-            $level = VmZlibArg::requireLevel($frame->calledArgs[1], 'gzcompress');
+            $level = VmZlibArg::coerceLevel($frame, 1, 'gzcompress');
         }
         if (3 === $argc) {
-            $encoding = VmZlibArg::requireInt($frame->calledArgs[2], 'gzcompress', 3, 'encoding');
+            $encoding = VmZlibArg::coerceInt($frame, 2, 'gzcompress', 3, 'encoding');
         }
         if (null === $frame->returnVar) {
             return;

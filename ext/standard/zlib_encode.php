@@ -26,11 +26,11 @@ final class zlib_encode extends Internal
             throw new \LogicException('zlib_encode() expects two or three arguments in this compiler build');
         }
         $data = VmZlibArg::resolveDataString($frame, 'zlib_encode');
-        $encoding = VmZlibArg::requireInt($frame->calledArgs[1], 'zlib_encode', 2, 'encoding');
+        $encoding = VmZlibArg::coerceInt($frame, 1, 'zlib_encode', 2, 'encoding');
         self::assertValidEncoding($encoding);
         $level = -1;
         if (3 === $argc) {
-            $level = VmZlibArg::requireLevel($frame->calledArgs[2], 'zlib_encode', 3, 'level');
+            $level = VmZlibArg::coerceLevel($frame, 2, 'zlib_encode', 3, 'level');
         }
         if (null === $frame->returnVar) {
             return;

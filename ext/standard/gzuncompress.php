@@ -28,7 +28,7 @@ final class gzuncompress extends Internal
         $data = VmZlibArg::resolveDataString($frame, 'gzuncompress');
         $maxLength = 0;
         if (2 === $argc) {
-            $maxLength = VmZlibArg::requireInt($frame->calledArgs[1], 'gzuncompress', 2, 'max_length');
+            $maxLength = VmZlibArg::coerceInt($frame, 1, 'gzuncompress', 2, 'max_length');
         }
         if (null === $frame->returnVar) {
             return;

@@ -103,6 +103,33 @@ final class VmZlibArg
         return $var->toInt();
     }
 
+    /**
+     * Z_PARAM_LONG — coerce null→0 in non-strict; TypeError in strict (#19948).
+     */
+    public static function coerceInt(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $position,
+        string $paramName
+    ): int {
+        $var = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d ($%s) must be of type int, null given',
+                    $function,
+                    $position,
+                    $paramName
+                ));
+            }
+
+            return 0;
+        }
+
+        return self::requireInt($var, $function, $position, $paramName);
+    }
+
     public static function requireLevel(
         Variable $var,
         string $function,
@@ -110,6 +137,29 @@ final class VmZlibArg
         string $paramName = 'level'
     ): int {
         $level = self::requireInt($var, $function, $position, $paramName);
+        if ($level < -1 || $level > 9) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($%s) must be between -1 and 9',
+                $function,
+                $position,
+                $paramName
+            ));
+        }
+
+        return $level;
+    }
+
+    /**
+     * Z_PARAM_LONG level with range check — coerce null→0 in non-strict (#19948).
+     */
+    public static function coerceLevel(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $position = 2,
+        string $paramName = 'level'
+    ): int {
+        $level = self::coerceInt($frame, $argIndex, $function, $position, $paramName);
         if ($level < -1 || $level > 9) {
             throw new \ValueError(\sprintf(
                 '%s(): Argument #%d ($%s) must be between -1 and 9',
