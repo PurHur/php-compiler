@@ -26,6 +26,9 @@ final class ResponseContext
 
     private static bool $fastCgiRequestFinished = false;
 
+    /** Client response body captured at fastcgi_finish_request() (#6136). */
+    private static ?string $fastCgiFinishedBody = null;
+
     public static function reset(): void
     {
         self::$status = 0;
@@ -33,6 +36,7 @@ final class ResponseContext
         OutputRewriteVarsJitHelper::reset();
         self::$headerQueueEnabled = false;
         self::$fastCgiRequestFinished = false;
+        self::$fastCgiFinishedBody = null;
     }
 
     /** Enable pending-header tracking for CGI/dev-server requests (issue #4037). */
@@ -212,14 +216,29 @@ final class ResponseContext
         return VmOutputRewriteVars::list();
     }
 
-    /** fastcgi_finish_request() flushed the response to the client (#3466). */
-    public static function markFastCgiRequestFinished(): void
+    /**
+     * fastcgi_finish_request() flushed the response to the client (#3466, #6136).
+     *
+     * @param string $body Output already sent (or buffered for CGI capture) at finish time;
+     *                     later echo/print must not appear in the HTTP body.
+     */
+    public static function markFastCgiRequestFinished(string $body = ''): void
     {
         self::$fastCgiRequestFinished = true;
+        // First finish wins — nested/repeated calls must not grow the client body.
+        if (null === self::$fastCgiFinishedBody) {
+            self::$fastCgiFinishedBody = $body;
+        }
     }
 
     public static function isFastCgiRequestFinished(): bool
     {
         return self::$fastCgiRequestFinished;
+    }
+
+    /** Body frozen for the client at finish time, or null if finish was not called. */
+    public static function getFastCgiFinishedBody(): ?string
+    {
+        return self::$fastCgiFinishedBody;
     }
 }
