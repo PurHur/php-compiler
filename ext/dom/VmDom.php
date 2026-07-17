@@ -8891,7 +8891,7 @@ final class VmDom
         return $ok;
     }
 
-    /** DOMDocument::relaxNGValidateSource() — in-memory RelaxNG validation stub (php-src ext/dom/document.c; #18748). */
+    /** DOMDocument::relaxNGValidateSource() — in-memory RelaxNG via libxml2 FFI (php-src ext/dom/document.c; #18748, #20235). */
     public static function relaxNGValidateSource(
         Context $ctx,
         ObjectEntry $document,
@@ -8915,7 +8915,25 @@ final class VmDom
             return false;
         }
 
-        return false;
+        if (!VmDomValidationNative::available()) {
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidateSource(): not implemented in this compiler build');
+
+            return false;
+        }
+
+        $docXml = self::saveXML($document);
+        $ok = VmDomValidationNative::validateRelaxNGDocumentSource($docXml, $source);
+        if (!$ok) {
+            self::reportDomLibxmlValidationErrors(
+                $ctx,
+                $frame,
+                'DOMDocument::relaxNGValidateSource()',
+                VmDomValidationNative::consumeLastErrors(),
+                'DOMDocument::relaxNGValidateSource(): Invalid RelaxNG'
+            );
+        }
+
+        return $ok;
     }
 
     /**
