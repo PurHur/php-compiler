@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** DomDocumentMethod user-script AOT kernel quarantined in ext/dom (#19496). */
+/** DomDocumentMethod thin standalone AOT kernel quarantined in ext/dom (#19496, #20214). */
 final class DomDocumentMethodKernelShrinkTest extends TestCase
 {
     public function testUserScriptLlvmMovedToExtKernel(): void
@@ -29,5 +29,12 @@ final class DomDocumentMethodKernelShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('JitDomDocumentMethodKernel.php', $spine);
         $this->assertStringNotContainsString('DomDocumentMethodUserScriptLlvm.php', $spine);
+    }
+
+    public function testThinPathGatesOnIsThinStandaloneAotMain(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/dom/JitDomDocumentMethodKernel.php');
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
     }
 }

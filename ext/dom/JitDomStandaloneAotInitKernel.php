@@ -10,12 +10,12 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * User-script standalone AOT: compile DomStandaloneAotInit in the main module (#17391, #19487).
+ * Thin standalone AOT: compile DomStandaloneAotInit in the main module (#17391, #19487, #20214).
  *
+ * Gate: {@see Context::isThinStandaloneAotMain()} (peer #20200 / #20178 — no NestedJit defer).
  * Housed in ext/dom (not lib/JIT/Builtin) — same kernel-move pattern as #19430 / #19389.
  */
 final class JitDomStandaloneAotInitKernel
@@ -31,7 +31,7 @@ final class JitDomStandaloneAotInitKernel
 
     public static function shouldUse(Context $context): bool
     {
-        return UserScriptAotDeferNestedJit::shouldDefer($context);
+        return $context->isThinStandaloneAotMain();
     }
 
     public static function ensureLinked(Context $context): void
