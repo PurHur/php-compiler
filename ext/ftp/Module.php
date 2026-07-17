@@ -57,6 +57,7 @@ class Module extends ModuleAbstract
             new ftp_connect(),
             new ftp_ssl_connect(),
             new ftp_close(),
+            new ftp_quit(),
             new ftp_login(),
             new ftp_fget(),
             new ftp_fput(),
@@ -85,6 +86,7 @@ class Module extends ModuleAbstract
             new ftp_chmod(),
             new ftp_raw(),
             new ftp_site(),
+            new ftp_exec(),
             new ftp_set_option(),
             new ftp_get_option(),
         ];
