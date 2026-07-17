@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5250 |
-| Phase A inventory files (M2 ratio SSOT) | 5250 |
+| PHP files on vm.php path | 5251 |
+| Phase A inventory files (M2 ratio SSOT) | 5251 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14471 |
+| Source constructs flagged (warnings) | 14472 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1774,6 +1774,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrSplit.php` | 0 | 1 |
 | `ext/standard/JitStreamBucket.php` | 0 | 3 |
 | `ext/standard/JitStreamBucketKernel.php` | 0 | 3 |
+| `ext/standard/JitStreamBufferKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamCapsKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamContextCreate.php` | 0 | 1 |
 | `ext/standard/JitStreamContextGetDefault.php` | 0 | 1 |
@@ -3969,7 +3970,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamBucket.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamBuffer.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamBufferJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StreamBufferRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StreamBufferRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCaps.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCapsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCapsRuntime.php` | 0 | 1 |
@@ -6295,7 +6296,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomNodePropertySupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 49)
+- new Variable (line 50)
 - 3 class method(s)
 
 ### `ext/dom/DomParseSimpleHtmlJitHelper.php`
@@ -6603,8 +6604,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomAttributeNodeNS.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 319)
-- new JITVariable (line 334)
+- new JITVariable (line 320)
+- new JITVariable (line 335)
 - 24 class method(s)
 
 ### `ext/dom/JitDomC14N.php`
@@ -7376,111 +7377,111 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1111)
 - new Variable (line 1132)
 - new ObjectEntry (line 1150)
-- new DomNodeState (line 1158)
-- new Variable (line 1170)
-- new DOMException (line 1215)
-- new Variable (line 1219)
-- new Variable (line 1225)
-- new DOMException (line 1234)
-- new Variable (line 1270)
-- new DOMException (line 1290)
-- new Variable (line 1293)
-- new DOMException (line 1312)
-- new Variable (line 1344)
-- new DOMException (line 1356)
-- new DOMException (line 1369)
-- new Variable (line 1381)
-- new DOMException (line 1489)
-- new DOMException (line 1541)
-- new DOMException (line 1554)
-- new DOMException (line 1577)
-- new DOMException (line 1591)
-- new DOMException (line 1650)
-- new DOMException (line 1705)
-- new DOMException (line 1761)
-- new DOMException (line 1765)
-- new DOMException (line 1778)
-- new DOMException (line 1782)
-- new DOMException (line 1792)
-- new DOMException (line 2212)
-- new DOMException (line 2228)
-- new ObjectEntry (line 2315)
-- new DomNodeState (line 2320)
-- new ObjectEntry (line 2336)
-- new DomNodeState (line 2341)
-- new ObjectEntry (line 2357)
-- new DomNodeState (line 2362)
-- new DOMException (line 2401)
-- new DOMException (line 2411)
-- new DOMException (line 2424)
-- new DOMException (line 2443)
-- new ObjectEntry (line 2531)
-- new DomNodeState (line 2536)
-- new Variable (line 2545)
-- new ObjectEntry (line 2555)
-- new DomNodeState (line 2560)
-- new Variable (line 2566)
-- new ObjectEntry (line 3280)
-- new DomNodeState (line 3282)
-- new ObjectEntry (line 3478)
-- new DomNodeState (line 3480)
-- new ObjectEntry (line 3508)
-- new DomNodeState (line 3510)
-- new ObjectEntry (line 3639)
-- new DomNodeState (line 3644)
-- new DOMException (line 4015)
-- new DOMException (line 4031)
-- new Variable (line 4049)
-- new DOMException (line 4063)
-- new DOMException (line 4066)
-- new DOMException (line 4076)
-- new Error (line 4106)
-- new DOMException (line 4112)
-- new DOMException (line 4126)
-- new DOMException (line 4324)
-- new DOMException (line 4521)
-- new DOMException (line 4525)
-- new DOMException (line 4614)
-- new DOMException (line 4618)
-- new DOMException (line 4676)
-- new DOMException (line 4693)
-- new DOMException (line 4725)
-- new DOMException (line 4767)
-- new DOMException (line 4794)
-- new DOMException (line 5466)
-- new Variable (line 5494)
-- new DOMException (line 5740)
-- new DOMException (line 5852)
-- new DOMException (line 5894)
-- new ObjectEntry (line 5979)
-- new DomNodeState (line 5983)
-- new Variable (line 5990)
-- new ObjectEntry (line 6198)
-- new DomNodeState (line 6202)
-- new Variable (line 6209)
-- new ObjectEntry (line 6229)
-- new DomNodeState (line 6232)
-- new Variable (line 6240)
-- new Variable (line 6409)
-- new DOMException (line 6516)
-- new DOMException (line 6523)
-- new DOMException (line 6530)
-- new DOMException (line 6534)
-- new DOMException (line 6537)
-- new DOMException (line 6546)
-- new DOMException (line 6558)
-- new DOMException (line 7506)
-- new Variable (line 7565)
-- new Variable (line 7578)
-- new Variable (line 7616)
-- new DOMException (line 7627)
-- new Variable (line 7629)
-- new DOMException (line 7762)
-- new DOMException (line 7789)
-- new DOMException (line 7820)
-- new DOMException (line 7884)
-- new DOMException (line 7892)
-- new DOMException (line 7901)
+- new DomNodeState (line 1159)
+- new Variable (line 1171)
+- new DOMException (line 1216)
+- new Variable (line 1220)
+- new Variable (line 1226)
+- new DOMException (line 1235)
+- new Variable (line 1271)
+- new DOMException (line 1291)
+- new Variable (line 1294)
+- new DOMException (line 1313)
+- new Variable (line 1345)
+- new DOMException (line 1357)
+- new DOMException (line 1370)
+- new Variable (line 1382)
+- new DOMException (line 1490)
+- new DOMException (line 1542)
+- new DOMException (line 1555)
+- new DOMException (line 1578)
+- new DOMException (line 1592)
+- new DOMException (line 1651)
+- new DOMException (line 1706)
+- new DOMException (line 1762)
+- new DOMException (line 1766)
+- new DOMException (line 1779)
+- new DOMException (line 1783)
+- new DOMException (line 1793)
+- new DOMException (line 2213)
+- new DOMException (line 2229)
+- new ObjectEntry (line 2316)
+- new DomNodeState (line 2321)
+- new ObjectEntry (line 2337)
+- new DomNodeState (line 2342)
+- new ObjectEntry (line 2358)
+- new DomNodeState (line 2363)
+- new DOMException (line 2402)
+- new DOMException (line 2412)
+- new DOMException (line 2425)
+- new DOMException (line 2444)
+- new ObjectEntry (line 2532)
+- new DomNodeState (line 2537)
+- new Variable (line 2546)
+- new ObjectEntry (line 2556)
+- new DomNodeState (line 2561)
+- new Variable (line 2567)
+- new ObjectEntry (line 3281)
+- new DomNodeState (line 3283)
+- new ObjectEntry (line 3479)
+- new DomNodeState (line 3481)
+- new ObjectEntry (line 3509)
+- new DomNodeState (line 3511)
+- new ObjectEntry (line 3640)
+- new DomNodeState (line 3645)
+- new DOMException (line 4016)
+- new DOMException (line 4032)
+- new Variable (line 4050)
+- new DOMException (line 4064)
+- new DOMException (line 4067)
+- new DOMException (line 4077)
+- new Error (line 4107)
+- new DOMException (line 4113)
+- new DOMException (line 4127)
+- new DOMException (line 4325)
+- new DOMException (line 4522)
+- new DOMException (line 4526)
+- new DOMException (line 4615)
+- new DOMException (line 4619)
+- new DOMException (line 4677)
+- new DOMException (line 4694)
+- new DOMException (line 4726)
+- new DOMException (line 4768)
+- new DOMException (line 4795)
+- new DOMException (line 5467)
+- new Variable (line 5495)
+- new DOMException (line 5741)
+- new DOMException (line 5853)
+- new DOMException (line 5895)
+- new ObjectEntry (line 5980)
+- new DomNodeState (line 5984)
+- new Variable (line 5991)
+- new ObjectEntry (line 6203)
+- new DomNodeState (line 6207)
+- new Variable (line 6214)
+- new ObjectEntry (line 6234)
+- new DomNodeState (line 6237)
+- new Variable (line 6245)
+- new Variable (line 6414)
+- new DOMException (line 6521)
+- new DOMException (line 6528)
+- new DOMException (line 6535)
+- new DOMException (line 6539)
+- new DOMException (line 6542)
+- new DOMException (line 6551)
+- new DOMException (line 6563)
+- new DOMException (line 7511)
+- new Variable (line 7570)
+- new Variable (line 7583)
+- new Variable (line 7621)
+- new DOMException (line 7632)
+- new Variable (line 7634)
+- new DOMException (line 7767)
+- new DOMException (line 7794)
+- new DOMException (line 7825)
+- new DOMException (line 7889)
+- new DOMException (line 7897)
+- new DOMException (line 7906)
 - 364 class method(s)
 - 1 closure(s)
 
@@ -16987,6 +16988,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 302)
 - 23 class method(s)
 - 1 closure(s)
+
+### `ext/standard/JitStreamBufferKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 206)
+- 10 class method(s)
+- 4 closure(s)
 
 ### `ext/standard/JitStreamCapsKernel.php`
 
@@ -31912,9 +31920,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamBufferRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 203)
-- 10 class method(s)
-- 4 closure(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StreamCaps.php`
 

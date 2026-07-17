@@ -8,7 +8,9 @@ use PHPCompiler\ext\standard\StreamBufferJitHelper;
 use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
-/** Stream buffer JIT routes through StreamBufferJitHelper PHP not inline LLVM (#14462). */
+/**
+ * Stream buffer NestedJIT ABI bridges quarantined in ext/standard (#14462, #19788).
+ */
 final class StreamBufferRuntimeShrinkTest extends TestCase
 {
     private const BASELINE_LOC = 441;
@@ -28,13 +30,42 @@ final class StreamBufferRuntimeShrinkTest extends TestCase
         $this->assertLessThanOrEqual((int) floor(self::BASELINE_LOC * 0.3), $loc, 'StreamBufferJit.php LOC');
     }
 
-    public function testStreamBufferRuntimeUsesJitHelper(): void
+    public function testBuiltinStreamBufferRuntimeIsThinOrchestrator(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamBufferRuntime.php');
-        $this->assertStringContainsString('StreamBufferJitHelper::setChunkSizeArgv', $source);
-        $this->assertStringContainsString('StreamBufferJitHelper::setWriteBufferArgv', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
-        $this->assertStringNotContainsString('setvbuf', $source);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamBufferKernel.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StreamBufferRuntime.php');
+
+        $orchestrator = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamBufferRuntime.php');
+        $this->assertStringContainsString('JitStreamBufferKernel', $orchestrator);
+        $this->assertStringContainsString('JitStreamBufferKernel::ensureLinked', $orchestrator);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $orchestrator);
+        $this->assertStringNotContainsString('__compiler_stream_set_chunk_size', $orchestrator);
+        $this->assertLessThan(55, \substr_count($orchestrator, "\n") + 1);
+    }
+
+    public function testKernelPresent(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamBufferKernel.php');
+        $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
+        $this->assertStringContainsString('final class JitStreamBufferKernel', $source);
+        $this->assertStringContainsString('__compiler_stream_set_chunk_size', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertStringContainsString('StreamBufferJitHelper', $source);
+        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
+        $this->assertLessThan(260, \substr_count($source, "\n") + 1);
+    }
+
+    public function testSpineBundleIncludesKernelAndOrchestrator(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitStreamBufferKernel.php', $spine);
+        $this->assertStringContainsString('StreamBufferRuntime.php', $spine);
+        $kernelPos = strpos($spine, 'JitStreamBufferKernel.php');
+        $orchPos = strpos($spine, 'lib/JIT/Builtin/StreamBufferRuntime.php');
+        $this->assertNotFalse($kernelPos);
+        $this->assertNotFalse($orchPos);
+        $this->assertLessThan($orchPos, $kernelPos, 'kernel must load before thin orchestrator');
     }
 
     public function testStreamBufferJitHelperMemoryRoundTrip(): void
