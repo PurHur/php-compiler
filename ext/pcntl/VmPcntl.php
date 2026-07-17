@@ -168,6 +168,60 @@ final class VmPcntl
         throw new \Error('pcntl_wstopsig() is not available in this compiler build');
     }
 
+    public static function priorityAvailable(): bool
+    {
+        return PcntlHostBridge::priorityAvailable() || PcntlLibcThinAbi::priorityAvailable();
+    }
+
+    /**
+     * php-src pcntl_getpriority() — getpriority(2) (ext/pcntl/pcntl.c; #20046).
+     *
+     * @return int|false
+     */
+    public static function getpriority(?int $pid, int $who): int|false
+    {
+        if (!self::isValidPrioWho($who)) {
+            throw new \ValueError(
+                'pcntl_getpriority(): Argument #2 ($mode) must be one of PRIO_PGRP, PRIO_USER, or PRIO_PROCESS'
+            );
+        }
+        if (PcntlHostBridge::priorityAvailable()) {
+            return PcntlHostBridge::getpriority($pid, $who);
+        }
+        if (PcntlLibcThinAbi::priorityAvailable()) {
+            return PcntlLibcThinAbi::getpriority($pid, $who);
+        }
+
+        throw new \Error('pcntl_getpriority() is not available in this compiler build');
+    }
+
+    /**
+     * php-src pcntl_setpriority() — setpriority(2) (ext/pcntl/pcntl.c; #20046).
+     */
+    public static function setpriority(int $priority, ?int $pid, int $who): bool
+    {
+        if (!self::isValidPrioWho($who)) {
+            throw new \ValueError(
+                'pcntl_setpriority(): Argument #3 ($mode) must be one of PRIO_PGRP, PRIO_USER, or PRIO_PROCESS'
+            );
+        }
+        if (PcntlHostBridge::priorityAvailable()) {
+            return PcntlHostBridge::setpriority($priority, $pid, $who);
+        }
+        if (PcntlLibcThinAbi::priorityAvailable()) {
+            return PcntlLibcThinAbi::setpriority($priority, $pid, $who);
+        }
+
+        throw new \Error('pcntl_setpriority() is not available in this compiler build');
+    }
+
+    private static function isValidPrioWho(int $who): bool
+    {
+        return PcntlConstants::PRIO_PROCESS === $who
+            || PcntlConstants::PRIO_PGRP === $who
+            || PcntlConstants::PRIO_USER === $who;
+    }
+
     public static function hasHandler(int $signo): bool
     {
         return isset(self::$handlers[$signo]);

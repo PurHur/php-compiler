@@ -175,6 +175,29 @@ final class PcntlHostBridge
         return (int) \pcntl_wstopsig($status);
     }
 
+    public static function priorityAvailable(): bool
+    {
+        return \function_exists('pcntl_getpriority') && \function_exists('pcntl_setpriority');
+    }
+
+    public static function getpriority(?int $pid, int $who): int|false
+    {
+        if (null === $pid) {
+            return \pcntl_getpriority(null, $who);
+        }
+
+        return \pcntl_getpriority($pid, $who);
+    }
+
+    public static function setpriority(int $priority, ?int $pid, int $who): bool
+    {
+        if (null === $pid) {
+            return (bool) \pcntl_setpriority($priority, null, $who);
+        }
+
+        return (bool) \pcntl_setpriority($priority, $pid, $who);
+    }
+
     private static function ffiCallbackAvailable(): bool
     {
         return \class_exists(\FFI::class, false) && \method_exists(\FFI::class, 'callback');
