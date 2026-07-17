@@ -90,6 +90,17 @@ final class SimpleXmlRegistry
         return self::$documentKeys[$entry->id] ?? $entry->id;
     }
 
+    /** Document root node for a loaded tree (object id of the root SimpleXMLElement). */
+    public static function rootState(int $documentKey): SimpleXmlNodeState
+    {
+        $state = self::$states[$documentKey] ?? null;
+        if (null === $state) {
+            throw new \LogicException('SimpleXML document root not found for this compiler build');
+        }
+
+        return $state;
+    }
+
     /** @return array<string, string> */
     public static function xpathNamespaces(ObjectEntry $entry): array
     {
