@@ -696,7 +696,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
-            foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists'] as $fn) {
+            foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists', 'isAnonymousClass'] as $fn) {
                 $this->assertFalse(isset($ctx->functions[$fn]), $fn);
             }
         } finally {
@@ -715,7 +715,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
-            foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists'] as $fn) {
+            foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists', 'isAnonymousClass'] as $fn) {
                 $this->assertFalse(isset($ctx->functions[$fn]), $fn);
             }
         } finally {

@@ -29,6 +29,7 @@ use PHPCompiler\VM\Builtin\DeprecatedConstruct;
 use PHPCompiler\VM\Builtin\EnumCasesConstruct;
 use PHPCompiler\VM\Builtin\NoDiscardConstruct;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ObjectHandleSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -1186,6 +1187,26 @@ final class ReflectionSupport
     public static function isReflectionClassAnonymous(ObjectEntry $reflection): bool
     {
         return str_contains(self::classNameFromReflection($reflection), '@anonymous');
+    }
+
+    /**
+     * isAnonymousClass() — php-src zif_is_anonymous_class (ext/reflection/php_reflection.c, #19969).
+     */
+    public static function isAnonymousClassObject(Variable $var, string $function = 'isAnonymousClass'): bool
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            return false;
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #1 ($object) must be of type object, %s given',
+                $function,
+                ObjectHandleSupport::vmTypeName($var->type)
+            ));
+        }
+
+        return str_contains($var->toObject()->class->name, '@anonymous');
     }
 
     public static function isReflectionInternalFunction(ObjectEntry $reflection): bool
