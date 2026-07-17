@@ -12,6 +12,14 @@ use PHPCompiler\ext\standard\VmFsReadNative;
 final class VmOpensslPkeyNative
 {
     private const EVP_PKEY_RSA = 6;
+    private const EVP_PKEY_RSA2 = 19;
+    private const EVP_PKEY_DSA = 116;
+    private const EVP_PKEY_DSA1 = 67;
+    private const EVP_PKEY_DSA2 = 66;
+    private const EVP_PKEY_DSA3 = 113;
+    private const EVP_PKEY_DSA4 = 70;
+    private const EVP_PKEY_DH = 28;
+    private const EVP_PKEY_EC = 408;
 
     /** @var \FFI|null */
     private static $ffi = null;
@@ -108,11 +116,89 @@ final class VmOpensslPkeyNative
     }
 
     /**
+     * Normalize a public-key PEM only (php-src openssl_pkey_get_public; #20240).
+     * Private-key PEMs must fail — do not coerce via readAnyKey().
+     */
+    public static function normalizePublicKeyPem(string $pem): string|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $pkey = self::readPublicKey($ffi, $pem);
+        if (null === $pkey) {
+            return false;
+        }
+
+        try {
+            return self::writePublicKeyPem($ffi, $pkey);
+        } finally {
+            $ffi->EVP_PKEY_free($pkey);
+        }
+    }
+
+    /**
+     * openssl_pkey_get_details() array (php-src ext/openssl/openssl.c; #20240).
+     *
+     * @return array{bits: int, key: string, type: int, rsa?: array<string, string>}|false
+     */
+    public static function getDetails(string $pem): array|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $pkey = self::readAnyKey($ffi, $pem);
+        if (null === $pkey) {
+            return false;
+        }
+
+        try {
+            $bits = (int) $ffi->EVP_PKEY_get_bits($pkey);
+            if ($bits <= 0) {
+                return false;
+            }
+            $pubPem = self::writePublicKeyPem($ffi, $pkey);
+            if (false === $pubPem) {
+                return false;
+            }
+
+            $baseId = (int) $ffi->EVP_PKEY_get_base_id($pkey);
+            $type = match ($baseId) {
+                self::EVP_PKEY_RSA, self::EVP_PKEY_RSA2 => OpensslConstants::OPENSSL_KEYTYPE_RSA,
+                self::EVP_PKEY_DSA, self::EVP_PKEY_DSA1, self::EVP_PKEY_DSA2, self::EVP_PKEY_DSA3, self::EVP_PKEY_DSA4 => OpensslConstants::OPENSSL_KEYTYPE_DSA,
+                self::EVP_PKEY_DH => OpensslConstants::OPENSSL_KEYTYPE_DH,
+                self::EVP_PKEY_EC => OpensslConstants::OPENSSL_KEYTYPE_EC,
+                default => -1,
+            };
+
+            $details = [
+                'bits' => $bits,
+                'key' => $pubPem,
+                'type' => $type,
+            ];
+
+            if (OpensslConstants::OPENSSL_KEYTYPE_RSA === $type) {
+                $rsaDetails = self::rsaDetails($ffi, $pkey);
+                if (null !== $rsaDetails) {
+                    $details['rsa'] = $rsaDetails;
+                }
+            }
+
+            return $details;
+        } finally {
+            $ffi->EVP_PKEY_free($pkey);
+        }
+    }
+
+    /**
      * @param \FFI $ffi
      *
      * @return \FFI\CData|null
      */
-    private static function readAnyKey($ffi, string $pem)
+    private static function readPublicKey($ffi, string $pem)
     {
         $bio = $ffi->BIO_new_mem_buf($pem, \strlen($pem));
         if (null === $bio) {
@@ -120,12 +206,22 @@ final class VmOpensslPkeyNative
         }
 
         try {
-            $pub = $ffi->PEM_read_bio_PUBKEY($bio, null, null, null);
-            if (null !== $pub) {
-                return $pub;
-            }
+            return $ffi->PEM_read_bio_PUBKEY($bio, null, null, null);
         } finally {
             $ffi->BIO_free($bio);
+        }
+    }
+
+    /**
+     * @param \FFI $ffi
+     *
+     * @return \FFI\CData|null
+     */
+    private static function readAnyKey($ffi, string $pem)
+    {
+        $pub = self::readPublicKey($ffi, $pem);
+        if (null !== $pub) {
+            return $pub;
         }
 
         $bio = $ffi->BIO_new_mem_buf($pem, \strlen($pem));
@@ -138,6 +234,67 @@ final class VmOpensslPkeyNative
         } finally {
             $ffi->BIO_free($bio);
         }
+    }
+
+    /**
+     * @param \FFI $ffi
+     * @param \FFI\CData $pkey
+     *
+     * @return array<string, string>|null
+     */
+    private static function rsaDetails($ffi, $pkey): ?array
+    {
+        $rsa = $ffi->EVP_PKEY_get0_RSA($pkey);
+        if (null === $rsa) {
+            return null;
+        }
+
+        $details = [];
+        foreach ([
+            'n' => 'RSA_get0_n',
+            'e' => 'RSA_get0_e',
+            'd' => 'RSA_get0_d',
+            'p' => 'RSA_get0_p',
+            'q' => 'RSA_get0_q',
+            'dmp1' => 'RSA_get0_dmp1',
+            'dmq1' => 'RSA_get0_dmq1',
+            'iqmp' => 'RSA_get0_iqmp',
+        ] as $key => $getter) {
+            $bn = $ffi->$getter($rsa);
+            if (null === $bn) {
+                continue;
+            }
+            $bin = self::bn2bin($ffi, $bn);
+            if (null === $bin) {
+                continue;
+            }
+            $details[$key] = $bin;
+        }
+
+        return [] === $details ? null : $details;
+    }
+
+    /**
+     * @param \FFI $ffi
+     * @param \FFI\CData $bn
+     */
+    private static function bn2bin($ffi, $bn): ?string
+    {
+        $bits = (int) $ffi->BN_num_bits($bn);
+        if ($bits <= 0) {
+            return '';
+        }
+        $len = intdiv($bits + 7, 8);
+        if ($len <= 0) {
+            return '';
+        }
+        $buf = $ffi->new("unsigned char[{$len}]");
+        $written = (int) $ffi->BN_bn2bin($bn, $buf);
+        if ($written <= 0) {
+            return null;
+        }
+
+        return \FFI::string($buf, $written);
     }
 
     /**
@@ -479,6 +636,8 @@ final class VmOpensslPkeyNative
 typedef struct bio_st BIO;
 typedef struct evp_pkey_st EVP_PKEY;
 typedef struct evp_pkey_ctx_st EVP_PKEY_CTX;
+typedef struct rsa_st RSA;
+typedef struct bignum_st BIGNUM;
 
 BIO *BIO_new_mem_buf(const void *buf, int len);
 BIO *BIO_new_file(const char *filename, const char *mode);
@@ -505,6 +664,19 @@ int EVP_PKEY_verify_recover_init(EVP_PKEY_CTX *ctx);
 int EVP_PKEY_verify_recover(EVP_PKEY_CTX *ctx, unsigned char *rout, size_t *routlen,
     const unsigned char *sig, size_t siglen);
 int EVP_PKEY_CTX_set_rsa_padding(EVP_PKEY_CTX *ctx, int pad);
+int EVP_PKEY_get_bits(const EVP_PKEY *pkey);
+int EVP_PKEY_get_base_id(const EVP_PKEY *pkey);
+RSA *EVP_PKEY_get0_RSA(EVP_PKEY *pkey);
+BIGNUM *RSA_get0_n(const RSA *d);
+BIGNUM *RSA_get0_e(const RSA *d);
+BIGNUM *RSA_get0_d(const RSA *d);
+BIGNUM *RSA_get0_p(const RSA *d);
+BIGNUM *RSA_get0_q(const RSA *d);
+BIGNUM *RSA_get0_dmp1(const RSA *d);
+BIGNUM *RSA_get0_dmq1(const RSA *d);
+BIGNUM *RSA_get0_iqmp(const RSA *d);
+int BN_num_bits(const BIGNUM *a);
+int BN_bn2bin(const BIGNUM *a, unsigned char *to);
 int PEM_write_bio_PrivateKey(BIO *bp, EVP_PKEY *x, void *enc,
     void *kstr, int klen, void *cb, void *u);
 int PEM_write_bio_PUBKEY(BIO *bp, EVP_PKEY *x);

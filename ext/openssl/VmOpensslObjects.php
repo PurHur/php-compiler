@@ -365,6 +365,14 @@ final class VmOpensslObjects
     /**
      * @param array<string, mixed>|string|int|float|bool|null $value
      */
+    public static function variableFromPhpValue(array|string|int|float|bool|null $value): Variable
+    {
+        return self::phpValueToVariable($value);
+    }
+
+    /**
+     * @param array<string, mixed>|string|int|float|bool|null $value
+     */
     private static function phpValueToVariable(array|string|int|float|bool|null $value): Variable
     {
         $var = new Variable();
