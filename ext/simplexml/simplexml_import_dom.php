@@ -58,11 +58,7 @@ final class simplexml_import_dom extends Internal
         $class = VmDomSimpleXmlBridge::resolveSimpleXmlClass($frame->vmContext, $className);
 
         if (!DomRegistry::has($node)) {
-            $frame->vmContext->errors->triggerError(
-                'simplexml_import_dom(): Invalid Nodetype to import',
-                ErrorReporter::E_WARNING,
-                $frame
-            );
+            self::warnInvalidNodeType($frame);
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(false);
             }
@@ -72,11 +68,7 @@ final class simplexml_import_dom extends Internal
 
         $imported = VmDomSimpleXmlBridge::importDom($frame->vmContext, $node, $class);
         if (null === $imported) {
-            $frame->vmContext->errors->triggerError(
-                'simplexml_import_dom(): Invalid Nodetype to import',
-                ErrorReporter::E_WARNING,
-                $frame
-            );
+            self::warnInvalidNodeType($frame);
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(false);
             }
@@ -92,5 +84,19 @@ final class simplexml_import_dom extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         throw new \LogicException('simplexml_import_dom() is not JIT-lowered in this compiler build');
+    }
+
+    private static function warnInvalidNodeType(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            'simplexml_import_dom(): Invalid Nodetype to import',
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 }
