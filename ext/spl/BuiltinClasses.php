@@ -23,6 +23,8 @@ final class BuiltinClasses
         GlobIteratorBuiltin::registerClass($ctx);
         SplFixedArrayBuiltin::registerClass($ctx);
         SplObjectStorageBuiltin::registerClass($ctx);
+        // RecursiveIterator / OuterIterator before wrappers that list them on ClassEntry (#19784).
+        VmSplIterators::registerCoreInterfaces($ctx);
         IteratorIteratorBuiltin::registerClass($ctx);
         FilterIteratorBuiltin::registerClass($ctx);
         CallbackFilterIteratorBuiltin::registerClass($ctx);
@@ -34,7 +36,7 @@ final class BuiltinClasses
         CachingIteratorBuiltin::registerClass($ctx);
         InfiniteIteratorBuiltin::registerClass($ctx);
         NoRewindIteratorBuiltin::registerClass($ctx);
-        // RecursiveIterator (and siblings) must exist before RecursiveCachingIterator (#6393, #6915).
+        // ArrayIterator / RecursiveArrayIterator / RecursiveCallbackFilterIterator (#6393, #6915).
         // RecursiveCachingIterator before RecursiveTreeIterator — tree wraps caching for hasNext (#6273).
         VmSplIterators::register($ctx);
         RecursiveCachingIteratorBuiltin::registerClass($ctx);

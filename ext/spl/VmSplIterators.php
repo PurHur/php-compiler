@@ -15,10 +15,19 @@ use PHPCfg\Func as CfgFunc;
  */
 final class VmSplIterators
 {
-    public static function register(Context $ctx): void
+    /**
+     * RecursiveIterator / OuterIterator must exist before FilterIterator / ParentIterator /
+     * RecursiveRegexIterator / IteratorIterator attach `$entry->interfaces` (#19784).
+     */
+    public static function registerCoreInterfaces(Context $ctx): void
     {
         self::registerRecursiveIteratorInterface($ctx);
         self::registerOuterIteratorInterface($ctx);
+    }
+
+    public static function register(Context $ctx): void
+    {
+        self::registerCoreInterfaces($ctx);
         self::registerInternalIterator($ctx);
         EmptyIteratorBuiltin::registerClass($ctx);
         ArrayIteratorBuiltin::registerClass($ctx);
