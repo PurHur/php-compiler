@@ -9,6 +9,7 @@ use PHPCompiler\ext\iconv\CharsetEngine;
 use PHPCompiler\ext\iconv\VmIconv;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
+use PHPCompiler\ReflectionSupport;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
@@ -45,20 +46,36 @@ final class VmUConverter
         $entry = new ClassEntry('UConverter');
         $entry->isInternal = true;
         $pub = CfgFunc::FLAG_PUBLIC;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $entry->constructor = new UConverterConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
         $methods = [
-            'convert' => [new UConverterConvert(), 'convert'],
-            'geterrorcode' => [new UConverterGetErrorCode(), 'getErrorCode'],
-            'geterrormessage' => [new UConverterGetErrorMessage(), 'getErrorMessage'],
+            'convert' => [new UConverterConvert(), 'convert', false],
+            'geterrorcode' => [new UConverterGetErrorCode(), 'getErrorCode', false],
+            'geterrormessage' => [new UConverterGetErrorMessage(), 'getErrorMessage', false],
+            'transcode' => [new UConverterTranscode(), 'transcode', true],
         ];
-        foreach ($methods as $lc => [$handler, $name]) {
+        foreach ($methods as $lc => [$handler, $name, $static]) {
             $entry->methods[$lc] = $handler;
-            $entry->methodVisibility[$lc] = $pub;
+            $entry->methodVisibility[$lc] = $static ? $pubStatic : $pub;
             $entry->methodNames[$lc] = $name;
         }
         $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    /**
+     * UConverter::transcode() — one-shot charset conversion (php-src ext/intl/converter; #6401).
+     */
+    public static function transcode(
+        string $str,
+        string $toEncoding,
+        string $fromEncoding,
+        ?array $options = null
+    ): string|false {
+        unset($options);
+
+        return VmIconv::iconv($fromEncoding, $toEncoding, $str);
     }
 
     public static function isUConverterObject(?ObjectEntry $object): bool
@@ -257,6 +274,69 @@ final class UConverterGetErrorCode extends VmClassMethod
             return;
         }
         $frame->returnVar->int(VmUConverter::getErrorCode($object));
+    }
+}
+
+/** UConverter::transcode() — php-src ext/intl/converter/converter.c (#6401). */
+final class UConverterTranscode extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('transcode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::transcode() expects at least 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::transcode() expects at most 4 arguments, %d given',
+                $argc
+            ));
+        }
+        $str = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'UConverter::transcode',
+            0,
+            'str'
+        );
+        $toEncoding = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'UConverter::transcode',
+            1,
+            'toEncoding'
+        );
+        $fromEncoding = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[2],
+            'UConverter::transcode',
+            2,
+            'fromEncoding'
+        );
+        if (4 === $argc) {
+            $optVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $optVar->type && Variable::TYPE_ARRAY !== $optVar->type) {
+                throw new \TypeError(\sprintf(
+                    'UConverter::transcode(): Argument #4 ($options) must be of type array, %s given',
+                    ReflectionSupport::valueTypeLabelPublic($optVar)
+                ));
+            }
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmUConverter::transcode($str, $toEncoding, $fromEncoding);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
     }
 }
 
