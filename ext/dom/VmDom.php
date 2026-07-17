@@ -9,6 +9,7 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsReadNative;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\ext\xml\VmXml;
@@ -4193,6 +4194,34 @@ final class VmDom
         return $out;
     }
 
+    /**
+     * Expand HTML character references the way libxml htmlReadMemory does (php-src html_document.c; #20260).
+     *
+     * ENT_HTML401 matches libxml's HTML named-entity set (&eacute;, &amp;, …); ENT_QUOTES covers attr values.
+     */
+    public static function decodeHtmlCharacterReferences(string $text): string
+    {
+        if ('' === $text || false === strpos($text, '&')) {
+            return $text;
+        }
+
+        return VmString::html_entity_decode($text, ENT_QUOTES | ENT_HTML401 | ENT_SUBSTITUTE, 'UTF-8');
+    }
+
+    /**
+     * @param array<string, string> $attributes
+     *
+     * @return array<string, string>
+     */
+    private static function decodeHtmlAttributeMap(array $attributes): array
+    {
+        foreach ($attributes as $name => $value) {
+            $attributes[$name] = self::decodeHtmlCharacterReferences($value);
+        }
+
+        return $attributes;
+    }
+
     private static function decodePredefinedXmlEntity(string $name): ?string
     {
         return match ($name) {
@@ -5692,7 +5721,7 @@ final class VmDom
         $localName = strtolower($tagName);
         $entry = self::createElement($ctx, $localName)->toObject();
         $state = DomRegistry::state($entry);
-        $state->attributes = self::parseAttributes($attrPart);
+        $state->attributes = self::decodeHtmlAttributeMap(self::parseAttributes($attrPart));
         self::applyQualifiedElementNames($state, $localName);
         self::applyParsedAttributes($state, $state->attributes);
         self::appendHtmlChildren($ctx, $entry, $inner, $ownerDocument, $frame);
@@ -5721,7 +5750,12 @@ final class VmDom
                 $next = strpos($inner, '<', $pos);
                 $text = false === $next ? substr($inner, $pos) : substr($inner, $pos, $next - $pos);
                 if ('' !== $text) {
-                    $textNode = self::createTextNode($ctx, $text, $ownerDocument);
+                    // libxml htmlReadMemory expands character references into text (php-src html_document.c; #20260).
+                    $textNode = self::createTextNode(
+                        $ctx,
+                        self::decodeHtmlCharacterReferences($text),
+                        $ownerDocument
+                    );
                     $state->childIds[] = $textNode->id;
                     self::linkChildToParent($textNode, $parent);
                 }

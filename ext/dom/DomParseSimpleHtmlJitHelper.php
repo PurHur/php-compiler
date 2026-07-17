@@ -40,6 +40,9 @@ final class DomParseSimpleHtmlJitHelper
             return null;
         }
         $text = substr($trimmed, $gt + 1, $closePos - $gt - 1);
+        // Match VmDom::loadHTML / libxml htmlReadMemory entity expansion (#20260).
+        $text = VmDom::decodeHtmlCharacterReferences($text);
+        $id = VmDom::decodeHtmlCharacterReferences($id);
 
         return [
             'tag' => $tag,
