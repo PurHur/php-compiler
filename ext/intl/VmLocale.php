@@ -94,6 +94,307 @@ final class VmLocale
         return $language;
     }
 
+    /**
+     * locale_lookup() / Locale::lookup() — RFC 4647 lookup (php-src locale_methods.c; #20036).
+     *
+     * @param list<string> $langtag
+     */
+    public static function lookup(
+        array $langtag,
+        string $locale,
+        bool $canonicalize = false,
+        ?string $defaultLocale = null
+    ): string {
+        if ([] === $langtag) {
+            return '';
+        }
+        if ('' === $locale) {
+            $locale = null !== $defaultLocale && '' !== $defaultLocale
+                ? $defaultLocale
+                : self::getDefault();
+        }
+        $matched = self::lookupLocRange($locale, $langtag, $canonicalize);
+        if (null === $matched || '' === $matched) {
+            return null !== $defaultLocale ? $defaultLocale : '';
+        }
+
+        return $matched;
+    }
+
+    /**
+     * locale_filter_matches() / Locale::filterMatches() — prefix filter (php-src; #20036).
+     */
+    public static function filterMatches(
+        string $langtag,
+        string $locale,
+        bool $canonicalize = false
+    ): bool {
+        if ('' === $locale) {
+            $locale = self::getDefault();
+        }
+        if ('*' === $locale) {
+            return true;
+        }
+        unset($canonicalize); // ICU canonicalize path deferred; non-canonical match matches php-src |b=false
+        $curLang = self::strToMatch($langtag);
+        $curRange = self::strToMatch($locale);
+        if (null === $curLang || null === $curRange) {
+            return false;
+        }
+        if (!str_starts_with($curLang, $curRange)) {
+            return false;
+        }
+        $next = \strlen($curRange);
+        if ($next >= \strlen($curLang)) {
+            return true;
+        }
+        $ch = $curLang[$next];
+
+        return '_' === $ch || '-' === $ch || '@' === $ch;
+    }
+
+    /**
+     * locale_accept_from_http() / Locale::acceptFromHttp() — Accept-Language (#20036).
+     *
+     * Prefers ICU uloc_acceptLanguageFromHTTP via thin FFI; PHP q-value parse fallback.
+     *
+     * @return string|false
+     */
+    public static function acceptFromHttp(string $header)
+    {
+        if (self::httpAcceptFragmentTooLong($header)) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'locale_accept_from_http: locale string too long'
+            );
+
+            return false;
+        }
+        $icu = self::acceptFromHttpIcu($header);
+        if (null !== $icu) {
+            return $icu;
+        }
+
+        return self::acceptFromHttpFallback($header);
+    }
+
+    /**
+     * @param list<string> $langtag
+     */
+    private static function lookupLocRange(string $locRange, array $langtag, bool $canonicalize): ?string
+    {
+        /** @var list<array{0: string, 1: string}> normalized + original */
+        $cur = [];
+        foreach ($langtag as $tag) {
+            if (!\is_string($tag)) {
+                throw new \TypeError(
+                    'Locale::lookup(): Argument #1 ($langtag) must only contain string values'
+                );
+            }
+            $norm = self::strToMatch($tag);
+            if (null === $norm) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'lookup_loc_range: unable to canonicalize lang_tag'
+                );
+
+                return null;
+            }
+            if ($canonicalize) {
+                $norm = self::lightweightCanonicalize($norm);
+            }
+            $cur[] = [$norm, $tag];
+        }
+        if ($canonicalize) {
+            $locRange = self::lightweightCanonicalize(self::strToMatch($locRange) ?? $locRange);
+        }
+        $curLoc = self::strToMatch($locRange);
+        if (null === $curLoc) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'lookup_loc_range: unable to canonicalize loc_range'
+            );
+
+            return null;
+        }
+        $savedPos = \strlen($curLoc);
+        while ($savedPos > 0) {
+            foreach ($cur as [$norm, $orig]) {
+                if (\strlen($norm) === $savedPos && 0 === substr_compare($curLoc, $norm, 0, $savedPos)) {
+                    return $canonicalize ? $norm : $orig;
+                }
+            }
+            $savedPos = self::getStrrTokenPos($curLoc, $savedPos);
+        }
+
+        return null;
+    }
+
+    /** php-src strToMatch — lower + hyphen→underscore */
+    private static function strToMatch(string $tag): ?string
+    {
+        if ('' === $tag) {
+            return '';
+        }
+        $out = '';
+        $len = \strlen($tag);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $tag[$i];
+            if ('-' === $ch) {
+                $out .= '_';
+            } else {
+                $out .= strtolower($ch);
+            }
+        }
+
+        return $out;
+    }
+
+    /** php-src getStrrtokenPos — reverse token delimiter for lookup truncation */
+    private static function getStrrTokenPos(string $str, int $savedPos): int
+    {
+        $result = -1;
+        for ($i = $savedPos - 1; $i >= 0; --$i) {
+            $ch = $str[$i];
+            if ('_' === $ch || '-' === $ch || '@' === $ch) {
+                if ($i >= 2 && ('_' === $str[$i - 2] || '-' === $str[$i - 2])) {
+                    $result = $i - 2;
+                } else {
+                    $result = $i;
+                }
+                break;
+            }
+        }
+        if ($result < 1) {
+            return -1;
+        }
+
+        return $result;
+    }
+
+    /** Approximate ICU canonicalize when FFI unavailable (underscore form, lower language). */
+    private static function lightweightCanonicalize(string $normalized): string
+    {
+        $tags = self::parseBcp47Tags(str_replace('_', '-', $normalized));
+        $parts = [];
+        if ('' !== $tags['language']) {
+            $parts[] = $tags['language'];
+        }
+        if ('' !== $tags['script']) {
+            $parts[] = $tags['script'];
+        }
+        if ('' !== $tags['region']) {
+            $parts[] = $tags['region'];
+        }
+
+        return strtolower(implode('_', $parts));
+    }
+
+    private static function httpAcceptFragmentTooLong(string $header): bool
+    {
+        // ULOC_FULLNAME_CAPACITY ≈ 157
+        $capacity = 157;
+        if (\strlen($header) <= $capacity) {
+            return false;
+        }
+        foreach (explode(',', $header) as $frag) {
+            if (\strlen(trim($frag)) > $capacity) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @return string|false|null null = ICU unavailable */
+    private static function acceptFromHttpIcu(string $header)
+    {
+        if (!\class_exists(\FFI::class, false) && !\extension_loaded('FFI')) {
+            return null;
+        }
+        $candidates = [
+            ['libicui18n.so.70', '_70'],
+            ['libicui18n.so.74', '_74'],
+            ['libicui18n.so.72', '_72'],
+            ['libicui18n.so', '_70'],
+            ['libicui18n.dylib', ''],
+        ];
+        $cdef = static function (string $suffix): string {
+            return <<<C
+typedef int32_t UErrorCode;
+typedef struct UEnumeration UEnumeration;
+typedef enum { ULOC_ACCEPT_FAILED=0, ULOC_ACCEPT_VALID=1, ULOC_ACCEPT_FALLBACK=2 } UAcceptResult;
+UEnumeration *ures_openAvailableLocales{$suffix}(const char *packageName, UErrorCode *status);
+void uenum_close{$suffix}(UEnumeration *en);
+int32_t uloc_acceptLanguageFromHTTP{$suffix}(char *result, int32_t resultAvailable, UAcceptResult *outResult, const char *httpAcceptLanguage, UEnumeration *availableLocales, UErrorCode *status);
+C;
+        };
+        foreach ($candidates as [$lib, $suffix]) {
+            try {
+                $ffi = \FFI::cdef($cdef($suffix), $lib);
+                $status = $ffi->new('UErrorCode');
+                $status->cdata = 0;
+                $open = 'ures_openAvailableLocales'.$suffix;
+                $close = 'uenum_close'.$suffix;
+                $accept = 'uloc_acceptLanguageFromHTTP'.$suffix;
+                $en = $ffi->$open(null, \FFI::addr($status));
+                if ((int) $status->cdata > 0 || null === $en) {
+                    continue;
+                }
+                $status->cdata = 0;
+                $out = $ffi->new('UAcceptResult');
+                $buf = $ffi->new('char[157]');
+                $len = (int) $ffi->$accept($buf, 156, \FFI::addr($out), $header, $en, \FFI::addr($status));
+                $ffi->$close($en);
+                if ((int) $status->cdata > 0 || $len < 0 || 0 === (int) $out->cdata) {
+                    IntlError::clear();
+
+                    return false;
+                }
+                IntlError::clear();
+
+                return \FFI::string($buf);
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return string|false */
+    private static function acceptFromHttpFallback(string $header)
+    {
+        $bestTag = null;
+        $bestQ = -1.0;
+        foreach (explode(',', $header) as $part) {
+            $part = trim($part);
+            if ('' === $part) {
+                continue;
+            }
+            $pieces = array_map('trim', explode(';', $part));
+            $tag = $pieces[0];
+            if ('' === $tag || '*' === $tag) {
+                continue;
+            }
+            $q = 1.0;
+            for ($i = 1, $n = \count($pieces); $i < $n; ++$i) {
+                if (1 === preg_match('/^q\s*=\s*([0-9.]+)$/i', $pieces[$i], $m)) {
+                    $q = (float) $m[1];
+                }
+            }
+            if ($q > $bestQ) {
+                $bestQ = $q;
+                $bestTag = str_replace('-', '_', $tag);
+            }
+        }
+        if (null === $bestTag) {
+            return false;
+        }
+
+        return $bestTag;
+    }
+
     private static function englishLanguageName(string $language): ?string
     {
         static $names = [

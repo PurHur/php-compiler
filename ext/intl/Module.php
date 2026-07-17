@@ -79,6 +79,9 @@ class Module extends ModuleAbstract
             $functions[] = new locale_get_primary_language();
             $functions[] = new locale_get_region();
             $functions[] = new locale_get_script();
+            $functions[] = new locale_lookup();
+            $functions[] = new locale_filter_matches();
+            $functions[] = new locale_accept_from_http();
         }
         $normalizer = IntlExtensionPolicy::advertisesNormalizer()
             ? [
