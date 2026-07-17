@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 
 /**
- * parse_str dispatch — embed + standalone AOT via ParseStrRuntime PHP (#9295, #13360, #13429).
+ * parse_str dispatch — embed + standalone AOT via ParseStrRuntime PHP (#9295, #13360, #13429, #20132).
  *
- * php-src: ext/standard/basic_functions.c
+ * Embed / non-thin: {@see ParseStrRuntime::ensureLinked} → ParseStrJitHelper.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20028 shape): {@see ParseStrRuntime::ensureUserScriptLinked}
+ * cstr delimited bridges (no NestedJIT defer gate).
+ * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
 final class StringParseStr
 {
@@ -28,7 +30,7 @@ final class StringParseStr
 
     public static function implement(Context $context): void
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             ParseStrRuntime::ensureUserScriptLinked($context);
 
             return;
