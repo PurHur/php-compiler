@@ -149,12 +149,13 @@ final class VmSoapServer
         $state->functionsAll = true;
     }
 
-    public static function setClass(ObjectEntry $object, string $className): void
+    public static function setClass(ObjectEntry $object, string $className, array $ctorArgs = []): void
     {
         $state = self::state($object);
         $state->className = $className;
         $state->object = null;
         $state->classInstance = null;
+        $state->classCtorArgs = $ctorArgs;
     }
 
     public static function setObject(ObjectEntry $object, ObjectEntry $service): void
@@ -163,6 +164,7 @@ final class VmSoapServer
         $state->object = $service;
         $state->className = null;
         $state->classInstance = null;
+        $state->classCtorArgs = [];
         foreach ($service->class->methods as $lc => $_) {
             if (\str_starts_with($lc, '__')) {
                 continue;
@@ -407,7 +409,18 @@ final class VmSoapServer
                 null === $instance
                 || SoapConstants::SOAP_PERSISTENCE_SESSION !== $state->persistence
             ) {
-                $instance = new ObjectEntry($ctx->classes[$classLc]);
+                // php-src: instantiate with setClass ctor argv (#20294).
+                $ce = $ctx->classes[$classLc];
+                $instance = new ObjectEntry($ce);
+                $ctorArgs = [];
+                foreach ($state->classCtorArgs as $arg) {
+                    $copy = new Variable();
+                    $copy->copyFrom($arg);
+                    $ctorArgs[] = $copy;
+                }
+                if (null !== $ce->constructor || isset($ce->methods['__construct'])) {
+                    $ctx->runtime->vm->invokeInstanceMethod($instance, '__construct', ...$ctorArgs);
+                }
                 $instance->constructed = true;
                 if (SoapConstants::SOAP_PERSISTENCE_SESSION === $state->persistence) {
                     $state->classInstance = $instance;
@@ -753,6 +766,9 @@ final class SoapServerState
     /** Cached setClass instance when SOAP_PERSISTENCE_SESSION (in-process v1). */
     public ?ObjectEntry $classInstance = null;
 
+    /** @var list<Variable> SoapServer::setClass() constructor argv (#20294). */
+    public array $classCtorArgs = [];
+
     public int $persistence = SoapConstants::SOAP_PERSISTENCE_REQUEST;
 
     /** @var list<ObjectEntry> */
@@ -858,7 +874,14 @@ final class SoapServerSetClass extends SoapClassMethod
             throw new \ArgumentCountError('SoapServer::setClass() expects at least 1 argument, 0 given');
         }
         $className = $this->stringArg($frame->calledArgs[1], 'SoapServer::setClass', 0, 'class_name');
-        VmSoapServer::setClass($receiver, $className);
+        $ctorArgs = [];
+        $argc = \count($frame->calledArgs);
+        for ($i = 2; $i < $argc; ++$i) {
+            $copy = new Variable();
+            $copy->copyFrom($frame->calledArgs[$i]->resolveIndirect());
+            $ctorArgs[] = $copy;
+        }
+        VmSoapServer::setClass($receiver, $className, $ctorArgs);
     }
 }
 
