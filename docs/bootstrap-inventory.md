@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5250 |
-| Phase A inventory files (M2 ratio SSOT) | 5250 |
+| PHP files on vm.php path | 5251 |
+| Phase A inventory files (M2 ratio SSOT) | 5251 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14471 |
+| Source constructs flagged (warnings) | 14472 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1774,6 +1774,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrSplit.php` | 0 | 1 |
 | `ext/standard/JitStreamBucket.php` | 0 | 3 |
 | `ext/standard/JitStreamBucketKernel.php` | 0 | 3 |
+| `ext/standard/JitStreamBufferKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamCapsKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamContextCreate.php` | 0 | 1 |
 | `ext/standard/JitStreamContextGetDefault.php` | 0 | 1 |
@@ -3969,7 +3970,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamBucket.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamBuffer.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamBufferJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StreamBufferRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StreamBufferRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCaps.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCapsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCapsRuntime.php` | 0 | 1 |
@@ -16987,6 +16988,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 302)
 - 23 class method(s)
 - 1 closure(s)
+
+### `ext/standard/JitStreamBufferKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 206)
+- 10 class method(s)
+- 4 closure(s)
 
 ### `ext/standard/JitStreamCapsKernel.php`
 
@@ -31912,9 +31920,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamBufferRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 203)
-- 10 class method(s)
-- 4 closure(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StreamCaps.php`
 

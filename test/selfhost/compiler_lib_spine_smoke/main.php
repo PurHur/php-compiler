@@ -45,6 +45,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -1843,6 +1844,7 @@ require_once __DIR__.'/../../../ext/standard/JitStrReplaceMulti.php';
 require_once __DIR__.'/../../../ext/standard/JitStrShuffle.php';
 require_once __DIR__.'/../../../ext/standard/JitStrSplit.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamBucket.php';
+require_once __DIR__.'/../../../ext/standard/JitStreamBufferKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamCapsKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamContextCreate.php';
 require_once __DIR__.'/../../../ext/standard/JitStreamContextGetDefault.php';
