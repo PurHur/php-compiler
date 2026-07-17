@@ -1166,6 +1166,7 @@ require_once __DIR__.'/../../../ext/soap/SoapExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/soap/SoapFaultConstruct.php';
 require_once __DIR__.'/../../../ext/soap/VmSoapClient.php';
 require_once __DIR__.'/../../../ext/soap/VmSoapEncoding.php';
+require_once __DIR__.'/../../../ext/soap/VmSoapServer.php';
 require_once __DIR__.'/../../../ext/soap/bootstrap_soapfault.php';
 require_once __DIR__.'/../../../ext/soap/is_soap_fault.php';
 require_once __DIR__.'/../../../ext/sockets/BuiltinClasses.php';
@@ -1249,6 +1250,9 @@ require_once __DIR__.'/../../../ext/sodium/SodiumPwhashStrNeedsRehashFunction.ph
 require_once __DIR__.'/../../../ext/sodium/SodiumPwhashStrVerifyFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumScalarmultBaseFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumScalarmultFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumOneStringBoolFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumOneStringFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumTwoStringFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumShorthashFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumSignFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumSignKeypairExtractFunction.php';
@@ -1303,6 +1307,21 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_pwhash_str_needs_rehash
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_pwhash_str_verify.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_scalarmult.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_scalarmult_base.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_add.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_from_hash.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_is_valid_point.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_random.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_scalar_add.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_scalar_complement.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_scalar_invert.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_scalar_mul.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_scalar_negate.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_scalar_random.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_scalar_reduce.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_scalar_sub.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_sub.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_scalarmult_ristretto255.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_scalarmult_ristretto255_base.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_secretbox.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_secretbox_keygen.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_secretbox_open.php';
@@ -5543,13 +5562,6 @@ require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/llvm_env_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
-require_once __DIR__.'/../../../ext/sodium/SodiumKxSessionKeysFunction.php';
-require_once __DIR__.'/../../../ext/sodium/sodium_crypto_kx_client_session_keys.php';
-require_once __DIR__.'/../../../ext/sodium/sodium_crypto_kx_keypair.php';
-require_once __DIR__.'/../../../ext/sodium/sodium_crypto_kx_publickey.php';
-require_once __DIR__.'/../../../ext/sodium/sodium_crypto_kx_secretkey.php';
-require_once __DIR__.'/../../../ext/sodium/sodium_crypto_kx_seed_keypair.php';
-require_once __DIR__.'/../../../ext/sodium/sodium_crypto_kx_server_session_keys.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
