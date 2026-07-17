@@ -12,11 +12,11 @@ use PHPCompiler\ext\standard\JitHtmlspecialcharsKernel;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __string__htmlspecialchars via HtmlspecialcharsJitHelper PHP (#9445, #18967, #19389).
+ * JIT/AOT link for __string__htmlspecialchars via HtmlspecialcharsJitHelper PHP (#9445, #18967, #20141).
  *
- * Embed / non-deferred: {@see HtmlspecialcharsJitHelper} via {@see JitVmHelperLink}.
- * User-script / heavy StreamIo defer: thin {@see JitHtmlspecialcharsKernel} identity stub —
- * nested helper TUs skip __init__ under PHP_COMPILER_AOT_USER_SCRIPT (#16075, #18974).
+ * Embed / non-thin: {@see HtmlspecialcharsJitHelper} via {@see JitVmHelperLink}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20011 shape): {@see JitHtmlspecialcharsKernel}
+ * escape loop — nested helper TUs are ExternalMethod-stubbed under user-script AOT (#16075).
  * SSOT: {@see \PHPCompiler\ext\standard\VmString::htmlspecialchars()}.
  * php-src: ext/standard/html.c — PHP_FUNCTION(htmlspecialchars)
  */
@@ -54,28 +54,21 @@ final class StringHtmlspecialchars
         }
 
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
+            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
         }
-        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
-            $context->registerFunction(self::ABI, $probe);
 
-            return;
-        }
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::ABI, $probe);
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementKernelBody($context, $probe);
 
             return;
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::implementUserScriptKernel($context, $probe);
-        } else {
-            self::implementBridge($context);
-        }
+        self::implementBridge($context);
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
@@ -96,12 +89,14 @@ final class StringHtmlspecialchars
             self::HTMLSPECIALCHARS_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#18967'
+            '#20141'
         );
     }
 
-    private static function implementUserScriptKernel(Context $context, ?LlvmFunction $probe): void
+    private static function implementKernelBody(Context $context, ?LlvmFunction $probe): void
     {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $fn = null !== $probe
@@ -115,5 +110,11 @@ final class StringHtmlspecialchars
         $context->builder->positionAtEnd($entry);
         JitHtmlspecialcharsKernel::emitBody($context, $fn);
         $context->registerFunction(self::ABI, $fn);
+
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

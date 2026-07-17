@@ -144,6 +144,7 @@
         "ext/curl/curl_unescape.php",
         "ext/curl/curl_upkeep.php",
         "ext/curl/curl_version.php",
+        "ext/dom/AttrIsId.php",
         "ext/dom/BuiltinClasses.php",
         "ext/dom/CharacterDataAppendData.php",
         "ext/dom/CharacterDataDeleteData.php",
@@ -5737,9 +5738,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5503,
+        "inventory_files": 5504,
         "excluded": 0,
-        "eligible": 5503,
+        "eligible": 5504,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

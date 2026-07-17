@@ -6,23 +6,29 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** htmlspecialchars() JIT: PHP helper embed + ext kernel for user-script AOT (#9445, #18967, #19389). */
+/** htmlspecialchars() JIT: helper embed + thin escape kernel (#9445, #18967, #20141). */
 final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
 {
-    public function testStringHtmlspecialcharsUsesJitHelperAndExtKernel(): void
+    public function testStringHtmlspecialcharsUsesThinStandaloneKernelGate(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialchars.php');
         $this->assertStringContainsString('HtmlspecialcharsJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
-        $this->assertStringContainsString('StreamIoRuntime::shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('JitHtmlspecialcharsKernel', $source);
         $this->assertStringContainsString('htmlspecialchars_kernel_entry', $source);
+        $this->assertStringNotContainsString('StreamIoRuntime::shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StringHtmlspecialcharsUserScriptLlvm', $source);
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
-        $this->assertStringNotContainsString('htmlspecialchars_count_head', $source);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitHtmlspecialcharsKernel.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsUserScriptLlvm.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php');
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitHtmlspecialcharsKernel.php');
+
+        $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitHtmlspecialcharsKernel.php');
+        $this->assertStringContainsString('emitBody', $kernel);
+        $this->assertStringContainsString('&amp;', $kernel);
+        $this->assertStringNotContainsString('returnValue($fn->getParam(0))', $kernel);
     }
 
     public function testHtmlspecialcharsJitHelperIsSelfContained(): void
