@@ -15764,6 +15764,85 @@ class Compiler {
     }
 
     /**
+     * Dead call-arg temp whose php-cfg type is unknown/mixed, fed by stmt-before Array_ of
+     * ClassConstFetch values (enum cases). Typed int[]/string[] arrays already hit
+     * {@see callArgOperandExpectsArrayProducer()}; enum-case arrays stay inferred:unknown so
+     * ARG_SEND would otherwise steal the first ClassConstFetch (#19786).
+     */
+    private function callArgIsDeadUntypedInlineArrayOfClassConst(
+        Operand $callArg,
+        Op $cfgCallOp,
+        Block $block,
+        int $argIndex
+    ): bool {
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        if ($this->callArgOperandExpectsArrayProducer($callArg)) {
+            return false;
+        }
+        $root = $this->unwrapOperandChain($callArg);
+        if (null !== $root->type && method_exists($root->type, 'toString')) {
+            $repr = $root->type->toString();
+            if (!\in_array($repr, ['unknown', 'mixed'], true)) {
+                return false;
+            }
+        }
+        $array = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+        if (!$array instanceof Op\Expr\Array_) {
+            return false;
+        }
+        if (!$this->arrayLiteralHasClassConstFetchValue($array)) {
+            return false;
+        }
+        $argc = \count($cfgCallOp->args ?? []);
+        if (1 === $argc) {
+            return 0 === $argIndex;
+        }
+        if (null === $block->orig) {
+            return false;
+        }
+        // Multi-arg: ClassConstFetch mapped to this arg is an Array_ element ⇒ arg is the Array_
+        // (json_encode([E::A]); f([E::A], E::B) arg0). Bare E::A arg keeps ClassConstFetch wiring.
+        $fetches = $this->precedingCallArgClassConstFetchesBeforeCfgOp(
+            $block->orig->children,
+            $cfgCallOp,
+            $block
+        );
+        $fetch = $this->precedingClassConstFetchForCallArgIndex($cfgCallOp, $argIndex, $fetches);
+        if (!$fetch instanceof Op\Expr\ClassConstFetch || null === $fetch->result) {
+            return 0 === $argIndex;
+        }
+        foreach ($array->values as $value) {
+            if (null !== $value && $this->operandsReferToSameVariable($value, $fetch->result)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** @param Op\Expr\Array_ $array */
+    private function arrayLiteralHasClassConstFetchValue(Op\Expr\Array_ $array): bool
+    {
+        foreach ($array->values as $value) {
+            if (null === $value) {
+                continue;
+            }
+            $candidates = [$value, $this->unwrapOperandChain($value)];
+            foreach ($candidates as $operand) {
+                foreach ($operand->ops ?? [] as $op) {
+                    if ($op instanceof Op\Expr\ClassConstFetch) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Dedicated array-producer ARG_SEND resolution — haystack-family builtins only (#15612, #14134).
      *
      * Skips mb_detect_order([...]) and other mutators that take a single inline array operand.
@@ -41694,13 +41773,22 @@ class Compiler {
             if (
                 null !== $cfgCallOp
                 && $this->callArgIsDeadInlineTemporary($arg)
-                && $this->callArgOperandExpectsArrayProducer($arg)
+                && (
+                    $this->callArgOperandExpectsArrayProducer($arg)
+                    || $this->callArgIsDeadUntypedInlineArrayOfClassConst(
+                        $arg,
+                        $cfgCallOp,
+                        $block,
+                        (int) $argIndex
+                    )
+                )
                 && !$this->shouldUseArrayProducerCallArgResolution($cfgCallOp, (int) $argIndex, $calleeName)
                 && !$this->callArgInlineProducerIsNew($cfgCallOp, (int) $argIndex, $block)
             ) {
                 // var_export/json_encode([…, $x->format(...)]) — stmt-before Array_ feeds the call arg (#10733, #16067).
                 // array_map('explode', [','], ['a,b']) — map each hoisted Array_ to its arg slot (#16085, #16078 regression).
                 // array_udiff_assoc(['a'=>1], ['A'=>1], 'strcasecmp') — sibling Array_ per arg, not stmt-before (#16194).
+                // json_encode([E::A, E::B]) — enum-case arrays stay inferred:unknown (#19786).
                 $inlineArrayProducer = null;
                 if (null !== $block->orig) {
                     $arrayArgProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
