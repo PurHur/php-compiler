@@ -1496,6 +1496,7 @@ final class VmReflection
         if ($entry->isInterface) {
             // php-src: interface operands list parent interfaces only, not self (#7400).
             foreach ($entry->interfaces as $parentLc) {
+                $parentLc = strtolower(ltrim($parentLc, '\\'));
                 if (!isset($ctx->classes[$parentLc])) {
                     continue;
                 }
@@ -1505,16 +1506,32 @@ final class VmReflection
             return $result;
         }
 
-        foreach ($entry->interfaces as $ifaceLc) {
-            $builtin = self::builtinEnumInterfaceDisplayName($ifaceLc);
-            if (null !== $builtin) {
-                $result[$builtin] = $builtin;
-                continue;
+        // Walk parent classes so inherited interface lists match Zend (#19784).
+        // Interface names on ClassEntry may be mixed-case; registry keys are lowercase.
+        $current = $entry;
+        $visited = [];
+        while (null !== $current) {
+            $lc = strtolower($current->name);
+            if (isset($visited[$lc])) {
+                break;
             }
-            if (!isset($ctx->classes[$ifaceLc])) {
-                continue;
+            $visited[$lc] = true;
+            foreach ($current->interfaces as $ifaceLc) {
+                $builtin = self::builtinEnumInterfaceDisplayName($ifaceLc);
+                if (null !== $builtin) {
+                    $result[$builtin] = $builtin;
+                    continue;
+                }
+                $ifaceLc = strtolower(ltrim($ifaceLc, '\\'));
+                if (!isset($ctx->classes[$ifaceLc])) {
+                    continue;
+                }
+                self::addInterfaceAndParents($ctx->classes[$ifaceLc], $ctx, $result);
             }
-            self::addInterfaceAndParents($ctx->classes[$ifaceLc], $ctx, $result);
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                break;
+            }
+            $current = $ctx->classes[$current->parentLc];
         }
 
         if (StringableSupport::entryHasImplicitStringable($entry, $ctx)) {
@@ -1546,6 +1563,7 @@ final class VmReflection
         $name = $iface->name;
         $result[$name] = $name;
         foreach ($iface->interfaces as $parentLc) {
+            $parentLc = strtolower(ltrim($parentLc, '\\'));
             if (!isset($ctx->classes[$parentLc])) {
                 continue;
             }

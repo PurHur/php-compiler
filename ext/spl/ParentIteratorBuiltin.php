@@ -66,6 +66,25 @@ final class ParentIteratorBuiltin
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
+    /**
+     * ParentIterator::getChildren() wraps the inner child in a new ParentIterator
+     * (php-src spl_iterators.c — spl_ParentIterator_get_children; #19784).
+     */
+    public static function createFromInner(Context $ctx, ObjectEntry $childInner): Variable
+    {
+        $class = $ctx->classes[self::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('ParentIterator is not registered in this compiler build');
+        }
+        $object = new ObjectEntry($class);
+        $object->constructed = true;
+        SplDualIteratorStorage::initSimple($object, $childInner);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($object);
+
+        return $var;
+    }
+
     private static function classIsComplete(ClassEntry $entry): bool
     {
         return isset($entry->methods['rewind'], $entry->methods['accept'], $entry->methods['__construct']);
@@ -282,12 +301,16 @@ final class ParentIteratorGetChildren extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
+        if (null === $frame->vmContext) {
+            throw new \LogicException('ParentIterator::getChildren() requires VM context');
+        }
         $inner = SplDualIteratorStorage::inner($object);
         $child = SplDualIteratorStorage::callInner($frame, $inner, 'getChildren')->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $child->type) {
-            $frame->returnVar->null();
-        } else {
-            $frame->returnVar->copyFrom($child);
+            throw new \UnexpectedValueException('RecursiveIterator::getChildren() must return an object');
         }
+        $frame->returnVar->copyFrom(
+            ParentIteratorBuiltin::createFromInner($frame->vmContext, $child->toObject())
+        );
     }
 }
