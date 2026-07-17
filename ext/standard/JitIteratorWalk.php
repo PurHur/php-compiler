@@ -4,20 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\IteratorHelper;
 use PHPCompiler\JIT\IteratorProtocolHelper;
 use PHPCompiler\JIT\JitIterableArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
-use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -25,9 +20,6 @@ use PHPLLVM\Value;
  */
 final class JitIteratorWalk
 {
-    /** Zend ext/spl/php_spl.c — iterator_count() on exhausted Generator (#5132). */
-    private const CLOSED_GENERATOR_ITERATOR_COUNT_ERROR = \PHPCompiler\VM\GeneratorState::CLOSED_TRAVERSE_ERROR;
-
     public static function count(Context $context, Variable $iterable): Value
     {
         if (!JitIterableArg::guardIterableOperand($context, $iterable, 'iterator_count')) {
@@ -63,7 +55,7 @@ final class JitIteratorWalk
 
     public static function apply(Context $context, Variable $iterable, Variable $callback, Variable $params): Value
     {
-        if (!JitIterableArg::guardIterableOperand($context, $iterable, 'iterator_apply')) {
+        if (!JitIterableArg::guardTraversableOperand($context, $iterable, 'iterator_apply')) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
         if (!ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
@@ -80,12 +72,7 @@ final class JitIteratorWalk
         if (null !== $gen) {
             return self::applyGenerator($context, $gen, $closureCall);
         }
-        if ($iterable->type & Variable::IS_NATIVE_ARRAY) {
-            return self::applyNativeArray($context, $iterable, $closureCall);
-        }
-        if (Variable::TYPE_HASHTABLE === $iterable->type) {
-            return self::applyHashTable($context, $iterable, $closureCall);
-        }
+        // Arrays rejected by guardTraversableOperand (#19839); native/hashtable paths are unreachable.
         if (Variable::TYPE_OBJECT === $iterable->type || Variable::TYPE_VALUE === $iterable->type) {
             if (IteratorProtocolHelper::canLowerIteratorProtocol($context, $iterable, null)) {
                 return self::applyIteratorObject($context, $iterable, $closureCall);
@@ -97,7 +84,8 @@ final class JitIteratorWalk
             'iterator_apply',
             0,
             'iterator',
-            JitOperandTypeLabel::givenLabel($context, $iterable)
+            JitOperandTypeLabel::givenLabel($context, $iterable),
+            false
         );
 
         return $context->getTypeFromString('int64')->constInt(0, false);
@@ -186,53 +174,6 @@ final class JitIteratorWalk
             $countSlot
         );
         IteratorProtocolHelper::invokeIteratorMethod($context, $receiver, 'next');
-        $context->builder->branch($head);
-        $context->builder->positionAtEnd($done);
-
-        return $context->builder->load($countSlot);
-    }
-
-    private static function applyNativeArray(Context $context, Variable $array, Call $closureCall): Value
-    {
-        $ht = HashTableHelper::materializeNativeArrayForCall($context, $array);
-
-        return self::applyHashTable($context, new Variable(
-            $context,
-            Variable::TYPE_HASHTABLE,
-            Variable::KIND_VALUE,
-            $ht
-        ), $closureCall);
-    }
-
-    private static function applyHashTable(Context $context, Variable $array, Call $closureCall): Value
-    {
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $countSlot = $context->builder->alloca($context->getTypeFromString('int64'), 1, 'iterator_apply_n');
-        $context->builder->store(
-            $context->getTypeFromString('int64')->constInt(0, false),
-            $countSlot
-        );
-        IteratorHelper::compileReset($context, $array, null);
-        $head = BasicBlockHelper::append($context, 'iterator_apply_head');
-        $work = BasicBlockHelper::append($context, 'iterator_apply_work');
-        $advance = BasicBlockHelper::append($context, 'iterator_apply_advance');
-        $done = BasicBlockHelper::append($context, 'iterator_apply_done');
-        $context->builder->branch($head);
-        $context->builder->positionAtEnd($head);
-        $valid = IteratorHelper::compileValid($context, $array, null);
-        $context->builder->branchIf($valid, $work, $done);
-        $context->builder->positionAtEnd($work);
-        $key = IteratorHelper::compileKey($context, $array, null);
-        $value = IteratorHelper::compileValue($context, $array, null);
-        $result = $closureCall->call($context, $value, $key);
-        $keep = IteratorProtocolHelper::truthyI1($context, $result);
-        $context->builder->branchIf($keep, $advance, $done);
-        $context->builder->positionAtEnd($advance);
-        $cur = $context->builder->load($countSlot);
-        $context->builder->store(
-            $context->builder->add($cur, $context->getTypeFromString('int64')->constInt(1, false)),
-            $countSlot
-        );
         $context->builder->branch($head);
         $context->builder->positionAtEnd($done);
 

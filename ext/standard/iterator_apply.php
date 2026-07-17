@@ -34,7 +34,7 @@ final class iterator_apply extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         $vm = $frame->vmContext->runtime->vm;
-        $iterable = VmIteratorWalk::assertTraversable($frame->calledArgs[0], $ctx, 'iterator_apply');
+        $iterable = VmIteratorWalk::assertTraversableOnly($frame->calledArgs[0], $ctx, 'iterator_apply');
         $callback = $frame->calledArgs[1]->resolveIndirect();
         $params = 3 === $argc
             ? $frame->calledArgs[2]
