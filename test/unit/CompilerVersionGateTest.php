@@ -1093,12 +1093,12 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsPropertyHooksFalseOn84DevDefaultProfile(): void
+    public function testSupportsPropertyHooksTrueOn84DevDefaultProfile(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
-            $this->assertFalse(CompilerVersion::supportsPropertyHooks());
+            $this->assertTrue(CompilerVersion::supportsPropertyHooks());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
