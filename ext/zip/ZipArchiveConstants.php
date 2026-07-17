@@ -65,12 +65,31 @@ final class ZipArchiveConstants
 
     public const ER_DELETED = 23;
 
+    /** Encryption methods — libzip ZIP_EM_* / php-src ZipArchive::EM_* (#19873). */
+    public const EM_NONE = 0;
+
+    public const EM_TRAD_PKWARE = 1;
+
+    public const EM_AES_128 = 0x0101;
+
+    public const EM_AES_192 = 0x0102;
+
+    public const EM_AES_256 = 0x0103;
+
+    public const EM_UNKNOWN = 0xffff;
+
     /** @var array<string, int> */
     public const CLASS_CONSTANTS = [
         'create' => self::CREATE,
         'excl' => self::EXCL,
         'checkcons' => self::CHECKCONS,
         'overwrite' => self::OVERWRITE,
+        'em_none' => self::EM_NONE,
+        'em_trad_pkware' => self::EM_TRAD_PKWARE,
+        'em_aes_128' => self::EM_AES_128,
+        'em_aes_192' => self::EM_AES_192,
+        'em_aes_256' => self::EM_AES_256,
+        'em_unknown' => self::EM_UNKNOWN,
         'er_ok' => self::ER_OK,
         'er_multidisk' => self::ER_MULTIDISK,
         'er_rename' => self::ER_RENAME,
@@ -103,6 +122,12 @@ final class ZipArchiveConstants
         'excl' => 'EXCL',
         'checkcons' => 'CHECKCONS',
         'overwrite' => 'OVERWRITE',
+        'em_none' => 'EM_NONE',
+        'em_trad_pkware' => 'EM_TRAD_PKWARE',
+        'em_aes_128' => 'EM_AES_128',
+        'em_aes_192' => 'EM_AES_192',
+        'em_aes_256' => 'EM_AES_256',
+        'em_unknown' => 'EM_UNKNOWN',
         'er_ok' => 'ER_OK',
         'er_multidisk' => 'ER_MULTIDISK',
         'er_rename' => 'ER_RENAME',

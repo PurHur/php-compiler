@@ -72,6 +72,9 @@ final class VmZipArchive
             'extractto' => new ZipArchiveExtractTo(),
             'getstatusstring' => new ZipArchiveGetStatusString(),
             'count' => new ZipArchiveCount(),
+            'statname' => new ZipArchiveStatName(),
+            'setpassword' => new ZipArchiveSetPassword(),
+            'setencryptionname' => new ZipArchiveSetEncryptionName(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -266,14 +269,10 @@ final class VmZipArchive
         }
         $size = strlen($data);
         $crc = self::crc32Unsigned($data);
+        $row = self::makeEntry($entryname, $data, $crc, $size);
         foreach ($state->entries as $idx => $existing) {
             if ($existing['name'] === $entryname) {
-                $state->entries[$idx] = [
-                    'name' => $entryname,
-                    'data' => $data,
-                    'crc' => $crc,
-                    'size' => $size,
-                ];
+                $state->entries[$idx] = $row;
                 $state->dirty = true;
                 self::syncProperties($entry, $state);
                 self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
@@ -281,12 +280,7 @@ final class VmZipArchive
                 return true;
             }
         }
-        $state->entries[] = [
-            'name' => $entryname,
-            'data' => $data,
-            'crc' => $crc,
-            'size' => $size,
-        ];
+        $state->entries[] = $row;
         $state->dirty = true;
         self::syncProperties($entry, $state);
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
@@ -304,14 +298,10 @@ final class VmZipArchive
         }
         $size = strlen($content);
         $crc = self::crc32Unsigned($content);
+        $row = self::makeEntry($name, $content, $crc, $size);
         foreach ($state->entries as $idx => $existing) {
             if ($existing['name'] === $name) {
-                $state->entries[$idx] = [
-                    'name' => $name,
-                    'data' => $content,
-                    'crc' => $crc,
-                    'size' => $size,
-                ];
+                $state->entries[$idx] = $row;
                 $state->dirty = true;
                 self::syncProperties($entry, $state);
                 self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
@@ -319,12 +309,7 @@ final class VmZipArchive
                 return true;
             }
         }
-        $state->entries[] = [
-            'name' => $name,
-            'data' => $content,
-            'crc' => $crc,
-            'size' => $size,
-        ];
+        $state->entries[] = $row;
         $state->dirty = true;
         self::syncProperties($entry, $state);
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
@@ -346,6 +331,114 @@ final class VmZipArchive
 
                 return $zipEntry['data'];
             }
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+        return false;
+    }
+
+    /**
+     * ZipArchive::statName — php-src RETURN_SB shape (#19873).
+     *
+     * @return array{
+     *     name: string,
+     *     index: int,
+     *     crc: int,
+     *     size: int,
+     *     mtime: int,
+     *     comp_size: int,
+     *     comp_method: int,
+     *     encryption_method: int
+     * }|false
+     */
+    public static function statName(ObjectEntry $entry, string $name, int $flags = 0): array|false
+    {
+        unset($flags); // FL_* lookup flags not yet implemented; exact name match only
+        $state = self::state($entry);
+        if (!$state->open) {
+            throw new \ValueError('Invalid or uninitialized Zip object');
+        }
+        if ('' === $name) {
+            throw new \ValueError('ZipArchive::statName(): Argument #1 ($name) must not be empty');
+        }
+        foreach ($state->entries as $index => $zipEntry) {
+            if ($zipEntry['name'] === $name) {
+                self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+                $size = (int) $zipEntry['size'];
+
+                return [
+                    'name' => $zipEntry['name'],
+                    'index' => $index,
+                    'crc' => (int) $zipEntry['crc'],
+                    'size' => $size,
+                    'mtime' => (int) ($zipEntry['mtime'] ?? 0),
+                    'comp_size' => $size,
+                    'comp_method' => 0,
+                    'encryption_method' => (int) ($zipEntry['encryption_method'] ?? ZipArchiveConstants::EM_NONE),
+                ];
+            }
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+        return false;
+    }
+
+    /** ZipArchive::setPassword — php-src zim_ZipArchive_setPassword (#19873). */
+    public static function setPassword(ObjectEntry $entry, string $password): bool
+    {
+        $state = self::state($entry);
+        if (!$state->open) {
+            throw new \ValueError('Invalid or uninitialized Zip object');
+        }
+        if ('' === $password) {
+            return false;
+        }
+        $state->password = $password;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::setEncryptionName — marks entry encryption metadata (#19873).
+     *
+     * Pure-PHP ZipEngine still stores plaintext; method/password are retained for
+     * API/stat parity. Real AES write needs libzip (follow-up).
+     */
+    public static function setEncryptionName(
+        ObjectEntry $entry,
+        string $name,
+        int $method,
+        ?string $password = null
+    ): bool {
+        $state = self::state($entry);
+        if (!$state->open) {
+            throw new \ValueError('Invalid or uninitialized Zip object');
+        }
+        if ('' === $name) {
+            throw new \ValueError('ZipArchive::setEncryptionName(): Argument #1 ($name) must not be empty');
+        }
+        foreach ($state->entries as $idx => $zipEntry) {
+            if ($zipEntry['name'] !== $name) {
+                continue;
+            }
+            if (ZipArchiveConstants::EM_NONE === $method) {
+                $zipEntry['encryption_method'] = ZipArchiveConstants::EM_NONE;
+                unset($zipEntry['encryption_password']);
+            } else {
+                $zipEntry['encryption_method'] = $method;
+                $usePassword = $password ?? $state->password;
+                if ('' !== $usePassword) {
+                    $zipEntry['encryption_password'] = $usePassword;
+                } else {
+                    unset($zipEntry['encryption_password']);
+                }
+            }
+            $state->entries[$idx] = $zipEntry;
+            $state->dirty = true;
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+            return true;
         }
         self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
 
@@ -412,6 +505,21 @@ final class VmZipArchive
         return \count(self::state($entry)->entries);
     }
 
+    /**
+     * @return array{name: string, data: string, crc: int, size: int, mtime: int, encryption_method: int}
+     */
+    private static function makeEntry(string $name, string $data, int $crc, int $size): array
+    {
+        return [
+            'name' => $name,
+            'data' => $data,
+            'crc' => $crc,
+            'size' => $size,
+            'mtime' => time(),
+            'encryption_method' => ZipArchiveConstants::EM_NONE,
+        ];
+    }
+
     private static function setStatus(ObjectEntry $entry, ZipArchiveState $state, int $code): void
     {
         $state->status = $code;
@@ -468,6 +576,9 @@ final class VmZipArchive
             'getfromname' => 'getFromName',
             'extractto' => 'extractTo',
             'getstatusstring' => 'getStatusString',
+            'statname' => 'statName',
+            'setpassword' => 'setPassword',
+            'setencryptionname' => 'setEncryptionName',
             default => $lc,
         };
     }

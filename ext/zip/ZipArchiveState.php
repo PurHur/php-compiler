@@ -17,6 +17,19 @@ final class ZipArchiveState
 
     public bool $dirty = false;
 
-    /** @var list<array{name: string, data: string, crc: int, size: int}> */
+    /** Default archive password for setEncryptionName / decrypt (#19873). */
+    public string $password = '';
+
+    /**
+     * @var list<array{
+     *     name: string,
+     *     data: string,
+     *     crc: int,
+     *     size: int,
+     *     mtime?: int,
+     *     encryption_method?: int,
+     *     encryption_password?: string
+     * }>
+     */
     public array $entries = [];
 }
