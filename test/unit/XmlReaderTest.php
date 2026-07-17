@@ -146,6 +146,19 @@ PHP;
         }
     }
 
+    public function test_xmlreader_move_to_attribute_next_repro(): void
+    {
+        $runtime = new Runtime();
+        $code = (string) file_get_contents(__DIR__.'/../repro/maintainer_gap_xmlreader_move_next.php');
+        $block = $runtime->parseAndCompile($code, 'xmlreader_move_next_repro.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "name=a attrCount=2\ntrue\nattrName=id val=1 type=2\ntrue\ntrue\nfirst=id\ntrue\nnextAttr=x\ntrue\nafterNext=b\n",
+            ob_get_clean()
+        );
+    }
+
     public function test_xmlreader_tokenizer_matches_zend_event_shape(): void
     {
         $events = VmXmlReader::tokenize('<root><item id="1">a</item></root>');
