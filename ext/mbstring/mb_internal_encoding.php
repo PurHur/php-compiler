@@ -7,10 +7,11 @@ namespace PHPCompiler\ext\mbstring;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** mb_internal_encoding() — internal charset (php-src ext/mbstring/mbstring.c; #13376). */
+/** mb_internal_encoding() — internal charset (php-src ext/mbstring/mbstring.c; #13376, #20014 AOT). */
 final class mb_internal_encoding extends Internal
 {
     public function __construct()
@@ -45,8 +46,30 @@ final class mb_internal_encoding extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'mb_internal_encoding() JIT is not supported in this compiler build'
+        $argc = \count($args);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(sprintf(
+                'mb_internal_encoding() expects at most 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (0 === $argc) {
+            $enc = MbstringAotFoldState::internalEncoding($context) ?? MbstringState::internalEncoding();
+
+            return $context->builder->load($context->constantStringFromString($enc));
+        }
+
+        $encodingLit = JitStringArg::compileTimeLiteral($args[0]);
+        if (null === $encodingLit) {
+            throw new \LogicException(
+                'mb_internal_encoding() encoding must be a compile-time string in this compiler build'
+            );
+        }
+        MbstringAotFoldState::setInternalEncoding(
+            $context,
+            MbstringEncodingRegistry::assertValid($encodingLit, 'mb_internal_encoding', 0)
         );
+
+        return $context->getTypeFromString('int1')->constInt(1, false);
     }
 }
