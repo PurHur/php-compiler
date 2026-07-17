@@ -3453,6 +3453,8 @@ require_once __DIR__.'/../../../ext/xmlreader/VmXmlReader.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderClose.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderConstants.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderEvent.php';
+require_once __DIR__.'/../../../ext/xmlreader/XmlReaderExpand.php';
+require_once __DIR__.'/../../../ext/xmlreader/XmlReaderExpandHelper.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderGetAttribute.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderIsValid.php';
 require_once __DIR__.'/../../../ext/xmlreader/XmlReaderOpen.php';
