@@ -97,6 +97,17 @@ final class VmSoapClient
             $state->exceptions = !(false === $ex || 0 === $ex || '0' === $ex);
         }
 
+        // php-src SoapClient ctor: login/password → HTTP Authorization (#20312).
+        if (isset($options['login'])) {
+            $state->login = (string) $options['login'];
+        }
+        if (isset($options['password'])) {
+            $state->password = (string) $options['password'];
+        }
+        if (isset($options['authentication'])) {
+            $state->authentication = (int) $options['authentication'];
+        }
+
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
         }
@@ -231,7 +242,14 @@ final class VmSoapClient
         $state->lastRequest = $request;
 
         $cookieHeader = self::formatCookieHeader($state->cookies);
-        $requestHeaders = self::buildHttpRequestHeaders($location, $action, \strlen($request), $cookieHeader);
+        $authHeader = self::formatAuthorizationHeader($state);
+        $requestHeaders = self::buildHttpRequestHeaders(
+            $location,
+            $action,
+            \strlen($request),
+            $cookieHeader,
+            $authHeader
+        );
         if ($state->trace) {
             $state->lastRequestHeaders = $requestHeaders;
         }
@@ -258,6 +276,9 @@ final class VmSoapClient
             'SOAPAction: "'.$action."\"\r\n";
         if ('' !== $cookieHeader) {
             $headers .= 'Cookie: '.$cookieHeader."\r\n";
+        }
+        if ('' !== $authHeader) {
+            $headers .= $authHeader."\r\n";
         }
         $ctx = \stream_context_create([
             'http' => [
@@ -302,13 +323,34 @@ final class VmSoapClient
     }
 
     /**
+     * HTTP Authorization header line (no trailing CRLF) — php-src php_http.c (#20312).
+     *
+     * Digest is not implemented in this child; only Basic when login is set.
+     */
+    private static function formatAuthorizationHeader(SoapClientState $state): string
+    {
+        if (null === $state->login) {
+            return '';
+        }
+        if (SoapConstants::SOAP_AUTHENTICATION_DIGEST === $state->authentication) {
+            // Digest requires a challenge/response exchange; leave for a follow-up child.
+            return '';
+        }
+        $user = $state->login;
+        $pass = null !== $state->password ? $state->password : '';
+
+        return 'Authorization: Basic '.\base64_encode($user.':'.$pass);
+    }
+
+    /**
      * Build Zend-shaped HTTP request header block for trace (php-src soap_client).
      */
     private static function buildHttpRequestHeaders(
         string $location,
         string $action,
         int $contentLength,
-        string $cookieHeader = ''
+        string $cookieHeader = '',
+        string $authHeader = ''
     ): string {
         $path = '/';
         $host = 'localhost';
@@ -328,6 +370,9 @@ final class VmSoapClient
             'Content-Length: '.$contentLength."\r\n";
         if ('' !== $cookieHeader) {
             $hdr .= 'Cookie: '.$cookieHeader."\r\n";
+        }
+        if ('' !== $authHeader) {
+            $hdr .= $authHeader."\r\n";
         }
 
         return $hdr;
@@ -750,6 +795,13 @@ final class SoapClientState
 
     /** php-src Z_CLIENT_EXCEPTIONS — default true; false returns SoapFault (#20293). */
     public bool $exceptions = true;
+
+    /** php-src _login / _password / _authentication (#20312). */
+    public ?string $login = null;
+
+    public ?string $password = null;
+
+    public int $authentication = SoapConstants::SOAP_AUTHENTICATION_BASIC;
 
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
