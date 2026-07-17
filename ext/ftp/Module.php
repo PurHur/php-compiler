@@ -72,6 +72,8 @@ class Module extends ModuleAbstract
             new ftp_nlist(),
             new ftp_rawlist(),
             new ftp_chdir(),
+            new ftp_pwd(),
+            new ftp_cdup(),
             new ftp_mkdir(),
             new ftp_delete(),
             new ftp_size(),

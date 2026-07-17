@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5508 |
-| Phase A inventory files (M2 ratio SSOT) | 5508 |
+| PHP files on vm.php path | 5510 |
+| Phase A inventory files (M2 ratio SSOT) | 5510 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15648 |
+| Source constructs flagged (warnings) | 15652 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -425,12 +425,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/BuiltinClasses.php` | 0 | 1 |
 | `ext/ftp/FtpConstants.php` | 0 | 1 |
 | `ext/ftp/FtpExtensionPolicy.php` | 0 | 1 |
-| `ext/ftp/Module.php` | 0 | 30 |
+| `ext/ftp/Module.php` | 0 | 32 |
 | `ext/ftp/VmFtpArg.php` | 0 | 1 |
 | `ext/ftp/VmFtpConnection.php` | 0 | 2 |
 | `ext/ftp/VmFtpCore.php` | 0 | 9 |
 | `ext/ftp/ftp_alloc.php` | 0 | 2 |
 | `ext/ftp/ftp_append.php` | 0 | 2 |
+| `ext/ftp/ftp_cdup.php` | 0 | 2 |
 | `ext/ftp/ftp_chdir.php` | 0 | 2 |
 | `ext/ftp/ftp_chmod.php` | 0 | 2 |
 | `ext/ftp/ftp_close.php` | 0 | 2 |
@@ -451,6 +452,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/ftp_nlist.php` | 0 | 2 |
 | `ext/ftp/ftp_pasv.php` | 0 | 2 |
 | `ext/ftp/ftp_put.php` | 0 | 2 |
+| `ext/ftp/ftp_pwd.php` | 0 | 2 |
 | `ext/ftp/ftp_raw.php` | 0 | 2 |
 | `ext/ftp/ftp_rawlist.php` | 0 | 2 |
 | `ext/ftp/ftp_set_option.php` | 0 | 2 |
@@ -4228,7 +4230,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamGlobalsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamIo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamIoJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StreamIoRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StreamIoRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamLibcHandleRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamLifecycle.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamLifecycleJit.php` | 0 | 1 |
@@ -8298,17 +8300,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ftp_nlist (line 72)
 - new ftp_rawlist (line 73)
 - new ftp_chdir (line 74)
-- new ftp_mkdir (line 75)
-- new ftp_delete (line 76)
-- new ftp_size (line 77)
-- new ftp_mdtm (line 78)
-- new ftp_append (line 79)
-- new ftp_alloc (line 80)
-- new ftp_chmod (line 81)
-- new ftp_raw (line 82)
-- new ftp_site (line 83)
-- new ftp_set_option (line 84)
-- new ftp_get_option (line 85)
+- new ftp_pwd (line 75)
+- new ftp_cdup (line 76)
+- new ftp_mkdir (line 77)
+- new ftp_delete (line 78)
+- new ftp_size (line 79)
+- new ftp_mdtm (line 80)
+- new ftp_append (line 81)
+- new ftp_alloc (line 82)
+- new ftp_chmod (line 83)
+- new ftp_raw (line 84)
+- new ftp_site (line 85)
+- new ftp_set_option (line 86)
+- new ftp_get_option (line 87)
 - 4 class method(s)
 
 ### `ext/ftp/VmFtpArg.php`
@@ -8331,9 +8335,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 211)
 - new HashTable (line 212)
 - new Variable (line 214)
-- new HashTable (line 632)
-- new Variable (line 634)
-- 49 class method(s)
+- new HashTable (line 649)
+- new Variable (line 651)
+- 51 class method(s)
 
 ### `ext/ftp/ftp_alloc.php`
 
@@ -8345,6 +8349,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
+- 2 class method(s)
+
+### `ext/ftp/ftp_cdup.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
 - 2 class method(s)
 
 ### `ext/ftp/ftp_chdir.php`
@@ -8465,6 +8475,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
+- 2 class method(s)
+
+### `ext/ftp/ftp_pwd.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
 - 2 class method(s)
 
 ### `ext/ftp/ftp_raw.php`
@@ -34377,9 +34393,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamIoRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 557)
 - 38 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/StreamLibcHandleRuntime.php`
 

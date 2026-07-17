@@ -424,6 +424,23 @@ final class VmFtpCore
         return (bool) @\ftp_chdir($hostConn, $directory);
     }
 
+    public static function pwd(ObjectEntry $connection): string|false
+    {
+        self::ensureLive($connection, 'ftp_pwd');
+        $hostConn = self::requireHostConn($connection, 'ftp_pwd');
+        $result = @\ftp_pwd($hostConn);
+
+        return false === $result ? false : (string) $result;
+    }
+
+    public static function cdup(ObjectEntry $connection): bool
+    {
+        self::ensureLive($connection, 'ftp_cdup');
+        $hostConn = self::requireHostConn($connection, 'ftp_cdup');
+
+        return (bool) @\ftp_cdup($hostConn);
+    }
+
     public static function mkdir(ObjectEntry $connection, string $directory): string|false
     {
         self::ensureLive($connection, 'ftp_mkdir');
