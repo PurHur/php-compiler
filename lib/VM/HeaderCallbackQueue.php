@@ -8,13 +8,17 @@ use PHPCompiler\Func;
 use PHPCompiler\ext\standard\VmClosureCall;
 
 /**
- * FIFO header callback queue (header_register_callback parity, issue #3759).
+ * FIFO header callback queue (header_register_callback parity, issue #3759 / #3492).
  *
  * php-src: ext/standard/head.c — php_header_register_callback()
+ *
+ * Closures are retained as {@see ClosureState} (not live {@see Variable} slots):
+ * outgoing call-arg temp release can drop ObjectEntry refs on the original arg
+ * while a copied Variable still points at the destroyed entry.
  */
 final class HeaderCallbackQueue
 {
-    /** @var list<Variable> */
+    /** @var list<ClosureState|string> */
     private static array $queue = [];
 
     private static bool $running = false;
@@ -30,9 +34,21 @@ final class HeaderCallbackQueue
 
     public static function register(Variable $callable): bool
     {
-        self::$queue[] = $callable;
+        $callable = $callable->resolveIndirect();
+        if (VmClosureCall::isClosure($callable)) {
+            self::$queue[] = VmClosureCall::resolve($callable);
 
-        return true;
+            return true;
+        }
+        if (Variable::TYPE_STRING === $callable->type) {
+            self::$queue[] = strtolower($callable->toString());
+
+            return true;
+        }
+
+        throw new \TypeError(
+            'header_register_callback(): Argument #1 ($callback) must be a valid callback, no array or string given'
+        );
     }
 
     /**
@@ -53,29 +69,16 @@ final class HeaderCallbackQueue
         self::$flushed = true;
     }
 
-    private static function invoke(Context $context, Variable $callable): void
+    private static function invoke(Context $context, ClosureState|string $callable): void
     {
-        $callable = $callable->resolveIndirect();
-        if (Variable::TYPE_NULL === $callable->type) {
-            return;
-        }
-        if (VmClosureCall::isClosure($callable)) {
-            VmClosureCall::invoke($context, VmClosureCall::resolve($callable));
+        if ($callable instanceof ClosureState) {
+            VmClosureCall::invoke($context, $callable);
 
             return;
         }
-        if (Variable::TYPE_STRING === $callable->type) {
-            $name = strtolower($callable->toString());
-            $fn = $context->functions[$name] ?? null;
-            if ($fn instanceof Func\PHP) {
-                $context->runtime->vm->invokePhpFunction($fn);
-            }
-
-            return;
+        $fn = $context->functions[$callable] ?? null;
+        if ($fn instanceof Func\PHP) {
+            $context->runtime->vm->invokePhpFunction($fn);
         }
-
-        throw new \LogicException(
-            'header_register_callback() callback must be a closure or function name string in this compiler build'
-        );
     }
 }
