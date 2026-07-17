@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::relaxNGValidateSource() — in-memory RelaxNG validation (php-src ext/dom/document.c; #18748). */
+/** DOMDocument::relaxNGValidateSource() — in-memory RelaxNG validation (php-src ext/dom/document.c; #18748, #20235). */
 final class DocumentRelaxNGValidateSource extends DomClassMethod
 {
     public function __construct()
