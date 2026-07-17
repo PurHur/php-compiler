@@ -30,9 +30,7 @@ final class JitXmlWriterUserScript
 
     public static function isUserScriptAot(): bool
     {
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-
-        return '1' === $userScript || 'true' === strtolower((string) $userScript);
+        return \PHPCompiler\JIT\UserScriptAotEnv::isActive();
     }
 
     public static function tryInit(Context $context, JITVariable $receiver): ?Value

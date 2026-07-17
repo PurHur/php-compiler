@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5518 |
-| Phase A inventory files (M2 ratio SSOT) | 5518 |
+| PHP files on vm.php path | 5519 |
+| Phase A inventory files (M2 ratio SSOT) | 5519 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15683 |
+| Source constructs flagged (warnings) | 15684 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4789,6 +4789,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/UndefinedVariableHelper.php` | 0 | 1 |
 | `lib/JIT/UnsetHelper.php` | 0 | 1 |
 | `lib/JIT/UnsetHelperLlvm.php` | 0 | 4 |
+| `lib/JIT/UserScriptAotEnv.php` | 0 | 1 |
 | `lib/JIT/UsortCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 1 |
 | `lib/JIT/VarFetchHelper.php` | 0 | 1 |
@@ -9409,7 +9410,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/JitIconvString.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 12 class method(s)
 
 ### `ext/iconv/Module.php`
 
@@ -29903,10 +29904,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlwriter/JitXmlWriterUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new XMLWriter (line 43)
-- new XMLWriter (line 693)
-- new XMLWriter (line 713)
-- new XMLWriter (line 856)
+- new XMLWriter (line 41)
+- new XMLWriter (line 691)
+- new XMLWriter (line 711)
+- new XMLWriter (line 854)
 - 53 class method(s)
 
 ### `ext/xmlwriter/Module.php`
@@ -36908,19 +36909,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 911)
 - new Call\DateTimeFormat (line 914)
 - new Call\DateTimeFormat (line 915)
-- new Result (line 1254)
-- new Result (line 1275)
-- new Variable (line 1876)
-- new Variable (line 2013)
-- new Variable (line 2239)
-- new Variable (line 2297)
-- new VMVariable (line 2435)
-- new VMVariable (line 2451)
-- new VMVariable (line 2457)
-- new VMVariable (line 2463)
-- new VMVariable (line 2474)
-- new Variable (line 2504)
-- new Variable (line 2544)
+- new Result (line 1249)
+- new Result (line 1270)
+- new Variable (line 1871)
+- new Variable (line 2008)
+- new Variable (line 2234)
+- new Variable (line 2292)
+- new VMVariable (line 2430)
+- new VMVariable (line 2446)
+- new VMVariable (line 2452)
+- new VMVariable (line 2458)
+- new VMVariable (line 2469)
+- new Variable (line 2499)
+- new Variable (line 2539)
 - 101 class method(s)
 - 28 closure(s)
 
@@ -36950,47 +36951,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DomInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\DomDocumentCreateElement (line 114)
-- new Call\DomDocumentCreateElementNS (line 119)
-- new Call\DomDocumentCreateComment (line 124)
-- new Call\DomDocumentLoad (line 129)
-- new Call\DomDocumentLoadHTML (line 134)
-- new Call\DomDocumentLoadHTMLFile (line 139)
-- new Call\DomDocumentGetElementById (line 144)
-- new Call\DomDocumentImportNode (line 149)
-- new Call\DomElementGetAttribute (line 154)
-- new Call\DomElementSetAttribute (line 159)
-- new Call\DomElementRemoveAttribute (line 164)
-- new Call\DomElementGetAttributeNode (line 169)
-- new Call\DomElementGetAttributeNodeNS (line 174)
-- new Call\DomElementSetAttributeNodeNS (line 179)
-- new Call\DomDocumentCreateAttributeNS (line 184)
-- new Call\DomDocumentLoadXML (line 189)
-- new Call\DomDocumentSaveXML (line 194)
-- new Call\DomDocumentSaveHTML (line 199)
-- new Call\DomDocumentSaveHTMLFile (line 204)
-- new Call\DomDocumentGetElementsByTagName (line 209)
-- new Call\DomDocumentAppendChild (line 214)
+- new Call\DomDocumentCreateElement (line 109)
+- new Call\DomDocumentCreateElementNS (line 114)
+- new Call\DomDocumentCreateComment (line 119)
+- new Call\DomDocumentLoad (line 124)
+- new Call\DomDocumentLoadHTML (line 129)
+- new Call\DomDocumentLoadHTMLFile (line 134)
+- new Call\DomDocumentGetElementById (line 139)
+- new Call\DomDocumentImportNode (line 144)
+- new Call\DomElementGetAttribute (line 149)
+- new Call\DomElementSetAttribute (line 154)
+- new Call\DomElementRemoveAttribute (line 159)
+- new Call\DomElementGetAttributeNode (line 164)
+- new Call\DomElementGetAttributeNodeNS (line 169)
+- new Call\DomElementSetAttributeNodeNS (line 174)
+- new Call\DomDocumentCreateAttributeNS (line 179)
+- new Call\DomDocumentLoadXML (line 184)
+- new Call\DomDocumentSaveXML (line 189)
+- new Call\DomDocumentSaveHTML (line 194)
+- new Call\DomDocumentSaveHTMLFile (line 199)
+- new Call\DomDocumentGetElementsByTagName (line 204)
+- new Call\DomDocumentAppendChild (line 209)
+- new Call\DomNodeAppendChild (line 214)
 - new Call\DomNodeAppendChild (line 219)
 - new Call\DomNodeAppendChild (line 224)
-- new Call\DomNodeAppendChild (line 229)
-- new Call\DomNodeAppend (line 234)
-- new Call\DomNodePrepend (line 239)
-- new Call\DomNodeReplaceChildren (line 244)
-- new Call\DomElementToggleAttribute (line 249)
-- new Call\DomNodeContains (line 254)
-- new Call\DomNodeGetRootNode (line 259)
-- new Call\DomNodeIsEqualNode (line 264)
-- new Call\DomNodeC14N (line 269)
-- new Call\DomNodeRemoveChild (line 274)
-- new Call\DomNodeReplaceChild (line 279)
-- new Call\DomDocumentCreateDocumentFragment (line 284)
-- new Call\DomImplementationCreateDocumentType (line 289)
-- new Call\DomXPathQuery (line 294)
-- new Call\DomXPathEvaluate (line 299)
-- new Call\DomNodeListItem (line 304)
-- new Call\DomInstanceMethod (line 316)
-- new Call\DomInstanceMethod (line 334)
+- new Call\DomNodeAppend (line 229)
+- new Call\DomNodePrepend (line 234)
+- new Call\DomNodeReplaceChildren (line 239)
+- new Call\DomElementToggleAttribute (line 244)
+- new Call\DomNodeContains (line 249)
+- new Call\DomNodeGetRootNode (line 254)
+- new Call\DomNodeIsEqualNode (line 259)
+- new Call\DomNodeC14N (line 264)
+- new Call\DomNodeRemoveChild (line 269)
+- new Call\DomNodeReplaceChild (line 274)
+- new Call\DomDocumentCreateDocumentFragment (line 279)
+- new Call\DomImplementationCreateDocumentType (line 284)
+- new Call\DomXPathQuery (line 289)
+- new Call\DomXPathEvaluate (line 294)
+- new Call\DomNodeListItem (line 299)
+- new Call\DomInstanceMethod (line 311)
+- new Call\DomInstanceMethod (line 329)
 - 7 class method(s)
 
 ### `lib/JIT/DynamicObjectReadonlyGuard.php`
@@ -37602,9 +37603,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/RandomizerInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\RandomizerMt19937Construct (line 44)
-- new Call\RandomizerConstruct (line 49)
-- new Call\RandomizerGetBytesFromString (line 54)
+- new Call\RandomizerMt19937Construct (line 42)
+- new Call\RandomizerConstruct (line 47)
+- new Call\RandomizerGetBytesFromString (line 52)
 - 3 class method(s)
 
 ### `lib/JIT/ReadonlyBridge.php`
@@ -37806,6 +37807,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 168)
 - 5 class method(s)
 - 2 closure(s)
+
+### `lib/JIT/UserScriptAotEnv.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/UsortCallbackPolicy.php`
 

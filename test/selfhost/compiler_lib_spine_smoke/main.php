@@ -4771,6 +4771,7 @@ require_once __DIR__.'/../../../lib/JIT/ClosureHelper.php';
 require_once __DIR__.'/../../../lib/JIT/CoalesceHelper.php';
 require_once __DIR__.'/../../../lib/JIT/CompileCache.php';
 require_once __DIR__.'/../../../lib/JIT/CompilerOperandChainNative.php';
+require_once __DIR__.'/../../../lib/JIT/UserScriptAotEnv.php';
 require_once __DIR__.'/../../../lib/JIT/Context.php';
 require_once __DIR__.'/../../../lib/JIT/DnfParamCheck.php';
 require_once __DIR__.'/../../../lib/JIT/DomInstanceMethodJit.php';
