@@ -53,6 +53,12 @@ final class VmXmlWriter
         $entry->methods['writeattributens'] = new XmlWriterWriteAttributeNS();
         $entry->methodVisibility['writeattributens'] = $pub;
         $entry->methodNames['writeattributens'] = 'writeAttributeNS';
+        $entry->methods['startelementns'] = new XmlWriterStartElementNS();
+        $entry->methodVisibility['startelementns'] = $pub;
+        $entry->methodNames['startelementns'] = 'startElementNS';
+        $entry->methods['startattributens'] = new XmlWriterStartAttributeNS();
+        $entry->methodVisibility['startattributens'] = $pub;
+        $entry->methodNames['startattributens'] = 'startAttributeNS';
         $entry->methods['startattribute'] = new XmlWriterStartAttribute();
         $entry->methodVisibility['startattribute'] = $pub;
         $entry->methodNames['startattribute'] = 'startAttribute';
@@ -371,6 +377,85 @@ final class VmXmlWriter
         $qname = self::composeQName($prefix, $name);
         $state->buffer .= ' '.self::escapeElementName($qname).'="'.self::escapeAttribute($content).'"';
         // null uri → no xmlns; empty string still emits xmlns:prefix="" (Zend/libxml).
+        if (null !== $uri) {
+            $state->pendingNsDecls[] = ['prefix' => $prefix, 'uri' => $uri];
+        }
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::startElementNS — open a namespaced element.
+     * php-src: zim_XMLWriter_startElementNS / xmlTextWriterStartElementNS (#19446).
+     */
+    public static function startElementNS(
+        ObjectEntry $entry,
+        ?string $prefix,
+        string $name,
+        ?string $uri
+    ): bool {
+        $state = self::requireOpen($entry, 'XMLWriter::startElementNS()');
+        if (!self::isValidElementName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::startElementNS(): Argument #2 ($name) must be a valid element name, %s given',
+                var_export($name, true)
+            ));
+        }
+        if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::startElementNS(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
+                var_export($prefix, true)
+            ));
+        }
+        self::closeStartTagIfOpen($state);
+        if ([] !== $state->elementStack) {
+            if ($state->indent) {
+                $parentIdx = \count($state->elementStack) - 1;
+                $state->elementStack[$parentIdx]['hasIndentedChild'] = true;
+                $state->buffer .= "\n".str_repeat($state->indentString, \count($state->elementStack));
+            }
+        }
+        $qname = self::composeQName($prefix, $name);
+        $state->elementStack[] = ['name' => $qname, 'hasIndentedChild' => false];
+        $state->buffer .= '<'.self::escapeElementName($qname);
+        if (null !== $uri) {
+            $state->buffer .= self::xmlnsAttribute($prefix, $uri);
+        }
+        $state->startTagOpen = true;
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::startAttributeNS — open a namespaced streaming attribute.
+     * php-src: zim_XMLWriter_startAttributeNS / xmlTextWriterStartAttributeNS (#19446).
+     */
+    public static function startAttributeNS(
+        ObjectEntry $entry,
+        ?string $prefix,
+        string $name,
+        ?string $uri
+    ): bool {
+        $state = self::requireOpen($entry, 'XMLWriter::startAttributeNS()');
+        if (!$state->startTagOpen || [] === $state->elementStack) {
+            return false;
+        }
+        if (!self::isValidAttributeName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::startAttributeNS(): Argument #2 ($name) must be a valid attribute name, %s given',
+                var_export($name, true)
+            ));
+        }
+        if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::startAttributeNS(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
+                var_export($prefix, true)
+            ));
+        }
+        self::endOpenAttributeIfNeeded($state);
+        $qname = self::composeQName($prefix, $name);
+        $state->buffer .= ' '.self::escapeElementName($qname).'="';
+        $state->attributeOpen = true;
         if (null !== $uri) {
             $state->pendingNsDecls[] = ['prefix' => $prefix, 'uri' => $uri];
         }
