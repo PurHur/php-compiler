@@ -35,7 +35,8 @@ final class array_replace_recursive extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $first = VmArray::requireArrayArgNum($frame->calledArgs[0]->resolveIndirect(), 'array_replace_recursive', 1);
+        // Arg #1 includes ($array); later variadic args omit the param name (php-src stub; #19846).
+        $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_replace_recursive', 1, 'array');
         if (1 === $argc) {
             $frame->returnVar->array($first->replaceRecursiveCopy());
 
@@ -61,7 +62,11 @@ final class array_replace_recursive extends Internal
         }
         TypeErrorRaise::ensureLinked($context);
         foreach ($args as $i => $arg) {
-            JitArrayElem::requireArrayArgNum($context, $arg, 'array_replace_recursive', $i + 1);
+            if (0 === $i) {
+                JitArrayElem::requireArrayParam($context, $arg, 'array_replace_recursive', 1, 'array');
+            } else {
+                JitArrayElem::requireArrayArgNum($context, $arg, 'array_replace_recursive', $i + 1);
+            }
         }
 
         return ArrayReplaceRecursiveRuntime::replaceRecursive($context, ...$args);

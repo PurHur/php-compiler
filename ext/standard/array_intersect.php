@@ -23,11 +23,8 @@ final class array_intersect extends Internal
         if ($argc < 1) {
             throw new \ArgumentCountError('array_intersect() expects at least 1 argument, 0 given');
         }
-        $firstHt = VmArray::requireArrayArgNum(
-            $frame->calledArgs[0]->resolveIndirect(),
-            'array_intersect',
-            1
-        );
+        // Arg #1 includes ($array); later variadic args omit the param name (php-src stub; #19846).
+        $firstHt = VmArray::requireArrayParam($frame->calledArgs[0], 'array_intersect', 1, 'array');
         $operandTables = [$firstHt];
         if (1 === $argc) {
             VmArray::rejectEnumCaseSetOpOperands($frame, $firstHt);
@@ -70,7 +67,11 @@ final class array_intersect extends Internal
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_intersect() argument #'.((int) $i + 1));
             }
-            JitArrayElem::requireArrayArgNum($context, $arg, 'array_intersect', $i + 1);
+            if (0 === $i) {
+                JitArrayElem::requireArrayParam($context, $arg, 'array_intersect', 1, 'array');
+            } else {
+                JitArrayElem::requireArrayArgNum($context, $arg, 'array_intersect', $i + 1);
+            }
         }
 
         return ArrayIntersectRuntime::intersect($context, $args[0], ...\array_slice($args, 1));

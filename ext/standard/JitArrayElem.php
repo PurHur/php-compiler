@@ -42,7 +42,7 @@ final class JitArrayElem
         self::requireArrayParam($context, $array, $fn, 1, 'array');
     }
 
-    /** Variadic array builtins whose Zend messages omit ($param) — e.g. array_merge(), array_replace_recursive(). */
+    /** Variadic array builtins whose Zend messages omit ($param) — e.g. array_merge(); later args of array_diff(). */
     public static function requireArrayArgNum(Context $context, JITVariable $array, string $fn, int $argNum): void
     {
         if (JITVariable::TYPE_HASHTABLE === $array->type
