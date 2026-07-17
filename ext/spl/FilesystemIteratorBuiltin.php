@@ -27,17 +27,27 @@ final class FilesystemIteratorBuiltin
 
     public const CURRENT_AS_SELF = 16;
 
+    /** SPL_FILE_DIR_CURRENT_MODE_MASK — php-src ext/spl/spl_directory.h (#20070). */
+    public const CURRENT_MODE_MASK = 0x000000F0;
+
     public const KEY_AS_PATHNAME = 0;
 
     public const KEY_AS_FILENAME = 256;
 
     public const NEW_CURRENT_AND_KEY = 256;
 
+    /** SPL_FILE_DIR_KEY_MODE_MASK — php-src ext/spl/spl_directory.h (#20070). */
+    public const KEY_MODE_MASK = 0x00000F00;
+
     public const SKIP_DOTS = 4096;
 
     public const UNIX_PATHS = 8192;
 
-    public const FOLLOW_SYMLINKS = 512;
+    /** SPL_FILE_DIR_FOLLOW_SYMLINKS — php-src ext/spl/spl_directory.h (#20070). */
+    public const FOLLOW_SYMLINKS = 0x00004000;
+
+    /** SPL_FILE_DIR_OTHERS_MASK — php-src ext/spl/spl_directory.h (#20070). */
+    public const OTHER_MODE_MASK = 0x00007000;
 
     public static function registerClass(Context $ctx): void
     {
@@ -65,12 +75,15 @@ final class FilesystemIteratorBuiltin
             'CURRENT_AS_PATHNAME' => self::CURRENT_AS_PATHNAME,
             'CURRENT_AS_FILEINFO' => self::CURRENT_AS_FILEINFO,
             'CURRENT_AS_SELF' => self::CURRENT_AS_SELF,
+            'CURRENT_MODE_MASK' => self::CURRENT_MODE_MASK,
             'KEY_AS_PATHNAME' => self::KEY_AS_PATHNAME,
             'KEY_AS_FILENAME' => self::KEY_AS_FILENAME,
+            'KEY_MODE_MASK' => self::KEY_MODE_MASK,
             'NEW_CURRENT_AND_KEY' => self::NEW_CURRENT_AND_KEY,
             'SKIP_DOTS' => self::SKIP_DOTS,
             'UNIX_PATHS' => self::UNIX_PATHS,
             'FOLLOW_SYMLINKS' => self::FOLLOW_SYMLINKS,
+            'OTHER_MODE_MASK' => self::OTHER_MODE_MASK,
         ]);
 
         $entry->constructor = new FilesystemIteratorConstruct();
