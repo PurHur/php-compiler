@@ -53,6 +53,9 @@ final class VmDom
 
     public const CLASS_ATTR = 'domattr';
 
+    /** php-src DOMNameSpaceNode — not a DOMNode subclass (#20097). */
+    public const CLASS_NAMESPACE_NODE = 'domnamespacenode';
+
     public const CLASS_ENTITY_REFERENCE = 'domentityreference';
 
     public const CLASS_ENTITY = 'domentity';
@@ -382,6 +385,19 @@ final class VmDom
         $attr->properties[] = new ClassProperty(self::PROP_VALUE, null, $strProto);
         $attr->properties[] = new ClassProperty(self::PROP_OWNER_ELEMENT, $nullProto, $objProto);
         $ctx->classes[self::CLASS_ATTR] = $attr;
+
+        // DOMNameSpaceNode — standalone (no DOMNode parent); php-src php_dom.stub.php (#20097).
+        $nsNode = new ClassEntry('DOMNameSpaceNode');
+        $nsNode->isInternal = true;
+        $nsNode->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $nsNode->properties[] = new ClassProperty(self::PROP_NODE_VALUE, $nullProto, $strProto);
+        $nsNode->properties[] = new ClassProperty(self::PROP_NODE_TYPE, null, $intProto);
+        $nsNode->properties[] = new ClassProperty(self::PROP_PREFIX, null, $strProto);
+        $nsNode->properties[] = new ClassProperty(self::PROP_LOCAL_NAME, null, $strProto);
+        $nsNode->properties[] = new ClassProperty(self::PROP_NAMESPACE_URI, $nullProto, $strProto);
+        $nsNode->properties[] = new ClassProperty(self::PROP_OWNER_DOCUMENT, $nullProto, $objProto);
+        $nsNode->properties[] = new ClassProperty(self::PROP_PARENT_NODE, $nullProto, $objProto);
+        $ctx->classes[self::CLASS_NAMESPACE_NODE] = $nsNode;
 
         $nodeList = new ClassEntry('DOMNodeList');
         $nodeList->isInternal = true;
@@ -1180,6 +1196,58 @@ final class VmDom
         ?ObjectEntry $ownerDocument = null
     ): Variable {
         return self::createAttributeNS($ctx, null, $name, $ownerDocument);
+    }
+
+    /**
+     * Materialize a DOMNameSpaceNode for XPath namespace axis (php-src ext/dom/php_dom.c; #20097).
+     *
+     * @param string $prefix empty string for the default xmlns declaration
+     */
+    public static function createNameSpaceNode(
+        Context $ctx,
+        ObjectEntry $parentElement,
+        string $prefix,
+        string $namespaceUri
+    ): ObjectEntry {
+        $class = $ctx->classes[self::CLASS_NAMESPACE_NODE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DOMNameSpaceNode is not registered in this compiler build');
+        }
+
+        $isDefault = '' === $prefix;
+        $nodeName = $isDefault ? 'xmlns' : 'xmlns:'.$prefix;
+        $localName = $isDefault ? 'xmlns' : $prefix;
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_NODE_NAME)->string($nodeName);
+        $entry->getProperty(self::PROP_PREFIX)->string($prefix);
+        $entry->getProperty(self::PROP_LOCAL_NAME)->string($localName);
+        $entry->getProperty(self::PROP_NAMESPACE_URI)->string($namespaceUri);
+        $entry->getProperty(self::PROP_NODE_VALUE)->string($namespaceUri);
+        $entry->getProperty(self::PROP_NODE_TYPE)->int(DomConstants::XML_NAMESPACE_DECL_NODE);
+        $entry->getProperty(self::PROP_PARENT_NODE)->object($parentElement);
+        $owner = self::ownerDocumentEntry($parentElement);
+        if (null === $owner) {
+            $entry->getProperty(self::PROP_OWNER_DOCUMENT)->null();
+        } else {
+            $entry->getProperty(self::PROP_OWNER_DOCUMENT)->object($owner);
+        }
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_NAMESPACE_DECL_NODE;
+        $state->nodeName = $nodeName;
+        $state->localName = $localName;
+        $state->prefix = $isDefault ? null : $prefix;
+        $state->namespaceUri = $namespaceUri;
+        $state->textContent = $namespaceUri;
+        $state->parentId = $parentElement->id;
+        if (null !== $owner) {
+            $state->documentId = $owner->id;
+        }
+        DomRegistry::attach($entry, $state);
+
+        return $entry;
     }
 
     /**
@@ -2057,6 +2125,7 @@ final class VmDom
         $state = DomRegistry::state($node);
         if (DomConstants::XML_ELEMENT_NODE === $state->nodeType
             || DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType
+            || DomConstants::XML_NAMESPACE_DECL_NODE === $state->nodeType
         ) {
             return $state->namespaceUri;
         }
@@ -7464,10 +7533,11 @@ final class VmDom
         if (DomConstants::XML_DOCUMENT_NODE === $state->nodeType) {
             return null;
         }
-        // Text / CDATA / Comment / PI / Attr — php-src dom_node_node_value_read (#19455).
+        // Text / CDATA / Comment / PI / Attr / Namespace — php-src dom_node_node_value_read (#19455, #20097).
         if (self::isCharacterData($node)
             || DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType
-            || DomConstants::XML_PROCESSING_INSTRUCTION_NODE === $state->nodeType) {
+            || DomConstants::XML_PROCESSING_INSTRUCTION_NODE === $state->nodeType
+            || DomConstants::XML_NAMESPACE_DECL_NODE === $state->nodeType) {
             return $state->textContent ?? '';
         }
         if (DomConstants::XML_ELEMENT_NODE === $state->nodeType) {

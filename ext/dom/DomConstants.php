@@ -32,6 +32,12 @@ final class DomConstants
 
     public const XML_NOTATION_NODE = 12;
 
+    /** Namespace declaration node (libxml XML_NAMESPACE_DECL; php-src DOMNameSpaceNode; #20097). */
+    public const XML_NAMESPACE_DECL_NODE = 18;
+
+    /** Built-in xml prefix namespace URI (http://www.w3.org/XML/1998/namespace). */
+    public const XML_NS_URI = 'http://www.w3.org/XML/1998/namespace';
+
     /** Internal marker for {@see VmDom::createNodeList()} handles. */
     public const XML_NODELIST = -1;
 

@@ -24,7 +24,7 @@ final class DomNodePropertySupport
 
         return strtolower(VmDom::PROP_NODE_TYPE) === $lc
             || strtolower(VmDom::PROP_NODE_NAME) === $lc
-            || strtolower(VmDom::PROP_TAG_NAME) === $lc
+            || (VmDom::isElement($object) && strtolower(VmDom::PROP_TAG_NAME) === $lc)
             || strtolower(VmDom::PROP_OWNER_DOCUMENT) === $lc
             || (VmDom::isElement($object) && strtolower(VmDom::PROP_ATTRIBUTES) === $lc)
             || strtolower(VmDom::PROP_NODE_VALUE) === $lc
@@ -63,9 +63,6 @@ final class DomNodePropertySupport
             return $var;
         }
         if (strtolower(VmDom::PROP_NODE_NAME) === $lc || strtolower(VmDom::PROP_TAG_NAME) === $lc) {
-            if (strtolower(VmDom::PROP_TAG_NAME) === $lc && !VmDom::isElement($object)) {
-                throw new \LogicException('DomNodePropertySupport::getProperty() called with unmanaged name');
-            }
             $var->string(DomRegistry::state($object)->nodeName);
 
             return $var;
