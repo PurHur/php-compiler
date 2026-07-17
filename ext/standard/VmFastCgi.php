@@ -69,7 +69,15 @@ final class VmFastCgi
             OutputBuffer::endFlush();
         }
         OutputBuffer::flush();
-        ResponseContext::markFastCgiRequestFinished();
+
+        // Snapshot host SAPI capture (CgiDriver ob_start) as the client body — post-finish
+        // echo must not appear in the HTTP response (php-src fpm_main / main/output.c, #6136).
+        $body = '';
+        if (\ob_get_level() > 0) {
+            $contents = \ob_get_contents();
+            $body = false !== $contents ? $contents : '';
+        }
+        ResponseContext::markFastCgiRequestFinished($body);
 
         return true;
     }

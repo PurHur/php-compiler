@@ -106,11 +106,19 @@ final class CgiDriver
      */
     private static function collectResponse(string $output): array
     {
+        // fastcgi_finish_request() freezes the client body; ignore post-finish echo (#6136).
+        if (ResponseContext::isFastCgiRequestFinished()) {
+            $finished = ResponseContext::getFastCgiFinishedBody();
+            if (null !== $finished) {
+                $output = $finished;
+            }
+        }
+
         $responseHeaders = ResponseContext::listHeaders();
         if ([] === $responseHeaders && \function_exists('headers_list')) {
             $responseHeaders = \headers_list();
         }
-        if (\function_exists('header_remove')) {
+        if (\function_exists('header_remove') && !\headers_sent()) {
             \header_remove();
         }
         $status = ResponseContext::getStatus();
