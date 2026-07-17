@@ -52,6 +52,8 @@ final class VmSoapClient
             '__getlastresponseheaders' => new SoapClientGetLastResponseHeaders(),
             '__setcookie' => new SoapClientSetCookie(),
             '__getcookies' => new SoapClientGetCookies(),
+            '__setlocation' => new SoapClientSetLocation(),
+            '__setsoapheaders' => new SoapClientSetSoapHeaders(),
             '__call' => new SoapClientCall(),
         ];
         foreach ($methods as $name => $method) {
@@ -68,6 +70,8 @@ final class VmSoapClient
         $entry->methodNames['__getlastresponseheaders'] = '__getLastResponseHeaders';
         $entry->methodNames['__setcookie'] = '__setCookie';
         $entry->methodNames['__getcookies'] = '__getCookies';
+        $entry->methodNames['__setlocation'] = '__setLocation';
+        $entry->methodNames['__setsoapheaders'] = '__setSoapHeaders';
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -150,6 +154,23 @@ final class VmSoapClient
             return;
         }
         $state->cookies[$name] = $value;
+    }
+
+    public static function setLocation(ObjectEntry $object, string $location): string
+    {
+        $state = self::state($object);
+        $previous = $state->location;
+        $state->location = $location;
+
+        return $previous;
+    }
+
+    /**
+     * @param list<ObjectEntry> $headers
+     */
+    public static function setSoapHeaders(ObjectEntry $object, array $headers): void
+    {
+        self::state($object)->soapHeaders = $headers;
     }
 
     public static function soapCall(
@@ -397,6 +418,15 @@ final class VmSoapClient
             }
         }
 
+        $headerXml = '';
+        if ($state->soapHeaders !== []) {
+            $headerXml = '  <'.$prefix.':Header>'."\n";
+            foreach ($state->soapHeaders as $hdr) {
+                $headerXml .= self::encodeSoapHeaderElement($hdr, $prefix);
+            }
+            $headerXml .= '  </'.$prefix.':Header>'."\n";
+        }
+
         return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
             '<'.$prefix.':Envelope xmlns:'.$prefix.'="'.$envelopeNs.'"'.
             ' xmlns:ns1="'.\htmlspecialchars($ns, \ENT_XML1).'"'.
@@ -404,10 +434,64 @@ final class VmSoapClient
             ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'.
             ' xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"'.
             ' SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'."\n".
+            $headerXml.
             '  <'.$prefix.':Body>'."\n".
             '    <ns1:'.$name.'>'.$paramsXml.'</ns1:'.$name.'>'."\n".
             '  </'.$prefix.':Body>'."\n".
             '</'.$prefix.':Envelope>';
+    }
+
+    private static function encodeSoapHeaderElement(ObjectEntry $header, string $prefix): string
+    {
+        $ns = $header->hasProperty('namespace')
+            ? $header->getProperty('namespace')->resolveIndirect()->toString()
+            : '';
+        $name = $header->hasProperty('name')
+            ? $header->getProperty('name')->resolveIndirect()->toString()
+            : 'Header';
+        $tag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $name) ?: 'Header';
+        $must = false;
+        if ($header->hasProperty('mustUnderstand')) {
+            $mu = $header->getProperty('mustUnderstand')->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $mu->type) {
+                $must = $mu->toBool();
+            } elseif (Variable::TYPE_INTEGER === $mu->type) {
+                $must = 0 !== $mu->toInt();
+            }
+        }
+        $attrs = '';
+        if ('' !== $ns) {
+            $attrs .= ' xmlns="'.\htmlspecialchars($ns, \ENT_XML1).'"';
+        }
+        if ($must) {
+            $attrs .= ' '.$prefix.':mustUnderstand="1"';
+        }
+        if ($header->hasProperty('actor')) {
+            $actorVar = $header->getProperty('actor')->resolveIndirect();
+            if (Variable::TYPE_NULL !== $actorVar->type) {
+                if (Variable::TYPE_INTEGER === $actorVar->type) {
+                    $attrs .= ' '.$prefix.':actor="'.$actorVar->toInt().'"';
+                } else {
+                    $attrs .= ' '.$prefix.':actor="'.\htmlspecialchars($actorVar->toString(), \ENT_XML1).'"';
+                }
+            }
+        }
+        $inner = '';
+        if ($header->hasProperty('data')) {
+            $dataVar = $header->getProperty('data')->resolveIndirect();
+            if (Variable::TYPE_NULL !== $dataVar->type) {
+                $exported = VmJson::export($dataVar, null, null, null);
+                if (\is_scalar($exported) || null === $exported) {
+                    $inner = \htmlspecialchars((string) $exported, \ENT_XML1);
+                } elseif (\is_array($exported)) {
+                    foreach ($exported as $k => $v) {
+                        $inner .= self::encodeParam(\is_int($k) ? 'item' : (string) $k, $v);
+                    }
+                }
+            }
+        }
+
+        return '    <'.$tag.$attrs.'>'.$inner.'</'.$tag.'>'."\n";
     }
 
     private static function encodeParam(string $name, mixed $value): string
@@ -663,6 +747,9 @@ final class SoapClientState
 
     /** @var array<string, string> */
     public array $cookies = [];
+
+    /** @var list<ObjectEntry> */
+    public array $soapHeaders = [];
 }
 
 final class SoapClientConstruct extends SoapClassMethod
@@ -965,5 +1052,93 @@ final class SoapClientGetCookies extends SoapClassMethod
             $ht->add((string) $name, $slot);
         }
         $frame->returnVar->array($ht);
+    }
+}
+
+final class SoapClientSetLocation extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__setLocation');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(
+                'SoapClient::__setLocation() expects at most 1 argument, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'SoapClient::__setLocation()');
+        $location = '';
+        if ($argc >= 2) {
+            $locVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $locVar->type) {
+                $location = $this->stringArg($frame->calledArgs[1], 'SoapClient::__setLocation', 0, 'location');
+            }
+        }
+        $previous = VmSoapClient::setLocation($receiver, $location);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string($previous);
+        }
+    }
+}
+
+final class SoapClientSetSoapHeaders extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__setSoapHeaders');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(
+                'SoapClient::__setSoapHeaders() expects at most 1 argument, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'SoapClient::__setSoapHeaders()');
+        $headers = [];
+        if ($argc >= 2) {
+            $arg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL === $arg->type) {
+                $headers = [];
+            } elseif (Variable::TYPE_OBJECT === $arg->type) {
+                $obj = $arg->toObject();
+                if ('soapheader' !== \strtolower($obj->class->name)) {
+                    throw new \TypeError(
+                        'SoapClient::__setSoapHeaders(): Argument #1 ($headers) must be of type SoapHeader|array|null'
+                    );
+                }
+                $headers = [$obj];
+            } elseif (Variable::TYPE_ARRAY === $arg->type) {
+                foreach ($arg->toArray()->iterateKeyed(false) as $pair) {
+                    $v = $pair[1]->resolveIndirect();
+                    if (Variable::TYPE_OBJECT !== $v->type) {
+                        throw new \TypeError(
+                            'SoapClient::__setSoapHeaders(): Argument #1 ($headers) must be of type SoapHeader|array|null'
+                        );
+                    }
+                    $obj = $v->toObject();
+                    if ('soapheader' !== \strtolower($obj->class->name)) {
+                        throw new \TypeError(
+                            'SoapClient::__setSoapHeaders(): Argument #1 ($headers) must be of type SoapHeader|array|null'
+                        );
+                    }
+                    $headers[] = $obj;
+                }
+            } else {
+                throw new \TypeError(
+                    'SoapClient::__setSoapHeaders(): Argument #1 ($headers) must be of type SoapHeader|array|null'
+                );
+            }
+        }
+        VmSoapClient::setSoapHeaders($receiver, $headers);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
     }
 }
