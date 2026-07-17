@@ -104,6 +104,21 @@ final class JitStringBuiltinArg
         );
     }
 
+    /**
+     * Soft-null string args — coerce+deprecate on forward profile (not Z_PARAM_STR TypeError).
+     *
+     * trim/ltrim/rtrim/chop (#19983) and str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998).
+     */
+    public static function lowerTrimFamilyString(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        return self::lower($context, $arg, $function, $argIndex, $paramName, 'string', null, false, false);
+    }
+
     public static function lower(
         Context $context,
         Variable $arg,
@@ -228,26 +243,20 @@ final class JitStringBuiltinArg
     ): Value {
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             JitNativeString::ensureInsertBlock($context);
-            if (
-                !$softNullPath
-                && (
-                    $context->callerStrictTypes
-                    || self::requiresZparamStrStrictNullOnForwardProfile()
-                )
-            ) {
+            if (!$softNullPath && $context->callerStrictTypes) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
 
                 return self::unreachableStringPtr($context);
             }
 
-            if (!$softNullPath && !self::requiresForwardProfileStrictStringNull()) {
+            if (!self::requiresForwardProfileStrictStringNull()) {
                 self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName, $expectedType);
             }
 
             return $context->builder->load($context->constantStringFromString(''));
         }
 
-        // Boxed null / VALUE: same Z_PARAM_PATH 8.4 null TypeError as Z_PARAM_STR (#19256).
+        // Boxed null / VALUE: coerce like trim family on forward profile (#19997, ext/standard/filestat.c).
         return self::lower(
             $context,
             $arg,
@@ -257,7 +266,7 @@ final class JitStringBuiltinArg
             $expectedType,
             $arrayExpectedType,
             false,
-            !$softNullPath
+            false
         );
     }
 

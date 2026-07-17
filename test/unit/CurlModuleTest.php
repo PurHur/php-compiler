@@ -19,7 +19,7 @@ final class CurlModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['curl_init', 'curl_setopt', 'curl_close'] as $fn) {
+        foreach (['curl_init', 'curl_setopt', 'curl_setopt_array', 'curl_close'] as $fn) {
             self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_share_init', 'curl_share_setopt', 'curl_share_close'] as $fn) {

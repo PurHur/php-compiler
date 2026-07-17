@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\ext\standard\JitIntdiv;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -19,7 +20,7 @@ use PHPLLVM\Value;
 /**
  * grapheme_str_split() — split string into grapheme clusters (php-src ext/intl/grapheme; #5958).
  *
- * VM: {@see VmGrapheme}; JIT: compile-time fold via {@see JitGrapheme::tryStrSplitFold} (#5958, #6246).
+ * VM: {@see VmGrapheme}; JIT: fold via {@see JitGrapheme::tryStrSplitFold}, runtime via {@see JitGraphemeStrSplit} (#5958, #6246, #19964).
  */
 final class grapheme_str_split extends Internal
 {
@@ -81,10 +82,19 @@ final class grapheme_str_split extends Internal
         if (null !== $folded) {
             return $folded;
         }
-        JitStringBuiltinArg::lower($context, $args[0], 'grapheme_str_split', 0, 'string');
+        $i64 = $context->getTypeFromString('int64');
+        $length = $i64->constInt(1, false);
+        if (2 === $argc) {
+            $length = JitIntdiv::lowerIntBuiltinArgForCaller(
+                $context,
+                $args[1],
+                'grapheme_str_split',
+                2,
+                'length'
+            );
+        }
+        $string = JitStringBuiltinArg::lower($context, $args[0], 'grapheme_str_split', 0, 'string');
 
-        throw new \LogicException(
-            'grapheme_str_split() JIT runtime lowering is deferred; use VM or compile-time literals (#5958)'
-        );
+        return JitGraphemeStrSplit::invoke($context, $string, $length);
     }
 }

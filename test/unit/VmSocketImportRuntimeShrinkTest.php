@@ -22,7 +22,9 @@ final class VmSocketImportRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/sockets/VmSocket.php');
         $this->assertStringContainsString('importStreamHandle', $source);
-        $this->assertStringContainsString('VmStreamMeta::streamTypeForUri', $source);
+        $this->assertStringContainsString('stdioInheritedStreamType', $source);
+        $this->assertStringNotContainsString('isStdioUri($uri)) {
+            return false', $source);
         $this->assertStringContainsString('VmFs::socketFdForHandle', $source);
         $this->assertStringNotContainsString('stream_get_meta_data(', $source);
         $this->assertStringNotContainsString('stream_socket_get_name(', $source);

@@ -45,11 +45,21 @@ final class JitFdiv
         int $argIndex,
         string $paramName,
         string $function,
-        string $expectedType = 'float'
+        string $expectedType = 'float',
+        bool $zParamDoubleNullDeprecatedCoerce = false
     ): Value {
         $double = $context->getTypeFromString('double');
 
-        return self::lowerOperand($context, $arg, $argIndex, $paramName, $double, $function, $expectedType);
+        return self::lowerOperand(
+            $context,
+            $arg,
+            $argIndex,
+            $paramName,
+            $double,
+            $function,
+            $expectedType,
+            $zParamDoubleNullDeprecatedCoerce
+        );
     }
 
     private static function lowerOperand(
@@ -59,7 +69,8 @@ final class JitFdiv
         string $paramName,
         $double,
         string $function = self::FUNCTION,
-        string $expectedType = 'float'
+        string $expectedType = 'float',
+        bool $zParamDoubleNullDeprecatedCoerce = false
     ): Value {
         if (JITVariable::TYPE_NULL === $arg->type) {
             if ($context->callerStrictTypes) {
@@ -68,11 +79,9 @@ final class JitFdiv
                 } elseif ('float' === $expectedType) {
                     JitInternalStrictArg::requireFloat($context, $arg, $function, $paramName, $argIndex);
                 }
-            } elseif ('number' === $expectedType && VmMath::requiresForwardProfileStrictNumberNull()) {
-                self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
             } elseif ('number' === $expectedType) {
                 self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'int|float');
-            } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull()) {
+            } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull() && !$zParamDoubleNullDeprecatedCoerce) {
                 self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
             } elseif ('float' === $expectedType) {
                 // Z_PARAM_DOUBLE null coerce (number_format; #19756).
@@ -108,7 +117,16 @@ final class JitFdiv
             return self::lowerStringOperand($context, $arg, $argIndex, $paramName, $double, $function, $expectedType);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxedOperand($context, $arg, $argIndex, $paramName, $double, $function, $expectedType);
+            return self::lowerBoxedOperand(
+                $context,
+                $arg,
+                $argIndex,
+                $paramName,
+                $double,
+                $function,
+                $expectedType,
+                $zParamDoubleNullDeprecatedCoerce
+            );
         }
         if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
             return $context->builder->uiToFp($context->helper->loadValue($arg), $double);
@@ -161,7 +179,8 @@ final class JitFdiv
         string $paramName,
         $double,
         string $function = self::FUNCTION,
-        string $expectedType = 'float'
+        string $expectedType = 'float',
+        bool $zParamDoubleNullDeprecatedCoerce = false
     ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -197,13 +216,11 @@ final class JitFdiv
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
         } elseif ($context->callerStrictTypes && 'float' === $expectedType) {
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
-        } elseif ('number' === $expectedType && VmMath::requiresForwardProfileStrictNumberNull()) {
-            self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
         } elseif (!$context->callerStrictTypes && 'number' === $expectedType) {
             self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'int|float');
-        } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull()) {
+        } elseif ('float' === $expectedType && VmMath::requiresForwardProfileStrictDoubleNull() && !$zParamDoubleNullDeprecatedCoerce) {
             self::emitNumericTypeErrorAndAbort($context, $argIndex, $paramName, 'null', $function, $expectedType);
-        } elseif (!$context->callerStrictTypes && 'float' === $expectedType) {
+        } elseif ('float' === $expectedType) {
             self::emitNullNumberDeprecation($context, $function, $argIndex, $paramName, 'float');
         }
         $context->builder->branch($mergeBlock);

@@ -325,6 +325,15 @@ class AotTest extends BaseTest
                 && str_contains($name, 'curl_share_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::runsCurlEasyCompliance($name)
+                && str_contains($name, 'curl_setopt_array')
+                && !str_contains($name, 'curl_easy_phantom')) {
+                continue;
+            }
+            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesEasyHandleStubs()
+                && str_contains($name, 'curl_easy_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsArrayReplaceKey()
                 && str_contains($name, 'array_replace_key')
                 && !str_contains($name, 'array_replace_key_phantom')) {

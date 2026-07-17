@@ -90,6 +90,16 @@ final class CurlExtensionPolicy
         return self::advertisesExtension();
     }
 
+    /** Run curl_init/curl_setopt_array compliance when easy handles ship or phantom guard matches (#6695). */
+    public static function runsCurlEasyCompliance(string $testFileName): bool
+    {
+        if (self::advertisesEasyHandleStubs()) {
+            return true;
+        }
+
+        return str_contains($testFileName, 'curl_easy_phantom');
+    }
+
     /**
      * curl_version/curl_strerror/… — function_exists only when ext/curl is loaded (#18554, #18470).
      *

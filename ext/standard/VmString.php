@@ -78,12 +78,48 @@ final class VmString
      * Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222, #19254, #19318).
      *
      * Distinct from {@see requiresForwardProfileStrictStringNull} (legacy global switch, currently off).
-     * trim/ltrim/rtrim/chop, wordwrap/str_pad, unserialize/substr, and other typed string builtins use
-     * this guard (php-src ext/standard/string.c, var_unserializer.c).
+     * wordwrap/str_pad, unserialize/substr, and other typed string builtins use this guard
+     * (php-src ext/standard/string.c, var_unserializer.c). trim/ltrim/rtrim/chop and
+     * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords coerce null with deprecation on forward
+     * profile (php_trim / string.c, re-#18850 #19983 #19998).
      */
     public static function requiresZparamStrStrictNullOnForwardProfile(): bool
     {
         return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * String builtins that coerce null with deprecation (not Z_PARAM_STR TypeError on 8.4).
+     *
+     * Used by trim/ltrim/rtrim/chop (#19983) and str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998).
+     */
+    public static function coerceTrimFamilyStringArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): string {
+        return self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName, 'string', false);
+    }
+
+    /**
+     * Frame wrapper for {@see coerceTrimFamilyStringArg} — honors caller strict_types (#19998).
+     */
+    public static function trimFamilyStringArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): string {
+        return self::stringBuiltinArgForFrame(
+            $frame,
+            $argIndex,
+            $function,
+            $userArgIndex,
+            $paramName,
+            false
+        );
     }
 
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
@@ -399,13 +435,8 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            // Z_PARAM_PATH: null→TypeError on 8.4 forward (#19256); softNullPath keeps ≤8.3 coerce (#11016).
-            if (!$softNullPath && self::requiresZparamStrStrictNullOnForwardProfile()) {
-                throw new \TypeError(
-                    self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null')
-                );
-            }
-            if (!$softNullPath && !self::requiresForwardProfileStrictStringNull()) {
+            // Z_PARAM_PATH: null coerces with deprecation on forward profile (re-#18850, #19997; php-src filestat.c).
+            if (!self::requiresForwardProfileStrictStringNull()) {
                 VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
             }
 

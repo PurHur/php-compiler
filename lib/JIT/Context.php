@@ -1043,6 +1043,7 @@ class Context {
                 Builtin\StringStrRot13::ensureStandaloneBodies($this);
                 Builtin\StringUniqid::ensureStandaloneBodies($this);
                 Builtin\StringChunkSplit::ensureStandaloneBodies($this);
+                Builtin\StringGraphemeStrSplit::ensureStandaloneBodies($this);
                 Builtin\StringHex2bin::ensureStandaloneBodies($this);
                 Builtin\StringLevenshtein::ensureStandaloneBodies($this);
                 Builtin\StringSubstrCount::ensureStandaloneBodies($this);

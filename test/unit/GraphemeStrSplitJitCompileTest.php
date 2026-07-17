@@ -6,15 +6,25 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** AOT lint verify for grapheme_str_split() JIT compile-time fold (#6246). */
+/** AOT lint verify for grapheme_str_split() JIT (#6246 compile-time fold, #19964 runtime). */
 final class GraphemeStrSplitJitCompileTest extends TestCase
 {
     public function testGraphemeStrSplitAotLint(): void
     {
+        $this->assertAotLintPasses('grapheme_str_split_literals.php');
+    }
+
+    public function testGraphemeStrSplitRuntimeAotLint(): void
+    {
+        $this->assertAotLintPasses('grapheme_str_split_runtime.php');
+    }
+
+    private function assertAotLintPasses(string $fixtureBasename): void
+    {
         $root = dirname(__DIR__, 2);
         $bin = realpath($root.'/bin/compile.php');
         $this->assertNotFalse($bin);
-        $target = $root.'/test/fixtures/aot/compile-only/grapheme_str_split_literals.php';
+        $target = $root.'/test/fixtures/aot/compile-only/'.$fixtureBasename;
         $cmd = [PHP_BINARY, $bin, '-l', $target];
         $descriptorSpec = [
             0 => ['pipe', 'r'],
@@ -31,7 +41,7 @@ final class GraphemeStrSplitJitCompileTest extends TestCase
         $this->assertSame(
             0,
             $exit,
-            trim($stderr !== false ? $stderr : '')."\n".'compile.php -l failed for grapheme_str_split_literals.php'
+            trim($stderr !== false ? $stderr : '')."\n".'compile.php -l failed for '.$fixtureBasename
         );
     }
 }

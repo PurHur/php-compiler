@@ -29,6 +29,20 @@ final class CurlConstants
     public const CURL_LOCK_DATA_SSL_SESSION = 4;
     public const CURL_LOCK_DATA_CONNECT = 5;
 
+    /** @var array<int, true> */
+    private const EASY_OPTIONS = [
+        self::CURLOPT_URL => true,
+        self::CURLOPT_RETURNTRANSFER => true,
+        self::CURLOPT_POST => true,
+        self::CURLOPT_HTTPHEADER => true,
+        self::CURLOPT_SHARE => true,
+    ];
+
+    public static function isValidEasyOption(int $option): bool
+    {
+        return isset(self::EASY_OPTIONS[$option]);
+    }
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
