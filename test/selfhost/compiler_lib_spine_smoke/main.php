@@ -1783,6 +1783,7 @@ require_once __DIR__.'/../../../ext/standard/JitProcGetStatus.php';
 require_once __DIR__.'/../../../ext/standard/JitProcNice.php';
 require_once __DIR__.'/../../../ext/standard/JitProcOpen.php';
 require_once __DIR__.'/../../../ext/standard/JitProcTerminate.php';
+require_once __DIR__.'/../../../ext/standard/JitProgressNoteKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitPropertyExists.php';
 require_once __DIR__.'/../../../ext/standard/JitQuotPrint.php';
 require_once __DIR__.'/../../../ext/standard/JitQuotedPrintableDecode.php';

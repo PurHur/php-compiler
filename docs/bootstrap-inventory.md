@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5297 |
-| Phase A inventory files (M2 ratio SSOT) | 5297 |
+| PHP files on vm.php path | 5298 |
+| Phase A inventory files (M2 ratio SSOT) | 5298 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14710 |
+| Source constructs flagged (warnings) | 14711 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1716,6 +1716,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitProcNice.php` | 0 | 1 |
 | `ext/standard/JitProcOpen.php` | 0 | 1 |
 | `ext/standard/JitProcTerminate.php` | 0 | 1 |
+| `ext/standard/JitProgressNoteKernel.php` | 0 | 4 |
 | `ext/standard/JitPropertyExists.php` | 0 | 2 |
 | `ext/standard/JitQuotPrint.php` | 0 | 1 |
 | `ext/standard/JitQuotedPrintableDecode.php` | 0 | 1 |
@@ -3947,7 +3948,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ProcessOpenJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessOpenRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/ProgressNoteRuntime.php` | 0 | 4 |
+| `lib/JIT/Builtin/ProgressNoteRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/Rand.php` | 0 | 2 |
 | `lib/JIT/Builtin/RangeIntRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ReadonlyRaise.php` | 0 | 4 |
@@ -16858,6 +16859,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitProgressNoteKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new Call\Native (line 150)
+- new JIT (line 326)
+- 25 class method(s)
+- 2 closure(s)
 
 ### `ext/standard/JitPropertyExists.php`
 
@@ -31991,10 +32000,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ProgressNoteRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 147)
-- new JIT (line 323)
-- 25 class method(s)
-- 2 closure(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/Rand.php`
 
