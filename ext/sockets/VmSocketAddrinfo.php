@@ -135,7 +135,7 @@ final class VmSocketAddrinfo
             return false;
         }
 
-        $object = VmSocket::wrapOwnedFd($fd, $ctx);
+        $object = VmSocket::wrapOwnedFd($fd, $ctx, $snap['ai_family']);
         VmSockets::recordError($object, 0);
 
         return $object;
