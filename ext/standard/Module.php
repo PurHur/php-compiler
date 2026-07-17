@@ -878,6 +878,7 @@ class Module extends ModuleAbstract
             new date_timestamp_get(),
             new date_timestamp_set(),
             new date_date_set(),
+            new date_isodate_set(),
             new date_time_set(),
             new date_timezone_get(),
             new date_timezone_set(),
