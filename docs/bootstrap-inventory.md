@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5504 |
-| Phase A inventory files (M2 ratio SSOT) | 5504 |
+| PHP files on vm.php path | 5507 |
+| Phase A inventory files (M2 ratio SSOT) | 5507 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15614 |
+| Source constructs flagged (warnings) | 15633 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -463,9 +463,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 4 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 31 |
-| `ext/gd/VmGd.php` | 0 | 6 |
+| `ext/gd/Module.php` | 0 | 33 |
+| `ext/gd/VmGd.php` | 0 | 8 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
+| `ext/gd/VmGdFreeType.php` | 0 | 1 |
 | `ext/gd/VmGdPng.php` | 0 | 1 |
 | `ext/gd/VmGdWebp.php` | 0 | 1 |
 | `ext/gd/imagealphablending.php` | 0 | 1 |
@@ -495,6 +496,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagestring.php` | 0 | 1 |
 | `ext/gd/imagesx.php` | 0 | 1 |
 | `ext/gd/imagesy.php` | 0 | 1 |
+| `ext/gd/imagettfbbox.php` | 0 | 2 |
+| `ext/gd/imagettftext.php` | 0 | 2 |
 | `ext/gd/imagewebp.php` | 0 | 1 |
 | `ext/gettext/GettextFunction.php` | 0 | 2 |
 | `ext/gettext/GettextJitHelper.php` | 0 | 1 |
@@ -1075,7 +1078,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/soap/SoapConstants.php` | 0 | 1 |
 | `ext/soap/SoapExtensionPolicy.php` | 0 | 1 |
 | `ext/soap/SoapFaultConstruct.php` | 0 | 1 |
-| `ext/soap/VmSoapClient.php` | 0 | 35 |
+| `ext/soap/VmSoapClient.php` | 0 | 37 |
 | `ext/soap/VmSoapEncoding.php` | 0 | 32 |
 | `ext/soap/VmSoapServer.php` | 0 | 38 |
 | `ext/soap/bootstrap_soapfault.php` | 0 | 1 |
@@ -1265,8 +1268,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_pad.php` | 0 | 1 |
 | `ext/sodium/sodium_unpad.php` | 0 | 1 |
 | `ext/spl/AppendIteratorBuiltin.php` | 0 | 8 |
-| `ext/spl/ArrayIteratorBuiltin.php` | 0 | 33 |
-| `ext/spl/ArrayObjectBuiltin.php` | 0 | 31 |
+| `ext/spl/ArrayIteratorBuiltin.php` | 0 | 34 |
+| `ext/spl/ArrayObjectBuiltin.php` | 0 | 32 |
 | `ext/spl/BuiltinClasses.php` | 0 | 1 |
 | `ext/spl/CachingIteratorBuiltin.php` | 0 | 22 |
 | `ext/spl/CallbackFilterIteratorBuiltin.php` | 0 | 6 |
@@ -1286,7 +1289,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/RecursiveCachingIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/RecursiveTreeIteratorBuiltin.php` | 0 | 6 |
-| `ext/spl/RegexIteratorBuiltin.php` | 0 | 20 |
+| `ext/spl/RegexIteratorBuiltin.php` | 0 | 24 |
 | `ext/spl/SplArraySerializeSupport.php` | 0 | 2 |
 | `ext/spl/SplArraySortMethod.php` | 0 | 3 |
 | `ext/spl/SplArrayStorage.php` | 0 | 19 |
@@ -1299,7 +1302,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplFileIteratorSerializeDeny.php` | 0 | 3 |
 | `ext/spl/SplFileObjectBuiltin.php` | 0 | 16 |
 | `ext/spl/SplFileObjectStorage.php` | 0 | 1 |
-| `ext/spl/SplFixedArrayBuiltin.php` | 0 | 35 |
+| `ext/spl/SplFixedArrayBuiltin.php` | 0 | 37 |
 | `ext/spl/SplFixedArraySerializeSupport.php` | 0 | 3 |
 | `ext/spl/SplHeapBuiltin.php` | 0 | 46 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 3 |
@@ -7778,7 +7781,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 8223)
 - new DOMException (line 8231)
 - new DOMException (line 8240)
-- 371 class method(s)
+- 372 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomInstanceInvoke.php`
@@ -7881,29 +7884,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 233)
 - new DOMException (line 239)
 - new DOMException (line 325)
-- new DOMException (line 632)
-- new DOMException (line 736)
-- new DOMException (line 778)
-- new DOMException (line 788)
-- new Variable (line 867)
-- new DOMException (line 873)
-- new Error (line 886)
-- new Variable (line 890)
-- new Variable (line 900)
-- new Variable (line 1026)
-- new DOMException (line 1033)
-- new Error (line 1087)
-- new Variable (line 1122)
-- new Variable (line 1128)
-- new Variable (line 1134)
-- new Variable (line 1140)
-- new Variable (line 1149)
-- new HashTable (line 1160)
-- new Variable (line 1166)
-- new Variable (line 1170)
-- new Variable (line 1187)
-- new Variable (line 1196)
-- 42 class method(s)
+- new DOMException (line 744)
+- new DOMException (line 848)
+- new DOMException (line 890)
+- new DOMException (line 900)
+- new Variable (line 979)
+- new DOMException (line 985)
+- new Error (line 998)
+- new Variable (line 1002)
+- new Variable (line 1012)
+- new Variable (line 1138)
+- new DOMException (line 1145)
+- new Error (line 1199)
+- new Variable (line 1234)
+- new Variable (line 1240)
+- new Variable (line 1246)
+- new Variable (line 1252)
+- new Variable (line 1261)
+- new HashTable (line 1272)
+- new Variable (line 1278)
+- new Variable (line 1282)
+- new Variable (line 1299)
+- new Variable (line 1308)
+- 46 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/XPathConstruct.php`
@@ -8557,32 +8560,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagefilledrectangle (line 74)
 - new imagestring (line 75)
 - new imagechar (line 76)
-- new imagefilter (line 77)
-- new imageflip (line 78)
-- new imagecrop (line 79)
-- new imagecropauto (line 80)
-- new imagecreatefromstring (line 83)
-- new imagepng (line 84)
-- new imagewebp (line 85)
-- new imageavif (line 86)
-- new imagecreatefromwebp (line 87)
-- new imagecreatefromavif (line 88)
+- new imagettftext (line 78)
+- new imagettfbbox (line 79)
+- new imagefilter (line 81)
+- new imageflip (line 82)
+- new imagecrop (line 83)
+- new imagecropauto (line 84)
+- new imagecreatefromstring (line 87)
+- new imagepng (line 88)
+- new imagewebp (line 89)
+- new imageavif (line 90)
+- new imagecreatefromwebp (line 91)
+- new imagecreatefromavif (line 92)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 53)
-- new ObjectEntry (line 76)
-- new ObjectEntry (line 766)
-- new ObjectEntry (line 790)
-- new ObjectEntry (line 1016)
-- 61 class method(s)
+- new ObjectEntry (line 54)
+- new ObjectEntry (line 77)
+- new HashTable (line 354)
+- new Variable (line 356)
+- new ObjectEntry (line 872)
+- new ObjectEntry (line 896)
+- new ObjectEntry (line 1122)
+- 66 class method(s)
 
 ### `ext/gd/VmGdAvif.php`
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/gd/VmGdFreeType.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `ext/gd/VmGdPng.php`
 
@@ -8727,6 +8739,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gd/imagesy.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagettfbbox.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/gd/imagettftext.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/gd/imagewebp.php`
@@ -13136,41 +13160,43 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/VmSoapClient.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 35)
-- new SoapClientConstruct (line 39)
-- new SoapClientSoapCall (line 44)
-- new SoapClientDoRequest (line 45)
-- new SoapClientGetFunctions (line 46)
-- new SoapClientGetTypes (line 47)
-- new SoapClientGetLastRequest (line 48)
-- new SoapClientGetLastResponse (line 49)
-- new SoapClientCall (line 50)
-- new SoapClientState (line 68)
-- new SoapFault (line 97)
-- new SoapFault (line 161)
-- new SoapFault (line 169)
-- new SoapFault (line 185)
-- new SoapFault (line 219)
-- new DOMDocument (line 221)
-- new SoapFault (line 223)
-- new DOMXPath (line 225)
-- new DOMDocument (line 338)
-- new SoapFault (line 340)
-- new DOMXPath (line 342)
-- new SoapFault (line 365)
-- new Variable (line 442)
-- new Variable (line 450)
-- new HashTable (line 477)
-- new ObjectEntry (line 495)
-- new ArgumentCountError (line 567)
-- new ArgumentCountError (line 605)
-- new ArgumentCountError (line 633)
-- new ArgumentCountError (line 661)
-- new HashTable (line 690)
-- new Variable (line 693)
-- new HashTable (line 715)
-- new Variable (line 718)
-- 25 class method(s)
+- new ClassEntry (line 36)
+- new SoapClientConstruct (line 40)
+- new SoapClientSoapCall (line 45)
+- new SoapClientDoRequest (line 46)
+- new SoapClientGetFunctions (line 47)
+- new SoapClientGetTypes (line 48)
+- new SoapClientGetLastRequest (line 49)
+- new SoapClientGetLastResponse (line 50)
+- new SoapClientGetLastRequestHeaders (line 51)
+- new SoapClientGetLastResponseHeaders (line 52)
+- new SoapClientCall (line 53)
+- new SoapClientState (line 73)
+- new SoapFault (line 103)
+- new SoapFault (line 172)
+- new SoapFault (line 183)
+- new SoapFault (line 199)
+- new SoapFault (line 271)
+- new DOMDocument (line 273)
+- new SoapFault (line 275)
+- new DOMXPath (line 277)
+- new DOMDocument (line 390)
+- new SoapFault (line 392)
+- new DOMXPath (line 394)
+- new SoapFault (line 417)
+- new Variable (line 494)
+- new Variable (line 502)
+- new HashTable (line 529)
+- new ObjectEntry (line 547)
+- new ArgumentCountError (line 625)
+- new ArgumentCountError (line 663)
+- new ArgumentCountError (line 691)
+- new ArgumentCountError (line 719)
+- new HashTable (line 748)
+- new Variable (line 751)
+- new HashTable (line 773)
+- new Variable (line 776)
+- 29 class method(s)
 
 ### `ext/soap/VmSoapEncoding.php`
 
@@ -14565,12 +14591,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 182)
 - new HashTable (line 203)
 - new ArgumentCountError (line 252)
-- new ArgumentCountError (line 420)
-- new ArgumentCountError (line 445)
-- new ArgumentCountError (line 469)
-- new ArgumentCountError (line 499)
-- new ArgumentCountError (line 523)
-- new ArgumentCountError (line 550)
+- new ArgumentCountError (line 358)
+- new ArgumentCountError (line 427)
+- new ArgumentCountError (line 452)
+- new ArgumentCountError (line 476)
+- new ArgumentCountError (line 506)
+- new ArgumentCountError (line 530)
+- new ArgumentCountError (line 557)
 - 26 class method(s)
 
 ### `ext/spl/ArrayObjectBuiltin.php`
@@ -14598,14 +14625,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 131)
 - new Variable (line 135)
 - new HashTable (line 156)
-- new ArgumentCountError (line 258)
-- new ArgumentCountError (line 317)
-- new ArgumentCountError (line 366)
-- new ArgumentCountError (line 396)
-- new ArgumentCountError (line 420)
-- new ArgumentCountError (line 447)
-- new ArgumentCountError (line 471)
-- new ArgumentCountError (line 506)
+- new ArgumentCountError (line 217)
+- new ArgumentCountError (line 265)
+- new ArgumentCountError (line 324)
+- new ArgumentCountError (line 373)
+- new ArgumentCountError (line 403)
+- new ArgumentCountError (line 427)
+- new ArgumentCountError (line 454)
+- new ArgumentCountError (line 478)
+- new ArgumentCountError (line 513)
 - 16 class method(s)
 
 ### `ext/spl/BuiltinClasses.php`
@@ -14739,14 +14767,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new IteratorIteratorGetInnerIterator (line 53)
 - new ClassEntry (line 99)
 - new RecursiveIteratorIteratorConstruct (line 108)
-- new OutOfBoundsException (line 290)
-- new OutOfBoundsException (line 297)
-- new UnexpectedValueException (line 454)
-- new Variable (line 503)
-- new UnexpectedValueException (line 687)
-- new ArgumentCountError (line 753)
-- new ArgumentCountError (line 785)
-- 67 class method(s)
+- new OutOfBoundsException (line 316)
+- new OutOfBoundsException (line 323)
+- new UnexpectedValueException (line 504)
+- new Variable (line 553)
+- new UnexpectedValueException (line 759)
+- new ArgumentCountError (line 825)
+- new ArgumentCountError (line 857)
+- 74 class method(s)
 - 1 closure(s)
 
 ### `ext/spl/JitSplClasses.php`
@@ -14870,26 +14898,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/RegexIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 55)
-- new RegexIteratorConstruct (line 74)
-- new RegexIteratorAccept (line 77)
-- new Variable (line 227)
-- new Variable (line 252)
-- new Variable (line 271)
-- new Variable (line 292)
-- new ArgumentCountError (line 405)
-- new ArgumentCountError (line 648)
-- new ArgumentCountError (line 703)
-- new ArgumentCountError (line 758)
-- new ClassEntry (line 791)
-- new RecursiveRegexIteratorConstruct (line 800)
-- new RecursiveRegexIteratorHasChildren (line 803)
-- new RecursiveRegexIteratorGetChildren (line 806)
-- new ObjectEntry (line 824)
-- new Variable (line 834)
-- new ArgumentCountError (line 857)
-- new UnexpectedValueException (line 954)
-- 42 class method(s)
+- new ClassEntry (line 56)
+- new Variable (line 77)
+- new Variable (line 78)
+- new ClassProperty (line 79)
+- new RegexIteratorConstruct (line 89)
+- new RegexIteratorAccept (line 92)
+- new Variable (line 291)
+- new Variable (line 316)
+- new Variable (line 335)
+- new Variable (line 356)
+- new ArgumentCountError (line 469)
+- new ArgumentCountError (line 712)
+- new ArgumentCountError (line 767)
+- new ArgumentCountError (line 822)
+- new ClassEntry (line 855)
+- new RecursiveRegexIteratorConstruct (line 864)
+- new RecursiveRegexIteratorHasChildren (line 867)
+- new RecursiveRegexIteratorGetChildren (line 870)
+- new RecursiveRegexIteratorAccept (line 874)
+- new ObjectEntry (line 901)
+- new Variable (line 911)
+- new ArgumentCountError (line 934)
+- new UnexpectedValueException (line 1031)
+- 47 class method(s)
 
 ### `ext/spl/SplArraySerializeSupport.php`
 
@@ -15063,18 +15095,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 280)
 - new ObjectEntry (line 296)
 - new Variable (line 299)
-- new ArgumentCountError (line 458)
-- new ArgumentCountError (line 485)
-- new ArgumentCountError (line 509)
-- new ArgumentCountError (line 538)
-- new ArgumentCountError (line 557)
-- new Variable (line 571)
-- new Variable (line 591)
-- new ArgumentCountError (line 655)
-- new Variable (line 684)
-- new Variable (line 705)
-- new Variable (line 709)
-- new ArgumentCountError (line 732)
+- new ArgumentCountError (line 438)
+- new ArgumentCountError (line 465)
+- new ArgumentCountError (line 492)
+- new ArgumentCountError (line 516)
+- new ArgumentCountError (line 545)
+- new ArgumentCountError (line 564)
+- new Variable (line 578)
+- new Variable (line 598)
+- new ArgumentCountError (line 642)
+- new ArgumentCountError (line 669)
+- new Variable (line 698)
+- new Variable (line 719)
+- new Variable (line 723)
+- new ArgumentCountError (line 746)
 - 34 class method(s)
 
 ### `ext/spl/SplFixedArraySerializeSupport.php`
@@ -23482,8 +23516,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1770)
-- new Error (line 1781)
+- new Error (line 1771)
+- new Error (line 1782)
 - 219 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
