@@ -35,6 +35,8 @@ class Module extends ModuleAbstract
             new xmlwriter_end_element(),
             new xmlwriter_full_end_element(),
             new xmlwriter_write_attribute(),
+            new xmlwriter_start_attribute(),
+            new xmlwriter_end_attribute(),
             new xmlwriter_write_element(),
             new xmlwriter_write_cdata(),
             new xmlwriter_write_comment(),

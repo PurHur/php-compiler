@@ -126,6 +126,32 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, (bool) $ok);
     }
 
+    public static function tryStartAttribute(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1])) {
+            return null;
+        }
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
+        if (null === $name || str_starts_with($name, '__phpc_xw_')) {
+            return null;
+        }
+        $ok = $writer->startAttribute($name);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryEndAttribute(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer) {
+            return null;
+        }
+        $ok = $writer->endAttribute();
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
     public static function tryText(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);
@@ -231,6 +257,8 @@ final class JitXmlWriterUserScript
             'xmlwriter_end_element' => self::tryEndElement($context, ...$args),
             'xmlwriter_full_end_element' => self::tryFullEndElement($context, ...$args),
             'xmlwriter_write_attribute' => self::tryWriteAttribute($context, ...$args),
+            'xmlwriter_start_attribute' => self::tryStartAttribute($context, ...$args),
+            'xmlwriter_end_attribute' => self::tryEndAttribute($context, ...$args),
             'xmlwriter_write_element' => self::tryProceduralWriteElement($context, ...$args),
             'xmlwriter_write_cdata' => self::tryProceduralWriteCData($context, ...$args),
             'xmlwriter_write_comment' => self::tryProceduralWriteComment($context, ...$args),
