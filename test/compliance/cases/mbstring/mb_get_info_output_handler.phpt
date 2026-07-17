@@ -12,21 +12,18 @@ echo $all['mail_charset'], "\n";
 echo $all['mail_header_encoding'], "\n";
 echo $all['strict_detection'], "\n";
 echo $all['encoding_translation'], "\n";
-var_export(mb_get_info('http_input'));
-echo "\n";
-var_export(mb_get_info('func_overload'));
-echo "\n";
-var_export(mb_get_info('no_such_type'));
-echo "\n";
+echo (null === mb_get_info('http_input') ? 'NULL' : 'other'), "\n";
+echo (false === mb_get_info('func_overload') ? 'false' : 'other'), "\n";
+echo (false === mb_get_info('no_such_type') ? 'false' : 'other'), "\n";
 echo mb_get_info('http_output_conv_mimetypes'), "\n";
 
 mb_internal_encoding('UTF-8');
 mb_http_output('ISO-8859-1');
-$flags = PHP_OUTPUT_HANDLER_START | PHP_OUTPUT_HANDLER_END;
-$converted = mb_output_handler("caf\xC3\xA9", $flags);
+// Literal 9 === PHP_OUTPUT_HANDLER_START|END for thin AOT fold (#20014).
+$converted = mb_output_handler("caf\xC3\xA9", 9);
 echo bin2hex($converted), "\n";
 mb_http_output('pass');
-$pass = mb_output_handler("caf\xC3\xA9", $flags);
+$pass = mb_output_handler("caf\xC3\xA9", 9);
 echo bin2hex($pass), "\n";
 
 // Callable as OB handler (CLI often skips mime-gated conversion; identity is OK).

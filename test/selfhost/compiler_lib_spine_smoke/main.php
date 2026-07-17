@@ -778,6 +778,7 @@ require_once __DIR__.'/../../../ext/mbstring/MbStrcutJitHelper.php';
 require_once __DIR__.'/../../../ext/mbstring/MbStrwidthJitHelper.php';
 require_once __DIR__.'/../../../ext/mbstring/MbstringConstants.php';
 require_once __DIR__.'/../../../ext/mbstring/MbstringEncodingRegistry.php';
+require_once __DIR__.'/../../../ext/mbstring/MbstringAotFoldState.php';
 require_once __DIR__.'/../../../ext/mbstring/MbstringLanguageRegistry.php';
 require_once __DIR__.'/../../../ext/mbstring/MbstringMailProfile.php';
 require_once __DIR__.'/../../../ext/mbstring/MbstringState.php';
