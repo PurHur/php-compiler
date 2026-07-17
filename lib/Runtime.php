@@ -278,6 +278,7 @@ class Runtime {
         $this->load(new ext\sysvshm\Module);
         $this->load(new ext\sysvsem\Module);
         $this->load(new ext\sysvmsg\Module);
+        $this->load(new ext\reflection\Module);
         $this->load(new ext\standard\Module);
     }
 
