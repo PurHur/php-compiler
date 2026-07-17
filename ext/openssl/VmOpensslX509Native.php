@@ -242,6 +242,16 @@ final class VmOpensslX509Native
      */
     public static function normalizeCertificatePem(string $pem): string|false
     {
+        return self::exportCertificatePem($pem, true);
+    }
+
+    /**
+     * openssl_x509_export() body — optional X509_print text + PEM (php-src ext/openssl/openssl.c; #20273).
+     *
+     * @param bool $noText when false, prepend human-readable X509_print() dump before PEM
+     */
+    public static function exportCertificatePem(string $pem, bool $noText = true): string|false
+    {
         $ffi = self::ffi();
         if (null === $ffi) {
             return false;
@@ -264,6 +274,10 @@ final class VmOpensslX509Native
 
             $outBio = $ffi->BIO_new($ffi->BIO_s_mem());
             if (null === $outBio) {
+                return false;
+            }
+
+            if (!$noText && 1 !== (int) $ffi->X509_print($outBio, $x509)) {
                 return false;
             }
 
@@ -331,6 +345,7 @@ const BIO_METHOD *BIO_s_mem(void);
 void BIO_free(BIO *a);
 X509 *PEM_read_bio_X509(BIO *bp, X509 **x, void *cb, void *u);
 int PEM_write_bio_X509(BIO *bp, const X509 *x);
+int X509_print(BIO *bp, X509 *x);
 size_t BIO_ctrl_pending(BIO *b);
 int BIO_read(BIO *b, void *data, int dlen);
 void X509_free(X509 *a);

@@ -968,6 +968,8 @@ require_once __DIR__.'/../../../ext/openssl/openssl_spki_export_challenge.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_spki_new.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_spki_verify.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_verify.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_x509_export.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_x509_export_to_file.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_x509_fingerprint.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_x509_parse.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_x509_read.php';
