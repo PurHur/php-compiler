@@ -8,6 +8,8 @@ use PHPCompiler\JIT\Builtin\StringStrContains;
 use PHPCompiler\JIT\Builtin\StringUtf8Runtime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -48,6 +50,33 @@ final class JitGrapheme
         }
 
         return $context->constantFromInteger($result, 'int64');
+    }
+
+    /**
+     * @param JITVariable[] $args
+     */
+    public static function tryStrSplitFold(Context $context, array $args): ?Value
+    {
+        $string = self::compileTimeString($args, 0);
+        if (null === $string) {
+            return null;
+        }
+        $length = 1;
+        if (isset($args[1])) {
+            $lengthCt = self::compileTimeInt($args, 1);
+            if (null === $lengthCt) {
+                return null;
+            }
+            $length = $lengthCt;
+        }
+        $parts = VmGrapheme::strSplit($string, $length);
+        if (false === $parts) {
+            return $context->getTypeFromString('bool')->constInt(0, false);
+        }
+        $ht = self::hashTableFromStringList($parts);
+        $cacheKey = 'grapheme_str_split_'.md5($string."\0".$length);
+
+        return $context->constantArrayFromVmHashTable($cacheKey, $ht);
     }
 
     /**
@@ -272,5 +301,20 @@ final class JitGrapheme
         }
 
         return (bool) ($args[$index]->compileTimeBool ?? false);
+    }
+
+    /**
+     * @param list<string> $parts
+     */
+    private static function hashTableFromStringList(array $parts): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($parts as $part) {
+            $stored = new Variable();
+            $stored->string($part);
+            $ht->append($stored);
+        }
+
+        return $ht;
     }
 }
