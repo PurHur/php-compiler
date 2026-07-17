@@ -27,6 +27,9 @@ final class GeneratorState
     /** Zend zend_generators.c — foreach / iterator_count on closed generator (#5132, #17368). */
     public const CLOSED_TRAVERSE_ERROR = 'Cannot traverse an already closed generator';
 
+    /** Zend zend_generators.c — yield inside finally during forced close (#19905). */
+    public const FORCED_CLOSE_YIELD_ERROR = 'Cannot yield from finally in a force-closed generator';
+
     public bool $done = false;
 
     /** True after the generator body has been entered (Zend rewind guard, #5195). */
@@ -70,6 +73,13 @@ final class GeneratorState
 
     /** Foreach iteration must observe yielded values before a trailing throw (#13366). */
     public bool $foreachAdvance = false;
+
+    /**
+     * True while running finally during early close (Zend ZEND_GENERATOR_FORCED_CLOSE, #19905).
+     *
+     * Yield inside finally while this flag is set must Error like php-src.
+     */
+    public bool $forcedClose = false;
 
     /** Closure binding when this generator was created from a closure (#6567). */
     public ?ClosureState $closureCall = null;
@@ -190,5 +200,6 @@ final class GeneratorState
         $this->pendingSend->null();
         $this->hasPendingThrow = false;
         $this->pendingThrow->null();
+        $this->forcedClose = false;
     }
 }

@@ -12834,6 +12834,95 @@ restart:
         return $this->advanceGeneratorIteration($gen);
     }
 
+    /**
+     * Close a started generator and run pending finally (Zend zend_generator_dtor_storage, #19905).
+     *
+     * Called from object release / unset / GC when the Generator instance is destroyed.
+     * Foreach `break` alone does not close — only destroying the generator object does.
+     *
+     * @see https://github.com/php/php-src/blob/master/Zend/zend_generators.c zend_generator_dtor_storage
+     */
+    public function closeGenerator(GeneratorState $gen): void
+    {
+        if ($gen->done || $gen->forcedClose) {
+            return;
+        }
+        $gen->forcedClose = true;
+        try {
+            if ($gen->started && null !== $gen->frame) {
+                $this->resumeGeneratorFinallyOnForcedClose($gen);
+            }
+        } finally {
+            if (!$gen->done) {
+                $gen->markClosedWithoutReturn();
+            }
+        }
+    }
+
+    /**
+     * Jump suspended generator into innermost pending finally and resume (php-src dtor_storage).
+     */
+    private function resumeGeneratorFinallyOnForcedClose(GeneratorState $gen): void
+    {
+        $suspended = $gen->frame;
+        if (null === $suspended) {
+            return;
+        }
+        if ($this->frameIsInFinallyBody($suspended)) {
+            return;
+        }
+
+        for ($handler = $suspended; null !== $handler; $handler = $handler->parent) {
+            if ($handler->generatorState !== $gen && $this->findGeneratorState($handler) !== $gen) {
+                break;
+            }
+            if (!$this->hasPendingFinally($handler)) {
+                continue;
+            }
+            $finallyOp = $this->findFinallyOpForHandler($handler);
+            if (null === $finallyOp || null === $finallyOp->block1) {
+                continue;
+            }
+            if (!$this->generatorSuspendedInsideTryBody($handler, $suspended)) {
+                continue;
+            }
+
+            $this->context->completedFinallyHandlers[spl_object_id($handler)] = true;
+            $finallyFrame = $finallyOp->block1->getFrame($this->context, $handler);
+            $finallyFrame->generatorState = $gen;
+            $gen->frame = $finallyFrame;
+            $gen->clearCurrentValue();
+
+            if ($this->advanceGeneratorIteration($gen)) {
+                // Yield during forced-close finally — Zend Error (zend_generators.c).
+                throw new \Error(GeneratorState::FORCED_CLOSE_YIELD_ERROR);
+            }
+
+            return;
+        }
+    }
+
+    /** True when the suspended frame is still inside this handler's try body (before finally). */
+    private function generatorSuspendedInsideTryBody(Frame $handler, Frame $suspended): bool
+    {
+        $tryOp = null;
+        foreach ($handler->block->opCodes as $op) {
+            if (OpCode::TYPE_TRY === $op->type) {
+                $tryOp = $op;
+                break;
+            }
+        }
+        if (null === $tryOp || null === $tryOp->block1) {
+            return false;
+        }
+        $tryBody = $tryOp->block1;
+        if ($suspended->block === $tryBody) {
+            return true;
+        }
+
+        return VM\GeneratorJitHelper::cfgBlockContains($tryBody, $suspended->block);
+    }
+
     private function applyGeneratorPendingSend(GeneratorState $gen): void
     {
         if (!$gen->hasPendingSend || null === $gen->frame || null === $gen->yieldResultSlot) {
@@ -17061,10 +17150,18 @@ restart:
 
     /**
      * Invoke user __destruct() once (Zend zend_objects_destroy_object; #3144).
+     *
+     * Generators run pending finally via {@see closeGenerator()} (zend_generator_dtor_storage, #19905).
      */
     public function invokeUserDestructor(ObjectEntry $object): void
     {
         if ($object->destructorInvoked) {
+            return;
+        }
+        if (null !== $object->generatorState) {
+            $object->destructorInvoked = true;
+            $this->closeGenerator($object->generatorState);
+
             return;
         }
         $destructor = $object->class->destructor;
