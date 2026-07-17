@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5289 |
-| Phase A inventory files (M2 ratio SSOT) | 5289 |
+| PHP files on vm.php path | 5290 |
+| Phase A inventory files (M2 ratio SSOT) | 5290 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14683 |
+| Source constructs flagged (warnings) | 14684 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1871,6 +1871,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitTmpfile.php` | 0 | 1 |
 | `ext/standard/JitTouch.php` | 0 | 1 |
 | `ext/standard/JitTraitExists.php` | 0 | 1 |
+| `ext/standard/JitTriggerErrorKernel.php` | 0 | 3 |
 | `ext/standard/JitUmask.php` | 0 | 1 |
 | `ext/standard/JitUnitEnumExists.php` | 0 | 1 |
 | `ext/standard/JitUnlink.php` | 0 | 1 |
@@ -4206,7 +4207,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringTempnam.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringTraitExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringTriggerError.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringTriggerErrorJit.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringTriggerErrorJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringTrimMask.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringTrimModeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUcwords.php` | 0 | 3 |
@@ -17675,6 +17676,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/standard/JitTriggerErrorKernel.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 459)
+- 16 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/JitUmask.php`
 
@@ -33459,9 +33467,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringTriggerErrorJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 453)
-- 16 class method(s)
-- 1 closure(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StringTrimMask.php`
 

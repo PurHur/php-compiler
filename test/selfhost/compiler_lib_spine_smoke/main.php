@@ -1936,6 +1936,7 @@ require_once __DIR__.'/../../../ext/standard/JitTimezoneTransitionsGet.php';
 require_once __DIR__.'/../../../ext/standard/JitTmpfile.php';
 require_once __DIR__.'/../../../ext/standard/JitTouch.php';
 require_once __DIR__.'/../../../ext/standard/JitTraitExists.php';
+require_once __DIR__.'/../../../ext/standard/JitTriggerErrorKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitUmask.php';
 require_once __DIR__.'/../../../ext/standard/JitUnitEnumExists.php';
 require_once __DIR__.'/../../../ext/standard/JitUnlink.php';
