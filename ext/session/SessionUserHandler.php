@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\session;
 
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\VM\Variable;
@@ -220,6 +221,19 @@ final class SessionUserHandler
         }
 
         return $var->toObject();
+    }
+
+    public static function assertSessionHandlerInterface(
+        Context $context,
+        ObjectEntry $handler,
+        string $function
+    ): void {
+        if (!InterfaceCheck::entryImplements($handler->class, 'sessionhandlerinterface', $context)) {
+            throw new \TypeError(
+                $function.'(): Argument #1 ($open) must be of type SessionHandlerInterface, '
+                .$handler->class->name.' given'
+            );
+        }
     }
 
     public static function assertHandlerMethods(VM $vm, ObjectEntry $handler, string $function): void

@@ -4,7 +4,7 @@ session session_set_save_handler() / session_register_shutdown() — custom obje
 <?php
 declare(strict_types=1);
 
-class TestSessionHandler {
+class TestSessionHandler implements SessionHandlerInterface, SessionIdInterface {
     private static array $store = [];
 
     public function open(string $path, string $name): bool
