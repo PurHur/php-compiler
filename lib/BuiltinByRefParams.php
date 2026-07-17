@@ -149,6 +149,9 @@ final class BuiltinByRefParams
             case 'sqlite3stmt::bindparam':
                 // $this + $param + &$var (+ optional $type) — php-src sqlite3.stub.php (#19854)
                 return [2];
+            case 'pdostatement::bindparam':
+                // $this + $param + &$var (+ optional $type/$maxLength/…) — php-src pdo.stub.php (#19853)
+                return [2];
             case 'msg_send':
                 // php-src ext/sysvmsg/sysvmsg.stub.php — &$error_code (#3666)
                 return [5];

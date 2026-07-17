@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5299 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14735 |
+| Source constructs flagged (warnings) | 14750 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -869,7 +869,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
 | `ext/pdo/VmPDO.php` | 0 | 39 |
-| `ext/pdo/VmPDOStatement.php` | 0 | 22 |
+| `ext/pdo/VmPDOStatement.php` | 0 | 37 |
 | `ext/phar/BuiltinClasses.php` | 0 | 3 |
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 9 |
@@ -11268,21 +11268,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new PDOStatementFetchColumn (line 50)
 - new PDOStatementFetchObject (line 51)
 - new PDOStatementBindValue (line 52)
-- new PDOStatementRowCount (line 53)
-- new PDOStatementColumnCount (line 54)
-- new PDOStatementCloseCursor (line 55)
-- new PDOStatementRewind (line 56)
-- new PDOStatementValid (line 57)
-- new PDOStatementCurrent (line 58)
-- new PDOStatementKey (line 59)
-- new PDOStatementNext (line 60)
-- new ObjectEntry (line 85)
-- new PdoStatementState (line 86)
-- new HashTable (line 319)
-- new Variable (line 322)
-- new ArgumentCountError (line 344)
-- new ObjectEntry (line 427)
-- 20 class method(s)
+- new PDOStatementBindParam (line 53)
+- new PDOStatementRowCount (line 54)
+- new PDOStatementColumnCount (line 55)
+- new PDOStatementCloseCursor (line 56)
+- new PDOStatementSetFetchMode (line 57)
+- new PDOStatementErrorCode (line 58)
+- new PDOStatementErrorInfo (line 59)
+- new PDOStatementGetColumnMeta (line 60)
+- new PDOStatementRewind (line 61)
+- new PDOStatementValid (line 62)
+- new PDOStatementCurrent (line 63)
+- new PDOStatementKey (line 64)
+- new PDOStatementNext (line 65)
+- new ObjectEntry (line 95)
+- new PdoStatementState (line 96)
+- new HashTable (line 464)
+- new Variable (line 467)
+- new ArgumentCountError (line 489)
+- new ArgumentCountError (line 529)
+- new ObjectEntry (line 624)
+- new ArgumentCountError (line 805)
+- new HashTable (line 847)
+- new Variable (line 848)
+- new Variable (line 851)
+- new Variable (line 858)
+- new ArgumentCountError (line 881)
+- new HashTable (line 894)
+- new Variable (line 896)
+- new HashTable (line 898)
+- 31 class method(s)
 
 ### `ext/phar/BuiltinClasses.php`
 
@@ -14015,7 +14030,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SQLite3Exception (line 92)
 - new SQLite3Exception (line 139)
 - new SQLite3Exception (line 183)
-- 31 class method(s)
+- 32 class method(s)
 
 ### `ext/standard/AbsJitHelper.php`
 

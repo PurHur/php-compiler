@@ -50,9 +50,14 @@ final class VmPDOStatement
             'fetchcolumn' => new PDOStatementFetchColumn(),
             'fetchobject' => new PDOStatementFetchObject(),
             'bindvalue' => new PDOStatementBindValue(),
+            'bindparam' => new PDOStatementBindParam(),
             'rowcount' => new PDOStatementRowCount(),
             'columncount' => new PDOStatementColumnCount(),
             'closecursor' => new PDOStatementCloseCursor(),
+            'setfetchmode' => new PDOStatementSetFetchMode(),
+            'errorcode' => new PDOStatementErrorCode(),
+            'errorinfo' => new PDOStatementErrorInfo(),
+            'getcolumnmeta' => new PDOStatementGetColumnMeta(),
             'rewind' => new PDOStatementRewind(),
             'valid' => new PDOStatementValid(),
             'current' => new PDOStatementCurrent(),
@@ -66,9 +71,14 @@ final class VmPDOStatement
         $entry->methodNames['fetchcolumn'] = 'fetchColumn';
         $entry->methodNames['fetchobject'] = 'fetchObject';
         $entry->methodNames['bindvalue'] = 'bindValue';
+        $entry->methodNames['bindparam'] = 'bindParam';
         $entry->methodNames['rowcount'] = 'rowCount';
         $entry->methodNames['columncount'] = 'columnCount';
         $entry->methodNames['closecursor'] = 'closeCursor';
+        $entry->methodNames['setfetchmode'] = 'setFetchMode';
+        $entry->methodNames['errorcode'] = 'errorCode';
+        $entry->methodNames['errorinfo'] = 'errorInfo';
+        $entry->methodNames['getcolumnmeta'] = 'getColumnMeta';
 
         self::$classEntry = $entry;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -163,6 +173,134 @@ final class VmPDOStatement
 
         return $row;
     }
+
+    public static function clearError(PdoStatementState $st): void
+    {
+        $st->errorCode = '00000';
+        $st->errorDriverCode = null;
+        $st->errorMessage = null;
+    }
+
+    public static function setError(PdoStatementState $st, string $sqlState, ?int $driverCode, ?string $message): void
+    {
+        $st->errorCode = $sqlState;
+        $st->errorDriverCode = $driverCode;
+        $st->errorMessage = $message;
+    }
+
+    /**
+     * Resolve 1-based bind index from int or named placeholder.
+     *
+     * @param \FFI\CData $stmt
+     */
+    public static function resolveParamIndex($stmt, Variable $paramVar, string $label): ?int
+    {
+        $resolved = $paramVar->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            $n = $resolved->toInt();
+
+            return $n >= 1 ? $n : null;
+        }
+        if (Variable::TYPE_STRING === $resolved->type) {
+            $name = $resolved->toString();
+            if ('' === $name) {
+                return null;
+            }
+            if (':' !== $name[0] && '@' !== $name[0]) {
+                $name = ':'.$name;
+            }
+            $idx = VmSqlite3Native::bindParameterIndex($stmt, $name);
+
+            return $idx >= 1 ? $idx : null;
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type) {
+            $n = (int) $resolved->toFloat();
+
+            return $n >= 1 ? $n : null;
+        }
+        if (Variable::TYPE_BOOLEAN === $resolved->type) {
+            $n = $resolved->toBool() ? 1 : 0;
+
+            return $n >= 1 ? $n : null;
+        }
+
+        throw new \TypeError(
+            \sprintf('%s(): Argument #1 ($param) must be of type string|int', $label)
+        );
+    }
+
+    /**
+     * Apply stored binds (1-based) to the native statement.
+     *
+     * @param \FFI\CData $stmt
+     */
+    public static function applyBindings(PdoStatementState $st, $stmt): void
+    {
+        foreach ($st->bound as $index => $entry) {
+            if ('param' === $entry['kind']) {
+                $value = VmPDO::phpValueFromVariable($entry['var']);
+            } else {
+                $value = $entry['value'];
+            }
+            VmSqlite3Native::bindValue($stmt, (int) $index, $value);
+        }
+    }
+
+    /**
+     * Map sqlite affinity / runtime type to PDO getColumnMeta shape (pdo_sqlite_stmt_col_meta).
+     *
+     * @return array<string, mixed>|false
+     */
+    public static function columnMeta(PdoStatementState $st, int $column): array|false
+    {
+        if (null === $st->stmt || $column < 0) {
+            return false;
+        }
+        $count = VmSqlite3Native::columnCount($st->stmt);
+        if ($column >= $count) {
+            return false;
+        }
+        $name = VmSqlite3Native::columnName($st->stmt, $column);
+        $decl = VmSqlite3Native::columnDecltype($st->stmt, $column);
+        $native = self::nativeTypeFromDecl($decl);
+        $pdoType = match ($native) {
+            'integer' => PdoConstants::PARAM_INT,
+            'null' => PdoConstants::PARAM_NULL,
+            default => PdoConstants::PARAM_STR,
+        };
+
+        return [
+            'native_type' => $native,
+            'sqlite:decl_type' => $decl,
+            'flags' => [],
+            'name' => $name,
+            'len' => -1,
+            'precision' => 0,
+            'pdo_type' => $pdoType,
+        ];
+    }
+
+    private static function nativeTypeFromDecl(string $decl): string
+    {
+        $upper = strtoupper($decl);
+        if ('' === $upper) {
+            return 'null';
+        }
+        if (str_contains($upper, 'INT')) {
+            return 'integer';
+        }
+        if (str_contains($upper, 'CHAR') || str_contains($upper, 'CLOB') || str_contains($upper, 'TEXT')) {
+            return 'string';
+        }
+        if (str_contains($upper, 'BLOB') || '' === $decl) {
+            return 'blob';
+        }
+        if (str_contains($upper, 'REAL') || str_contains($upper, 'FLOA') || str_contains($upper, 'DOUB')) {
+            return 'double';
+        }
+
+        return 'string';
+    }
 }
 
 /** @internal */
@@ -189,8 +327,18 @@ final class PdoStatementState
     /** @var array<string|int, mixed>|null */
     public ?array $current = null;
 
-    /** @var list<mixed> */
+    /**
+     * 1-based param index => bind entry (php-src bound_params; #19853 bindParam).
+     *
+     * @var array<int, array{kind: 'value', value: mixed}|array{kind: 'param', var: Variable}>
+     */
     public array $bound = [];
+
+    public string $errorCode = '00000';
+
+    public ?int $errorDriverCode = null;
+
+    public ?string $errorMessage = null;
 }
 
 final class PDOStatementExecute extends PdoClassMethod
@@ -219,28 +367,22 @@ final class PDOStatementExecute extends PdoClassMethod
         try {
             VmSqlite3Native::reset($st->stmt);
             VmSqlite3Native::clearBindings($st->stmt);
-            $params = [];
             if (\count($frame->calledArgs) >= 2) {
                 $arg = $frame->calledArgs[1]->resolveIndirect();
                 if (Variable::TYPE_ARRAY === $arg->type) {
+                    $i = 1;
                     foreach ($arg->toArray()->iterate() as $slot) {
-                        $params[] = VmPDO::phpValueFromVariable($slot);
+                        VmSqlite3Native::bindValue($st->stmt, $i, VmPDO::phpValueFromVariable($slot));
+                        ++$i;
                     }
                 }
             }
-            foreach ($st->bound as $index => $value) {
-                $params[$index] = $value;
-            }
-            $i = 1;
-            foreach ($params as $value) {
-                VmSqlite3Native::bindValue($st->stmt, $i, $value);
-                ++$i;
-            }
+            VmPDOStatement::applyBindings($st, $st->stmt);
             $rc = VmSqlite3Native::step($st->stmt);
             if (VmSqlite3Native::STEP_ROW !== $rc && VmSqlite3Native::STEP_DONE !== $rc) {
                 $pdoState = VmPDO::stateById($st->pdoId);
                 $msg = 'SQL execution failed';
-                // Prefer DB errmsg when available via parent.
+                VmPDOStatement::setError($st, 'HY000', null, $msg);
                 VmPDO::raise($pdoState, $msg);
                 if (null !== $frame->returnVar) {
                     $frame->returnVar->bool(false);
@@ -259,8 +401,11 @@ final class PDOStatementExecute extends PdoClassMethod
             $st->exhausted = false;
             $st->key = -1;
             $st->current = null;
+            VmPDOStatement::clearError($st);
+            VmPDO::clearError($pdoState);
         } catch (\SQLite3Exception $e) {
-            VmPDO::raise($pdoState, $e->getMessage());
+            VmPDOStatement::setError($st, 'HY000', (int) $e->getCode(), $e->getMessage());
+            VmPDO::raise($pdoState, $e->getMessage(), 'HY000', (int) $e->getCode());
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(false);
             }
@@ -346,10 +491,62 @@ final class PDOStatementBindValue extends PdoClassMethod
             );
         }
         $st = VmPDOStatement::state($receiver);
-        $param = $this->intArg($frame->calledArgs[1], 'PDOStatement::bindValue', 0, 'param');
+        if (null === $st->stmt) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        $param = VmPDOStatement::resolveParamIndex($st->stmt, $frame->calledArgs[1], 'PDOStatement::bindValue');
+        if (null === $param) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
         $value = VmPDO::phpValueFromVariable($frame->calledArgs[2]);
-        // 1-based param index → 0-based sparse list storage offset param-1
-        $st->bound[$param - 1] = $value;
+        $st->bound[$param] = ['kind' => 'value', 'value' => $value];
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+}
+
+/** PDOStatement::bindParam — keep Variable slot for live execute (#19853). */
+final class PDOStatementBindParam extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('bindParam');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::bindParam()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'PDOStatement::bindParam() expects at least 2 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $st = VmPDOStatement::state($receiver);
+        if (null === $st->stmt) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        $param = VmPDOStatement::resolveParamIndex($st->stmt, $frame->calledArgs[1], 'PDOStatement::bindParam');
+        if (null === $param) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        $st->bound[$param] = ['kind' => 'param', 'var' => $frame->calledArgs[2]];
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
@@ -590,5 +787,120 @@ final class PDOStatementNext extends PdoClassMethod
         $receiver = $this->receiver($frame, 'PDOStatement::next()');
         $st = VmPDOStatement::state($receiver);
         VmPDOStatement::fetchRow($st, PdoConstants::FETCH_ASSOC);
+    }
+}
+
+/** PDOStatement::setFetchMode(int $mode): bool — php-src zim_PDOStatement_setFetchMode (#19853). */
+final class PDOStatementSetFetchMode extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setFetchMode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::setFetchMode()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('PDOStatement::setFetchMode() expects at least 1 argument, 0 given');
+        }
+        $st = VmPDOStatement::state($receiver);
+        $st->fetchMode = $this->intArg($frame->calledArgs[1], 'PDOStatement::setFetchMode', 0, 'mode');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+}
+
+/** PDOStatement::errorCode(): ?string — php-src zim_PDOStatement_errorCode (#19853). */
+final class PDOStatementErrorCode extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('errorCode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::errorCode()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmPDOStatement::state($receiver)->errorCode);
+        }
+    }
+}
+
+/** PDOStatement::errorInfo(): array — php-src zim_PDOStatement_errorInfo (#19853). */
+final class PDOStatementErrorInfo extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('errorInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::errorInfo()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $st = VmPDOStatement::state($receiver);
+        $ht = new HashTable();
+        $c0 = new Variable();
+        $c0->string($st->errorCode);
+        $ht->add('0', $c0);
+        $c1 = new Variable();
+        if (null === $st->errorDriverCode) {
+            $c1->null();
+        } else {
+            $c1->int($st->errorDriverCode);
+        }
+        $ht->add('1', $c1);
+        $c2 = new Variable();
+        if (null === $st->errorMessage) {
+            $c2->null();
+        } else {
+            $c2->string($st->errorMessage);
+        }
+        $ht->add('2', $c2);
+        $frame->returnVar->array($ht);
+    }
+}
+
+/** PDOStatement::getColumnMeta(int $column): array|false — php-src zim_PDOStatement_getColumnMeta (#19853). */
+final class PDOStatementGetColumnMeta extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getColumnMeta');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::getColumnMeta()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('PDOStatement::getColumnMeta() expects exactly 1 argument, 0 given');
+        }
+        $column = $this->intArg($frame->calledArgs[1], 'PDOStatement::getColumnMeta', 0, 'column');
+        $st = VmPDOStatement::state($receiver);
+        $meta = VmPDOStatement::columnMeta($st, $column);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $meta) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($meta as $key => $value) {
+            $slot = new Variable();
+            if (\is_array($value)) {
+                $slot->array(new HashTable());
+            } else {
+                VmPDO::assignScalar($slot, $value);
+            }
+            $ht->add((string) $key, $slot);
+        }
+        $frame->returnVar->array($ht);
     }
 }

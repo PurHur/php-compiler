@@ -206,4 +206,11 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([1], BuiltinByRefParams::forFunction('pcntl_sigtimedwait'));
         $this->assertSame([2], BuiltinByRefParams::forFunction('pcntl_waitid'));
     }
+
+    public function testPdoStatementBindParam(): void
+    {
+        $this->assertSame([2], BuiltinByRefParams::forFunction('PDOStatement::bindParam'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('pdostatement::bindparam'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('SQLite3Stmt::bindParam'));
+    }
 }

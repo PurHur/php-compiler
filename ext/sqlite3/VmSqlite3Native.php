@@ -301,6 +301,14 @@ final class VmSqlite3Native
         return (int) self::requireFfi()->sqlite3_data_count($stmt);
     }
 
+    /** Declared column type from CREATE TABLE, or '' when unknown (sqlite3_column_decltype). */
+    public static function columnDecltype(\FFI\CData $stmt, int $index): string
+    {
+        $name = self::requireFfi()->sqlite3_column_decltype($stmt, $index);
+
+        return null === $name ? '' : self::ffiString($name);
+    }
+
     public const STEP_ROW = 100;
 
     public const STEP_DONE = 101;
@@ -412,6 +420,7 @@ const char *sqlite3_sql(sqlite3_stmt *pStmt);
 char *sqlite3_expanded_sql(sqlite3_stmt *pStmt);
 int sqlite3_stmt_readonly(sqlite3_stmt *pStmt);
 int sqlite3_data_count(sqlite3_stmt *pStmt);
+const char *sqlite3_column_decltype(sqlite3_stmt *pStmt, int N);
 CDEF;
 
         foreach (['libsqlite3.so.0', 'libsqlite3.so'] as $lib) {
