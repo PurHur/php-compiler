@@ -10,21 +10,52 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** SessionStorageRuntime embed + standalone route through SessionStorageJitHelper PHP (#9495, #12938). */
+/**
+ * SessionStorage NestedJIT ABI bridges quarantined in ext/standard (#9495, #19882).
+ */
 final class SessionStorageRuntimeShrinkTest extends TestCase
 {
-    public function testSessionStorageRuntimeUsesJitHelperNotStandaloneLlvm(): void
+    public function testBuiltinSessionStorageRuntimeIsThinOrchestrator(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionStorageRuntime.php');
-        $this->assertStringContainsString('SessionStorageJitHelper', $source);
-        $this->assertStringNotContainsString('SessionStorageStandaloneLlvm', $source);
-        $this->assertStringNotContainsString('emitLoadFromDisk', $source);
-        $this->assertStringNotContainsString('emitSaveToDisk', $source);
-        $this->assertStringNotContainsString('emitMergeHashtable', $source);
-        $this->assertStringNotContainsString('buildStoragePathCstr', $source);
-        $this->assertLessThan(520, \substr_count($source, "\n") + 1);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitSessionStorageKernel.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/SessionStorageRuntime.php');
 
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/SessionStorageStandaloneLlvm.php');
+        $orchestrator = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionStorageRuntime.php');
+        $this->assertStringContainsString('JitSessionStorageKernel', $orchestrator);
+        $this->assertStringContainsString('JitSessionStorageKernel::ensureLinked', $orchestrator);
+        $this->assertStringContainsString('JitSessionStorageKernel::ensureStandaloneBodies', $orchestrator);
+        $this->assertStringContainsString('JitSessionStorageKernel::implement', $orchestrator);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $orchestrator);
+        $this->assertStringNotContainsString('ensureJitHelperCompiled', $orchestrator);
+        $this->assertStringNotContainsString('implementLoadBridge', $orchestrator);
+        $this->assertStringNotContainsString('phpc_session_load_from_disk', $orchestrator);
+        $this->assertStringNotContainsString('SessionStorageStandaloneLlvm', $orchestrator);
+        $this->assertLessThan(50, \substr_count($orchestrator, "\n") + 1);
+    }
+
+    public function testKernelPresent(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSessionStorageKernel.php');
+        $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
+        $this->assertStringContainsString('final class JitSessionStorageKernel', $source);
+        $this->assertStringContainsString('phpc_session_load_from_disk', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertStringContainsString('SessionStorageJitHelper', $source);
+        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
+        $this->assertLessThan(550, \substr_count($source, "\n") + 1);
+    }
+
+    public function testSpineBundleIncludesKernelAndOrchestrator(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitSessionStorageKernel.php', $spine);
+        $this->assertStringContainsString('SessionStorageRuntime.php', $spine);
+        $kernelPos = strpos($spine, 'JitSessionStorageKernel.php');
+        $orchPos = strpos($spine, 'lib/JIT/Builtin/SessionStorageRuntime.php');
+        $this->assertNotFalse($kernelPos);
+        $this->assertNotFalse($orchPos);
+        $this->assertLessThan($orchPos, $kernelPos, 'kernel must load before thin orchestrator');
     }
 
     public function testSessionStorageJitHelperRoundTrip(): void
