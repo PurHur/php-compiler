@@ -826,6 +826,8 @@ class Module extends ModuleAbstract
             new deflate_add(),
             new inflate_init(),
             new inflate_add(),
+            new inflate_get_status(),
+            new inflate_get_read_len(),
             new zlib_get_coding_type(),
             new fnmatch(),
             new time(),

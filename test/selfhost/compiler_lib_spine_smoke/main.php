@@ -2919,6 +2919,8 @@ require_once __DIR__.'/../../../ext/standard/in_array.php';
 require_once __DIR__.'/../../../ext/standard/inet_ntop.php';
 require_once __DIR__.'/../../../ext/standard/inet_pton.php';
 require_once __DIR__.'/../../../ext/standard/inflate_add.php';
+require_once __DIR__.'/../../../ext/standard/inflate_get_read_len.php';
+require_once __DIR__.'/../../../ext/standard/inflate_get_status.php';
 require_once __DIR__.'/../../../ext/standard/inflate_init.php';
 require_once __DIR__.'/../../../ext/standard/ini_get_.php';
 require_once __DIR__.'/../../../ext/standard/ini_get_all.php';
