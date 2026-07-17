@@ -2376,6 +2376,27 @@ class VM {
     }
 
     /**
+     * Zend object handler clone_obj — copy extension-owned storage after shallow property clone
+     * (#19803 ArrayObject, #19805 SplObjectStorage). Walks parentLc for subclass handlers.
+     */
+    protected function invokeCloneObjectHandler(ObjectEntry $src, ObjectEntry $dest): void
+    {
+        $class = $src->class;
+        while (null !== $class) {
+            if (null !== $class->cloneObjectHandler) {
+                ($class->cloneObjectHandler)($src, $dest);
+
+                return;
+            }
+            $parentLc = $class->parentLc;
+            if (null === $parentLc || !isset($this->context->classes[$parentLc])) {
+                return;
+            }
+            $class = $this->context->classes[$parentLc];
+        }
+    }
+
+    /**
      * Zend zend_std_clone_object: shallow copy then user __clone() when defined (#3170).
      *
      * Must run on an isolated run stack with parent frame linkage — nested runFrames() from
@@ -6941,6 +6962,7 @@ restart:
                         goto restart;
                     }
                     $cloned = $srcObject->cloneShallow();
+                    $this->invokeCloneObjectHandler($srcObject, $cloned);
                     $catchFrame = $this->invokeCloneMagicMethod($cloned, $frame);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
