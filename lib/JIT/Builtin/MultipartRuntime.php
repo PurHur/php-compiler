@@ -182,6 +182,8 @@ final class MultipartRuntime
             '#15624'
         );
         $context->registerFunction('strlen', $libcStrlen);
+        JitMultipartKernel::ensureLinked($context);
+        $context->registerFunction('strlen', $libcStrlen);
         self::implementLegacyIfNeeded($context);
         self::registerLinkedRuntime($context);
 
@@ -247,15 +249,14 @@ final class MultipartRuntime
         $files = $context->builder->load(
             $context->builder->pointerCast($filesGlobal, $htPtr->pointerType(0))
         );
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::POPULATE_POST_BODY_NATIVE, '#15624');
-        $contentTypeStr = self::cstrDirectToPhpcString($context, $contentTypeCstr);
-        $bodyStr = self::cstrDirectToPhpcString($context, $bodyCstr);
+        // General rfc1867 boundaries (phpcFileB, curl, etc.) — fixture helper is RPB-only (#19979).
+        JitMultipartKernel::ensureLinked($context);
         $context->builder->call(
-            $helperFn,
-            JitNestedHelperCoerce::ptrToI64($context, $post),
-            JitNestedHelperCoerce::ptrToI64($context, $files),
-            JitNestedHelperCoerce::coerceArgForHelper($context, $contentTypeStr, $helperFn->getParam(2)->typeOf()),
-            JitNestedHelperCoerce::coerceArgForHelper($context, $bodyStr, $helperFn->getParam(3)->typeOf())
+            $context->lookupFunction(JitMultipartKernel::PARSE_FUNCTION),
+            $post,
+            $files,
+            $contentTypeCstr,
+            $bodyCstr
         );
         $context->builder->returnVoid();
     }
