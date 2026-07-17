@@ -59,6 +59,7 @@ final class VmXml
         if (!isset(self::$parsers[$parser])) {
             return false;
         }
+        XmlParserHandlers::releaseParserPins($parser);
         unset(self::$parsers[$parser]);
 
         return true;

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xml;
 
+use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ObjectRegistry;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -23,6 +25,20 @@ final class XmlParserHandlers
     public const HANDLER_EXTERNAL_ENTITY = 'external_entity_ref';
     public const HANDLER_START_NS = 'start_namespace_decl';
     public const HANDLER_END_NS = 'end_namespace_decl';
+
+    /**
+     * Strong roots for Closure / invokable handlers (#19343).
+     *
+     * Inline call-arg Closures lose ClosureState when {@see \PHPCompiler\VM\ObjectLifetime::releaseDirectObject}
+     * + scope-slot null run after the set_* call returns (refcount skew vs stored Variable copies).
+     * Pin the ObjectEntry and stash ClosureState for reattach — same pattern as SplIteratorSupport (#6138).
+     *
+     * @var array<string, Variable>
+     */
+    private static array $handlerPins = [];
+
+    /** @var array<int, ClosureState> */
+    private static array $closureStatePins = [];
 
     /** @return array<string, mixed> */
     public static function defaultParserState(): array
@@ -64,6 +80,10 @@ final class XmlParserHandlers
         }
         if (null !== $handler && Variable::TYPE_STRING === $handler->type && '' === $handler->toString()) {
             $handler = null;
+        }
+        self::unpinHandlerSlot($parser->id, $slot);
+        if (null !== $handler) {
+            self::pinHandlerSlot($parser->id, $slot, $handler);
         }
         $state['handlers'][$slot] = $handler;
         VmXml::replaceParserState($parser->id, $state);
@@ -133,6 +153,31 @@ final class XmlParserHandlers
         return VmXml::parserState($parser->id);
     }
 
+    /** Drop SAX handler pins when the parser resource is freed (#19343). */
+    public static function releaseParserPins(int $parserId): void
+    {
+        $prefix = $parserId.':';
+        foreach (array_keys(self::$handlerPins) as $key) {
+            if (!str_starts_with($key, $prefix)) {
+                continue;
+            }
+            $slot = self::$handlerPins[$key];
+            $objectId = null;
+            $resolved = $slot->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $resolved->type) {
+                try {
+                    $objectId = $resolved->toObject()->id;
+                } catch (\LogicException) {
+                }
+            }
+            $slot->null();
+            unset(self::$handlerPins[$key]);
+            if (null !== $objectId) {
+                self::dropClosureStatePinIfUnused($objectId);
+            }
+        }
+    }
+
     /**
      * Resolve a stored SAX handler to a call_user_func-compatible Variable.
      *
@@ -156,6 +201,9 @@ final class XmlParserHandlers
                 }
 
                 return self::stringHandlerCallback($parser, $handlerName);
+            }
+            if (Variable::TYPE_OBJECT === $handler->type) {
+                self::ensureHandlerObjectAlive($handler->toObject());
             }
 
             // Closure / invokable object / callable array — pass through.
@@ -195,5 +243,80 @@ final class XmlParserHandlers
         $var->object($object);
 
         return $var;
+    }
+
+    private static function pinHandlerSlot(int $parserId, string $slot, Variable $handler): void
+    {
+        $handler = $handler->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $handler->type) {
+            return;
+        }
+        try {
+            $object = $handler->toObject();
+        } catch (\LogicException) {
+            return;
+        }
+        $key = $parserId.':'.$slot;
+        if (isset(self::$handlerPins[$key])) {
+            self::$handlerPins[$key]->null();
+        }
+        $pin = new Variable();
+        $pin->object($object);
+        self::$handlerPins[$key] = $pin;
+        if (null !== $object->closureState) {
+            self::$closureStatePins[$object->id] = $object->closureState;
+        }
+    }
+
+    private static function unpinHandlerSlot(int $parserId, string $slot): void
+    {
+        $key = $parserId.':'.$slot;
+        if (!isset(self::$handlerPins[$key])) {
+            return;
+        }
+        $pin = self::$handlerPins[$key];
+        $objectId = null;
+        $resolved = $pin->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $resolved->type) {
+            try {
+                $objectId = $resolved->toObject()->id;
+            } catch (\LogicException) {
+            }
+        }
+        $pin->null();
+        unset(self::$handlerPins[$key]);
+        if (null !== $objectId) {
+            self::dropClosureStatePinIfUnused($objectId);
+        }
+    }
+
+    private static function dropClosureStatePinIfUnused(int $objectId): void
+    {
+        foreach (self::$handlerPins as $pin) {
+            $resolved = $pin->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $resolved->type) {
+                continue;
+            }
+            try {
+                if ($resolved->toObject()->id === $objectId) {
+                    return;
+                }
+            } catch (\LogicException) {
+            }
+        }
+        unset(self::$closureStatePins[$objectId]);
+    }
+
+    /**
+     * Reattach ClosureState cleared by premature ObjectLifetime teardown (#19343, #6138).
+     */
+    private static function ensureHandlerObjectAlive(ObjectEntry $object): void
+    {
+        if (null === $object->closureState && isset(self::$closureStatePins[$object->id])) {
+            $object->closureState = self::$closureStatePins[$object->id];
+        }
+        if (!ObjectRegistry::isRegistered($object->id) && isset(self::$closureStatePins[$object->id])) {
+            ObjectRegistry::register($object);
+        }
     }
 }

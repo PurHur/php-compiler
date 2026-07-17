@@ -59,7 +59,8 @@ abstract class XmlSetHandlerFunction extends XmlFunction
             return $out;
         }
         if (Variable::TYPE_OBJECT === $arg->type || Variable::TYPE_ARRAY === $arg->type) {
-            $out = new Variable($arg->type);
+            // Fresh NULL Variable then copyFrom — avoid TYPE_OBJECT without an ObjectEntry (#19343).
+            $out = new Variable();
             $out->copyFrom($arg);
 
             return $out;
