@@ -33,6 +33,7 @@ final class DomNodePropertySupport
             || strtolower(VmDom::PROP_NAMESPACE_URI) === $lc
             || strtolower(VmDom::PROP_LOCAL_NAME) === $lc
             || strtolower(VmDom::PROP_PREFIX) === $lc
+            || (VmDom::isAttr($object) && strtolower(VmDom::PROP_NAME) === $lc)
             || (VmDom::isAttr($object) && strtolower(VmDom::PROP_VALUE) === $lc)
             || (VmDom::isAttr($object) && strtolower(VmDom::PROP_OWNER_ELEMENT) === $lc)
             || (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_DATA) === $lc)
@@ -124,6 +125,12 @@ final class DomNodePropertySupport
         }
         if (strtolower(VmDom::PROP_PREFIX) === $lc) {
             $var->string(VmDom::readPrefix($object));
+
+            return $var;
+        }
+        // php-src ext/dom/attr.c dom_attr_name_read — local name, not QName (#19754).
+        if (VmDom::isAttr($object) && strtolower(VmDom::PROP_NAME) === $lc) {
+            $var->string(VmDom::readLocalName($object));
 
             return $var;
         }

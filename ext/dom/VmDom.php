@@ -1150,7 +1150,8 @@ final class VmDom
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
-        $entry->getProperty(self::PROP_NAME)->string($qualifiedName);
+        // php-src ext/dom/attr.c: Attr.name is the local name (libxml attr->name), not the QName.
+        $entry->getProperty(self::PROP_NAME)->string($localName);
         $entry->getProperty(self::PROP_VALUE)->string('');
         $entry->getProperty(self::PROP_OWNER_ELEMENT)->null();
         self::initNodePropertySlots($entry);
@@ -6172,6 +6173,10 @@ final class VmDom
         $node = self::namedNodeMapItem($namedNodeMap, $state->listIterIndex);
         if (null === $node) {
             return null;
+        }
+        // php-src NamedNodeMap iteration keys Attr.name (local), not nodeName (QName).
+        if (self::isAttr($node)) {
+            return self::readLocalName($node);
         }
 
         return DomRegistry::state($node)->nodeName;
