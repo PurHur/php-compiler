@@ -26,6 +26,10 @@ final class GmpModuleTest extends BaseTest
             __DIR__.'/../compliance/cases/gmp/gmp_init_null.phpt',
             'gmp_init_null.phpt'
         );
+        yield 'gmp_init_null_forward84.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/gmp/gmp_init_null_forward84.phpt',
+            'gmp_init_null_forward84.phpt'
+        );
         yield 'gmp_phase2_arith.phpt' => self::parsePHPT(
             __DIR__.'/../compliance/cases/gmp/phase2_arith.phpt',
             'gmp_phase2_arith.phpt'

@@ -1,5 +1,5 @@
 --TEST--
-gmp_init(null) coerces to zero GMP int (ext/gmp/gmp.c Z_PARAM_STR_OR_LONG; #18946)
+gmp_init(null) coerces to zero GMP int on default/8.2 profile (ext/gmp/gmp.c Z_PARAM_STR_OR_LONG; #18946, #20210)
 --FILE--
 <?php
 $z = gmp_init(null);

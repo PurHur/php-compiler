@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\gmp;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmStreamArg;
 
 /**
- * GMP integer semantics in PHP (php-src ext/gmp/gmp.c; issues #3341, #19527, #19539, #19540).
+ * GMP integer semantics in PHP (php-src ext/gmp/gmp.c; issues #3341, #19527, #19539, #19540, #20210).
  *
  * Phase 1–3: arithmetic + bit ops.
  * Phase 4: seedable random + import/export — no runtime/*.c growth.
+ * PROFILE=8.4: null init/operand TypeError (stub int|string; #20210).
  */
 final class VmGmp
 {
@@ -84,7 +86,17 @@ final class VmGmp
                 return self::objectToSignedDecimal($object);
             }
         }
+        // Z_PARAM_STR_OR_LONG / stub int|string — null soft-coerces on 8.2; TypeError on 8.4 (#20210, #18946).
         if (Variable::TYPE_NULL === $resolved->type) {
+            if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d ($%s) must be of type GMP|string|int, null given',
+                    $function,
+                    $index + 1,
+                    $label
+                ));
+            }
+
             return '0';
         }
         if (Variable::TYPE_INTEGER === $resolved->type) {
