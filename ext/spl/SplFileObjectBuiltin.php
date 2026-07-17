@@ -11,6 +11,7 @@ use PHPCompiler\ext\standard\VmFputcsv;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\ext\standard\VmVfscanf;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -67,6 +68,9 @@ final class SplFileObjectBuiltin
         $entry->methodVisibility['__construct'] = $pub;
         foreach ([
             'fgets' => SplFileObjectFgets::class,
+            'fread' => SplFileObjectFread::class,
+            'fgetc' => SplFileObjectFgetc::class,
+            'fscanf' => SplFileObjectFscanf::class,
             'fwrite' => SplFileObjectFwrite::class,
             'rewind' => SplFileObjectRewind::class,
             'next' => SplFileObjectNext::class,
@@ -117,6 +121,9 @@ final class SplFileObjectBuiltin
     {
         return isset(
             $entry->methods['fgets'],
+            $entry->methods['fread'],
+            $entry->methods['fgetc'],
+            $entry->methods['fscanf'],
             $entry->methods['fwrite'],
             $entry->methods['rewind'],
             $entry->methods['valid'],
@@ -258,6 +265,149 @@ final class SplFileObjectFgets extends VmClassMethod
             return;
         }
         $frame->returnVar->string($line);
+    }
+}
+
+/** php-src SplFileObject::fread — read up to $length bytes (#19804). */
+final class SplFileObjectFread extends VmClassMethod
+{
+    private const LENGTH_ERROR = 'SplFileObject::fread(): Argument #1 ($length) must be greater than 0';
+
+    public function __construct()
+    {
+        parent::__construct('fread');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::fread()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplFileObject::fread() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $length = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1],
+            'SplFileObject::fread',
+            1,
+            'length'
+        );
+        if ($length <= 0) {
+            throw new \ValueError(self::LENGTH_ERROR);
+        }
+        $data = VmFs::fread(SplFileObjectStorage::handle($object), $length);
+        if (false === $data) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($data);
+    }
+}
+
+/** php-src SplFileObject::fgetc — read one byte (#19804). */
+final class SplFileObjectFgetc extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fgetc');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::fgetc()'
+        );
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'SplFileObject::fgetc() expects exactly 0 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $byte = VmFs::fgetc(SplFileObjectStorage::handle($object));
+        if (false === $byte) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($byte);
+    }
+}
+
+/**
+ * php-src SplFileObject::fscanf — formatted stream input (#19804).
+ * Mirrors procedural fscanf() with $this as the stream handle.
+ */
+final class SplFileObjectFscanf extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fscanf');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::fscanf()'
+        );
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'SplFileObject::fscanf() expects at least 1 argument, '
+                .($argc - 1).' given'
+            );
+        }
+        $handle = SplFileObjectStorage::handle($object);
+        $format = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'SplFileObject::fscanf',
+            0,
+            'format'
+        );
+        $outVars = [];
+        for ($i = 2; $i < $argc; ++$i) {
+            $outVars[] = $frame->calledArgs[$i];
+        }
+        if (null === $frame->returnVar) {
+            if ([] !== $outVars) {
+                VmVfscanf::parse($handle, $format, $outVars);
+            }
+
+            return;
+        }
+        if ([] === $outVars) {
+            $parsed = VmVfscanf::parseToArray($handle, $format);
+            if (false === $parsed) {
+                $frame->returnVar->bool(false);
+            } elseif (null === $parsed) {
+                $frame->returnVar->null();
+            } else {
+                $frame->returnVar->array($parsed);
+            }
+
+            return;
+        }
+        $parsed = VmVfscanf::parse($handle, $format, $outVars);
+        if (false === $parsed) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->int($parsed);
+        }
     }
 }
 
