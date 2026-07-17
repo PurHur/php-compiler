@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5392 / #9340: stream_context LLVM routes through StreamContextJitHelper PHP.
+ * Issue #5392 / #9340 / #19817: stream_context LLVM routes through StreamContextJitHelper PHP.
  *
  * @group aot-lint
  */
@@ -20,10 +20,13 @@ final class StreamContextRuntimeStandaloneTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/phpc_stream_context.c');
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('phpc_stream_context.c', $linker);
-        $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StreamContextRuntime.php');
-        $this->assertStringContainsString('__phpc_stream_context_create', $runtime);
-        $this->assertStringContainsString('StreamContextJitHelper', $runtime);
-        $this->assertStringNotContainsString('implementMergeOptions', $runtime);
+        $kernel = (string) file_get_contents(__DIR__.'/../../../ext/standard/JitStreamContextKernel.php');
+        $this->assertStringContainsString('__phpc_stream_context_create', $kernel);
+        $this->assertStringContainsString('StreamContextJitHelper', $kernel);
+        $this->assertStringNotContainsString('implementMergeOptions', $kernel);
+        $orchestrator = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StreamContextRuntime.php');
+        $this->assertStringContainsString('JitStreamContextKernel', $orchestrator);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $orchestrator);
     }
 
     /**

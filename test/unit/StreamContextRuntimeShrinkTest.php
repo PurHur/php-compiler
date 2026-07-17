@@ -9,22 +9,50 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** StreamContextRuntime must route through StreamContextJitHelper PHP, not LLVM hashtable walker (#9340). */
+/**
+ * StreamContext NestedJIT ABI bridges quarantined in ext/standard (#9340, #12895, #19817).
+ */
 final class StreamContextRuntimeShrinkTest extends TestCase
 {
-    public function testStreamContextRuntimeUsesJitHelperNotLlvmWalker(): void
+    public function testBuiltinStreamContextRuntimeIsThinOrchestrator(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamContextRuntime.php');
-        $this->assertStringContainsString('StreamContextJitHelper', $source);
-        $this->assertStringNotContainsString('StreamContextStandaloneLlvm', $source);
-        $this->assertStringNotContainsString('implementMergeOptions', $source);
-        $this->assertStringNotContainsString('mergeScalar', $source);
-        $this->assertStringNotContainsString("GLOBAL_DEFAULT = 'phpc_stream_context_default'", $source);
-        $this->assertStringNotContainsString("GLOBAL_NEXT_ID = 'phpc_stream_context_next_id'", $source);
-        $this->assertStringNotContainsString('__hashtable__setStringKeyLong', $source);
-        $this->assertLessThan(280, \substr_count($source, "\n") + 1);
-
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamContextKernel.php');
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StreamContextRuntime.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamContextStandaloneLlvm.php');
+
+        $orchestrator = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamContextRuntime.php');
+        $this->assertStringContainsString('JitStreamContextKernel', $orchestrator);
+        $this->assertStringContainsString('JitStreamContextKernel::ensureLinked', $orchestrator);
+        $this->assertStringContainsString('JitStreamContextKernel::helperFunction', $orchestrator);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $orchestrator);
+        $this->assertStringNotContainsString('__phpc_stream_context_create', $orchestrator);
+        $this->assertStringNotContainsString('implementMergeOptions', $orchestrator);
+        $this->assertLessThan(45, \substr_count($orchestrator, "\n") + 1);
+    }
+
+    public function testKernelPresent(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStreamContextKernel.php');
+        $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
+        $this->assertStringContainsString('final class JitStreamContextKernel', $source);
+        $this->assertStringContainsString('__phpc_stream_context_create', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::run', $source);
+        $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertStringContainsString('StreamContextJitHelper', $source);
+        $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
+        $this->assertLessThan(340, \substr_count($source, "\n") + 1);
+    }
+
+    public function testSpineBundleIncludesKernelAndOrchestrator(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('JitStreamContextKernel.php', $spine);
+        $this->assertStringContainsString('StreamContextRuntime.php', $spine);
+        $kernelPos = strpos($spine, 'JitStreamContextKernel.php');
+        $orchPos = strpos($spine, 'lib/JIT/Builtin/StreamContextRuntime.php');
+        $this->assertNotFalse($kernelPos);
+        $this->assertNotFalse($orchPos);
+        $this->assertLessThan($orchPos, $kernelPos, 'kernel must load before thin orchestrator');
     }
 
     public function testJitStreamContextGetDefaultUsesHelperForEmbed(): void

@@ -55,12 +55,14 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitStreamBufferKernel.php',
         'ext/standard/JitStreamModeKernel.php',
         'ext/standard/JitEnvLocalKernel.php',
+        'ext/standard/JitStreamContextKernel.php',
         'lib/JIT/Builtin/StreamLibcHandleRuntime.php',
         'lib/JIT/Builtin/StreamLifecycleRuntime.php',
         'lib/JIT/Builtin/StreamCapsRuntime.php',
         'lib/JIT/Builtin/StreamBufferRuntime.php',
         'lib/JIT/Builtin/StreamModeRuntime.php',
         'lib/JIT/Builtin/EnvLocalRuntime.php',
+        'lib/JIT/Builtin/StreamContextRuntime.php',
         'lib/VM/WeakRefSupport.php',
         'lib/VM/InterfaceCheck.php',
         'lib/VM/ClassReadonly.php',
@@ -519,7 +521,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = bootstrap_spine_counts(self::$root)['spine'];
-        $this->assertSame(5269, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629, #18550)');
+        $this->assertSame(5270, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629, #18550)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
