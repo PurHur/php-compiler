@@ -1352,6 +1352,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'soap_client')) {
                 continue;
             }
+            // use_soap_error_handler — VM-first (#20267).
+            if (str_contains($name, 'soap_use_soap_error_handler')) {
+                continue;
+            }
             // get_defined_functions()/get_declared_functions() MCJIT: VM + dedicated PHPT (#3128/#3739); jit.php execute segfaults on merge runtime.
             if (str_contains($name, 'get_defined_functions') || str_contains($name, 'get_declared_functions')) {
                 continue;

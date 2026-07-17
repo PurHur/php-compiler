@@ -10,7 +10,7 @@ use PHPCompiler\Runtime;
 /**
  * soap extension module entry (php-src ext/soap/soap.c; #20037 / #20124 / #3724).
  *
- * VM-only: SoapClient + SoapFault + is_soap_fault. No new runtime C.
+ * VM-only: SoapClient + SoapFault + is_soap_fault + use_soap_error_handler. No new runtime C.
  */
 class Module extends ModuleAbstract
 {
@@ -28,6 +28,8 @@ class Module extends ModuleAbstract
     {
         require_once __DIR__.'/bootstrap_soapfault.php';
         parent::init($runtime);
+        // php-src SOAP_RINIT: use_soap_error_handler = 0
+        SoapExtensionPolicy::setUseSoapErrorHandler(false);
         foreach (SoapConstants::registeredConstants() as $name => $value) {
             $var = new \PHPCompiler\VM\Variable();
             $var->int($value);
@@ -40,6 +42,7 @@ class Module extends ModuleAbstract
     {
         return [
             new is_soap_fault(),
+            new use_soap_error_handler(),
         ];
     }
 }
