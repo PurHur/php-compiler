@@ -8,12 +8,13 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for locale_get_primary_language/region/script via LocaleParserJitHelper PHP (#17072).
+ * JIT/AOT link for locale_get_primary_language/region/script via LocaleParserJitHelper PHP (#17072, #20101).
  *
+ * Always {@see JitVmHelperLink} → {@see \PHPCompiler\ext\intl\LocaleParserJitHelper}
+ * (no user-script NestedJIT defer early-return — thin/user-script AOT must still link bridges).
  * SSOT: {@see \PHPCompiler\ext\intl\VmLocale}
  * php-src: ext/intl/locale/locale_methods.c
  */
@@ -113,10 +114,6 @@ final class LocaleParser
         string $entry,
         string $helper
     ): void {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            return;
-        }
-
         if (NestedJitCompileScope::isActive()) {
             return;
         }
@@ -139,7 +136,7 @@ final class LocaleParser
             $helper,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#17072'
+            '#20101'
         );
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
