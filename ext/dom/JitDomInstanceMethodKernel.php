@@ -12,15 +12,15 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * User-script standalone AOT: compile DOM instance bridge in the main module (#17391, #19487).
+ * Thin standalone AOT: compile DOM instance bridge in the main module (#17391, #19487, #20214).
  *
  * Split-compilation helper TUs lack per-unit ctor init for ObjectEntry reads (#16075); nested
  * VmDomInstanceInvoke also needs {@see VmActiveContextLlvm} because Superglobals is unset.
+ * Gate: {@see Context::isThinStandaloneAotMain()} (peer #20200 / #20178 — no NestedJit defer).
  * Housed in ext/dom (not lib/JIT/Builtin) — same kernel-move pattern as #19430 / #19389.
  */
 final class JitDomInstanceMethodKernel
@@ -32,7 +32,7 @@ final class JitDomInstanceMethodKernel
 
     public static function shouldUse(Context $context): bool
     {
-        return UserScriptAotDeferNestedJit::shouldDefer($context);
+        return $context->isThinStandaloneAotMain();
     }
 
     public static function ensureBridge(Context $context, int $extraArgCount): void

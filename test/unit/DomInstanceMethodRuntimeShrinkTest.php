@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** Dom instance-method + standalone AOT init user-script kernels in ext/dom (#17391, #19487). */
+/** Dom instance-method + standalone AOT init thin kernels in ext/dom (#17391, #19487, #20214). */
 final class DomInstanceMethodRuntimeShrinkTest extends TestCase
 {
     public function testDomInstanceMethodRuntimeUsesExtKernelForUserScript(): void
@@ -34,5 +34,17 @@ final class DomInstanceMethodRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitDomStandaloneAotInitKernel.php', $spine);
         $this->assertStringNotContainsString('DomInstanceMethodUserScriptLlvm.php', $spine);
         $this->assertStringNotContainsString('DomStandaloneAotInitUserScriptLlvm.php', $spine);
+    }
+
+    public function testDomKernelsGateThinPathOnIsThinStandaloneAotMain(): void
+    {
+        foreach ([
+            __DIR__.'/../../ext/dom/JitDomInstanceMethodKernel.php',
+            __DIR__.'/../../ext/dom/JitDomStandaloneAotInitKernel.php',
+        ] as $path) {
+            $source = (string) file_get_contents($path);
+            $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+            $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        }
     }
 }

@@ -37,20 +37,20 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
 
 /**
- * User-script standalone AOT: DOM document-method bridges in the main module (#17954, #19496).
+ * Thin standalone AOT: DOM document-method bridges in the main module (#17954, #19496, #20214).
  *
+ * Gate: {@see Context::isThinStandaloneAotMain()} (peer #20200 / #20178 — no NestedJit defer).
  * Housed in ext/dom (not lib/JIT/Builtin) — same kernel-move pattern as #19430 / #19471.
  */
 final class JitDomDocumentMethodKernel
 {
     public static function shouldUse(Context $context): bool
     {
-        return UserScriptAotDeferNestedJit::shouldDefer($context);
+        return $context->isThinStandaloneAotMain();
     }
 
     public static function ensureLoadHTMLBridge(Context $context): void
