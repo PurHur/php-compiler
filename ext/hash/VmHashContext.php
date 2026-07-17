@@ -229,12 +229,17 @@ final class VmHashContext
         return $object;
     }
 
+    /**
+     * Z_PARAM_STR for HashContext string operands (algo / data) — null TypeError on 8.4 (#20195).
+     *
+     * php-src: ext/hash/hash.c — PHP_FUNCTION(hash_init) / PHP_FUNCTION(hash_update)
+     */
     public static function coerceContextString(
         Variable $var,
         string $function,
         int $argNum,
         string $paramName
     ): string {
-        return VmString::coerceStringBuiltinArg($var, $function, $argNum, $paramName);
+        return VmString::coerceZparamStrBuiltinArg($var, $function, $argNum, $paramName);
     }
 }

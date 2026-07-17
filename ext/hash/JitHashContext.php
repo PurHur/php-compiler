@@ -79,7 +79,10 @@ final class JitHashContext
         HashContextEmbedBridge::ensureLinked($context);
         $obj = self::readContextObject($context, $args[0]);
         $handle = self::loadHandle($context, $obj);
-        $chunkStr = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'hash_update', 1, 'data');
+        // Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#20195, ext/hash/hash.c).
+        $chunkStr = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'hash_update', 1, 'data')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'hash_update', 1, 'data');
         self::callHelper($context, self::UPDATE_HELPER, $handle, $chunkStr);
         $bufPtr = self::loadStringProperty($context, $obj, HashContextJitSupport::PROP_BUF);
         $map = $context->structFieldMap['__string__'];
