@@ -19,6 +19,7 @@ use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\ext\standard\VmJson;
+use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\standard\VmUserCall;
 use PHPCompiler\VM\MagicMethodInvocationAborted;
@@ -30,6 +31,9 @@ use PHPCompiler\VM\ScriptExit;
 final class VmSoapServer
 {
     public const CLASS_LC = 'soapserver';
+
+    /** php-src soap.c session key for SOAP_PERSISTENCE_SESSION (#20315). */
+    private const SESSION_OBJECT_KEY = '_bogus_session_name';
 
     /** @var array<int, SoapServerState> */
     private static array $store = [];
@@ -414,28 +418,7 @@ final class VmSoapServer
             if (!isset($ctx->classes[$classLc])) {
                 throw new \SoapFault('Server', 'SoapServer::setClass(): class "'.$state->className.'" does not exist');
             }
-            $instance = $state->classInstance;
-            if (
-                null === $instance
-                || SoapConstants::SOAP_PERSISTENCE_SESSION !== $state->persistence
-            ) {
-                // php-src: instantiate with setClass ctor argv (#20294).
-                $ce = $ctx->classes[$classLc];
-                $instance = new ObjectEntry($ce);
-                $ctorArgs = [];
-                foreach ($state->classCtorArgs as $arg) {
-                    $copy = new Variable();
-                    $copy->copyFrom($arg);
-                    $ctorArgs[] = $copy;
-                }
-                if (null !== $ce->constructor || isset($ce->methods['__construct'])) {
-                    $ctx->runtime->vm->invokeInstanceMethod($instance, '__construct', ...$ctorArgs);
-                }
-                $instance->constructed = true;
-                if (SoapConstants::SOAP_PERSISTENCE_SESSION === $state->persistence) {
-                    $state->classInstance = $instance;
-                }
-            }
+            $instance = self::resolveSetClassInstance($state, $ctx, $classLc);
 
             return $ctx->runtime->vm->invokeInstanceMethod($instance, $opName, ...$args);
         }
@@ -467,6 +450,89 @@ final class VmSoapServer
         }
 
         throw new \SoapFault('Client', 'Function "'.$opName.'" doesn\'t exist');
+    }
+
+    /**
+     * Resolve setClass instance — REQUEST always fresh; SESSION via $_SESSION['_bogus_session_name'] (#20315).
+     */
+    private static function resolveSetClassInstance(
+        SoapServerState $state,
+        Context $ctx,
+        string $classLc
+    ): ObjectEntry {
+        if (SoapConstants::SOAP_PERSISTENCE_SESSION === $state->persistence) {
+            if (null !== $state->classInstance) {
+                return $state->classInstance;
+            }
+            $fromSession = self::loadSessionClassInstance($ctx, $classLc);
+            if (null !== $fromSession) {
+                $state->classInstance = $fromSession;
+
+                return $fromSession;
+            }
+        }
+
+        // php-src: instantiate with setClass ctor argv (#20294).
+        $ce = $ctx->classes[$classLc];
+        $instance = new ObjectEntry($ce);
+        $ctorArgs = [];
+        foreach ($state->classCtorArgs as $arg) {
+            $copy = new Variable();
+            $copy->copyFrom($arg);
+            $ctorArgs[] = $copy;
+        }
+        if (null !== $ce->constructor || isset($ce->methods['__construct'])) {
+            $ctx->runtime->vm->invokeInstanceMethod($instance, '__construct', ...$ctorArgs);
+        }
+        $instance->constructed = true;
+
+        if (SoapConstants::SOAP_PERSISTENCE_SESSION === $state->persistence) {
+            $state->classInstance = $instance;
+            self::storeSessionClassInstance($ctx, $instance);
+        }
+
+        return $instance;
+    }
+
+    private static function loadSessionClassInstance(Context $ctx, string $classLc): ?ObjectEntry
+    {
+        if (!VmSession::isActive()) {
+            // php-src: auto session_start when persistence is SESSION and session not disabled.
+            VmSession::start($ctx);
+        }
+        $sessionVar = $ctx->getSuperglobal('_SESSION');
+        if (null === $sessionVar || Variable::TYPE_ARRAY !== $sessionVar->type) {
+            return null;
+        }
+        $stored = $sessionVar->toArray()->find(self::SESSION_OBJECT_KEY);
+        if (null === $stored) {
+            return null;
+        }
+        $stored = $stored->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $stored->type) {
+            return null;
+        }
+        $obj = $stored->toObject();
+        if (\strtolower($obj->class->name) !== $classLc) {
+            // php-src incomplete_class fault — here mismatched class is ignored and recreated.
+            return null;
+        }
+
+        return $obj;
+    }
+
+    private static function storeSessionClassInstance(Context $ctx, ObjectEntry $instance): void
+    {
+        if (!VmSession::isActive()) {
+            VmSession::start($ctx);
+        }
+        $sessionVar = $ctx->ensureSuperglobal('_SESSION');
+        if (Variable::TYPE_ARRAY !== $sessionVar->type) {
+            $sessionVar->array(new HashTable());
+        }
+        $box = new Variable();
+        $box->object($instance);
+        $sessionVar->toArray()->add(self::SESSION_OBJECT_KEY, $box);
     }
 
     private static function buildResponse(SoapServerState $state, string $opName, Variable $result): string
