@@ -56,6 +56,23 @@ final class VmZlibArg
         return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, $function, 'filename');
     }
 
+    /**
+     * Z_PARAM_LONG $encoding — null coerces to 0 then ValueError on invalid mode (#19915, ext/zlib/zlib.c).
+     */
+    public static function resolveEncodingInt(
+        Variable $var,
+        string $function,
+        int $position,
+        string $paramName
+    ): int {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return 0;
+        }
+
+        return self::requireInt($var, $function, $position, $paramName);
+    }
+
     public static function requireInt(
         Variable $var,
         string $function,
