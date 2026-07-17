@@ -1,10 +1,9 @@
 --TEST--
-AOT: trim/ltrim/rtrim/chop null — TypeError on 8.4 forward profile (#19254)
+AOT: trim null — coerce on 8.4 forward profile (#19983)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-trim(null);
+echo var_export(trim(null), true), "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+''

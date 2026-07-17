@@ -104,6 +104,17 @@ final class JitStringBuiltinArg
         );
     }
 
+    /** trim/ltrim/rtrim/chop — null coerces with deprecation on forward profile (#19983, php_trim). */
+    public static function lowerTrimFamilyString(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        return self::lower($context, $arg, $function, $argIndex, $paramName, 'string', null, false, false);
+    }
+
     public static function lower(
         Context $context,
         Variable $arg,

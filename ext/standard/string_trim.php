@@ -259,14 +259,14 @@ final class string_trim extends Internal
         return $context->builder->icmp(Builder::INT_NE, $inMask, $i32->constInt(0, false));
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19254, ext/standard/string.c). */
+    /** php_trim — null coerces with deprecation on forward profile (#19983, ext/standard/string.c). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'trim', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'trim',
             $argIndex,
@@ -290,7 +290,7 @@ final class string_trim extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'trim',
