@@ -28,7 +28,19 @@ final class JitTokenGetAll
             return self::materializeCompileTime($context, $sourceLit, $flagsLit);
         }
 
-        $source = JitStringBuiltinArg::lower($context, $args[0], 'token_get_all', 0, 'source');
+        // php-src Z_PARAM_STR — null TypeError on 8.4 forward profile (#19894).
+        $source = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'token_get_all', 0, 'source');
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && (
+                $context->callerStrictTypes
+                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+            )
+        ) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
         $flags = self::lowerFlagsRuntime($context, $args, $argc);
         $ht = $context->builder->call(
             TokenGetAll::helperFunction($context),

@@ -16,6 +16,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -69,7 +70,7 @@ final class implode extends Internal
             } elseif (Variable::TYPE_NULL === $second->type) {
                 self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
                 self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
-                VmString::coerceStringBuiltinArg(
+                VmString::coerceZparamStrBuiltinArg(
                     $frame->calledArgs[0],
                     $this->getName(),
                     0,
@@ -83,7 +84,7 @@ final class implode extends Internal
             } else {
                 self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
                 self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
-                $glue = VmString::coerceStringBuiltinArg(
+                $glue = VmString::coerceZparamStrBuiltinArg(
                     $frame->calledArgs[0],
                     $this->getName(),
                     0,
@@ -143,7 +144,7 @@ final class implode extends Internal
                     return $this->jitTwoArgNullPiecesBoxedFirst($context, $args[0], $this->getName());
                 }
                 self::rejectNullSeparatorJit($context, $args[0], $this->getName());
-                JitStringBuiltinArg::lower(
+                JitStringBuiltinArg::lowerZparamStr(
                     $context,
                     $args[0],
                     $this->getName(),
@@ -168,7 +169,7 @@ final class implode extends Internal
                 return $this->jitTwoArgBoxedFirstDispatch($context, $args[0], $args[1], $this->getName());
             }
             self::rejectNullSeparatorJit($context, $args[0], $this->getName());
-            $glue = JitStringBuiltinArg::lower(
+            $glue = JitStringBuiltinArg::lowerZparamStr(
                 $context,
                 $args[0],
                 $this->getName(),
@@ -261,10 +262,14 @@ final class implode extends Internal
         ));
     }
 
-    /** php-src Z_PARAM_STR on implode() separator — null TypeError only under strict_types (#11013, ext/standard/string.c). */
+    /**
+     * php-src Z_PARAM_ARRAY_HT_OR_STR — null TypeError under strict_types or 8.4 forward profile
+     * (#11013, #19894, ext/standard/string.c).
+     */
     private static function rejectNullSeparator(Frame $frame, Variable $var, string $function): void
     {
-        if (!InternalStrictArg::isCallerStrict($frame)) {
+        if (!InternalStrictArg::isCallerStrict($frame)
+            && !VmString::requiresZparamStrStrictNullOnForwardProfile()) {
             return;
         }
         if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
@@ -336,7 +341,7 @@ final class implode extends Internal
         );
         $context->builder->positionAtEnd($stringBlock);
         self::rejectNullSeparatorJit($context, $firstArg, $function);
-        JitStringBuiltinArg::lower(
+        JitStringBuiltinArg::lowerZparamStr(
             $context,
             $firstArg,
             $function,
@@ -498,8 +503,8 @@ final class implode extends Internal
         self::jitRejectArrayFirstTwoArgForm($context, $secondArg, $function);
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->positionAtEnd($modernBlock);
-        self::rejectNullSeparatorJit($context, $firstArg, $function);
-        $glue = JitStringBuiltinArg::lower(
+        // lowerZparamStr handles boxed null TypeError on 8.4 (shared guard #19894).
+        $glue = JitStringBuiltinArg::lowerZparamStr(
             $context,
             $firstArg,
             $function,
@@ -516,7 +521,8 @@ final class implode extends Internal
 
     private static function rejectNullSeparatorJit(Context $context, JITVariable $arg, string $function): void
     {
-        if (!$context->callerStrictTypes) {
+        if (!$context->callerStrictTypes
+            && !JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()) {
             return;
         }
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
@@ -535,12 +541,13 @@ final class implode extends Internal
             $context->builder->structGep($valuePtr, $map['type'])
         );
         $i8 = $context->getTypeFromString('int8');
+        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $okBlock = BasicBlockHelper::append($context, 'implode_sep_null_ok');
         $failBlock = BasicBlockHelper::append($context, 'implode_sep_null_fail');
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
-                $typeByte,
+                $typeKind,
                 $i8->constInt(Variable::TYPE_NULL, false)
             ),
             $failBlock,
@@ -553,13 +560,11 @@ final class implode extends Internal
 
     private static function emitNullSeparatorTypeErrorAndAbort(Context $context, string $function): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, sprintf(
+        // ExceptionBridge — TypeErrorRaise+abort SIGABRTs on AOT without PHP fatal (#19894, #19276).
+        ExceptionBridge::emitTypeErrorAndAbort($context, sprintf(
             '%s(): Argument #1 ($separator) must be of type array|string, null given',
             $function
         ));
-        $context->builder->call($context->lookupFunction('abort'));
     }
 
     /** php-src pieces==NULL + string first — Argument #1 ($array), string given (#19566). */

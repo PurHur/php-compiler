@@ -29,7 +29,8 @@ final class token_get_all extends Internal
             return;
         }
 
-        $source = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'token_get_all', 0, 'source');
+        // php-src Z_PARAM_STR — null TypeError on 8.4 forward profile (#19894).
+        $source = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'token_get_all', 0, 'source');
         $flags = 0;
         if ($argc >= 2) {
             $flags = $frame->calledArgs[1]->toInt();
