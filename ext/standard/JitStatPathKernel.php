@@ -9,16 +9,16 @@ use PHPCompiler\JIT\Builtin\StatCacheRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT NestedJIT bridges for path predicates + stat fields (#9112, #19849).
+ * JIT/AOT NestedJIT bridges for path predicates + stat fields (#9112, #19849, #20086).
  *
  * Quarantined from lib/JIT/Builtin/StatPathRuntime — {@see \PHPCompiler\JIT\Builtin\StatPathRuntime}
- * stays the thin orchestrator. Thin libc mode/access leaf stays in {@see JitStatKernel}.
+ * stays the thin orchestrator. Thin standalone AOT (`isThinStandaloneAotMain`) uses
+ * {@see JitStatKernel} libc; embed keeps NestedJIT → {@see StatPathJitHelper}.
  *
  * SSOT: {@see StatPathJitHelper}, {@see StatFieldsJitHelper}
  * php-src: ext/standard/filestat.c
@@ -163,10 +163,10 @@ final class JitStatPathKernel
         $context->builder->branchIf($nullPath, $fail, $run);
 
         $context->builder->positionAtEnd($run);
-        // User-script standalone AOT: nested StatPathJitHelper sees VmStatPath /
+        // Thin standalone AOT: nested StatPathJitHelper sees VmStatPath /
         // phpc_stat_mode_kernel as external stubs (always 0). Emit thin libc here
-        // instead (#19215, mirrors StringRename + JitRenameKernel).
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+        // instead (#20086, mirrors StringRename isThinStandaloneAotMain + JitRenameKernel).
+        if ($context->isThinStandaloneAotMain()) {
             LibcExtern::register($context);
             $hit = self::kernelPathBool($context, $abiName, $path);
         } else {
