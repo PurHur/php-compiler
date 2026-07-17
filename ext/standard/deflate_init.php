@@ -22,7 +22,7 @@ final class deflate_init extends ZlibIncrementalFunction
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('deflate_init() expects one or two arguments in this compiler build');
         }
-        $encoding = VmZlibArg::requireInt($frame->calledArgs[0], 'deflate_init', 1, 'encoding');
+        $encoding = VmZlibArg::resolveEncodingInt($frame->calledArgs[0], 'deflate_init', 1, 'encoding');
         $options = [];
         if (2 === $argc) {
             $options = VmZlibContext::parseOptionsVariable($frame->calledArgs[1], 'deflate_init');

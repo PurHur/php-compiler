@@ -21,7 +21,7 @@ final class inflate_init extends ZlibIncrementalFunction
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('inflate_init() expects exactly one argument in this compiler build');
         }
-        $encoding = VmZlibArg::requireInt($frame->calledArgs[0], 'inflate_init', 1, 'encoding');
+        $encoding = VmZlibArg::resolveEncodingInt($frame->calledArgs[0], 'inflate_init', 1, 'encoding');
         $ctx = VmZlibContext::inflateInit(VmReflection::requireContext($frame), $encoding);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ctx): void {
             $ret->copyFrom($ctx);

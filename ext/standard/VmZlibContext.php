@@ -50,6 +50,12 @@ final class VmZlibContext
             return;
         }
 
+        if ('inflate_init' === $function) {
+            throw new \ValueError(
+                'Encoding mode must be ZLIB_ENCODING_RAW, ZLIB_ENCODING_GZIP or ZLIB_ENCODING_DEFLATE'
+            );
+        }
+
         throw new \ValueError(\sprintf(
             '%s(): Argument #%d ($%s) must be one of ZLIB_ENCODING_RAW, ZLIB_ENCODING_GZIP, or ZLIB_ENCODING_DEFLATE',
             $function,
