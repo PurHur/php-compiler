@@ -24,7 +24,8 @@ final class addcslashes extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('addcslashes() requires exactly two arguments in this compiler build');
         }
-        $subject = self::vmStringArg($frame, 0, 'str');
+        // php-src basic_functions.stub.php: addcslashes(string $string, string $characters)
+        $subject = self::vmStringArg($frame, 0, 'string');
         $charlist = self::vmStringArg($frame, 1, 'characters');
         BuiltinExecute::writeReturn(
             $frame,
@@ -46,7 +47,7 @@ final class addcslashes extends Internal
         }
 
         StringCslashes::ensureLinked($context);
-        $subject = self::jitStringArg($context, $args[0], 0, 'str');
+        $subject = self::jitStringArg($context, $args[0], 0, 'string');
         if (null !== $charlistLit) {
             return $context->builder->call(
                 $context->lookupFunction('__compiler_addcslashes'),

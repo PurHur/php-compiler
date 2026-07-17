@@ -1,5 +1,5 @@
 --TEST--
-stdlib strtolower()/strtoupper() — backed enum case TypeError (#5943, ext/standard/string.c)
+stdlib strtolower()/strtoupper() — backed enum case TypeError (#5943, #8846, ext/standard/string.c)
 --FILE--
 <?php
 declare(strict_types=1);

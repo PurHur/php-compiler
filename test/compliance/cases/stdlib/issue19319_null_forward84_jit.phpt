@@ -25,7 +25,7 @@ foreach ($cases as $name => $fn) {
 echo var_export(stripslashes(''), true), "\n";
 ?>
 --EXPECT--
-addcslashes(): Argument #1 ($str) must be of type string, null given
+addcslashes(): Argument #1 ($string) must be of type string, null given
 stripslashes(): Argument #1 ($string) must be of type string, null given
 hebrev(): Argument #1 ($string) must be of type string, null given
 str_split(): Argument #1 ($string) must be of type string, null given
