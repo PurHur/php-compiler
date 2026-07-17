@@ -7756,6 +7756,27 @@ final class VmDom
         return DomRegistry::has($entry);
     }
 
+    /**
+     * Class-hierarchy instanceof DOMNode (php-src zend_parse_parameters / stub union).
+     * Prefer this over {@see isDomNode()} for TypeError gates — registries also hold
+     * non-node helpers in some paths (#20291).
+     */
+    public static function isDomNodeInstance(ObjectEntry $entry, Context $ctx): bool
+    {
+        $class = $entry->class;
+        for ($guard = 0; null !== $class && $guard < 64; ++$guard) {
+            if (self::CLASS_NODE === strtolower($class->name)) {
+                return true;
+            }
+            if (null === $class->parentLc || !isset($ctx->classes[$class->parentLc])) {
+                return false;
+            }
+            $class = $ctx->classes[$class->parentLc];
+        }
+
+        return false;
+    }
+
     public static function isSameNode(ObjectEntry $node, ObjectEntry $other): bool
     {
         return $node->id === $other->id;
