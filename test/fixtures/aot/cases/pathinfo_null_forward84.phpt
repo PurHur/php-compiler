@@ -1,10 +1,9 @@
 --TEST--
-AOT: basename null — TypeError on 8.4 forward profile (#19256)
+AOT: basename null — coerce on 8.4 forward profile (#19997)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-basename(null);
+echo var_export(basename(null), true), "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+''
