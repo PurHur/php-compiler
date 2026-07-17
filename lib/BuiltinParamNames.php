@@ -84,6 +84,8 @@ final class BuiltinParamNames
                 return \PHPCompiler\CompilerVersion::supportsParseStrSeparator()
                     ? ['string', 'result', 'separator']
                     : ['string', 'result'];
+            case 'mb_parse_str':
+                return ['string', 'result'];
             case 'dns_get_mx':
             case 'getmxrr':
                 return ['hostname', 'mxhosts', 'weight'];

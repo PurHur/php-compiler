@@ -46,6 +46,7 @@ final class BuiltinByRefParams
             case 'frexp':
                 return [1];
             case 'parse_str':
+            case 'mb_parse_str':
                 return [1];
             case 'xml_parse_into_struct':
                 return [2, 3];
