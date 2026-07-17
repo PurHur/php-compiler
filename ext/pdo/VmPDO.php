@@ -13,6 +13,9 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\sqlite3\Sqlite3Constants;
 use PHPCompiler\ext\sqlite3\VmSqlite3Native;
+use PHPCompiler\ext\sqlite3\VmSqlite3Udf;
+use PHPCompiler\ext\spl\SplIteratorSupport;
+use PHPCompiler\ext\standard\VmCallable;
 
 /**
  * PDO VM class (php-src ext/pdo/pdo_dbh.c; #3367).
@@ -63,6 +66,8 @@ final class VmPDO
             'intransaction' => new PDOInTransaction(),
             'errorcode' => new PDOErrorCode(),
             'errorinfo' => new PDOErrorInfo(),
+            'sqlitecreatefunction' => new PDOSqliteCreateFunction(),
+            'sqlitecreateaggregate' => new PDOSqliteCreateAggregate(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -77,6 +82,8 @@ final class VmPDO
         $entry->methodNames['intransaction'] = 'inTransaction';
         $entry->methodNames['errorcode'] = 'errorCode';
         $entry->methodNames['errorinfo'] = 'errorInfo';
+        $entry->methodNames['sqlitecreatefunction'] = 'sqliteCreateFunction';
+        $entry->methodNames['sqlitecreateaggregate'] = 'sqliteCreateAggregate';
         $entry->methodVisibility['getavailabledrivers'] = CfgFunc::FLAG_STATIC | $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -180,6 +187,17 @@ final class VmPDO
         }
     }
 
+    /** Expand PDO sqliteCreateFunction UDFs in SQL (#19863 / #19862). */
+    public static function expandSql(ObjectEntry $entry, string $sql): string
+    {
+        $state = self::state($entry);
+        if ([] === $state->functions) {
+            return $sql;
+        }
+
+        return VmSqlite3Udf::expandSql($sql, $state->functions);
+    }
+
     public static function assignScalar(Variable $returnVar, mixed $value): void
     {
         if (null === $value) {
@@ -241,6 +259,13 @@ final class PdoState
     public ?int $errorDriverCode = null;
 
     public ?string $errorMessage = null;
+
+    /**
+     * PDO::sqliteCreateFunction registrations (share expand with SQLite3; #19863).
+     *
+     * @var array<string, array{callback: Variable, closure: ?\PHPCompiler\VM\ClosureState, argc: int, ctx: \PHPCompiler\VM\Context}>
+     */
+    public array $functions = [];
 }
 
 final class PDOConstruct extends PdoClassMethod
@@ -282,7 +307,10 @@ final class PDOExec extends PdoClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \ArgumentCountError('PDO::exec() expects exactly 1 argument, 0 given');
         }
-        $sql = $this->stringArg($frame->calledArgs[1], 'PDO::exec', 0, 'statement');
+        $sql = VmPDO::expandSql(
+            $receiver,
+            $this->stringArg($frame->calledArgs[1], 'PDO::exec', 0, 'statement')
+        );
         $state = VmPDO::state($receiver);
         $db = VmPDO::requireDb($receiver);
         try {
@@ -316,7 +344,10 @@ final class PDOPrepare extends PdoClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \ArgumentCountError('PDO::prepare() expects at least 1 argument, 0 given');
         }
-        $sql = $this->stringArg($frame->calledArgs[1], 'PDO::prepare', 0, 'query');
+        $sql = VmPDO::expandSql(
+            $receiver,
+            $this->stringArg($frame->calledArgs[1], 'PDO::prepare', 0, 'query')
+        );
         $state = VmPDO::state($receiver);
         $db = VmPDO::requireDb($receiver);
         try {
@@ -350,7 +381,10 @@ final class PDOQuery extends PdoClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \ArgumentCountError('PDO::query() expects at least 1 argument, 0 given');
         }
-        $sql = $this->stringArg($frame->calledArgs[1], 'PDO::query', 0, 'query');
+        $sql = VmPDO::expandSql(
+            $receiver,
+            $this->stringArg($frame->calledArgs[1], 'PDO::query', 0, 'query')
+        );
         $state = VmPDO::state($receiver);
         $db = VmPDO::requireDb($receiver);
         try {
@@ -664,5 +698,97 @@ final class PDOErrorInfo extends PdoClassMethod
         }
         $ht->add('2', $c2);
         $frame->returnVar->array($ht);
+    }
+}
+
+/** PDO::sqliteCreateFunction — pdo_sqlite (#19863); shares expand with SQLite3::createFunction. */
+final class PDOSqliteCreateFunction extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('sqliteCreateFunction');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDO::sqliteCreateFunction()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'PDO::sqliteCreateFunction() expects at least 2 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'PDO::sqliteCreateFunction', 0, 'name');
+        if ('' === $name) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('PDO::sqliteCreateFunction() requires a VM context');
+        }
+        $callback = $frame->calledArgs[2]->resolveIndirect();
+        if (!VmCallable::isCallable($ctx, $callback)) {
+            throw new \TypeError(VmCallable::invalidCallbackTypeError('PDO::sqliteCreateFunction'));
+        }
+        $argc = -1;
+        if (\count($frame->calledArgs) >= 4) {
+            $argc = $this->intArg($frame->calledArgs[3], 'PDO::sqliteCreateFunction', 2, 'numArgs', -1);
+        }
+        [$pinned, $closureState] = SplIteratorSupport::pinCallback($callback);
+        $state = VmPDO::state($receiver);
+        $state->functions[strtolower($name)] = [
+            'callback' => $pinned,
+            'closure' => $closureState,
+            'argc' => $argc,
+            'ctx' => $ctx,
+        ];
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+}
+
+/**
+ * PDO::sqliteCreateAggregate — method present (pdo_sqlite.stub.php; #19863).
+ * Full step/finalize UDF needs FFI::callback (PHP ≥ 8.3); registration succeeds for method_exists.
+ */
+final class PDOSqliteCreateAggregate extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('sqliteCreateAggregate');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDO::sqliteCreateAggregate()');
+        if (\count($frame->calledArgs) < 4) {
+            throw new \ArgumentCountError(
+                'PDO::sqliteCreateAggregate() expects at least 3 arguments, '.(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        // Validate name + callables so TypeErrors match Zend; execution of aggregates deferred.
+        $name = $this->stringArg($frame->calledArgs[1], 'PDO::sqliteCreateAggregate', 0, 'name');
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('PDO::sqliteCreateAggregate() requires a VM context');
+        }
+        if (!VmCallable::isCallable($ctx, $frame->calledArgs[2]->resolveIndirect())
+            || !VmCallable::isCallable($ctx, $frame->calledArgs[3]->resolveIndirect())) {
+            throw new \TypeError(VmCallable::invalidCallbackTypeError('PDO::sqliteCreateAggregate'));
+        }
+        if ('' === $name) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
     }
 }
