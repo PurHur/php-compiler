@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5441 |
-| Phase A inventory files (M2 ratio SSOT) | 5441 |
+| PHP files on vm.php path | 5447 |
+| Phase A inventory files (M2 ratio SSOT) | 5447 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15333 |
+| Source constructs flagged (warnings) | 15347 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1122,7 +1122,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_strerror.php` | 0 | 3 |
 | `ext/sockets/socket_write.php` | 0 | 3 |
 | `ext/sodium/JitSodium.php` | 0 | 1 |
-| `ext/sodium/Module.php` | 0 | 51 |
+| `ext/sodium/Module.php` | 0 | 55 |
 | `ext/sodium/SodiumAeadDecryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumAeadEncryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumAuthFunction.php` | 0 | 4 |
@@ -1139,11 +1139,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/SodiumFunction.php` | 0 | 4 |
 | `ext/sodium/SodiumGenerichashFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumJitHelper.php` | 0 | 1 |
+| `ext/sodium/SodiumKdfDeriveFromKeyFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumKeygenFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumMemcmpFunction.php` | 0 | 4 |
 | `ext/sodium/SodiumPadFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumScalarmultBaseFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumScalarmultFunction.php` | 0 | 2 |
+| `ext/sodium/SodiumShorthashFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumSignFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumSignKeypairExtractFunction.php` | 0 | 2 |
 | `ext/sodium/SodiumSignOpenFunction.php` | 0 | 2 |
@@ -1171,6 +1173,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_crypto_box_seal_open.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_box_secretkey.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_generichash.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_kdf_derive_from_key.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_kdf_keygen.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_scalarmult.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_scalarmult_base.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_secretbox.php` | 0 | 1 |
@@ -1182,6 +1186,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sodium/sodium_crypto_secretstream_xchacha20poly1305_pull.php` | 0 | 3 |
 | `ext/sodium/sodium_crypto_secretstream_xchacha20poly1305_push.php` | 0 | 3 |
 | `ext/sodium/sodium_crypto_secretstream_xchacha20poly1305_rekey.php` | 0 | 2 |
+| `ext/sodium/sodium_crypto_shorthash.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_shorthash_keygen.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_sign.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_sign_detached.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_sign_keypair.php` | 0 | 1 |
@@ -13509,6 +13515,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new sodium_crypto_secretstream_xchacha20poly1305_push (line 85)
 - new sodium_crypto_secretstream_xchacha20poly1305_pull (line 86)
 - new sodium_crypto_secretstream_xchacha20poly1305_rekey (line 87)
+- new sodium_crypto_shorthash (line 88)
+- new sodium_crypto_shorthash_keygen (line 89)
+- new sodium_crypto_kdf_keygen (line 90)
+- new sodium_crypto_kdf_derive_from_key (line 91)
 - 2 class method(s)
 
 ### `ext/sodium/SodiumAeadDecryptFunction.php`
@@ -13612,6 +13622,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `ext/sodium/SodiumKdfDeriveFromKeyFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 3 class method(s)
+- 1 closure(s)
+
 ### `ext/sodium/SodiumKeygenFunction.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13642,6 +13659,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/SodiumScalarmultFunction.php`
 
 **Warnings** (review for bootstrap subset):
+- 3 class method(s)
+- 1 closure(s)
+
+### `ext/sodium/SodiumShorthashFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
 - 3 class method(s)
 - 1 closure(s)
 
@@ -13694,22 +13718,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/VmSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 765)
-- new Exception (line 777)
-- new Exception (line 786)
-- new Exception (line 802)
-- new Exception (line 1083)
-- new Exception (line 1100)
-- new Exception (line 1115)
-- new Exception (line 1132)
-- new Exception (line 1149)
-- new Exception (line 1185)
-- new Exception (line 1263)
-- new Exception (line 1689)
-- new Exception (line 1692)
-- new SodiumException (line 1754)
-- new Exception (line 1756)
-- 110 class method(s)
+- new Exception (line 854)
+- new Exception (line 866)
+- new Exception (line 875)
+- new Exception (line 891)
+- new Exception (line 1201)
+- new Exception (line 1218)
+- new Exception (line 1233)
+- new Exception (line 1250)
+- new Exception (line 1267)
+- new Exception (line 1303)
+- new Exception (line 1381)
+- new Exception (line 1807)
+- new Exception (line 1810)
+- new SodiumException (line 1872)
+- new Exception (line 1874)
+- 116 class method(s)
 
 ### `ext/sodium/VmSodiumSecretstream.php`
 
@@ -13809,6 +13833,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/sodium/sodium_crypto_kdf_derive_from_key.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_kdf_keygen.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/sodium/sodium_crypto_scalarmult.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13870,6 +13904,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 - 1 closure(s)
+
+### `ext/sodium/sodium_crypto_shorthash.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_shorthash_keygen.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/sodium/sodium_crypto_sign.php`
 
