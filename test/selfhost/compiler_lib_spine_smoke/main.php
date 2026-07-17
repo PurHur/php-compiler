@@ -513,6 +513,8 @@ require_once __DIR__.'/../../../ext/ftp/ftp_put.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_pwd.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_raw.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_rawlist.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_rename.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_rmdir.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_set_option.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_site.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_size.php';
