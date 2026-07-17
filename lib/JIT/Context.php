@@ -865,6 +865,7 @@ class Context {
         $this->functionProxies['weakmap::count'] = new Call\WeakMapMethod('count');
 
         $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();
+        $this->functionProxies['reflectionobject::__construct'] = new Call\ReflectionObjectConstruct();
         $this->functionProxies['reflectionclass::getname'] = new Call\ReflectionClassGetName();
         $this->functionProxies['reflectionclass::getshortname'] = new Call\ReflectionClassGetShortName();
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();

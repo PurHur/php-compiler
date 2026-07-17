@@ -1119,12 +1119,13 @@ final class VmReflection
         \PHPCompiler\VM\ObjectEntry $obj,
         string $reflectedClassName,
         string $propertyName,
-        string $declaringClassName
+        string $declaringClassName,
+        bool $isDynamic = false
     ): void {
         $obj->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
         $obj->getProperty(ReflectionSupport::PROP_PROPERTY_NAME)->string($propertyName);
         $obj->getProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME)->string($declaringClassName);
-        $obj->getProperty(ReflectionSupport::PROP_IS_DYNAMIC)->bool(false);
+        $obj->getProperty(ReflectionSupport::PROP_IS_DYNAMIC)->bool($isDynamic);
     }
 
     /** Static property storage key on $class or an ancestor, or null. */
@@ -2882,13 +2883,17 @@ final class VmReflection
     }
 
     /**
-     * ReflectionClass::getProperties() result array (#3815).
+     * ReflectionClass::getProperties() / ReflectionObject::getProperties() result array (#3815, #20098).
+     *
+     * When $instance is set (ReflectionObject), undeclared dynamic properties on that
+     * instance are included — php-src zim_ReflectionClass_getProperties with intern->obj.
      */
     public static function reflectionPropertiesArray(
         Context $ctx,
         ClassEntry $entry,
         string $reflectedClassName,
-        int $filter = 0
+        int $filter = 0,
+        ?\PHPCompiler\VM\ObjectEntry $instance = null
     ): Variable {
         $rpClass = $ctx->classes[\PHPCompiler\VM\ReflectionSupport::REFLECTION_PROPERTY] ?? null;
         if (null === $rpClass) {
@@ -2897,7 +2902,10 @@ final class VmReflection
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
+        /** @var array<string, true> */
+        $seenLc = [];
         foreach (self::collectClassPropertiesForReflection($entry, $ctx, $filter) as $prop) {
+            $seenLc[strtolower($prop->name)] = true;
             $obj = new \PHPCompiler\VM\ObjectEntry($rpClass);
             $obj->constructed = true;
             self::attachReflectionPropertyState(
@@ -2909,6 +2917,32 @@ final class VmReflection
             $slot = new Variable(Variable::TYPE_OBJECT);
             $slot->object($obj);
             $ht->append($slot);
+        }
+        if (null !== $instance
+            && self::propertyMatchesReflectionFilter(\PHPCfg\Func::FLAG_PUBLIC, false, $filter)
+        ) {
+            foreach ($instance->propertiesWithNames() as $name => $_) {
+                $lc = strtolower($name);
+                if (isset($seenLc[$lc])) {
+                    continue;
+                }
+                if (self::propertyExistsOnClass($entry, $name, $ctx)) {
+                    continue;
+                }
+                $seenLc[$lc] = true;
+                $obj = new \PHPCompiler\VM\ObjectEntry($rpClass);
+                $obj->constructed = true;
+                self::attachReflectionPropertyState(
+                    $obj,
+                    $reflectedClassName,
+                    $name,
+                    $reflectedClassName,
+                    true
+                );
+                $slot = new Variable(Variable::TYPE_OBJECT);
+                $slot->object($obj);
+                $ht->append($slot);
+            }
         }
 
         return $result;

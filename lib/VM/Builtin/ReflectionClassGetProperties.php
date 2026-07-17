@@ -26,8 +26,9 @@ final class ReflectionClassGetProperties extends VmClassMethod
         }
         $filter = VmReflection::optionalReflectionFilterArg($frame, 1);
         if (null !== $frame->returnVar) {
+            $instance = ReflectionSupport::objectTargetFromReflectionObject($receiver);
             $frame->returnVar->copyFrom(
-                VmReflection::reflectionPropertiesArray($ctx, $entry, $entry->name, $filter)
+                VmReflection::reflectionPropertiesArray($ctx, $entry, $entry->name, $filter, $instance)
             );
         }
     }
