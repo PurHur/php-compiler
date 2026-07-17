@@ -45,6 +45,8 @@ final class VmSimpleXml
         $entry->methodVisibility['__get'] = $pub;
         $entry->methods['__isset'] = new SimpleXmlElementIsset();
         $entry->methodVisibility['__isset'] = $pub;
+        $entry->methods['__unset'] = new SimpleXmlElementUnset();
+        $entry->methodVisibility['__unset'] = $pub;
         $entry->methods['__tostring'] = new SimpleXmlElementToString();
         $entry->methodVisibility['__tostring'] = $pub;
         $entry->methodNames['__tostring'] = '__toString';
@@ -229,6 +231,54 @@ final class VmSimpleXml
         return '' === $text || '0' === $text;
     }
 
+    /**
+     * unset($sxe->child) — unlink all direct child elements with the given name (#19681, sxe_prop_dim_delete).
+     */
+    public static function unsetChildProperty(ObjectEntry $entry, string $name): void
+    {
+        if ('' === $name || SimpleXmlRegistry::isAttributesView($entry)) {
+            return;
+        }
+        if (SimpleXmlRegistry::isView($entry)) {
+            $docKey = SimpleXmlRegistry::documentKey($entry);
+            foreach (SimpleXmlRegistry::view($entry) as $node) {
+                self::removeNodeFromTree($docKey, $node);
+            }
+
+            return;
+        }
+        $state = SimpleXmlRegistry::state($entry);
+        $state->children = array_values(array_filter(
+            $state->children,
+            static fn (SimpleXmlNodeState $child): bool => $child->name !== $name
+        ));
+    }
+
+    /**
+     * Remove a node from the in-memory tree by reference (shared SimpleXmlNodeState objects).
+     */
+    private static function removeNodeFromTree(int $documentKey, SimpleXmlNodeState $target): void
+    {
+        $root = SimpleXmlRegistry::rootState($documentKey);
+        self::removeNodeFromParent($root, $target);
+    }
+
+    private static function removeNodeFromParent(SimpleXmlNodeState $parent, SimpleXmlNodeState $target): bool
+    {
+        foreach ($parent->children as $index => $child) {
+            if ($child === $target) {
+                array_splice($parent->children, $index, 1);
+
+                return true;
+            }
+            if (self::removeNodeFromParent($child, $target)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function offsetGet(Context $ctx, ObjectEntry $entry, Variable $offset): Variable
     {
         $offset = $offset->resolveIndirect();
@@ -404,14 +454,9 @@ final class VmSimpleXml
 
                 return;
             }
-            // Full element deletion needs a parent pointer; clear node content like a soft unset
-            // of the selected node's payload (attribute unset is the ArrayAccess write companion).
             $elements = SimpleXmlRegistry::view($entry);
             if ($index >= 0 && $index < \count($elements)) {
-                $node = $elements[$index];
-                $node->attributes = [];
-                $node->children = [];
-                $node->text = '';
+                self::removeNodeFromTree(SimpleXmlRegistry::documentKey($entry), $elements[$index]);
             }
 
             return;

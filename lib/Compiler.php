@@ -5732,17 +5732,20 @@ class Compiler {
     }
 
     /**
-     * @return array{0: int, 1: ?int}
+     * @return array{0: int, 1: ?int, 2: bool}
      */
     protected function resolveUnsetTarget($expr, Block $block): array
     {
         if ($expr instanceof Op\Expr\ArrayDimFetch) {
-            return $this->resolveIssetTargetFromArrayDimFetch($expr, $block);
+            [$containerSlot, $dimSlot] = $this->resolveIssetTargetFromArrayDimFetch($expr, $block);
+
+            return [$containerSlot, $dimSlot, false];
         }
         if ($expr instanceof Op\Expr\PropertyFetch) {
             return [
                 $this->compileOperand($expr->var, $block, true),
                 $this->compileOperand($expr->name, $block, true),
+                true,
             ];
         }
         if ($expr instanceof Op\Expr\StaticPropertyFetch) {
@@ -5753,18 +5756,22 @@ class Compiler {
         if ($expr instanceof Operand) {
             $dimFetch = $this->findCoalesceArrayDimFetch($expr, $block);
             if (null !== $dimFetch) {
-                return $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block);
+                [$containerSlot, $dimSlot] = $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block);
+
+                return [$containerSlot, $dimSlot, false];
             }
             foreach ($block->orig->children as $child) {
                 if ($child instanceof Op\Expr\PropertyFetch && $child->result === $expr) {
                     return [
                         $this->compileOperand($child->var, $block, true),
                         $this->compileOperand($child->name, $block, true),
+                        true,
                     ];
                 }
             }
+            [$containerSlot, $dimSlot] = $this->resolveIssetTarget($expr, $block);
 
-            return $this->resolveIssetTarget($expr, $block);
+            return [$containerSlot, $dimSlot, false];
         }
 
         $this->throwCompileLogic('Unsupported unset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));
@@ -36693,13 +36700,15 @@ class Compiler {
                         );
                         continue;
                     }
-                    [$containerSlot, $dimSlot] = $this->resolveUnsetTarget($unsetExpr, $block);
-                    $ops[] = new OpCode(
+                    [$containerSlot, $dimSlot, $unsetOnProperty] = $this->resolveUnsetTarget($unsetExpr, $block);
+                    $unsetOp = new OpCode(
                         OpCode::TYPE_UNSET,
                         null,
                         $containerSlot,
                         $dimSlot
                     );
+                    $unsetOp->unsetOnProperty = $unsetOnProperty;
+                    $ops[] = $unsetOp;
                 }
 
                 return $ops;

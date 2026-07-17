@@ -1054,6 +1054,7 @@ require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementOffsetExists.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementOffsetGet.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementOffsetSet.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementOffsetUnset.php';
+require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementUnset.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementRegisterXPathNamespace.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementToString.php';
 require_once __DIR__.'/../../../ext/simplexml/SimpleXmlElementXpath.php';

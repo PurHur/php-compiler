@@ -5198,12 +5198,33 @@ restart:
                     }
                     if (Variable::TYPE_OBJECT === $container->type) {
                         $object = $container->toObject();
-                        if ($this->objectImplementsArrayAccess($object)) {
+                        if (
+                            !$op->unsetOnProperty
+                            && $this->objectImplementsArrayAccess($object)
+                        ) {
                             $catchFrame = $this->invokeArrayAccessOffsetUnset($object, $key, $frame);
                             if (null !== $catchFrame) {
                                 $frame = $catchFrame;
                                 goto restart;
                             }
+                            break;
+                        }
+                        if (
+                            $op->unsetOnProperty
+                            && ext\simplexml\VmSimpleXml::CLASS_LC === strtolower($object->class->name)
+                            && ext\simplexml\SimpleXmlRegistry::has($object)
+                        ) {
+                            [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($key, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            $catchFrame = $this->enforcePropertyName($propName, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            ext\simplexml\VmSimpleXml::unsetChildProperty($object, $propName);
                             break;
                         }
                         [$propName, $catchFrame] = $this->coerceRuntimeOperandToString($key, $frame);
