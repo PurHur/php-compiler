@@ -52,6 +52,8 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -5476,6 +5478,28 @@ require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterToStream.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterToUri.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartAttributeNS.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartElementNS.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_alloc.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_append.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_chmod.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_get_option.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_raw.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_set_option.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_site.php';
+require_once __DIR__.'/../../../ext/pcntl/pcntl_get_last_error.php';
+require_once __DIR__.'/../../../ext/pcntl/pcntl_strerror.php';
+require_once __DIR__.'/../../../ext/pcntl/pcntl_unshare.php';
+require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterEndDtdElement.php';
+require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartDtdElement.php';
+require_once __DIR__.'/../../../ext/xmlwriter/xmlwriter_end_dtd_element.php';
+require_once __DIR__.'/../../../ext/xmlwriter/xmlwriter_start_dtd_element.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumBoxFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumBoxKeypairFromFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumBoxOpenFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumBoxPublickeyFromSecretkeyFunction.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_keypair_from_secretkey_and_publickey.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_open.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_publickey_from_secretkey.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -5508,8 +5532,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterEndDtdElement.php';
-require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartDtdElement.php';
-require_once __DIR__.'/../../../ext/xmlwriter/xmlwriter_end_dtd_element.php';
-require_once __DIR__.'/../../../ext/xmlwriter/xmlwriter_start_dtd_element.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
