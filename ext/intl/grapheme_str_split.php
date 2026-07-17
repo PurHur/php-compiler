@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\HashTable;
@@ -18,7 +19,7 @@ use PHPLLVM\Value;
 /**
  * grapheme_str_split() — split string into grapheme clusters (php-src ext/intl/grapheme; #5958).
  *
- * VM: {@see VmGrapheme}; JIT: compile-time fold via {@see JitGrapheme} (runtime defer #5958).
+ * VM: {@see VmGrapheme}; JIT: compile-time fold via {@see JitGrapheme::tryStrSplitFold} (#5958, #6246).
  */
 final class grapheme_str_split extends Internal
 {
@@ -76,9 +77,14 @@ final class grapheme_str_split extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('grapheme_str_split() requires one or two arguments');
         }
+        $folded = JitGrapheme::tryStrSplitFold($context, $args);
+        if (null !== $folded) {
+            return $folded;
+        }
+        JitStringBuiltinArg::lower($context, $args[0], 'grapheme_str_split', 0, 'string');
 
         throw new \LogicException(
-            'grapheme_str_split() JIT runtime lowering is deferred; use VM (#5958)'
+            'grapheme_str_split() JIT runtime lowering is deferred; use VM or compile-time literals (#5958)'
         );
     }
 }
