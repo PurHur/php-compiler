@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\phar;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -20,13 +19,8 @@ final class VmPharData
 {
     public const CLASS_LC = 'phardata';
 
-    public const FILEINFO_LC = 'pharfileinfo';
-
     /** @var array<int, array{path: string, files: array<string, string>, dirty: bool}> */
     private static array $state = [];
-
-    /** @var array<int, array{content: string, name: string}> */
-    private static array $fileInfoState = [];
 
     public static function bind(ObjectEntry $object, string $path, array $files, bool $dirty): void
     {
@@ -116,14 +110,8 @@ final class VmPharData
         if (!isset($st['files'][$localname])) {
             throw new \BadMethodCallException('Entry '.$localname.' does not exist');
         }
-        self::registerFileInfoClass($ctx);
         $var = new Variable(Variable::TYPE_OBJECT);
-        $info = new ObjectEntry($ctx->classes[self::FILEINFO_LC]);
-        $info->constructed = true;
-        self::$fileInfoState[$info->id] = [
-            'content' => $st['files'][$localname],
-            'name' => $localname,
-        ];
+        $info = VmPharFileInfo::createFromEntry($ctx, $st['path'], $localname, $st['files'][$localname]);
         $var->object($info);
 
         return $var;
@@ -131,11 +119,7 @@ final class VmPharData
 
     public static function fileInfoContent(ObjectEntry $info): string
     {
-        if (!isset(self::$fileInfoState[$info->id])) {
-            throw new \Error('PharFileInfo is uninitialized');
-        }
-
-        return self::$fileInfoState[$info->id]['content'];
+        return VmPharFileInfo::state($info)['content'];
     }
 
     public static function requireReceiver(Frame $frame, string $method): ObjectEntry
@@ -183,18 +167,5 @@ final class VmPharData
         }
 
         return self::$state[$object->id];
-    }
-
-    private static function registerFileInfoClass(Context $ctx): void
-    {
-        if (isset($ctx->classes[self::FILEINFO_LC])) {
-            return;
-        }
-        $entry = new ClassEntry('PharFileInfo');
-        $entry->isInternal = true;
-        $entry->methods['getcontent'] = new PharFileInfoGetContent();
-        $entry->methodVisibility['getcontent'] = \PHPCfg\Func::FLAG_PUBLIC;
-        $entry->methodNames['getcontent'] = 'getContent';
-        $ctx->classes[self::FILEINFO_LC] = $entry;
     }
 }

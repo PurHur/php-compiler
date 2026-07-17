@@ -926,6 +926,7 @@ require_once __DIR__.'/../../../ext/phar/PharDataBuiltin.php';
 require_once __DIR__.'/../../../ext/phar/PharExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/phar/VmPhar.php';
 require_once __DIR__.'/../../../ext/phar/VmPharData.php';
+require_once __DIR__.'/../../../ext/phar/VmPharFileInfo.php';
 require_once __DIR__.'/../../../ext/phar/VmPharTar.php';
 require_once __DIR__.'/../../../ext/posix/JitPosix.php';
 require_once __DIR__.'/../../../ext/posix/JitPosixTimes.php';

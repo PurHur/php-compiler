@@ -213,24 +213,3 @@ final class PharDataOffsetUnset extends VmClassMethod
         // Phase-1 stub: membership delete deferred (tar rewrite).
     }
 }
-
-final class PharFileInfoGetContent extends VmClassMethod
-{
-    public function __construct()
-    {
-        parent::__construct('getContent');
-    }
-
-    public function execute(Frame $frame): void
-    {
-        if (null === $frame->returnVar) {
-            return;
-        }
-        $receiver = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $receiver->type) {
-            throw new \TypeError('PharFileInfo::getContent() must be called on object');
-        }
-        $content = VmPharData::fileInfoContent($receiver->toObject());
-        $frame->returnVar->string($content);
-    }
-}

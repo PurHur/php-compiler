@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5322 |
-| Phase A inventory files (M2 ratio SSOT) | 5322 |
+| PHP files on vm.php path | 5323 |
+| Phase A inventory files (M2 ratio SSOT) | 5323 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14853 |
+| Source constructs flagged (warnings) | 14855 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -875,7 +875,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/phar/PharDataBuiltin.php` | 0 | 9 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 1 |
-| `ext/phar/VmPharData.php` | 0 | 13 |
+| `ext/phar/VmPharData.php` | 0 | 9 |
+| `ext/phar/VmPharFileInfo.php` | 0 | 6 |
 | `ext/phar/VmPharTar.php` | 0 | 1 |
 | `ext/posix/JitPosix.php` | 0 | 1 |
 | `ext/posix/JitPosixTimes.php` | 0 | 1 |
@@ -11329,14 +11330,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 33)
-- new PharRunning (line 36)
-- new PharCanWrite (line 40)
-- new PharCanCompress (line 44)
-- new PharApiVersion (line 48)
-- new PharIsValidPharFilename (line 52)
-- new Variable (line 61)
-- new ArgumentCountError (line 144)
+- new ClassEntry (line 34)
+- new PharRunning (line 37)
+- new PharCanWrite (line 41)
+- new PharCanCompress (line 45)
+- new PharApiVersion (line 49)
+- new PharIsValidPharFilename (line 53)
+- new Variable (line 62)
+- new ArgumentCountError (line 145)
 - 6 class method(s)
 - 8 closure(s)
 
@@ -11356,7 +11357,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 151)
 - new ArgumentCountError (line 171)
 - new ArgumentCountError (line 194)
-- 9 class method(s)
+- 8 class method(s)
 
 ### `ext/phar/PharExtensionPolicy.php`
 
@@ -11371,19 +11372,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPharData.php`
 
 **Warnings** (review for bootstrap subset):
-- new UnexpectedValueException (line 46)
-- new UnexpectedValueException (line 59)
-- new UnexpectedValueException (line 71)
-- new BadMethodCallException (line 117)
-- new Variable (line 120)
-- new ObjectEntry (line 121)
-- new Error (line 135)
-- new Error (line 144)
-- new UnexpectedValueException (line 171)
-- new Error (line 182)
-- new ClassEntry (line 193)
-- new PharFileInfoGetContent (line 195)
-- 13 class method(s)
+- new UnexpectedValueException (line 40)
+- new UnexpectedValueException (line 53)
+- new UnexpectedValueException (line 65)
+- new BadMethodCallException (line 111)
+- new Variable (line 113)
+- new Error (line 128)
+- new UnexpectedValueException (line 155)
+- new Error (line 166)
+- 12 class method(s)
+
+### `ext/phar/VmPharFileInfo.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 38)
+- new PharFileInfoConstruct (line 42)
+- new ObjectEntry (line 72)
+- new Error (line 107)
+- new ArgumentCountError (line 139)
+- 11 class method(s)
 
 ### `ext/phar/VmPharTar.php`
 
