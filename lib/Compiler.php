@@ -21171,6 +21171,23 @@ class Compiler {
 
                 return null;
             }
+            // array_reduce([...], fn(...), [...]) — input Array_(s) + closure + initial Array_
+            // (#5626). Generic pair logic below takes the *last* Array_ as the sole haystack and
+            // returns null for arg #2, scrambling input/callback/initial when both are inline.
+            if (
+                'array_reduce' === $inlineFuncName
+                && null !== $closureProducerIndex
+                && \count($callArgs) >= 3
+            ) {
+                $arrayReduceWired = $this->matchArrayReduceInlineArrayClosureInitialProducer(
+                    $producers,
+                    $argIndex,
+                    $closureProducerIndex
+                );
+                if (null !== $arrayReduceWired) {
+                    return $arrayReduceWired;
+                }
+            }
             // array_map(fn(...), [...]) / array_reduce([...], fn(...)) — closure + inline Array_ (#10651, #10775).
             // Guard callbackArgIndex >= 0: otherwise 1-(-1)=2 binds limit/flags to the Array_ (#19697).
             if (null !== $closureProducerIndex && null !== $arrayProducerIndex) {
@@ -24395,6 +24412,24 @@ class Compiler {
                     || $prev instanceof Op\Expr\ArrowFunction
                     || $prev instanceof Op\Expr\FirstClassCallable) {
                     array_unshift($producers, $prev);
+                    // array_reduce([...], fn(...), [...]) — CFG is Array_input, Closure, Array_initial.
+                    // Breaking here drops the input Array_, so pair-wiring binds initial [] to arg #0 (#5626).
+                    if ('array_reduce' === strtolower($this->resolveCfgFuncCallName($callOp) ?? '')) {
+                        for ($k = $i - 2; $k >= 0; --$k) {
+                            $before = $cfgChildren[$k];
+                            if (
+                                $before instanceof Op\Expr\ClassConstFetch
+                                || $before instanceof Op\Expr\ConstFetch
+                            ) {
+                                // Enum/scalar elements of the input Array_ — keep walking (#5626).
+                                continue;
+                            }
+                            if ($before instanceof Op\Expr\Array_) {
+                                array_unshift($producers, $before);
+                            }
+                            break;
+                        }
+                    }
                     break;
                 }
                 // php-cfg: `invokeArgs(new C(), [...])` — New_ immediately precedes Array_ (#9904).
@@ -35943,6 +35978,107 @@ class Compiler {
         );
     }
 
+    /**
+     * array_reduce([...], fn(...), [...]) — two+ inline Array_ producers before the call (#5626).
+     */
+    private function arrayReduceCfgCallHasMultipleInlineArrayProducers(Block $block, Op $cfgCallOp): bool
+    {
+        $cfgChildren = $this->inlineCallArgProducerCfgChildren($block);
+        if ([] === $cfgChildren && null !== $block->orig) {
+            $cfgChildren = $block->orig->children;
+        }
+        if ([] === $cfgChildren) {
+            return false;
+        }
+        $callIndex = null;
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return false;
+        }
+        $arrayCount = 0;
+        for ($i = 0; $i < $callIndex; ++$i) {
+            if (($cfgChildren[$i] ?? null) instanceof Op\Expr\Array_) {
+                ++$arrayCount;
+                if ($arrayCount >= 2) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * array_reduce([...], fn(...), [...]) — wire input Array_ chain, closure, initial Array_ (#5626).
+     *
+     * Skips ClassConstFetch/ConstFetch preludes (enum case elements) before the first Array_.
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchArrayReduceInlineArrayClosureInitialProducer(
+        array $producers,
+        int $argIndex,
+        int $closureProducerIndex
+    ): ?Op\Expr {
+        $arrayCount = 0;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                ++$arrayCount;
+            }
+        }
+        if ($arrayCount < 2) {
+            return null;
+        }
+        $firstArrayPi = null;
+        foreach ($producers as $pi => $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                $firstArrayPi = $pi;
+                break;
+            }
+        }
+        if (null === $firstArrayPi) {
+            return null;
+        }
+        $fromFirstArray = \array_slice($producers, $firstArrayPi);
+        $leading = $this->splitLeadingNestedArrayLiteralChainWithRemainingProducers($fromFirstArray);
+        if (null === $leading) {
+            return null;
+        }
+        [$chain, $remaining] = $leading;
+        if ([] === $chain) {
+            return null;
+        }
+        $inputArray = $chain[\count($chain) - 1];
+        if (!$inputArray instanceof Op\Expr\Array_) {
+            return null;
+        }
+        $initialArray = null;
+        foreach ($remaining as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                $initialArray = $producer;
+            }
+        }
+        if (null === $initialArray || $initialArray === $inputArray) {
+            return null;
+        }
+        if (0 === $argIndex) {
+            return $inputArray;
+        }
+        if (1 === $argIndex) {
+            return $producers[$closureProducerIndex];
+        }
+        if (2 === $argIndex) {
+            return $initialArray;
+        }
+
+        return null;
+    }
+
     /** Callback arg index for closure + inline Array_ hoists (array_map vs array_reduce, #10775). */
     private function inlineClosureArrayPairCallbackArgIndex(?string $funcName): int
     {
@@ -41835,16 +41971,33 @@ class Compiler {
                     ));
                     if (
                         'proc_open' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                        || 'array_reduce' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
                         || (
                             \count($siblingArrayProducers) >= 2
                             && !$this->arrayProducersFormNestedChain($siblingArrayProducers)
                         )
                     ) {
-                        $inlineArrayProducer = $this->matchInlineArrayProducersToArrayCallArgs(
-                            $arrayArgProducers,
-                            $cfgCallOp->args ?? [],
-                            (int) $argIndex
-                        );
+                        // array_reduce([...], fn, []) — arg0 is often inferred:unknown so the sole
+                        // array-typed dead temp is initial []; matchInlineArrayProducersToArrayCallArgs
+                        // would bind it to the *first* Array_ (input) (#5626).
+                        if ('array_reduce' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')) {
+                            $reduceMatched = $this->matchInlineCallArgProducer(
+                                $arrayArgProducers,
+                                $cfgCallOp->args ?? [],
+                                (int) $argIndex,
+                                $cfgCallOp,
+                                $block
+                            );
+                            $inlineArrayProducer = $reduceMatched instanceof Op\Expr\Array_
+                                ? $reduceMatched
+                                : null;
+                        } else {
+                            $inlineArrayProducer = $this->matchInlineArrayProducersToArrayCallArgs(
+                                $arrayArgProducers,
+                                $cfgCallOp->args ?? [],
+                                (int) $argIndex
+                            );
+                        }
                     }
                     }
                 }
@@ -41900,7 +42053,21 @@ class Compiler {
                     );
                 }
                 if ($inlineArrayProducer instanceof Op\Expr\Array_) {
-                    $inlineArraySlot = $block->slotForOperand($inlineArrayProducer->result);
+                    $inlineArraySlot = null;
+                    if (
+                        'array_reduce' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                        && $this->arrayReduceCfgCallHasMultipleInlineArrayProducers($block, $cfgCallOp)
+                    ) {
+                        $inlineArraySlot = $this->slotForInitArrayProducerBeforeCfgCall(
+                            $block,
+                            $cfgCallOp,
+                            $inlineArrayProducer,
+                            $sends
+                        );
+                    }
+                    if (null === $inlineArraySlot) {
+                        $inlineArraySlot = $block->slotForOperand($inlineArrayProducer->result);
+                    }
                     if (null === $inlineArraySlot) {
                         $inlineArrayOps = $this->compileArrayLiteral($inlineArrayProducer, $block);
                         if ([] !== $inlineArrayOps) {
@@ -42234,6 +42401,64 @@ class Compiler {
                 );
                 if ($unpackMatch instanceof Op\Expr\Array_) {
                     $inlineArray = $unpackMatch;
+                }
+            }
+            // array_reduce([...], fn(...), [...]) — bind each Array_/closure ARG_SEND by producer ordinal (#5626).
+            if (
+                null !== $cfgCallOp
+                && 'array_reduce' === $this->resolveCfgFuncCallName($cfgCallOp)
+                && null !== $block->orig
+                && $this->arrayReduceCfgCallHasMultipleInlineArrayProducers($block, $cfgCallOp)
+            ) {
+                $reduceProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                $reduceMatched = $this->matchInlineCallArgProducer(
+                    $reduceProducers,
+                    $cfgCallOp->args ?? [],
+                    (int) $argIndex,
+                    $cfgCallOp,
+                    $block
+                );
+                if ($reduceMatched instanceof Op\Expr\Array_) {
+                    $reduceSlot = $this->slotForInitArrayProducerBeforeCfgCall(
+                        $block,
+                        $cfgCallOp,
+                        $reduceMatched,
+                        $sends
+                    );
+                    if (null !== $reduceSlot) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            $reduceSlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
+                    }
+                }
+                if (
+                    $reduceMatched instanceof Op\Expr\Closure
+                    || $reduceMatched instanceof Op\Expr\ArrowFunction
+                    || $reduceMatched instanceof Op\Expr\FirstClassCallable
+                ) {
+                    $closureSlot = $block->slotForOperand($reduceMatched->result);
+                    if (null === $closureSlot) {
+                        foreach ($this->compileExpr($reduceMatched, $block) as $op) {
+                            $sends[] = $op;
+                        }
+                        $closureSlot = $block->slotForOperand($reduceMatched->result);
+                    }
+                    if (null !== $closureSlot) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            (string) $closureSlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
+                    }
                 }
             }
             if (null !== $inlineArray && null !== $cfgCallOp && null !== $block->orig) {
@@ -42669,17 +42894,25 @@ class Compiler {
                 if (!$inlineArrayLiteralArgWired) {
                 $existingArraySlot = null;
                 // array_combine([...], [...]) — sibling Array_ producers map by index; never reuse "recent" init slot (#16080, #10214).
+                // array_reduce([...], fn, [...]) — same: initial [] must not steal input INIT_ARRAY (#5626).
                 $arrayCombineSiblingArray = null !== $cfgCallOp
                     && 'array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)
                     && $inlineArray instanceof Op\Expr\Array_;
+                $arrayReduceSiblingArrays = null !== $cfgCallOp
+                    && 'array_reduce' === $this->resolveCfgFuncCallName($cfgCallOp)
+                    && $inlineArray instanceof Op\Expr\Array_
+                    && null !== $block->orig
+                    && $this->arrayReduceCfgCallHasMultipleInlineArrayProducers($block, $cfgCallOp);
                 if (
                     $arrayCombineSiblingArray
+                    || $arrayReduceSiblingArrays
                     || !$this->callArgIsDeadInlineTemporary($callArgProbeForArray)
                     || !$this->callArgOperandExpectsArrayProducer($callArgProbeForArray)
                 ) {
-                    if ($arrayCombineSiblingArray && null !== $cfgCallOp) {
+                    if (($arrayCombineSiblingArray || $arrayReduceSiblingArrays) && null !== $cfgCallOp) {
                         // Sequential array_combine(array(...), array(...)) — operand slots from the first
                         // call must not be reused via slotForOperand (#17629, re-#16080, #10214).
+                        // array_reduce([...], fn, []) — map each Array_ to its INIT_ARRAY ordinal (#5626).
                         $existingArraySlot = $this->slotForInitArrayProducerBeforeCfgCall(
                             $block,
                             $cfgCallOp,
@@ -42728,6 +42961,7 @@ class Compiler {
                         && $this->callArgIsDeadInlineTemporary($callArgProbeForArray)
                         && $this->callArgOperandExpectsArrayProducer($callArgProbeForArray)
                         && !$arrayCombineSiblingArray
+                        && !$arrayReduceSiblingArrays
                     ) {
                         $initSlot = $this->slotForRecentInitArrayCallArg($block);
                     }
