@@ -2993,6 +2993,10 @@ final class VmDom
         $state = new DomNodeState();
         $state->nodeType = DomConstants::XML_DOCUMENT_FRAG_NODE;
         $state->nodeName = '#document-fragment';
+        // php-src ext/dom/document.c dom_document_create_document_fragment — owner is creating document (#20203).
+        if (null !== $ownerDocument && self::isDocument($ownerDocument)) {
+            $state->documentId = $ownerDocument->id;
+        }
         DomRegistry::attach($entry, $state);
         self::ensureChildNodesList($ctx, $entry);
 

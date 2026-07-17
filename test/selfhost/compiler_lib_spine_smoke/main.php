@@ -326,6 +326,7 @@ require_once __DIR__.'/../../../ext/dom/JitDomAppendChildUserScript.php';
 require_once __DIR__.'/../../../ext/dom/JitDomAttributeNodeNS.php';
 require_once __DIR__.'/../../../ext/dom/JitDomC14N.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateComment.php';
+require_once __DIR__.'/../../../ext/dom/JitDomCreateDocumentFragment.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateDocumentType.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateElement.php';
 require_once __DIR__.'/../../../ext/dom/JitDomCreateElementNS.php';
