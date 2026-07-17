@@ -3315,6 +3315,107 @@ final class VmDateTimeNative
     }
 
     /**
+     * php-src php_date_isodate_set / timelib_date_from_isodate — ISO week-year → Y-M-D (#19847).
+     *
+     * @return array{timestamp: int, microsecond: int}
+     */
+    public static function replaceISODateComponents(
+        int $timestamp,
+        int $microsecond,
+        string $tzName,
+        int $year,
+        int $week,
+        int $dayOfWeek
+    ): array {
+        [$y, $m, $d] = self::ymdFromIsoDate($year, $week, $dayOfWeek);
+
+        return self::replaceDateComponents($timestamp, $microsecond, $tzName, $y, $m, $d);
+    }
+
+    /**
+     * php-src timelib_date_from_isodate (ext/date/lib/dow.c).
+     *
+     * @return array{0: int, 1: int, 2: int} year, month, day
+     */
+    public static function ymdFromIsoDate(int $isoYear, int $isoWeek, int $isoDay): array
+    {
+        $daynr = self::daynrFromWeeknr($isoYear, $isoWeek, $isoDay) + 1;
+        $y = $isoYear;
+        $isLeap = self::isLeapYearGregorian($y);
+
+        while ($daynr <= 0) {
+            --$y;
+            $isLeap = self::isLeapYearGregorian($y);
+            $daynr += $isLeap ? 366 : 365;
+        }
+
+        while ($daynr > ($isLeap ? 366 : 365)) {
+            $daynr -= $isLeap ? 366 : 365;
+            ++$y;
+            $isLeap = self::isLeapYearGregorian($y);
+        }
+
+        $table = $isLeap
+            ? [0, 31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+            : [0, 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+        $m = 1;
+        while ($daynr > $table[$m]) {
+            $daynr -= $table[$m];
+            ++$m;
+        }
+
+        return [$y, $m, $daynr];
+    }
+
+    /**
+     * php-src timelib_daynr_from_weeknr (ext/date/lib/dow.c).
+     */
+    private static function daynrFromWeeknr(int $isoYear, int $isoWeek, int $isoDay): int
+    {
+        $dow = self::timelibDayOfWeek($isoYear, 1, 1);
+        $day = 0 - ($dow > 4 ? $dow - 7 : $dow);
+
+        return $day + (($isoWeek - 1) * 7) + $isoDay;
+    }
+
+    /**
+     * php-src timelib_day_of_week — Sunday=0 … Saturday=6 (ext/date/lib/dow.c).
+     */
+    private static function timelibDayOfWeek(int $year, int $month, int $day): int
+    {
+        // m_table_common / m_table_leap from timelib dow.c (1 = January).
+        static $mTableCommon = [-1, 0, 3, 3, 6, 1, 4, 6, 2, 5, 0, 3, 5];
+        static $mTableLeap = [-1, 6, 2, 3, 6, 1, 4, 6, 2, 5, 0, 3, 5];
+
+        $c1 = self::timelibCenturyValue(\intdiv(self::positiveMod($year, 400), 100));
+        $y1 = self::positiveMod($year, 100);
+        $m1 = self::isLeapYearGregorian($year) ? $mTableLeap[$month] : $mTableCommon[$month];
+
+        return self::positiveMod(($c1 + $y1 + $m1 + \intdiv($y1, 4) + $day), 7);
+    }
+
+    private static function timelibCenturyValue(int $j): int
+    {
+        return 6 - self::positiveMod($j, 4) * 2;
+    }
+
+    private static function positiveMod(int $x, int $y): int
+    {
+        $tmp = $x % $y;
+        if ($tmp < 0) {
+            $tmp += $y;
+        }
+
+        return $tmp;
+    }
+
+    /** Gregorian leap year (timelib_is_leap). */
+    private static function isLeapYearGregorian(int $year): bool
+    {
+        return 0 === ($year % 4) && (0 !== ($year % 100) || 0 === ($year % 400));
+    }
+
+    /**
      * php-src date_object_set_time — replace H:i:s.u, preserve calendar date (#12469).
      *
      * @return array{timestamp: int, microsecond: int}
