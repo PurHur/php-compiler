@@ -28,7 +28,7 @@ final class deflate_add extends ZlibIncrementalFunction
         $data = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'deflate_add', 2, 'data');
         $flush = \ZLIB_NO_FLUSH;
         if (3 === $argc) {
-            $flush = VmZlibArg::requireInt($frame->calledArgs[2], 'deflate_add', 3, 'flush');
+            $flush = VmZlibArg::coerceInt($frame, 2, 'deflate_add', 3, 'flush_mode');
         }
         if (null === $frame->returnVar) {
             return;

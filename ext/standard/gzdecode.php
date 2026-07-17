@@ -28,7 +28,7 @@ final class gzdecode extends Internal
         $data = VmZlibArg::resolveDataString($frame, 'gzdecode');
         $maxLength = 0;
         if (2 === $argc) {
-            $maxLength = VmZlibArg::requireInt($frame->calledArgs[1], 'gzdecode', 2, 'max_length');
+            $maxLength = VmZlibArg::coerceInt($frame, 1, 'gzdecode', 2, 'max_length');
         }
         if (null === $frame->returnVar) {
             return;

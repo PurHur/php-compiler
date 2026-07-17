@@ -29,10 +29,10 @@ final class gzencode extends Internal
         $level = -1;
         $encoding = \ZLIB_ENCODING_GZIP;
         if ($argc >= 2) {
-            $level = VmZlibArg::requireLevel($frame->calledArgs[1], 'gzencode');
+            $level = VmZlibArg::coerceLevel($frame, 1, 'gzencode');
         }
         if (3 === $argc) {
-            $encoding = VmZlibArg::requireInt($frame->calledArgs[2], 'gzencode', 3, 'encoding');
+            $encoding = VmZlibArg::coerceInt($frame, 2, 'gzencode', 3, 'encoding');
         }
         if (null === $frame->returnVar) {
             return;

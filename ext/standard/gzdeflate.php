@@ -29,10 +29,10 @@ final class gzdeflate extends Internal
         $level = -1;
         $encoding = \ZLIB_ENCODING_RAW;
         if ($argc >= 2) {
-            $level = VmZlibArg::requireLevel($frame->calledArgs[1], 'gzdeflate');
+            $level = VmZlibArg::coerceLevel($frame, 1, 'gzdeflate');
         }
         if (3 === $argc) {
-            $encoding = VmZlibArg::requireInt($frame->calledArgs[2], 'gzdeflate', 3, 'encoding');
+            $encoding = VmZlibArg::coerceInt($frame, 2, 'gzdeflate', 3, 'encoding');
         }
         if (null === $frame->returnVar) {
             return;
