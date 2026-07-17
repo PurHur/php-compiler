@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5375 |
-| Phase A inventory files (M2 ratio SSOT) | 5375 |
+| PHP files on vm.php path | 5381 |
+| Phase A inventory files (M2 ratio SSOT) | 5381 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15098 |
+| Source constructs flagged (warnings) | 15121 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -586,7 +586,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_init.php` | 0 | 2 |
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
-| `ext/intl/BuiltinClasses.php` | 0 | 16 |
+| `ext/intl/BuiltinClasses.php` | 0 | 19 |
 | `ext/intl/GraphemeStrSplitJitHelper.php` | 0 | 3 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
@@ -598,14 +598,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/JitGrapheme.php` | 0 | 4 |
 | `ext/intl/JitGraphemeStrSplit.php` | 0 | 1 |
 | `ext/intl/JitLocaleParser.php` | 0 | 1 |
+| `ext/intl/LocaleAcceptFromHttp.php` | 0 | 2 |
+| `ext/intl/LocaleFilterMatches.php` | 0 | 3 |
 | `ext/intl/LocaleGetDefault.php` | 0 | 2 |
 | `ext/intl/LocaleGetDisplayName.php` | 0 | 3 |
 | `ext/intl/LocaleGetPrimaryLanguage.php` | 0 | 2 |
 | `ext/intl/LocaleGetRegion.php` | 0 | 2 |
 | `ext/intl/LocaleGetScript.php` | 0 | 2 |
+| `ext/intl/LocaleLookup.php` | 0 | 3 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 33 |
+| `ext/intl/Module.php` | 0 | 36 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -618,7 +621,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmIntlChar.php` | 0 | 7 |
 | `ext/intl/VmIntlDateFormatter.php` | 0 | 4 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 12 |
-| `ext/intl/VmLocale.php` | 0 | 1 |
+| `ext/intl/VmLocale.php` | 0 | 2 |
 | `ext/intl/VmMessageFormatter.php` | 0 | 18 |
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/VmNumberFormatter.php` | 0 | 11 |
@@ -644,10 +647,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/intl_get_error_code.php` | 0 | 1 |
 | `ext/intl/intl_get_error_message.php` | 0 | 1 |
 | `ext/intl/intl_is_failure.php` | 0 | 1 |
+| `ext/intl/locale_accept_from_http.php` | 0 | 2 |
+| `ext/intl/locale_filter_matches.php` | 0 | 3 |
 | `ext/intl/locale_get_default.php` | 0 | 2 |
 | `ext/intl/locale_get_primary_language.php` | 0 | 3 |
 | `ext/intl/locale_get_region.php` | 0 | 3 |
 | `ext/intl/locale_get_script.php` | 0 | 3 |
+| `ext/intl/locale_lookup.php` | 0 | 3 |
 | `ext/intl/locale_set_default.php` | 0 | 2 |
 | `ext/intl/msgfmt_create.php` | 0 | 3 |
 | `ext/intl/msgfmt_format.php` | 0 | 3 |
@@ -9193,10 +9199,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new LocaleGetRegion (line 116)
 - new LocaleGetScript (line 117)
 - new LocaleGetDisplayName (line 118)
-- new ClassEntry (line 134)
-- new IntlDateFormatterCreate (line 145)
-- new IntlDateFormatterFormat (line 148)
-- new ClassEntry (line 231)
+- new LocaleLookup (line 119)
+- new LocaleFilterMatches (line 120)
+- new LocaleAcceptFromHttp (line 121)
+- new ClassEntry (line 137)
+- new IntlDateFormatterCreate (line 148)
+- new IntlDateFormatterFormat (line 151)
+- new ClassEntry (line 234)
 - 17 class method(s)
 
 ### `ext/intl/GraphemeStrSplitJitHelper.php`
@@ -9268,6 +9277,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/intl/LocaleAcceptFromHttp.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/intl/LocaleFilterMatches.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- new ArgumentCountError (line 29)
+- 1 class method(s)
+
 ### `ext/intl/LocaleGetDefault.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9299,6 +9321,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 22)
 - 1 class method(s)
 
+### `ext/intl/LocaleLookup.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 33)
+- 4 class method(s)
+
 ### `ext/intl/LocaleParserJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9319,32 +9348,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new locale_get_primary_language (line 79)
 - new locale_get_region (line 80)
 - new locale_get_script (line 81)
-- new normalizer_normalize (line 85)
-- new normalizer_is_normalized (line 86)
-- new normalizer_get_raw_decomposition (line 87)
-- new idn_to_ascii (line 91)
-- new idn_to_utf8 (line 91)
-- new collator_create (line 95)
-- new msgfmt_create (line 100)
-- new msgfmt_format (line 101)
-- new msgfmt_format_message (line 102)
-- new transliterator_create (line 108)
-- new transliterator_transliterate (line 109)
-- new grapheme_strlen (line 132)
-- new grapheme_substr (line 133)
-- new grapheme_strpos (line 134)
-- new grapheme_str_contains (line 135)
-- new grapheme_strstr (line 136)
-- new grapheme_stristr (line 137)
-- new grapheme_stripos (line 138)
-- new grapheme_strrpos (line 139)
-- new grapheme_extract (line 140)
-- new grapheme_levenshtein (line 141)
-- new grapheme_str_split (line 142)
-- new grapheme_strimwidth (line 143)
-- new intl_get_error_code (line 144)
-- new intl_get_error_message (line 145)
-- new intl_is_failure (line 146)
+- new locale_lookup (line 82)
+- new locale_filter_matches (line 83)
+- new locale_accept_from_http (line 84)
+- new normalizer_normalize (line 88)
+- new normalizer_is_normalized (line 89)
+- new normalizer_get_raw_decomposition (line 90)
+- new idn_to_ascii (line 94)
+- new idn_to_utf8 (line 94)
+- new collator_create (line 98)
+- new msgfmt_create (line 103)
+- new msgfmt_format (line 104)
+- new msgfmt_format_message (line 105)
+- new transliterator_create (line 111)
+- new transliterator_transliterate (line 112)
+- new grapheme_strlen (line 135)
+- new grapheme_substr (line 136)
+- new grapheme_strpos (line 137)
+- new grapheme_str_contains (line 138)
+- new grapheme_strstr (line 139)
+- new grapheme_stristr (line 140)
+- new grapheme_stripos (line 141)
+- new grapheme_strrpos (line 142)
+- new grapheme_extract (line 143)
+- new grapheme_levenshtein (line 144)
+- new grapheme_str_split (line 145)
+- new grapheme_strimwidth (line 146)
+- new intl_get_error_code (line 147)
+- new intl_get_error_message (line 148)
+- new intl_is_failure (line 149)
 - 3 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -9506,7 +9538,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmLocale.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 25 class method(s)
+- 1 closure(s)
 
 ### `ext/intl/VmMessageFormatter.php`
 
@@ -9748,6 +9781,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/intl/locale_accept_from_http.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 2 class method(s)
+
+### `ext/intl/locale_filter_matches.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
 ### `ext/intl/locale_get_default.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9773,6 +9819,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 20)
 - new ArgumentCountError (line 38)
+- 2 class method(s)
+
+### `ext/intl/locale_lookup.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- new ArgumentCountError (line 28)
 - 2 class method(s)
 
 ### `ext/intl/locale_set_default.php`

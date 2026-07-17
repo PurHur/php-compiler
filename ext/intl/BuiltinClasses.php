@@ -116,6 +116,9 @@ final class BuiltinClasses
             'getregion' => [new LocaleGetRegion(), 'getRegion'],
             'getscript' => [new LocaleGetScript(), 'getScript'],
             'getdisplayname' => [new LocaleGetDisplayName(), 'getDisplayName'],
+            'lookup' => [new LocaleLookup(), 'lookup'],
+            'filtermatches' => [new LocaleFilterMatches(), 'filterMatches'],
+            'acceptfromhttp' => [new LocaleAcceptFromHttp(), 'acceptFromHttp'],
         ];
         foreach ($methods as $lc => [$handler, $name]) {
             $entry->methods[$lc] = $handler;
