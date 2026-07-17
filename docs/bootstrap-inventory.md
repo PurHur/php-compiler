@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5258 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14490 |
+| Source constructs flagged (warnings) | 14492 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1127,7 +1127,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/BuiltinClasses.php` | 0 | 1 |
 | `ext/spl/CachingIteratorBuiltin.php` | 0 | 11 |
 | `ext/spl/CallbackFilterIteratorBuiltin.php` | 0 | 6 |
-| `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 6 |
+| `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/EmptyIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/FilesystemIteratorBuiltin.php` | 0 | 15 |
 | `ext/spl/FilterIteratorBuiltin.php` | 0 | 9 |
@@ -13166,10 +13166,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 36)
 - new DirectoryIteratorConstruct (line 45)
-- new Variable (line 149)
-- new ObjectEntry (line 167)
-- new ArgumentCountError (line 297)
-- 30 class method(s)
+- new OutOfBoundsException (line 137)
+- new Variable (line 171)
+- new ObjectEntry (line 189)
+- new ArgumentCountError (line 319)
+- new ArgumentCountError (line 443)
+- 32 class method(s)
 
 ### `ext/spl/EmptyIteratorBuiltin.php`
 

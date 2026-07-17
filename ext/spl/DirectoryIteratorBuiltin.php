@@ -51,6 +51,7 @@ final class DirectoryIteratorBuiltin
             'current' => DirectoryIteratorCurrent::class,
             'key' => DirectoryIteratorKey::class,
             'next' => DirectoryIteratorNext::class,
+            'seek' => DirectoryIteratorSeek::class,
             'isdot' => DirectoryIteratorIsDot::class,
             'gettype' => DirectoryIteratorGetType::class,
             '__tostring' => DirectoryIteratorToString::class,
@@ -71,6 +72,7 @@ final class DirectoryIteratorBuiltin
             $entry->methods['valid'],
             $entry->methods['rewind'],
             $entry->methods['current'],
+            $entry->methods['seek'],
             $entry->methods['isdot'],
             $entry->methods['gettype']
         );
@@ -116,6 +118,26 @@ final class DirectoryIteratorStorage
         $state = &self::$store[$object->id];
         ++$state['index'];
         self::readCurrent($object);
+    }
+
+    /**
+     * php-src DirectoryIterator::seek — rewind if past target, then next until index.
+     * OutOfBoundsException only when advancing would require a valid entry that is missing
+     * (seek to exactly one past the last entry leaves valid=false without throwing).
+     *
+     * @see https://github.com/php/php-src/blob/PHP-8.2/ext/spl/spl_directory.c
+     */
+    public static function seek(ObjectEntry $object, int $position): void
+    {
+        if (self::key($object) > $position) {
+            self::rewind($object);
+        }
+        while (self::key($object) < $position) {
+            if (!self::valid($object)) {
+                throw new \OutOfBoundsException('Seek position '.$position.' is out of range');
+            }
+            self::next($object);
+        }
     }
 
     public static function valid(ObjectEntry $object): bool
@@ -400,6 +422,31 @@ final class DirectoryIteratorNext extends VmClassMethod
             'DirectoryIterator::next()'
         );
         DirectoryIteratorStorage::next($object);
+    }
+}
+
+final class DirectoryIteratorSeek extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('seek');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            DirectoryIteratorBuiltin::CLASS_LC,
+            'DirectoryIterator::seek()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'DirectoryIterator::seek() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $offset = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        DirectoryIteratorStorage::seek($object, $offset);
     }
 }
 
