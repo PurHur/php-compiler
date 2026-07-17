@@ -31,19 +31,44 @@ final class JitSscanf
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
 
+        // Do not fold null→'' at compile time — Z_PARAM_STR TypeError on 8.4 (#19894).
         $strLit = $args[0]->compileTimeString ?? null;
         if (($args[0]->isNullConstant ?? false) && null === $strLit) {
-            $strLit = '';
+            if (JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+                || $context->callerStrictTypes) {
+                $strLit = null;
+            } else {
+                $strLit = '';
+            }
         }
         $fmtLit = $args[1]->compileTimeString ?? null;
+        if (($args[1]->isNullConstant ?? false) && null === $fmtLit) {
+            if (JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+                || $context->callerStrictTypes) {
+                $fmtLit = null;
+            } else {
+                $fmtLit = '';
+            }
+        }
         if (null !== $strLit && null !== $fmtLit && self::canFoldCompileTime($fmtLit, $argc - 2)) {
             return self::parseCompileTime($context, $strLit, $fmtLit, \array_slice($args, 2));
         }
 
-        Sscanf::ensureLinked($context);
+        // Lower Z_PARAM_STR before ensureLinked — null must TypeError without compiling helpers (#19894).
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'sscanf', 0, 'string');
+        $fmt = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'sscanf', 1, 'format');
+        $nullRejected = (
+            $context->callerStrictTypes
+            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+        ) && (
+            JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)
+            || JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)
+        );
+        if ($nullRejected) {
+            return $context->getTypeFromString('__value__*')->constNull();
+        }
 
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'sscanf', 0, 'string');
-        $fmt = JitStringBuiltinArg::lower($context, $args[1], 'sscanf', 1, 'format');
+        Sscanf::ensureLinked($context);
         $outCount = $argc - 2;
         $i64 = $context->getTypeFromString('int64');
         if (0 === $outCount) {

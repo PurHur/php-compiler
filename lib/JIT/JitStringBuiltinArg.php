@@ -156,6 +156,37 @@ final class JitStringBuiltinArg
             return self::unreachableStringPtr($context);
         }
         if (Variable::TYPE_VALUE === $arg->type) {
+            // Boxed null (common when null is arg #1 before an array literal) — Z_PARAM_STR
+            // TypeError on 8.4 / strict_types (#19894; same mask as JitStrlen).
+            if (
+                $context->callerStrictTypes
+                || ($zparamStrNullGuard && self::requiresZparamStrStrictNullOnForwardProfile())
+                || ($rejectNullOnForwardProfile && self::requiresForwardProfileStrictStringNull())
+            ) {
+                TypeErrorRaise::registerDeclarations($context);
+                TypeErrorRaise::ensureLinked($context);
+                $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+                $map = $context->structFieldMap['__value__'];
+                $typeByte = $context->builder->load(
+                    $context->builder->structGep($valuePtr, $map['type'])
+                );
+                $i8 = $context->getTypeFromString('int8');
+                $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+                $nullErrBlock = BasicBlockHelper::append($context, 'zparam_str_value_null');
+                $okBlock = BasicBlockHelper::append($context, 'zparam_str_value_ok');
+                $context->builder->branchIf(
+                    $context->builder->icmp(
+                        Builder::INT_EQ,
+                        $typeKind,
+                        $i8->constInt(VmVariable::TYPE_NULL, false)
+                    ),
+                    $nullErrBlock,
+                    $okBlock
+                );
+                $context->builder->positionAtEnd($nullErrBlock);
+                self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
+                $context->builder->positionAtEnd($okBlock);
+            }
             $native = JitNativeString::coerce($context, $arg);
 
             return $context->helper->loadValue($native);
