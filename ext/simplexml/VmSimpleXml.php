@@ -663,6 +663,56 @@ final class VmSimpleXml
                 $var->object(self::wrapNode($ctx, $entry->class, $context, SimpleXmlRegistry::documentKey($entry)));
                 $ht->append($var);
             }
+
+            return $ht;
+        }
+
+        if (str_starts_with($expression, '/')) {
+            $segments = array_values(array_filter(explode('/', $expression), static fn (string $part): bool => '' !== $part));
+            if ([] === $segments) {
+                return $ht;
+            }
+            $docKey = SimpleXmlRegistry::documentKey($entry);
+            $nodes = [SimpleXmlRegistry::rootState($docKey)];
+            foreach ($segments as $index => $segment) {
+                $next = [];
+                if (0 === $index) {
+                    foreach ($nodes as $node) {
+                        if ($node->name === $segment) {
+                            $next[] = $node;
+                        }
+                    }
+                } else {
+                    foreach ($nodes as $node) {
+                        foreach ($node->elementsNamed($segment) as $child) {
+                            $next[] = $child;
+                        }
+                    }
+                }
+                $nodes = $next;
+                if ([] === $nodes) {
+                    break;
+                }
+            }
+            foreach ($nodes as $node) {
+                $var = new Variable();
+                $var->object(self::wrapNode($ctx, $entry->class, $node, $docKey));
+                $ht->append($var);
+            }
+
+            return $ht;
+        }
+
+        if (preg_match('~^[\w:-]+$~', $expression)) {
+            foreach ($contextNodes as $context) {
+                foreach ($context->elementsNamed($expression) as $node) {
+                    $var = new Variable();
+                    $var->object(self::wrapNode($ctx, $entry->class, $node, SimpleXmlRegistry::documentKey($entry)));
+                    $ht->append($var);
+                }
+            }
+
+            return $ht;
         }
 
         return $ht;
