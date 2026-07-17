@@ -34,7 +34,9 @@ final class openssl_encrypt extends Internal
             return;
         }
 
-        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'openssl_encrypt', 0, 'data');
+        // Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#20263, re-#19038, ext/openssl/openssl.c);
+        // 8.2 still coerces+deprecates like openssl_digest (#20207).
+        $data = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'openssl_encrypt', 0, 'data');
         $cipherAlgo = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'openssl_encrypt', 1, 'cipher_algo');
         $passphrase = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'openssl_encrypt', 2, 'passphrase');
         $options = 0;
