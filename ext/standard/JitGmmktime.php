@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\StringGmmktime;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -45,8 +46,11 @@ final class JitGmmktime
     private static function jitIntArg(Context $context, JITVariable $arg, int $position): Value
     {
         if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
-            if ($context->callerStrictTypes) {
-                throw new \LogicException('gmmktime() argument #'.$position.' must be an integer in this compiler build');
+            // Z_PARAM_LONG $hour — null TypeError on PROFILE=8.4 (#20227).
+            if ($context->callerStrictTypes || VmMath::requiresForwardProfileStrictLongNull()) {
+                self::emitIntTypeErrorAndAbort($context, $position, 'null');
+
+                return $context->getTypeFromString('int64')->constInt(0, false);
             }
 
             return $context->getTypeFromString('int64')->constInt(0, false);
@@ -62,6 +66,31 @@ final class JitGmmktime
         }
 
         throw new \LogicException('gmmktime() argument #'.$position.' must be an integer in this compiler build');
+    }
+
+    private static function emitIntTypeErrorAndAbort(Context $context, int $position, string $given): void
+    {
+        $name = match ($position) {
+            1 => 'hour',
+            2 => 'minute',
+            3 => 'second',
+            4 => 'month',
+            5 => 'day',
+            6 => 'year',
+            default => 'arg',
+        };
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise(
+            $context,
+            \sprintf(
+                'gmmktime(): Argument #%d ($%s) must be of type int, %s given',
+                $position,
+                $name,
+                $given
+            )
+        );
+        $context->builder->call($context->lookupFunction('abort'));
     }
 
     private static function jitOptionalIntArg(

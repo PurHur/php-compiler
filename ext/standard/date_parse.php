@@ -32,7 +32,8 @@ final class date_parse extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $date = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'date_parse', 0, 'date');
+        // Z_PARAM_STR $datetime — null TypeError on PROFILE=8.4 (#20227, ext/date/php_date.c).
+        $date = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'date_parse', 0, 'datetime');
         $frame->returnVar->array(VmDate::parseResultToHashTable(VmDateTimeNative::parseDate($date)));
     }
 

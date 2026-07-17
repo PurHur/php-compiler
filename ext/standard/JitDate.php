@@ -12,7 +12,6 @@ use PHPCompiler\JIT\Builtin\ProcessIdentityJit;
 use PHPCompiler\JIT\Builtin\StringHrtime;
 use PHPCompiler\JIT\Builtin\StringMicrotime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -292,14 +291,15 @@ final class JitDate
             throw new \ArgumentCountError("{$function}() expects at most 2 arguments, {$argc} given");
         }
         VmEngineBuiltinDeprecation::emitJitFunction($context, $function);
-        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
-            JitInternalStrictArg::requireString($context, $args[0], $function, 'format', 1);
-
+        // Pre-8.4 soft-null → false; PROFILE=8.4 / strict_types → TypeError (#20227).
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant)
+            && !$context->callerStrictTypes
+            && !JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+        ) {
             return self::boxStrftimeFailure($context);
         }
-        JitInternalStrictArg::requireString($context, $args[0], $function, 'format', 1);
-        $format = JitStringBuiltinArg::lower($context, $args[0], $function, 0, 'format', 'string', null, false);
-        $i64 = $context->getTypeFromString('int64');
+        $format = JitStringBuiltinArg::lowerZparamStr($context, $args[0], $function, 0, 'format');
         $timestamp = $argc >= 2
             ? JitDateTimestampArg::lowerNullable(
                 $context,
