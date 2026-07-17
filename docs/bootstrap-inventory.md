@@ -37368,7 +37368,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitNestedHelperCoerce.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 18 class method(s)
 
 ### `lib/JIT/JitNumericDivisionGuard.php`
 

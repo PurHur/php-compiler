@@ -6,20 +6,26 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** __compiler_readfile: no UserScriptAotDeferNestedJit; libc via JitReadfileLibc / phpc_readfile_kernel (#9188, #19966). */
+/**
+ * __compiler_readfile shrink guards (#9188, #19966, #20266).
+ * Thin standalone libc fork remains; helper path uses extractLongFromHelperResult.
+ */
 final class ReadfileRuntimeShrinkTest extends TestCase
 {
-    public function testStringReadfileHasNoUserScriptDeferKernel(): void
+    public function testStringReadfileHelperPathUsesLongExtract(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringReadfile.php');
         $this->assertStringContainsString('ReadfileJitHelper', $bridge);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringContainsString('extractLongFromHelperResult', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
         $this->assertStringNotContainsString('JitReadfileKernel', $bridge);
         $this->assertStringNotContainsString('StringReadfileLibc', $bridge);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringReadfileLibc.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitReadfileKernel.php');
+        $this->assertStringContainsString('isThinStandaloneAotMain', $bridge);
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitReadfileLibc.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/phpc_readfile_kernel.php');
     }
 
     public function testReadfileJitHelperUsesPhpcReadfileKernel(): void

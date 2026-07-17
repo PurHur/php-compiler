@@ -7,29 +7,37 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\FilePutContentsJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** __compiler_file_put_contents: no UserScriptAotDeferNestedJit (#15310, #19966). */
+/**
+ * __compiler_file_put_contents shrink guards (#15310, #19966, #20266).
+ *
+ * Thin standalone libc fork remains until NestedJIT emits phpc_*_kernel libc under
+ * always-helper (user-script fopen NestedJIT aborts; Internal::call leaf missing).
+ * Embed/helper path unwraps boxed ints via extractLongFromHelperResult.
+ */
 final class FilePutContentsRuntimeShrinkTest extends TestCase
 {
-    public function testStringFilePutContentsHasNoUserScriptDeferKernel(): void
+    public function testStringFilePutContentsHelperPathUsesLongExtract(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFilePutContents.php');
         $this->assertStringContainsString('FilePutContentsJitHelper', $bridge);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringContainsString('extractLongFromHelperResult', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
         $this->assertStringNotContainsString('JitFilePutContentsKernel', $bridge);
         $this->assertStringNotContainsString('StringFilePutContentsLibc', $bridge);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFilePutContentsLibc.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitFilePutContentsKernel.php');
+        // Thin fork still load-bearing for user-script AOT (#20266).
+        $this->assertStringContainsString('isThinStandaloneAotMain', $bridge);
         $this->assertFileExists(__DIR__.'/../../ext/standard/JitFilePutContentsLibc.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/phpc_file_put_contents_kernel.php');
     }
 
     public function testFilePutContentsJitHelperUsesPhpcKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/FilePutContentsJitHelper.php');
         $this->assertMatchesRegularExpression('/return\s+\\\\phpc_file_put_contents_kernel\s*\(/', $source);
-        $this->assertFileExists(__DIR__.'/../../ext/standard/phpc_file_put_contents_kernel.php');
         $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/phpc_file_put_contents_kernel.php');
-        // NestedJIT flags are __value__ boxes — must use JitLongArg, not trunc(loadValue) (#20266).
         $this->assertStringContainsString('JitLongArg::lower', $kernel);
         $this->assertStringNotContainsString('truncOrBitCast', $kernel);
     }
@@ -44,7 +52,7 @@ final class FilePutContentsRuntimeShrinkTest extends TestCase
         $written = FilePutContentsJitHelper::writePathArgv($path, 'put-ok', 0);
         $this->assertSame(6, $written);
         $this->assertSame('put-ok', file_get_contents($path));
-        $this->assertSame(-1, FilePutContentsJitHelper::writePathArgv($path.'/missing-15310', 'x', 0));
+        $this->assertSame(-1, FilePutContentsJitHelper::writePathArgv($path.'/missing-20266', 'x', 0));
         @unlink($path);
     }
 
@@ -56,5 +64,20 @@ final class FilePutContentsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('phpc_file_put_contents_kernel.php', $spine);
         $this->assertStringContainsString('JitFilePutContentsLibc.php', $spine);
         $this->assertStringNotContainsString('JitFilePutContentsKernel.php', $spine);
+    }
+
+    public function testNestedHelperCoerceHasScopedLongExtractNotGlobalReadLong(): void
+    {
+        $coerce = (string) file_get_contents(__DIR__.'/../../lib/JIT/JitNestedHelperCoerce.php');
+        $this->assertStringContainsString('extractLongFromHelperResult', $coerce);
+        if (preg_match(
+            '/function coerceHelperScalarResult\(.*?^\s{4}\}/ms',
+            $coerce,
+            $m
+        )) {
+            $this->assertStringNotContainsString('__value__readLong', $m[0]);
+        } else {
+            $this->fail('coerceHelperScalarResult not found');
+        }
     }
 }

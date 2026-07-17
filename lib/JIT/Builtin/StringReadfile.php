@@ -97,7 +97,7 @@ final class StringReadfile
         $helperFn = JitVmHelperLink::lookupCompiled($context, self::READFILE_HELPER, '#19966');
         $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$path]);
         $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+            JitNestedHelperCoerce::extractLongFromHelperResult($context, $raw, $i64)
         );
 
         $context->builder->positionAtEnd($failBb);
