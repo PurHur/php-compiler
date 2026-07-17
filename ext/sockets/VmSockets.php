@@ -262,7 +262,7 @@ final class VmSockets
             return false;
         }
 
-        $object = VmSocket::wrapOwnedFd($fd, $ctx);
+        $object = VmSocket::wrapOwnedFd($fd, $ctx, $domain);
         self::$socketErrors[$object->id] = 0;
 
         return $object;
@@ -289,8 +289,8 @@ final class VmSockets
             return false;
         }
 
-        $a = VmSocket::wrapOwnedFd($fds[0], $ctx);
-        $b = VmSocket::wrapOwnedFd($fds[1], $ctx);
+        $a = VmSocket::wrapOwnedFd($fds[0], $ctx, $domain);
+        $b = VmSocket::wrapOwnedFd($fds[1], $ctx, $domain);
         self::$socketErrors[$a->id] = 0;
         self::$socketErrors[$b->id] = 0;
 
@@ -360,7 +360,7 @@ final class VmSockets
             return false;
         }
 
-        $object = VmSocket::wrapOwnedFd($fd, $ctx);
+        $object = VmSocket::wrapOwnedFd($fd, $ctx, self::AF_INET);
         self::$socketErrors[$object->id] = 0;
 
         return $object;
@@ -372,7 +372,24 @@ final class VmSockets
         if (null === $fd) {
             return false;
         }
-        $rc = SocketsLibcThinAbi::connectInet($fd, $addr, $port);
+        $domain = VmSocket::domainForObject($object) ?? self::AF_INET;
+        if (self::AF_UNIX === $domain) {
+            if (\strlen($addr) >= SocketsLibcThinAbi::UNIX_PATH_MAX) {
+                throw new \ValueError(
+                    \sprintf(
+                        'socket_connect(): Argument #2 ($address) must be less than %d',
+                        SocketsLibcThinAbi::UNIX_PATH_MAX
+                    )
+                );
+            }
+            $rc = SocketsLibcThinAbi::connectUnix($fd, $addr);
+        } elseif (self::AF_INET === $domain) {
+            $rc = SocketsLibcThinAbi::connectInet($fd, $addr, $port);
+        } else {
+            throw new \ValueError(
+                'socket_connect(): Argument #1 ($socket) must be one of AF_UNIX, AF_INET, or AF_INET6'
+            );
+        }
         if (0 === $rc) {
             self::$socketErrors[$object->id] = 0;
 
@@ -393,7 +410,7 @@ final class VmSockets
     }
 
     /**
-     * php-src: PHP_FUNCTION(socket_bind) — AF_INET bind(2) (#6176).
+     * php-src: PHP_FUNCTION(socket_bind) — AF_INET / AF_UNIX bind(2) (#6176, #20268).
      */
     public static function bind(ObjectEntry $object, string $addr, int $port, Frame $frame): bool
     {
@@ -401,7 +418,24 @@ final class VmSockets
         if (null === $fd) {
             return false;
         }
-        $rc = SocketsLibcThinAbi::bindInet($fd, $addr, $port);
+        $domain = VmSocket::domainForObject($object) ?? self::AF_INET;
+        if (self::AF_UNIX === $domain) {
+            if (\strlen($addr) >= SocketsLibcThinAbi::UNIX_PATH_MAX) {
+                throw new \ValueError(
+                    \sprintf(
+                        'socket_bind(): Argument #2 ($address) must be less than %d',
+                        SocketsLibcThinAbi::UNIX_PATH_MAX
+                    )
+                );
+            }
+            $rc = SocketsLibcThinAbi::bindUnix($fd, $addr);
+        } elseif (self::AF_INET === $domain) {
+            $rc = SocketsLibcThinAbi::bindInet($fd, $addr, $port);
+        } else {
+            throw new \ValueError(
+                'socket_bind(): Argument #1 ($socket) must be one of AF_UNIX, AF_INET, or AF_INET6'
+            );
+        }
         if (0 === $rc) {
             self::$socketErrors[$object->id] = 0;
 
@@ -477,7 +511,8 @@ final class VmSockets
             return false;
         }
 
-        $wrapped = VmSocket::wrapOwnedFd($client, $ctx);
+        $parentDomain = VmSocket::domainForObject($object);
+        $wrapped = VmSocket::wrapOwnedFd($client, $ctx, $parentDomain);
         self::$socketErrors[$wrapped->id] = 0;
 
         return $wrapped;

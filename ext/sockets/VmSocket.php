@@ -41,6 +41,9 @@ final class VmSocket
     /** @var array<int, true> object ids whose fd is owned by socket_create() (#19286) */
     private static array $ownedFds = [];
 
+    /** @var array<int, int> object id => AF_* domain (php_sock->type; #20268) */
+    private static array $domains = [];
+
     /** @var array<int, int> JIT object handle (ptrToInt) => socket fd */
     private static array $jitHandleFds = [];
 
@@ -74,16 +77,32 @@ final class VmSocket
 
     /**
      * socket_create() — wrap an owned BSD socket fd as Socket (#19286).
+     *
+     * @param int|null $domain AF_* family stored as php_sock->type (#20268)
      */
-    public static function wrapOwnedFd(int $fd, Context $ctx): ObjectEntry
+    public static function wrapOwnedFd(int $fd, Context $ctx, ?int $domain = null): ObjectEntry
     {
         self::registerClass($ctx);
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
         self::$hostSocketFds[$object->id] = $fd;
         self::$ownedFds[$object->id] = true;
+        if (null !== $domain) {
+            self::$domains[$object->id] = $domain;
+        }
 
         return $object;
+    }
+
+    /** AF_* domain for bind/connect dispatch (php-src php_sock->type). */
+    public static function domainForObject(ObjectEntry $object): ?int
+    {
+        return self::$domains[$object->id] ?? null;
+    }
+
+    public static function setDomainForObject(ObjectEntry $object, int $domain): void
+    {
+        self::$domains[$object->id] = $domain;
     }
 
     public static function ownedFdForObject(ObjectEntry $object): ?int
@@ -102,6 +121,7 @@ final class VmSocket
             self::$streamHandles[$object->id],
             self::$hostSocketFds[$object->id],
             self::$ownedFds[$object->id],
+            self::$domains[$object->id],
             self::$jitHandleFds[$object->id]
         );
     }

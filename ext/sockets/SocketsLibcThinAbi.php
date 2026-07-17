@@ -499,6 +499,30 @@ final class SocketsLibcThinAbi
         return [] === $out ? false : $out;
     }
 
+    /** Linux sizeof(sockaddr_un.sun_path) — php-src path length guard (#20268). */
+    public const UNIX_PATH_MAX = 108;
+
+    /**
+     * Pack AF_UNIX sockaddr bytes (Linux sockaddr_un; #20268).
+     *
+     * Length is offsetof(sun_path) + strlen(path) — matches php-src bind/connect.
+     * Caller must ensure strlen($path) < {@see UNIX_PATH_MAX}.
+     */
+    public static function packSockaddrUn(string $path): string
+    {
+        // sa_family_t (unsigned short) + path bytes; bind(2) addrlen = 2 + strlen(path)
+        return \pack('v', 1).$path; // AF_UNIX = 1
+    }
+
+    public static function bindUnix(int $fd, string $path): int
+    {
+        return self::bindAddr($fd, self::packSockaddrUn($path));
+    }
+
+    public static function connectUnix(int $fd, string $path): int
+    {
+        return self::connectAddr($fd, self::packSockaddrUn($path));
+    }
     /**
      * connect(2) / bind(2) with a raw sockaddr byte string (#6064).
      */

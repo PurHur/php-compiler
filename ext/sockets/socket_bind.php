@@ -14,7 +14,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
 /**
- * socket_bind() — bind(2) for AF_INET (php-src ext/sockets/sockets.c; #6176).
+ * socket_bind() — bind(2) for AF_INET / AF_UNIX (php-src ext/sockets/sockets.c; #6176, #20268).
  *
  * @see https://github.com/php/php-src/blob/master/ext/sockets/sockets.c PHP_FUNCTION(socket_bind)
  */

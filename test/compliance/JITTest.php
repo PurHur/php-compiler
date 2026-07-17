@@ -1055,6 +1055,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'socket_recv_send')) {
                 continue;
             }
+            // AF_UNIX bind/listen — VM + libc FFI first (#20268).
+            if (str_contains($name, 'socket_afunix_bind_listen')) {
+                continue;
+            }
             // socket_strerror/last_error/clear_error — VM first (#6227).
             if (str_contains($name, 'socket_strerror')) {
                 continue;
