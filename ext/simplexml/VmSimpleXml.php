@@ -534,7 +534,10 @@ final class VmSimpleXml
             return self::wrapAttributesView($ctx, $entry->class, $viewState, SimpleXmlRegistry::documentKey($entry));
         }
 
-        return self::wrapAttributesView($ctx, $entry->class, $state, SimpleXmlRegistry::documentKey($entry));
+        $plain = self::filterUnqualifiedAttributes($state->attributes);
+        $viewState = new SimpleXmlNodeState($state->name, $plain);
+
+        return self::wrapAttributesView($ctx, $entry->class, $viewState, SimpleXmlRegistry::documentKey($entry));
     }
 
     public static function asXml(ObjectEntry $entry, bool $includeDeclaration = false): string|false
@@ -924,26 +927,79 @@ final class VmSimpleXml
     }
 
     /** @param array<string, string> $attributes */
+    private static function filterUnqualifiedAttributes(array $attributes): array
+    {
+        $out = [];
+        foreach ($attributes as $name => $value) {
+            if (str_starts_with($name, 'xmlns')) {
+                continue;
+            }
+            if (str_contains($name, ':')) {
+                continue;
+            }
+            $out[$name] = $value;
+        }
+
+        return $out;
+    }
+
+    /** @return array<string, string> prefix => namespace URI */
+    private static function namespaceMapForEntry(ObjectEntry $entry): array
+    {
+        $map = SimpleXmlRegistry::xpathNamespaces($entry);
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            return $map;
+        }
+        $nodes = SimpleXmlRegistry::isView($entry) ? SimpleXmlRegistry::view($entry) : [SimpleXmlRegistry::state($entry)];
+        foreach ($nodes as $node) {
+            self::collectNamespacesFromNode($node, $map, false);
+        }
+
+        return $map;
+    }
+
+    /** @param array<string, string> $attributes */
     private static function filterAttributesByNamespace(
         array $attributes,
         string $namespaceOrPrefix,
         bool $isPrefix,
         ObjectEntry $entry
     ): array {
-        $namespaces = SimpleXmlRegistry::xpathNamespaces($entry);
-        if ($isPrefix && !isset($namespaces[$namespaceOrPrefix])) {
-            return [];
+        $namespaces = self::namespaceMapForEntry($entry);
+        // php-src: unknown prefix with isPrefix=true falls back to URI match (same as children()).
+        $targetUri = $isPrefix ? ($namespaces[$namespaceOrPrefix] ?? $namespaceOrPrefix) : $namespaceOrPrefix;
+        $matchedPrefix = null;
+        if ($isPrefix && isset($namespaces[$namespaceOrPrefix])) {
+            $matchedPrefix = $namespaceOrPrefix;
+        } else {
+            foreach ($namespaces as $prefix => $uri) {
+                if ($uri === $targetUri) {
+                    $matchedPrefix = $prefix;
+                    break;
+                }
+            }
         }
-        $prefix = $isPrefix ? $namespaceOrPrefix.':' : '';
 
         $out = [];
         foreach ($attributes as $name => $value) {
-            if ($isPrefix) {
-                if (str_starts_with($name, $prefix)) {
-                    $out[$name] = $value;
+            if (str_starts_with($name, 'xmlns')) {
+                continue;
+            }
+            $colon = strpos($name, ':');
+            if (false === $colon) {
+                continue;
+            }
+            $attrPrefix = substr($name, 0, $colon);
+            $localName = substr($name, $colon + 1);
+            if (null !== $matchedPrefix && $attrPrefix === $matchedPrefix) {
+                $out[$localName] = $value;
+                continue;
+            }
+            if (null === $matchedPrefix) {
+                $attrUri = $namespaces[$attrPrefix] ?? '';
+                if ($attrUri === $targetUri) {
+                    $out[$localName] = $value;
                 }
-            } elseif (str_starts_with($name, $namespaceOrPrefix.':')) {
-                $out[$name] = $value;
             }
         }
 
