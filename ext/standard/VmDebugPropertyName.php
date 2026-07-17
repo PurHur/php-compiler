@@ -12,9 +12,18 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmDebugPropertyName
 {
-    /** var_dump(): ["name"], ["name":protected], ["name":"Class":private] */
-    public static function formatForVarDump(string $key): string
+    /**
+     * var_dump(): [0], ["name"], ["name":protected], ["name":"Class":private]
+     *
+     * Integer keys from __debugInfo stay unquoted (php-src php_var_dump; #19783).
+     *
+     * @param int|string $key
+     */
+    public static function formatForVarDump($key): string
     {
+        if (\is_int($key)) {
+            return '['.$key.']';
+        }
         $decoded = self::decode($key);
         if (null === $decoded) {
             return '["'.$key.'"]';
@@ -26,9 +35,16 @@ final class VmDebugPropertyName
         return '["'.$decoded['name'].'":"'.$decoded['class'].'":private]';
     }
 
-    /** print_r(): [name], [name:protected], [name:Class:private] */
-    public static function formatForPrintR(string $key): string
+    /**
+     * print_r(): [0], [name], [name:protected], [name:Class:private]
+     *
+     * @param int|string $key
+     */
+    public static function formatForPrintR($key): string
     {
+        if (\is_int($key)) {
+            return '['.$key.']';
+        }
         $decoded = self::decode($key);
         if (null === $decoded) {
             return '['.$key.']';
