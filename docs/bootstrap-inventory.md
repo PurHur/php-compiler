@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5507 |
-| Phase A inventory files (M2 ratio SSOT) | 5507 |
+| PHP files on vm.php path | 5508 |
+| Phase A inventory files (M2 ratio SSOT) | 5508 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15645 |
+| Source constructs flagged (warnings) | 15648 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -269,6 +269,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomAttributeNodeNS.php` | 0 | 3 |
 | `ext/dom/JitDomC14N.php` | 0 | 1 |
 | `ext/dom/JitDomCreateComment.php` | 0 | 2 |
+| `ext/dom/JitDomCreateDocumentFragment.php` | 0 | 3 |
 | `ext/dom/JitDomCreateDocumentType.php` | 0 | 4 |
 | `ext/dom/JitDomCreateElement.php` | 0 | 5 |
 | `ext/dom/JitDomCreateElementNS.php` | 0 | 1 |
@@ -6894,6 +6895,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 111)
 - 7 class method(s)
 
+### `ext/dom/JitDomCreateDocumentFragment.php`
+
+**Warnings** (review for bootstrap subset):
+- new JITVariable (line 47)
+- new JITVariable (line 76)
+- 4 class method(s)
+
 ### `ext/dom/JitDomCreateDocumentType.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7719,68 +7727,68 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2978)
 - new ObjectEntry (line 2988)
 - new DomNodeState (line 2993)
-- new Variable (line 2999)
-- new ObjectEntry (line 3725)
-- new DomNodeState (line 3727)
-- new ObjectEntry (line 3923)
-- new DomNodeState (line 3925)
-- new ObjectEntry (line 3953)
-- new DomNodeState (line 3955)
-- new ObjectEntry (line 4143)
-- new DomNodeState (line 4148)
-- new DOMException (line 4519)
-- new DOMException (line 4535)
-- new Variable (line 4553)
-- new DOMException (line 4567)
-- new DOMException (line 4570)
-- new DOMException (line 4580)
-- new Error (line 4610)
-- new DOMException (line 4616)
-- new DOMException (line 4630)
-- new DOMException (line 4828)
-- new DOMException (line 5025)
+- new Variable (line 3003)
+- new ObjectEntry (line 3729)
+- new DomNodeState (line 3731)
+- new ObjectEntry (line 3927)
+- new DomNodeState (line 3929)
+- new ObjectEntry (line 3957)
+- new DomNodeState (line 3959)
+- new ObjectEntry (line 4147)
+- new DomNodeState (line 4152)
+- new DOMException (line 4523)
+- new DOMException (line 4539)
+- new Variable (line 4557)
+- new DOMException (line 4571)
+- new DOMException (line 4574)
+- new DOMException (line 4584)
+- new Error (line 4614)
+- new DOMException (line 4620)
+- new DOMException (line 4634)
+- new DOMException (line 4832)
 - new DOMException (line 5029)
-- new DOMException (line 5118)
+- new DOMException (line 5033)
 - new DOMException (line 5122)
-- new DOMException (line 5180)
-- new DOMException (line 5197)
-- new DOMException (line 5229)
-- new DOMException (line 5271)
-- new DOMException (line 5298)
-- new DOMException (line 6000)
-- new Variable (line 6028)
-- new DOMException (line 6289)
-- new DOMException (line 6401)
-- new DOMException (line 6443)
-- new ObjectEntry (line 6528)
-- new DomNodeState (line 6532)
-- new Variable (line 6539)
-- new ObjectEntry (line 6751)
-- new DomNodeState (line 6755)
-- new Variable (line 6762)
-- new ObjectEntry (line 6782)
-- new DomNodeState (line 6785)
-- new Variable (line 6793)
-- new Variable (line 6962)
-- new DOMException (line 7069)
-- new DOMException (line 7076)
-- new DOMException (line 7083)
+- new DOMException (line 5126)
+- new DOMException (line 5184)
+- new DOMException (line 5201)
+- new DOMException (line 5233)
+- new DOMException (line 5275)
+- new DOMException (line 5302)
+- new DOMException (line 6004)
+- new Variable (line 6032)
+- new DOMException (line 6293)
+- new DOMException (line 6405)
+- new DOMException (line 6447)
+- new ObjectEntry (line 6532)
+- new DomNodeState (line 6536)
+- new Variable (line 6543)
+- new ObjectEntry (line 6755)
+- new DomNodeState (line 6759)
+- new Variable (line 6766)
+- new ObjectEntry (line 6786)
+- new DomNodeState (line 6789)
+- new Variable (line 6797)
+- new Variable (line 6966)
+- new DOMException (line 7073)
+- new DOMException (line 7080)
 - new DOMException (line 7087)
-- new DOMException (line 7090)
-- new DOMException (line 7099)
-- new DOMException (line 7111)
-- new DOMException (line 8060)
-- new Variable (line 8119)
-- new Variable (line 8132)
-- new Variable (line 8170)
-- new DOMException (line 8181)
-- new Variable (line 8183)
-- new DOMException (line 8339)
-- new DOMException (line 8366)
-- new DOMException (line 8397)
-- new DOMException (line 8461)
-- new DOMException (line 8469)
-- new DOMException (line 8478)
+- new DOMException (line 7091)
+- new DOMException (line 7094)
+- new DOMException (line 7103)
+- new DOMException (line 7115)
+- new DOMException (line 8064)
+- new Variable (line 8123)
+- new Variable (line 8136)
+- new Variable (line 8174)
+- new DOMException (line 8185)
+- new Variable (line 8187)
+- new DOMException (line 8343)
+- new DOMException (line 8370)
+- new DOMException (line 8401)
+- new DOMException (line 8465)
+- new DOMException (line 8473)
+- new DOMException (line 8482)
 - 378 class method(s)
 - 1 closure(s)
 
