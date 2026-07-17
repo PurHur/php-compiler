@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5522 |
-| Phase A inventory files (M2 ratio SSOT) | 5522 |
+| PHP files on vm.php path | 5523 |
+| Phase A inventory files (M2 ratio SSOT) | 5523 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15699 |
+| Source constructs flagged (warnings) | 15702 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -831,7 +831,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 56 |
+| `ext/openssl/Module.php` | 0 | 57 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
@@ -887,6 +887,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_pkcs7_verify.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_derive.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_export.php` | 0 | 2 |
+| `ext/openssl/openssl_pkey_free.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_get_details.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_get_private.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_get_public.php` | 0 | 2 |
@@ -11282,13 +11283,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_csr_get_subject (line 80)
 - new openssl_csr_get_public_key (line 81)
 - new openssl_free_key (line 82)
-- new openssl_spki_new (line 83)
-- new openssl_spki_verify (line 84)
-- new openssl_spki_export (line 85)
-- new openssl_spki_export_challenge (line 86)
-- new openssl_seal (line 87)
-- new openssl_open (line 88)
-- new openssl_error_string (line 89)
+- new openssl_pkey_free (line 83)
+- new openssl_spki_new (line 84)
+- new openssl_spki_verify (line 85)
+- new openssl_spki_export (line 86)
+- new openssl_spki_export_challenge (line 87)
+- new openssl_seal (line 88)
+- new openssl_open (line 89)
+- new openssl_error_string (line 90)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -11632,6 +11634,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
 - 2 class method(s)
+
+### `ext/openssl/openssl_pkey_free.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- 3 class method(s)
 
 ### `ext/openssl/openssl_pkey_get_details.php`
 

@@ -80,6 +80,7 @@ class Module extends ModuleAbstract
             new openssl_csr_get_subject(),
             new openssl_csr_get_public_key(),
             new openssl_free_key(),
+            new openssl_pkey_free(),
             new openssl_spki_new(),
             new openssl_spki_verify(),
             new openssl_spki_export(),
