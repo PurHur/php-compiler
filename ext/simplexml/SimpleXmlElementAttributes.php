@@ -41,7 +41,7 @@ final class SimpleXmlElementAttributes extends VmClassMethod
         }
         if (\count($frame->calledArgs) >= 3) {
             $arg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_BOOL !== $arg->type) {
+            if (Variable::TYPE_BOOLEAN !== $arg->type) {
                 throw new \TypeError('SimpleXMLElement::attributes(): Argument #2 ($isPrefix) must be of type bool');
             }
             $isPrefix = $arg->toBool();

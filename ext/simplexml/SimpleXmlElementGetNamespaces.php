@@ -28,7 +28,7 @@ final class SimpleXmlElementGetNamespaces extends VmClassMethod
         $recursive = false;
         if (\count($frame->calledArgs) >= 2) {
             $arg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOL !== $arg->type) {
+            if (Variable::TYPE_BOOLEAN !== $arg->type) {
                 throw new \TypeError('SimpleXMLElement::getNamespaces(): Argument #1 ($recursive) must be of type bool');
             }
             $recursive = $arg->toBool();
