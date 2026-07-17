@@ -46,6 +46,9 @@ final class VmXmlWriter
         $entry->methods['writeattribute'] = new XmlWriterWriteAttribute();
         $entry->methodVisibility['writeattribute'] = $pub;
         $entry->methodNames['writeattribute'] = 'writeAttribute';
+        $entry->methods['writeattributens'] = new XmlWriterWriteAttributeNS();
+        $entry->methodVisibility['writeattributens'] = $pub;
+        $entry->methodNames['writeattributens'] = 'writeAttributeNS';
         $entry->methods['startattribute'] = new XmlWriterStartAttribute();
         $entry->methodVisibility['startattribute'] = $pub;
         $entry->methodNames['startattribute'] = 'startAttribute';
@@ -55,6 +58,9 @@ final class VmXmlWriter
         $entry->methods['writeelement'] = new XmlWriterWriteElement();
         $entry->methodVisibility['writeelement'] = $pub;
         $entry->methodNames['writeelement'] = 'writeElement';
+        $entry->methods['writeelementns'] = new XmlWriterWriteElementNS();
+        $entry->methodVisibility['writeelementns'] = $pub;
+        $entry->methodNames['writeelementns'] = 'writeElementNS';
         $entry->methods['writecdata'] = new XmlWriterWriteCData();
         $entry->methodVisibility['writecdata'] = $pub;
         $entry->methodNames['writecdata'] = 'writeCData';
@@ -70,6 +76,12 @@ final class VmXmlWriter
         $entry->methods['endpi'] = new XmlWriterEndPI();
         $entry->methodVisibility['endpi'] = $pub;
         $entry->methodNames['endpi'] = 'endPI';
+        $entry->methods['writepi'] = new XmlWriterWritePI();
+        $entry->methodVisibility['writepi'] = $pub;
+        $entry->methodNames['writepi'] = 'writePI';
+        $entry->methods['writeraw'] = new XmlWriterWriteRaw();
+        $entry->methodVisibility['writeraw'] = $pub;
+        $entry->methodNames['writeraw'] = 'writeRaw';
         $entry->methods['writecomment'] = new XmlWriterWriteComment();
         $entry->methodVisibility['writecomment'] = $pub;
         $entry->methodNames['writecomment'] = 'writeComment';
@@ -224,6 +236,44 @@ final class VmXmlWriter
     }
 
     /**
+     * XMLWriter::writeAttributeNS — namespaced attribute (+ deferred xmlns).
+     * php-src: zim_XMLWriter_writeAttributeNS / xmlTextWriterWriteAttributeNS (#19371).
+     */
+    public static function writeAttributeNS(
+        ObjectEntry $entry,
+        ?string $prefix,
+        string $name,
+        ?string $uri,
+        string $content
+    ): bool {
+        $state = self::requireOpen($entry, 'XMLWriter::writeAttributeNS()');
+        if (!$state->startTagOpen || [] === $state->elementStack) {
+            return false;
+        }
+        if (!self::isValidAttributeName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::writeAttributeNS(): Argument #2 ($name) must be a valid attribute name, %s given',
+                var_export($name, true)
+            ));
+        }
+        if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::writeAttributeNS(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
+                var_export($prefix, true)
+            ));
+        }
+        self::endOpenAttributeIfNeeded($state);
+        $qname = self::composeQName($prefix, $name);
+        $state->buffer .= ' '.self::escapeElementName($qname).'="'.self::escapeAttribute($content).'"';
+        // null uri → no xmlns; empty string still emits xmlns:prefix="" (Zend/libxml).
+        if (null !== $uri) {
+            $state->pendingNsDecls[] = ['prefix' => $prefix, 'uri' => $uri];
+        }
+
+        return true;
+    }
+
+    /**
      * Begin a streaming attribute (` name="`); content via text(); close with endAttribute().
      * php-src: zim_XMLWriter_startAttribute / xmlTextWriterStartAttribute (#19820).
      */
@@ -274,6 +324,101 @@ final class VmXmlWriter
         }
 
         return self::endElement($entry);
+    }
+
+    /**
+     * XMLWriter::writeElementNS — namespaced element with optional content.
+     * php-src: zim_XMLWriter_writeElementNS / xmlTextWriterWriteElementNS (#19371).
+     */
+    public static function writeElementNS(
+        ObjectEntry $entry,
+        ?string $prefix,
+        string $name,
+        ?string $uri,
+        ?string $content = null
+    ): bool {
+        $state = self::requireOpen($entry, 'XMLWriter::writeElementNS()');
+        if (!self::isValidElementName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::writeElementNS(): Argument #2 ($name) must be a valid element name, %s given',
+                var_export($name, true)
+            ));
+        }
+        if (null !== $prefix && '' !== $prefix && !self::isValidNcName($prefix)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::writeElementNS(): Argument #1 ($prefix) must be a valid namespace prefix, %s given',
+                var_export($prefix, true)
+            ));
+        }
+        self::closeStartTagIfOpen($state);
+        if ([] !== $state->elementStack) {
+            if ($state->indent) {
+                $parentIdx = \count($state->elementStack) - 1;
+                $state->elementStack[$parentIdx]['hasIndentedChild'] = true;
+                $state->buffer .= "\n".str_repeat($state->indentString, \count($state->elementStack));
+            }
+        }
+        $qname = self::composeQName($prefix, $name);
+        $state->elementStack[] = ['name' => $qname, 'hasIndentedChild' => false];
+        $state->buffer .= '<'.self::escapeElementName($qname);
+        if (null !== $uri) {
+            $state->buffer .= self::xmlnsAttribute($prefix, $uri);
+        }
+        $state->startTagOpen = true;
+        if (null !== $content) {
+            if (!self::text($entry, $content)) {
+                return false;
+            }
+        }
+
+        return self::endElement($entry);
+    }
+
+    /**
+     * XMLWriter::writePI — one-shot processing instruction (php-src zim_XMLWriter_writePI; #19371).
+     */
+    public static function writePI(ObjectEntry $entry, string $target, string $content): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::writePI()');
+        if ('' === $target) {
+            throw new \ValueError(
+                'XMLWriter::writePi(): Argument #2 ($content) must be a valid PI target, "" given'
+            );
+        }
+        // libxml reserves xml / XmL / … for the XML declaration (php-src xmlTextWriterStartPI).
+        if (0 === strcasecmp($target, 'xml')) {
+            @\trigger_error(
+                'XMLWriter::writePi(): xmlTextWriterStartPI : target name [Xx][Mm][Ll] is reserved for xml standardization!',
+                \E_USER_WARNING
+            );
+
+            return false;
+        }
+        if (!self::isValidPiTarget($target)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::writePi(): Argument #1 ($target) must be a valid PI target, %s given',
+                var_export($target, true)
+            ));
+        }
+        if ($state->inCdata) {
+            return false;
+        }
+        self::closeStartTagIfOpen($state);
+        $state->buffer .= '<?'.self::escapeElementName($target).' '.$content.'?>';
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::writeRaw — append unescaped markup (php-src zim_XMLWriter_writeRaw; #19371).
+     */
+    public static function writeRaw(ObjectEntry $entry, string $content): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::writeRaw()');
+        self::closeStartTagIfOpen($state);
+        $state->buffer .= $content;
+
+        return true;
     }
 
     public static function writeCData(ObjectEntry $entry, string $content): bool
@@ -407,6 +552,10 @@ final class VmXmlWriter
         }
         if ($state->startTagOpen) {
             self::endOpenAttributeIfNeeded($state);
+            foreach ($state->pendingNsDecls as $decl) {
+                $state->buffer .= self::xmlnsAttribute($decl['prefix'], $decl['uri']);
+            }
+            $state->pendingNsDecls = [];
             $state->buffer .= '/>';
             array_pop($state->elementStack);
             $state->startTagOpen = false;
@@ -429,6 +578,10 @@ final class VmXmlWriter
         }
         if ($state->startTagOpen) {
             self::endOpenAttributeIfNeeded($state);
+            foreach ($state->pendingNsDecls as $decl) {
+                $state->buffer .= self::xmlnsAttribute($decl['prefix'], $decl['uri']);
+            }
+            $state->pendingNsDecls = [];
             $state->buffer .= '>';
             $state->startTagOpen = false;
         }
@@ -532,6 +685,7 @@ final class VmXmlWriter
         $state->inCdata = false;
         $state->inPi = false;
         $state->piHasContent = false;
+        $state->pendingNsDecls = [];
     }
 
     private static function requireOpen(ObjectEntry $entry, string $label): XmlWriterState
@@ -559,6 +713,10 @@ final class VmXmlWriter
     {
         self::endOpenAttributeIfNeeded($state);
         if ($state->startTagOpen) {
+            foreach ($state->pendingNsDecls as $decl) {
+                $state->buffer .= self::xmlnsAttribute($decl['prefix'], $decl['uri']);
+            }
+            $state->pendingNsDecls = [];
             $state->buffer .= '>';
             $state->startTagOpen = false;
         }
@@ -579,6 +737,34 @@ final class VmXmlWriter
     private static function isValidAttributeName(string $name): bool
     {
         return self::isValidElementName($name);
+    }
+
+    /** NCName for namespace prefixes (no colon). */
+    private static function isValidNcName(string $name): bool
+    {
+        if ('' === $name) {
+            return false;
+        }
+
+        return (bool) preg_match('/^[A-Za-z_][A-Za-z0-9._-]*$/', $name);
+    }
+
+    private static function composeQName(?string $prefix, string $localName): string
+    {
+        if (null === $prefix) {
+            return $localName;
+        }
+
+        return $prefix.':'.$localName;
+    }
+
+    private static function xmlnsAttribute(?string $prefix, string $uri): string
+    {
+        if (null === $prefix) {
+            return ' xmlns="'.self::escapeAttribute($uri).'"';
+        }
+
+        return ' xmlns:'.$prefix.'="'.self::escapeAttribute($uri).'"';
     }
 
     private static function isValidPiTarget(string $target): bool

@@ -43,4 +43,12 @@ final class XmlWriterState
 
     /** True after any text() inside the current PI (controls leading space before content). */
     public bool $piHasContent = false;
+
+    /**
+     * Namespace decls from writeAttributeNS, flushed when the start tag closes
+     * (php-src/libxml defers xmlns onto the open element; #19371).
+     *
+     * @var list<array{prefix: ?string, uri: string}>
+     */
+    public array $pendingNsDecls = [];
 }
