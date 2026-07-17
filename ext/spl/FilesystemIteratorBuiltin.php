@@ -284,9 +284,10 @@ final class RecursiveDirectoryIteratorConstruct extends VmClassMethod
             $frame->calledArgs[1],
             'RecursiveDirectoryIterator::__construct'
         );
-        $flags = FilesystemIteratorBuiltin::CURRENT_AS_FILEINFO
-            | FilesystemIteratorBuiltin::KEY_AS_FILENAME
-            | FilesystemIteratorBuiltin::SKIP_DOTS;
+        // php-src RecursiveDirectoryIterator defaults to flags=0 (include dots;
+        // CURRENT_AS_FILEINFO / KEY_AS_PATHNAME). Do NOT inherit FilesystemIterator's
+        // SKIP_DOTS default (#20145).
+        $flags = 0;
         if ($argCount >= 3) {
             $flags = SplFilesystemArg::requireIntArg(
                 $frame->calledArgs[2],
