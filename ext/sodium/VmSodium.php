@@ -70,6 +70,16 @@ final class VmSodium
 
     public const CRYPTO_BOX_SEALBYTES = 48;
 
+    public const CRYPTO_KX_PUBLICKEYBYTES = 32;
+
+    public const CRYPTO_KX_SECRETKEYBYTES = 32;
+
+    public const CRYPTO_KX_KEYPAIRBYTES = 64;
+
+    public const CRYPTO_KX_SEEDBYTES = 32;
+
+    public const CRYPTO_KX_SESSIONKEYBYTES = 32;
+
     public const CRYPTO_AEAD_AES256GCM_KEYBYTES = 32;
 
     public const CRYPTO_AEAD_AES256GCM_NPUBBYTES = 12;
@@ -389,6 +399,114 @@ final class VmSodium
         }
 
         return self::ffiScalarmultBase($secretkey);
+    }
+
+    /**
+     * sodium_crypto_kx_keypair() — X25519 key-exchange keypair (php-src ext/sodium/libsodium.c; #20047).
+     */
+    public static function kxKeypair(): string
+    {
+        if (\function_exists('sodium_crypto_kx_keypair')) {
+            return \sodium_crypto_kx_keypair();
+        }
+        $sk = self::randomKeyBytes(self::CRYPTO_KX_SECRETKEYBYTES);
+
+        return $sk.self::scalarmultBase($sk);
+    }
+
+    /**
+     * sodium_crypto_kx_seed_keypair() — deterministic kx keypair from seed (#20047).
+     */
+    public static function kxSeedKeypair(string $seed): string
+    {
+        if (\strlen($seed) !== self::CRYPTO_KX_SEEDBYTES) {
+            self::throwSodium(
+                'sodium_crypto_kx_seed_keypair(): Argument #1 ($seed) must be SODIUM_CRYPTO_KX_SEEDBYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_kx_seed_keypair')) {
+            return \sodium_crypto_kx_seed_keypair($seed);
+        }
+        $sk = self::generichash($seed, '', self::CRYPTO_KX_SECRETKEYBYTES);
+
+        return $sk.self::scalarmultBase($sk);
+    }
+
+    /**
+     * sodium_crypto_kx_publickey() — extract public key from kx keypair (#20047).
+     */
+    public static function kxPublickey(string $keypair): string
+    {
+        self::validateKxKeypair($keypair, 'sodium_crypto_kx_publickey');
+        if (\function_exists('sodium_crypto_kx_publickey')) {
+            return \sodium_crypto_kx_publickey($keypair);
+        }
+
+        return \substr($keypair, self::CRYPTO_KX_SECRETKEYBYTES, self::CRYPTO_KX_PUBLICKEYBYTES);
+    }
+
+    /**
+     * sodium_crypto_kx_secretkey() — extract secret key from kx keypair (#20047).
+     */
+    public static function kxSecretkey(string $keypair): string
+    {
+        self::validateKxKeypair($keypair, 'sodium_crypto_kx_secretkey');
+        if (\function_exists('sodium_crypto_kx_secretkey')) {
+            return \sodium_crypto_kx_secretkey($keypair);
+        }
+
+        return \substr($keypair, 0, self::CRYPTO_KX_SECRETKEYBYTES);
+    }
+
+    /**
+     * sodium_crypto_kx_client_session_keys() — client rx/tx session keys (#20047).
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function kxClientSessionKeys(string $clientKeypair, string $serverKey): array
+    {
+        self::validateKxKeypair($clientKeypair, 'sodium_crypto_kx_client_session_keys', 1, 'client_key_pair');
+        self::validateKxPublickey($serverKey, 'sodium_crypto_kx_client_session_keys', 2, 'server_key');
+        if (\function_exists('sodium_crypto_kx_client_session_keys')) {
+            /** @var array{0: string, 1: string} $keys */
+            $keys = \sodium_crypto_kx_client_session_keys($clientKeypair, $serverKey);
+
+            return $keys;
+        }
+        $clientSk = \substr($clientKeypair, 0, self::CRYPTO_KX_SECRETKEYBYTES);
+        $clientPk = \substr($clientKeypair, self::CRYPTO_KX_SECRETKEYBYTES, self::CRYPTO_KX_PUBLICKEYBYTES);
+        $session = self::kxSessionKeyMaterial($clientSk, $serverKey, $clientPk, $serverKey);
+
+        return [
+            \substr($session, 0, self::CRYPTO_KX_SESSIONKEYBYTES),
+            \substr($session, self::CRYPTO_KX_SESSIONKEYBYTES, self::CRYPTO_KX_SESSIONKEYBYTES),
+        ];
+    }
+
+    /**
+     * sodium_crypto_kx_server_session_keys() — server rx/tx session keys (#20047).
+     *
+     * @return array{0: string, 1: string}
+     */
+    public static function kxServerSessionKeys(string $serverKeypair, string $clientKey): array
+    {
+        self::validateKxKeypair($serverKeypair, 'sodium_crypto_kx_server_session_keys', 1, 'server_key_pair');
+        self::validateKxPublickey($clientKey, 'sodium_crypto_kx_server_session_keys', 2, 'client_key');
+        if (\function_exists('sodium_crypto_kx_server_session_keys')) {
+            /** @var array{0: string, 1: string} $keys */
+            $keys = \sodium_crypto_kx_server_session_keys($serverKeypair, $clientKey);
+
+            return $keys;
+        }
+        $serverSk = \substr($serverKeypair, 0, self::CRYPTO_KX_SECRETKEYBYTES);
+        $serverPk = \substr($serverKeypair, self::CRYPTO_KX_SECRETKEYBYTES, self::CRYPTO_KX_PUBLICKEYBYTES);
+        $session = self::kxSessionKeyMaterial($serverSk, $clientKey, $clientKey, $serverPk);
+
+        // php-src swaps halves vs client so rx/tx cross-agree.
+        return [
+            \substr($session, self::CRYPTO_KX_SESSIONKEYBYTES, self::CRYPTO_KX_SESSIONKEYBYTES),
+            \substr($session, 0, self::CRYPTO_KX_SESSIONKEYBYTES),
+        ];
     }
 
     public static function stream(int $length, string $nonce, string $key): string
@@ -2232,6 +2350,54 @@ final class VmSodium
                 $argNum
             ));
         }
+    }
+
+    private static function validateKxKeypair(
+        string $keypair,
+        string $fn,
+        int $argNum = 1,
+        string $paramName = 'key_pair'
+    ): void {
+        if (\strlen($keypair) !== self::CRYPTO_KX_KEYPAIRBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($%s) must be SODIUM_CRYPTO_KX_KEYPAIRBYTES bytes long',
+                $fn,
+                $argNum,
+                $paramName
+            ));
+        }
+    }
+
+    private static function validateKxPublickey(
+        string $publickey,
+        string $fn,
+        int $argNum,
+        string $paramName
+    ): void {
+        if (\strlen($publickey) !== self::CRYPTO_KX_PUBLICKEYBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($%s) must be SODIUM_CRYPTO_KX_PUBLICKEYBYTES bytes long',
+                $fn,
+                $argNum,
+                $paramName
+            ));
+        }
+    }
+
+    /**
+     * Shared BLAKE2b session-key material (php-src sodium_crypto_kx_*_session_keys).
+     *
+     * Hash input order is always q || client_pk || server_pk.
+     */
+    private static function kxSessionKeyMaterial(
+        string $sk,
+        string $peerPk,
+        string $clientPk,
+        string $serverPk
+    ): string {
+        $q = self::scalarmult($sk, $peerPk);
+
+        return self::generichash($q.$clientPk.$serverPk, '', 2 * self::CRYPTO_KX_SESSIONKEYBYTES);
     }
 
     private static function throwSodium(string $message): void
