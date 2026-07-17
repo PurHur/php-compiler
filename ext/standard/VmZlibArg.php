@@ -57,16 +57,26 @@ final class VmZlibArg
     }
 
     /**
-     * Z_PARAM_LONG $encoding — null coerces to 0 then ValueError on invalid mode (#19915, ext/zlib/zlib.c).
+     * Z_PARAM_LONG $encoding — strict_types TypeError before coercion; else null→0 then ValueError (#19915).
      */
     public static function resolveEncodingInt(
-        Variable $var,
+        Frame $frame,
+        int $argIndex,
         string $function,
         int $position,
         string $paramName
     ): int {
-        $var = $var->resolveIndirect();
+        $var = $frame->calledArgs[$argIndex]->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d ($%s) must be of type int, null given',
+                    $function,
+                    $position,
+                    $paramName
+                ));
+            }
+
             return 0;
         }
 
