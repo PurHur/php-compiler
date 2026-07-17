@@ -111,6 +111,62 @@ final class VmDomXPath
         ));
     }
 
+    /**
+     * DOMXPath::registerPhpFunctionNS() — php-src xpath.c / xpath_callbacks.c (#20119).
+     */
+    public static function registerPhpFunctionNS(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $namespaceUri,
+        string $name,
+        Variable $callable
+    ): void {
+        self::ensureXPath($xpath);
+        if (str_contains($namespaceUri, "\0")) {
+            throw new \ValueError(
+                'DOMXPath::registerPhpFunctionNS(): Argument #1 ($namespaceURI) must not contain any null bytes'
+            );
+        }
+        if (DomConstants::PHP_XPATH_NS === $namespaceUri) {
+            throw new \ValueError(
+                'DOMXPath::registerPhpFunctionNS(): Argument #1 ($namespaceURI) must not be "http://php.net/xpath" because it is reserved by PHP'
+            );
+        }
+        if (str_contains($name, "\0")) {
+            throw new \ValueError(
+                'DOMXPath::registerPhpFunctionNS(): Argument #2 ($name) must not contain any null bytes'
+            );
+        }
+        if (!self::isValidXPathNcName($name)) {
+            throw new \ValueError(
+                'DOMXPath::registerPhpFunctionNS(): Argument #2 ($name) must be a valid callback name'
+            );
+        }
+        $callable = $callable->resolveIndirect();
+        if (!VmCallable::isCallable($ctx, $callable)) {
+            throw new \TypeError(sprintf(
+                'DOMXPath::registerPhpFunctionNS(): Argument #3 ($callable) must be of type callable, %s given',
+                VmDom::typeLabel($callable)
+            ));
+        }
+        $state = DomRegistry::state($xpath);
+        if (!isset($state->xpathPhpFunctionNs[$namespaceUri])) {
+            $state->xpathPhpFunctionNs[$namespaceUri] = [];
+        }
+        $state->xpathPhpFunctionNs[$namespaceUri][$name] = $callable;
+    }
+
+    /** xmlValidateNCName(name, 0) subset used by php-src xpath_callbacks.c (#20119). */
+    private static function isValidXPathNcName(string $name): bool
+    {
+        if ('' === $name) {
+            return false;
+        }
+
+        // NCName: no colon; Letter|'_' start; then NameChar without ':'.
+        return 1 === preg_match('/^[A-Za-z_][\w.-]*$/u', $name);
+    }
+
     public static function query(
         Context $ctx,
         ObjectEntry $xpath,
@@ -134,6 +190,10 @@ final class VmDomXPath
         $phpFn = self::tryEvaluatePhpFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
         if (null !== $phpFn) {
             return $phpFn;
+        }
+        $nsFn = self::tryEvaluateNamespacedPhpFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+        if (null !== $nsFn) {
+            return $nsFn;
         }
         if (self::isBooleanExpression($expression)) {
             $var = new Variable(Variable::TYPE_BOOLEAN);
@@ -187,6 +247,16 @@ final class VmDomXPath
             self::registerContextNodeNamespaces($xpath, $context);
         }
 
+        // Relative attribute axis: @attr on context element (needed for NS php preds; #20119).
+        if (preg_match('~^@([\w.-]+)$~', $expression, $attrMatch)) {
+            if (!VmDom::isElement($context)) {
+                return [];
+            }
+            $attr = self::attributeNodeFromElement($ctx, $context, $attrMatch[1], $state->xpathNamespaces);
+
+            return null !== $attr ? [$attr->id] : [];
+        }
+
         // Namespace axis: namespace::* / namespace::prefix (php-src/libxml; #20097).
         $nsIds = self::tryEvaluateNamespaceAxis($ctx, $context, $expression);
         if (null !== $nsIds) {
@@ -197,6 +267,18 @@ final class VmDomXPath
         $attrIds = self::tryEvaluateAttributeAxis($ctx, $context, $expression, $state->xpathNamespaces);
         if (null !== $attrIds) {
             return $attrIds;
+        }
+
+        // //tag[prefix:fn(args) = "lit"] / //tag[prefix:fn(args)] — registerPhpFunctionNS (#20119).
+        $nsPredIds = self::tryEvaluateNamespacedPhpFunctionPredicate(
+            $ctx,
+            $xpath,
+            $context,
+            $expression,
+            $state
+        );
+        if (null !== $nsPredIds) {
+            return $nsPredIds;
         }
 
         // //tag, //tag[@attr='v'], //tag[n] — positional preds keep element string-value (#19456).
@@ -820,6 +902,167 @@ final class VmDomXPath
         $result = VmCallable::invoke($ctx, $callback, ...$callArgs);
 
         return self::coercePhpFunctionReturn($result);
+    }
+
+    /**
+     * Top-level prefix:localName(...) for registerPhpFunctionNS() (#20119).
+     */
+    private static function tryEvaluateNamespacedPhpFunction(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $expression,
+        ?ObjectEntry $contextNode,
+        bool $registerNodeNS
+    ): ?Variable {
+        if (!preg_match('~^([A-Za-z_][\w]*):([A-Za-z_][\w.-]*)\(~', $expression, $prefixMatch)) {
+            return null;
+        }
+        // php:function / php:functionString handled elsewhere.
+        if (0 === strcasecmp($prefixMatch[2], 'function') || 0 === strcasecmp($prefixMatch[2], 'functionString')) {
+            return null;
+        }
+        self::ensureXPath($xpath);
+        if ($registerNodeNS && null !== $contextNode) {
+            self::registerContextNodeNamespaces($xpath, $contextNode);
+        }
+        $openParen = strpos($expression, '(');
+        if (false === $openParen) {
+            return null;
+        }
+        $closeParen = self::findMatchingCloseParen($expression, $openParen);
+        if (null === $closeParen || $closeParen !== \strlen($expression) - 1) {
+            return null;
+        }
+        $argsStr = substr($expression, $openParen + 1, $closeParen - $openParen - 1);
+
+        return self::invokeNamespacedPhpFunction(
+            $ctx,
+            $xpath,
+            $prefixMatch[1],
+            $prefixMatch[2],
+            $argsStr,
+            $contextNode
+        );
+    }
+
+    /**
+     * //tag[prefix:fn(args)(= "lit")?] filtered by registerPhpFunctionNS (#20119).
+     *
+     * @return list<int>|null
+     */
+    private static function tryEvaluateNamespacedPhpFunctionPredicate(
+        Context $ctx,
+        ObjectEntry $xpath,
+        ObjectEntry $context,
+        string $expression,
+        DomNodeState $state
+    ): ?array {
+        $compare = null;
+        $matches = null;
+        if (preg_match(
+            '~^//([*\w][\w:-]*)\[([A-Za-z_][\w]*):([A-Za-z_][\w.-]*)\((.*)\)\s*=\s*(["\'])(.*?)\5\]$~s',
+            $expression,
+            $matches
+        )) {
+            $compare = $matches[6];
+        } elseif (preg_match(
+            '~^//([*\w][\w:-]*)\[([A-Za-z_][\w]*):([A-Za-z_][\w.-]*)\((.*)\)\]$~s',
+            $expression,
+            $matches
+        )) {
+            $compare = null;
+        } else {
+            return null;
+        }
+
+        $tag = $matches[1];
+        $prefix = $matches[2];
+        $localName = $matches[3];
+        $argsStr = $matches[4];
+        $nsUri = $state->xpathNamespaces[$prefix] ?? null;
+        if (null === $nsUri || !isset($state->xpathPhpFunctionNs[$nsUri][$localName])) {
+            // Unregistered — match libxml empty node-set rather than Invalid expression for query.
+            return [];
+        }
+
+        $nodeIds = self::collectDescendantElements($context, $tag, $state->xpathNamespaces);
+        $filtered = [];
+        foreach ($nodeIds as $nodeId) {
+            $element = DomRegistry::entry($nodeId);
+            if (null === $element || !VmDom::isElement($element)) {
+                continue;
+            }
+            $result = self::invokeNamespacedPhpFunction(
+                $ctx,
+                $xpath,
+                $prefix,
+                $localName,
+                $argsStr,
+                $element
+            );
+            if (null === $compare) {
+                if (self::booleanizePhpFunctionResult($result)) {
+                    $filtered[] = $nodeId;
+                }
+            } elseif ($result->toString() === $compare) {
+                $filtered[] = $nodeId;
+            }
+        }
+
+        return $filtered;
+    }
+
+    private static function invokeNamespacedPhpFunction(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $prefix,
+        string $localName,
+        string $argsStr,
+        ?ObjectEntry $contextNode
+    ): Variable {
+        $state = DomRegistry::state($xpath);
+        $nsUri = $state->xpathNamespaces[$prefix] ?? null;
+        if (null === $nsUri) {
+            $var = new Variable(Variable::TYPE_BOOLEAN);
+            $var->bool(false);
+
+            return $var;
+        }
+        $callable = $state->xpathPhpFunctionNs[$nsUri][$localName] ?? null;
+        if (null === $callable) {
+            throw new \DOMException('Invalid expression');
+        }
+        $argExprs = self::splitXPathCallArgs($argsStr);
+        $callArgs = [];
+        foreach ($argExprs as $argExpr) {
+            $callArgs[] = self::evaluatePhpFunctionArg($ctx, $xpath, trim($argExpr), $contextNode, false);
+        }
+
+        return self::coercePhpFunctionReturn(VmCallable::invoke($ctx, $callable, ...$callArgs));
+    }
+
+    private static function booleanizePhpFunctionResult(Variable $result): bool
+    {
+        $result = $result->resolveIndirect();
+        if (Variable::TYPE_NULL === $result->type) {
+            return false;
+        }
+        if (Variable::TYPE_BOOLEAN === $result->type) {
+            return $result->toBool();
+        }
+        if (Variable::TYPE_STRING === $result->type) {
+            return '' !== $result->toString();
+        }
+        if (Variable::TYPE_INTEGER === $result->type) {
+            return 0 !== $result->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $result->type) {
+            $n = $result->toFloat();
+
+            return 0.0 !== $n && !is_nan($n);
+        }
+
+        return true;
     }
 
     private static function assertValidPhpFunctionName(string $name, bool $isArray): void
