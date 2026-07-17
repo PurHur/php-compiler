@@ -174,6 +174,9 @@ final class BuiltinByRefParams
             case 'pcntl_waitid':
                 // &$info
                 return [2];
+            case 'ftp_alloc':
+                // php-src ext/ftp/ftp.stub.php — &$result (#20060)
+                return [2];
         }
 
         return [];

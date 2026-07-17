@@ -29,7 +29,10 @@ final class VmFtpCore
      *     host: string,
      *     port: int,
      *     closed: bool,
-     *     ssl: bool
+     *     ssl: bool,
+     *     timeout: int,
+     *     autoseek: bool,
+     *     usepasvaddress: bool
      * }>
      */
     private static array $state = [];
@@ -64,7 +67,7 @@ final class VmFtpCore
                 return false;
             }
 
-            return self::wrapConnection($ctx, $hostname, $port, $ssl, null, $hostConn);
+            return self::wrapConnection($ctx, $hostname, $port, $timeout, $ssl, null, $hostConn);
         }
 
         [$handle, $errno, $errstr] = $ssl
@@ -88,7 +91,7 @@ final class VmFtpCore
             return false;
         }
 
-        return self::wrapConnection($ctx, $hostname, $port, $ssl, $handle, null);
+        return self::wrapConnection($ctx, $hostname, $port, $timeout, $ssl, $handle, null);
     }
 
     /**
@@ -98,6 +101,7 @@ final class VmFtpCore
         Context $ctx,
         string $hostname,
         int $port,
+        int $timeout,
         bool $ssl,
         ?int $handle,
         mixed $hostConn
@@ -113,6 +117,9 @@ final class VmFtpCore
             'port' => $port,
             'closed' => false,
             'ssl' => $ssl,
+            'timeout' => $timeout > 0 ? $timeout : 90,
+            'autoseek' => true,
+            'usepasvaddress' => true,
         ];
         $var->object($object);
 
@@ -450,18 +457,183 @@ final class VmFtpCore
         return (int) @\ftp_mdtm($hostConn, $filename);
     }
 
+    public static function append(
+        ObjectEntry $connection,
+        string $remoteFile,
+        string $localFile,
+        int $mode
+    ): bool {
+        self::ensureLive($connection, 'ftp_append');
+        $hostConn = self::requireHostConn($connection, 'ftp_append');
+
+        return (bool) @\ftp_append($hostConn, $remoteFile, $localFile, $mode);
+    }
+
+    /**
+     * @param-out string|null $response
+     */
+    public static function alloc(ObjectEntry $connection, int $size, ?string &$response = null): bool
+    {
+        self::ensureLive($connection, 'ftp_alloc');
+        $hostConn = self::requireHostConn($connection, 'ftp_alloc');
+        $out = null;
+        $ok = (bool) @\ftp_alloc($hostConn, $size, $out);
+        $response = null === $out ? null : (string) $out;
+
+        return $ok;
+    }
+
+    /**
+     * @return int|false
+     */
+    public static function chmod(ObjectEntry $connection, int $permissions, string $filename): int|false
+    {
+        self::ensureLive($connection, 'ftp_chmod');
+        $hostConn = self::requireHostConn($connection, 'ftp_chmod');
+        $result = @\ftp_chmod($hostConn, $permissions, $filename);
+
+        return false === $result ? false : (int) $result;
+    }
+
+    /**
+     * @return HashTable|null
+     */
+    public static function raw(ObjectEntry $connection, string $command): ?HashTable
+    {
+        self::ensureLive($connection, 'ftp_raw');
+        $hostConn = self::requireHostConn($connection, 'ftp_raw');
+        $rows = @\ftp_raw($hostConn, $command);
+        if (null === $rows || false === $rows || !\is_array($rows)) {
+            return null;
+        }
+
+        return self::stringListToHashTable($rows);
+    }
+
+    public static function site(ObjectEntry $connection, string $command): bool
+    {
+        self::ensureLive($connection, 'ftp_site');
+        $hostConn = self::requireHostConn($connection, 'ftp_site');
+
+        return (bool) @\ftp_site($hostConn, $command);
+    }
+
+    /**
+     * php-src PHP_FUNCTION(ftp_set_option) — TIMEOUT_SEC / AUTOSEEK / USEPASVADDRESS (#20060).
+     *
+     * @param int|bool $value
+     */
+    public static function setOption(ObjectEntry $connection, int $option, int|bool $value): bool
+    {
+        self::ensureLive($connection, 'ftp_set_option');
+        $hostConn = self::$state[$connection->id]['hostConn'] ?? null;
+        if (null !== $hostConn) {
+            return (bool) @\ftp_set_option($hostConn, $option, $value);
+        }
+
+        return self::setOptionLocal($connection, $option, $value);
+    }
+
+    /**
+     * @return int|bool
+     */
+    public static function getOption(ObjectEntry $connection, int $option): int|bool
+    {
+        self::ensureLive($connection, 'ftp_get_option');
+        $hostConn = self::$state[$connection->id]['hostConn'] ?? null;
+        if (null !== $hostConn) {
+            $result = @\ftp_get_option($hostConn, $option);
+
+            return false === $result ? false : $result;
+        }
+
+        return self::getOptionLocal($connection, $option);
+    }
+
+    /**
+     * @param int|bool $value
+     */
+    private static function setOptionLocal(ObjectEntry $connection, int $option, int|bool $value): bool
+    {
+        $id = $connection->id;
+        if (FtpConstants::FTP_TIMEOUT_SEC === $option) {
+            $timeout = \is_bool($value) ? (int) $value : (int) $value;
+            if ($timeout <= 0) {
+                self::warnFtp('ftp_set_option(): Timeout must be greater than zero');
+
+                return false;
+            }
+            self::$state[$id]['timeout'] = $timeout;
+
+            return true;
+        }
+        if (FtpConstants::FTP_AUTOSEEK === $option) {
+            self::$state[$id]['autoseek'] = (bool) $value;
+
+            return true;
+        }
+        if (FtpConstants::FTP_USEPASVADDRESS === $option) {
+            self::$state[$id]['usepasvaddress'] = (bool) $value;
+
+            return true;
+        }
+        self::warnFtp('ftp_set_option(): Unknown option `'.$option.'`');
+
+        return false;
+    }
+
+    /**
+     * @return int|bool
+     */
+    private static function getOptionLocal(ObjectEntry $connection, int $option): int|bool
+    {
+        $st = self::$state[$connection->id];
+        if (FtpConstants::FTP_TIMEOUT_SEC === $option) {
+            return (int) ($st['timeout'] ?? 90);
+        }
+        if (FtpConstants::FTP_AUTOSEEK === $option) {
+            return (bool) ($st['autoseek'] ?? true);
+        }
+        if (FtpConstants::FTP_USEPASVADDRESS === $option) {
+            return (bool) ($st['usepasvaddress'] ?? true);
+        }
+        self::warnFtp('ftp_get_option(): Unknown option `'.$option.'`');
+
+        return false;
+    }
+
+    private static function warnFtp(string $message): void
+    {
+        $vm = VM::running();
+        if (null === $vm) {
+            @\trigger_error($message, \E_WARNING);
+
+            return;
+        }
+        $frame = $vm->builtinHandlerFrame();
+        if (null === $frame) {
+            $frames = $vm->context->runStackFrames();
+            $frame = [] !== $frames ? $frames[0] : null;
+        }
+        $vm->context->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            null,
+            $vm->context,
+            $frame
+        );
+    }
+
     /**
      * @param list<string> $rows
      */
     private static function stringListToHashTable(array $rows): HashTable
     {
         $ht = new HashTable();
-        $i = 0;
         foreach ($rows as $row) {
             $slot = new Variable();
             $slot->string((string) $row);
-            $ht->add($i, $slot);
-            ++$i;
+            $ht->append($slot);
         }
 
         return $ht;

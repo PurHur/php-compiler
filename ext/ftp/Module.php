@@ -76,6 +76,13 @@ class Module extends ModuleAbstract
             new ftp_delete(),
             new ftp_size(),
             new ftp_mdtm(),
+            new ftp_append(),
+            new ftp_alloc(),
+            new ftp_chmod(),
+            new ftp_raw(),
+            new ftp_site(),
+            new ftp_set_option(),
+            new ftp_get_option(),
         ];
     }
 }
