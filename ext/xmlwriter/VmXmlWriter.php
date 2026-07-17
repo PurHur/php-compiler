@@ -110,6 +110,21 @@ final class VmXmlWriter
         $entry->methods['writedtd'] = new XmlWriterWriteDtd();
         $entry->methodVisibility['writedtd'] = $pub;
         $entry->methodNames['writedtd'] = 'writeDtd';
+        $entry->methods['writedtdelement'] = new XmlWriterWriteDtdElement();
+        $entry->methodVisibility['writedtdelement'] = $pub;
+        $entry->methodNames['writedtdelement'] = 'writeDtdElement';
+        $entry->methods['writedtdattlist'] = new XmlWriterWriteDtdAttlist();
+        $entry->methodVisibility['writedtdattlist'] = $pub;
+        $entry->methodNames['writedtdattlist'] = 'writeDtdAttlist';
+        $entry->methods['startdtdentity'] = new XmlWriterStartDtdEntity();
+        $entry->methodVisibility['startdtdentity'] = $pub;
+        $entry->methodNames['startdtdentity'] = 'startDtdEntity';
+        $entry->methods['enddtdentity'] = new XmlWriterEndDtdEntity();
+        $entry->methodVisibility['enddtdentity'] = $pub;
+        $entry->methodNames['enddtdentity'] = 'endDtdEntity';
+        $entry->methods['writedtdentity'] = new XmlWriterWriteDtdEntity();
+        $entry->methodVisibility['writedtdentity'] = $pub;
+        $entry->methodNames['writedtdentity'] = 'writeDtdEntity';
         $entry->methods['text'] = new XmlWriterText();
         $entry->methodVisibility['text'] = $pub;
         $entry->methodNames['text'] = 'text';
@@ -711,7 +726,7 @@ final class VmXmlWriter
     public static function startComment(ObjectEntry $entry): bool
     {
         $state = self::requireOpen($entry, 'XMLWriter::startComment()');
-        if ($state->inComment || $state->inCdata || $state->inPi || $state->inDtd) {
+        if ($state->inComment || $state->inCdata || $state->inPi || $state->inDtd || $state->inDtdEntity) {
             return false;
         }
         self::closeStartTagIfOpen($state);
@@ -746,7 +761,7 @@ final class VmXmlWriter
         ?string $systemId = null
     ): bool {
         $state = self::requireOpen($entry, 'XMLWriter::startDtd()');
-        if ('' === $qualifiedName || $state->inDtd || $state->inComment || $state->inCdata || $state->inPi) {
+        if ('' === $qualifiedName || $state->inDtd || $state->inComment || $state->inCdata || $state->inPi || $state->inDtdEntity) {
             return false;
         }
         if (null !== $publicId && (null === $systemId || '' === $systemId)) {
@@ -775,12 +790,20 @@ final class VmXmlWriter
     /**
      * XMLWriter::endDtd — close a DOCTYPE (php-src zim_XMLWriter_endDtd; #19386).
      * Zend returns true with no write when no DTD is open (same as endPI).
+     * Open DTD entities / internal subset are closed first (libxml; #19468).
      */
     public static function endDtd(ObjectEntry $entry): bool
     {
         $state = self::requireOpen($entry, 'XMLWriter::endDtd()');
         if (!$state->inDtd) {
             return true;
+        }
+        if ($state->inDtdEntity) {
+            self::finishOpenDtdEntity($state);
+        }
+        if ($state->dtdSubsetOpen) {
+            $state->buffer .= ']';
+            $state->dtdSubsetOpen = false;
         }
         $state->buffer .= '>';
         $state->inDtd = false;
@@ -828,11 +851,175 @@ final class VmXmlWriter
         return true;
     }
 
+    /**
+     * XMLWriter::writeDtdElement — `<!ELEMENT name content>` (php-src zim_XMLWriter_writeDtdElement; #19468).
+     */
+    public static function writeDtdElement(ObjectEntry $entry, string $name, string $content): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::writeDtdElement()');
+        if (!self::isValidElementName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::writeDtdElement(): Argument #1 ($name) must be a valid element name, %s given',
+                var_export($name, true)
+            ));
+        }
+        if ($state->inDtdEntity || $state->inComment || $state->inCdata || $state->inPi) {
+            return false;
+        }
+        self::closeStartTagIfOpen($state);
+        self::ensureDtdSubsetOpen($state);
+        $state->buffer .= '<!ELEMENT '.self::escapeElementName($name).' '.$content.'>';
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::writeDtdAttlist — `<!ATTLIST name content>` (php-src zim_XMLWriter_writeDtdAttlist; #19468).
+     */
+    public static function writeDtdAttlist(ObjectEntry $entry, string $name, string $content): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::writeDtdAttlist()');
+        if (!self::isValidElementName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::writeDtdAttlist(): Argument #1 ($name) must be a valid element name, %s given',
+                var_export($name, true)
+            ));
+        }
+        if ($state->inDtdEntity || $state->inComment || $state->inCdata || $state->inPi) {
+            return false;
+        }
+        self::closeStartTagIfOpen($state);
+        self::ensureDtdSubsetOpen($state);
+        $state->buffer .= '<!ATTLIST '.self::escapeElementName($name).' '.$content.'>';
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::startDtdEntity — open `<!ENTITY …` (php-src zim_XMLWriter_startDtdEntity; #19468).
+     */
+    public static function startDtdEntity(ObjectEntry $entry, string $name, bool $isParam): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::startDtdEntity()');
+        if (!self::isValidAttributeName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::startDtdEntity(): Argument #1 ($name) must be a valid attribute name, %s given',
+                var_export($name, true)
+            ));
+        }
+        if ($state->inDtdEntity || $state->inComment || $state->inCdata || $state->inPi) {
+            return false;
+        }
+        self::closeStartTagIfOpen($state);
+        self::ensureDtdSubsetOpen($state);
+        $state->buffer .= '<!ENTITY ';
+        if ($isParam) {
+            $state->buffer .= '% ';
+        }
+        $state->buffer .= self::escapeElementName($name);
+        $state->inDtdEntity = true;
+        $state->dtdEntityIsParam = $isParam;
+        $state->dtdEntityHasContent = false;
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::endDtdEntity — close open entity (php-src zim_XMLWriter_endDtdEntity; #19468).
+     */
+    public static function endDtdEntity(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry, 'XMLWriter::endDtdEntity()');
+        if (!$state->inDtdEntity) {
+            return false;
+        }
+        self::finishOpenDtdEntity($state);
+
+        return true;
+    }
+
+    /**
+     * XMLWriter::writeDtdEntity — one-shot entity (php-src zim_XMLWriter_writeDtdEntity; #19468).
+     */
+    public static function writeDtdEntity(
+        ObjectEntry $entry,
+        string $name,
+        string $content,
+        bool $isParam = false,
+        ?string $publicId = null,
+        ?string $systemId = null,
+        ?string $notationData = null
+    ): bool {
+        $state = self::requireOpen($entry, 'XMLWriter::writeDtdEntity()');
+        if (!self::isValidElementName($name)) {
+            throw new \ValueError(sprintf(
+                'XMLWriter::writeDtdEntity(): Argument #1 ($name) must be a valid element name, %s given',
+                var_export($name, true)
+            ));
+        }
+        if ($state->inDtdEntity || $state->inComment || $state->inCdata || $state->inPi) {
+            return false;
+        }
+        self::closeStartTagIfOpen($state);
+        self::ensureDtdSubsetOpen($state);
+
+        $external = null !== $publicId || null !== $systemId || null !== $notationData;
+        if ($external) {
+            if (null !== $publicId && (null === $systemId || '' === $systemId)) {
+                $state->buffer .= '<!ENTITY ';
+                if ($isParam) {
+                    $state->buffer .= '% ';
+                }
+                $state->buffer .= self::escapeElementName($name);
+                @\trigger_error(
+                    'XMLWriter::writeDtdEntity(): xmlTextWriterWriteDTDExternalEntityContents: system identifier needed!',
+                    \E_WARNING
+                );
+
+                return false;
+            }
+            $state->buffer .= '<!ENTITY ';
+            if ($isParam) {
+                $state->buffer .= '% ';
+            }
+            $state->buffer .= self::escapeElementName($name);
+            if (null !== $publicId) {
+                $state->buffer .= ' PUBLIC "'.self::escapeAttribute($publicId).'" "'.self::escapeAttribute((string) $systemId).'"';
+            } else {
+                $state->buffer .= ' SYSTEM "'.self::escapeAttribute((string) $systemId).'"';
+            }
+            if (null !== $notationData && '' !== $notationData) {
+                $state->buffer .= ' NDATA '.$notationData;
+            }
+            $state->buffer .= '>';
+
+            return true;
+        }
+
+        $state->buffer .= '<!ENTITY ';
+        if ($isParam) {
+            $state->buffer .= '% ';
+        }
+        $state->buffer .= self::escapeElementName($name).' "'.$content.'">';
+
+        return true;
+    }
+
     public static function text(ObjectEntry $entry, string $content): bool
     {
         $state = self::requireOpen($entry, 'XMLWriter::text()');
         if ($state->attributeOpen) {
             $state->buffer .= self::escapeAttribute($content);
+
+            return true;
+        }
+        if ($state->inDtdEntity) {
+            // libxml: first text() opens the quoted value; further text appends raw (#19468).
+            if (!$state->dtdEntityHasContent) {
+                $state->buffer .= ' "';
+                $state->dtdEntityHasContent = true;
+            }
+            $state->buffer .= $content;
 
             return true;
         }
@@ -1019,7 +1206,33 @@ final class VmXmlWriter
         $state->piHasContent = false;
         $state->inComment = false;
         $state->inDtd = false;
+        $state->dtdSubsetOpen = false;
+        $state->inDtdEntity = false;
+        $state->dtdEntityIsParam = false;
+        $state->dtdEntityHasContent = false;
         $state->pendingNsDecls = [];
+    }
+
+    /** Open `[` for DOCTYPE internal subset on first subset decl while inDtd (#19468). */
+    private static function ensureDtdSubsetOpen(XmlWriterState $state): void
+    {
+        if ($state->inDtd && !$state->dtdSubsetOpen) {
+            $state->buffer .= ' [';
+            $state->dtdSubsetOpen = true;
+        }
+    }
+
+    /** Finish `<!ENTITY …>` started by startDtdEntity / endDtd auto-close (#19468). */
+    private static function finishOpenDtdEntity(XmlWriterState $state): void
+    {
+        if ($state->dtdEntityHasContent) {
+            $state->buffer .= '">';
+        } else {
+            $state->buffer .= '>';
+        }
+        $state->inDtdEntity = false;
+        $state->dtdEntityIsParam = false;
+        $state->dtdEntityHasContent = false;
     }
 
     private static function requireOpen(ObjectEntry $entry, string $label): XmlWriterState

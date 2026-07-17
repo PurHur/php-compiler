@@ -53,6 +53,18 @@ final class XmlWriterState
     /** Inside startDtd() … endDtd() (php-src xmlTextWriterStartDTD; #19386). */
     public bool $inDtd = false;
 
+    /** True after `[` opened for the DOCTYPE internal subset (#19468). */
+    public bool $dtdSubsetOpen = false;
+
+    /** Inside startDtdEntity() … endDtdEntity() (php-src xmlTextWriterStartDTDEntity; #19468). */
+    public bool $inDtdEntity = false;
+
+    /** Parameter-entity (`%`) form for the open DTD entity (#19468). */
+    public bool $dtdEntityIsParam = false;
+
+    /** True after the opening ` "` of an internal entity value (#19468). */
+    public bool $dtdEntityHasContent = false;
+
     /**
      * Namespace decls from writeAttributeNS, flushed when the start tag closes
      * (php-src/libxml defers xmlns onto the open element; #19371).

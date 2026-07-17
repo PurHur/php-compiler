@@ -59,13 +59,13 @@
       <div class="cap-summary">
         <article>
           <div>Language constructs</div>
-          <strong>80</strong> / 89 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">5 partial · 4 gaps</p>
+          <strong>81</strong> / 89 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">4 partial · 4 gaps</p>
         </article>
         <article>
           <div>Stdlib builtins</div>
-          <strong>1006</strong> / 1095 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">64 partial · 25 gaps</p>
+          <strong>1008</strong> / 1098 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">64 partial · 26 gaps</p>
         </article>
         <article>
           <div>Legend</div>
@@ -115,7 +115,7 @@
 <tr data-support="full"><td><code>Fibers (`Fiber`, `Fiber::suspend()`, start/resume)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3130">#3130</a></td></tr>
 <tr data-support="full"><td><code>`ClassName::class` / `static::class`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/740">#740</a></td></tr>
 <tr data-support="full"><td><code>Class member constants `public` / `private` / `protected const`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/2199">#2199</a></td></tr>
-<tr data-support="partial"><td><code>PHP 8.3 typed class constants (`const array X = [1,2];`, `const string S = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/3592">#3592</a></td></tr>
+<tr data-support="full"><td><code>PHP 8.3 typed class constants (`const array X = [1,2];`, `const string S = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/3592">#3592</a></td></tr>
 <tr data-support="partial"><td><code>PHP 8.3+ file/namespace typed constants (`const string X = &#039;a&#039;;`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/7081">#7081</a></td></tr>
 <tr data-support="full"><td><code>PHP 8.3 typed interface constants (`interface I { public const string X = &#039;a&#039;; }`)</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td><a href="https://github.com/PurHur/php-compiler/issues/5980">#5980</a></td></tr>
 <tr data-support="partial"><td><code>Class constants with `new` object expressions</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td><a href="https://github.com/PurHur/php-compiler/issues/15608">#15608</a></td></tr>
@@ -632,6 +632,7 @@
 <tr data-support="full"><td><code>`ip2long`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`iptcembed`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`iptcparse`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`isAnonymousClass`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`is_a`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`is_array`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`is_bool`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -669,6 +670,7 @@
 <tr data-support="full"><td><code>`json_encode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`json_last_error`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`json_last_error_msg`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`json_validate`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`key`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`key_exists`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`krsort`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -731,6 +733,7 @@
 <tr data-support="full"><td><code>`mb_strpos`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_strrichr`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_strrpos`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`mb_strstr`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_strtolower`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_strtoupper`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_strwidth`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
