@@ -16,11 +16,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * User-script AOT ob stack via ObStorageGlobals LLVM (#10492, #15407, #19576).
+ * Thin standalone AOT ob stack via ObStorageGlobals LLVM (#10492, #15407, #19576, #20169).
  *
  * Moved out of lib/JIT/Builtin/ — {@see \PHPCompiler\JIT\Builtin\ObOutputExecCaptureRuntime}
  * stays the thin orchestrator. Nested-JIT {@see ObOutputExecCaptureJitHelper} segfaults under
- * {@see \PHPCompiler\JIT\UserScriptAotDeferNestedJit}; this path keeps exec
+ * {@see \PHPCompiler\JIT\Context::isThinStandaloneAotMain()} (#16075); this path keeps exec
  * stdout capture + ob read/discard API on fixed char buffers (#4914).
  * php-src: ext/standard/output.c
  */

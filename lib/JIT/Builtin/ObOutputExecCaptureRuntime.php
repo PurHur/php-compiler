@@ -9,16 +9,16 @@ use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Lazy minimal ob stack for user-script AOT exec stdout capture (#10492, #19136).
+ * Lazy minimal ob stack for user-script AOT exec stdout capture (#10492, #19136, #20169).
  *
- * SSOT: {@see \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper} via {@see JitVmHelperLink}.
- * User-script defer path: {@see \PHPCompiler\ext\standard\JitObOutputExecCaptureKernel}.
+ * Embed / non-thin: {@see \PHPCompiler\ext\standard\ObOutputExecCaptureJitHelper} via {@see JitVmHelperLink}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20156 shape): {@see JitObOutputExecCaptureKernel}
+ * (NestedJIT of the helper segfaults under user-script AOT — #16075).
  * php-src: ext/standard/output.c
  */
 final class ObOutputExecCaptureRuntime
@@ -59,8 +59,7 @@ final class ObOutputExecCaptureRuntime
             return;
         }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)
-            || StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             JitObOutputExecCaptureKernel::ensureLinked($context);
 
             return;
@@ -89,8 +88,7 @@ final class ObOutputExecCaptureRuntime
             return;
         }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)
-            || StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             JitObOutputExecCaptureKernel::ensureReadApiLinked($context);
 
             return;
