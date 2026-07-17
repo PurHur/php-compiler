@@ -821,6 +821,35 @@ final class DateTimeSupport
         return $clone;
     }
 
+    /** php-src zim_DateTime_setISODate / php_date_isodate_set — mutable in-place (#19847). */
+    public static function setISODate(ObjectEntry $dt, int $year, int $week, int $dayOfWeek = 1): void
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::setISODate()");
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $label)->toInt();
+        $microsecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->toInt();
+        $updated = VmDateTimeNative::replaceISODateComponents(
+            $timestamp,
+            $microsecond,
+            $tzName,
+            $year,
+            $week,
+            $dayOfWeek
+        );
+        self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($updated['timestamp']);
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->int($updated['microsecond']);
+    }
+
+    /** php-src zim_DateTimeImmutable_setISODate — returns new instance (#19847). */
+    public static function withISODate(ObjectEntry $dt, int $year, int $week, int $dayOfWeek = 1): ObjectEntry
+    {
+        $clone = self::cloneDateTimeObject($dt);
+        self::setISODate($clone, $year, $week, $dayOfWeek);
+
+        return $clone;
+    }
+
     /** php-src zim_DateTime_setTime — mutable in-place (#12469). */
     public static function setTime(
         ObjectEntry $dt,

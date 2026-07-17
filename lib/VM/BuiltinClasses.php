@@ -40,6 +40,7 @@ use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromInterface;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromMutable;
 use PHPCompiler\VM\Builtin\DateTimeModify;
 use PHPCompiler\VM\Builtin\DateTimeSetDate;
+use PHPCompiler\VM\Builtin\DateTimeSetISODate;
 use PHPCompiler\VM\Builtin\DateTimeSetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeSetTime;
 use PHPCompiler\VM\Builtin\DateTimeSetTimestamp;
@@ -1359,6 +1360,7 @@ final class BuiltinClasses
             'sub' => new DateTimeSub(),
             'diff' => new DateTimeDiff(),
             'setdate' => new DateTimeSetDate(),
+            'setisodate' => new DateTimeSetISODate(),
             'settime' => new DateTimeSetTime(),
             ...(CompilerVersion::supportsDateTimeMicrosecond() ? [
                 'setmicrosecond' => new DateTimeSetMicrosecond(),
