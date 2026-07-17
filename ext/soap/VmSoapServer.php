@@ -5,14 +5,19 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\soap;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal as InternalFunc;
+use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\standard\VmUserCall;
@@ -20,7 +25,7 @@ use PHPCompiler\VM\MagicMethodInvocationAborted;
 use PHPCompiler\VM\ScriptExit;
 
 /**
- * SoapServer VM class — v1 string handle + addFunction/setObject (php-src ext/soap/soap.c; #20126).
+ * SoapServer VM class — v1 string handle + addFunction/setObject (php-src ext/soap/soap.c; #20126, #20292).
  */
 final class VmSoapServer
 {
@@ -109,6 +114,8 @@ final class VmSoapServer
         if (!\is_array($functions)) {
             throw new \TypeError('SoapServer::addFunction(): Argument #1 ($functions) must be of type array|string|int');
         }
+        // php-src: string/array path clears functions_all and rebuilds ft (#20292).
+        $state->functionsAll = false;
         foreach ($functions as $fn) {
             $name = (string) $fn;
             if ('' === $name) {
@@ -117,6 +124,29 @@ final class VmSoapServer
             $state->functions[] = $name;
             $state->functionIndex[\strtolower($name)] = $name;
         }
+    }
+
+    /**
+     * SoapServer::addFunction(SOAP_FUNCTIONS_ALL) — enable EG(function_table) dispatch (php-src soap.c; #20292).
+     */
+    public static function addFunctionAll(ObjectEntry $object, Frame $frame): void
+    {
+        $state = self::state($object);
+        if (version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=')
+            && null !== $frame->vmContext
+        ) {
+            $frame->vmContext->errors->triggerError(
+                'Enabling all functions via SOAP_FUNCTIONS_ALL is deprecated since 8.4, due to possible security concerns.'
+                .' If all PHP functions should be enabled, the flattened return value of get_defined_functions() can be used',
+                ErrorReporter::E_DEPRECATED,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+        }
+        $state->functions = [];
+        $state->functionIndex = [];
+        $state->functionsAll = true;
     }
 
     public static function setClass(ObjectEntry $object, string $className): void
@@ -169,9 +199,23 @@ final class VmSoapServer
     /**
      * @return list<string>
      */
-    public static function getFunctions(ObjectEntry $object): array
+    public static function getFunctions(ObjectEntry $object, ?Context $ctx = null): array
     {
-        return self::state($object)->functions;
+        $state = self::state($object);
+        if ($state->functionsAll) {
+            // php-src: ft = EG(function_table) when functions_all (#20292).
+            if (null === $ctx) {
+                return [];
+            }
+            $out = [];
+            foreach ($ctx->functions as $fn) {
+                $out[] = $fn->getName();
+            }
+
+            return $out;
+        }
+
+        return $state->functions;
     }
 
     public static function handle(ObjectEntry $object, ?string $request, Context $ctx, Frame $frame): void
@@ -373,8 +417,25 @@ final class VmSoapServer
             return $ctx->runtime->vm->invokeInstanceMethod($instance, $opName, ...$args);
         }
 
-        if (isset($state->functionIndex[$lc])) {
-            $fnName = $state->functionIndex[$lc];
+        if ($state->functionsAll || isset($state->functionIndex[$lc])) {
+            $fnName = $state->functionsAll ? $opName : $state->functionIndex[$lc];
+            if ($state->functionsAll) {
+                $resolvedLc = $ctx->resolveFunctionCallLc($fnName);
+                if (null === $resolvedLc) {
+                    throw new \SoapFault('Client', 'Function "'.$opName.'" doesn\'t exist');
+                }
+                $handler = $ctx->functions[$resolvedLc];
+                if ($handler instanceof PhpFunc) {
+                    // Isolated stack: outer user try/catch around handle() must not absorb
+                    // SoapFault from $server->fault() so handle() can emit Fault XML (#20194).
+                    return $ctx->runtime->vm->invokePhpFunctionIsolated($handler, ...$args);
+                }
+                if ($handler instanceof InternalFunc) {
+                    return VmInternalCall::invokeInContext($ctx, $handler, ...$args);
+                }
+
+                throw new \SoapFault('Client', 'Function "'.$opName.'" doesn\'t exist');
+            }
             // Isolated stack: outer user try/catch around handle() must not absorb
             // SoapFault from $server->fault() so handle() can emit Fault XML (#20194).
             $fn = VmUserCall::resolveStringCallback($ctx, $fnName);
@@ -679,6 +740,9 @@ final class SoapServerState
     /** @var array<string, string> */
     public array $functionIndex = [];
 
+    /** php-src soap_functions.functions_all after addFunction(SOAP_FUNCTIONS_ALL) (#20292). */
+    public bool $functionsAll = false;
+
     /** @var list<string> */
     public array $wsdlOperations = [];
 
@@ -766,6 +830,14 @@ final class SoapServerAddFunction extends SoapClassMethod
                 $list[] = Variable::TYPE_STRING === $v->type ? $v->toString() : (string) $v->toString();
             }
             VmSoapServer::addFunction($receiver, $list);
+        } elseif (Variable::TYPE_INTEGER === $arg->type) {
+            // php-src IS_LONG: only SOAP_FUNCTIONS_ALL; else ValueError (#20292).
+            if (SoapConstants::SOAP_FUNCTIONS_ALL !== $arg->toInt()) {
+                throw new \ValueError(
+                    'SoapServer::addFunction(): Argument #1 ($functions) must be SOAP_FUNCTIONS_ALL when an integer is passed'
+                );
+            }
+            VmSoapServer::addFunctionAll($receiver, $frame);
         } else {
             throw new \TypeError('SoapServer::addFunction(): Argument #1 ($functions) must be of type array|string|int');
         }
@@ -826,7 +898,8 @@ final class SoapServerGetFunctions extends SoapClassMethod
         }
         $ht = new HashTable();
         $i = 0;
-        foreach (VmSoapServer::getFunctions($receiver) as $fn) {
+        $ctx = $frame->vmContext;
+        foreach (VmSoapServer::getFunctions($receiver, $ctx) as $fn) {
             $slot = new Variable();
             $slot->string($fn);
             $ht->addIndex($i, $slot);
