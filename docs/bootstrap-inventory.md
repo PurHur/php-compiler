@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5512 |
-| Phase A inventory files (M2 ratio SSOT) | 5512 |
+| PHP files on vm.php path | 5514 |
+| Phase A inventory files (M2 ratio SSOT) | 5514 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15658 |
+| Source constructs flagged (warnings) | 15664 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -425,7 +425,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/BuiltinClasses.php` | 0 | 1 |
 | `ext/ftp/FtpConstants.php` | 0 | 1 |
 | `ext/ftp/FtpExtensionPolicy.php` | 0 | 1 |
-| `ext/ftp/Module.php` | 0 | 34 |
+| `ext/ftp/Module.php` | 0 | 36 |
 | `ext/ftp/VmFtpArg.php` | 0 | 1 |
 | `ext/ftp/VmFtpConnection.php` | 0 | 2 |
 | `ext/ftp/VmFtpCore.php` | 0 | 9 |
@@ -437,6 +437,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/ftp_close.php` | 0 | 2 |
 | `ext/ftp/ftp_connect.php` | 0 | 2 |
 | `ext/ftp/ftp_delete.php` | 0 | 2 |
+| `ext/ftp/ftp_exec.php` | 0 | 2 |
 | `ext/ftp/ftp_fget.php` | 0 | 2 |
 | `ext/ftp/ftp_fput.php` | 0 | 2 |
 | `ext/ftp/ftp_get.php` | 0 | 2 |
@@ -453,6 +454,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ftp/ftp_pasv.php` | 0 | 2 |
 | `ext/ftp/ftp_put.php` | 0 | 2 |
 | `ext/ftp/ftp_pwd.php` | 0 | 2 |
+| `ext/ftp/ftp_quit.php` | 0 | 2 |
 | `ext/ftp/ftp_raw.php` | 0 | 2 |
 | `ext/ftp/ftp_rawlist.php` | 0 | 2 |
 | `ext/ftp/ftp_rename.php` | 0 | 2 |
@@ -8287,36 +8289,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ftp_connect (line 57)
 - new ftp_ssl_connect (line 58)
 - new ftp_close (line 59)
-- new ftp_login (line 60)
-- new ftp_fget (line 61)
-- new ftp_fput (line 62)
-- new ftp_mlsd (line 63)
-- new ftp_systype (line 64)
-- new ftp_nb_continue (line 65)
-- new ftp_nb_fget (line 66)
-- new ftp_nb_get (line 67)
-- new ftp_nb_put (line 68)
-- new ftp_pasv (line 69)
-- new ftp_get (line 70)
-- new ftp_put (line 71)
-- new ftp_nlist (line 72)
-- new ftp_rawlist (line 73)
-- new ftp_chdir (line 74)
-- new ftp_pwd (line 75)
-- new ftp_cdup (line 76)
-- new ftp_mkdir (line 77)
-- new ftp_delete (line 78)
-- new ftp_rename (line 79)
-- new ftp_rmdir (line 80)
-- new ftp_size (line 81)
-- new ftp_mdtm (line 82)
-- new ftp_append (line 83)
-- new ftp_alloc (line 84)
-- new ftp_chmod (line 85)
-- new ftp_raw (line 86)
-- new ftp_site (line 87)
-- new ftp_set_option (line 88)
-- new ftp_get_option (line 89)
+- new ftp_quit (line 60)
+- new ftp_login (line 61)
+- new ftp_fget (line 62)
+- new ftp_fput (line 63)
+- new ftp_mlsd (line 64)
+- new ftp_systype (line 65)
+- new ftp_nb_continue (line 66)
+- new ftp_nb_fget (line 67)
+- new ftp_nb_get (line 68)
+- new ftp_nb_put (line 69)
+- new ftp_pasv (line 70)
+- new ftp_get (line 71)
+- new ftp_put (line 72)
+- new ftp_nlist (line 73)
+- new ftp_rawlist (line 74)
+- new ftp_chdir (line 75)
+- new ftp_pwd (line 76)
+- new ftp_cdup (line 77)
+- new ftp_mkdir (line 78)
+- new ftp_delete (line 79)
+- new ftp_rename (line 80)
+- new ftp_rmdir (line 81)
+- new ftp_size (line 82)
+- new ftp_mdtm (line 83)
+- new ftp_append (line 84)
+- new ftp_alloc (line 85)
+- new ftp_chmod (line 86)
+- new ftp_raw (line 87)
+- new ftp_site (line 88)
+- new ftp_exec (line 89)
+- new ftp_set_option (line 90)
+- new ftp_get_option (line 91)
 - 4 class method(s)
 
 ### `ext/ftp/VmFtpArg.php`
@@ -8339,9 +8343,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 211)
 - new HashTable (line 212)
 - new Variable (line 214)
-- new HashTable (line 665)
-- new Variable (line 667)
-- 53 class method(s)
+- new HashTable (line 673)
+- new Variable (line 675)
+- 54 class method(s)
 
 ### `ext/ftp/ftp_alloc.php`
 
@@ -8386,6 +8390,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/ftp/ftp_delete.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/ftp/ftp_exec.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
@@ -8482,6 +8492,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/ftp/ftp_pwd.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/ftp/ftp_quit.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)

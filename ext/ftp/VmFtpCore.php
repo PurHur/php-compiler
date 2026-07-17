@@ -551,6 +551,14 @@ final class VmFtpCore
         return (bool) @\ftp_site($hostConn, $command);
     }
 
+    public static function exec(ObjectEntry $connection, string $command): bool
+    {
+        self::ensureLive($connection, 'ftp_exec');
+        $hostConn = self::requireHostConn($connection, 'ftp_exec');
+
+        return (bool) @\ftp_exec($hostConn, $command);
+    }
+
     /**
      * php-src PHP_FUNCTION(ftp_set_option) — TIMEOUT_SEC / AUTOSEEK / USEPASVADDRESS (#20060).
      *

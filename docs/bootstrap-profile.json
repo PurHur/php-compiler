@@ -441,6 +441,7 @@
         "ext/ftp/ftp_close.php",
         "ext/ftp/ftp_connect.php",
         "ext/ftp/ftp_delete.php",
+        "ext/ftp/ftp_exec.php",
         "ext/ftp/ftp_fget.php",
         "ext/ftp/ftp_fput.php",
         "ext/ftp/ftp_get.php",
@@ -457,6 +458,7 @@
         "ext/ftp/ftp_pasv.php",
         "ext/ftp/ftp_put.php",
         "ext/ftp/ftp_pwd.php",
+        "ext/ftp/ftp_quit.php",
         "ext/ftp/ftp_raw.php",
         "ext/ftp/ftp_rawlist.php",
         "ext/ftp/ftp_rename.php",
@@ -5746,9 +5748,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5512,
+        "inventory_files": 5514,
         "excluded": 0,
-        "eligible": 5512,
+        "eligible": 5514,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
