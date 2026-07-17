@@ -471,6 +471,7 @@
         "ext/gd/Module.php",
         "ext/gd/VmGd.php",
         "ext/gd/VmGdAvif.php",
+        "ext/gd/VmGdFreeType.php",
         "ext/gd/VmGdPng.php",
         "ext/gd/VmGdWebp.php",
         "ext/gd/imagealphablending.php",
@@ -501,6 +502,8 @@
         "ext/gd/imagestring.php",
         "ext/gd/imagesx.php",
         "ext/gd/imagesy.php",
+        "ext/gd/imagettfbbox.php",
+        "ext/gd/imagettftext.php",
         "ext/gd/imagewebp.php",
         "ext/gettext/GettextFunction.php",
         "ext/gettext/GettextJitHelper.php",
@@ -5738,9 +5741,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5504,
+        "inventory_files": 5507,
         "excluded": 0,
-        "eligible": 5504,
+        "eligible": 5507,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
