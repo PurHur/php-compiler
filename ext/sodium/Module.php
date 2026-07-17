@@ -24,7 +24,11 @@ class Module extends ModuleAbstract
         }
         foreach (SodiumConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
-            $var->int($value);
+            if (\is_string($value)) {
+                $var->string($value);
+            } else {
+                $var->int($value);
+            }
             $runtime->vmContext->defineConstant($name, $var);
         }
     }
@@ -103,6 +107,10 @@ class Module extends ModuleAbstract
             new sodium_crypto_shorthash_keygen(),
             new sodium_crypto_kdf_keygen(),
             new sodium_crypto_kdf_derive_from_key(),
+            new sodium_crypto_pwhash(),
+            new sodium_crypto_pwhash_str(),
+            new sodium_crypto_pwhash_str_verify(),
+            new sodium_crypto_pwhash_str_needs_rehash(),
         ];
     }
 }
