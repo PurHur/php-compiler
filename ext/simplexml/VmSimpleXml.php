@@ -584,6 +584,18 @@ final class VmSimpleXml
         if (null !== $value && '' !== $value) {
             $child->text = $value;
         }
+        // php-src zim_simplexmlelement_addChild: default xmlns on new element (#19906).
+        if (null !== $namespace && '' !== $namespace) {
+            $colon = strpos($qualifiedName, ':');
+            if (false !== $colon) {
+                $prefix = substr($qualifiedName, 0, $colon);
+                if ('' !== $prefix) {
+                    $child->attributes['xmlns:'.$prefix] = $namespace;
+                }
+            } else {
+                $child->attributes['xmlns'] = $namespace;
+            }
+        }
         SimpleXmlRegistry::state($entry)->children[] = $child;
 
         return self::wrapNode($ctx, $entry->class, $child, SimpleXmlRegistry::documentKey($entry));
@@ -915,7 +927,7 @@ final class VmSimpleXml
         $targetUri = $isPrefix ? ($namespaces[$namespaceOrPrefix] ?? $namespaceOrPrefix) : $namespaceOrPrefix;
         $out = [];
         foreach ($elements as $element) {
-            $elementUri = $element->attributes['xmlns'] ?? ($element->attributes['xmlns:'.$namespaceOrPrefix] ?? '');
+            $elementUri = self::elementNamespaceUri($element);
             if ($isPrefix) {
                 if (($namespaces[$namespaceOrPrefix] ?? null) === $targetUri || $elementUri === $targetUri) {
                     $out[] = $element;
@@ -926,6 +938,23 @@ final class VmSimpleXml
         }
 
         return $out;
+    }
+
+    /** Namespace URI declared on an element (default xmlns or xmlns:prefix on the tag). */
+    private static function elementNamespaceUri(SimpleXmlNodeState $element): string
+    {
+        if (isset($element->attributes['xmlns'])) {
+            return $element->attributes['xmlns'];
+        }
+        $colon = strpos($element->name, ':');
+        if (false !== $colon) {
+            $prefix = substr($element->name, 0, $colon);
+            if ('' !== $prefix && isset($element->attributes['xmlns:'.$prefix])) {
+                return $element->attributes['xmlns:'.$prefix];
+            }
+        }
+
+        return '';
     }
 
     /** @param array<string, string> $attributes */
