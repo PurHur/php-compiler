@@ -433,6 +433,13 @@ final class SplFixedArrayCount extends VmClassMethod
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::count()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE — SplFixedArray::count() (#20162)
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'SplFixedArray::count() expects exactly 0 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -630,6 +637,13 @@ final class SplFixedArrayGetSize extends VmClassMethod
             SplFixedArrayBuiltin::CLASS_LC,
             'SplFixedArray::getSize()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE — SplFixedArray::getSize() (#20162)
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'SplFixedArray::getSize() expects exactly 0 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
         if (null === $frame->returnVar) {
             return;
         }

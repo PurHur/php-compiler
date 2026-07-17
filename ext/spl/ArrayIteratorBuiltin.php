@@ -353,6 +353,13 @@ final class ArrayIteratorCount extends VmClassMethod
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::count()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE — ArrayIterator::count() (#20162)
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::count() expects exactly 0 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
         if (null === $frame->returnVar) {
             return;
         }
