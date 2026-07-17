@@ -9,6 +9,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
@@ -97,6 +98,10 @@ final class SplDoublyLinkedListBuiltin
         $entry->methodNames['getiteratormode'] = 'getIteratorMode';
         $entry->methodNames['isempty'] = 'isEmpty';
 
+        $entry->methods['__debuginfo'] = new SplDoublyLinkedListDebugInfo();
+        $entry->methodVisibility['__debuginfo'] = $pub;
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
+
         $entry->isInternal = true;
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'SplDoublyLinkedList');
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -114,7 +119,8 @@ final class SplDoublyLinkedListBuiltin
             $entry->methods['prev'],
             $entry->methods['offsetget'],
             $entry->methods['rewind'],
-            $entry->methods['valid']
+            $entry->methods['valid'],
+            $entry->methods['__debuginfo']
         );
     }
 
@@ -257,6 +263,33 @@ final class SplDoublyLinkedListBuiltin
         }
 
         return $exported;
+    }
+
+    /**
+     * Private flags + dllist bag for var_dump/print_r (php-src spl_dllist_object_get_debug_info; #19824).
+     */
+    public static function debugInfoTable(ObjectEntry $object): HashTable
+    {
+        $ht = new HashTable();
+        $flags = new Variable();
+        $flags->int(self::getIteratorMode($object));
+        $ht->addNew("\0SplDoublyLinkedList\0flags", $flags);
+
+        $values = [];
+        foreach (self::state($object) as $var) {
+            $copy = new Variable();
+            $copy->copyFrom($var->resolveIndirect());
+            $values[] = $copy;
+        }
+        $dllist = new Variable();
+        $dllistHt = new HashTable();
+        if ([] !== $values) {
+            $dllistHt->assignPackedList($values);
+        }
+        $dllist->array($dllistHt);
+        $ht->addNew("\0SplDoublyLinkedList\0dllist", $dllist);
+
+        return $ht;
     }
 
     /**
@@ -442,6 +475,31 @@ final class SplDoublyLinkedListBuiltin
         }
 
         return $resolved->toInt();
+    }
+}
+
+/**
+ * SplDoublyLinkedList::__debugInfo() — private flags + dllist
+ * (php-src spl_dllist_object_get_debug_info; #19824). Inherited by SplQueue/SplStack.
+ */
+final class SplDoublyLinkedListDebugInfo extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__debugInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::__debugInfo()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(SplDoublyLinkedListBuiltin::debugInfoTable($object));
     }
 }
 
