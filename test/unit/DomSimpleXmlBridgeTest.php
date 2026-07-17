@@ -26,5 +26,7 @@ final class DomSimpleXmlBridgeTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/dom/VmDomSimpleXmlBridge.php');
         $this->assertStringContainsString('SimpleXmlNodeState', $source);
         $this->assertStringContainsString('DomRegistry', $source);
+        $this->assertStringContainsString('linkPeers', $source);
+        $this->assertStringContainsString('syncSimpleXmlTextFromDom', $source);
     }
 }

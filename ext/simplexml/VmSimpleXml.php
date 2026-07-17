@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\simplexml;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\ext\dom\VmDomSimpleXmlBridge;
 use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\Frame;
@@ -397,6 +398,8 @@ final class VmSimpleXml
             $node = $elements[$index];
             $node->children = [];
             $node->text = $stringValue;
+            // Live DOM peer — same libxml node in php-src (#20137).
+            VmDomSimpleXmlBridge::syncDomTextFromSimpleXml($ctx, $node, $stringValue);
 
             return;
         }
@@ -412,7 +415,9 @@ final class VmSimpleXml
                 // php-src: attributes() view cannot introduce new attributes.
                 return;
             }
-            $state->attributes[$name] = $value->toString($vm, $frame);
+            $attrValue = $value->toString($vm, $frame);
+            $state->attributes[$name] = $attrValue;
+            VmDomSimpleXmlBridge::syncDomAttributeFromSimpleXml($ctx, $state, $name, $attrValue);
 
             return;
         }
@@ -423,12 +428,17 @@ final class VmSimpleXml
                 return;
             }
             // php-src: dimension write on a multi-node selection updates the first node.
-            $elements[0]->attributes[$name] = $value->toString($vm, $frame);
+            $attrValue = $value->toString($vm, $frame);
+            $elements[0]->attributes[$name] = $attrValue;
+            VmDomSimpleXmlBridge::syncDomAttributeFromSimpleXml($ctx, $elements[0], $name, $attrValue);
 
             return;
         }
 
-        SimpleXmlRegistry::state($entry)->attributes[$name] = $value->toString($vm, $frame);
+        $attrValue = $value->toString($vm, $frame);
+        $state = SimpleXmlRegistry::state($entry);
+        $state->attributes[$name] = $attrValue;
+        VmDomSimpleXmlBridge::syncDomAttributeFromSimpleXml($ctx, $state, $name, $attrValue);
     }
 
     /**

@@ -14,10 +14,18 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * DOM ↔ SimpleXML cross-extension bridge (php-src ext/dom/node.c + ext/simplexml/simplexml.c; #6057).
+ * DOM ↔ SimpleXML cross-extension bridge (php-src ext/dom/node.c + ext/simplexml/simplexml.c; #6057, #20137).
+ *
+ * php-src shares the same libxml node between wrappers. Here we keep peer links between
+ * DomRegistry element ids and SimpleXmlNodeState objects so text/attribute mutations propagate.
  */
 final class VmDomSimpleXmlBridge
 {
+    private const PEERS_KEY = '__phpc_dom_simplexml_peers';
+
+    /** Re-entrancy guard while syncing Dom ↔ SimpleXML peers. */
+    private static bool $syncing = false;
+
     public static function importSimpleXml(Context $ctx, ObjectEntry $sxe): ObjectEntry
     {
         VmSimpleXml::requireElement($sxe, 'dom_import_simplexml()');
@@ -51,6 +59,107 @@ final class VmDomSimpleXmlBridge
         return self::wrapSimpleXml($class, $state);
     }
 
+    /**
+     * After DOM element textContent / nodeValue write — mirror into linked SimpleXML state (#20137).
+     */
+    public static function syncSimpleXmlTextFromDom(ObjectEntry $domElement, string $value): void
+    {
+        if (self::$syncing) {
+            return;
+        }
+        $sxe = self::sxePeer($domElement->id);
+        if (null === $sxe) {
+            return;
+        }
+        self::$syncing = true;
+        try {
+            $sxe->children = [];
+            $sxe->text = $value;
+        } finally {
+            self::$syncing = false;
+        }
+    }
+
+    /**
+     * After DOM attribute write/remove — mirror attribute map into linked SimpleXML state (#20137).
+     */
+    public static function syncSimpleXmlAttributesFromDom(ObjectEntry $domElement): void
+    {
+        if (self::$syncing) {
+            return;
+        }
+        $sxe = self::sxePeer($domElement->id);
+        if (null === $sxe) {
+            return;
+        }
+        if (!DomRegistry::has($domElement)) {
+            return;
+        }
+        self::$syncing = true;
+        try {
+            $sxe->attributes = DomRegistry::state($domElement)->attributes;
+        } finally {
+            self::$syncing = false;
+        }
+    }
+
+    /**
+     * After SimpleXML text write — mirror into linked DOM element (#20137).
+     */
+    public static function syncDomTextFromSimpleXml(Context $ctx, SimpleXmlNodeState $sxe, string $value): void
+    {
+        if (self::$syncing) {
+            return;
+        }
+        $domId = self::domPeerId($sxe);
+        if (null === $domId) {
+            return;
+        }
+        $dom = DomRegistry::entry($domId);
+        if (null === $dom || !VmDom::isElement($dom)) {
+            return;
+        }
+        self::$syncing = true;
+        try {
+            VmDom::writeTextContent($ctx, $dom, $value);
+        } finally {
+            self::$syncing = false;
+        }
+    }
+
+    /**
+     * After SimpleXML attribute write — mirror into linked DOM element (#20137).
+     */
+    public static function syncDomAttributeFromSimpleXml(
+        Context $ctx,
+        SimpleXmlNodeState $sxe,
+        string $name,
+        string $value
+    ): void {
+        if (self::$syncing) {
+            return;
+        }
+        $domId = self::domPeerId($sxe);
+        if (null === $domId) {
+            return;
+        }
+        $dom = DomRegistry::entry($domId);
+        if (null === $dom || !VmDom::isElement($dom)) {
+            return;
+        }
+        self::$syncing = true;
+        try {
+            VmDom::setAttributeNS($ctx, $dom, null, $name, $value);
+        } finally {
+            self::$syncing = false;
+        }
+    }
+
+    public static function resetPeers(): void
+    {
+        unset($GLOBALS[self::PEERS_KEY]);
+    }
+
     private static function createEmptyDocument(Context $ctx): ObjectEntry
     {
         $class = $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null;
@@ -77,8 +186,12 @@ final class VmDomSimpleXmlBridge
             VmDom::setAttributeNS($ctx, $element, null, $name, $value);
         }
 
+        // Link after initial attrs so setAttributeNS during build does not need a peer yet.
+        self::linkPeers($element, $node);
+
         if ([] === $node->children) {
             if ('' !== $node->text) {
+                // writeTextContent syncs back to the same SimpleXmlNodeState (no-op values).
                 VmDom::writeTextContent($ctx, $element, $node->text);
             }
 
@@ -103,6 +216,7 @@ final class VmDomSimpleXmlBridge
         $state = DomRegistry::state($element);
         $node = new SimpleXmlNodeState($state->nodeName, $state->attributes);
         $node->text = self::directTextContent($element);
+        self::linkPeers($element, $node);
 
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
@@ -135,6 +249,42 @@ final class VmDomSimpleXmlBridge
         SimpleXmlRegistry::attach($entry, $state);
 
         return $entry;
+    }
+
+    private static function linkPeers(ObjectEntry $domElement, SimpleXmlNodeState $sxe): void
+    {
+        $bucket = &self::peersBucket();
+        $bucket['dom_to_sxe'][$domElement->id] = $sxe;
+        $bucket['sxe_to_dom'][spl_object_id($sxe)] = $domElement->id;
+    }
+
+    private static function sxePeer(int $domId): ?SimpleXmlNodeState
+    {
+        $bucket = self::peersBucket();
+        $peer = $bucket['dom_to_sxe'][$domId] ?? null;
+
+        return $peer instanceof SimpleXmlNodeState ? $peer : null;
+    }
+
+    private static function domPeerId(SimpleXmlNodeState $sxe): ?int
+    {
+        $bucket = self::peersBucket();
+        $id = $bucket['sxe_to_dom'][spl_object_id($sxe)] ?? null;
+
+        return \is_int($id) ? $id : null;
+    }
+
+    /** @return array{dom_to_sxe: array<int, SimpleXmlNodeState>, sxe_to_dom: array<int, int>} */
+    private static function &peersBucket(): array
+    {
+        if (!isset($GLOBALS[self::PEERS_KEY]) || !\is_array($GLOBALS[self::PEERS_KEY])) {
+            $GLOBALS[self::PEERS_KEY] = [
+                'dom_to_sxe' => [],
+                'sxe_to_dom' => [],
+            ];
+        }
+
+        return $GLOBALS[self::PEERS_KEY];
     }
 
     public static function requireSimpleXmlElement(Variable $var, string $label): ObjectEntry

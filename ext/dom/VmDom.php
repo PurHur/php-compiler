@@ -1705,6 +1705,8 @@ final class VmDom
             VmDomTokenList::invalidateForElement($element);
         }
         self::syncElementAttributes($ctx, $element);
+        // Live SimpleXML peer attribute map (#20137).
+        VmDomSimpleXmlBridge::syncSimpleXmlAttributesFromDom($element);
     }
 
     private static function detachCachedAttributeIfAny(DomNodeState $state, string $qualifiedName): void
@@ -1760,6 +1762,7 @@ final class VmDom
             VmDomTokenList::invalidateForElement($element);
         }
         self::syncElementAttributes($ctx, $element);
+        VmDomSimpleXmlBridge::syncSimpleXmlAttributesFromDom($element);
 
         return true;
     }
@@ -7670,6 +7673,8 @@ final class VmDom
             self::linkChildToParent($text, $node);
         }
         self::syncSubtree($ctx, $node);
+        // Live SimpleXML peer — same libxml node in php-src (#20137).
+        VmDomSimpleXmlBridge::syncSimpleXmlTextFromDom($node, $value);
     }
 
     public static function readTextContent(ObjectEntry $node): string
