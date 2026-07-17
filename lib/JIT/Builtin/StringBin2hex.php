@@ -8,16 +8,15 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\ext\standard\JitBin2hexKernel;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for bin2hex() via Bin2hexJitHelper PHP (#14603, #18884, #19344).
+ * JIT/AOT link for bin2hex() via Bin2hexJitHelper PHP (#14603, #18884, #20011).
  *
- * Embed / non-user-script: {@see Bin2hexJitHelper} via {@see JitVmHelperLink}.
- * User-script standalone AOT: thin {@see JitBin2hexKernel} hex loop —
- * nested helper TUs skip __init__ under PHP_COMPILER_AOT_USER_SCRIPT (#16075).
+ * When JIT modules are registered: {@see Bin2hexJitHelper} via {@see JitVmHelperLink}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #15417): {@see JitBin2hexKernel} hex loop
+ * so nested helper TUs are not ExternalMethod-stubbed (#16075).
  * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(bin2hex)
  */
@@ -55,23 +54,22 @@ final class StringBin2hex
         }
 
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
+            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
         }
-        if (null !== $probe && JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
-            $context->registerFunction(self::ABI, $probe);
+
+        // User-script / bootstrap thin standalone: emit hex kernel (former defer path).
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementKernelBody($context, $probe);
 
             return;
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            self::implementUserScriptKernel($context, $probe);
-        } else {
-            self::implementBridge($context);
-        }
+        self::implementBridge($context);
         if (null !== $savedInsert) {
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
@@ -91,12 +89,14 @@ final class StringBin2hex
             self::BIN2HEX_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#19344'
+            '#20011'
         );
     }
 
-    private static function implementUserScriptKernel(Context $context, ?LlvmFunction $probe): void
+    private static function implementKernelBody(Context $context, ?LlvmFunction $probe): void
     {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
         $strPtr = $context->getTypeFromString('__string__*');
         $fn = null !== $probe
             ? $probe
@@ -109,5 +109,11 @@ final class StringBin2hex
         $context->builder->positionAtEnd($entry);
         JitBin2hexKernel::emitBody($context, $fn);
         $context->registerFunction(self::ABI, $fn);
+
+        if (null !== $savedInsert) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }

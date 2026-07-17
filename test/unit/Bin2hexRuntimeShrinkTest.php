@@ -8,15 +8,16 @@ use PHPCompiler\ext\standard\Bin2hexJitHelper;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** bin2hex() JIT: PHP helper for embed; ext kernel for user-script AOT (#14603, #18884, #19344). */
+/** bin2hex() JIT: PHP helper for embed; thin hex kernel via isThinStandaloneAotMain (#14603, #20011). */
 final class Bin2hexRuntimeShrinkTest extends TestCase
 {
-    public function testStringBin2hexUsesJitHelperAndExtKernel(): void
+    public function testStringBin2hexUsesJitHelperAndThinKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringBin2hex.php');
         $this->assertStringContainsString('Bin2hexJitHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringContainsString('JitBin2hexKernel', $source);
         $this->assertStringContainsString('bin2hex_kernel_entry', $source);
         $this->assertStringNotContainsString('bin2hex_inline_entry', $source);

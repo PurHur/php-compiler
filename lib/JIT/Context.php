@@ -988,6 +988,7 @@ class Context {
         Builtin\StringHashCrypto::ensureStandaloneBodies($this);
         Builtin\MbNumericEntity::ensureStandaloneBodies($this);
         Builtin\StringReadfile::ensureStandaloneBodies($this);
+        Builtin\StringBin2hex::ensureStandaloneBodies($this);
         Builtin\StringAddslashes::ensureStandaloneBodies($this);
         Builtin\StringStripslashes::ensureStandaloneBodies($this);
         Builtin\StringFilePutContents::ensureStandaloneBodies($this);
