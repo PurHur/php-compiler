@@ -9140,6 +9140,8 @@ restart:
             return $this->dispatchVmPDOException($e, $callerFrame);
         } catch (\SQLite3Exception $e) {
             return $this->dispatchVmSQLite3Exception($e, $callerFrame);
+        } catch (\SoapFault $e) {
+            return $this->dispatchVmSoapFault($e, $callerFrame);
         } catch (\RuntimeException $e) {
             return $this->dispatchVmRuntimeException($e, $callerFrame);
         } catch (\InvalidArgumentException $e) {
@@ -9305,6 +9307,24 @@ restart:
             $file,
             $line,
             $error->getCode()
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native SoapFault from ext/soap builtins (#20124). */
+    private function dispatchVmSoapFault(\SoapFault $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $faultcode = isset($error->faultcode) ? (string) $error->faultcode : '';
+        $faultstring = isset($error->faultstring) ? (string) $error->faultstring : $error->getMessage();
+        $thrown = VM\BuiltinExceptionSupport::materializeSoapFault(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line,
+            $faultcode,
+            $faultstring
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);

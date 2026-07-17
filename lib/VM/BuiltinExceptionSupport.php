@@ -29,6 +29,7 @@ final class BuiltinExceptionSupport
     public const CLASS_REDIS_EXCEPTION = 'redisexception';
     public const CLASS_PDO_EXCEPTION = 'pdoexception';
     public const CLASS_SQLITE3_EXCEPTION = 'sqlite3exception';
+    public const CLASS_SOAP_FAULT = 'soapfault';
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
     public const CLASS_INVALID_ARGUMENT_EXCEPTION = 'invalidargumentexception';
@@ -177,6 +178,29 @@ final class BuiltinExceptionSupport
         }
         $var = self::materializeThrowable($ctx, self::CLASS_PDO_EXCEPTION, $message, $file, $line);
         $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
+
+        return $var;
+    }
+
+    /** Bridge native SoapFault from ext/soap builtins (#20124). */
+    public static function materializeSoapFault(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0,
+        string $faultcode = '',
+        string $faultstring = ''
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_SOAP_FAULT])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+        $var = self::materializeThrowable($ctx, self::CLASS_SOAP_FAULT, $message, $file, $line);
+        $obj = $var->toObject();
+        if ('' !== $faultcode) {
+            $obj->getProperty('faultcode')->string($faultcode);
+        }
+        $fs = '' !== $faultstring ? $faultstring : $message;
+        $obj->getProperty('faultstring')->string($fs);
 
         return $var;
     }

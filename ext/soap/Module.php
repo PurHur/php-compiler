@@ -8,9 +8,9 @@ use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
 /**
- * soap extension module entry (php-src ext/soap/soap.c; #20037 / #3724).
+ * soap extension module entry (php-src ext/soap/soap.c; #20037 / #20124 / #3724).
  *
- * VM-only v1: SoapClient + local WSDL/file transport. No new runtime C.
+ * VM-only: SoapClient + SoapFault + is_soap_fault. No new runtime C.
  */
 class Module extends ModuleAbstract
 {
@@ -34,5 +34,12 @@ class Module extends ModuleAbstract
             $runtime->vmContext->defineConstant($name, $var);
         }
         BuiltinClasses::register($runtime->vmContext);
+    }
+
+    public function getFunctions(): array
+    {
+        return [
+            new is_soap_fault(),
+        ];
     }
 }
