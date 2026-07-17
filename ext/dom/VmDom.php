@@ -699,6 +699,9 @@ final class VmDom
         $element->methods['setidattributens'] = new ElementSetIdAttributeNS();
         $element->methodVisibility['setidattributens'] = $pub;
         $element->methodNames['setidattributens'] = 'setIdAttributeNS';
+        $element->methods['setidattributenode'] = new ElementSetIdAttributeNode();
+        $element->methodVisibility['setidattributenode'] = $pub;
+        $element->methodNames['setidattributenode'] = 'setIdAttributeNode';
         $element->methods['getelementsbytagname'] = new ElementGetElementsByTagName();
         $element->methodVisibility['getelementsbytagname'] = $pub;
         $element->methods['getelementsbytagnamens'] = new ElementGetElementsByTagNameNS();
@@ -1848,6 +1851,31 @@ final class VmDom
             throw new \DOMException('Not Found Error', 8);
         }
         self::applyIdAttributeRegistration($element, $qName, $isId);
+    }
+
+    /**
+     * DOMElement::setIdAttributeNode() — mark an owned Attr as ID (php-src ext/dom/element.c; #20123).
+     * Zend: NOT_FOUND_ERR when attr->parent != element.
+     */
+    public static function setIdAttributeNode(ObjectEntry $element, ObjectEntry $attr, bool $isId): void
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        if (!self::isAttr($attr)) {
+            throw new \TypeError('DOMElement::setIdAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');
+        }
+        $attrState = DomRegistry::state($attr);
+        $name = $attrState->nodeName;
+        $elementState = DomRegistry::state($element);
+        $cachedId = $elementState->attributeNodeIds[$name] ?? null;
+        if (!\array_key_exists($name, $elementState->attributes)
+            || $attrState->ownerElementId !== $element->id
+            || (null !== $cachedId && $cachedId !== $attr->id)
+        ) {
+            throw new \DOMException('Not Found Error', 8);
+        }
+        self::applyIdAttributeRegistration($element, $name, $isId);
     }
 
     private static function applyIdAttributeRegistration(ObjectEntry $element, string $qName, bool $isId): void
