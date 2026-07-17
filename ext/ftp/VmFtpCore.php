@@ -297,6 +297,32 @@ final class VmFtpCore
         return $status;
     }
 
+    public static function nbFput(
+        ObjectEntry $connection,
+        string $remoteFile,
+        int $streamHandle,
+        int $mode,
+        int $offset
+    ): int {
+        self::ensureLive($connection, 'ftp_nb_fput');
+        $hostConn = self::requireHostConn($connection, 'ftp_nb_fput');
+        if (!\function_exists('ftp_nb_fput')) {
+            throw new \LogicException('ftp_nb_fput() requires host ext/ftp (issue #20234)');
+        }
+        $hostFp = self::hostStreamForRead($streamHandle);
+        if (false === $hostFp) {
+            return FtpConstants::FTP_FAILED;
+        }
+        $owned = $hostFp['owned'];
+        $fp = $hostFp['fp'];
+        $status = (int) @\ftp_nb_fput($hostConn, $remoteFile, $fp, $mode, $offset);
+        if ($owned) {
+            \fclose($fp);
+        }
+
+        return $status;
+    }
+
     public static function nbGet(
         ObjectEntry $connection,
         string $localFile,
