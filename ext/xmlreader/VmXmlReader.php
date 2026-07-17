@@ -756,7 +756,7 @@ final class VmXmlReader
         }
         if (!VmDomValidationNative::available() || !VmDomValidationNative::parseSchemaFile($filename)) {
             foreach (VmDomValidationNative::consumeLastErrors() as $error) {
-                self::warn($ctx, 'XMLReader::setSchema(): '.$error, $frame);
+                self::warn($ctx, 'XMLReader::setSchema(): '.$error['message'], $frame);
             }
             self::warn($ctx, 'XMLReader::setSchema(): Schema contains errors', $frame);
 
@@ -819,7 +819,7 @@ final class VmXmlReader
         }
         if (!VmDomValidationNative::available() || !VmDomValidationNative::parseRelaxNGFile($filename)) {
             foreach (VmDomValidationNative::consumeLastErrors() as $error) {
-                self::warn($ctx, 'XMLReader::setRelaxNGSchema(): '.$error, $frame);
+                self::warn($ctx, 'XMLReader::setRelaxNGSchema(): '.$error['message'], $frame);
             }
             self::warn($ctx, 'XMLReader::setRelaxNGSchema(): Schema contains errors', $frame);
 
@@ -869,7 +869,7 @@ final class VmXmlReader
         }
         if (!VmDomValidationNative::available() || !VmDomValidationNative::parseRelaxNGSource($source)) {
             foreach (VmDomValidationNative::consumeLastErrors() as $error) {
-                self::warn($ctx, 'XMLReader::setRelaxNGSchemaSource(): '.$error, $frame);
+                self::warn($ctx, 'XMLReader::setRelaxNGSchemaSource(): '.$error['message'], $frame);
             }
             self::warn($ctx, 'XMLReader::setRelaxNGSchemaSource(): Schema contains errors', $frame);
 

@@ -14,10 +14,11 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmJson;
 
 /**
- * SoapClient VM class — v1 local WSDL + file/HTTP transport (php-src ext/soap/soap.c; #20037).
+ * SoapClient VM class — v1 local WSDL + file/HTTP transport (php-src ext/soap/soap.c; #20037, #20183).
  *
  * Fixture mode: options['location'] may be a local filesystem path or file:// URL; __doRequest
  * returns that file's contents (no network). HTTP locations use host file_get_contents POST.
+ * With options['trace'], __getLastRequestHeaders / __getLastResponseHeaders capture HTTP header blocks.
  */
 final class VmSoapClient
 {
@@ -47,6 +48,12 @@ final class VmSoapClient
             '__gettypes' => new SoapClientGetTypes(),
             '__getlastrequest' => new SoapClientGetLastRequest(),
             '__getlastresponse' => new SoapClientGetLastResponse(),
+            '__getlastrequestheaders' => new SoapClientGetLastRequestHeaders(),
+            '__getlastresponseheaders' => new SoapClientGetLastResponseHeaders(),
+            '__setcookie' => new SoapClientSetCookie(),
+            '__getcookies' => new SoapClientGetCookies(),
+            '__setlocation' => new SoapClientSetLocation(),
+            '__setsoapheaders' => new SoapClientSetSoapHeaders(),
             '__call' => new SoapClientCall(),
         ];
         foreach ($methods as $name => $method) {
@@ -59,6 +66,12 @@ final class VmSoapClient
         $entry->methodNames['__gettypes'] = '__getTypes';
         $entry->methodNames['__getlastrequest'] = '__getLastRequest';
         $entry->methodNames['__getlastresponse'] = '__getLastResponse';
+        $entry->methodNames['__getlastrequestheaders'] = '__getLastRequestHeaders';
+        $entry->methodNames['__getlastresponseheaders'] = '__getLastResponseHeaders';
+        $entry->methodNames['__setcookie'] = '__setCookie';
+        $entry->methodNames['__getcookies'] = '__getCookies';
+        $entry->methodNames['__setlocation'] = '__setLocation';
+        $entry->methodNames['__setsoapheaders'] = '__setSoapHeaders';
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -70,6 +83,7 @@ final class VmSoapClient
         $state->options = $options;
         $state->location = isset($options['location']) ? (string) $options['location'] : '';
         $state->uri = isset($options['uri']) ? (string) $options['uri'] : '';
+        $state->trace = !empty($options['trace']);
         $state->soapVersion = isset($options['soap_version'])
             ? (int) $options['soap_version']
             : SoapConstants::SOAP_1_1;
@@ -123,6 +137,42 @@ final class VmSoapClient
         return self::state($object)->types;
     }
 
+    /**
+     * @return array<string, string>
+     */
+    public static function getCookies(ObjectEntry $object): array
+    {
+        return self::state($object)->cookies;
+    }
+
+    public static function setCookie(ObjectEntry $object, string $name, ?string $value): void
+    {
+        $state = self::state($object);
+        if (null === $value) {
+            unset($state->cookies[$name]);
+
+            return;
+        }
+        $state->cookies[$name] = $value;
+    }
+
+    public static function setLocation(ObjectEntry $object, string $location): string
+    {
+        $state = self::state($object);
+        $previous = $state->location;
+        $state->location = $location;
+
+        return $previous;
+    }
+
+    /**
+     * @param list<ObjectEntry> $headers
+     */
+    public static function setSoapHeaders(ObjectEntry $object, array $headers): void
+    {
+        self::state($object)->soapHeaders = $headers;
+    }
+
     public static function soapCall(
         ObjectEntry $object,
         string $name,
@@ -154,6 +204,12 @@ final class VmSoapClient
         $state = self::state($object);
         $state->lastRequest = $request;
 
+        $cookieHeader = self::formatCookieHeader($state->cookies);
+        $requestHeaders = self::buildHttpRequestHeaders($location, $action, \strlen($request), $cookieHeader);
+        if ($state->trace) {
+            $state->lastRequestHeaders = $requestHeaders;
+        }
+
         $path = self::localPathFromLocation($location);
         if (null !== $path) {
             $body = @\file_get_contents($path);
@@ -161,6 +217,9 @@ final class VmSoapClient
                 throw new \SoapFault('HTTP', 'Could not read SOAP response fixture: '.$path);
             }
             $state->lastResponse = $body;
+            if ($state->trace) {
+                $state->lastResponseHeaders = self::synthesizeFixtureResponseHeaders(\strlen($body));
+            }
 
             return $body;
         }
@@ -171,6 +230,9 @@ final class VmSoapClient
 
         $headers = "Content-Type: text/xml; charset=utf-8\r\n".
             'SOAPAction: "'.$action."\"\r\n";
+        if ('' !== $cookieHeader) {
+            $headers .= 'Cookie: '.$cookieHeader."\r\n";
+        }
         $ctx = \stream_context_create([
             'http' => [
                 'method' => 'POST',
@@ -185,8 +247,71 @@ final class VmSoapClient
             throw new \SoapFault('HTTP', 'Could not connect to host');
         }
         $state->lastResponse = $body;
+        if ($state->trace) {
+            // file_get_contents populates $http_response_header in local scope (php-src HTTP wrapper).
+            if (isset($http_response_header) && \is_array($http_response_header) && $http_response_header !== []) {
+                $state->lastResponseHeaders = \implode("\r\n", $http_response_header)."\r\n";
+            } else {
+                $state->lastResponseHeaders = self::synthesizeFixtureResponseHeaders(\strlen($body));
+            }
+        }
 
         return $body;
+    }
+
+    /**
+     * @param array<string, string> $cookies
+     */
+    private static function formatCookieHeader(array $cookies): string
+    {
+        if ($cookies === []) {
+            return '';
+        }
+        $parts = [];
+        foreach ($cookies as $name => $value) {
+            $parts[] = $name.'='.$value;
+        }
+
+        return \implode('; ', $parts);
+    }
+
+    /**
+     * Build Zend-shaped HTTP request header block for trace (php-src soap_client).
+     */
+    private static function buildHttpRequestHeaders(
+        string $location,
+        string $action,
+        int $contentLength,
+        string $cookieHeader = ''
+    ): string {
+        $path = '/';
+        $host = 'localhost';
+        if (\preg_match('#^https?://([^/]+)(/.*)?$#i', $location, $m)) {
+            $host = $m[1];
+            $path = isset($m[2]) && '' !== $m[2] ? $m[2] : '/';
+        } elseif ('' !== $location) {
+            $path = $location;
+        }
+
+        $hdr = 'POST '.$path." HTTP/1.1\r\n".
+            'Host: '.$host."\r\n".
+            "Connection: Keep-Alive\r\n".
+            'User-Agent: PHP-SOAP/'.\PHP_VERSION."\r\n".
+            "Content-Type: text/xml; charset=utf-8\r\n".
+            'SOAPAction: "'.$action."\"\r\n".
+            'Content-Length: '.$contentLength."\r\n";
+        if ('' !== $cookieHeader) {
+            $hdr .= 'Cookie: '.$cookieHeader."\r\n";
+        }
+
+        return $hdr;
+    }
+
+    private static function synthesizeFixtureResponseHeaders(int $contentLength): string
+    {
+        return "HTTP/1.1 200 OK\r\n".
+            "Content-Type: text/xml; charset=utf-8\r\n".
+            'Content-Length: '.$contentLength."\r\n";
     }
 
     private static function localPathFromLocation(string $location): ?string
@@ -293,6 +418,15 @@ final class VmSoapClient
             }
         }
 
+        $headerXml = '';
+        if ($state->soapHeaders !== []) {
+            $headerXml = '  <'.$prefix.':Header>'."\n";
+            foreach ($state->soapHeaders as $hdr) {
+                $headerXml .= self::encodeSoapHeaderElement($hdr, $prefix);
+            }
+            $headerXml .= '  </'.$prefix.':Header>'."\n";
+        }
+
         return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
             '<'.$prefix.':Envelope xmlns:'.$prefix.'="'.$envelopeNs.'"'.
             ' xmlns:ns1="'.\htmlspecialchars($ns, \ENT_XML1).'"'.
@@ -300,10 +434,64 @@ final class VmSoapClient
             ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'.
             ' xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"'.
             ' SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'."\n".
+            $headerXml.
             '  <'.$prefix.':Body>'."\n".
             '    <ns1:'.$name.'>'.$paramsXml.'</ns1:'.$name.'>'."\n".
             '  </'.$prefix.':Body>'."\n".
             '</'.$prefix.':Envelope>';
+    }
+
+    private static function encodeSoapHeaderElement(ObjectEntry $header, string $prefix): string
+    {
+        $ns = $header->hasProperty('namespace')
+            ? $header->getProperty('namespace')->resolveIndirect()->toString()
+            : '';
+        $name = $header->hasProperty('name')
+            ? $header->getProperty('name')->resolveIndirect()->toString()
+            : 'Header';
+        $tag = \preg_replace('/[^A-Za-z0-9_.-]/', '_', $name) ?: 'Header';
+        $must = false;
+        if ($header->hasProperty('mustUnderstand')) {
+            $mu = $header->getProperty('mustUnderstand')->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $mu->type) {
+                $must = $mu->toBool();
+            } elseif (Variable::TYPE_INTEGER === $mu->type) {
+                $must = 0 !== $mu->toInt();
+            }
+        }
+        $attrs = '';
+        if ('' !== $ns) {
+            $attrs .= ' xmlns="'.\htmlspecialchars($ns, \ENT_XML1).'"';
+        }
+        if ($must) {
+            $attrs .= ' '.$prefix.':mustUnderstand="1"';
+        }
+        if ($header->hasProperty('actor')) {
+            $actorVar = $header->getProperty('actor')->resolveIndirect();
+            if (Variable::TYPE_NULL !== $actorVar->type) {
+                if (Variable::TYPE_INTEGER === $actorVar->type) {
+                    $attrs .= ' '.$prefix.':actor="'.$actorVar->toInt().'"';
+                } else {
+                    $attrs .= ' '.$prefix.':actor="'.\htmlspecialchars($actorVar->toString(), \ENT_XML1).'"';
+                }
+            }
+        }
+        $inner = '';
+        if ($header->hasProperty('data')) {
+            $dataVar = $header->getProperty('data')->resolveIndirect();
+            if (Variable::TYPE_NULL !== $dataVar->type) {
+                $exported = VmJson::export($dataVar, null, null, null);
+                if (\is_scalar($exported) || null === $exported) {
+                    $inner = \htmlspecialchars((string) $exported, \ENT_XML1);
+                } elseif (\is_array($exported)) {
+                    foreach ($exported as $k => $v) {
+                        $inner .= self::encodeParam(\is_int($k) ? 'item' : (string) $k, $v);
+                    }
+                }
+            }
+        }
+
+        return '    <'.$tag.$attrs.'>'.$inner.'</'.$tag.'>'."\n";
     }
 
     private static function encodeParam(string $name, mixed $value): string
@@ -532,6 +720,8 @@ final class SoapClientState
 
     public string $uri = '';
 
+    public bool $trace = false;
+
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
     public int $style = SoapConstants::SOAP_RPC;
@@ -550,6 +740,16 @@ final class SoapClientState
     public string $lastRequest = '';
 
     public string $lastResponse = '';
+
+    public ?string $lastRequestHeaders = null;
+
+    public ?string $lastResponseHeaders = null;
+
+    /** @var array<string, string> */
+    public array $cookies = [];
+
+    /** @var list<ObjectEntry> */
+    public array $soapHeaders = [];
 }
 
 final class SoapClientConstruct extends SoapClassMethod
@@ -755,5 +955,190 @@ final class SoapClientGetLastResponse extends SoapClassMethod
             return;
         }
         $frame->returnVar->string(VmSoapClient::state($receiver)->lastResponse);
+    }
+}
+
+final class SoapClientGetLastRequestHeaders extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__getLastRequestHeaders');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'SoapClient::__getLastRequestHeaders()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $headers = VmSoapClient::state($receiver)->lastRequestHeaders;
+        if (null === $headers || '' === $headers) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->string($headers);
+    }
+}
+
+final class SoapClientGetLastResponseHeaders extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__getLastResponseHeaders');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'SoapClient::__getLastResponseHeaders()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $headers = VmSoapClient::state($receiver)->lastResponseHeaders;
+        if (null === $headers || '' === $headers) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->string($headers);
+    }
+}
+
+final class SoapClientSetCookie extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__setCookie');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(
+                'SoapClient::__setCookie() expects at least 1 argument and at most 2, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'SoapClient::__setCookie()');
+        $name = $this->stringArg($frame->calledArgs[1], 'SoapClient::__setCookie', 0, 'name');
+        $value = null;
+        if ($argc >= 3) {
+            $valVar = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $valVar->type) {
+                $value = $this->stringArg($frame->calledArgs[2], 'SoapClient::__setCookie', 1, 'value');
+            }
+        }
+        VmSoapClient::setCookie($receiver, $name, $value);
+    }
+}
+
+final class SoapClientGetCookies extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__getCookies');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'SoapClient::__getCookies()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ht = new HashTable();
+        foreach (VmSoapClient::getCookies($receiver) as $name => $value) {
+            $slot = new Variable();
+            $slot->string($value);
+            $ht->add((string) $name, $slot);
+        }
+        $frame->returnVar->array($ht);
+    }
+}
+
+final class SoapClientSetLocation extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__setLocation');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(
+                'SoapClient::__setLocation() expects at most 1 argument, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'SoapClient::__setLocation()');
+        $location = '';
+        if ($argc >= 2) {
+            $locVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $locVar->type) {
+                $location = $this->stringArg($frame->calledArgs[1], 'SoapClient::__setLocation', 0, 'location');
+            }
+        }
+        $previous = VmSoapClient::setLocation($receiver, $location);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string($previous);
+        }
+    }
+}
+
+final class SoapClientSetSoapHeaders extends SoapClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__setSoapHeaders');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(
+                'SoapClient::__setSoapHeaders() expects at most 1 argument, '.($argc - 1).' given'
+            );
+        }
+        $receiver = $this->receiver($frame, 'SoapClient::__setSoapHeaders()');
+        $headers = [];
+        if ($argc >= 2) {
+            $arg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL === $arg->type) {
+                $headers = [];
+            } elseif (Variable::TYPE_OBJECT === $arg->type) {
+                $obj = $arg->toObject();
+                if ('soapheader' !== \strtolower($obj->class->name)) {
+                    throw new \TypeError(
+                        'SoapClient::__setSoapHeaders(): Argument #1 ($headers) must be of type SoapHeader|array|null'
+                    );
+                }
+                $headers = [$obj];
+            } elseif (Variable::TYPE_ARRAY === $arg->type) {
+                foreach ($arg->toArray()->iterateKeyed(false) as $pair) {
+                    $v = $pair[1]->resolveIndirect();
+                    if (Variable::TYPE_OBJECT !== $v->type) {
+                        throw new \TypeError(
+                            'SoapClient::__setSoapHeaders(): Argument #1 ($headers) must be of type SoapHeader|array|null'
+                        );
+                    }
+                    $obj = $v->toObject();
+                    if ('soapheader' !== \strtolower($obj->class->name)) {
+                        throw new \TypeError(
+                            'SoapClient::__setSoapHeaders(): Argument #1 ($headers) must be of type SoapHeader|array|null'
+                        );
+                    }
+                    $headers[] = $obj;
+                }
+            } else {
+                throw new \TypeError(
+                    'SoapClient::__setSoapHeaders(): Argument #1 ($headers) must be of type SoapHeader|array|null'
+                );
+            }
+        }
+        VmSoapClient::setSoapHeaders($receiver, $headers);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
     }
 }
