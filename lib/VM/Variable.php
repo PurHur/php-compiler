@@ -129,7 +129,10 @@ final class Variable {
 
     public ?string $arrayAsPropsName = null;
 
-    /** Temporary from __get; []= / dim-write must throw (#4673, zend_object_handlers.c). */
+    /**
+     * Temporary from __get; non-object []= / dim-write must throw (#4673).
+     * Objects (SimpleXMLElement / ArrayAccess) may accept write_dimension (#20005).
+     */
     public ?ObjectEntry $magicGetOverloadedTarget = null;
 
     public ?string $magicGetOverloadedName = null;

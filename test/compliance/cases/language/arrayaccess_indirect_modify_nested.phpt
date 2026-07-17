@@ -13,6 +13,6 @@ $c = new C();
 $c[0][1] = 2;
 var_dump($c[0]);
 --EXPECTF--
-PHP Notice:  Indirect modification of overloaded element of C has no effect
+PHP Notice:  Indirect modification of overloaded element of C has no effect in %s on line %d
 array(0) {
 }
