@@ -63,6 +63,8 @@ final class VmSodium
 
     public const CRYPTO_BOX_MACBYTES = 16;
 
+    public const CRYPTO_BOX_NONCEBYTES = 24;
+
     public const CRYPTO_BOX_SEALBYTES = 48;
 
     public const CRYPTO_AEAD_AES256GCM_KEYBYTES = 32;
@@ -113,6 +115,7 @@ final class VmSodium
             || \function_exists('sodium_crypto_generichash')
             || \function_exists('sodium_crypto_scalarmult')
             || \function_exists('sodium_crypto_box_seal')
+            || \function_exists('sodium_crypto_box')
             || \function_exists('sodium_crypto_aead_aes256gcm_encrypt')
             || \function_exists('sodium_crypto_sign_keypair')
             || \function_exists('sodium_crypto_secretstream_xchacha20poly1305_keygen')
@@ -270,6 +273,52 @@ final class VmSodium
         }
 
         return self::ffiBoxSealOpen($ciphertext, $keypair);
+    }
+
+    public static function box(string $message, string $nonce, string $keypair): string
+    {
+        self::validateBoxNonce($nonce, 'sodium_crypto_box', 2);
+        self::validateBoxKeypair($keypair, 'sodium_crypto_box', 3);
+        if (\function_exists('sodium_crypto_box')) {
+            return \sodium_crypto_box($message, $nonce, $keypair);
+        }
+
+        return self::ffiBox($message, $nonce, $keypair);
+    }
+
+    /**
+     * @return string|false
+     */
+    public static function boxOpen(string $ciphertext, string $nonce, string $keypair): string|false
+    {
+        self::validateBoxNonce($nonce, 'sodium_crypto_box_open', 2);
+        self::validateBoxKeypair($keypair, 'sodium_crypto_box_open', 3);
+        if (\function_exists('sodium_crypto_box_open')) {
+            return \sodium_crypto_box_open($ciphertext, $nonce, $keypair);
+        }
+
+        return self::ffiBoxOpen($ciphertext, $nonce, $keypair);
+    }
+
+    public static function boxKeypairFromSecretkeyAndPublickey(string $secretkey, string $publickey): string
+    {
+        self::validateBoxSecretkey($secretkey, 'sodium_crypto_box_keypair_from_secretkey_and_publickey', 1);
+        self::validateBoxPublickey($publickey, 'sodium_crypto_box_keypair_from_secretkey_and_publickey', 2);
+        if (\function_exists('sodium_crypto_box_keypair_from_secretkey_and_publickey')) {
+            return \sodium_crypto_box_keypair_from_secretkey_and_publickey($secretkey, $publickey);
+        }
+
+        return $secretkey.$publickey;
+    }
+
+    public static function boxPublickeyFromSecretkey(string $secretkey): string
+    {
+        self::validateBoxSecretkey($secretkey, 'sodium_crypto_box_publickey_from_secretkey', 1);
+        if (\function_exists('sodium_crypto_box_publickey_from_secretkey')) {
+            return \sodium_crypto_box_publickey_from_secretkey($secretkey);
+        }
+
+        return self::ffiScalarmultBase($secretkey);
     }
 
     public static function stream(int $length, string $nonce, string $key): string
@@ -974,6 +1023,54 @@ final class VmSodium
         return self::unsignedCharArrayToString($mBuf, $mlen);
     }
 
+    private static function ffiBox(string $message, string $nonce, string $keypair): string
+    {
+        $ffi = self::requireFfi();
+        $mlen = \strlen($message);
+        $clen = $mlen + self::CRYPTO_BOX_MACBYTES;
+        $cBuf = $ffi->new('unsigned char['.$clen.']');
+        $mBuf = self::stringToUnsignedCharArray($ffi, $message);
+        $nBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $skBuf = self::stringToUnsignedCharArray($ffi, \substr($keypair, 0, self::CRYPTO_BOX_SECRETKEYBYTES));
+        $pkBuf = self::stringToUnsignedCharArray(
+            $ffi,
+            \substr($keypair, self::CRYPTO_BOX_SECRETKEYBYTES, self::CRYPTO_BOX_PUBLICKEYBYTES)
+        );
+        $rc = $ffi->crypto_box_easy($cBuf, $mBuf, $mlen, $nBuf, $pkBuf, $skBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($cBuf, $clen);
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function ffiBoxOpen(string $ciphertext, string $nonce, string $keypair): string|false
+    {
+        $ffi = self::requireFfi();
+        $clen = \strlen($ciphertext);
+        if ($clen < self::CRYPTO_BOX_MACBYTES) {
+            return false;
+        }
+        $mlen = $clen - self::CRYPTO_BOX_MACBYTES;
+        $mBuf = $ffi->new('unsigned char['.$mlen.']');
+        $cBuf = self::stringToUnsignedCharArray($ffi, $ciphertext);
+        $nBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $skBuf = self::stringToUnsignedCharArray($ffi, \substr($keypair, 0, self::CRYPTO_BOX_SECRETKEYBYTES));
+        $pkBuf = self::stringToUnsignedCharArray(
+            $ffi,
+            \substr($keypair, self::CRYPTO_BOX_SECRETKEYBYTES, self::CRYPTO_BOX_PUBLICKEYBYTES)
+        );
+        $rc = $ffi->crypto_box_open_easy($mBuf, $cBuf, $clen, $nBuf, $pkBuf, $skBuf);
+        if (0 !== $rc) {
+            return false;
+        }
+
+        return self::unsignedCharArrayToString($mBuf, $mlen);
+    }
+
     private static function ffiStream(int $length, string $nonce, string $key): string
     {
         $ffi = self::requireFfi();
@@ -1618,6 +1715,39 @@ final class VmSodium
         }
     }
 
+    private static function validateBoxNonce(string $nonce, string $fn, int $argNum): void
+    {
+        if (\strlen($nonce) !== self::CRYPTO_BOX_NONCEBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($nonce) must be SODIUM_CRYPTO_BOX_NONCEBYTES bytes long',
+                $fn,
+                $argNum
+            ));
+        }
+    }
+
+    private static function validateBoxSecretkey(string $secretkey, string $fn, int $argNum): void
+    {
+        if (\strlen($secretkey) !== self::CRYPTO_BOX_SECRETKEYBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($secret_key) must be SODIUM_CRYPTO_BOX_SECRETKEYBYTES bytes long',
+                $fn,
+                $argNum
+            ));
+        }
+    }
+
+    private static function validateBoxPublickey(string $publickey, string $fn, int $argNum): void
+    {
+        if (\strlen($publickey) !== self::CRYPTO_BOX_PUBLICKEYBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($public_key) must be SODIUM_CRYPTO_BOX_PUBLICKEYBYTES bytes long',
+                $fn,
+                $argNum
+            ));
+        }
+    }
+
     private static function throwSodium(string $message): void
     {
         if (\class_exists(\SodiumException::class, false)) {
@@ -1673,6 +1803,8 @@ final class VmSodium
                     int crypto_scalarmult(unsigned char *q, const unsigned char *n, const unsigned char *p);
                     int crypto_scalarmult_base(unsigned char *q, const unsigned char *n);
                     int crypto_box_keypair(unsigned char *pk, unsigned char *sk);
+                    int crypto_box_easy(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n, const unsigned char *pk, const unsigned char *sk);
+                    int crypto_box_open_easy(unsigned char *m, const unsigned char *c, unsigned long long clen, const unsigned char *n, const unsigned char *pk, const unsigned char *sk);
                     int crypto_box_seal(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *pk);
                     int crypto_box_seal_open(unsigned char *m, const unsigned char *c, unsigned long long clen, const unsigned char *pk, const unsigned char *sk);
                     int crypto_aead_aes256gcm_is_available(void);
