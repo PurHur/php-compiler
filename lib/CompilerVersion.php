@@ -1339,13 +1339,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ FTP\Connection internal class (ext/ftp/ftp.stub.php; #7270, #3353).
+     * FTP\Connection opaque object + procedural ftp_* (ext/ftp/ftp.stub.php; #7270, #3353, #20083).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Present since PHP 8.1 resource→object (Zend 8.2 reference has both class_exists and ftp_connect).
+     * Do not tie to {@see supportsBuiltinStubEnums()} — that hid the whole module on 8.4.0-dev (#20083).
      */
     public static function supportsFtpConnection(): bool
     {
-        return self::supportsBuiltinStubEnums();
+        return version_compare(self::languageProfileVersion(), '8.1.0', '>=');
     }
 
     /**
