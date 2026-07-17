@@ -10,13 +10,13 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM lowering for user-script AOT readfile — thin libc open/read/write (#19311).
+ * LLVM lowering for {@see phpc_readfile_kernel} — thin libc open/read/write (#19966).
  *
- * Nested {@see ReadfileJitHelper} does not run under minimal standalone init
- * (#16075); this kernel mirrors pre-#9188 LLVM from ext/ not lib/JIT/Builtin/.
+ * Used inside {@see ReadfileJitHelper} so nested helper TUs do not recurse through
+ * readfile()/fopen() under user-script AOT (#16075; same shape as {@see JitRenameKernel}).
  * php-src: ext/standard/streamsfuncs.c — php_stream_passthru
  */
-final class JitReadfileKernel
+final class JitReadfileLibc
 {
     private const CHUNK = 8192;
 
@@ -63,8 +63,8 @@ final class JitReadfileKernel
         $context->builder->call($context->lookupFunction('__mm__free'), $pathBuf);
 
         $openFail = $context->builder->icmp(Builder::INT_SLT, $fd, $zeroI32);
-        $failBlock = $fn->appendBasicBlock('rf_kernel_open_fail');
-        $okBlock = $fn->appendBasicBlock('rf_kernel_open_ok');
+        $failBlock = $fn->appendBasicBlock('rf_libc_open_fail');
+        $okBlock = $fn->appendBasicBlock('rf_libc_open_ok');
         $context->builder->branchIf($openFail, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
@@ -77,12 +77,12 @@ final class JitReadfileKernel
         );
         $chunkPtr = $context->builder->pointerCast($chunkBuf, $i8p);
 
-        $totalSlot = $context->builder->alloca($i64, 1, 'rf_kernel_total');
+        $totalSlot = $context->builder->alloca($i64, 1, 'rf_libc_total');
         $context->builder->store($i64->constInt(0, false), $totalSlot);
 
-        $loopHead = BasicBlockHelper::append($context, 'rf_kernel_loop_head');
-        $loopBody = BasicBlockHelper::append($context, 'rf_kernel_loop_body');
-        $loopDone = BasicBlockHelper::append($context, 'rf_kernel_loop_done');
+        $loopHead = BasicBlockHelper::append($context, 'rf_libc_loop_head');
+        $loopBody = BasicBlockHelper::append($context, 'rf_libc_loop_body');
+        $loopDone = BasicBlockHelper::append($context, 'rf_libc_loop_done');
         $context->builder->branch($loopHead);
 
         $context->builder->positionAtEnd($loopHead);
@@ -108,8 +108,8 @@ final class JitReadfileKernel
             $context->builder->icmp(Builder::INT_SLT, $nWritten, $i64->constInt(0, false)),
             $context->builder->icmp(Builder::INT_NE, $nWrittenAsRead, $nRead)
         );
-        $writeFailBlock = BasicBlockHelper::append($context, 'rf_kernel_write_fail');
-        $writeOkBlock = BasicBlockHelper::append($context, 'rf_kernel_write_ok');
+        $writeFailBlock = BasicBlockHelper::append($context, 'rf_libc_write_fail');
+        $writeOkBlock = BasicBlockHelper::append($context, 'rf_libc_write_ok');
         $context->builder->branchIf($writeFail, $writeFailBlock, $writeOkBlock);
 
         $context->builder->positionAtEnd($writeFailBlock);

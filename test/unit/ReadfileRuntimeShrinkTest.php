@@ -6,38 +6,39 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** __compiler_readfile: PHP helper for embed; ext kernel for user-script AOT (#9188, #19311). */
+/** __compiler_readfile: no UserScriptAotDeferNestedJit; libc via JitReadfileLibc / phpc_readfile_kernel (#9188, #19966). */
 final class ReadfileRuntimeShrinkTest extends TestCase
 {
-    public function testStringReadfileRoutesDeferThroughExtKernelNotLibcBuiltin(): void
+    public function testStringReadfileHasNoUserScriptDeferKernel(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringReadfile.php');
         $this->assertStringContainsString('ReadfileJitHelper', $bridge);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $bridge);
-        $this->assertStringContainsString('JitReadfileKernel', $bridge);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $bridge);
-        $this->assertStringNotContainsString('ensureJitHelperCompiled', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('JitReadfileKernel', $bridge);
         $this->assertStringNotContainsString('StringReadfileLibc', $bridge);
-        $this->assertStringNotContainsString("lookupFunction('open')", $bridge);
-        $this->assertStringNotContainsString("lookupFunction('read')", $bridge);
-        $this->assertStringNotContainsString("lookupFunction('write')", $bridge);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringReadfileLibc.php');
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitReadfileKernel.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitReadfileKernel.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitReadfileLibc.php');
     }
 
-    public function testReadfileJitHelperDelegatesToVmFs(): void
+    public function testReadfileJitHelperUsesPhpcReadfileKernel(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/ReadfileJitHelper.php');
-        $this->assertStringContainsString('VmFs::readfile', $source);
-        $this->assertStringNotContainsString("lookupFunction('open')", $source);
-        $this->assertStringNotContainsString("lookupFunction('read')", $source);
+        $this->assertMatchesRegularExpression('/return\s+\\\\phpc_readfile_kernel\s*\(/', $source);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/phpc_readfile_kernel.php');
     }
 
     public function testReadfileJitHelperReturnsMinusOneWhenOpenFails(): void
     {
+        if (!\function_exists('phpc_readfile_kernel')) {
+            $this->markTestSkipped('phpc_readfile_kernel requires compiler runtime');
+        }
         $this->assertSame(
             -1,
-            \PHPCompiler\ext\standard\ReadfileJitHelper::readfile('/no/such/phpc-readfile-jit-helper-'.bin2hex(random_bytes(4)))
+            \PHPCompiler\ext\standard\ReadfileJitHelper::readfile(
+                sys_get_temp_dir().'/phpc-no-such-readfile-'.bin2hex(random_bytes(4))
+            )
         );
     }
 
@@ -45,8 +46,9 @@ final class ReadfileRuntimeShrinkTest extends TestCase
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('ReadfileJitHelper.php', $spine);
-        $this->assertStringContainsString('JitReadfileKernel.php', $spine);
         $this->assertStringContainsString('StringReadfile.php', $spine);
-        $this->assertStringNotContainsString('StringReadfileLibc.php', $spine);
+        $this->assertStringContainsString('phpc_readfile_kernel.php', $spine);
+        $this->assertStringContainsString('JitReadfileLibc.php', $spine);
+        $this->assertStringNotContainsString('JitReadfileKernel.php', $spine);
     }
 }

@@ -27,6 +27,7 @@ final class VmFsWritePure
         if (str_contains($path, "\0")) {
             return false;
         }
+        $path = VmFsLocalPath::resolveAgainstCwd($path);
 
         $phpFlags = 0;
         if (0 !== ($flags & self::FILE_APPEND)) {

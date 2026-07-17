@@ -36,6 +36,7 @@ final class VmFsReadPure
         if (str_contains($path, "\0")) {
             return false;
         }
+        $path = VmFsLocalPath::resolveAgainstCwd($path);
         // is_readable() is false in user-script AOT while fopen succeeds (#18897, re-#18695).
         $fp = @\fopen($path, 'rb');
         if (false === $fp) {

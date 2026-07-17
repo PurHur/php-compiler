@@ -10,13 +10,13 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM lowering for user-script AOT file_put_contents — thin libc fopen/fwrite (#19294).
+ * LLVM lowering for {@see phpc_file_put_contents_kernel} — thin libc fopen/fwrite (#19966).
  *
- * Nested {@see FilePutContentsJitHelper} does not run under minimal standalone init
- * (#16075); this kernel mirrors pre-#15310 LLVM from ext/ not lib/JIT/Builtin/.
+ * Used inside {@see FilePutContentsJitHelper} so nested helper TUs do not recurse through
+ * file_put_contents() under user-script AOT (#16075; same shape as {@see JitRenameKernel}).
  * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_stream_ex
  */
-final class JitFilePutContentsKernel
+final class JitFilePutContentsLibc
 {
     private const FILE_APPEND = 8;
 
@@ -63,8 +63,8 @@ final class JitFilePutContentsKernel
         $context->builder->call($context->lookupFunction('__mm__free'), $pathBuf);
 
         $openFail = $context->builder->icmp(Builder::INT_EQ, $stream, $nullPtr);
-        $failBlock = $fn->appendBasicBlock('fpc_kernel_open_fail');
-        $okBlock = $fn->appendBasicBlock('fpc_kernel_open_ok');
+        $failBlock = $fn->appendBasicBlock('fpc_libc_open_fail');
+        $okBlock = $fn->appendBasicBlock('fpc_libc_open_ok');
         $context->builder->branchIf($openFail, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
@@ -75,8 +75,8 @@ final class JitFilePutContentsKernel
             $context->builder->structGep($data, $strMap['length'])
         );
         $zeroLen = $context->builder->icmp(Builder::INT_EQ, $dataLen, $i64->constInt(0, false));
-        $emptyBlock = $fn->appendBasicBlock('fpc_kernel_empty_data');
-        $writeBlock = $fn->appendBasicBlock('fpc_kernel_write_data');
+        $emptyBlock = $fn->appendBasicBlock('fpc_libc_empty_data');
+        $writeBlock = $fn->appendBasicBlock('fpc_libc_write_data');
         $context->builder->branchIf($zeroLen, $emptyBlock, $writeBlock);
 
         $context->builder->positionAtEnd($emptyBlock);
@@ -99,8 +99,8 @@ final class JitFilePutContentsKernel
         $context->builder->call($context->lookupFunction('fclose'), $stream);
 
         $writeFail = $context->builder->icmp(Builder::INT_NE, $nWritten, $dataSizeT);
-        $writeFailBlock = BasicBlockHelper::append($context, 'fpc_kernel_write_fail');
-        $writeOkBlock = BasicBlockHelper::append($context, 'fpc_kernel_write_ok');
+        $writeFailBlock = BasicBlockHelper::append($context, 'fpc_libc_write_fail');
+        $writeOkBlock = BasicBlockHelper::append($context, 'fpc_libc_write_ok');
         $context->builder->branchIf($writeFail, $writeFailBlock, $writeOkBlock);
 
         $context->builder->positionAtEnd($writeFailBlock);
