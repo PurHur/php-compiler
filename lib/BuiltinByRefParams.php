@@ -141,6 +141,9 @@ final class BuiltinByRefParams
             case 'sodium_crypto_secretstream_xchacha20poly1305_rekey':
                 return [0];
             case 'sodium_memzero':
+            case 'sodium_increment':
+                return [0];
+            case 'sodium_add':
                 return [0];
             case 'uuid_generate':
                 return [0];

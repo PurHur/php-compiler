@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -32,6 +33,8 @@ final class StringSodium
 
     private const MEMCMP_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::memcmp';
 
+    private const COMPARE_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::compare';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::SECRETBOX_HELPER,
@@ -41,6 +44,7 @@ final class StringSodium
         self::STREAM_XOR_HELPER,
         self::STREAM_XCHACHA20_XOR_HELPER,
         self::MEMCMP_HELPER,
+        self::COMPARE_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -50,6 +54,7 @@ final class StringSodium
         self::implementAuthBridge($context);
         self::implementAuthVerifyBridge($context);
         self::implementMemcmpBridge($context);
+        self::implementCompareBridge($context);
         self::implementBridge($context, '__compiler_sodium_stream_xor', self::STREAM_XOR_HELPER);
         self::implementBridge($context, '__compiler_sodium_stream_xchacha20_xor', self::STREAM_XCHACHA20_XOR_HELPER);
     }
@@ -63,6 +68,7 @@ final class StringSodium
             return;
         }
 
+        $restore = self::captureInsertBlock($context);
         self::ensureJitHelperCompiled($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
@@ -83,7 +89,7 @@ final class StringSodium
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
+        self::restoreInsertBlock($context, $restore);
     }
 
     private static function implementAuthBridge(Context $context): void
@@ -96,6 +102,7 @@ final class StringSodium
             return;
         }
 
+        $restore = self::captureInsertBlock($context);
         self::ensureJitHelperCompiled($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
@@ -115,7 +122,7 @@ final class StringSodium
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
+        self::restoreInsertBlock($context, $restore);
     }
 
     private static function implementAuthVerifyBridge(Context $context): void
@@ -128,6 +135,7 @@ final class StringSodium
             return;
         }
 
+        $restore = self::captureInsertBlock($context);
         self::ensureJitHelperCompiled($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
@@ -149,7 +157,7 @@ final class StringSodium
         );
         $context->builder->returnValue($context->builder->zext($result, $i32));
         $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
+        self::restoreInsertBlock($context, $restore);
     }
 
     private static function implementMemcmpBridge(Context $context): void
@@ -162,15 +170,16 @@ final class StringSodium
             return;
         }
 
+        $restore = self::captureInsertBlock($context);
         self::ensureJitHelperCompiled($context);
 
         $strPtr = $context->getTypeFromString('__string__*');
-        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction(
                 $abiName,
-                $context->context->functionType($i32, false, $strPtr, $strPtr)
+                $context->context->functionType($i64, false, $strPtr, $strPtr)
             );
 
         $entry = $fn->appendBasicBlock('sodium_memcmp_bridge_entry');
@@ -182,7 +191,59 @@ final class StringSodium
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    private static function implementCompareBridge(Context $context): void
+    {
+        $abiName = '__compiler_sodium_compare';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $restore = self::captureInsertBlock($context);
+        self::ensureJitHelperCompiled($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i64, false, $strPtr, $strPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('sodium_compare_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::COMPARE_HELPER),
+            $fn->getParam(0),
+            $fn->getParam(1)
+        );
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    private static function captureInsertBlock(Context $context): ?BasicBlock
+    {
+        try {
+            return $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
+    {
+        if (null !== $block) {
+            $context->builder->positionAtEnd($block);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

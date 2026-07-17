@@ -194,6 +194,8 @@ final class BuiltinByRefParamsTest extends TestCase
     {
         $this->assertSame([0], BuiltinByRefParams::forFunction('sodium_memzero'));
         $this->assertSame([0], BuiltinByRefParams::forFunction('SODIUM_MEMZERO'));
+        $this->assertSame([0], BuiltinByRefParams::forFunction('sodium_increment'));
+        $this->assertSame([0], BuiltinByRefParams::forFunction('sodium_add'));
     }
 
     public function testPcntlWaitpidStatusByRef(): void

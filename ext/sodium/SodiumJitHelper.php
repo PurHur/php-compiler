@@ -7,7 +7,8 @@ namespace PHPCompiler\ext\sodium;
 /**
  * sodium_crypto_secretbox* for compiled JIT/AOT modules (#13078, php-in-PHP).
  *
- * SSOT: {@see VmSodium}
+ * SSOT for crypto ops: {@see VmSodium}
+ * Compare/memcmp: inlined pure algorithms so NestedJitCompile does not miss VmSodium bodies (#20081).
  * php-src: ext/sodium/libsodium.c
  */
 final class SodiumJitHelper
@@ -45,6 +46,37 @@ final class SodiumJitHelper
 
     public static function memcmp(string $string1, string $string2): int
     {
-        return VmSodium::memcmp($string1, $string2);
+        if (\strlen($string1) !== \strlen($string2)) {
+            throw new \SodiumException(
+                'sodium_memcmp(): Argument #1 ($string1) and argument #2 ($string_2) must have the same length'
+            );
+        }
+        $len = \strlen($string1);
+        $d = 0;
+        for ($i = 0; $i < $len; ++$i) {
+            $d |= \ord($string1[$i]) ^ \ord($string2[$i]);
+        }
+
+        return (1 & (($d - 1) >> 8)) - 1;
+    }
+
+    public static function compare(string $string1, string $string2): int
+    {
+        if (\strlen($string1) !== \strlen($string2)) {
+            throw new \SodiumException(
+                'sodium_compare(): Argument #1 ($string1) and argument #2 ($string_2) must have the same length'
+            );
+        }
+        $gt = 0;
+        $eq = 1;
+        for ($i = \strlen($string1); $i !== 0; ) {
+            --$i;
+            $b1 = \ord($string1[$i]);
+            $b2 = \ord($string2[$i]);
+            $gt |= (($b2 - $b1) >> 8) & $eq;
+            $eq &= (($b2 ^ $b1) - 1) >> 8;
+        }
+
+        return ($gt + $gt + $eq) - 1;
     }
 }
