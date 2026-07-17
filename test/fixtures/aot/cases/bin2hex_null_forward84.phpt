@@ -1,9 +1,10 @@
 --TEST--
-AOT: bin2hex null — coerce on 8.4 forward profile (#20007)
+AOT: bin2hex(null) — TypeError on 8.4 forward profile (#20154, ext/standard/string.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-echo bin2hex(null) === '' ? 'ok' : 'bad', "\n";
+bin2hex(null);
 --EXPECT--
-ok
+--EXPECT_EXIT--
+255

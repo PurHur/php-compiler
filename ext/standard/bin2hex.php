@@ -25,6 +25,7 @@ use PHPLLVM\Value;
  * bin2hex() for string arguments (subset of PHP).
  *
  * VM: {@see VmString::bin2hex()}; JIT/AOT: {@see StringBin2hex} + {@see Bin2hexJitHelper}.
+ * php-src: ext/standard/string.c — PHP_FUNCTION(bin2hex) / Z_PARAM_STR
  */
 final class bin2hex extends Internal
 {
@@ -53,14 +54,14 @@ final class bin2hex extends Internal
         );
     }
 
-    /** Soft-null — coerce+deprecate on forward profile (#20007, ext/standard/string.c). */
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#20154, ext/standard/string.c). */
     private static function vmStringArg(Frame $frame): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, 0, 'bin2hex', 'string')->toString();
         }
 
-        return VmString::coerceTrimFamilyStringArg(
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'bin2hex',
             0,
@@ -80,7 +81,7 @@ final class bin2hex extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerTrimFamilyString(
+        return JitStringBuiltinArg::lowerZparamStr(
             $context,
             $arg,
             'bin2hex',

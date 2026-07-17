@@ -78,10 +78,11 @@ final class VmString
      * Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222, #19254, #19318).
      *
      * Distinct from {@see requiresForwardProfileStrictStringNull} (legacy global switch, currently off).
-     * wordwrap/str_pad, unserialize/substr, and other typed string builtins use this guard
+     * wordwrap/str_pad, unserialize/substr, bin2hex, and other typed string builtins use this guard
      * (php-src ext/standard/string.c, var_unserializer.c). trim/ltrim/rtrim/chop,
-     * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords, and strlen/strtolower/strtoupper/strrev/bin2hex
+     * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords, and strlen/strtolower/strtoupper/strrev
      * coerce null with deprecation on forward profile (php_trim / string.c, re-#18850 #19983 #19998 #20007).
+     * bin2hex is Z_PARAM_STR TypeError on 8.4 (#20154), not soft-null.
      */
     public static function requiresZparamStrStrictNullOnForwardProfile(): bool
     {
@@ -92,7 +93,7 @@ final class VmString
      * String builtins that coerce null with deprecation (not Z_PARAM_STR TypeError on 8.4).
      *
      * Used by trim/ltrim/rtrim/chop (#19983), str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
-     * and strlen/strtolower/strtoupper/strrev/bin2hex (#20007).
+     * and strlen/strtolower/strtoupper/strrev (#20007). bin2hex uses {@see coerceZparamStrBuiltinArg} (#20154).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,
