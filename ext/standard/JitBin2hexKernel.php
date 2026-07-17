@@ -9,10 +9,10 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM lowering for user-script AOT bin2hex — thin hex loop (#19344).
+ * LLVM lowering for thin-standalone AOT bin2hex — hex encode loop (#19344, #20011).
  *
- * Nested {@see Bin2hexJitHelper} does not run under minimal standalone init
- * (#16075); this kernel mirrors pre-#18884 inline LLVM from ext/ not lib/JIT/Builtin/.
+ * Used when {@see \PHPCompiler\JIT\Context::isThinStandaloneAotMain()} so nested
+ * {@see Bin2hexJitHelper} is not ExternalMethod-stubbed under minimal init (#16075).
  * php-src: ext/standard/string.c — PHP_FUNCTION(bin2hex)
  */
 final class JitBin2hexKernel
