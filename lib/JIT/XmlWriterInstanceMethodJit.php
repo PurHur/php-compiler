@@ -28,6 +28,8 @@ final class XmlWriterInstanceMethodJit
         'xmlwriter::writedtd' => true,
         'xmlwriter::writedtdelement' => true,
         'xmlwriter::writedtdattlist' => true,
+        'xmlwriter::startdtdattlist' => true,
+        'xmlwriter::enddtdattlist' => true,
         'xmlwriter::startdtdentity' => true,
         'xmlwriter::enddtdentity' => true,
         'xmlwriter::writedtdentity' => true,
