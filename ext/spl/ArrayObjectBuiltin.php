@@ -212,6 +212,13 @@ final class ArrayObjectCount extends VmClassMethod
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::count()'
         );
+        // php-src: ZEND_PARSE_PARAMETERS_NONE — ArrayObject::count() (#20162)
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(
+                'ArrayObject::count() expects exactly 0 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
         if (null === $frame->returnVar) {
             return;
         }
