@@ -11,14 +11,16 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\BuiltinExceptionSupport;
 use PHPCompiler\ext\standard\VmJson;
 
 /**
- * SoapClient VM class — v1 local WSDL + file/HTTP transport (php-src ext/soap/soap.c; #20037, #20183).
+ * SoapClient VM class — v1 local WSDL + file/HTTP transport (php-src ext/soap/soap.c; #20037, #20183, #20293).
  *
  * Fixture mode: options['location'] may be a local filesystem path or file:// URL; __doRequest
  * returns that file's contents (no network). HTTP locations use host file_get_contents POST.
  * With options['trace'], __getLastRequestHeaders / __getLastResponseHeaders capture HTTP header blocks.
+ * options['exceptions']=false returns SoapFault objects instead of throwing (#20293).
  */
 final class VmSoapClient
 {
@@ -89,6 +91,11 @@ final class VmSoapClient
             : SoapConstants::SOAP_1_1;
         $state->style = isset($options['style']) ? (int) $options['style'] : SoapConstants::SOAP_RPC;
         $state->use = isset($options['use']) ? (int) $options['use'] : SoapConstants::SOAP_ENCODED;
+        // php-src: exceptions false when IS_FALSE or long 0 (#20293).
+        if (\array_key_exists('exceptions', $options)) {
+            $ex = $options['exceptions'];
+            $state->exceptions = !(false === $ex || 0 === $ex || '0' === $ex);
+        }
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
@@ -181,16 +188,35 @@ final class VmSoapClient
         Frame $frame
     ): Variable {
         $state = self::state($object);
-        $request = self::buildRequest($state, $name, $arguments);
-        $state->lastRequest = $request;
+        try {
+            $request = self::buildRequest($state, $name, $arguments);
+            $state->lastRequest = $request;
 
-        $action = $state->uri !== '' ? \rtrim($state->uri, '/').'/'.$name : $name;
-        $response = self::doRequest($object, $request, $state->location, $action, $state->soapVersion, $frame);
-        $state->lastResponse = $response;
+            $action = $state->uri !== '' ? \rtrim($state->uri, '/').'/'.$name : $name;
+            $response = self::doRequest($object, $request, $state->location, $action, $state->soapVersion, $frame);
+            $state->lastResponse = $response;
 
-        $decoded = self::decodeResponse($response, $name);
+            $decoded = self::decodeResponse($response, $name);
 
-        return self::importValue($decoded, $ctx);
+            return self::importValue($decoded, $ctx);
+        } catch (\SoapFault $e) {
+            // php-src: SoapFault return value thrown only when exceptions != false (#20293).
+            if ($state->exceptions) {
+                throw $e;
+            }
+
+            return BuiltinExceptionSupport::materializeSoapFault(
+                $ctx,
+                $e->getMessage(),
+                '',
+                0,
+                (string) ($e->faultcode ?? ''),
+                '' !== ($e->faultstring ?? '') ? (string) $e->faultstring : $e->getMessage(),
+                (string) ($e->faultactor ?? ''),
+                $e->detail ?? null,
+                (string) ($e->_name ?? '')
+            );
+        }
     }
 
     public static function doRequest(
@@ -721,6 +747,9 @@ final class SoapClientState
     public string $uri = '';
 
     public bool $trace = false;
+
+    /** php-src Z_CLIENT_EXCEPTIONS — default true; false returns SoapFault (#20293). */
+    public bool $exceptions = true;
 
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
