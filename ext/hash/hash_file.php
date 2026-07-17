@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\hash;
 
-use PHPCompiler\ext\standard\JitBoolArg;
 use PHPCompiler\ext\standard\JitHashFile;
 use PHPCompiler\ext\standard\JitStreamPath;
-use PHPCompiler\ext\standard\JitStringBuiltinArg;
 use PHPCompiler\ext\standard\VmHashFile;
 use PHPCompiler\ext\standard\VmStreamOpenFailure;
 use PHPCompiler\ext\standard\VmStreamPath;
@@ -15,6 +13,8 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -36,7 +36,8 @@ final class hash_file extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash_file', 0, 'algo');
+        // Z_PARAM_STR $algo — null TypeError on 8.4 forward profile (#20304, ext/hash/hash.c).
+        $algo = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'hash_file', 0, 'algo');
         $path = VmStreamPath::coerceNonEmptyPathArgForFrame($frame, 1, 'hash_file', 'filename');
         $raw = false;
         if (3 === $argc) {
@@ -65,7 +66,9 @@ final class hash_file extends Internal
         if (isset($args[2])) {
             $raw = JitBoolArg::lower($context, $args[2], 'hash_file() raw_output');
         }
-        $algo = JitStringBuiltinArg::lower($context, $args[0], 'hash_file', 0, 'algo');
+        $algo = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_file', 0, 'algo')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'hash_file', 0, 'algo');
         $path = JitStreamPath::lowerNonEmptyPath($context, $args[1], 'hash_file', 1, 'filename');
 
         return JitHashFile::hash($context, $algo, $path, $raw);

@@ -34,7 +34,8 @@ final class hash_hmac extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $algo = VmString::stringBuiltinArgForFrame($frame, 0, 'hash_hmac', 0, 'algo');
+        // Z_PARAM_STR $algo — null TypeError on 8.4 forward profile (#20304, ext/hash/hash.c).
+        $algo = self::vmZparamStrArg($frame, 0, 'algo');
         $data = self::vmZparamStrArg($frame, 1, 'data');
         $key = self::vmZparamStrArg($frame, 2, 'key');
         $raw = false;
@@ -65,7 +66,7 @@ final class hash_hmac extends Internal
         }
         return JitHash::hashHmac(
             $context,
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_hmac', 0, 'algo'),
+            self::jitZparamStrArg($context, $args[0], 0, 'algo'),
             self::jitZparamStrArg($context, $args[1], 1, 'data'),
             self::jitZparamStrArg($context, $args[2], 2, 'key'),
             $raw
@@ -73,7 +74,7 @@ final class hash_hmac extends Internal
     }
 
     /**
-     * Z_PARAM_STR $data / $key — null TypeError on 8.4 forward profile (#19275, #20175, ext/hash/hash.c).
+     * Z_PARAM_STR $algo / $data / $key — null TypeError on 8.4 forward profile (#19275, #20175, #20304, ext/hash/hash.c).
      */
     private static function vmZparamStrArg(Frame $frame, int $argIndex, string $paramName): string
     {
