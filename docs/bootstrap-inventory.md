@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5281 |
-| Phase A inventory files (M2 ratio SSOT) | 5281 |
+| PHP files on vm.php path | 5288 |
+| Phase A inventory files (M2 ratio SSOT) | 5288 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14641 |
+| Source constructs flagged (warnings) | 14677 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1178,13 +1178,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/spl_classes.php` | 0 | 2 |
 | `ext/sqlite3/BuiltinClasses.php` | 0 | 1 |
 | `ext/sqlite3/Module.php` | 0 | 1 |
+| `ext/sqlite3/SQLite3Changes.php` | 0 | 1 |
 | `ext/sqlite3/SQLite3Close.php` | 0 | 1 |
 | `ext/sqlite3/SQLite3Construct.php` | 0 | 2 |
+| `ext/sqlite3/SQLite3EscapeString.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3Exec.php` | 0 | 2 |
+| `ext/sqlite3/SQLite3LastInsertRowID.php` | 0 | 1 |
+| `ext/sqlite3/SQLite3Prepare.php` | 0 | 2 |
+| `ext/sqlite3/SQLite3Query.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3QuerySingle.php` | 0 | 2 |
 | `ext/sqlite3/Sqlite3ClassMethod.php` | 0 | 1 |
 | `ext/sqlite3/Sqlite3ExtensionPolicy.php` | 0 | 1 |
-| `ext/sqlite3/VmSQLite3.php` | 0 | 9 |
+| `ext/sqlite3/VmSQLite3.php` | 0 | 14 |
+| `ext/sqlite3/VmSQLite3Result.php` | 0 | 12 |
+| `ext/sqlite3/VmSQLite3Stmt.php` | 0 | 11 |
 | `ext/sqlite3/VmSqlite3Native.php` | 0 | 6 |
 | `ext/standard/AbsJitHelper.php` | 0 | 1 |
 | `ext/standard/AcosJitHelper.php` | 0 | 1 |
@@ -13854,12 +13861,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sqlite3/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/sqlite3/Module.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/sqlite3/SQLite3Changes.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/sqlite3/SQLite3Close.php`
 
@@ -13872,7 +13884,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 20)
 - 1 class method(s)
 
+### `ext/sqlite3/SQLite3EscapeString.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 1 class method(s)
+
 ### `ext/sqlite3/SQLite3Exec.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/sqlite3/SQLite3LastInsertRowID.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sqlite3/SQLite3Prepare.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/sqlite3/SQLite3Query.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -13897,14 +13932,50 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sqlite3/VmSQLite3.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 30)
-- new Variable (line 33)
-- new SQLite3Construct (line 40)
-- new SQLite3Close (line 45)
-- new SQLite3Exec (line 46)
-- new SQLite3QuerySingle (line 47)
-- new Sqlite3State (line 64)
-- new Variable (line 186)
+- new ClassEntry (line 35)
+- new Variable (line 38)
+- new SQLite3Construct (line 45)
+- new SQLite3Close (line 50)
+- new SQLite3Exec (line 51)
+- new SQLite3QuerySingle (line 52)
+- new SQLite3Query (line 53)
+- new SQLite3Prepare (line 54)
+- new SQLite3Changes (line 55)
+- new SQLite3LastInsertRowID (line 56)
+- new SQLite3EscapeString (line 57)
+- new Sqlite3State (line 75)
+- new Variable (line 207)
+- 12 class method(s)
+
+### `ext/sqlite3/VmSQLite3Result.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 34)
+- new SQLite3ResultFetchArray (line 38)
+- new SQLite3ResultNumColumns (line 39)
+- new SQLite3ResultColumnName (line 40)
+- new SQLite3ResultColumnType (line 41)
+- new SQLite3ResultReset (line 42)
+- new SQLite3ResultFinalize (line 43)
+- new ObjectEntry (line 65)
+- new Sqlite3ResultState (line 66)
+- new ArgumentCountError (line 204)
+- new ArgumentCountError (line 232)
+- 11 class method(s)
+
+### `ext/sqlite3/VmSQLite3Stmt.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 34)
+- new SQLite3StmtBindValue (line 38)
+- new SQLite3StmtClear (line 39)
+- new SQLite3StmtClose (line 40)
+- new SQLite3StmtExecute (line 41)
+- new SQLite3StmtParamCount (line 42)
+- new SQLite3StmtReset (line 43)
+- new ObjectEntry (line 63)
+- new Sqlite3StmtState (line 64)
+- new ArgumentCountError (line 137)
 - 11 class method(s)
 
 ### `ext/sqlite3/VmSqlite3Native.php`
@@ -13915,7 +13986,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SQLite3Exception (line 92)
 - new SQLite3Exception (line 139)
 - new SQLite3Exception (line 183)
-- 21 class method(s)
+- 25 class method(s)
 
 ### `ext/standard/AbsJitHelper.php`
 

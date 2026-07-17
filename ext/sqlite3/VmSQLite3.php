@@ -21,13 +21,18 @@ final class VmSQLite3
     /** @var array<int, Sqlite3State> */
     private static array $store = [];
 
+    /** @var array<int, ObjectEntry> */
+    private static array $objects = [];
+
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['query'])) {
             return;
         }
 
-        $entry = new ClassEntry('SQLite3');
+        $entry = isset($ctx->classes[self::CLASS_LC])
+            ? $ctx->classes[self::CLASS_LC]
+            : new ClassEntry('SQLite3');
         $entry->isInternal = true;
         foreach (Sqlite3Constants::CLASS_CONSTANTS as $name => $value) {
             $const = new Variable(Variable::TYPE_INTEGER);
@@ -45,12 +50,18 @@ final class VmSQLite3
             'close' => new SQLite3Close(),
             'exec' => new SQLite3Exec(),
             'querysingle' => new SQLite3QuerySingle(),
+            'query' => new SQLite3Query(),
+            'prepare' => new SQLite3Prepare(),
+            'changes' => new SQLite3Changes(),
+            'lastinsertrowid' => new SQLite3LastInsertRowID(),
+            'escapestring' => new SQLite3EscapeString(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;
             $entry->methodNames[$name] = self::methodDisplayName($name);
         }
+        $entry->methodVisibility['escapestring'] = CfgFunc::FLAG_STATIC | $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -65,7 +76,17 @@ final class VmSQLite3
         $state->filename = $filename;
         $state->db = VmSqlite3Native::open($filename, $flags);
         self::$store[$entry->id] = $state;
+        self::$objects[$entry->id] = $entry;
         $entry->constructed = true;
+    }
+
+    public static function objectById(int $id): ObjectEntry
+    {
+        if (!isset(self::$objects[$id])) {
+            throw new \LogicException('SQLite3 object missing for result/stmt handle');
+        }
+
+        return self::$objects[$id];
     }
 
     public static function requireReceiver(Variable $var, string $label): ObjectEntry
@@ -194,6 +215,8 @@ final class VmSQLite3
     {
         return match ($lc) {
             'querysingle' => 'querySingle',
+            'lastinsertrowid' => 'lastInsertRowID',
+            'escapestring' => 'escapeString',
             default => $lc,
         };
     }

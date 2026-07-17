@@ -214,9 +214,51 @@ final class VmSqlite3Native
         return (int) self::requireFfi()->sqlite3_changes($db);
     }
 
+    public static function lastInsertRowId(\FFI\CData $db): int
+    {
+        return (int) self::requireFfi()->sqlite3_last_insert_rowid($db);
+    }
+
+    /** php-src SQLite3::escapeString — sqlite3_mprintf("%q", …). */
+    public static function escapeString(string $value): string
+    {
+        if ('' === $value) {
+            return '';
+        }
+        $ffi = self::requireFfi();
+        $ret = $ffi->sqlite3_mprintf('%q', $value);
+        if (null === $ret) {
+            return '';
+        }
+        $out = self::ffiString($ret);
+        $ffi->sqlite3_free($ret);
+
+        return $out;
+    }
+
+    public static function columnTypeAt(\FFI\CData $stmt, int $index): int
+    {
+        return (int) self::requireFfi()->sqlite3_column_type($stmt, $index);
+    }
+
+    public static function bindParameterCount(\FFI\CData $stmt): int
+    {
+        return (int) self::requireFfi()->sqlite3_bind_parameter_count($stmt);
+    }
+
     public const STEP_ROW = 100;
 
     public const STEP_DONE = 101;
+
+    public const TYPE_INTEGER = 1;
+
+    public const TYPE_FLOAT = 2;
+
+    public const TYPE_TEXT = 3;
+
+    public const TYPE_BLOB = 4;
+
+    public const TYPE_NULL = 5;
 
     /** @return \FFI\CData|string|int|float|null */
     private static function columnValue(\FFI $ffi, \FFI\CData $stmt, int $index): string|int|float|null
@@ -307,6 +349,9 @@ sqlite3_int64 sqlite3_column_int64(sqlite3_stmt *pStmt, int iCol);
 double sqlite3_column_double(sqlite3_stmt *pStmt, int iCol);
 int sqlite3_finalize(sqlite3_stmt *pStmt);
 int sqlite3_changes(sqlite3 *db);
+sqlite3_int64 sqlite3_last_insert_rowid(sqlite3 *db);
+char *sqlite3_mprintf(const char *zFormat, ...);
+int sqlite3_bind_parameter_count(sqlite3_stmt *pStmt);
 CDEF;
 
         foreach (['libsqlite3.so.0', 'libsqlite3.so'] as $lib) {
