@@ -13,9 +13,11 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\Variable;
-use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\ext\standard\VmUserCall;
+use PHPCompiler\VM\MagicMethodInvocationAborted;
+use PHPCompiler\VM\ScriptExit;
 
 /**
  * SoapServer VM class — v1 string handle + addFunction/setObject (php-src ext/soap/soap.c; #20126).
@@ -26,6 +28,9 @@ final class VmSoapServer
 
     /** @var array<int, SoapServerState> */
     private static array $store = [];
+
+    /** Nesting depth of {@see handle()} — in-handler fault() must emit Fault XML (#20194). */
+    private static int $handleDepth = 0;
 
     public static function registerClass(Context $ctx): void
     {
@@ -183,23 +188,55 @@ final class VmSoapServer
             }
         }
 
+        $state->pendingFault = null;
+        ++self::$handleDepth;
         try {
-            [$opName, $args] = self::parseRequest($request);
-            $result = self::dispatch($object, $opName, $args, $ctx, $frame);
-            $response = self::buildResponse($state, $opName, $result);
-        } catch (\SoapFault $e) {
-            $response = self::buildFaultResponse($state, $e);
-        } catch (\Throwable $e) {
-            $sf = new \SoapFault('Server', $e->getMessage());
-            $response = self::buildFaultResponse($state, $sf);
-        }
+            try {
+                [$opName, $args] = self::parseRequest($request);
+                $result = self::dispatch($object, $opName, $args, $ctx, $frame);
+                if (null !== $state->pendingFault) {
+                    $response = self::buildFaultFromPending($state);
+                } else {
+                    $response = self::buildResponse($state, $opName, $result);
+                }
+            } catch (\SoapFault $e) {
+                // Prefer pendingFault: isolated dispatch rematerializes SoapFault as
+                // new SoapFault($message) and drops faultcode (#20194).
+                $response = null !== $state->pendingFault
+                    ? self::buildFaultFromPending($state)
+                    : self::buildFaultResponse($state, $e);
+            } catch (MagicMethodInvocationAborted $e) {
+                if (null === $state->pendingFault) {
+                    throw $e;
+                }
+                $response = self::buildFaultFromPending($state);
+            } catch (ScriptExit $e) {
+                throw $e;
+            } catch (\Throwable $e) {
+                if (null !== $state->pendingFault) {
+                    $response = self::buildFaultFromPending($state);
+                } else {
+                    $sf = new \SoapFault('Server', $e->getMessage());
+                    $response = self::buildFaultResponse($state, $sf);
+                }
+            }
 
-        $state->lastResponse = $response;
-        OutputBuffer::append($response);
+            $state->lastResponse = $response;
+            OutputBuffer::append($response);
+        } finally {
+            --self::$handleDepth;
+            $state->pendingFault = null;
+        }
     }
 
     public static function fault(ObjectEntry $object, string $code, string $string): void
     {
+        $state = self::state($object);
+        // Zend soap_server_fault_ex: in-handler fault is serialized into the response
+        // buffer; outside handle() the SoapFault escapes to user code (#20194).
+        if (self::$handleDepth > 0) {
+            $state->pendingFault = ['code' => $code, 'string' => $string];
+        }
         throw new \SoapFault($code, $string);
     }
 
@@ -325,11 +362,12 @@ final class VmSoapServer
         }
 
         if (isset($state->functionIndex[$lc])) {
-            $fn = $state->functionIndex[$lc];
-            $cb = new Variable();
-            $cb->string($fn);
+            $fnName = $state->functionIndex[$lc];
+            // Isolated stack: outer user try/catch around handle() must not absorb
+            // SoapFault from $server->fault() so handle() can emit Fault XML (#20194).
+            $fn = VmUserCall::resolveStringCallback($ctx, $fnName);
 
-            return VmCallable::invokeAs('SoapServer::handle', $ctx, $cb, ...$args);
+            return $ctx->runtime->vm->invokePhpFunctionIsolated($fn, ...$args);
         }
 
         throw new \SoapFault('Client', 'Function "'.$opName.'" doesn\'t exist');
@@ -458,6 +496,21 @@ final class VmSoapServer
         $code = (string) ($e->faultcode ?? 'Server');
         $string = (string) ($e->faultstring !== '' ? $e->faultstring : $e->getMessage());
 
+        return self::buildFaultEnvelope($code, $string);
+    }
+
+    private static function buildFaultFromPending(SoapServerState $state): string
+    {
+        $pending = $state->pendingFault;
+        if (null === $pending) {
+            return self::buildFaultEnvelope('Server', 'Unknown');
+        }
+
+        return self::buildFaultEnvelope($pending['code'], $pending['string']);
+    }
+
+    private static function buildFaultEnvelope(string $code, string $string): string
+    {
         return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
             '<SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">'."\n".
             '  <SOAP-ENV:Body>'."\n".
@@ -534,6 +587,13 @@ final class SoapServerState
     public array $responseHeaders = [];
 
     public string $lastResponse = '';
+
+    /**
+     * In-handler SoapServer::fault() payload (php-src soap_server_fault_ex; #20194).
+     *
+     * @var array{code: string, string: string}|null
+     */
+    public ?array $pendingFault = null;
 }
 
 final class SoapServerConstruct extends SoapClassMethod

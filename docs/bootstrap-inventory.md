@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5507 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15645 |
+| Source constructs flagged (warnings) | 15644 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1080,7 +1080,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/soap/SoapFaultConstruct.php` | 0 | 1 |
 | `ext/soap/VmSoapClient.php` | 0 | 46 |
 | `ext/soap/VmSoapEncoding.php` | 0 | 32 |
-| `ext/soap/VmSoapServer.php` | 0 | 41 |
+| `ext/soap/VmSoapServer.php` | 0 | 40 |
 | `ext/soap/bootstrap_soapfault.php` | 0 | 1 |
 | `ext/soap/is_soap_fault.php` | 0 | 2 |
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
@@ -13246,47 +13246,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/VmSoapServer.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 36)
-- new SoapServerConstruct (line 40)
-- new SoapServerAddFunction (line 45)
-- new SoapServerSetClass (line 46)
-- new SoapServerSetObject (line 47)
-- new SoapServerGetFunctions (line 48)
-- new SoapServerHandle (line 49)
-- new SoapServerFault (line 50)
-- new SoapServerAddSoapHeader (line 51)
-- new SoapServerSetPersistence (line 52)
-- new SoapServerGetLastResponse (line 53)
-- new SoapServerState (line 72)
-- new SoapFault (line 89)
-- new SoapFault (line 155)
-- new SoapFault (line 193)
-- new SoapFault (line 203)
-- new DOMDocument (line 211)
-- new SoapFault (line 213)
-- new DOMXPath (line 215)
-- new SoapFault (line 221)
-- new SoapFault (line 225)
-- new Variable (line 247)
-- new HashTable (line 279)
-- new SoapFault (line 310)
-- new ObjectEntry (line 317)
-- new Variable (line 329)
-- new SoapFault (line 335)
-- new SoapFault (line 476)
-- new DOMDocument (line 478)
-- new SoapFault (line 480)
-- new DOMXPath (line 482)
-- new SoapFault (line 572)
-- new ArgumentCountError (line 589)
-- new ArgumentCountError (line 618)
-- new ArgumentCountError (line 636)
-- new HashTable (line 659)
-- new Variable (line 662)
-- new ArgumentCountError (line 706)
-- new ArgumentCountError (line 725)
-- new ArgumentCountError (line 749)
-- 29 class method(s)
+- new ClassEntry (line 41)
+- new SoapServerConstruct (line 45)
+- new SoapServerAddFunction (line 50)
+- new SoapServerSetClass (line 51)
+- new SoapServerSetObject (line 52)
+- new SoapServerGetFunctions (line 53)
+- new SoapServerHandle (line 54)
+- new SoapServerFault (line 55)
+- new SoapServerAddSoapHeader (line 56)
+- new SoapServerSetPersistence (line 57)
+- new SoapServerGetLastResponse (line 58)
+- new SoapServerState (line 77)
+- new SoapFault (line 94)
+- new SoapFault (line 160)
+- new SoapFault (line 219)
+- new SoapFault (line 240)
+- new DOMDocument (line 248)
+- new SoapFault (line 250)
+- new DOMXPath (line 252)
+- new SoapFault (line 258)
+- new SoapFault (line 262)
+- new Variable (line 284)
+- new HashTable (line 316)
+- new SoapFault (line 347)
+- new ObjectEntry (line 354)
+- new SoapFault (line 373)
+- new SoapFault (line 529)
+- new DOMDocument (line 531)
+- new SoapFault (line 533)
+- new DOMXPath (line 535)
+- new SoapFault (line 632)
+- new ArgumentCountError (line 649)
+- new ArgumentCountError (line 678)
+- new ArgumentCountError (line 696)
+- new HashTable (line 719)
+- new Variable (line 722)
+- new ArgumentCountError (line 766)
+- new ArgumentCountError (line 785)
+- new ArgumentCountError (line 809)
+- 31 class method(s)
 
 ### `ext/soap/bootstrap_soapfault.php`
 
