@@ -78,12 +78,25 @@ final class VmString
      * Z_PARAM_STR typed operands — null TypeError on 8.4 forward profile (#18840, #18980, #19222, #19254, #19318).
      *
      * Distinct from {@see requiresForwardProfileStrictStringNull} (legacy global switch, currently off).
-     * trim/ltrim/rtrim/chop, wordwrap/str_pad, unserialize/substr, and other typed string builtins use
-     * this guard (php-src ext/standard/string.c, var_unserializer.c).
+     * wordwrap/str_pad, unserialize/substr, and other typed string builtins use this guard
+     * (php-src ext/standard/string.c, var_unserializer.c). trim/ltrim/rtrim/chop coerce null with
+     * deprecation on forward profile (php_trim, re-#18850 #19983).
      */
     public static function requiresZparamStrStrictNullOnForwardProfile(): bool
     {
         return version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * trim/ltrim/rtrim/chop $string operand — null coerces with deprecation (#19983, php_trim).
+     */
+    public static function coerceTrimFamilyStringArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): string {
+        return self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName, 'string', false);
     }
 
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";

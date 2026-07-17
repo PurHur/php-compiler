@@ -133,7 +133,7 @@ final class string_rtrim extends Internal
         return string_trim::jitCopySlice($context, $str, $charPtr, $start, $end, $fn);
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19254, ext/standard/string.c). */
+    /** php_trim — null coerces with deprecation on forward profile (#19983, ext/standard/string.c). */
     private static function vmStringArg(
         Frame $frame,
         string $function,
@@ -144,7 +144,7 @@ final class string_rtrim extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, $function, $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             $function,
             $argIndex,
@@ -169,7 +169,7 @@ final class string_rtrim extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             $function,
