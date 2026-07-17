@@ -27,6 +27,9 @@ final class MbstringState
     /** @var list<string> */
     private static array $httpInputList = ['UTF-8'];
 
+    /** Last encoding detected by mb_parse_str() / GPC handler (MBSTRG(http_input_identify)). */
+    private static ?string $httpInputIdentify = null;
+
     /** @var list<string> */
     private static array $detectOrder = ['ASCII', 'UTF-8'];
 
@@ -88,7 +91,7 @@ final class MbstringState
     public static function httpInput(?string $type = null): string|array|bool
     {
         if (null === $type) {
-            return false;
+            return self::$httpInputIdentify ?? false;
         }
         if (1 !== strlen($type)) {
             throw new \ValueError(
@@ -101,6 +104,7 @@ final class MbstringState
             case 'P':
             case 'C':
             case 'S':
+                // Per-source identify slots (get/post/cookie/string) — unset until GPC handlers land.
                 return false;
             case 'I':
                 return self::$httpInputList;
@@ -115,6 +119,17 @@ final class MbstringState
                     'mb_http_input(): Argument #1 ($type) must be one of "G", "P", "C", "S", "I", or "L"'
                 );
         }
+    }
+
+    /** @param ?string $encoding Canonical encoding name, or null to clear (empty mb_parse_str). */
+    public static function setHttpInputIdentify(?string $encoding): void
+    {
+        self::$httpInputIdentify = $encoding;
+    }
+
+    public static function httpInputIdentify(): ?string
+    {
+        return self::$httpInputIdentify;
     }
 
     public static function httpOutput(?string $encoding = null): string|bool

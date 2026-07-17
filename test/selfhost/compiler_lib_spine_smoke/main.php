@@ -50,6 +50,8 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -745,6 +747,7 @@ require_once __DIR__.'/../../../ext/mbstring/JitMbCheckEncoding.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbConvertCase.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbMimeheader.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbNumericEntity.php';
+require_once __DIR__.'/../../../ext/mbstring/JitMbParseStr.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbScrub.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbSearch.php';
 require_once __DIR__.'/../../../ext/mbstring/JitMbStrPad.php';
@@ -764,6 +767,7 @@ require_once __DIR__.'/../../../ext/mbstring/MbstringState.php';
 require_once __DIR__.'/../../../ext/mbstring/Module.php';
 require_once __DIR__.'/../../../ext/mbstring/Utf8CaseMap.php';
 require_once __DIR__.'/../../../ext/mbstring/VmMbConvertVariables.php';
+require_once __DIR__.'/../../../ext/mbstring/VmMbParseStr.php';
 require_once __DIR__.'/../../../ext/mbstring/VmMbstring.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_check_encoding.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_chr.php';
@@ -799,6 +803,7 @@ require_once __DIR__.'/../../../ext/mbstring/mb_lcfirst.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_list_encodings.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_ltrim.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_ord.php';
+require_once __DIR__.'/../../../ext/mbstring/mb_parse_str.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_preferred_mime_name.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_regex_encoding.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_regex_set_options.php';
@@ -5424,6 +5429,9 @@ require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterWriteRaw.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterToMemory.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterToStream.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterToUri.php';
+require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartAttributeNS.php';
+require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartElementNS.php';
+require_once __DIR__.'/../../../ext/intl/VmSpoofchecker.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -5456,6 +5464,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartAttributeNS.php';
-require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartElementNS.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
