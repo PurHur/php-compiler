@@ -492,7 +492,7 @@ final class VmSimpleXml
             /** @var string $first */
             $first = array_key_first($attrs);
 
-            return $first;
+            return self::localNameFromQualified($first);
         }
         if (SimpleXmlRegistry::isView($entry)) {
             $view = SimpleXmlRegistry::view($entry);
@@ -500,10 +500,17 @@ final class VmSimpleXml
                 return '';
             }
 
-            return $view[0]->name;
+            return self::localNameFromQualified($view[0]->name);
         }
 
-        return SimpleXmlRegistry::state($entry)->name;
+        return self::localNameFromQualified(SimpleXmlRegistry::state($entry)->name);
+    }
+
+    private static function localNameFromQualified(string $qualifiedName): string
+    {
+        $colon = strpos($qualifiedName, ':');
+
+        return false === $colon ? $qualifiedName : substr($qualifiedName, $colon + 1);
     }
 
     public static function children(Context $ctx, ObjectEntry $entry, ?string $namespaceOrPrefix = null, bool $isPrefix = true): ObjectEntry
@@ -513,8 +520,14 @@ final class VmSimpleXml
         }
 
         $elements = self::directElementChildren($entry);
-        if (null !== $namespaceOrPrefix && '' !== $namespaceOrPrefix) {
-            $elements = self::filterChildrenByNamespace($elements, $namespaceOrPrefix, $isPrefix, $entry);
+        $scope = self::inScopeNamespacesForEntry($entry);
+        if (null === $namespaceOrPrefix) {
+            $elements = array_values(array_filter(
+                $elements,
+                static fn (SimpleXmlNodeState $element): bool => '' === self::resolveElementNamespaceUri($element, $scope)
+            ));
+        } elseif ('' !== $namespaceOrPrefix) {
+            $elements = self::filterChildrenByNamespace($elements, $namespaceOrPrefix, $isPrefix, $entry, $scope);
         }
 
         return self::wrapView($ctx, $entry->class, $elements, SimpleXmlRegistry::documentKey($entry));
@@ -921,18 +934,17 @@ final class VmSimpleXml
         array $elements,
         string $namespaceOrPrefix,
         bool $isPrefix,
-        ObjectEntry $entry
+        ObjectEntry $entry,
+        ?array $parentScope = null
     ): array {
-        $namespaces = SimpleXmlRegistry::xpathNamespaces($entry);
-        $targetUri = $isPrefix ? ($namespaces[$namespaceOrPrefix] ?? $namespaceOrPrefix) : $namespaceOrPrefix;
+        $namespaces = $parentScope ?? self::inScopeNamespacesForEntry($entry);
+        $map = array_merge($namespaces, SimpleXmlRegistry::xpathNamespaces($entry));
+        // php-src: unknown prefix with isPrefix=true falls back to URI match (same as children()).
+        $targetUri = $isPrefix ? ($map[$namespaceOrPrefix] ?? $namespaceOrPrefix) : $namespaceOrPrefix;
         $out = [];
         foreach ($elements as $element) {
-            $elementUri = self::elementNamespaceUri($element);
-            if ($isPrefix) {
-                if (($namespaces[$namespaceOrPrefix] ?? null) === $targetUri || $elementUri === $targetUri) {
-                    $out[] = $element;
-                }
-            } elseif ($elementUri === $targetUri) {
+            $elementUri = self::resolveElementNamespaceUri($element, $namespaces);
+            if ($elementUri === $targetUri) {
                 $out[] = $element;
             }
         }
@@ -940,8 +952,56 @@ final class VmSimpleXml
         return $out;
     }
 
-    /** Namespace URI declared on an element (default xmlns or xmlns:prefix on the tag). */
-    private static function elementNamespaceUri(SimpleXmlNodeState $element): string
+    /** @return array<string, string> prefix => namespace URI in scope on $entry's node(s) */
+    private static function inScopeNamespacesForEntry(ObjectEntry $entry): array
+    {
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            return self::namespaceMapForEntry($entry);
+        }
+
+        $docKey = SimpleXmlRegistry::documentKey($entry);
+        $root = SimpleXmlRegistry::rootState($docKey);
+        $nodes = SimpleXmlRegistry::isView($entry) ? SimpleXmlRegistry::view($entry) : [SimpleXmlRegistry::state($entry)];
+        $merged = [];
+        foreach ($nodes as $node) {
+            $scope = self::namespacesAtNodeWalk($root, $node, []);
+            if (null === $scope) {
+                continue;
+            }
+            foreach ($scope as $prefix => $uri) {
+                $merged[$prefix] = $uri;
+            }
+        }
+
+        return $merged;
+    }
+
+    /** @param array<string, string> $inScope */
+    private static function namespacesAtNodeWalk(SimpleXmlNodeState $node, SimpleXmlNodeState $target, array $inScope): ?array
+    {
+        $scope = $inScope;
+        foreach ($node->attributes as $name => $value) {
+            if ('xmlns' === $name) {
+                $scope[''] = $value;
+            } elseif (str_starts_with($name, 'xmlns:')) {
+                $scope[substr($name, 6)] = $value;
+            }
+        }
+        if ($node === $target) {
+            return $scope;
+        }
+        foreach ($node->children as $child) {
+            $found = self::namespacesAtNodeWalk($child, $target, $scope);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    /** Namespace URI for an element name in the given in-scope xmlns map (php-src sxe_children). */
+    private static function resolveElementNamespaceUri(SimpleXmlNodeState $element, array $inScope): string
     {
         if (isset($element->attributes['xmlns'])) {
             return $element->attributes['xmlns'];
@@ -949,12 +1009,16 @@ final class VmSimpleXml
         $colon = strpos($element->name, ':');
         if (false !== $colon) {
             $prefix = substr($element->name, 0, $colon);
-            if ('' !== $prefix && isset($element->attributes['xmlns:'.$prefix])) {
-                return $element->attributes['xmlns:'.$prefix];
+            if ('' !== $prefix) {
+                if (isset($element->attributes['xmlns:'.$prefix])) {
+                    return $element->attributes['xmlns:'.$prefix];
+                }
+
+                return $inScope[$prefix] ?? '';
             }
         }
 
-        return '';
+        return $inScope[''] ?? '';
     }
 
     /** @param array<string, string> $attributes */
