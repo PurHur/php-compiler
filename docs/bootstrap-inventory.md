@@ -3368,9 +3368,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/xml_set_unparsed_entity_decl_handler.php` | 0 | 2 |
 | `ext/xmlreader/BuiltinClasses.php` | 0 | 1 |
 | `ext/xmlreader/Module.php` | 0 | 1 |
-| `ext/xmlreader/VmXmlReader.php` | 0 | 12 |
+| `ext/xmlreader/VmXmlReader.php` | 0 | 14 |
 | `ext/xmlreader/XmlReaderClose.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderConstants.php` | 0 | 1 |
+| `ext/xmlreader/XmlReaderExpand.php` | 0 | 3 |
+| `ext/xmlreader/XmlReaderExpandHelper.php` | 0 | 1 |
 | `ext/xmlreader/XmlReaderGetAttribute.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderIsValid.php` | 0 | 3 |
 | `ext/xmlreader/XmlReaderOpen.php` | 0 | 4 |
@@ -27645,18 +27647,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xmlreader/VmXmlReader.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 47)
-- new XmlReaderOpen (line 48)
-- new XmlReaderXML (line 51)
-- new XmlReaderRead (line 54)
-- new XmlReaderClose (line 57)
-- new XmlReaderGetAttribute (line 60)
-- new XmlReaderIsValid (line 63)
-- new Variable (line 68)
-- new ObjectEntry (line 109)
-- new XmlReaderState (line 163)
-- new XmlReaderEvent (line 452)
-- 26 class method(s)
+- new ClassEntry (line 48)
+- new XmlReaderOpen (line 49)
+- new XmlReaderXML (line 52)
+- new XmlReaderRead (line 55)
+- new XmlReaderClose (line 58)
+- new XmlReaderGetAttribute (line 61)
+- new XmlReaderIsValid (line 64)
+- new XmlReaderExpand (line 67)
+- new Variable (line 72)
+- new ObjectEntry (line 113)
+- new XmlReaderState (line 167)
+- new Error (line 241)
+- new XmlReaderEvent (line 501)
+- 28 class method(s)
 
 ### `ext/xmlreader/XmlReaderClose.php`
 
@@ -27669,6 +27673,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/xmlreader/XmlReaderExpand.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlreader/XmlReaderExpandHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/xmlreader/XmlReaderGetAttribute.php`
 

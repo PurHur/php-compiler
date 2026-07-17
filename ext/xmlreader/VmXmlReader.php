@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlreader;
 
+use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\Frame;
@@ -63,6 +64,9 @@ final class VmXmlReader
         $entry->methods['isvalid'] = new XmlReaderIsValid();
         $entry->methodVisibility['isvalid'] = $pub;
         $entry->methodNames['isvalid'] = 'isValid';
+        $entry->methods['expand'] = new XmlReaderExpand();
+        $entry->methodVisibility['expand'] = $pub;
+        $entry->methodNames['expand'] = 'expand';
 
         foreach (XmlReaderConstants::classConstants() as $name => $value) {
             $var = new Variable(Variable::TYPE_INTEGER);
@@ -219,6 +223,51 @@ final class VmXmlReader
     public static function isValid(ObjectEntry $entry): bool
     {
         return XmlReaderRegistry::state($entry)->valid;
+    }
+
+    /**
+     * XMLReader::expand() — php-src zim_XMLReader_expand / xmlTextReaderExpand (#19394).
+     *
+     * @return ObjectEntry|false
+     */
+    public static function expand(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?ObjectEntry $baseNode = null,
+        ?Frame $frame = null
+    ): ObjectEntry|false {
+        self::requireClass($entry, 'XMLReader::expand()');
+        if (!XmlReaderRegistry::has($entry)) {
+            throw new \Error('Data must be loaded before expanding');
+        }
+        if (null !== $baseNode && !VmDom::isDomNode($baseNode)) {
+            throw new \TypeError(
+                'XMLReader::expand(): Argument #1 ($baseNode) must be of type ?DOMNode, '
+                .$baseNode->class->name.' given'
+            );
+        }
+        $ownerDocument = self::resolveExpandDocument($baseNode);
+        $state = XmlReaderRegistry::state($entry);
+        $node = XmlReaderExpandHelper::expandAt($ctx, $state->events, $state->position, $ownerDocument);
+        if (false === $node) {
+            self::warn($ctx, 'XMLReader::expand(): An Error Occurred while expanding', $frame);
+
+            return false;
+        }
+
+        return $node;
+    }
+
+    private static function resolveExpandDocument(?ObjectEntry $baseNode): ?ObjectEntry
+    {
+        if (null === $baseNode) {
+            return null;
+        }
+        if (VmDom::isDocument($baseNode)) {
+            return $baseNode;
+        }
+
+        return VmDom::ownerDocumentEntry($baseNode);
     }
 
     public static function requireReader(ObjectEntry $entry, string $label): ObjectEntry
