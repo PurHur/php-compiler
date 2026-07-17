@@ -6,11 +6,11 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InternalStrictArg;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** Shared VM argument parsing for ext/zlib builtins (php-src ext/zlib/zlib.c, issue #4497). */
@@ -54,6 +54,29 @@ final class VmZlibArg
     public static function resolveFilenameString(Frame $frame, string $function, int $argIndex = 0): string
     {
         return InternalStrictArg::resolveCoercibleStringArg($frame, $argIndex, $function, 'filename');
+    }
+
+    /**
+     * Z_PARAM_LONG $encoding for inflate_init()/deflate_init() — null coerces to 0, then ValueError
+     * when invalid (php-src ext/zlib/zlib.c; #19915).
+     */
+    public static function parseEncodingZParamForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName = 'encoding'
+    ): int {
+        // php-src ext/zlib/zlib.c Z_PARAM_LONG — null coerces to 0 even under caller strict_types (#19915).
+        $var = $frame->calledArgs[$argIndex];
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_FLOAT === $resolved->type && null !== $frame->vmContext) {
+            VmMath::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
+        }
+        $encoding = VmMath::parseZParamLongBuiltinArg($var, $function, $userArgIndex, $paramName);
+        VmZlibContext::assertValidEncoding($encoding, $function, $userArgIndex, $paramName);
+
+        return $encoding;
     }
 
     public static function requireInt(
