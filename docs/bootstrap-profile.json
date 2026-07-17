@@ -435,6 +435,7 @@
         "ext/ftp/VmFtpCore.php",
         "ext/ftp/ftp_alloc.php",
         "ext/ftp/ftp_append.php",
+        "ext/ftp/ftp_cdup.php",
         "ext/ftp/ftp_chdir.php",
         "ext/ftp/ftp_chmod.php",
         "ext/ftp/ftp_close.php",
@@ -455,6 +456,7 @@
         "ext/ftp/ftp_nlist.php",
         "ext/ftp/ftp_pasv.php",
         "ext/ftp/ftp_put.php",
+        "ext/ftp/ftp_pwd.php",
         "ext/ftp/ftp_raw.php",
         "ext/ftp/ftp_rawlist.php",
         "ext/ftp/ftp_set_option.php",
@@ -5742,9 +5744,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5508,
+        "inventory_files": 5510,
         "excluded": 0,
-        "eligible": 5508,
+        "eligible": 5510,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

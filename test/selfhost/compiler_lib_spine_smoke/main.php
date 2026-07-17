@@ -488,8 +488,10 @@ require_once __DIR__.'/../../../ext/ftp/VmFtpConnection.php';
 require_once __DIR__.'/../../../ext/ftp/VmFtpCore.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_alloc.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_append.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_cdup.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_chdir.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_chmod.php';
+
 require_once __DIR__.'/../../../ext/ftp/ftp_close.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_connect.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_delete.php';
@@ -508,6 +510,7 @@ require_once __DIR__.'/../../../ext/ftp/ftp_nb_put.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_nlist.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_pasv.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_put.php';
+require_once __DIR__.'/../../../ext/ftp/ftp_pwd.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_raw.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_rawlist.php';
 require_once __DIR__.'/../../../ext/ftp/ftp_set_option.php';
