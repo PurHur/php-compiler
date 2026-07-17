@@ -17,9 +17,7 @@ final class inflate_add extends ZlibIncrementalFunction
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('inflate_add() expects two or three arguments in this compiler build');
-        }
+        $this->requireArgCountBetween($argc, 2, 3);
         $ctx = VmZlibContext::requireZlibContext(
             $frame->calledArgs[0],
             'inflate_add',
