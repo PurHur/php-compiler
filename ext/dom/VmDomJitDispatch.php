@@ -303,6 +303,33 @@ final class VmDomJitDispatch
     }
 
     /**
+     * DOMElement::setIdAttributeNode() — JIT/AOT (#20123, php-src ext/dom/element.c).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function setIdAttributeNode(ObjectEntry $element, array $extra): Variable
+    {
+        $attrVar = ($extra[0] ?? self::missingArg('setIdAttributeNode', 0))->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $attrVar->type) {
+            throw new \TypeError('DOMElement::setIdAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');
+        }
+        $attr = VariableObject::entry($attrVar);
+        if (!VmDom::isAttr($attr)) {
+            throw new \TypeError('DOMElement::setIdAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');
+        }
+        $isId = self::optionalBoolArg(
+            $extra[1] ?? self::missingArg('setIdAttributeNode', 1),
+            'setIdAttributeNode',
+            1
+        );
+        VmDom::setIdAttributeNode($element, $attr, $isId);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
      * @param list<Variable> $extra
      */
     public static function tokenListAdd(VmContext $ctx, ObjectEntry $tokenList, array $extra): Variable
