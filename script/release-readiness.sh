@@ -253,7 +253,8 @@ release_readiness_collect_honest_compile_metric() {
   fi
   local metric_out
   metric_out="$("${_CI_SCRIPT_DIR}/bootstrap-honest-compile-metric.sh" "${metric_args[@]}" 2>/dev/null)" || true
-  if [[ -n "${metric_out}" ]] && php -r 'exit json_decode($argv[1], true) === null ? 1 : 0;' "${metric_out}"; then
+  # exit(...) needs parens — bare `exit json_decode(...)` is a parse error on PHP 8.2+
+  if [[ -n "${metric_out}" ]] && php -r 'exit(json_decode($argv[1], true) === null ? 1 : 0);' "${metric_out}"; then
     HONEST_COMPILE_JSON="${metric_out}"
     return 0
   fi

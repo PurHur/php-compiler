@@ -5313,4 +5313,19 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/redis/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/redis/Module.php';
+require_once __DIR__.'/../../../ext/redis/RedisClassMethod.php';
+require_once __DIR__.'/../../../ext/redis/RedisClose.php';
+require_once __DIR__.'/../../../ext/redis/RedisConnect.php';
+require_once __DIR__.'/../../../ext/redis/RedisConstants.php';
+require_once __DIR__.'/../../../ext/redis/RedisConstruct.php';
+require_once __DIR__.'/../../../ext/redis/RedisExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/redis/RedisGet.php';
+require_once __DIR__.'/../../../ext/redis/RedisSet.php';
+require_once __DIR__.'/../../../ext/redis/RedisState.php';
+require_once __DIR__.'/../../../ext/redis/VmRedis.php';
+require_once __DIR__.'/../../../ext/redis/VmRedisNative.php';
+require_once __DIR__.'/../../../ext/redis/bootstrap_redisexception.php';
+require_once __DIR__.'/../../../ext/standard/VmDebugPropertyName.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
