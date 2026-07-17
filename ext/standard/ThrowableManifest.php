@@ -147,6 +147,7 @@ final class ThrowableManifest
         'DOMException' => 'Exception',
         'SodiumException' => 'Exception',
         'SQLite3Exception' => 'Exception',
+        'PDOException' => 'RuntimeException',
         'RedisException' => 'Exception',
     ];
 
@@ -185,6 +186,7 @@ final class ThrowableManifest
         'DOMException' => \DOMException::class,
         'SodiumException' => \SodiumException::class,
         'SQLite3Exception' => 'SQLite3Exception',
+        'PDOException' => 'PDOException',
         'RedisException' => 'RedisException',
     ];
 
@@ -210,6 +212,7 @@ final class ThrowableManifest
             'DateRangeError' => CompilerVersion::advertisesDateExceptionHierarchy(),
             'RequestParseBodyException' => CompilerVersion::advertisesRequestParseBodyExceptionClass(),
             'SQLite3Exception' => \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExceptionClass(),
+            'PDOException' => \PHPCompiler\ext\pdo\PdoExtensionPolicy::advertisesExceptionClass(),
             'RedisException' => \PHPCompiler\ext\redis\RedisExtensionPolicy::advertisesExtension(),
             default => true,
         };
