@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5315 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14829 |
+| Source constructs flagged (warnings) | 14827 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1166,7 +1166,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplFileObjectStorage.php` | 0 | 1 |
 | `ext/spl/SplFixedArrayBuiltin.php` | 0 | 35 |
 | `ext/spl/SplFixedArraySerializeSupport.php` | 0 | 3 |
-| `ext/spl/SplHeapBuiltin.php` | 0 | 48 |
+| `ext/spl/SplHeapBuiltin.php` | 0 | 46 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 3 |
 | `ext/spl/SplLegacySerializableMethods.php` | 0 | 5 |
 | `ext/spl/SplObjectStorageBuiltin.php` | 0 | 36 |
@@ -13762,54 +13762,52 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplHeapBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 48)
-- new SplHeapConstruct (line 57)
-- new SplHeapCompareAbstract (line 60)
-- new SplHeapDebugInfo (line 80)
-- new Variable (line 110)
-- new Variable (line 130)
-- new Variable (line 142)
-- new HashTable (line 201)
-- new Variable (line 203)
-- new Variable (line 207)
-- new Variable (line 213)
-- new Variable (line 217)
-- new HashTable (line 218)
-- new ClassEntry (line 303)
-- new SplMinHeapConstruct (line 307)
-- new SplMinHeapCompare (line 310)
-- new ClassEntry (line 333)
-- new SplMaxHeapConstruct (line 337)
-- new SplMaxHeapCompare (line 340)
-- new ClassEntry (line 373)
-- new SplPriorityQueueConstruct (line 379)
-- new SplPriorityQueueDebugInfo (line 406)
-- new Variable (line 447)
-- new Variable (line 449)
-- new HashTable (line 535)
-- new Variable (line 537)
-- new Variable (line 541)
-- new HashTable (line 547)
-- new Variable (line 548)
-- new Variable (line 551)
-- new Variable (line 554)
-- new Variable (line 558)
-- new HashTable (line 559)
-- new Variable (line 574)
+- new ClassEntry (line 54)
+- new SplHeapCompareAbstract (line 66)
+- new SplHeapDebugInfo (line 86)
+- new Variable (line 125)
+- new Variable (line 146)
+- new Variable (line 159)
+- new HashTable (line 227)
+- new Variable (line 229)
+- new Variable (line 233)
+- new Variable (line 239)
+- new Variable (line 243)
+- new HashTable (line 244)
+- new ClassEntry (line 348)
+- new SplMinHeapConstruct (line 352)
+- new SplMinHeapCompare (line 355)
+- new ClassEntry (line 378)
+- new SplMaxHeapConstruct (line 382)
+- new SplMaxHeapCompare (line 385)
+- new ClassEntry (line 418)
+- new SplPriorityQueueConstruct (line 424)
+- new SplPriorityQueueDebugInfo (line 451)
+- new Variable (line 492)
+- new Variable (line 494)
 - new HashTable (line 580)
-- new Variable (line 581)
-- new Variable (line 583)
-- new Variable (line 587)
-- new Variable (line 592)
-- new Error (line 719)
-- new Error (line 732)
-- new ArgumentCountError (line 775)
-- new ArgumentCountError (line 795)
-- new ArgumentCountError (line 815)
-- new ArgumentCountError (line 1005)
-- new ArgumentCountError (line 1107)
-- new ArgumentCountError (line 1267)
-- 79 class method(s)
+- new Variable (line 582)
+- new Variable (line 586)
+- new HashTable (line 592)
+- new Variable (line 593)
+- new Variable (line 596)
+- new Variable (line 599)
+- new Variable (line 603)
+- new HashTable (line 604)
+- new Variable (line 619)
+- new HashTable (line 625)
+- new Variable (line 626)
+- new Variable (line 628)
+- new Variable (line 632)
+- new Variable (line 637)
+- new Error (line 764)
+- new ArgumentCountError (line 807)
+- new ArgumentCountError (line 827)
+- new ArgumentCountError (line 847)
+- new ArgumentCountError (line 1037)
+- new ArgumentCountError (line 1139)
+- new ArgumentCountError (line 1299)
+- 80 class method(s)
 
 ### `ext/spl/SplIteratorSupport.php`
 
