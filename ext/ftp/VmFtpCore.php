@@ -345,6 +345,128 @@ final class VmFtpCore
         return $ok;
     }
 
+    public static function pasv(ObjectEntry $connection, bool $enable): bool
+    {
+        self::ensureLive($connection, 'ftp_pasv');
+        $hostConn = self::requireHostConn($connection, 'ftp_pasv');
+
+        return (bool) @\ftp_pasv($hostConn, $enable);
+    }
+
+    public static function get(
+        ObjectEntry $connection,
+        string $localFile,
+        string $remoteFile,
+        int $mode,
+        int $offset
+    ): bool {
+        self::ensureLive($connection, 'ftp_get');
+        $hostConn = self::requireHostConn($connection, 'ftp_get');
+
+        return (bool) @\ftp_get($hostConn, $localFile, $remoteFile, $mode, $offset);
+    }
+
+    public static function put(
+        ObjectEntry $connection,
+        string $remoteFile,
+        string $localFile,
+        int $mode,
+        int $offset
+    ): bool {
+        self::ensureLive($connection, 'ftp_put');
+        $hostConn = self::requireHostConn($connection, 'ftp_put');
+
+        return (bool) @\ftp_put($hostConn, $remoteFile, $localFile, $mode, $offset);
+    }
+
+    /**
+     * @return HashTable|false
+     */
+    public static function nlist(ObjectEntry $connection, string $directory): HashTable|false
+    {
+        self::ensureLive($connection, 'ftp_nlist');
+        $hostConn = self::requireHostConn($connection, 'ftp_nlist');
+        $rows = @\ftp_nlist($hostConn, $directory);
+        if (false === $rows || !\is_array($rows)) {
+            return false;
+        }
+
+        return self::stringListToHashTable($rows);
+    }
+
+    /**
+     * @return HashTable|false
+     */
+    public static function rawlist(ObjectEntry $connection, string $directory, bool $recursive): HashTable|false
+    {
+        self::ensureLive($connection, 'ftp_rawlist');
+        $hostConn = self::requireHostConn($connection, 'ftp_rawlist');
+        $rows = @\ftp_rawlist($hostConn, $directory, $recursive);
+        if (false === $rows || !\is_array($rows)) {
+            return false;
+        }
+
+        return self::stringListToHashTable($rows);
+    }
+
+    public static function chdir(ObjectEntry $connection, string $directory): bool
+    {
+        self::ensureLive($connection, 'ftp_chdir');
+        $hostConn = self::requireHostConn($connection, 'ftp_chdir');
+
+        return (bool) @\ftp_chdir($hostConn, $directory);
+    }
+
+    public static function mkdir(ObjectEntry $connection, string $directory): string|false
+    {
+        self::ensureLive($connection, 'ftp_mkdir');
+        $hostConn = self::requireHostConn($connection, 'ftp_mkdir');
+        $result = @\ftp_mkdir($hostConn, $directory);
+
+        return false === $result ? false : (string) $result;
+    }
+
+    public static function delete(ObjectEntry $connection, string $filename): bool
+    {
+        self::ensureLive($connection, 'ftp_delete');
+        $hostConn = self::requireHostConn($connection, 'ftp_delete');
+
+        return (bool) @\ftp_delete($hostConn, $filename);
+    }
+
+    public static function size(ObjectEntry $connection, string $filename): int
+    {
+        self::ensureLive($connection, 'ftp_size');
+        $hostConn = self::requireHostConn($connection, 'ftp_size');
+
+        return (int) @\ftp_size($hostConn, $filename);
+    }
+
+    public static function mdtm(ObjectEntry $connection, string $filename): int
+    {
+        self::ensureLive($connection, 'ftp_mdtm');
+        $hostConn = self::requireHostConn($connection, 'ftp_mdtm');
+
+        return (int) @\ftp_mdtm($hostConn, $filename);
+    }
+
+    /**
+     * @param list<string> $rows
+     */
+    private static function stringListToHashTable(array $rows): HashTable
+    {
+        $ht = new HashTable();
+        $i = 0;
+        foreach ($rows as $row) {
+            $slot = new Variable();
+            $slot->string((string) $row);
+            $ht->add($i, $slot);
+            ++$i;
+        }
+
+        return $ht;
+    }
+
     public static function isConnectionObject(?ObjectEntry $object): bool
     {
         return null !== $object && VmFtpConnection::CLASS_LC === strtolower($object->class->name);

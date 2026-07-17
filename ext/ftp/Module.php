@@ -66,6 +66,16 @@ class Module extends ModuleAbstract
             new ftp_nb_fget(),
             new ftp_nb_get(),
             new ftp_nb_put(),
+            new ftp_pasv(),
+            new ftp_get(),
+            new ftp_put(),
+            new ftp_nlist(),
+            new ftp_rawlist(),
+            new ftp_chdir(),
+            new ftp_mkdir(),
+            new ftp_delete(),
+            new ftp_size(),
+            new ftp_mdtm(),
         ];
     }
 }
