@@ -18,6 +18,7 @@ final class SplFileObjectStorage
     /**
      * @var array<int, array{
      *     handle: int,
+     *     openMode: string,
      *     currentLine: string|null,
      *     currentCsv: list<string|null>|null,
      *     lineNum: int,
@@ -30,10 +31,11 @@ final class SplFileObjectStorage
      */
     private static array $state = [];
 
-    public static function setHandle(ObjectEntry $object, int $handle): void
+    public static function setHandle(ObjectEntry $object, int $handle, string $openMode = 'r'): void
     {
         self::$state[$object->id] = [
             'handle' => $handle,
+            'openMode' => $openMode,
             'currentLine' => null,
             'currentCsv' => null,
             'lineNum' => 0,
@@ -43,6 +45,11 @@ final class SplFileObjectStorage
             'enclosure' => '"',
             'escape' => '\\',
         ];
+    }
+
+    public static function openMode(ObjectEntry $object): string
+    {
+        return self::state($object)['openMode'];
     }
 
     public static function handle(ObjectEntry $object): int

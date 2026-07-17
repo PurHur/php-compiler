@@ -13,6 +13,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -72,6 +73,7 @@ final class SplFileInfoBuiltin
             'openfile' => SplFileInfoOpenFile::class,
             'setfileclass' => SplFileInfoSetFileClass::class,
             'setinfoclass' => SplFileInfoSetInfoClass::class,
+            '__debuginfo' => SplFileInfoDebugInfo::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -99,6 +101,7 @@ final class SplFileInfoBuiltin
         $entry->methodNames['openfile'] = 'openFile';
         $entry->methodNames['setfileclass'] = 'setFileClass';
         $entry->methodNames['setinfoclass'] = 'setInfoClass';
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -120,8 +123,42 @@ final class SplFileInfoBuiltin
             $entry->methods['getpathinfo'],
             $entry->methods['openfile'],
             $entry->methods['setfileclass'],
-            $entry->methods['setinfoclass']
+            $entry->methods['setinfoclass'],
+            $entry->methods['__debuginfo']
         );
+    }
+
+    /**
+     * Private pathName/fileName (+ SplFileObject openMode/delimiter/enclosure)
+     * for var_dump (php-src spl_filesystem_object_get_debug_info; #20108).
+     */
+    public static function debugInfoTable(ObjectEntry $object): HashTable
+    {
+        $ht = new HashTable();
+        $pathname = SplFileInfoStorage::pathname($object);
+        $pathName = new Variable();
+        $pathName->string($pathname);
+        $ht->addNew("\0SplFileInfo\0pathName", $pathName);
+
+        $fileName = new Variable();
+        $fileName->string(VmString::basename($pathname));
+        $ht->addNew("\0SplFileInfo\0fileName", $fileName);
+
+        if (SplFileObjectStorage::hasHandle($object)) {
+            $openMode = new Variable();
+            $openMode->string(SplFileObjectStorage::openMode($object));
+            $ht->addNew("\0SplFileObject\0openMode", $openMode);
+
+            [$separator, $enclosure] = SplFileObjectStorage::getCsvControl($object);
+            $delim = new Variable();
+            $delim->string($separator);
+            $ht->addNew("\0SplFileObject\0delimiter", $delim);
+            $encl = new Variable();
+            $encl->string($enclosure);
+            $ht->addNew("\0SplFileObject\0enclosure", $encl);
+        }
+
+        return $ht;
     }
 
     /**
@@ -234,7 +271,7 @@ final class SplFileInfoBuiltin
             $obj = new ObjectEntry($ce);
             $obj->constructed = true;
             SplFileInfoStorage::init($obj, $pathname);
-            SplFileObjectStorage::setHandle($obj, $handle);
+            SplFileObjectStorage::setHandle($obj, $handle, $mode);
 
             return $obj;
         }
@@ -1074,5 +1111,27 @@ final class SplFileInfoSetInfoClass extends VmClassMethod
             SplFileInfoBuiltin::CLASS_LC
         );
         SplFileInfoStorage::setInfoClassLc($object, strtolower(ltrim($ce->name, '\\')));
+    }
+}
+
+/** php-src SplFileInfo::__debugInfo — spl_filesystem_object_get_debug_info (#20108). */
+final class SplFileInfoDebugInfo extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__debugInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::__debugInfo()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(SplFileInfoBuiltin::debugInfoTable($object));
     }
 }
