@@ -76,6 +76,15 @@ final class VmXmlReader
         $entry->methods['expand'] = new XmlReaderExpand();
         $entry->methodVisibility['expand'] = $pub;
         $entry->methodNames['expand'] = 'expand';
+        $entry->methods['readinnerxml'] = new XmlReaderReadInnerXml();
+        $entry->methodVisibility['readinnerxml'] = $pub;
+        $entry->methodNames['readinnerxml'] = 'readInnerXml';
+        $entry->methods['readouterxml'] = new XmlReaderReadOuterXml();
+        $entry->methodVisibility['readouterxml'] = $pub;
+        $entry->methodNames['readouterxml'] = 'readOuterXml';
+        $entry->methods['readstring'] = new XmlReaderReadString();
+        $entry->methodVisibility['readstring'] = $pub;
+        $entry->methodNames['readstring'] = 'readString';
         $entry->methods['movetoattribute'] = new XmlReaderMoveToAttribute();
         $entry->methodVisibility['movetoattribute'] = $pub;
         $entry->methodNames['movetoattribute'] = 'moveToAttribute';
@@ -543,6 +552,73 @@ final class VmXmlReader
     public static function isValid(ObjectEntry $entry): bool
     {
         return XmlReaderRegistry::state($entry)->valid;
+    }
+
+    /**
+     * XMLReader::readInnerXml() — php-src zim_XMLReader_readInnerXml (#19411).
+     */
+    public static function readInnerXml(ObjectEntry $entry): string
+    {
+        self::requireClass($entry, 'XMLReader::readInnerXml()');
+        $position = self::subtreePosition($entry);
+        if (null === $position) {
+            return '';
+        }
+        $state = XmlReaderRegistry::state($entry);
+
+        return XmlReaderSubtreeXmlHelper::innerXml($state->events, $position);
+    }
+
+    /**
+     * XMLReader::readOuterXml() — php-src zim_XMLReader_readOuterXml (#19411).
+     *
+     * Attribute cursor uses the parent element position (php-src).
+     */
+    public static function readOuterXml(ObjectEntry $entry): string
+    {
+        self::requireClass($entry, 'XMLReader::readOuterXml()');
+        $position = self::subtreePosition($entry);
+        if (null === $position) {
+            return '';
+        }
+        $state = XmlReaderRegistry::state($entry);
+
+        return XmlReaderSubtreeXmlHelper::outerXml($state->events, $position);
+    }
+
+    /**
+     * XMLReader::readString() — php-src zim_XMLReader_readString (#19411).
+     */
+    public static function readString(ObjectEntry $entry): string
+    {
+        self::requireClass($entry, 'XMLReader::readString()');
+        $position = self::subtreePosition($entry);
+        if (null === $position) {
+            return '';
+        }
+        $state = XmlReaderRegistry::state($entry);
+        // Attribute nodes: php-src returns "" (unimplemented block warning on some builds).
+        if (null !== $state->attributeIndex) {
+            return '';
+        }
+
+        return XmlReaderSubtreeXmlHelper::readString($state->events, $position);
+    }
+
+    /**
+     * Event index for subtree APIs, or null when the reader has no current node.
+     */
+    private static function subtreePosition(ObjectEntry $entry): ?int
+    {
+        if (!XmlReaderRegistry::has($entry)) {
+            return null;
+        }
+        $state = XmlReaderRegistry::state($entry);
+        if ($state->closed || null === $state->current || $state->position < 0) {
+            return null;
+        }
+
+        return $state->position;
     }
 
     /**
