@@ -270,6 +270,7 @@
         "ext/dom/JitDomAttributeNodeNS.php",
         "ext/dom/JitDomC14N.php",
         "ext/dom/JitDomCreateComment.php",
+        "ext/dom/JitDomCreateDocumentType.php",
         "ext/dom/JitDomCreateElement.php",
         "ext/dom/JitDomCreateElementNS.php",
         "ext/dom/JitDomCreateTextNode.php",
@@ -4340,6 +4341,7 @@
         "lib/JIT/Call/DomElementSetAttribute.php",
         "lib/JIT/Call/DomElementSetAttributeNodeNS.php",
         "lib/JIT/Call/DomElementToggleAttribute.php",
+        "lib/JIT/Call/DomImplementationCreateDocumentType.php",
         "lib/JIT/Call/DomInstanceMethod.php",
         "lib/JIT/Call/DomNodeAppend.php",
         "lib/JIT/Call/DomNodeAppendChild.php",
@@ -5492,9 +5494,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5258,
+        "inventory_files": 5260,
         "excluded": 0,
-        "eligible": 5258,
+        "eligible": 5260,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
