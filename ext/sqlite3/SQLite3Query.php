@@ -20,7 +20,10 @@ final class SQLite3Query extends Sqlite3ClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \ArgumentCountError('SQLite3::query() expects exactly 1 argument, 0 given');
         }
-        $query = $this->stringArg($frame->calledArgs[1], 'SQLite3::query', 0, 'query');
+        $query = VmSQLite3::expandSql(
+            $receiver,
+            $this->stringArg($frame->calledArgs[1], 'SQLite3::query', 0, 'query')
+        );
         if ('' === $query) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(false);
@@ -46,8 +49,12 @@ final class SQLite3Query extends Sqlite3ClassMethod
                 $frame->returnVar->object($result);
             }
         } catch (\SQLite3Exception $e) {
-            if (null !== $frame->returnVar) {
-                $frame->returnVar->bool(false);
+            if (VmSQLite3::handleException($receiver, $e)) {
+                if (null !== $frame->returnVar) {
+                    $frame->returnVar->bool(false);
+                }
+
+                return;
             }
         }
     }

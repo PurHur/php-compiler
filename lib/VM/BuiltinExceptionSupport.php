@@ -28,6 +28,7 @@ final class BuiltinExceptionSupport
     public const CLASS_SODIUM_EXCEPTION = 'sodiumexception';
     public const CLASS_REDIS_EXCEPTION = 'redisexception';
     public const CLASS_PDO_EXCEPTION = 'pdoexception';
+    public const CLASS_SQLITE3_EXCEPTION = 'sqlite3exception';
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
     public const CLASS_INVALID_ARGUMENT_EXCEPTION = 'invalidargumentexception';
@@ -175,6 +176,22 @@ final class BuiltinExceptionSupport
             return self::materializeRuntimeException($ctx, $message, $file, $line);
         }
         $var = self::materializeThrowable($ctx, self::CLASS_PDO_EXCEPTION, $message, $file, $line);
+        $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
+
+        return $var;
+    }
+
+    public static function materializeSQLite3Exception(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0,
+        int $code = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_SQLITE3_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+        $var = self::materializeThrowable($ctx, self::CLASS_SQLITE3_EXCEPTION, $message, $file, $line);
         $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
 
         return $var;

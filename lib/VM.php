@@ -9081,6 +9081,8 @@ restart:
             return $this->dispatchVmUnexpectedValueException($e, $callerFrame);
         } catch (\PDOException $e) {
             return $this->dispatchVmPDOException($e, $callerFrame);
+        } catch (\SQLite3Exception $e) {
+            return $this->dispatchVmSQLite3Exception($e, $callerFrame);
         } catch (\RuntimeException $e) {
             return $this->dispatchVmRuntimeException($e, $callerFrame);
         } catch (\InvalidArgumentException $e) {
@@ -9246,6 +9248,21 @@ restart:
             $file,
             $line,
             $error->getCode()
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native SQLite3Exception from ext/sqlite3 builtins (#19862). */
+    private function dispatchVmSQLite3Exception(\SQLite3Exception $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeSQLite3Exception(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line,
+            (int) $error->getCode()
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
