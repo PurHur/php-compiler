@@ -29,14 +29,14 @@ final class SimpleXmlElementGetDocNamespaces extends VmClassMethod
         $fromRoot = true;
         if (\count($frame->calledArgs) >= 2) {
             $arg = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOL !== $arg->type) {
+            if (Variable::TYPE_BOOLEAN !== $arg->type) {
                 throw new \TypeError('SimpleXMLElement::getDocNamespaces(): Argument #1 ($recursive) must be of type bool');
             }
             $recursive = $arg->toBool();
         }
         if (\count($frame->calledArgs) >= 3) {
             $arg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_BOOL !== $arg->type) {
+            if (Variable::TYPE_BOOLEAN !== $arg->type) {
                 throw new \TypeError('SimpleXMLElement::getDocNamespaces(): Argument #2 ($fromRoot) must be of type bool');
             }
             $fromRoot = $arg->toBool();
