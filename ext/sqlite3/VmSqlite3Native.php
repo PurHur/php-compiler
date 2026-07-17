@@ -125,6 +125,99 @@ final class VmSqlite3Native
         return self::ffiString($ffi->sqlite3_errmsg($db));
     }
 
+    /**
+     * Prepare a statement (caller must finalize). Used by ext/pdo (#3367).
+     *
+     * @return \FFI\CData sqlite3_stmt*
+     */
+    public static function prepare(\FFI\CData $db, string $sql): \FFI\CData
+    {
+        $ffi = self::requireFfi();
+        $stmtPtr = $ffi->new('sqlite3_stmt*');
+        $rc = (int) $ffi->sqlite3_prepare_v2($db, $sql, -1, \FFI::addr($stmtPtr), null);
+        if (self::SQLITE_OK !== $rc) {
+            throw new \SQLite3Exception(self::errmsg($db));
+        }
+
+        return $stmtPtr;
+    }
+
+    public static function finalize(\FFI\CData $stmt): void
+    {
+        self::requireFfi()->sqlite3_finalize($stmt);
+    }
+
+    public static function reset(\FFI\CData $stmt): void
+    {
+        self::requireFfi()->sqlite3_reset($stmt);
+    }
+
+    public static function clearBindings(\FFI\CData $stmt): void
+    {
+        self::requireFfi()->sqlite3_clear_bindings($stmt);
+    }
+
+    public static function bindValue(\FFI\CData $stmt, int $index, mixed $value): void
+    {
+        $ffi = self::requireFfi();
+        if (null === $value) {
+            $rc = (int) $ffi->sqlite3_bind_null($stmt, $index);
+        } elseif (\is_bool($value)) {
+            $rc = (int) $ffi->sqlite3_bind_int($stmt, $index, $value ? 1 : 0);
+        } elseif (\is_int($value)) {
+            $rc = (int) $ffi->sqlite3_bind_int64($stmt, $index, $value);
+        } elseif (\is_float($value)) {
+            $rc = (int) $ffi->sqlite3_bind_double($stmt, $index, $value);
+        } else {
+            $text = (string) $value;
+            // SQLITE_TRANSIENT (-1): copy binding so PHP string lifetime is safe.
+            $rc = (int) $ffi->sqlite3_bind_text(
+                $stmt,
+                $index,
+                $text,
+                \strlen($text),
+                \FFI::cast('void*', -1)
+            );
+        }
+        if (self::SQLITE_OK !== $rc) {
+            throw new \SQLite3Exception('Failed to bind parameter '.$index);
+        }
+    }
+
+    /** @return int SQLITE_ROW (100), SQLITE_DONE (101), or error */
+    public static function step(\FFI\CData $stmt): int
+    {
+        return (int) self::requireFfi()->sqlite3_step($stmt);
+    }
+
+    public static function columnCount(\FFI\CData $stmt): int
+    {
+        return (int) self::requireFfi()->sqlite3_column_count($stmt);
+    }
+
+    public static function columnName(\FFI\CData $stmt, int $index): string
+    {
+        $ffi = self::requireFfi();
+        $name = $ffi->sqlite3_column_name($stmt, $index);
+
+        return null === $name ? '' : self::ffiString($name);
+    }
+
+    /** @return string|int|float|null */
+    public static function columnValueAt(\FFI\CData $stmt, int $index): string|int|float|null
+    {
+        return self::columnValue(self::requireFfi(), $stmt, $index);
+    }
+
+    public static function changes(\FFI\CData $db): int
+    {
+        return (int) self::requireFfi()->sqlite3_changes($db);
+    }
+
+    public const STEP_ROW = 100;
+
+    public const STEP_DONE = 101;
+
     /** @return \FFI\CData|string|int|float|null */
     private static function columnValue(\FFI $ffi, \FFI\CData $stmt, int $index): string|int|float|null
     {
@@ -199,12 +292,21 @@ void sqlite3_free(void *p);
 const char *sqlite3_errmsg(sqlite3 *db);
 int sqlite3_prepare_v2(sqlite3 *db, const char *zSql, int nByte, sqlite3_stmt **ppStmt, const char **pzTail);
 int sqlite3_step(sqlite3_stmt *pStmt);
+int sqlite3_reset(sqlite3_stmt *pStmt);
+int sqlite3_clear_bindings(sqlite3_stmt *pStmt);
+int sqlite3_bind_null(sqlite3_stmt *pStmt, int i);
+int sqlite3_bind_int(sqlite3_stmt *pStmt, int i, int iValue);
+int sqlite3_bind_int64(sqlite3_stmt *pStmt, int i, sqlite3_int64 iValue);
+int sqlite3_bind_double(sqlite3_stmt *pStmt, int i, double dValue);
+int sqlite3_bind_text(sqlite3_stmt *pStmt, int i, const char *zData, int nData, void *xDel);
 int sqlite3_column_count(sqlite3_stmt *pStmt);
+const char *sqlite3_column_name(sqlite3_stmt *pStmt, int N);
 int sqlite3_column_type(sqlite3_stmt *pStmt, int iCol);
 const unsigned char *sqlite3_column_text(sqlite3_stmt *pStmt, int iCol);
 sqlite3_int64 sqlite3_column_int64(sqlite3_stmt *pStmt, int iCol);
 double sqlite3_column_double(sqlite3_stmt *pStmt, int iCol);
 int sqlite3_finalize(sqlite3_stmt *pStmt);
+int sqlite3_changes(sqlite3 *db);
 CDEF;
 
         foreach (['libsqlite3.so.0', 'libsqlite3.so'] as $lib) {

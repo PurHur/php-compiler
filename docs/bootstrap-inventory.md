@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5261 |
-| Phase A inventory files (M2 ratio SSOT) | 5261 |
+| PHP files on vm.php path | 5269 |
+| Phase A inventory files (M2 ratio SSOT) | 5269 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14511 |
+| Source constructs flagged (warnings) | 14560 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -864,6 +864,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pcntl/pcntl_wifstopped.php` | 0 | 4 |
 | `ext/pcntl/pcntl_wstopsig.php` | 0 | 4 |
 | `ext/pcntl/pcntl_wtermsig.php` | 0 | 4 |
+| `ext/pdo/BuiltinClasses.php` | 0 | 1 |
+| `ext/pdo/Module.php` | 0 | 1 |
+| `ext/pdo/PdoClassMethod.php` | 0 | 1 |
+| `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
+| `ext/pdo/VmPDO.php` | 0 | 26 |
+| `ext/pdo/VmPDOStatement.php` | 0 | 16 |
 | `ext/phar/BuiltinClasses.php` | 0 | 3 |
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 9 |
@@ -1179,7 +1185,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/Sqlite3ClassMethod.php` | 0 | 1 |
 | `ext/sqlite3/Sqlite3ExtensionPolicy.php` | 0 | 1 |
 | `ext/sqlite3/VmSQLite3.php` | 0 | 9 |
-| `ext/sqlite3/VmSqlite3Native.php` | 0 | 4 |
+| `ext/sqlite3/VmSqlite3Native.php` | 0 | 6 |
 | `ext/standard/AbsJitHelper.php` | 0 | 1 |
 | `ext/standard/AcosJitHelper.php` | 0 | 1 |
 | `ext/standard/AcoshJitHelper.php` | 0 | 1 |
@@ -4575,7 +4581,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 94 |
+| `lib/Runtime.php` | 0 | 95 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -11158,6 +11164,76 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 39)
 - 2 class method(s)
 
+### `ext/pdo/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/pdo/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/pdo/PdoClassMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/pdo/PdoExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/pdo/VmPDO.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 37)
+- new Variable (line 40)
+- new PDOConstruct (line 47)
+- new PDOExec (line 52)
+- new PDOPrepare (line 53)
+- new PDOQuery (line 54)
+- new PDOSetAttribute (line 55)
+- new PDOGetAttribute (line 56)
+- new PDOGetAvailableDrivers (line 57)
+- new PDOException (line 83)
+- new PDOException (line 89)
+- new PdoState (line 91)
+- new PDOException (line 113)
+- new PDOException (line 122)
+- new PDOException (line 139)
+- new HashTable (line 165)
+- new Variable (line 167)
+- new ArgumentCountError (line 212)
+- new ArgumentCountError (line 239)
+- new ArgumentCountError (line 272)
+- new ArgumentCountError (line 305)
+- new ArgumentCountError (line 352)
+- new ArgumentCountError (line 381)
+- new HashTable (line 408)
+- new Variable (line 410)
+- 17 class method(s)
+
+### `ext/pdo/VmPDOStatement.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 36)
+- new PDOStatementExecute (line 47)
+- new PDOStatementFetch (line 48)
+- new PDOStatementFetchAll (line 49)
+- new PDOStatementBindValue (line 50)
+- new PDOStatementRewind (line 51)
+- new PDOStatementValid (line 52)
+- new PDOStatementCurrent (line 53)
+- new PDOStatementKey (line 54)
+- new PDOStatementNext (line 55)
+- new ObjectEntry (line 75)
+- new PdoStatementState (line 76)
+- new HashTable (line 284)
+- new Variable (line 287)
+- new ArgumentCountError (line 309)
+- 14 class method(s)
+
 ### `ext/phar/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13787,7 +13863,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SQLite3Exception (line 50)
 - new SQLite3Exception (line 77)
 - new SQLite3Exception (line 92)
-- 11 class method(s)
+- new SQLite3Exception (line 139)
+- new SQLite3Exception (line 183)
+- 21 class method(s)
 
 ### `ext/standard/AbsJitHelper.php`
 
@@ -35733,24 +35811,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\brotli\Module (line 270)
 - new ext\sodium\Module (line 271)
 - new ext\sqlite3\Module (line 272)
-- new ext\phar\Module (line 273)
-- new ext\uri\Module (line 274)
-- new ext\uuid\Module (line 275)
-- new ext\uploadprogress\Module (line 276)
-- new ext\sysvshm\Module (line 277)
-- new ext\sysvsem\Module (line 278)
-- new ext\sysvmsg\Module (line 279)
-- new ext\standard\Module (line 280)
-- new JIT (line 356)
-- new JITContext (line 370)
-- new SealedClassPreprocessor (line 436)
-- new StaticClassPreprocessor (line 439)
-- new SourcePreprocessor\PropertyHooks (line 442)
-- new State (line 582)
-- new ReflectionProperty (line 609)
-- new ReflectionProperty (line 612)
-- new LintCompiler (line 1023)
-- new Variable (line 1153)
+- new ext\pdo\Module (line 273)
+- new ext\phar\Module (line 274)
+- new ext\uri\Module (line 275)
+- new ext\uuid\Module (line 276)
+- new ext\uploadprogress\Module (line 277)
+- new ext\sysvshm\Module (line 278)
+- new ext\sysvsem\Module (line 279)
+- new ext\sysvmsg\Module (line 280)
+- new ext\standard\Module (line 281)
+- new JIT (line 357)
+- new JITContext (line 371)
+- new SealedClassPreprocessor (line 437)
+- new StaticClassPreprocessor (line 440)
+- new SourcePreprocessor\PropertyHooks (line 443)
+- new State (line 583)
+- new ReflectionProperty (line 610)
+- new ReflectionProperty (line 613)
+- new LintCompiler (line 1024)
+- new Variable (line 1154)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
