@@ -7,18 +7,19 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\FileGetContentsJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** __compiler_file_get_contents: PHP helper for embed; ext kernel for user-script AOT (#15309, #19279). */
+/** __compiler_file_get_contents: always PHP helper bridge, no libc kernel (#15309, #19339). */
 final class FileGetContentsRuntimeShrinkTest extends TestCase
 {
-    public function testStringFileGetContentsRoutesDeferThroughExtKernelNotLibcBuiltin(): void
+    public function testStringFileGetContentsUsesPhpBridgeNotDeferKernel(): void
     {
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContents.php');
         $this->assertStringContainsString('FileGetContentsJitHelper', $bridge);
-        $this->assertStringContainsString('JitFileGetContentsKernel', $bridge);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
+        $this->assertStringNotContainsString('JitFileGetContentsKernel', $bridge);
         $this->assertStringNotContainsString('StringFileGetContentsLibc', $bridge);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFileGetContentsLibc.php');
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitFileGetContentsKernel.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitFileGetContentsKernel.php');
     }
 
     public function testFileGetContentsJitHelperDelegatesToVmFs(): void
@@ -37,8 +38,8 @@ final class FileGetContentsRuntimeShrinkTest extends TestCase
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('FileGetContentsJitHelper.php', $spine);
-        $this->assertStringContainsString('JitFileGetContentsKernel.php', $spine);
         $this->assertStringContainsString('StringFileGetContents.php', $spine);
+        $this->assertStringNotContainsString('JitFileGetContentsKernel.php', $spine);
         $this->assertStringNotContainsString('StringFileGetContentsLibc.php', $spine);
     }
 
