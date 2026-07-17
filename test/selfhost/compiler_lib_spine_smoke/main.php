@@ -55,6 +55,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -5498,6 +5499,12 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_keypair_from_secretkey_and_publickey.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_open.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_publickey_from_secretkey.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumShorthashFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumKdfDeriveFromKeyFunction.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_shorthash.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_shorthash_keygen.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_kdf_keygen.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_kdf_derive_from_key.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 

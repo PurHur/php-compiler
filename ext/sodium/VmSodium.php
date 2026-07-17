@@ -101,6 +101,20 @@ final class VmSodium
 
     public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_FINAL = 3;
 
+    /** SipHash-2-4 short hash (php-src crypto_shorthash_*; #20063). */
+    public const CRYPTO_SHORTHASH_BYTES = 8;
+
+    public const CRYPTO_SHORTHASH_KEYBYTES = 16;
+
+    /** BLAKE2b-based key derivation (php-src crypto_kdf_*; #20063). */
+    public const CRYPTO_KDF_BYTES_MIN = 16;
+
+    public const CRYPTO_KDF_BYTES_MAX = 64;
+
+    public const CRYPTO_KDF_CONTEXTBYTES = 8;
+
+    public const CRYPTO_KDF_KEYBYTES = 32;
+
     private static ?\FFI $ffi = null;
 
     private static bool $ffiUnavailable = false;
@@ -119,6 +133,8 @@ final class VmSodium
             || \function_exists('sodium_crypto_aead_aes256gcm_encrypt')
             || \function_exists('sodium_crypto_sign_keypair')
             || \function_exists('sodium_crypto_secretstream_xchacha20poly1305_keygen')
+            || \function_exists('sodium_crypto_shorthash')
+            || \function_exists('sodium_crypto_kdf_derive_from_key')
             || null !== self::ffi();
     }
 
@@ -650,6 +666,79 @@ final class VmSodium
         return self::ffiAuth($message, $key);
     }
 
+    /**
+     * sodium_crypto_shorthash() — SipHash-2-4 (php-src ext/sodium/libsodium.c; #20063).
+     */
+    public static function shorthash(string $message, string $key): string
+    {
+        if (\strlen($key) !== self::CRYPTO_SHORTHASH_KEYBYTES) {
+            self::throwSodium(
+                'sodium_crypto_shorthash(): Argument #2 ($key) must be SODIUM_CRYPTO_SHORTHASH_KEYBYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_shorthash')) {
+            return \sodium_crypto_shorthash($message, $key);
+        }
+
+        return self::ffiShorthash($message, $key);
+    }
+
+    public static function shorthashKeygen(): string
+    {
+        if (\function_exists('sodium_crypto_shorthash_keygen')) {
+            return \sodium_crypto_shorthash_keygen();
+        }
+
+        return self::randomKeyBytes(self::CRYPTO_SHORTHASH_KEYBYTES);
+    }
+
+    public static function kdfKeygen(): string
+    {
+        if (\function_exists('sodium_crypto_kdf_keygen')) {
+            return \sodium_crypto_kdf_keygen();
+        }
+
+        return self::randomKeyBytes(self::CRYPTO_KDF_KEYBYTES);
+    }
+
+    /**
+     * sodium_crypto_kdf_derive_from_key() (php-src ext/sodium/libsodium.c; #20063).
+     */
+    public static function kdfDeriveFromKey(int $subkeyLength, int $subkeyId, string $context, string $key): string
+    {
+        if ($subkeyLength < self::CRYPTO_KDF_BYTES_MIN) {
+            self::throwSodium(
+                'sodium_crypto_kdf_derive_from_key(): Argument #1 ($subkey_length) must be greater than or equal to SODIUM_CRYPTO_KDF_BYTES_MIN'
+            );
+        }
+        if ($subkeyLength > self::CRYPTO_KDF_BYTES_MAX) {
+            self::throwSodium(
+                'sodium_crypto_kdf_derive_from_key(): Argument #1 ($subkey_length) must be less than or equal to SODIUM_CRYPTO_KDF_BYTES_MAX'
+            );
+        }
+        if ($subkeyId < 0) {
+            self::throwSodium(
+                'sodium_crypto_kdf_derive_from_key(): Argument #2 ($subkey_id) must be greater than or equal to 0'
+            );
+        }
+        if (\strlen($context) !== self::CRYPTO_KDF_CONTEXTBYTES) {
+            self::throwSodium(
+                'sodium_crypto_kdf_derive_from_key(): Argument #3 ($context) must be SODIUM_CRYPTO_KDF_CONTEXTBYTES bytes long'
+            );
+        }
+        if (\strlen($key) !== self::CRYPTO_KDF_KEYBYTES) {
+            // PHP 8.2 wording uses BYTES_MIN (value equals KEYBYTES check); php-src master says KEYBYTES.
+            self::throwSodium(
+                'sodium_crypto_kdf_derive_from_key(): Argument #4 ($key) must be SODIUM_CRYPTO_KDF_BYTES_MIN bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_kdf_derive_from_key')) {
+            return \sodium_crypto_kdf_derive_from_key($subkeyLength, $subkeyId, $context, $key);
+        }
+
+        return self::ffiKdfDeriveFromKey($subkeyLength, $subkeyId, $context, $key);
+    }
+
     public static function authVerify(string $mac, string $message, string $key): bool
     {
         if (\function_exists('sodium_crypto_auth_verify')) {
@@ -803,6 +892,35 @@ final class VmSodium
         }
 
         return self::unsignedCharArrayToString($outBuf, self::CRYPTO_AUTH_BYTES);
+    }
+
+    private static function ffiShorthash(string $message, string $key): string
+    {
+        $ffi = self::requireFfi();
+        $mlen = \strlen($message);
+        $outBuf = $ffi->new('unsigned char['.self::CRYPTO_SHORTHASH_BYTES.']');
+        $mBuf = self::stringToUnsignedCharArray($ffi, $message);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_shorthash($outBuf, $mBuf, $mlen, $kBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($outBuf, self::CRYPTO_SHORTHASH_BYTES);
+    }
+
+    private static function ffiKdfDeriveFromKey(int $subkeyLength, int $subkeyId, string $context, string $key): string
+    {
+        $ffi = self::requireFfi();
+        $outBuf = $ffi->new('unsigned char['.$subkeyLength.']');
+        $ctxBuf = self::stringToUnsignedCharArray($ffi, $context);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_kdf_derive_from_key($outBuf, $subkeyLength, $subkeyId, $ctxBuf, $kBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($outBuf, $subkeyLength);
     }
 
     private static function ffiAuthVerify(string $mac, string $message, string $key): bool
@@ -1787,6 +1905,8 @@ final class VmSodium
                     int crypto_secretbox_open(unsigned char *m, const unsigned char *c, unsigned long long clen, const unsigned char *n, const unsigned char *k);
                     int crypto_auth(unsigned char *out, const unsigned char *in, unsigned long long inlen, const unsigned char *k);
                     int crypto_auth_verify(const unsigned char *h, const unsigned char *in, unsigned long long inlen, const unsigned char *k);
+                    int crypto_shorthash(unsigned char *out, const unsigned char *in, unsigned long long inlen, const unsigned char *k);
+                    int crypto_kdf_derive_from_key(unsigned char *subkey, size_t subkey_len, uint64_t subkey_id, const char *ctx, const unsigned char *key);
                     int crypto_stream(unsigned char *c, unsigned long long clen, const unsigned char *n, const unsigned char *k);
                     int crypto_stream_xor(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n, const unsigned char *k);
                     int crypto_stream_xchacha20(unsigned char *c, unsigned long long clen, const unsigned char *n, const unsigned char *k);

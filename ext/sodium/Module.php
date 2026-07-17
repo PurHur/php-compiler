@@ -85,6 +85,10 @@ class Module extends ModuleAbstract
             new sodium_crypto_secretstream_xchacha20poly1305_push(),
             new sodium_crypto_secretstream_xchacha20poly1305_pull(),
             new sodium_crypto_secretstream_xchacha20poly1305_rekey(),
+            new sodium_crypto_shorthash(),
+            new sodium_crypto_shorthash_keygen(),
+            new sodium_crypto_kdf_keygen(),
+            new sodium_crypto_kdf_derive_from_key(),
         ];
     }
 }
