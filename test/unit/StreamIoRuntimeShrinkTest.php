@@ -9,7 +9,7 @@ use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Stream I/O JIT: embed via StreamIoJitHelper PHP; user-script AOT via JitStreamIoKernel (#10326, #12956, #19462, #19530).
+ * Stream I/O JIT: embed via StreamIoJitHelper PHP; thin AOT via isThinStandaloneAotMain + JitStreamIoKernel (#10326, #12956, #19462, #19530, #20229).
  */
 final class StreamIoRuntimeShrinkTest extends TestCase
 {
@@ -20,7 +20,8 @@ final class StreamIoRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoJit.php');
         $this->assertStringContainsString('StreamIoRuntime::ensureLinked', $source);
         $this->assertStringContainsString('JitStreamIoKernel', $source);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('emitFwrite', $source);
         $this->assertStringNotContainsString('emitFread', $source);
         $this->assertStringNotContainsString('emitFopen', $source);
@@ -39,10 +40,13 @@ final class StreamIoRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamIoJitHelper::fopenArgv', $source);
         $this->assertStringContainsString('StreamIoJitHelper::freadArgv', $source);
         $this->assertStringContainsString('StreamIoJitHelper::fwriteArgv', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('ensureRuntimeAbiDeclared', $source);
-        // User-script AOT upgrades via libc kernel — nested VmFs helpers skip __init__ (#16075, #19462, #19530).
+        // Thin AOT upgrades via libc kernel — nested VmFs helpers skip __init__ (#16075, #19462, #19530, #20229).
         $this->assertStringContainsString('JitStreamIoKernel', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
         $this->assertStringNotContainsString('StreamIoStandaloneLlvm', $source);
     }
 

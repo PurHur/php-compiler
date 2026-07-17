@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\ext\standard\JitStreamIoKernel;
 
 /**
- * Stream I/O dispatch — JIT embed + AOT standalone via StreamIoRuntime PHP (#5343, #10326, #12956).
+ * Stream I/O dispatch — JIT embed + AOT standalone via StreamIoRuntime PHP (#5343, #10326, #12956, #20229).
  *
+ * Thin standalone AOT (`isThinStandaloneAotMain`): {@see JitStreamIoKernel} libc + handle-table
+ * (VmFs nested helpers skip __init__, #16075 / #19462 / peer #20214).
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */
 final class StreamIoJit
@@ -35,8 +36,8 @@ final class StreamIoJit
         self::ensureStreamGlobals($context);
         StreamFilter::ensureLinked($context);
 
-        // User-script AOT: libc + handle-table kernels (VmFs nested helpers skip __init__, #16075 / #19462).
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+        // Thin/user-script AOT: libc + handle-table kernels (#16075 / #19462 / #20229).
+        if ($context->isThinStandaloneAotMain()) {
             JitStreamIoKernel::implementForUserScriptLowering($context);
 
             return;
