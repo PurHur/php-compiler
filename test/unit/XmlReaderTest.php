@@ -207,6 +207,20 @@ PHP;
         );
     }
 
+    public function test_xmlreader_malformed_read_warnings_repro(): void
+    {
+        $runtime = new Runtime();
+        $code = (string) file_get_contents(__DIR__.'/../repro/maintainer_gap_xmlreader_malformed_read_warnings.php');
+        $block = $runtime->parseAndCompile($code, 'xmlreader_malformed_read_warnings_repro.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("parser error : Extra content at the end of the document\n", $out);
+        self::assertStringContainsString("XMLReader::read(): <not-closed>\n", $out);
+        self::assertMatchesRegularExpression('/XMLReader::read\(\): +\\^\n/', $out);
+        self::assertStringStartsWith("3\n", $out);
+    }
+
     public function test_xmlreader_tokenizer_matches_zend_event_shape(): void
     {
         $events = VmXmlReader::tokenize('<root><item id="1">a</item></root>');

@@ -13,6 +13,18 @@ final class XmlReaderState
 
     public bool $valid = true;
 
+    /** Raw document bytes for libxml-style read() diagnostics (#19933). */
+    public string $sourceData = '';
+
+    /**
+     * Deferred libxml validation records when {@see $valid} is false (emitted on first read()).
+     *
+     * @var list<array{level: int, code: int, column: int, message: string, file: string, line: int}>
+     */
+    public array $parseErrorRecords = [];
+
+    public bool $readParseErrorsEmitted = false;
+
     /** @var list<XmlReaderEvent> */
     public array $events = [];
 
