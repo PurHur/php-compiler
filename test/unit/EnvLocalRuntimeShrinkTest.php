@@ -62,8 +62,9 @@ final class EnvLocalRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenvAll.php');
         $this->assertStringContainsString('GetenvJitHelper::fillAllEnvironmentHashtable', $source);
-        $this->assertStringContainsString('shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('EnvLocalRuntime::emitMergeOverlay', $source);
         $this->assertStringNotContainsString('emitLocalOverlay', $source);
         $this->assertStringNotContainsString('phpc_env_local_entries', $source);

@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5504 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15618 |
+| Source constructs flagged (warnings) | 15614 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4297,8 +4297,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringGetObjectVars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetParentClass.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetdate.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringGetenv.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringGetenvAll.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringGetenv.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringGetenvAll.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetrusage.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetrusageRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringGettext.php` | 0 | 1 |
@@ -7772,12 +7772,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 7932)
 - new DOMException (line 7943)
 - new Variable (line 7945)
-- new DOMException (line 8074)
 - new DOMException (line 8101)
-- new DOMException (line 8132)
-- new DOMException (line 8196)
-- new DOMException (line 8204)
-- new DOMException (line 8213)
+- new DOMException (line 8128)
+- new DOMException (line 8159)
+- new DOMException (line 8223)
+- new DOMException (line 8231)
+- new DOMException (line 8240)
 - 371 class method(s)
 - 1 closure(s)
 
@@ -34733,16 +34733,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringGetenv.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 136)
-- 10 class method(s)
-- 1 closure(s)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/StringGetenvAll.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 184)
-- 10 class method(s)
-- 1 closure(s)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/StringGetrusage.php`
 
@@ -36769,19 +36765,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 911)
 - new Call\DateTimeFormat (line 914)
 - new Call\DateTimeFormat (line 915)
-- new Result (line 1241)
-- new Result (line 1262)
-- new Variable (line 1863)
-- new Variable (line 2000)
-- new Variable (line 2226)
-- new Variable (line 2284)
-- new VMVariable (line 2422)
-- new VMVariable (line 2438)
-- new VMVariable (line 2444)
-- new VMVariable (line 2450)
-- new VMVariable (line 2461)
-- new Variable (line 2491)
-- new Variable (line 2531)
+- new Result (line 1242)
+- new Result (line 1263)
+- new Variable (line 1864)
+- new Variable (line 2001)
+- new Variable (line 2227)
+- new Variable (line 2285)
+- new VMVariable (line 2423)
+- new VMVariable (line 2439)
+- new VMVariable (line 2445)
+- new VMVariable (line 2451)
+- new VMVariable (line 2462)
+- new Variable (line 2492)
+- new Variable (line 2532)
 - 100 class method(s)
 - 28 closure(s)
 
