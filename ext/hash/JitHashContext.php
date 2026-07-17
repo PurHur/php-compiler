@@ -14,7 +14,6 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -129,10 +128,11 @@ final class JitHashContext
         return self::finalLowering($context, $args[0], $rawBool);
     }
 
-    /** Shared hash_final() body (#3357). */
+    /** Shared hash_final() body (#3357, #20200). */
     public static function finalLowering(Context $context, JITVariable $ctxArg, Value $rawBool): Value
     {
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
+        // Thin standalone AOT: NestedJIT HashContextJitHelper::finalize segfaults (#3357 / #16075).
+        if ($context->isThinStandaloneAotMain()) {
             return self::finalLoweringStandaloneAot($context, $ctxArg, $rawBool);
         }
 
@@ -154,8 +154,9 @@ final class JitHashContext
     }
 
     /**
-     * Standalone user-script AOT: HashContextJitHelper::finalize segfaults at execute (#3357).
-     * One-shot __compiler_hash on buffered data + inline bin2hex when $binary is false.
+     * Thin standalone AOT (`isThinStandaloneAotMain`, #20200): HashContextJitHelper::finalize
+     * segfaults at execute (#3357). One-shot __compiler_hash on buffered data + inline bin2hex
+     * when $binary is false.
      */
     private static function finalLoweringStandaloneAot(
         Context $context,

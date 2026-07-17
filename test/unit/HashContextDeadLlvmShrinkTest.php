@@ -11,6 +11,9 @@ use PHPUnit\Framework\TestCase;
  *
  * hash_copy() / hash_final() route through {@see \PHPCompiler\ext\hash\JitHashContext}; the
  * unused `__compiler_hash_context_*` LLVM bridges had zero callers.
+ *
+ * Thin standalone AOT gates on {@see \PHPCompiler\JIT\Context::isThinStandaloneAotMain()} —
+ * no {@see \PHPCompiler\JIT\UserScriptAotDeferNestedJit} (#20200 / #20178 shape).
  */
 final class HashContextDeadLlvmShrinkTest extends TestCase
 {
@@ -36,5 +39,13 @@ final class HashContextDeadLlvmShrinkTest extends TestCase
         $this->assertStringContainsString('function finalLowering(', $source);
         $this->assertStringNotContainsString('HashContextCopyLlvm', $source);
         $this->assertStringNotContainsString('HashContextFinalLlvm', $source);
+    }
+
+    public function testHashFinalThinPathUsesIsThinStandaloneAotMain(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/hash/JitHashContext.php');
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('finalLoweringStandaloneAot', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
     }
 }
