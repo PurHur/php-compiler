@@ -20,14 +20,15 @@ final class JitIterableArg
         string $function,
         int $argIndex,
         string $paramName,
-        string $given
+        string $given,
+        bool $allowArray = true
     ): string {
         return \sprintf(
             '%s(): Argument #%d ($%s) must be of type %s, %s given',
             $function,
             $argIndex + 1,
             $paramName,
-            IterableCheck::TYPE_LABEL,
+            $allowArray ? IterableCheck::TYPE_LABEL : IterableCheck::TRAVERSABLE_TYPE_LABEL,
             $given
         );
     }
@@ -37,13 +38,14 @@ final class JitIterableArg
         string $function,
         int $argIndex,
         string $paramName,
-        string $given
+        string $given,
+        bool $allowArray = true
     ): void {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         TypeErrorRaise::emitRaise(
             $context,
-            self::iterableTypeErrorMessage($function, $argIndex, $paramName, $given)
+            self::iterableTypeErrorMessage($function, $argIndex, $paramName, $given, $allowArray)
         );
         $context->builder->call($context->lookupFunction('abort'));
     }
@@ -60,17 +62,43 @@ final class JitIterableArg
         int $argIndex = 0,
         string $paramName = 'iterator'
     ): bool {
-        if (self::isCompileTimeIterable($context, $arg)) {
+        return self::guardOperand($context, $arg, $function, $argIndex, $paramName, true);
+    }
+
+    /**
+     * iterator_apply() — Traversable only; arrays TypeError like Zend (#19839).
+     *
+     * @return bool false when compile-time rejection IR was emitted
+     */
+    public static function guardTraversableOperand(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'iterator'
+    ): bool {
+        return self::guardOperand($context, $arg, $function, $argIndex, $paramName, false);
+    }
+
+    private static function guardOperand(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        bool $allowArray
+    ): bool {
+        if (self::isCompileTimeAccepted($context, $arg, $allowArray)) {
             return true;
         }
         $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
         if (null !== $enumLabel) {
-            self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, $enumLabel);
+            self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, $enumLabel, $allowArray);
 
             return false;
         }
         if (Variable::TYPE_VALUE === $arg->type) {
-            return self::guardValueBoxOperand($context, $arg, $function, $argIndex, $paramName);
+            return self::guardValueBoxOperand($context, $arg, $function, $argIndex, $paramName, $allowArray);
         }
         if (Variable::TYPE_OBJECT === $arg->type) {
             self::emitIterableTypeErrorAndAbort(
@@ -79,7 +107,8 @@ final class JitIterableArg
                 $argIndex,
                 $paramName,
                 JitOperandTypeLabel::compileTimeEnumClassName($context, $arg)
-                    ?? JitOperandTypeLabel::givenLabel($context, $arg)
+                    ?? JitOperandTypeLabel::givenLabel($context, $arg),
+                $allowArray
             );
 
             return false;
@@ -89,19 +118,17 @@ final class JitIterableArg
             $function,
             $argIndex,
             $paramName,
-            JitOperandTypeLabel::givenLabel($context, $arg)
+            JitOperandTypeLabel::givenLabel($context, $arg),
+            $allowArray
         );
 
         return false;
     }
 
-    private static function isCompileTimeIterable(Context $context, Variable $arg): bool
+    private static function isCompileTimeAccepted(Context $context, Variable $arg, bool $allowArray): bool
     {
-        if ($arg->type & Variable::IS_NATIVE_ARRAY) {
-            return true;
-        }
-        if (Variable::TYPE_HASHTABLE === $arg->type) {
-            return true;
+        if ($arg->type & Variable::IS_NATIVE_ARRAY || Variable::TYPE_HASHTABLE === $arg->type) {
+            return $allowArray;
         }
         if (GeneratorHelper::isGeneratorVariable($arg)) {
             return true;
@@ -117,7 +144,7 @@ final class JitIterableArg
             return false;
         }
         if (VmVariable::TYPE_ARRAY === $constantType) {
-            return true;
+            return $allowArray;
         }
         if (VmVariable::TYPE_OBJECT === $constantType) {
             return GeneratorHelper::isGeneratorVariable($arg)
@@ -151,18 +178,31 @@ final class JitIterableArg
         Variable $arg,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        bool $allowArray
     ): bool {
         $constantType = self::constantValueBoxType($context, $arg);
         if (null !== $constantType) {
             if (VmVariable::TYPE_ARRAY === $constantType) {
-                return true;
+                if ($allowArray) {
+                    return true;
+                }
+                self::emitIterableTypeErrorAndAbort(
+                    $context,
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    'array',
+                    false
+                );
+
+                return false;
             }
             if (VmVariable::TYPE_ENUM_CASE === $constantType
                 || VmVariable::TYPE_OBJECT === $constantType) {
                 $enumLabel = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg)
                     ?? JitOperandTypeLabel::givenLabel($context, $arg);
-                self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, $enumLabel);
+                self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, $enumLabel, $allowArray);
 
                 return false;
             }
@@ -171,13 +211,14 @@ final class JitIterableArg
                 $function,
                 $argIndex,
                 $paramName,
-                JitOperandTypeLabel::givenLabel($context, $arg)
+                JitOperandTypeLabel::givenLabel($context, $arg),
+                $allowArray
             );
 
             return false;
         }
 
-        self::emitRuntimeValueBoxEnumGuard($context, $arg, $function, $argIndex, $paramName);
+        self::emitRuntimeValueBoxEnumGuard($context, $arg, $function, $argIndex, $paramName, $allowArray);
 
         return true;
     }
@@ -187,7 +228,8 @@ final class JitIterableArg
         Variable $arg,
         string $function,
         int $argIndex,
-        string $paramName
+        string $paramName,
+        bool $allowArray
     ): void {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $map = $context->structFieldMap['__value__'];
@@ -200,7 +242,14 @@ final class JitIterableArg
         $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $arrayTy);
         $okBlock = BasicBlockHelper::append($context, 'iterable_arg_ok');
         $checkEnumBlock = BasicBlockHelper::append($context, 'iterable_arg_check_enum');
-        $context->builder->branchIf($isArray, $okBlock, $checkEnumBlock);
+        if ($allowArray) {
+            $context->builder->branchIf($isArray, $okBlock, $checkEnumBlock);
+        } else {
+            $arrayReject = BasicBlockHelper::append($context, 'traversable_arg_array');
+            $context->builder->branchIf($isArray, $arrayReject, $checkEnumBlock);
+            $context->builder->positionAtEnd($arrayReject);
+            self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', false);
+        }
 
         $context->builder->positionAtEnd($checkEnumBlock);
         $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
@@ -208,7 +257,7 @@ final class JitIterableArg
         $context->builder->branchIf($isEnumCase, $enumBlock, $okBlock);
 
         $context->builder->positionAtEnd($enumBlock);
-        self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object');
+        self::emitIterableTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $allowArray);
 
         $context->builder->positionAtEnd($okBlock);
     }

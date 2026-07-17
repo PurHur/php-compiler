@@ -12,6 +12,9 @@ final class IterableCheck
     /** Zend zend_verify_arg_type() wording for iterable parameters. */
     public const TYPE_LABEL = 'Traversable|array';
 
+    /** Zend ext/spl/spl.stub.php — iterator_apply(Traversable $iterator, …) (#19839). */
+    public const TRAVERSABLE_TYPE_LABEL = 'Traversable';
+
     private const TRAVERSABLE_IFACES = ['traversable', 'iterator', 'iteratoraggregate'];
 
     public static function isIterable(Variable $value, Context $context): bool
@@ -20,6 +23,16 @@ final class IterableCheck
         if (Variable::TYPE_ARRAY === $value->type) {
             return true;
         }
+
+        return self::isTraversable($value, $context);
+    }
+
+    /**
+     * Traversable objects only (not arrays) — php-src iterator_apply() (#19839).
+     */
+    public static function isTraversable(Variable $value, Context $context): bool
+    {
+        $value = $value->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $value->type) {
             return false;
         }

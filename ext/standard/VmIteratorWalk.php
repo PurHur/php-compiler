@@ -23,16 +23,47 @@ final class VmIteratorWalk
         return VM\IterableCheck::isIterable($value, $ctx);
     }
 
+    /**
+     * iterator_count() / iterator_to_array() — Zend accepts Traversable|array.
+     */
     public static function assertTraversable(
         Variable $value,
         Context $ctx,
         string $funcName,
         string $paramName = 'iterator'
     ): Variable {
+        return self::assertIteratorOperand($value, $ctx, $funcName, $paramName, true);
+    }
+
+    /**
+     * iterator_apply() — Zend Traversable only (arrays TypeError, #19839).
+     */
+    public static function assertTraversableOnly(
+        Variable $value,
+        Context $ctx,
+        string $funcName,
+        string $paramName = 'iterator'
+    ): Variable {
+        return self::assertIteratorOperand($value, $ctx, $funcName, $paramName, false);
+    }
+
+    private static function assertIteratorOperand(
+        Variable $value,
+        Context $ctx,
+        string $funcName,
+        string $paramName,
+        bool $allowArray
+    ): Variable {
         $value = $value->resolveIndirect();
-        if (!self::isIterable($value, $ctx)) {
+        $ok = $allowArray
+            ? self::isIterable($value, $ctx)
+            : VM\IterableCheck::isTraversable($value, $ctx);
+        if (!$ok) {
+            $typeLabel = $allowArray
+                ? VM\IterableCheck::TYPE_LABEL
+                : VM\IterableCheck::TRAVERSABLE_TYPE_LABEL;
             throw new \TypeError(
-                "{$funcName}(): Argument #1 (\${$paramName}) must be of type ".VM\IterableCheck::TYPE_LABEL.', '
+                "{$funcName}(): Argument #1 (\${$paramName}) must be of type {$typeLabel}, "
                 .VM\IterableCheck::valueTypeName($value).' given'
             );
         }
