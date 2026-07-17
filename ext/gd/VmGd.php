@@ -11,6 +11,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ObjectHandleSupport;
 use PHPCompiler\VM\OutputBuffer;
@@ -267,6 +268,111 @@ final class VmGd
         self::putPixel($state, $x, $y, $color);
 
         return true;
+    }
+
+    /** Package-visible pixel write for FreeType glyph blit (#6532). */
+    public static function blendPixelAt(GdImageState $state, int $x, int $y, int $color): void
+    {
+        self::putPixel($state, $x, $y, $color);
+    }
+
+    /**
+     * imagettfbbox() — FreeType string bounding box (php-src ext/gd/gd.c; #6532).
+     *
+     * @return list<int>|false
+     */
+    public static function ttfBBox(
+        Frame $frame,
+        float $size,
+        float $angleDegrees,
+        string $fontFilename,
+        string $text
+    ): array|false {
+        $result = VmGdFreeType::stringFT(
+            null,
+            $size,
+            $angleDegrees * (M_PI / 180.0),
+            0,
+            0,
+            0,
+            $fontFilename,
+            $text
+        );
+        if (\is_string($result)) {
+            self::warnTtf($frame, 'imagettfbbox', $result);
+
+            return false;
+        }
+
+        return $result;
+    }
+
+    /**
+     * imagettftext() — FreeType string draw + bbox (php-src ext/gd/gd.c; #6532).
+     *
+     * @return list<int>|false
+     */
+    public static function ttfText(
+        Frame $frame,
+        ObjectEntry $image,
+        float $size,
+        float $angleDegrees,
+        int $x,
+        int $y,
+        int $color,
+        string $fontFilename,
+        string $text
+    ): array|false {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $result = VmGdFreeType::stringFT(
+            $state,
+            $size,
+            $angleDegrees * (M_PI / 180.0),
+            $x,
+            $y,
+            $color,
+            $fontFilename,
+            $text
+        );
+        if (\is_string($result)) {
+            self::warnTtf($frame, 'imagettftext', $result);
+
+            return false;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param list<int> $brect
+     */
+    public static function brectToHashTable(array $brect): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($brect as $value) {
+            $var = new Variable();
+            $var->int((int) $value);
+            $ht->append($var);
+        }
+
+        return $ht;
+    }
+
+    private static function warnTtf(Frame $frame, string $function, string $error): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            $function.'(): '.$error,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     /**
@@ -1368,6 +1474,24 @@ final class VmGd
                 4 => 'y',
                 5 => 'char' === \substr($function, -4) ? 'char' : 'string',
                 6 => 'color',
+                default => 'arg',
+            },
+            'imagettfbbox' => match ($position) {
+                1 => 'size',
+                2 => 'angle',
+                3 => 'font_filename',
+                4 => 'string',
+                default => 'arg',
+            },
+            'imagettftext' => match ($position) {
+                1 => 'image',
+                2 => 'size',
+                3 => 'angle',
+                4 => 'x',
+                5 => 'y',
+                6 => 'color',
+                7 => 'font_filename',
+                8 => 'text',
                 default => 'arg',
             },
             default => 'arg',
