@@ -41,6 +41,7 @@ final class MultipartRuntimeShrinkTest extends TestCase
         $multipartRuntime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MultipartRuntime.php');
         $this->assertStringContainsString('MultipartNativeJitHelper', $multipartRuntime);
         $this->assertStringContainsString('JitMultipartKernel', $multipartRuntime);
+        $this->assertStringContainsString('JitMultipartKernel::PARSE_FUNCTION', $multipartRuntime);
         $this->assertStringNotContainsString('MultipartRuntimeUserScriptLlvm', $multipartRuntime);
         $refresh = (string) file_get_contents(__DIR__.'/../../ext/standard/JitSuperglobalRefreshKernel.php');
         $this->assertStringContainsString('MultipartRuntime::ensureUserScriptLinked', $refresh);
