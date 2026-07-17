@@ -35,6 +35,13 @@ final class VmDomSimpleXmlBridge
         if (!DomRegistry::has($domNode)) {
             return null;
         }
+        if (VmDom::isDocument($domNode)) {
+            $rootVar = $domNode->getProperty(VmDom::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $rootVar->type) {
+                return null;
+            }
+            $domNode = $rootVar->toObject();
+        }
         if (!VmDom::isElement($domNode)) {
             return null;
         }
