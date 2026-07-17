@@ -40,11 +40,12 @@ final class session_set_save_handler extends Internal
 
             return;
         }
+        $ctx = VmReflection::requireContext($frame);
         $handler = SessionUserHandler::requireHandlerObject(
             $frame->calledArgs[0],
             'session_set_save_handler'
         );
-        $ctx = VmReflection::requireContext($frame);
+        SessionUserHandler::assertSessionHandlerInterface($ctx, $handler, 'session_set_save_handler');
         SessionUserHandler::assertHandlerMethods($ctx->runtime->vm, $handler, 'session_set_save_handler');
         $registerShutdown = true;
         if (2 === $argc) {
