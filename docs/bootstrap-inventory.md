@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5323 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14855 |
+| Source constructs flagged (warnings) | 14883 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -872,10 +872,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
 | `ext/phar/BuiltinClasses.php` | 0 | 10 |
 | `ext/phar/Module.php` | 0 | 1 |
-| `ext/phar/PharDataBuiltin.php` | 0 | 9 |
+| `ext/phar/PharDataBuiltin.php` | 0 | 15 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 1 |
-| `ext/phar/VmPharData.php` | 0 | 9 |
+| `ext/phar/VmPharData.php` | 0 | 29 |
 | `ext/phar/VmPharFileInfo.php` | 0 | 6 |
 | `ext/phar/VmPharTar.php` | 0 | 1 |
 | `ext/posix/JitPosix.php` | 0 | 1 |
@@ -2446,7 +2446,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/XslConstants.php` | 0 | 1 |
 | `ext/standard/ZendSort.php` | 0 | 2 |
 | `ext/standard/ZlibEncodeJitHelper.php` | 0 | 1 |
-| `ext/standard/ZlibIncrementalFunction.php` | 0 | 1 |
+| `ext/standard/ZlibIncrementalFunction.php` | 0 | 3 |
 | `ext/standard/ZlibJitHelper.php` | 0 | 1 |
 | `ext/standard/__compiler_libcrypt.php` | 0 | 1 |
 | `ext/standard/__compiler_password_random_bytes.php` | 0 | 1 |
@@ -11349,15 +11349,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/PharDataBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 31)
-- new PharDataConstruct (line 43)
-- new ArgumentCountError (line 80)
-- new ArgumentCountError (line 100)
+- new ClassEntry (line 30)
+- new PharDataConstruct (line 39)
+- new ArgumentCountError (line 76)
+- new ArgumentCountError (line 92)
+- new ArgumentCountError (line 111)
 - new ArgumentCountError (line 126)
-- new ArgumentCountError (line 151)
-- new ArgumentCountError (line 171)
-- new ArgumentCountError (line 194)
-- 8 class method(s)
+- new ArgumentCountError (line 143)
+- new ArgumentCountError (line 160)
+- new UnexpectedValueException (line 176)
+- new ArgumentCountError (line 190)
+- new ArgumentCountError (line 250)
+- new ArgumentCountError (line 264)
+- new ArgumentCountError (line 281)
+- new ArgumentCountError (line 296)
+- 17 class method(s)
 
 ### `ext/phar/PharExtensionPolicy.php`
 
@@ -11372,15 +11378,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPharData.php`
 
 **Warnings** (review for bootstrap subset):
-- new UnexpectedValueException (line 40)
-- new UnexpectedValueException (line 53)
-- new UnexpectedValueException (line 65)
-- new BadMethodCallException (line 111)
-- new Variable (line 113)
-- new Error (line 128)
-- new UnexpectedValueException (line 155)
-- new Error (line 166)
-- 12 class method(s)
+- new UnexpectedValueException (line 41)
+- new UnexpectedValueException (line 46)
+- new UnexpectedValueException (line 57)
+- new UnexpectedValueException (line 67)
+- new UnexpectedValueException (line 79)
+- new UnexpectedValueException (line 92)
+- new UnexpectedValueException (line 96)
+- new UnexpectedValueException (line 109)
+- new RecursiveIteratorIterator (line 112)
+- new RecursiveDirectoryIterator (line 113)
+- new BadMethodCallException (line 168)
+- new BadMethodCallException (line 171)
+- new UnexpectedValueException (line 179)
+- new ObjectEntry (line 181)
+- new UnexpectedValueException (line 208)
+- new ObjectEntry (line 210)
+- new ObjectEntry (line 221)
+- new BadMethodCallException (line 231)
+- new BadMethodCallException (line 233)
+- new BadMethodCallException (line 281)
+- new BadMethodCallException (line 284)
+- new Variable (line 286)
+- new HashTable (line 300)
+- new Variable (line 302)
+- new Error (line 313)
+- new UnexpectedValueException (line 344)
+- new UnexpectedValueException (line 349)
+- new Error (line 358)
+- 21 class method(s)
 
 ### `ext/phar/VmPharFileInfo.php`
 
@@ -11395,7 +11421,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPharTar.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `ext/posix/JitPosix.php`
 
@@ -22398,7 +22424,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ZlibIncrementalFunction.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- new ArgumentCountError (line 18)
+- new ArgumentCountError (line 26)
+- 2 class method(s)
 
 ### `ext/standard/ZlibJitHelper.php`
 
