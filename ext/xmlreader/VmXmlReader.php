@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\xmlreader;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\dom\VmDom;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\Frame;
@@ -12,6 +14,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -67,6 +70,18 @@ final class VmXmlReader
         $entry->methods['expand'] = new XmlReaderExpand();
         $entry->methodVisibility['expand'] = $pub;
         $entry->methodNames['expand'] = 'expand';
+
+        if (CompilerVersion::supportsXmlReaderFactories()) {
+            $entry->methods['fromstring'] = new XmlReaderFromString();
+            $entry->methodVisibility['fromstring'] = $pubStatic;
+            $entry->methodNames['fromstring'] = 'fromString';
+            $entry->methods['fromuri'] = new XmlReaderFromUri();
+            $entry->methodVisibility['fromuri'] = $pubStatic;
+            $entry->methodNames['fromuri'] = 'fromUri';
+            $entry->methods['fromstream'] = new XmlReaderFromStream();
+            $entry->methodVisibility['fromstream'] = $pubStatic;
+            $entry->methodNames['fromstream'] = 'fromStream';
+        }
 
         foreach (XmlReaderConstants::classConstants() as $name => $value) {
             $var = new Variable(Variable::TYPE_INTEGER);
@@ -145,6 +160,53 @@ final class VmXmlReader
         self::bindParsedSource($ctx, $entry, '', $source, $frame);
 
         return true;
+    }
+
+    /**
+     * XMLReader::fromString() — always-static in-memory factory (php-src; #19607).
+     */
+    public static function fromString(Context $ctx, string $source, ?Frame $frame = null): ObjectEntry
+    {
+        $reader = self::openFromString($ctx, '', $source, $frame);
+        if (null === $reader) {
+            throw new \Error('XMLReader::fromString(): Unable to open source data');
+        }
+
+        return $reader;
+    }
+
+    /**
+     * XMLReader::fromUri() — always-static URI factory (php-src; #19607).
+     */
+    public static function fromUri(Context $ctx, string $uri, ?Frame $frame = null): ?ObjectEntry
+    {
+        return self::open($ctx, $uri, $frame);
+    }
+
+    /**
+     * XMLReader::fromStream() — always-static stream factory (php-src; #19607).
+     */
+    public static function fromStream(
+        Context $ctx,
+        Variable $streamVar,
+        ?string $documentUri = null,
+        ?Frame $frame = null
+    ): ObjectEntry {
+        $handle = ResourceSupport::resolveHandle($streamVar);
+        if (null === $handle) {
+            throw new \TypeError('XMLReader::fromStream(): Argument #1 ($stream) must be of type resource');
+        }
+        $contents = VmFs::streamGetContents($handle);
+        if (false === $contents) {
+            throw new \Error('XMLReader::fromStream(): Unable to read source data');
+        }
+        $uri = $documentUri ?? '';
+        $reader = self::openFromString($ctx, $uri, $contents, $frame);
+        if (null === $reader) {
+            throw new \Error('XMLReader::fromStream(): Unable to open source data');
+        }
+
+        return $reader;
     }
 
     private static function bindParsedSource(
