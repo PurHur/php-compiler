@@ -33315,6 +33315,20 @@ class Compiler {
             ) {
                 return null;
             }
+            // importNode($list->item(0), true) — leaf MethodCall feeds arg #0; trailing
+            // true/false/null ConstFetch maps to later args (#20284, re-#18860 MethodCall).
+            if ($argIndex > 0) {
+                $immediatePrelude = $block->orig->children[$callIndex - 1] ?? null;
+                if ($immediatePrelude instanceof Op\Expr\ConstFetch) {
+                    $scalarName = $this->staticNameFromOperand($immediatePrelude->name);
+                    if (
+                        null !== $scalarName
+                        && \in_array(strtolower($scalarName), ['true', 'false', 'null'], true)
+                    ) {
+                        return null;
+                    }
+                }
+            }
             $operandSlot = $block->slotForOperand($prev->result);
             if (null !== $operandSlot) {
                 return (string) $operandSlot;

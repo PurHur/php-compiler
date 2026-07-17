@@ -7829,6 +7829,64 @@ PHP;
         self::assertSame("x:text\n", ob_get_clean());
     }
 
+    /** Issue #20284 — importNode($list->item(0), true) must not misbind deep to MethodCall result. */
+    public function testDomDocumentImportNodeMethodCallChainAndTrueUseDistinctArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$doc1 = new DOMDocument();
+$doc1->loadXML('<root><a><b>x</b></a></root>');
+$doc2 = new DOMDocument();
+$doc2->loadXML('<root/>');
+$imported = $doc2->importNode($doc1->getElementsByTagName('a')->item(0), true);
+$doc2->documentElement->appendChild($imported);
+echo $doc2->saveXML();
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_import_node_methodcall_true.php');
+
+        $importArgSendSlots = [];
+        $seenImportNode = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type
+                && null !== $op->arg2
+                && isset($block->constants[$op->arg2])
+                && 'importNode' === $block->constants[$op->arg2]->toString()) {
+                $seenImportNode = true;
+                continue;
+            }
+            if ($seenImportNode && OpCode::TYPE_ARG_SEND === $op->type) {
+                $importArgSendSlots[] = $op->arg1;
+            }
+            if ($seenImportNode && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertCount(2, $importArgSendSlots, 'importNode arg sends='.json_encode($importArgSendSlots));
+        self::assertNotSame($importArgSendSlots[0], $importArgSendSlots[1]);
+        $deepSlot = $importArgSendSlots[1];
+        $deepIsConstFetchTrue = false;
+        foreach ($block->opCodes as $op) {
+            if (
+                OpCode::TYPE_CONST_FETCH === $op->type
+                && (string) $op->arg1 === (string) $deepSlot
+                && null !== $op->arg2
+                && isset($block->constants[$op->arg2])
+                && 'true' === strtolower($block->constants[$op->arg2]->toString())
+            ) {
+                $deepIsConstFetchTrue = true;
+                break;
+            }
+        }
+        self::assertTrue($deepIsConstFetchTrue, 'arg #1 must be ConstFetch true, got slot='.$deepSlot);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("<?xml version=\"1.0\"?>\n<root><a><b>x</b></a></root>\n", ob_get_clean());
+    }
+
     /** Issue #18410 — documentElement->appendChild(createElement) must not feed receiver fetch into inner arg. */
     public function testDomDocumentElementAppendChildCreateElementUsesDistinctArgSlots(): void
     {
