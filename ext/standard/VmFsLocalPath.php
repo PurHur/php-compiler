@@ -7,9 +7,9 @@ namespace PHPCompiler\ext\standard;
 /**
  * Resolve relative local paths before host-style fopen/file_put_contents in compiled helpers.
  *
- * User-script AOT nested helpers call {@see VmFsReadPure} / {@see VmFsWritePure}; libc
- * defer kernels used absolute open(2) paths while PHP lowering kept argv-relative strings
- * (#19966, #16075).
+ * User-script AOT nested helpers call {@see VmFsReadPure} / {@see VmFsWritePure}; WritePure
+ * uses fopen/fwrite (not file_put_contents) so NestedJIT cannot recurse into the FPC ABI
+ * (#19966, #16075, #20266).
  */
 final class VmFsLocalPath
 {
