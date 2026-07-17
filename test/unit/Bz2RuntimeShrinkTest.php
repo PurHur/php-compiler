@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** bz2 JIT lowering routes through Bz2JitHelper PHP, not StringBz2Jit LLVM (#8868). */
+/** bz2 JIT: always JitVmHelperLink + Bz2JitHelper; no UserScriptAotDeferNestedJit (#8868, #20117). */
 final class Bz2RuntimeShrinkTest extends TestCase
 {
     public function testStringBz2RoutesThroughRuntimeNotJitMonolith(): void
@@ -19,6 +19,10 @@ final class Bz2RuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Bz2Runtime.php');
         $this->assertStringContainsString('Bz2JitHelper', $runtime);
         $this->assertStringContainsString('VmBz2Native', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $runtime);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $runtime);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $runtime);
+        $this->assertStringNotContainsString('shouldDefer', $runtime);
         $this->assertStringNotContainsString('Bz2StandaloneLlvm', $runtime);
         $this->assertStringContainsString('VmBz2Core', (string) file_get_contents(__DIR__.'/../../ext/bz2/VmBz2Native.php'));
         $this->assertFileExists(__DIR__.'/../../ext/bz2/Bz2ExtensionPolicy.php');
