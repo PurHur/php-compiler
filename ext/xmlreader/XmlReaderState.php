@@ -38,4 +38,31 @@ final class XmlReaderState
      * null = not on an attribute node (php-src moveToAttribute* / moveToElement).
      */
     public ?int $attributeIndex = null;
+
+    /**
+     * Parser properties (XMLReader::LOADDTD / DEFAULTATTRS / VALIDATE / SUBST_ENTITIES).
+     *
+     * @var array<int, bool>
+     */
+    public array $parserProps = [
+        XmlReaderConstants::LOADDTD => false,
+        XmlReaderConstants::DEFAULTATTRS => false,
+        XmlReaderConstants::VALIDATE => false,
+        XmlReaderConstants::SUBST_ENTITIES => false,
+    ];
+
+    /** XSD file path when {@see VmXmlReader::setSchema} attached a schema; null = none. */
+    public ?string $schemaPath = null;
+
+    /** RelaxNG file path when {@see VmXmlReader::setRelaxNGSchema} attached a grammar; null = none. */
+    public ?string $relaxNgPath = null;
+
+    /** True when an XSD or RelaxNG schema is attached (affects {@see VmXmlReader::isValid}). */
+    public bool $schemaModeActive = false;
+
+    /** Schema/DTD validity after the first read() under schema or VALIDATE mode. */
+    public bool $schemaValid = true;
+
+    /** Whether deferred schema/DTD validation has been applied. */
+    public bool $schemaCheckDone = false;
 }

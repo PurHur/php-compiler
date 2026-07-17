@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\xmlreader;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\dom\VmDom;
+use PHPCompiler\ext\dom\VmDomValidationNative;
 use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsReadNative;
@@ -110,6 +111,18 @@ final class VmXmlReader
         $entry->methods['lookupnamespace'] = new XmlReaderLookupNamespace();
         $entry->methodVisibility['lookupnamespace'] = $pub;
         $entry->methodNames['lookupnamespace'] = 'lookupNamespace';
+        $entry->methods['setparserproperty'] = new XmlReaderSetParserProperty();
+        $entry->methodVisibility['setparserproperty'] = $pub;
+        $entry->methodNames['setparserproperty'] = 'setParserProperty';
+        $entry->methods['getparserproperty'] = new XmlReaderGetParserProperty();
+        $entry->methodVisibility['getparserproperty'] = $pub;
+        $entry->methodNames['getparserproperty'] = 'getParserProperty';
+        $entry->methods['setschema'] = new XmlReaderSetSchema();
+        $entry->methodVisibility['setschema'] = $pub;
+        $entry->methodNames['setschema'] = 'setSchema';
+        $entry->methods['setrelaxngschema'] = new XmlReaderSetRelaxNGSchema();
+        $entry->methodVisibility['setrelaxngschema'] = $pub;
+        $entry->methodNames['setrelaxngschema'] = 'setRelaxNGSchema';
 
         if (CompilerVersion::supportsXmlReaderFactories()) {
             $entry->methods['fromstring'] = new XmlReaderFromString();
@@ -302,7 +315,13 @@ final class VmXmlReader
             return false;
         }
 
-        return self::advanceEvent($entry);
+        $ok = self::advanceEvent($entry);
+        if ($state->schemaModeActive || !empty($state->parserProps[XmlReaderConstants::VALIDATE])) {
+            // Trigger deferred schema/DTD check on first successful or exhausting read (#19553).
+            self::ensureSchemaValidation($entry);
+        }
+
+        return $ok;
     }
 
     /**
@@ -633,7 +652,231 @@ final class VmXmlReader
 
     public static function isValid(ObjectEntry $entry): bool
     {
-        return XmlReaderRegistry::state($entry)->valid;
+        $state = XmlReaderRegistry::state($entry);
+        if ($state->schemaModeActive || !empty($state->parserProps[XmlReaderConstants::VALIDATE])) {
+            // php-src xmlTextReaderIsValid: optimistic true before the first read under schema/VALIDATE.
+            if ($state->position < 0) {
+                return true;
+            }
+            self::ensureSchemaValidation($entry);
+
+            return $state->schemaValid;
+        }
+
+        return $state->valid;
+    }
+
+    /**
+     * XMLReader::setParserProperty() — php-src zim_XMLReader_setParserProperty (#19553).
+     */
+    public static function setParserProperty(ObjectEntry $entry, int $property, bool $value): bool
+    {
+        if (!XmlReaderRegistry::has($entry)) {
+            throw new \Error('Cannot access parser properties before loading data');
+        }
+        if (!isset(XmlReaderRegistry::state($entry)->parserProps[$property])) {
+            throw new \ValueError('XMLReader::setParserProperty(): Argument #1 ($property) must be a valid parser property');
+        }
+        $state = XmlReaderRegistry::state($entry);
+        $state->parserProps[$property] = $value;
+        if (XmlReaderConstants::VALIDATE === $property) {
+            $state->schemaCheckDone = false;
+            if ($value) {
+                // Match php-src: isValid() becomes true before the first read once VALIDATE is on.
+                $state->schemaValid = true;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * XMLReader::getParserProperty() — php-src zim_XMLReader_getParserProperty (#19553).
+     */
+    public static function getParserProperty(ObjectEntry $entry, int $property): bool
+    {
+        if (!XmlReaderRegistry::has($entry)) {
+            throw new \Error('Cannot access parser properties before loading data');
+        }
+        $state = XmlReaderRegistry::state($entry);
+        if (!isset($state->parserProps[$property])) {
+            throw new \ValueError('XMLReader::getParserProperty(): Argument #1 ($property) must be a valid parser property');
+        }
+
+        return $state->parserProps[$property];
+    }
+
+    /**
+     * XMLReader::setSchema() — php-src zim_XMLReader_setSchema / xmlTextReaderSchemaValidate (#19553).
+     */
+    public static function setSchema(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?string $filename,
+        ?Frame $frame = null
+    ): bool {
+        if (!XmlReaderRegistry::has($entry)) {
+            throw new \Error('Schema must be set prior to reading');
+        }
+        $state = XmlReaderRegistry::state($entry);
+        if ($state->position >= 0) {
+            self::warn($ctx, 'XMLReader::setSchema(): Schema contains errors', $frame);
+
+            return false;
+        }
+        if (null === $filename) {
+            $state->schemaPath = null;
+            if (null === $state->relaxNgPath) {
+                $state->schemaModeActive = false;
+            }
+            $state->schemaCheckDone = false;
+            $state->schemaValid = true;
+
+            return true;
+        }
+        if ('' === $filename) {
+            throw new \ValueError('XMLReader::setSchema(): Argument #1 ($filename) cannot be empty');
+        }
+        if (!is_file($filename)) {
+            $schemaPath = $filename;
+            if ('/' !== $schemaPath[0]) {
+                $cwd = getcwd();
+                if (false !== $cwd && '' !== $cwd) {
+                    $schemaPath = rtrim($cwd, '/\\').'/'.$schemaPath;
+                }
+            }
+            self::warn($ctx, 'XMLReader::setSchema(): I/O warning : failed to load external entity "'.$schemaPath.'"', $frame);
+            self::warn($ctx, "XMLReader::setSchema(): Failed to locate the main schema resource at '{$schemaPath}'.", $frame);
+            self::warn($ctx, 'XMLReader::setSchema(): Schema contains errors', $frame);
+
+            return false;
+        }
+        if (!VmDomValidationNative::available() || !VmDomValidationNative::parseSchemaFile($filename)) {
+            foreach (VmDomValidationNative::consumeLastErrors() as $error) {
+                self::warn($ctx, 'XMLReader::setSchema(): '.$error, $frame);
+            }
+            self::warn($ctx, 'XMLReader::setSchema(): Schema contains errors', $frame);
+
+            return false;
+        }
+        $state->schemaPath = $filename;
+        $state->relaxNgPath = null;
+        $state->schemaModeActive = true;
+        $state->schemaCheckDone = false;
+        $state->schemaValid = true;
+
+        return true;
+    }
+
+    /**
+     * XMLReader::setRelaxNGSchema() — php-src zim_XMLReader_setRelaxNGSchema (#19553).
+     */
+    public static function setRelaxNGSchema(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?string $filename,
+        ?Frame $frame = null
+    ): bool {
+        if (!XmlReaderRegistry::has($entry)) {
+            throw new \Error('Schema must be set prior to reading');
+        }
+        $state = XmlReaderRegistry::state($entry);
+        if ($state->position >= 0) {
+            self::warn($ctx, 'XMLReader::setRelaxNGSchema(): Schema contains errors', $frame);
+
+            return false;
+        }
+        if (null === $filename) {
+            $state->relaxNgPath = null;
+            if (null === $state->schemaPath) {
+                $state->schemaModeActive = false;
+            }
+            $state->schemaCheckDone = false;
+            $state->schemaValid = true;
+
+            return true;
+        }
+        if ('' === $filename) {
+            throw new \ValueError('XMLReader::setRelaxNGSchema(): Argument #1 ($filename) cannot be empty');
+        }
+        if (!is_file($filename)) {
+            $rngPath = $filename;
+            if ('/' !== $rngPath[0]) {
+                $cwd = getcwd();
+                if (false !== $cwd && '' !== $cwd) {
+                    $rngPath = rtrim($cwd, '/\\').'/'.$rngPath;
+                }
+            }
+            self::warn($ctx, 'XMLReader::setRelaxNGSchema(): I/O warning : failed to load external entity "'.$rngPath.'"', $frame);
+            self::warn($ctx, 'XMLReader::setRelaxNGSchema(): xmlRelaxNGParse: could not load '.$rngPath, $frame);
+            self::warn($ctx, 'XMLReader::setRelaxNGSchema(): Schema contains errors', $frame);
+
+            return false;
+        }
+        if (!VmDomValidationNative::available() || !VmDomValidationNative::parseRelaxNGFile($filename)) {
+            foreach (VmDomValidationNative::consumeLastErrors() as $error) {
+                self::warn($ctx, 'XMLReader::setRelaxNGSchema(): '.$error, $frame);
+            }
+            self::warn($ctx, 'XMLReader::setRelaxNGSchema(): Schema contains errors', $frame);
+
+            return false;
+        }
+        $state->relaxNgPath = $filename;
+        $state->schemaPath = null;
+        $state->schemaModeActive = true;
+        $state->schemaCheckDone = false;
+        $state->schemaValid = true;
+
+        return true;
+    }
+
+    /**
+     * Apply deferred XSD / RelaxNG / DTD validation after the first read() (#19553).
+     */
+    private static function ensureSchemaValidation(ObjectEntry $entry): void
+    {
+        $state = XmlReaderRegistry::state($entry);
+        if ($state->schemaCheckDone) {
+            return;
+        }
+        $state->schemaCheckDone = true;
+        if (null !== $state->schemaPath) {
+            if (!VmDomValidationNative::available()) {
+                $state->schemaValid = false;
+
+                return;
+            }
+            $state->schemaValid = VmDomValidationNative::validateSchemaDocument(
+                $state->sourceData,
+                $state->schemaPath
+            );
+            VmDomValidationNative::consumeLastErrors();
+
+            return;
+        }
+        if (null !== $state->relaxNgPath) {
+            if (!VmDomValidationNative::available()) {
+                $state->schemaValid = false;
+
+                return;
+            }
+            $state->schemaValid = VmDomValidationNative::validateRelaxNGDocument(
+                $state->sourceData,
+                $state->relaxNgPath
+            );
+            VmDomValidationNative::consumeLastErrors();
+
+            return;
+        }
+        if (!empty($state->parserProps[XmlReaderConstants::VALIDATE])) {
+            if (!VmDomValidationNative::available()) {
+                $state->schemaValid = false;
+
+                return;
+            }
+            $result = VmDomValidationNative::validateDtdDocument($state->sourceData);
+            $state->schemaValid = $result['valid'];
+        }
     }
 
     /**
