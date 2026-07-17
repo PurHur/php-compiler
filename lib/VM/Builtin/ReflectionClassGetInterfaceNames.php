@@ -41,10 +41,8 @@ final class ReflectionClassGetInterfaceNames extends VmClassMethod
 
     private static function requireReflectionClassOrEnum(ObjectEntry $obj): void
     {
-        $lc = strtolower($obj->class->name);
-        if (ReflectionSupport::REFLECTION_CLASS !== $lc
-            && ReflectionSupport::REFLECTION_ENUM !== $lc) {
-            throw new \LogicException('Expected ReflectionClass or ReflectionEnum instance');
+        if (!ReflectionSupport::isReflectionClassObject($obj)) {
+            throw new \LogicException('Expected ReflectionClass instance');
         }
     }
 }
