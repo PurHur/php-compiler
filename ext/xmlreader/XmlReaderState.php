@@ -20,4 +20,10 @@ final class XmlReaderState
     public int $position = -1;
 
     public ?XmlReaderEvent $current = null;
+
+    /**
+     * Attribute cursor index into the current ELEMENT's attribute map (document order).
+     * null = not on an attribute node (php-src moveToAttribute* / moveToElement).
+     */
+    public ?int $attributeIndex = null;
 }
