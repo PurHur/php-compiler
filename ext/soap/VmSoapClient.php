@@ -107,6 +107,10 @@ final class VmSoapClient
         if (isset($options['authentication'])) {
             $state->authentication = (int) $options['authentication'];
         }
+        // php-src Z_CLIENT_COMPRESSION (#20313).
+        if (isset($options['compression'])) {
+            $state->compression = (int) $options['compression'];
+        }
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
@@ -241,14 +245,18 @@ final class VmSoapClient
         $state = self::state($object);
         $state->lastRequest = $request;
 
+        [$bodyOut, $contentEncoding, $acceptEncoding] = self::applyRequestCompression($state, $request);
+
         $cookieHeader = self::formatCookieHeader($state->cookies);
         $authHeader = self::formatAuthorizationHeader($state);
         $requestHeaders = self::buildHttpRequestHeaders(
             $location,
             $action,
-            \strlen($request),
+            \strlen($bodyOut),
             $cookieHeader,
-            $authHeader
+            $authHeader,
+            $acceptEncoding,
+            $contentEncoding
         );
         if ($state->trace) {
             $state->lastRequestHeaders = $requestHeaders;
@@ -274,6 +282,12 @@ final class VmSoapClient
 
         $headers = "Content-Type: text/xml; charset=utf-8\r\n".
             'SOAPAction: "'.$action."\"\r\n";
+        if ('' !== $acceptEncoding) {
+            $headers .= 'Accept-Encoding: '.$acceptEncoding."\r\n";
+        }
+        if ('' !== $contentEncoding) {
+            $headers .= 'Content-Encoding: '.$contentEncoding."\r\n";
+        }
         if ('' !== $cookieHeader) {
             $headers .= 'Cookie: '.$cookieHeader."\r\n";
         }
@@ -284,7 +298,7 @@ final class VmSoapClient
             'http' => [
                 'method' => 'POST',
                 'header' => $headers,
-                'content' => $request,
+                'content' => $bodyOut,
                 'ignore_errors' => true,
                 'timeout' => 30,
             ],
@@ -293,14 +307,81 @@ final class VmSoapClient
         if (false === $body) {
             throw new \SoapFault('HTTP', 'Could not connect to host');
         }
+        $responseHeaders = '';
+        if (isset($http_response_header) && \is_array($http_response_header) && $http_response_header !== []) {
+            $responseHeaders = \implode("\r\n", $http_response_header)."\r\n";
+        }
+        $body = self::maybeDecompressResponse($body, $responseHeaders);
         $state->lastResponse = $body;
         if ($state->trace) {
-            // file_get_contents populates $http_response_header in local scope (php-src HTTP wrapper).
-            if (isset($http_response_header) && \is_array($http_response_header) && $http_response_header !== []) {
-                $state->lastResponseHeaders = \implode("\r\n", $http_response_header)."\r\n";
+            if ('' !== $responseHeaders) {
+                $state->lastResponseHeaders = $responseHeaders;
             } else {
                 $state->lastResponseHeaders = self::synthesizeFixtureResponseHeaders(\strlen($body));
             }
+        }
+
+        return $body;
+    }
+
+    /**
+     * php-src php_http.c request compression (#20313).
+     *
+     * @return array{0: string, 1: string, 2: string} body, Content-Encoding value, Accept-Encoding value
+     */
+    private static function applyRequestCompression(SoapClientState $state, string $request): array
+    {
+        if (null === $state->compression) {
+            return [$request, '', ''];
+        }
+        $flags = $state->compression;
+        $level = $flags & 0x0f;
+        if ($level > 9) {
+            $level = 9;
+        }
+        $accept = '';
+        if (0 !== ($flags & SoapConstants::SOAP_COMPRESSION_ACCEPT)) {
+            $accept = 'gzip, deflate';
+        }
+        $contentEncoding = '';
+        $body = $request;
+        if ($level > 0) {
+            if (0 !== ($flags & SoapConstants::SOAP_COMPRESSION_DEFLATE)) {
+                $compressed = \gzcompress($request, $level);
+                if (false !== $compressed) {
+                    $body = $compressed;
+                    $contentEncoding = 'deflate';
+                }
+            } else {
+                $compressed = \gzencode($request, $level);
+                if (false !== $compressed) {
+                    $body = $compressed;
+                    $contentEncoding = 'gzip';
+                }
+            }
+        }
+
+        return [$body, $contentEncoding, $accept];
+    }
+
+    private static function maybeDecompressResponse(string $body, string $responseHeaders): string
+    {
+        if ('' === $responseHeaders || !\preg_match('/^Content-Encoding:\s*(\S+)/im', $responseHeaders, $m)) {
+            return $body;
+        }
+        $enc = \strtolower($m[1]);
+        if ('gzip' === $enc || 'x-gzip' === $enc) {
+            $out = \gzdecode($body);
+            return false !== $out ? $out : $body;
+        }
+        if ('deflate' === $enc) {
+            $out = \gzuncompress($body);
+            if (false === $out) {
+                // Some servers send raw deflate (RFC 1951) — try inflate.
+                $out = @\gzinflate($body);
+            }
+
+            return false !== $out ? $out : $body;
         }
 
         return $body;
@@ -350,7 +431,9 @@ final class VmSoapClient
         string $action,
         int $contentLength,
         string $cookieHeader = '',
-        string $authHeader = ''
+        string $authHeader = '',
+        string $acceptEncoding = '',
+        string $contentEncoding = ''
     ): string {
         $path = '/';
         $host = 'localhost';
@@ -364,8 +447,14 @@ final class VmSoapClient
         $hdr = 'POST '.$path." HTTP/1.1\r\n".
             'Host: '.$host."\r\n".
             "Connection: Keep-Alive\r\n".
-            'User-Agent: PHP-SOAP/'.\PHP_VERSION."\r\n".
-            "Content-Type: text/xml; charset=utf-8\r\n".
+            'User-Agent: PHP-SOAP/'.\PHP_VERSION."\r\n";
+        if ('' !== $acceptEncoding) {
+            $hdr .= 'Accept-Encoding: '.$acceptEncoding."\r\n";
+        }
+        if ('' !== $contentEncoding) {
+            $hdr .= 'Content-Encoding: '.$contentEncoding."\r\n";
+        }
+        $hdr .= "Content-Type: text/xml; charset=utf-8\r\n".
             'SOAPAction: "'.$action."\"\r\n".
             'Content-Length: '.$contentLength."\r\n";
         if ('' !== $cookieHeader) {
@@ -802,6 +891,9 @@ final class SoapClientState
     public ?string $password = null;
 
     public int $authentication = SoapConstants::SOAP_AUTHENTICATION_BASIC;
+
+    /** php-src Z_CLIENT_COMPRESSION — null when unset (#20313). */
+    public ?int $compression = null;
 
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
