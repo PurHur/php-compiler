@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** crypt() — POSIX DES/BCRYPT via libcrypt (issue #3771; php-src: ext/standard/crypt.c). */
@@ -27,6 +28,14 @@ final class crypt extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        $arg0 = $frame->calledArgs[0]->resolveIndirect();
+        $arg1 = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_NULL === $arg0->type) {
+            throw new \TypeError('crypt(): Argument #1 ($password) must be of type string, null given');
+        }
+        if (Variable::TYPE_NULL === $arg1->type) {
+            throw new \TypeError('crypt(): Argument #2 ($salt) must be of type string, null given');
+        }
         $password = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'crypt', 0, 'password');
         $salt = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'crypt', 1, 'salt');
         $frame->returnVar->string(
@@ -42,8 +51,8 @@ final class crypt extends Internal
 
         return JitPassword::crypt(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'crypt', 0, 'password'),
-            JitStringBuiltinArg::lower($context, $args[1], 'crypt', 1, 'salt')
+            JitStringBuiltinArg::lowerTypedString($context, $args[0], 'crypt', 0, 'password'),
+            JitStringBuiltinArg::lowerTypedString($context, $args[1], 'crypt', 1, 'salt')
         );
     }
 }
