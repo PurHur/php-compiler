@@ -412,12 +412,7 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            // Z_PARAM_PATH: null→TypeError on 8.4 forward (#19256); softNullPath keeps ≤8.3 coerce (#11016).
-            if (!$softNullPath && self::requiresZparamStrStrictNullOnForwardProfile()) {
-                throw new \TypeError(
-                    self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null')
-                );
-            }
+            // Z_PARAM_PATH: null coerces with deprecation on forward profile (re-#18850, #19997; php-src filestat.c).
             if (!$softNullPath && !self::requiresForwardProfileStrictStringNull()) {
                 VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
             }
