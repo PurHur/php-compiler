@@ -9,10 +9,13 @@ final class XmlWriterState
 {
     public bool $open = false;
 
-    /** @var ''|'memory'|'uri' */
+    /** @var ''|'memory'|'uri'|'stream' */
     public string $mode = '';
 
     public ?string $uri = null;
+
+    /** VM stream handle when {@see $mode} is `stream` (#19606). */
+    public ?int $streamHandle = null;
 
     public string $buffer = '';
 
