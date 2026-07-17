@@ -11,6 +11,7 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -71,6 +72,20 @@ final class RegexIteratorBuiltin
             'REPLACE' => self::REPLACE,
         ]);
 
+        // php-src stub: public ?string $replacement = null (#20153).
+        if (!self::hasDeclaredReplacement($entry)) {
+            $nullDefault = new Variable(Variable::TYPE_NULL);
+            $strProto = new Variable(Variable::TYPE_STRING);
+            $entry->properties[] = new ClassProperty(
+                'replacement',
+                $nullDefault,
+                $strProto,
+                false,
+                $pub,
+                self::CLASS_LC
+            );
+        }
+
         $entry->constructor = new RegexIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
@@ -111,7 +126,25 @@ final class RegexIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['rewind'], $entry->methods['accept'], $entry->methods['__construct']);
+        return isset($entry->methods['rewind'], $entry->methods['accept'], $entry->methods['__construct'])
+            && self::hasDeclaredReplacement($entry);
+    }
+
+    private static function hasDeclaredReplacement(ClassEntry $entry): bool
+    {
+        return self::entryHasProperty($entry, 'replacement');
+    }
+
+    /** @internal Shared by RecursiveRegexIterator property inheritance (#20153). */
+    public static function entryHasProperty(ClassEntry $entry, string $name): bool
+    {
+        foreach ($entry->properties as $prop) {
+            if ($name === $prop->name) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function initState(
@@ -840,6 +873,16 @@ final class RecursiveRegexIteratorBuiltin
         // php-src PHP_METHOD(RecursiveRegexIterator, accept) — arrays descend via RII (#20152).
         $entry->methods['accept'] = new RecursiveRegexIteratorAccept();
         $entry->methodVisibility['accept'] = $pub;
+
+        // Inherit declared instance properties from RegexIterator (e.g. $replacement, #20153).
+        $parent = $ctx->classes[RegexIteratorBuiltin::CLASS_LC] ?? null;
+        if (null !== $parent) {
+            foreach ($parent->properties as $prop) {
+                if (!RegexIteratorBuiltin::entryHasProperty($entry, $prop->name)) {
+                    $entry->properties[] = $prop;
+                }
+            }
+        }
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
