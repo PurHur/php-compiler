@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5504 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15613 |
+| Source constructs flagged (warnings) | 15618 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1273,7 +1273,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/EmptyIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/FilesystemIteratorBuiltin.php` | 0 | 17 |
-| `ext/spl/FilterIteratorBuiltin.php` | 0 | 9 |
+| `ext/spl/FilterIteratorBuiltin.php` | 0 | 14 |
 | `ext/spl/GlobIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/InfiniteIteratorBuiltin.php` | 0 | 7 |
 | `ext/spl/IteratorIteratorBuiltin.php` | 0 | 14 |
@@ -13046,25 +13046,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 303)
 - new Variable (line 309)
 - new Variable (line 318)
-- new SimpleXmlNodeState (line 549)
-- new SimpleXmlNodeState (line 555)
-- new SimpleXmlNodeState (line 561)
-- new SimpleXmlNodeState (line 606)
-- new HashTable (line 680)
-- new Variable (line 692)
-- new Variable (line 702)
-- new Variable (line 738)
-- new Variable (line 749)
-- new SimpleXmlNodeState (line 785)
-- new ObjectEntry (line 803)
-- new ObjectEntry (line 845)
-- new ObjectEntry (line 856)
-- new SimpleXmlNodeState (line 860)
-- new ObjectEntry (line 876)
-- new HashTable (line 1117)
-- new Variable (line 1119)
-- new SimpleXmlNodeState (line 1178)
-- new SimpleXmlNodeState (line 1187)
+- new SimpleXmlNodeState (line 550)
+- new SimpleXmlNodeState (line 556)
+- new SimpleXmlNodeState (line 562)
+- new SimpleXmlNodeState (line 607)
+- new HashTable (line 681)
+- new Variable (line 693)
+- new Variable (line 703)
+- new Variable (line 739)
+- new Variable (line 750)
+- new SimpleXmlNodeState (line 786)
+- new ObjectEntry (line 804)
+- new ObjectEntry (line 846)
+- new ObjectEntry (line 857)
+- new SimpleXmlNodeState (line 861)
+- new ObjectEntry (line 877)
+- new HashTable (line 1118)
+- new Variable (line 1120)
+- new SimpleXmlNodeState (line 1179)
+- new SimpleXmlNodeState (line 1188)
 - 54 class method(s)
 - 3 closure(s)
 
@@ -14690,8 +14690,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new RecursiveDirectoryIteratorGetSubPathname (line 205)
 - new ArgumentCountError (line 240)
 - new ArgumentCountError (line 278)
-- new ObjectEntry (line 416)
-- new ArgumentCountError (line 501)
+- new ObjectEntry (line 417)
+- new ArgumentCountError (line 502)
 - 18 class method(s)
 
 ### `ext/spl/FilterIteratorBuiltin.php`
@@ -14700,12 +14700,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 34)
 - new FilterIteratorConstruct (line 43)
 - new FilterIteratorAccept (line 46)
-- new ClassEntry (line 120)
-- new RecursiveFilterIteratorConstruct (line 129)
-- new ArgumentCountError (line 153)
-- new ArgumentCountError (line 185)
-- new BadMethodCallException (line 216)
-- 15 class method(s)
+- new ClassEntry (line 125)
+- new RecursiveFilterIteratorConstruct (line 134)
+- new RecursiveFilterIteratorHasChildren (line 137)
+- new RecursiveFilterIteratorGetChildren (line 140)
+- new ObjectEntry (line 158)
+- new Variable (line 161)
+- new ArgumentCountError (line 192)
+- new ArgumentCountError (line 224)
+- new UnexpectedValueException (line 287)
+- new BadMethodCallException (line 313)
+- 19 class method(s)
 
 ### `ext/spl/GlobIteratorBuiltin.php`
 

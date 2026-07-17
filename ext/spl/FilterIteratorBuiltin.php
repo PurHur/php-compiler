@@ -103,14 +103,19 @@ final class FilterIteratorBuiltin
     }
 }
 
-/** RecursiveFilterIterator shares FilterIterator constructor + fetch (#13178). */
+/**
+ * RecursiveFilterIterator — FilterIterator + RecursiveIterator children (#13178, #20151).
+ *
+ * php-src ext/spl/spl_iterators.c — hasChildren delegates to the inner RecursiveIterator;
+ * getChildren wraps the inner child in a new instance of the same class (user subclass).
+ */
 final class RecursiveFilterIteratorBuiltin
 {
     public const CLASS_LC = 'recursivefilteriterator';
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['__construct'])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && self::classIsComplete($ctx->classes[self::CLASS_LC])) {
             return;
         }
 
@@ -129,9 +134,43 @@ final class RecursiveFilterIteratorBuiltin
         $entry->constructor = new RecursiveFilterIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
+        $entry->methods['haschildren'] = new RecursiveFilterIteratorHasChildren();
+        $entry->methodVisibility['haschildren'] = $pub;
+        $entry->methodNames['haschildren'] = 'hasChildren';
+        $entry->methods['getchildren'] = new RecursiveFilterIteratorGetChildren();
+        $entry->methodVisibility['getchildren'] = $pub;
+        $entry->methodNames['getchildren'] = 'getChildren';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    /**
+     * Wrap an inner RecursiveIterator child in a new filter of the same class as $template
+     * (php-src spl_RecursiveFilterIterator_get_children — Z_OBJCE_P(getThis())).
+     */
+    public static function createFromInnerTemplate(
+        Context $ctx,
+        ObjectEntry $childInner,
+        ObjectEntry $template
+    ): Variable {
+        $class = $template->class;
+        $object = new ObjectEntry($class);
+        $object->constructed = true;
+        SplDualIteratorStorage::initSimple($object, $childInner);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($object);
+
+        return $var;
+    }
+
+    private static function classIsComplete(ClassEntry $entry): bool
+    {
+        return isset(
+            $entry->methods['__construct'],
+            $entry->methods['haschildren'],
+            $entry->methods['getchildren']
+        );
     }
 }
 
@@ -196,6 +235,64 @@ final class RecursiveFilterIteratorConstruct extends VmClassMethod
             $frame->calledArgs[1]
         );
         SplDualIteratorStorage::initSimple($object, $inner);
+    }
+}
+
+final class RecursiveFilterIteratorHasChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('hasChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveFilterIteratorBuiltin::CLASS_LC,
+            'RecursiveFilterIterator::hasChildren()'
+        );
+        $inner = SplDualIteratorStorage::inner($object);
+        $result = SplDualIteratorStorage::callInner($frame, $inner, 'hasChildren')->resolveIndirect();
+        SplIteratorSupport::setReturnBool(
+            $frame,
+            Variable::TYPE_BOOLEAN === $result->type && $result->toBool()
+        );
+    }
+}
+
+final class RecursiveFilterIteratorGetChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveFilterIteratorBuiltin::CLASS_LC,
+            'RecursiveFilterIterator::getChildren()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException('RecursiveFilterIterator::getChildren() requires VM context');
+        }
+        $inner = SplDualIteratorStorage::inner($object);
+        $child = SplDualIteratorStorage::callInner($frame, $inner, 'getChildren')->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $child->type) {
+            throw new \UnexpectedValueException('RecursiveIterator::getChildren() must return an object');
+        }
+        $frame->returnVar->copyFrom(
+            RecursiveFilterIteratorBuiltin::createFromInnerTemplate(
+                $frame->vmContext,
+                $child->toObject(),
+                $object
+            )
+        );
     }
 }
 
