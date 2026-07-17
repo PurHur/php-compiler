@@ -33,21 +33,13 @@ final class mb_ereg extends Internal
                 $argc
             ));
         }
-        $pattern = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'mb_ereg',
-            0,
-            'pattern'
-        );
+        // Z_PARAM_STR $pattern — empty ValueError; null TypeError on PROFILE=8.4 (#20261).
+        $pattern = VmMbstring::coerceMbEregPatternArg($frame, 'mb_ereg', 0);
         if (null === $frame->returnVar) {
             return;
         }
-        $string = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
-            'mb_ereg',
-            1,
-            'string'
-        );
+        // Z_PARAM_STR $string — null TypeError on PROFILE=8.4 (php_mbregex.c).
+        $string = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'mb_ereg', 1, 'string');
 
         $out = VmMbstring::eregMatch($pattern, $string, false);
         if (!$out['matched'] && null !== VmMbstring::mbEregRegexCompileError($pattern, false)) {

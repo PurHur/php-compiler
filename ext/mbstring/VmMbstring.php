@@ -2732,6 +2732,32 @@ final class VmMbstring
     }
 
     /**
+     * Z_PARAM_STR $pattern for mb_ereg / mb_eregi (php-src php_mbregex.c; #20261).
+     *
+     * Null: TypeError on PROFILE=8.4; deprecate+coerce to "" on default profile.
+     * Empty string (after coerce): ValueError — must not be empty.
+     */
+    public static function coerceMbEregPatternArg(Frame $frame, string $function, int $argIndex = 0): string
+    {
+        $pattern = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            $argIndex,
+            $function,
+            $argIndex,
+            'pattern'
+        );
+        if ('' === $pattern) {
+            throw new \ValueError(sprintf(
+                '%s(): Argument #%d ($pattern) must not be empty',
+                $function,
+                $argIndex + 1
+            ));
+        }
+
+        return $pattern;
+    }
+
+    /**
      * Build PCRE pattern for mb_ereg* (php-src ext/mbstring/php_mbregex.c; #4635, #20024).
      *
      * Oniguruma semantics are approximated via PCRE u-flag (same approach as mb_split).
