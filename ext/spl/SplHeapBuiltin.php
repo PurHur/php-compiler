@@ -77,13 +77,16 @@ final class SplHeapBuiltin
         }
         $entry->methodNames['isempty'] = 'isEmpty';
         $entry->methodNames['recoverfromcorruption'] = 'recoverFromCorruption';
+        $entry->methods['__debuginfo'] = new SplHeapDebugInfo();
+        $entry->methodVisibility['__debuginfo'] = $pub;
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['insert'], $entry->methods['extract'], $entry->methods['rewind']);
+        return isset($entry->methods['insert'], $entry->methods['extract'], $entry->methods['rewind'], $entry->methods['__debuginfo']);
     }
 
     public static function init(ObjectEntry $object, int $kind): void
@@ -187,6 +190,39 @@ final class SplHeapBuiltin
         self::state($object);
 
         return true;
+    }
+
+    /**
+     * Private flags / isCorrupted / heap for var_dump (php-src spl_heap_object_get_debug_info; #19825).
+     */
+    public static function debugInfoTable(ObjectEntry $object): HashTable
+    {
+        $state = self::state($object);
+        $ht = new HashTable();
+
+        $flags = new Variable();
+        $flags->int($state['flags']);
+        $ht->addNew("\0SplHeap\0flags", $flags);
+
+        $corrupted = new Variable();
+        $corrupted->bool(false);
+        $ht->addNew("\0SplHeap\0isCorrupted", $corrupted);
+
+        $values = [];
+        foreach ($state['elements'] as $var) {
+            $copy = new Variable();
+            $copy->copyFrom($var->resolveIndirect());
+            $values[] = $copy;
+        }
+        $heap = new Variable();
+        $heapHt = new HashTable();
+        if ([] !== $values) {
+            $heapHt->assignPackedList($values);
+        }
+        $heap->array($heapHt);
+        $ht->addNew("\0SplHeap\0heap", $heap);
+
+        return $ht;
     }
 
     public static function compareElements(ObjectEntry $object, Variable $a, Variable $b): int
@@ -367,6 +403,9 @@ final class SplPriorityQueueBuiltin
         $entry->methodNames['setextractflags'] = 'setExtractFlags';
         $entry->methodNames['getextractflags'] = 'getExtractFlags';
         $entry->methodNames['recoverfromcorruption'] = 'recoverFromCorruption';
+        $entry->methods['__debuginfo'] = new SplPriorityQueueDebugInfo();
+        $entry->methodVisibility['__debuginfo'] = $pub;
+        $entry->methodNames['__debuginfo'] = '__debugInfo';
         SplClassConstants::registerIntConstants($entry, [
             'EXTR_DATA' => self::EXTR_DATA,
             'EXTR_PRIORITY' => self::EXTR_PRIORITY,
@@ -378,7 +417,7 @@ final class SplPriorityQueueBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['insert'], $entry->methods['extract'], $entry->methods['setextractflags']);
+        return isset($entry->methods['insert'], $entry->methods['extract'], $entry->methods['setextractflags'], $entry->methods['__debuginfo']);
     }
 
     public static function init(ObjectEntry $object): void
@@ -487,6 +526,46 @@ final class SplPriorityQueueBuiltin
         return true;
     }
 
+    /**
+     * Private flags / isCorrupted / heap for PriorityQueue var_dump (#19825).
+     */
+    public static function debugInfoTable(ObjectEntry $object): HashTable
+    {
+        $state = self::state($object);
+        $ht = new HashTable();
+
+        $flags = new Variable();
+        $flags->int($state['flags']);
+        $ht->addNew("\0SplPriorityQueue\0flags", $flags);
+
+        $corrupted = new Variable();
+        $corrupted->bool(false);
+        $ht->addNew("\0SplPriorityQueue\0isCorrupted", $corrupted);
+
+        $rows = [];
+        foreach ($state['elements'] as $element) {
+            $row = new HashTable();
+            $data = new Variable();
+            $data->copyFrom($element['data']->resolveIndirect());
+            $row->addNew('data', $data);
+            $prio = new Variable();
+            $prio->copyFrom($element['priority']->resolveIndirect());
+            $row->addNew('priority', $prio);
+            $rowVar = new Variable();
+            $rowVar->array($row);
+            $rows[] = $rowVar;
+        }
+        $heap = new Variable();
+        $heapHt = new HashTable();
+        if ([] !== $rows) {
+            $heapHt->assignPackedList($rows);
+        }
+        $heap->array($heapHt);
+        $ht->addNew("\0SplPriorityQueue\0heap", $heap);
+
+        return $ht;
+    }
+
     /** @param array{data: Variable, priority: Variable} $element */
     private static function formatElement(ObjectEntry $object, array $element): Variable
     {
@@ -576,6 +655,55 @@ final class SplPriorityQueueBuiltin
         }
 
         return self::$store[$object->id];
+    }
+}
+
+/**
+ * SplHeap::__debugInfo() — private flags/isCorrupted/heap (#19825).
+ * Inherited by SplMinHeap / SplMaxHeap.
+ */
+final class SplHeapDebugInfo extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__debugInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplHeapBuiltin::CLASS_LC,
+            'SplHeap::__debugInfo()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(SplHeapBuiltin::debugInfoTable($object));
+    }
+}
+
+/**
+ * SplPriorityQueue::__debugInfo() — private flags/isCorrupted/heap (#19825).
+ */
+final class SplPriorityQueueDebugInfo extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__debugInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplPriorityQueueBuiltin::CLASS_LC,
+            'SplPriorityQueue::__debugInfo()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(SplPriorityQueueBuiltin::debugInfoTable($object));
     }
 }
 
