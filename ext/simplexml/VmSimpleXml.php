@@ -180,7 +180,9 @@ final class VmSimpleXml
 
     public static function requireElement(ObjectEntry $entry, string $label): ObjectEntry
     {
-        if (self::CLASS_LC !== strtolower($entry->class->name)) {
+        // Accept SimpleXMLElement subclasses (php-src; needed for simplexml_import_dom class_name, #20291).
+        if (self::CLASS_LC !== strtolower($entry->class->name)
+            && self::CLASS_LC !== ($entry->class->parentLc ?? '')) {
             throw new \TypeError(sprintf('%s(): Argument must be SimpleXMLElement, %s given', $label, $entry->class->name));
         }
         if (!SimpleXmlRegistry::has($entry)) {

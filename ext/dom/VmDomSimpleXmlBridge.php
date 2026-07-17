@@ -60,6 +60,51 @@ final class VmDomSimpleXmlBridge
     }
 
     /**
+     * simplexml_import_dom(SimpleXMLElement) — new wrapper over the same node state
+     * (php-src ext/simplexml/simplexml.c; #20291).
+     */
+    public static function importSimpleXmlElement(
+        Context $ctx,
+        ObjectEntry $sxe,
+        ClassEntry $class
+    ): ?ObjectEntry {
+        if (!SimpleXmlRegistry::has($sxe)) {
+            return null;
+        }
+        if (SimpleXmlRegistry::isAttributesView($sxe)) {
+            return null;
+        }
+        $docKey = SimpleXmlRegistry::documentKey($sxe);
+        if (SimpleXmlRegistry::isView($sxe)) {
+            $elements = SimpleXmlRegistry::view($sxe);
+            if ([] === $elements) {
+                return null;
+            }
+
+            return VmSimpleXml::wrapIteratorNode($ctx, $class, $elements[0], $docKey);
+        }
+
+        return VmSimpleXml::wrapIteratorNode($ctx, $class, SimpleXmlRegistry::state($sxe), $docKey);
+    }
+
+    /** Class-hierarchy instanceof SimpleXMLElement (#20291). */
+    public static function isSimpleXmlElementInstance(ObjectEntry $entry, Context $ctx): bool
+    {
+        $class = $entry->class;
+        for ($guard = 0; null !== $class && $guard < 64; ++$guard) {
+            if (VmSimpleXml::CLASS_LC === strtolower($class->name)) {
+                return true;
+            }
+            if (null === $class->parentLc || !isset($ctx->classes[$class->parentLc])) {
+                return false;
+            }
+            $class = $ctx->classes[$class->parentLc];
+        }
+
+        return false;
+    }
+
+    /**
      * After DOM element textContent / nodeValue write — mirror into linked SimpleXML state (#20137).
      */
     public static function syncSimpleXmlTextFromDom(ObjectEntry $domElement, string $value): void

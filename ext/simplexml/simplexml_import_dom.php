@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\simplexml;
 
-use PHPCompiler\ext\dom\DomRegistry;
 use PHPCompiler\ext\dom\VmDom;
 use PHPCompiler\ext\dom\VmDomSimpleXmlBridge;
 use PHPCompiler\ext\standard\VmString;
@@ -12,11 +11,12 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** simplexml_import_dom() — DOMNode to SimpleXMLElement bridge (php-src ext/simplexml/simplexml.c; #6057). */
+/** simplexml_import_dom() — DOMNode to SimpleXMLElement bridge (php-src ext/simplexml/simplexml.c; #6057, #20291). */
 final class simplexml_import_dom extends Internal
 {
     public function __construct()
@@ -34,13 +34,22 @@ final class simplexml_import_dom extends Internal
         }
 
         $nodeVar = $frame->calledArgs[0]->resolveIndirect();
+        // Zend typed arg: non-objects report "object"; wrong objects report the union (#20291).
         if (Variable::TYPE_OBJECT !== $nodeVar->type) {
             throw new \TypeError(sprintf(
-                'simplexml_import_dom(): Argument #1 ($node) must be of type SimpleXMLElement|DOMNode, %s given',
-                VmDom::typeLabel($nodeVar)
+                'simplexml_import_dom(): Argument #1 ($node) must be of type object, %s given',
+                EnumCaseSupport::typeNameForVariable($nodeVar)
             ));
         }
         $node = $nodeVar->toObject();
+        $isSxe = VmDomSimpleXmlBridge::isSimpleXmlElementInstance($node, $frame->vmContext);
+        $isDom = VmDom::isDomNodeInstance($node, $frame->vmContext);
+        if (!$isSxe && !$isDom) {
+            throw new \TypeError(sprintf(
+                'simplexml_import_dom(): Argument #1 ($node) must be of type SimpleXMLElement|DOMNode, %s given',
+                EnumCaseSupport::typeNameForVariable($nodeVar)
+            ));
+        }
 
         $className = null;
         if (isset($frame->calledArgs[1])) {
@@ -57,20 +66,15 @@ final class simplexml_import_dom extends Internal
 
         $class = VmDomSimpleXmlBridge::resolveSimpleXmlClass($frame->vmContext, $className);
 
-        if (!DomRegistry::has($node)) {
-            self::warnInvalidNodeType($frame);
-            if (null !== $frame->returnVar) {
-                $frame->returnVar->bool(false);
-            }
-
-            return;
+        if ($isSxe) {
+            $imported = VmDomSimpleXmlBridge::importSimpleXmlElement($frame->vmContext, $node, $class);
+        } else {
+            $imported = VmDomSimpleXmlBridge::importDom($frame->vmContext, $node, $class);
         }
-
-        $imported = VmDomSimpleXmlBridge::importDom($frame->vmContext, $node, $class);
         if (null === $imported) {
             self::warnInvalidNodeType($frame);
             if (null !== $frame->returnVar) {
-                $frame->returnVar->bool(false);
+                $frame->returnVar->null();
             }
 
             return;
