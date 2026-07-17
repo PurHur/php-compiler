@@ -75,6 +75,7 @@ class Module extends ModuleAbstract
             new openssl_cms_decrypt(),
             new openssl_cms_read(),
             new openssl_x509_verify(),
+            new openssl_x509_free(),
             new openssl_csr_new(),
             new openssl_csr_export(),
             new openssl_csr_export_to_file(),

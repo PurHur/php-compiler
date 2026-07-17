@@ -971,6 +971,7 @@ require_once __DIR__.'/../../../ext/openssl/openssl_verify.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_x509_export.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_x509_export_to_file.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_x509_fingerprint.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_x509_free.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_x509_parse.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_x509_read.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_x509_verify.php';

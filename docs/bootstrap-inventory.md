@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5525 |
-| Phase A inventory files (M2 ratio SSOT) | 5525 |
+| PHP files on vm.php path | 5526 |
+| Phase A inventory files (M2 ratio SSOT) | 5526 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15715 |
+| Source constructs flagged (warnings) | 15718 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -831,7 +831,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 59 |
+| `ext/openssl/Module.php` | 0 | 60 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
@@ -906,6 +906,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_x509_export.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_export_to_file.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_fingerprint.php` | 0 | 2 |
+| `ext/openssl/openssl_x509_free.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_parse.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_verify.php` | 0 | 2 |
@@ -11283,21 +11284,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_cms_decrypt (line 75)
 - new openssl_cms_read (line 76)
 - new openssl_x509_verify (line 77)
-- new openssl_csr_new (line 78)
-- new openssl_csr_export (line 79)
-- new openssl_csr_export_to_file (line 80)
-- new openssl_csr_sign (line 81)
-- new openssl_csr_get_subject (line 82)
-- new openssl_csr_get_public_key (line 83)
-- new openssl_free_key (line 84)
-- new openssl_pkey_free (line 85)
-- new openssl_spki_new (line 86)
-- new openssl_spki_verify (line 87)
-- new openssl_spki_export (line 88)
-- new openssl_spki_export_challenge (line 89)
-- new openssl_seal (line 90)
-- new openssl_open (line 91)
-- new openssl_error_string (line 92)
+- new openssl_x509_free (line 78)
+- new openssl_csr_new (line 79)
+- new openssl_csr_export (line 80)
+- new openssl_csr_export_to_file (line 81)
+- new openssl_csr_sign (line 82)
+- new openssl_csr_get_subject (line 83)
+- new openssl_csr_get_public_key (line 84)
+- new openssl_free_key (line 85)
+- new openssl_pkey_free (line 86)
+- new openssl_spki_new (line 87)
+- new openssl_spki_verify (line 88)
+- new openssl_spki_export (line 89)
+- new openssl_spki_export_challenge (line 90)
+- new openssl_seal (line 91)
+- new openssl_open (line 92)
+- new openssl_error_string (line 93)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -11759,6 +11761,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
 - 2 class method(s)
+
+### `ext/openssl/openssl_x509_free.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
+- 3 class method(s)
 
 ### `ext/openssl/openssl_x509_parse.php`
 
