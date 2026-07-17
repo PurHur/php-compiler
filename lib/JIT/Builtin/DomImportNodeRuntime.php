@@ -22,6 +22,10 @@ final class DomImportNodeRuntime
 
     public const ABI_CREATE_ATTRIBUTE_NS = '__phpc_dom_create_attribute_ns';
 
+    public const ABI_SET_ATTRIBUTE = '__phpc_dom_set_attribute';
+
+    public const ABI_REMOVE_ATTRIBUTE = '__phpc_dom_remove_attribute';
+
     private const HELPER_PATH = '/ext/dom/DomImportNodeJitHelper.php';
 
     private const HELPER = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::importNodeArgv';
@@ -34,6 +38,10 @@ final class DomImportNodeRuntime
 
     private const HELPER_CREATE_ATTR_NS = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::createAttributeNSArgv';
 
+    private const HELPER_SET_ATTR = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::setAttributeArgv';
+
+    private const HELPER_REMOVE_ATTR = 'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::removeAttributeArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::HELPER,
@@ -41,6 +49,8 @@ final class DomImportNodeRuntime
         self::HELPER_GET_ATTR_NODE_NS,
         self::HELPER_SET_ATTR_NODE_NS,
         self::HELPER_CREATE_ATTR_NS,
+        self::HELPER_SET_ATTR,
+        self::HELPER_REMOVE_ATTR,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -154,6 +164,54 @@ final class DomImportNodeRuntime
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#19265'
+        );
+    }
+
+    public static function ensureSetAttributeLinked(Context $context): void
+    {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureSetAttributeBridge($context);
+
+            return;
+        }
+
+        $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i1 = $context->getTypeFromString('int1');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_SET_ATTRIBUTE,
+            'dom_set_attribute_bridge',
+            [$objPtr, $strPtr, $strPtr],
+            $i1,
+            self::HELPER_SET_ATTR,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#19870'
+        );
+    }
+
+    public static function ensureRemoveAttributeLinked(Context $context): void
+    {
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            JitDomDocumentMethodKernel::ensureRemoveAttributeBridge($context);
+
+            return;
+        }
+
+        $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i1 = $context->getTypeFromString('int1');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_REMOVE_ATTRIBUTE,
+            'dom_remove_attribute_bridge',
+            [$objPtr, $strPtr],
+            $i1,
+            self::HELPER_REMOVE_ATTR,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#19870'
         );
     }
 }

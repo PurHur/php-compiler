@@ -199,6 +199,36 @@ final class JitDomDocumentMethodKernel
         );
     }
 
+    public static function ensureSetAttributeBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::ensureBridge(
+            $context,
+            DomImportNodeRuntime::ABI_SET_ATTRIBUTE,
+            'dom_set_attribute_user_script',
+            [$objPtr, $strPtr, $strPtr],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::setAttributeArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureRemoveAttributeBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::ensureBridge(
+            $context,
+            DomImportNodeRuntime::ABI_REMOVE_ATTRIBUTE,
+            'dom_remove_attribute_user_script',
+            [$objPtr, $strPtr],
+            $context->getTypeFromString('int1'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::removeAttributeArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
     public static function ensureCreateAttributeNSBridge(Context $context): void
     {
         self::ensureContextBridge(

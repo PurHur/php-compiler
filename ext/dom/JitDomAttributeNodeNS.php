@@ -452,7 +452,10 @@ final class JitDomAttributeNodeNS
     }
 
     /**
-     * DOMElement::setAttribute() — user-script AOT live Attr cache (#19281).
+     * DOMElement::setAttribute() — DomRegistry + live ID map (#19870); Attr cache (#19281).
+     *
+     * User-script AOT keeps Attr cache only (nested DomRegistry helpers verify-fail).
+     * Non-user-script JIT links {@see DomImportNodeJitHelper::setAttributeArgv}.
      */
     public static function invokeSetAttribute(Context $context, JITVariable ...$args): Value
     {
@@ -460,6 +463,22 @@ final class JitDomAttributeNodeNS
             throw new \LogicException('DOMElement::setAttribute() expects receiver, name, and value');
         }
         BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattr_cont');
+
+        if (!JitDomDocumentMethodKernel::shouldUse($context)) {
+            DomImportNodeRuntime::ensureSetAttributeLinked($context);
+            $element = self::loadObjectArg($context, $args[0], 'DOMElement::setAttribute() receiver');
+            $name = self::loadStringArg($context, $args[1]);
+            $value = self::loadStringArg($context, $args[2]);
+            $context->builder->call(
+                $context->lookupFunction(DomImportNodeRuntime::ABI_SET_ATTRIBUTE),
+                $element,
+                $name,
+                $value
+            );
+
+            return self::boxNullResult($context);
+        }
+
         $nameLit = self::compileTimeStringArg($args[1]);
         $valueLit = self::compileTimeStringArg($args[2]);
         if (null !== $nameLit && null !== $valueLit) {
@@ -471,9 +490,41 @@ final class JitDomAttributeNodeNS
         }
         $name = self::loadStringArg($context, $args[1]);
         $value = self::loadStringArg($context, $args[2]);
-        $attr = self::materializeAttrFromRuntime($context, $context->builder->load($context->constantStringFromString('')), $name, $value);
-        // Runtime name: cannot key the compile-time cache; still materialize Attr for property writes.
+        self::materializeAttrFromRuntime(
+            $context,
+            $context->builder->load($context->constantStringFromString('')),
+            $name,
+            $value
+        );
+
         return self::boxNullResult($context);
+    }
+
+    /**
+     * DOMElement::removeAttribute() — DomRegistry + live ID map (#19870).
+     */
+    public static function invokeRemoveAttribute(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2) {
+            throw new \LogicException('DOMElement::removeAttribute() expects receiver and name');
+        }
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_removeattr_cont');
+        $i1 = $context->getTypeFromString('int1');
+
+        if (!JitDomDocumentMethodKernel::shouldUse($context)) {
+            DomImportNodeRuntime::ensureRemoveAttributeLinked($context);
+            $element = self::loadObjectArg($context, $args[0], 'DOMElement::removeAttribute() receiver');
+            $name = self::loadStringArg($context, $args[1]);
+
+            return $context->builder->call(
+                $context->lookupFunction(DomImportNodeRuntime::ABI_REMOVE_ATTRIBUTE),
+                $element,
+                $name
+            );
+        }
+
+        // User-script AOT: method exists; DomRegistry id-map sync is VM/JIT (#19870).
+        return $i1->constInt(1, false);
     }
 
     /**

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5298 |
-| Phase A inventory files (M2 ratio SSOT) | 5298 |
+| PHP files on vm.php path | 5299 |
+| Phase A inventory files (M2 ratio SSOT) | 5299 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14719 |
+| Source constructs flagged (warnings) | 14721 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4308,6 +4308,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/DomElementGetAttribute.php` | 0 | 1 |
 | `lib/JIT/Call/DomElementGetAttributeNode.php` | 0 | 1 |
 | `lib/JIT/Call/DomElementGetAttributeNodeNS.php` | 0 | 1 |
+| `lib/JIT/Call/DomElementRemoveAttribute.php` | 0 | 1 |
 | `lib/JIT/Call/DomElementSetAttribute.php` | 0 | 1 |
 | `lib/JIT/Call/DomElementSetAttributeNodeNS.php` | 0 | 1 |
 | `lib/JIT/Call/DomElementToggleAttribute.php` | 0 | 1 |
@@ -4436,7 +4437,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
 | `lib/JIT/Context.php` | 0 | 76 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 19 |
-| `lib/JIT/DomInstanceMethodJit.php` | 0 | 41 |
+| `lib/JIT/DomInstanceMethodJit.php` | 0 | 42 |
 | `lib/JIT/DynamicObjectReadonlyGuard.php` | 0 | 1 |
 | `lib/JIT/DynamicPropertyDeprecationGuard.php` | 0 | 1 |
 | `lib/JIT/EmitTuMode.php` | 0 | 1 |
@@ -6265,7 +6266,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new DOMException (line 73)
-- 5 class method(s)
+- 7 class method(s)
 
 ### `ext/dom/DomIsConnectedJitHelper.php`
 
@@ -6653,7 +6654,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JITVariable (line 320)
 - new JITVariable (line 335)
-- 24 class method(s)
+- 25 class method(s)
 
 ### `ext/dom/JitDomC14N.php`
 
@@ -6705,8 +6706,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomDocumentMethodKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 1341)
-- 72 class method(s)
+- new JIT (line 1371)
+- 74 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/JitDomElementNavigationProperty.php`
@@ -7458,86 +7459,86 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 1779)
 - new DOMException (line 1783)
 - new DOMException (line 1793)
-- new DOMException (line 2213)
-- new DOMException (line 2229)
-- new ObjectEntry (line 2316)
-- new DomNodeState (line 2321)
-- new ObjectEntry (line 2337)
-- new DomNodeState (line 2342)
-- new ObjectEntry (line 2358)
-- new DomNodeState (line 2363)
-- new DOMException (line 2402)
-- new DOMException (line 2412)
-- new DOMException (line 2425)
-- new DOMException (line 2444)
-- new ObjectEntry (line 2532)
-- new DomNodeState (line 2537)
-- new Variable (line 2546)
-- new ObjectEntry (line 2556)
-- new DomNodeState (line 2561)
-- new Variable (line 2567)
-- new ObjectEntry (line 3293)
-- new DomNodeState (line 3295)
-- new ObjectEntry (line 3491)
-- new DomNodeState (line 3493)
-- new ObjectEntry (line 3521)
-- new DomNodeState (line 3523)
-- new ObjectEntry (line 3711)
-- new DomNodeState (line 3716)
-- new DOMException (line 4087)
-- new DOMException (line 4103)
-- new Variable (line 4121)
-- new DOMException (line 4135)
-- new DOMException (line 4138)
-- new DOMException (line 4148)
-- new Error (line 4178)
-- new DOMException (line 4184)
-- new DOMException (line 4198)
-- new DOMException (line 4396)
-- new DOMException (line 4593)
-- new DOMException (line 4597)
-- new DOMException (line 4686)
-- new DOMException (line 4690)
-- new DOMException (line 4748)
-- new DOMException (line 4765)
-- new DOMException (line 4797)
-- new DOMException (line 4839)
-- new DOMException (line 4866)
-- new DOMException (line 5538)
-- new Variable (line 5566)
-- new DOMException (line 5827)
-- new DOMException (line 5939)
-- new DOMException (line 5981)
-- new ObjectEntry (line 6066)
-- new DomNodeState (line 6070)
-- new Variable (line 6077)
-- new ObjectEntry (line 6289)
-- new DomNodeState (line 6293)
-- new Variable (line 6300)
-- new ObjectEntry (line 6320)
-- new DomNodeState (line 6323)
-- new Variable (line 6331)
-- new Variable (line 6500)
-- new DOMException (line 6607)
-- new DOMException (line 6614)
-- new DOMException (line 6621)
-- new DOMException (line 6625)
-- new DOMException (line 6628)
-- new DOMException (line 6637)
-- new DOMException (line 6649)
-- new DOMException (line 7597)
-- new Variable (line 7656)
-- new Variable (line 7669)
-- new Variable (line 7707)
-- new DOMException (line 7718)
-- new Variable (line 7720)
-- new DOMException (line 7853)
-- new DOMException (line 7880)
-- new DOMException (line 7911)
-- new DOMException (line 7975)
-- new DOMException (line 7983)
-- new DOMException (line 7992)
-- 365 class method(s)
+- new DOMException (line 2267)
+- new DOMException (line 2283)
+- new ObjectEntry (line 2370)
+- new DomNodeState (line 2375)
+- new ObjectEntry (line 2391)
+- new DomNodeState (line 2396)
+- new ObjectEntry (line 2412)
+- new DomNodeState (line 2417)
+- new DOMException (line 2456)
+- new DOMException (line 2466)
+- new DOMException (line 2479)
+- new DOMException (line 2498)
+- new ObjectEntry (line 2586)
+- new DomNodeState (line 2591)
+- new Variable (line 2600)
+- new ObjectEntry (line 2610)
+- new DomNodeState (line 2615)
+- new Variable (line 2621)
+- new ObjectEntry (line 3347)
+- new DomNodeState (line 3349)
+- new ObjectEntry (line 3545)
+- new DomNodeState (line 3547)
+- new ObjectEntry (line 3575)
+- new DomNodeState (line 3577)
+- new ObjectEntry (line 3765)
+- new DomNodeState (line 3770)
+- new DOMException (line 4141)
+- new DOMException (line 4157)
+- new Variable (line 4175)
+- new DOMException (line 4189)
+- new DOMException (line 4192)
+- new DOMException (line 4202)
+- new Error (line 4232)
+- new DOMException (line 4238)
+- new DOMException (line 4252)
+- new DOMException (line 4450)
+- new DOMException (line 4647)
+- new DOMException (line 4651)
+- new DOMException (line 4740)
+- new DOMException (line 4744)
+- new DOMException (line 4802)
+- new DOMException (line 4819)
+- new DOMException (line 4851)
+- new DOMException (line 4893)
+- new DOMException (line 4920)
+- new DOMException (line 5592)
+- new Variable (line 5620)
+- new DOMException (line 5881)
+- new DOMException (line 5993)
+- new DOMException (line 6035)
+- new ObjectEntry (line 6120)
+- new DomNodeState (line 6124)
+- new Variable (line 6131)
+- new ObjectEntry (line 6343)
+- new DomNodeState (line 6347)
+- new Variable (line 6354)
+- new ObjectEntry (line 6374)
+- new DomNodeState (line 6377)
+- new Variable (line 6385)
+- new Variable (line 6554)
+- new DOMException (line 6661)
+- new DOMException (line 6668)
+- new DOMException (line 6675)
+- new DOMException (line 6679)
+- new DOMException (line 6682)
+- new DOMException (line 6691)
+- new DOMException (line 6703)
+- new DOMException (line 7651)
+- new Variable (line 7710)
+- new Variable (line 7723)
+- new Variable (line 7761)
+- new DOMException (line 7772)
+- new Variable (line 7774)
+- new DOMException (line 7907)
+- new DOMException (line 7934)
+- new DOMException (line 7965)
+- new DOMException (line 8029)
+- new DOMException (line 8037)
+- new DOMException (line 8046)
+- 367 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomInstanceInvoke.php`
@@ -30892,7 +30893,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DomImportNodeRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/DomInstanceMethodRuntime.php`
 
@@ -34102,6 +34103,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/DomElementRemoveAttribute.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Call/DomElementSetAttribute.php`
 
 **Warnings** (review for bootstrap subset):
@@ -34900,46 +34906,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/DomInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\DomDocumentCreateElement (line 111)
-- new Call\DomDocumentCreateElementNS (line 116)
-- new Call\DomDocumentCreateComment (line 121)
-- new Call\DomDocumentLoad (line 126)
-- new Call\DomDocumentLoadHTML (line 131)
-- new Call\DomDocumentLoadHTMLFile (line 136)
-- new Call\DomDocumentGetElementById (line 141)
-- new Call\DomDocumentImportNode (line 146)
-- new Call\DomElementGetAttribute (line 151)
-- new Call\DomElementSetAttribute (line 156)
-- new Call\DomElementGetAttributeNode (line 161)
-- new Call\DomElementGetAttributeNodeNS (line 166)
-- new Call\DomElementSetAttributeNodeNS (line 171)
-- new Call\DomDocumentCreateAttributeNS (line 176)
-- new Call\DomDocumentLoadXML (line 181)
-- new Call\DomDocumentSaveXML (line 186)
-- new Call\DomDocumentSaveHTML (line 191)
-- new Call\DomDocumentSaveHTMLFile (line 196)
-- new Call\DomDocumentGetElementsByTagName (line 201)
-- new Call\DomDocumentAppendChild (line 206)
-- new Call\DomNodeAppendChild (line 211)
-- new Call\DomNodeAppendChild (line 216)
-- new Call\DomNodeAppendChild (line 221)
-- new Call\DomNodeAppend (line 226)
-- new Call\DomNodePrepend (line 231)
-- new Call\DomNodeReplaceChildren (line 236)
-- new Call\DomElementToggleAttribute (line 241)
-- new Call\DomNodeContains (line 246)
-- new Call\DomNodeGetRootNode (line 251)
-- new Call\DomNodeIsEqualNode (line 256)
-- new Call\DomNodeC14N (line 261)
-- new Call\DomNodeRemoveChild (line 266)
-- new Call\DomNodeReplaceChild (line 271)
-- new Call\DomDocumentCreateDocumentFragment (line 276)
-- new Call\DomImplementationCreateDocumentType (line 281)
-- new Call\DomXPathQuery (line 286)
-- new Call\DomXPathEvaluate (line 291)
-- new Call\DomNodeListItem (line 296)
-- new Call\DomInstanceMethod (line 308)
-- new Call\DomInstanceMethod (line 326)
+- new Call\DomDocumentCreateElement (line 112)
+- new Call\DomDocumentCreateElementNS (line 117)
+- new Call\DomDocumentCreateComment (line 122)
+- new Call\DomDocumentLoad (line 127)
+- new Call\DomDocumentLoadHTML (line 132)
+- new Call\DomDocumentLoadHTMLFile (line 137)
+- new Call\DomDocumentGetElementById (line 142)
+- new Call\DomDocumentImportNode (line 147)
+- new Call\DomElementGetAttribute (line 152)
+- new Call\DomElementSetAttribute (line 157)
+- new Call\DomElementRemoveAttribute (line 162)
+- new Call\DomElementGetAttributeNode (line 167)
+- new Call\DomElementGetAttributeNodeNS (line 172)
+- new Call\DomElementSetAttributeNodeNS (line 177)
+- new Call\DomDocumentCreateAttributeNS (line 182)
+- new Call\DomDocumentLoadXML (line 187)
+- new Call\DomDocumentSaveXML (line 192)
+- new Call\DomDocumentSaveHTML (line 197)
+- new Call\DomDocumentSaveHTMLFile (line 202)
+- new Call\DomDocumentGetElementsByTagName (line 207)
+- new Call\DomDocumentAppendChild (line 212)
+- new Call\DomNodeAppendChild (line 217)
+- new Call\DomNodeAppendChild (line 222)
+- new Call\DomNodeAppendChild (line 227)
+- new Call\DomNodeAppend (line 232)
+- new Call\DomNodePrepend (line 237)
+- new Call\DomNodeReplaceChildren (line 242)
+- new Call\DomElementToggleAttribute (line 247)
+- new Call\DomNodeContains (line 252)
+- new Call\DomNodeGetRootNode (line 257)
+- new Call\DomNodeIsEqualNode (line 262)
+- new Call\DomNodeC14N (line 267)
+- new Call\DomNodeRemoveChild (line 272)
+- new Call\DomNodeReplaceChild (line 277)
+- new Call\DomDocumentCreateDocumentFragment (line 282)
+- new Call\DomImplementationCreateDocumentType (line 287)
+- new Call\DomXPathQuery (line 292)
+- new Call\DomXPathEvaluate (line 297)
+- new Call\DomNodeListItem (line 302)
+- new Call\DomInstanceMethod (line 314)
+- new Call\DomInstanceMethod (line 332)
 - 7 class method(s)
 
 ### `lib/JIT/DynamicObjectReadonlyGuard.php`

@@ -1264,8 +1264,8 @@ final class VmDom
             $attrState->prefix,
             $attrState->namespaceUri
         );
-        if (null !== $elementState->idAttributeName && $name === $elementState->idAttributeName) {
-            self::syncElementIdRegistration($element);
+        if (self::attributeMutationAffectsElementId($element, $name)) {
+            self::refreshElementIdMapEntry($element);
         }
         self::syncElementAttributes($ctx, $element);
         $var = new Variable();
@@ -1369,14 +1369,14 @@ final class VmDom
         ) {
             throw new \DOMException('Not Found Error', 8);
         }
+        $affectsId = self::attributeMutationAffectsElementId($element, $name);
         unset($elementState->attributes[$name], $elementState->attributeNamespaces[$name], $elementState->attributeNodeIds[$name]);
         self::detachAttributeNode($attr);
-        if (null !== $elementState->idAttributeName && $name === $elementState->idAttributeName) {
-            $document = self::ownerDocumentEntry($element);
-            if (null !== $document) {
-                self::unregisterElementId($document, $element);
-            }
+        if ($name === ($elementState->idAttributeName ?? null)) {
             $elementState->idAttributeName = null;
+        }
+        if ($affectsId) {
+            self::refreshElementIdMapEntry($element);
         }
         self::syncElementAttributes($ctx, $element);
         $var = new Variable(Variable::TYPE_OBJECT);
@@ -1624,8 +1624,8 @@ final class VmDom
             [$attrPrefix] = self::splitQualifiedName($qualifiedName);
             self::ensureNamespaceDeclarationForPrefixedAttribute($element, '' !== $attrPrefix ? $attrPrefix : null, $namespace);
         }
-        if (null !== $state->idAttributeName && $qualifiedName === $state->idAttributeName) {
-            self::syncElementIdRegistration($element);
+        if (self::attributeMutationAffectsElementId($element, $qualifiedName)) {
+            self::refreshElementIdMapEntry($element);
         }
         if (CompilerVersion::supportsDomTokenList() && 'class' === $qualifiedName) {
             VmDomTokenList::invalidateForElement($element);
@@ -1670,6 +1670,7 @@ final class VmDom
         if (null === $removedQName) {
             return false;
         }
+        $affectsId = self::attributeMutationAffectsElementId($element, $removedQName);
         if (isset($state->attributeNodeIds[$removedQName])) {
             $cached = DomRegistry::entry($state->attributeNodeIds[$removedQName]);
             if (null !== $cached && self::isAttr($cached)) {
@@ -1678,12 +1679,11 @@ final class VmDom
             unset($state->attributeNodeIds[$removedQName]);
         }
         unset($state->attributes[$removedQName], $state->attributeNamespaces[$removedQName]);
-        if (null !== $state->idAttributeName && $removedQName === $state->idAttributeName) {
-            $document = self::ownerDocumentEntry($element);
-            if (null !== $document) {
-                self::unregisterElementId($document, $element);
-            }
+        if ($removedQName === ($state->idAttributeName ?? null)) {
             $state->idAttributeName = null;
+        }
+        if ($affectsId) {
+            self::refreshElementIdMapEntry($element);
         }
         if (CompilerVersion::supportsDomTokenList() && 'class' === $removedQName) {
             VmDomTokenList::invalidateForElement($element);
@@ -1792,13 +1792,12 @@ final class VmDom
         if (null === $document) {
             throw new \DOMException('Not Found Error', 8);
         }
-        self::unregisterElementId($document, $element);
         if ($isId) {
             $state->idAttributeName = $qName;
-            self::registerElementId($document, $element);
         } else {
             $state->idAttributeName = null;
         }
+        self::refreshElementIdMapEntry($element);
     }
 
     private static function findAttributeQNameByNsAndLocal(
@@ -1841,45 +1840,100 @@ final class VmDom
         return self::lookupNamespaceURI($element, $prefix) ?? '';
     }
 
-    private static function registerElementId(ObjectEntry $document, ObjectEntry $element): void
+    /**
+     * True when mutating $qName can change getElementById() results (php-src ext/dom/element.c; #19870).
+     * HTML load indexes plain `id` without setting {@see DomNodeState::$idAttributeName}.
+     */
+    private static function attributeMutationAffectsElementId(ObjectEntry $element, string $qName): bool
     {
-        $nodeState = DomRegistry::state($element);
-        $idAttr = $nodeState->idAttributeName;
-        if (null === $idAttr) {
-            return;
+        $state = DomRegistry::state($element);
+        if ($qName === ($state->idAttributeName ?? null)) {
+            return true;
         }
-        $value = $nodeState->attributes[$idAttr] ?? null;
-        if (null === $value || '' === $value) {
-            return;
-        }
-        DomRegistry::state($document)->elementIds[$value] = $element->id;
-    }
-
-    private static function unregisterElementId(ObjectEntry $document, ObjectEntry $element): void
-    {
-        $nodeState = DomRegistry::state($element);
-        $idAttr = $nodeState->idAttributeName;
-        if (null === $idAttr) {
-            return;
-        }
-        $value = $nodeState->attributes[$idAttr] ?? null;
-        if (null === $value || '' === $value) {
-            return;
+        $document = self::ownerDocumentEntry($element);
+        if (null === $document) {
+            return 'id' === $qName || 'xml:id' === $qName;
         }
         $docState = DomRegistry::state($document);
-        if (($docState->elementIds[$value] ?? null) === $element->id) {
-            unset($docState->elementIds[$value]);
+        if ($docState->isHtmlDocument) {
+            return 'id' === $qName;
         }
+        if ('xml:id' === $qName) {
+            return true;
+        }
+        $dtdId = $docState->idAttrByElement[$state->nodeName] ?? null;
+        if (null !== $dtdId && $qName === $dtdId) {
+            return true;
+        }
+        if ('id' === $qName && self::XML_NAMESPACE_URI === ($state->attributeNamespaces['id'] ?? '')) {
+            return true;
+        }
+
+        return self::resolveElementIdAttributeName($document, $docState, $state) === $qName;
     }
 
-    private static function syncElementIdRegistration(ObjectEntry $element): void
+    /**
+     * Drop this element's document ID-map entries and re-index from current attrs (#19870).
+     * Clears by object id so removeAttribute works after the attr value is already unset.
+     * php-src: ext/dom/element.c / php_dom.c — ID table updates on set/remove attribute
+     */
+    private static function refreshElementIdMapEntry(ObjectEntry $element): void
     {
         $document = self::ownerDocumentEntry($element);
         if (null === $document) {
             return;
         }
-        self::unregisterElementId($document, $element);
-        self::registerElementId($document, $element);
+        $docState = DomRegistry::state($document);
+        foreach ($docState->elementIds as $id => $objectId) {
+            if ($objectId === $element->id) {
+                unset($docState->elementIds[$id]);
+            }
+        }
+        if (self::isConnected($element)) {
+            $nodeState = DomRegistry::state($element);
+            $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
+            if (null !== $idAttr) {
+                $value = $nodeState->attributes[$idAttr] ?? null;
+                if (null !== $value && '' !== $value) {
+                    $docState->elementIds[$value] = $element->id;
+                }
+            }
+        }
+        self::syncElementIdMapProperty($document);
+    }
+
+    /** @deprecated Prefer {@see refreshElementIdMapEntry()} — kept for detach-from-previous-owner paths. */
+    private static function registerElementId(ObjectEntry $document, ObjectEntry $element): void
+    {
+        $docState = DomRegistry::state($document);
+        $nodeState = DomRegistry::state($element);
+        $idAttr = self::resolveElementIdAttributeName($document, $docState, $nodeState);
+        if (null === $idAttr) {
+            return;
+        }
+        $value = $nodeState->attributes[$idAttr] ?? null;
+        if (null === $value || '' === $value) {
+            return;
+        }
+        $docState->elementIds[$value] = $element->id;
+        self::syncElementIdMapProperty($document);
+    }
+
+    /** Clear ID-map entries for $element by object id (safe after attr unset; #19870). */
+    private static function unregisterElementId(ObjectEntry $document, ObjectEntry $element): void
+    {
+        $docState = DomRegistry::state($document);
+        foreach ($docState->elementIds as $id => $objectId) {
+            if ($objectId === $element->id) {
+                unset($docState->elementIds[$id]);
+            }
+        }
+        self::syncElementIdMapProperty($document);
+    }
+
+    private static function syncElementIdRegistration(ObjectEntry $element): void
+    {
+        self::refreshElementIdMapEntry($element);
     }
 
     public static function lookupPrefix(ObjectEntry $node, ?string $namespace): ?string
@@ -7423,8 +7477,8 @@ final class VmDom
             $name = $state->nodeName;
             $ownerState->attributes[$name] = $value;
             // Bogus Attr named xmlns:* stays in the Attr map; nsDef is separate (#19718).
-            if (null !== $ownerState->idAttributeName && $name === $ownerState->idAttributeName) {
-                self::syncElementIdRegistration($owner);
+            if (self::attributeMutationAffectsElementId($owner, $name)) {
+                self::refreshElementIdMapEntry($owner);
             }
             if (CompilerVersion::supportsDomTokenList() && 'class' === $name) {
                 VmDomTokenList::invalidateForElement($owner);
@@ -8023,6 +8077,7 @@ final class VmDom
         if (!\array_key_exists($qualifiedName, $state->attributes)) {
             return;
         }
+        $affectsId = self::attributeMutationAffectsElementId($element, $qualifiedName);
         if (isset($state->attributeNodeIds[$qualifiedName])) {
             $cached = DomRegistry::entry($state->attributeNodeIds[$qualifiedName]);
             if (null !== $cached && self::isAttr($cached)) {
@@ -8031,12 +8086,11 @@ final class VmDom
             unset($state->attributeNodeIds[$qualifiedName]);
         }
         unset($state->attributes[$qualifiedName], $state->attributeNamespaces[$qualifiedName]);
-        if (null !== $state->idAttributeName && $qualifiedName === $state->idAttributeName) {
-            $document = self::ownerDocumentEntry($element);
-            if (null !== $document) {
-                self::unregisterElementId($document, $element);
-            }
+        if ($qualifiedName === ($state->idAttributeName ?? null)) {
             $state->idAttributeName = null;
+        }
+        if ($affectsId) {
+            self::refreshElementIdMapEntry($element);
         }
         self::syncElementAttributes($ctx, $element);
     }

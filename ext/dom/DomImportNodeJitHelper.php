@@ -75,4 +75,23 @@ final class DomImportNodeJitHelper
 
         return $var->toObject();
     }
+
+    /** DOMElement::setAttribute() — DomRegistry + live ID map (#19870). */
+    public static function setAttributeArgv(ObjectEntry $element, string $name, string $value): bool
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($element->id) ?? $element;
+        VmDom::setAttributeNS($ctx, $canonical, null, $name, $value);
+
+        return true;
+    }
+
+    /** DOMElement::removeAttribute() — DomRegistry + live ID map (#19870). */
+    public static function removeAttributeArgv(ObjectEntry $element, string $name): bool
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($element->id) ?? $element;
+
+        return VmDom::removeAttributeNS($ctx, $canonical, null, $name);
+    }
 }
