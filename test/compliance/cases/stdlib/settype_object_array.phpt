@@ -1,5 +1,5 @@
 --TEST--
-stdlib settype() object to array — property hash not index-0 wrap (#9963, ext/standard/type.c)
+stdlib settype() object to array — property hash not index-0 wrap (#9963, #10009, ext/standard/type.c)
 --FILE--
 <?php
 class C { public int $a = 1; private int $b = 2; }

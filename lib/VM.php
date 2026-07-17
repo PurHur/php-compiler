@@ -5512,6 +5512,8 @@ restart:
                     $frame->call = $this->context->functions[$lcname];
                     $frame->callArgs = [];
                     $frame->callArgEntries = [];
+                    // Drop leftover Class::__construct from a prior `new` (#10009).
+                    $frame->builtinCalleeQualifiedMethod = null;
                     break;
                 case OpCode::TYPE_METHODCALL_INIT:
                     $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
@@ -5646,6 +5648,10 @@ restart:
                         }
                         $frame->callArgs = [];
                         $frame->callArgEntries = [];
+                        // Null ctor stub: drop Class::__construct so later builtins use real names (#10009).
+                        if (null === $frame->pendingOutboundCallRestore) {
+                            $frame->builtinCalleeQualifiedMethod = null;
+                        }
                         $this->restorePendingOutboundCallAfterInlineNew($frame);
                         break;
                     }
@@ -6434,6 +6440,8 @@ restart:
                     $frame->builtinCalleeQualifiedMethod = $class->name.'::__construct';
                     if (null === $frame->call) {
                         $object->constructed = true;
+                        // No constructor body — clear the provisional Class::__construct label (#10009).
+                        $frame->builtinCalleeQualifiedMethod = null;
                         $newResultSlot = (int) $op->arg1;
                         if (!$this->isVmScopeSlotUsedByFollowingOps($frame, $newResultSlot)) {
                             $this->releaseVmDeadScopeSlot($frame, $newResultSlot);
@@ -13558,6 +13566,7 @@ restart:
             $frame->closureCall = null;
             $frame->callArgs = [];
             $frame->callArgEntries = [];
+            $frame->builtinCalleeQualifiedMethod = null;
 
             return;
         }
@@ -13572,6 +13581,7 @@ restart:
         $frame->pendingClosureInvoke = $state;
         $frame->callArgs = [];
         $frame->callArgEntries = [];
+        $frame->builtinCalleeQualifiedMethod = null;
     }
 
     protected function applyClosureBinding(Frame $callee, ?ClosureState $closureState): void
