@@ -54,6 +54,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -5478,16 +5479,6 @@ require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterToStream.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterToUri.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartAttributeNS.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartElementNS.php';
-require_once __DIR__.'/../../../ext/ftp/ftp_alloc.php';
-require_once __DIR__.'/../../../ext/ftp/ftp_append.php';
-require_once __DIR__.'/../../../ext/ftp/ftp_chmod.php';
-require_once __DIR__.'/../../../ext/ftp/ftp_get_option.php';
-require_once __DIR__.'/../../../ext/ftp/ftp_raw.php';
-require_once __DIR__.'/../../../ext/ftp/ftp_set_option.php';
-require_once __DIR__.'/../../../ext/ftp/ftp_site.php';
-require_once __DIR__.'/../../../ext/pcntl/pcntl_get_last_error.php';
-require_once __DIR__.'/../../../ext/pcntl/pcntl_strerror.php';
-require_once __DIR__.'/../../../ext/pcntl/pcntl_unshare.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterEndDtdElement.php';
 require_once __DIR__.'/../../../ext/xmlwriter/XmlWriterStartDtdElement.php';
 require_once __DIR__.'/../../../ext/xmlwriter/xmlwriter_end_dtd_element.php';
