@@ -10,10 +10,13 @@ use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsDirNative;
 use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\standard\VmFsWriteNative;
+use PHPCompiler\ext\standard\VmPhpMemoryStream;
 use PHPCompiler\ext\standard\VmStatPath;
+use PHPCompiler\ext\standard\VmStreamContext;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -75,6 +78,17 @@ final class VmZipArchive
             'statname' => new ZipArchiveStatName(),
             'setpassword' => new ZipArchiveSetPassword(),
             'setencryptionname' => new ZipArchiveSetEncryptionName(),
+            // Index / mutation APIs — php-src php_zip.c (#19880)
+            'statindex' => new ZipArchiveStatIndex(),
+            'locatename' => new ZipArchiveLocateName(),
+            'getfromindex' => new ZipArchiveGetFromIndex(),
+            'getnameindex' => new ZipArchiveGetNameIndex(),
+            'deletename' => new ZipArchiveDeleteName(),
+            'deleteindex' => new ZipArchiveDeleteIndex(),
+            'addemptydir' => new ZipArchiveAddEmptyDir(),
+            'renamename' => new ZipArchiveRenameName(),
+            'renameindex' => new ZipArchiveRenameIndex(),
+            'getstream' => new ZipArchiveGetStream(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -354,29 +368,268 @@ final class VmZipArchive
     public static function statName(ObjectEntry $entry, string $name, int $flags = 0): array|false
     {
         unset($flags); // FL_* lookup flags not yet implemented; exact name match only
-        $state = self::state($entry);
-        if (!$state->open) {
-            throw new \ValueError('Invalid or uninitialized Zip object');
-        }
+        $state = self::requireOpen($entry);
         if ('' === $name) {
             throw new \ValueError('ZipArchive::statName(): Argument #1 ($name) must not be empty');
         }
         foreach ($state->entries as $index => $zipEntry) {
             if ($zipEntry['name'] === $name) {
                 self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
-                $size = (int) $zipEntry['size'];
 
-                return [
-                    'name' => $zipEntry['name'],
-                    'index' => $index,
-                    'crc' => (int) $zipEntry['crc'],
-                    'size' => $size,
-                    'mtime' => (int) ($zipEntry['mtime'] ?? 0),
-                    'comp_size' => $size,
-                    'comp_method' => 0,
-                    'encryption_method' => (int) ($zipEntry['encryption_method'] ?? ZipArchiveConstants::EM_NONE),
-                ];
+                return self::statBag($zipEntry, $index);
             }
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+        return false;
+    }
+
+    /**
+     * ZipArchive::statIndex — php-src zim_ZipArchive_statIndex (#19880).
+     *
+     * @return array{
+     *     name: string,
+     *     index: int,
+     *     crc: int,
+     *     size: int,
+     *     mtime: int,
+     *     comp_size: int,
+     *     comp_method: int,
+     *     encryption_method: int
+     * }|false
+     */
+    public static function statIndex(ObjectEntry $entry, int $index, int $flags = 0): array|false
+    {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return self::statBag($state->entries[$index], $index);
+    }
+
+    /**
+     * ZipArchive::locateName — php-src zim_ZipArchive_locateName (#19880).
+     *
+     * @return int|false
+     */
+    public static function locateName(ObjectEntry $entry, string $name, int $flags = 0): int|false
+    {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ('' === $name) {
+            return false;
+        }
+        foreach ($state->entries as $index => $zipEntry) {
+            if ($zipEntry['name'] === $name) {
+                self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+                return $index;
+            }
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+        return false;
+    }
+
+    /**
+     * ZipArchive::getNameIndex — php-src zim_ZipArchive_getNameIndex (#19880).
+     *
+     * @return string|false
+     */
+    public static function getNameIndex(ObjectEntry $entry, int $index, int $flags = 0): string|false
+    {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return $state->entries[$index]['name'];
+    }
+
+    /**
+     * ZipArchive::getFromIndex — php-src php_zip_get_from(type=0) (#19880).
+     *
+     * @return string|false
+     */
+    public static function getFromIndex(ObjectEntry $entry, int $index, int $len = 0, int $flags = 0): string|false
+    {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        $data = $state->entries[$index]['data'];
+        $size = \strlen($data);
+        if ($size < 1) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+            return '';
+        }
+        if ($len < 1) {
+            $len = $size;
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return \substr($data, 0, $len);
+    }
+
+    /**
+     * ZipArchive::deleteIndex — php-src zim_ZipArchive_deleteIndex (#19880).
+     */
+    public static function deleteIndex(ObjectEntry $entry, int $index): bool
+    {
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        \array_splice($state->entries, $index, 1);
+        $state->dirty = true;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::deleteName — php-src zim_ZipArchive_deleteName (#19880).
+     */
+    public static function deleteName(ObjectEntry $entry, string $name): bool
+    {
+        $state = self::requireOpen($entry);
+        if ('' === $name) {
+            return false;
+        }
+        foreach ($state->entries as $index => $zipEntry) {
+            if ($zipEntry['name'] !== $name) {
+                continue;
+            }
+            \array_splice($state->entries, $index, 1);
+            $state->dirty = true;
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+            return true;
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+        return false;
+    }
+
+    /**
+     * ZipArchive::addEmptyDir — php-src zim_ZipArchive_addEmptyDir (#19880).
+     */
+    public static function addEmptyDir(ObjectEntry $entry, string $dirname, int $flags = 0): bool
+    {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ('' === $dirname) {
+            return false;
+        }
+        if (!\str_ends_with($dirname, '/')) {
+            $dirname .= '/';
+        }
+        foreach ($state->entries as $existing) {
+            if ($existing['name'] === $dirname) {
+                self::setStatus($entry, $state, ZipArchiveConstants::ER_EXISTS);
+
+                return false;
+            }
+        }
+        $state->entries[] = self::makeEntry($dirname, '', self::crc32Unsigned(''), 0);
+        $state->dirty = true;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::renameIndex — php-src zim_ZipArchive_renameIndex (#19880).
+     */
+    public static function renameIndex(ObjectEntry $entry, int $index, string $newName): bool
+    {
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            return false;
+        }
+        if ('' === $newName) {
+            throw new \ValueError('ZipArchive::renameIndex(): Argument #2 ($new_name) must not be empty');
+        }
+        $state->entries[$index]['name'] = $newName;
+        $state->dirty = true;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::renameName — php-src zim_ZipArchive_renameName (#19880).
+     */
+    public static function renameName(ObjectEntry $entry, string $name, string $newName): bool
+    {
+        $state = self::requireOpen($entry);
+        if ('' === $newName) {
+            throw new \ValueError('ZipArchive::renameName(): Argument #2 ($new_name) must not be empty');
+        }
+        foreach ($state->entries as $index => $zipEntry) {
+            if ($zipEntry['name'] !== $name) {
+                continue;
+            }
+            $state->entries[$index]['name'] = $newName;
+            $state->dirty = true;
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+            return true;
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+        return false;
+    }
+
+    /**
+     * ZipArchive::getStream — php-src zim_ZipArchive_getStream (#19880).
+     *
+     * Returns a readable php://memory stream handle id preloaded with entry bytes.
+     *
+     * @return int|false
+     */
+    public static function getStream(ObjectEntry $entry, string $name): int|false
+    {
+        $state = self::requireOpen($entry);
+        if ('' === $name) {
+            return false;
+        }
+        foreach ($state->entries as $zipEntry) {
+            if ($zipEntry['name'] !== $name) {
+                continue;
+            }
+            // Directory entries are not readable streams (libzip zip_fopen fails).
+            if (\str_ends_with($zipEntry['name'], '/')) {
+                self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+                return false;
+            }
+            $handle = VmPhpMemoryStream::openWithBuffer('php://memory', $zipEntry['data'], 'rb');
+            if (false === $handle) {
+                self::setStatus($entry, $state, ZipArchiveConstants::ER_MEMORY);
+
+                return false;
+            }
+            VmStreamContext::ensureDefaultForStreamOpen();
+            VmFs::registerStreamMode($handle, 'rb');
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+            return $handle;
         }
         self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
 
@@ -386,10 +639,7 @@ final class VmZipArchive
     /** ZipArchive::setPassword — php-src zim_ZipArchive_setPassword (#19873). */
     public static function setPassword(ObjectEntry $entry, string $password): bool
     {
-        $state = self::state($entry);
-        if (!$state->open) {
-            throw new \ValueError('Invalid or uninitialized Zip object');
-        }
+        $state = self::requireOpen($entry);
         if ('' === $password) {
             return false;
         }
@@ -411,10 +661,7 @@ final class VmZipArchive
         int $method,
         ?string $password = null
     ): bool {
-        $state = self::state($entry);
-        if (!$state->open) {
-            throw new \ValueError('Invalid or uninitialized Zip object');
-        }
+        $state = self::requireOpen($entry);
         if ('' === $name) {
             throw new \ValueError('ZipArchive::setEncryptionName(): Argument #1 ($name) must not be empty');
         }
@@ -505,6 +752,46 @@ final class VmZipArchive
         return \count(self::state($entry)->entries);
     }
 
+    /** ZIP_FROM_OBJECT — php-src php_zip.c ValueError when archive not open. */
+    private static function requireOpen(ObjectEntry $entry): ZipArchiveState
+    {
+        $state = self::state($entry);
+        if (!$state->open) {
+            throw new \ValueError('Invalid or uninitialized Zip object');
+        }
+
+        return $state;
+    }
+
+    /**
+     * @param array{name: string, data: string, crc: int, size: int, mtime?: int, encryption_method?: int} $zipEntry
+     * @return array{
+     *     name: string,
+     *     index: int,
+     *     crc: int,
+     *     size: int,
+     *     mtime: int,
+     *     comp_size: int,
+     *     comp_method: int,
+     *     encryption_method: int
+     * }
+     */
+    private static function statBag(array $zipEntry, int $index): array
+    {
+        $size = (int) $zipEntry['size'];
+
+        return [
+            'name' => $zipEntry['name'],
+            'index' => $index,
+            'crc' => (int) $zipEntry['crc'],
+            'size' => $size,
+            'mtime' => (int) ($zipEntry['mtime'] ?? 0),
+            'comp_size' => $size,
+            'comp_method' => 0,
+            'encryption_method' => (int) ($zipEntry['encryption_method'] ?? ZipArchiveConstants::EM_NONE),
+        ];
+    }
+
     /**
      * @return array{name: string, data: string, crc: int, size: int, mtime: int, encryption_method: int}
      */
@@ -579,6 +866,16 @@ final class VmZipArchive
             'statname' => 'statName',
             'setpassword' => 'setPassword',
             'setencryptionname' => 'setEncryptionName',
+            'statindex' => 'statIndex',
+            'locatename' => 'locateName',
+            'getfromindex' => 'getFromIndex',
+            'getnameindex' => 'getNameIndex',
+            'deletename' => 'deleteName',
+            'deleteindex' => 'deleteIndex',
+            'addemptydir' => 'addEmptyDir',
+            'renamename' => 'renameName',
+            'renameindex' => 'renameIndex',
+            'getstream' => 'getStream',
             default => $lc,
         };
     }

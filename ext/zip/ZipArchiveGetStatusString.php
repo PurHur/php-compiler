@@ -81,6 +81,14 @@ final class ZipArchiveStatName extends ZipClassMethod
 
             return;
         }
+        self::assignStatArray($frame->returnVar, $result);
+    }
+
+    /**
+     * @param array<string, string|int> $result
+     */
+    public static function assignStatArray(Variable $returnVar, array $result): void
+    {
         $ht = new HashTable();
         foreach ($result as $key => $value) {
             $slot = new Variable();
@@ -91,7 +99,7 @@ final class ZipArchiveStatName extends ZipClassMethod
             }
             $ht->add((string) $key, $slot);
         }
-        $frame->returnVar->array($ht);
+        $returnVar->array($ht);
     }
 }
 
@@ -191,5 +199,301 @@ final class ZipArchiveSetEncryptionName extends ZipClassMethod
         }
 
         return $var->toString();
+    }
+}
+
+/**
+ * ZipArchive::statIndex(int $index, int $flags = 0) — php-src php_zip.c (#19880).
+ */
+final class ZipArchiveStatIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('statIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::statIndex()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::statIndex() expects at least 1 argument, 0 given');
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::statIndex', 1, 'index');
+        $flags = \count($frame->calledArgs) >= 3
+            ? $this->intArg($frame->calledArgs[2], 'ZipArchive::statIndex', 2, 'flags')
+            : 0;
+        $result = VmZipArchive::statIndex($receiver, $index, $flags);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        ZipArchiveStatName::assignStatArray($frame->returnVar, $result);
+    }
+}
+
+/**
+ * ZipArchive::locateName(string $name, int $flags = 0) — php-src php_zip.c (#19880).
+ */
+final class ZipArchiveLocateName extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('locateName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::locateName()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::locateName() expects at least 1 argument, 0 given');
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::locateName', 1, 'name');
+        $flags = \count($frame->calledArgs) >= 3
+            ? $this->intArg($frame->calledArgs[2], 'ZipArchive::locateName', 2, 'flags')
+            : 0;
+        $result = VmZipArchive::locateName($receiver, $name, $flags);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($result);
+    }
+}
+
+/**
+ * ZipArchive::getFromIndex(int $index, int $len = 0, int $flags = 0) — php-src php_zip.c (#19880).
+ */
+final class ZipArchiveGetFromIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getFromIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::getFromIndex()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::getFromIndex() expects at least 1 argument, 0 given');
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::getFromIndex', 1, 'index');
+        $len = \count($frame->calledArgs) >= 3
+            ? $this->intArg($frame->calledArgs[2], 'ZipArchive::getFromIndex', 2, 'len')
+            : 0;
+        $flags = \count($frame->calledArgs) >= 4
+            ? $this->intArg($frame->calledArgs[3], 'ZipArchive::getFromIndex', 3, 'flags')
+            : 0;
+        $result = VmZipArchive::getFromIndex($receiver, $index, $len, $flags);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+}
+
+/**
+ * ZipArchive::getNameIndex(int $index, int $flags = 0) — php-src php_zip.c (#19880).
+ */
+final class ZipArchiveGetNameIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getNameIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::getNameIndex()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::getNameIndex() expects at least 1 argument, 0 given');
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::getNameIndex', 1, 'index');
+        $flags = \count($frame->calledArgs) >= 3
+            ? $this->intArg($frame->calledArgs[2], 'ZipArchive::getNameIndex', 2, 'flags')
+            : 0;
+        $result = VmZipArchive::getNameIndex($receiver, $index, $flags);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+}
+
+/**
+ * ZipArchive::deleteName(string $name) — php-src php_zip.c (#19880).
+ */
+final class ZipArchiveDeleteName extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('deleteName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::deleteName()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::deleteName() expects exactly 1 argument, 0 given');
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::deleteName', 1, 'name');
+        $ok = VmZipArchive::deleteName($receiver, $name);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::deleteIndex(int $index) — php-src php_zip.c (#19880).
+ */
+final class ZipArchiveDeleteIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('deleteIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::deleteIndex()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::deleteIndex() expects exactly 1 argument, 0 given');
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::deleteIndex', 1, 'index');
+        $ok = VmZipArchive::deleteIndex($receiver, $index);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::addEmptyDir(string $dirname, int $flags = 0) — php-src php_zip.c (#19880).
+ */
+final class ZipArchiveAddEmptyDir extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('addEmptyDir');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::addEmptyDir()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::addEmptyDir() expects at least 1 argument, 0 given');
+        }
+        $dirname = $this->stringArg($frame->calledArgs[1], 'ZipArchive::addEmptyDir', 1, 'dirname');
+        $flags = \count($frame->calledArgs) >= 3
+            ? $this->intArg($frame->calledArgs[2], 'ZipArchive::addEmptyDir', 2, 'flags')
+            : 0;
+        $ok = VmZipArchive::addEmptyDir($receiver, $dirname, $flags);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::renameName(string $name, string $new_name) — php-src php_zip.c (#19880).
+ */
+final class ZipArchiveRenameName extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('renameName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::renameName()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::renameName() expects exactly 2 arguments, %d given',
+                \count($frame->calledArgs) - 1
+            ));
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::renameName', 1, 'name');
+        $newName = $this->stringArg($frame->calledArgs[2], 'ZipArchive::renameName', 2, 'new_name');
+        $ok = VmZipArchive::renameName($receiver, $name, $newName);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::renameIndex(int $index, string $new_name) — php-src php_zip.c (#19880).
+ */
+final class ZipArchiveRenameIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('renameIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::renameIndex()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::renameIndex() expects exactly 2 arguments, %d given',
+                \count($frame->calledArgs) - 1
+            ));
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::renameIndex', 1, 'index');
+        $newName = $this->stringArg($frame->calledArgs[2], 'ZipArchive::renameIndex', 2, 'new_name');
+        $ok = VmZipArchive::renameIndex($receiver, $index, $newName);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::getStream(string $name) — php-src php_zip.c (#19880).
+ */
+final class ZipArchiveGetStream extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getStream');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::getStream()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::getStream() expects exactly 1 argument, 0 given');
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::getStream', 1, 'name');
+        $handle = VmZipArchive::getStream($receiver, $name);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $handle) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->streamHandle($handle, $frame->vmContext);
     }
 }
