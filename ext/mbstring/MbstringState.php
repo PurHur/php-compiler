@@ -38,6 +38,22 @@ final class MbstringState
 
     private static string $regexOptions = 'pr';
 
+    /** mb_ereg_search* cursor string (php-src MBREX(search_str); #20024). */
+    private static ?string $searchString = null;
+
+    /** Compiled search pattern text (php-src MBREX(search_re) source). */
+    private static ?string $searchPattern = null;
+
+    private static bool $searchCaseInsensitive = false;
+
+    /** Per-compile options override; null = use {@see regexOptions()}. */
+    private static ?string $searchOptionsOverride = null;
+
+    private static int $searchPos = 0;
+
+    /** @var array<int, string|false>|null */
+    private static ?array $searchRegs = null;
+
     public static function internalEncoding(): string
     {
         return self::$internalEncoding;
@@ -298,6 +314,67 @@ final class MbstringState
         }
 
         return $previous;
+    }
+
+    public static function searchString(): ?string
+    {
+        return self::$searchString;
+    }
+
+    public static function setSearchString(string $string): void
+    {
+        self::$searchString = $string;
+    }
+
+    public static function searchPattern(): ?string
+    {
+        return self::$searchPattern;
+    }
+
+    public static function searchCaseInsensitive(): bool
+    {
+        return self::$searchCaseInsensitive;
+    }
+
+    public static function searchOptionsOverride(): ?string
+    {
+        return self::$searchOptionsOverride;
+    }
+
+    public static function setSearchPattern(
+        string $pattern,
+        bool $caseInsensitive,
+        ?string $optionsOverride
+    ): void {
+        self::$searchPattern = $pattern;
+        self::$searchCaseInsensitive = $caseInsensitive;
+        self::$searchOptionsOverride = $optionsOverride;
+    }
+
+    public static function searchPos(): int
+    {
+        return self::$searchPos;
+    }
+
+    public static function setSearchPos(int $pos): void
+    {
+        self::$searchPos = $pos;
+    }
+
+    /**
+     * @return array<int, string|false>|null
+     */
+    public static function searchRegs(): ?array
+    {
+        return self::$searchRegs;
+    }
+
+    /**
+     * @param array<int, string|false>|null $regs
+     */
+    public static function setSearchRegs(?array $regs): void
+    {
+        self::$searchRegs = $regs;
     }
 
     private static function syncHttpInputListFromInternalEncoding(): void

@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\iconv\CharsetEngine;
 use PHPCompiler\ext\standard\mail as MailBuiltin;
+use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -2556,13 +2557,30 @@ final class VmMbstring
     }
 
     /**
-     * Build PCRE pattern for mb_ereg* (php-src ext/mbstring/php_mbregex.c; #4635).
+     * Build PCRE pattern for mb_ereg* (php-src ext/mbstring/php_mbregex.c; #4635, #20024).
      *
      * Oniguruma semantics are approximated via PCRE u-flag (same approach as mb_split).
      */
-    public static function mbEregRegex(string $pattern, bool $caseInsensitive): ?string
+    public static function mbEregRegex(
+        string $pattern,
+        bool $caseInsensitive,
+        ?string $optionsOverride = null,
+        bool $anchored = false
+    ): ?string {
+        if ('' === $pattern && !$anchored) {
+            // Empty pattern still compiles in some Onig modes; keep delimiter form.
+        }
+
+        return '#'.$pattern.'#'.self::mbEregPcreSuffix($caseInsensitive, $optionsOverride, $anchored);
+    }
+
+    public static function optionsImplyIgnoreCase(?string $options): bool
     {
-        return '#'.$pattern.'#'.self::mbEregPcreSuffix($caseInsensitive);
+        if (null === $options) {
+            return false;
+        }
+
+        return str_contains($options, 'i') || str_contains($options, 'I');
     }
 
     /**
@@ -2571,13 +2589,16 @@ final class VmMbstring
     public static function eregMatch(
         string $pattern,
         string $string,
-        bool $caseInsensitive
+        bool $caseInsensitive,
+        ?string $optionsOverride = null,
+        bool $anchored = false
     ): array {
         if (!self::checkEncoding($string, MbstringState::regexEncoding())) {
             return ['matched' => false, 'registers' => []];
         }
 
-        $regex = self::mbEregRegex($pattern, $caseInsensitive);
+        $ci = $caseInsensitive || self::optionsImplyIgnoreCase($optionsOverride);
+        $regex = self::mbEregRegex($pattern, $ci, $optionsOverride, $anchored);
         if (null === $regex) {
             return ['matched' => false, 'registers' => []];
         }
@@ -2594,17 +2615,32 @@ final class VmMbstring
         return ['matched' => true, 'registers' => $matches];
     }
 
+    /**
+     * mb_ereg_match() — match only at start of string (onig_match; #20024).
+     */
+    public static function eregMatchAnchored(
+        string $pattern,
+        string $string,
+        ?string $options = null
+    ): bool {
+        $out = self::eregMatch($pattern, $string, false, $options, true);
+
+        return $out['matched'];
+    }
+
     public static function eregReplace(
         string $pattern,
         string $replacement,
         string $string,
-        bool $caseInsensitive
-    ): string|false {
+        bool $caseInsensitive,
+        ?string $optionsOverride = null
+    ): string|false|null {
         if (!self::checkEncoding($string, MbstringState::regexEncoding())) {
-            return false;
+            return null;
         }
 
-        $regex = self::mbEregRegex($pattern, $caseInsensitive);
+        $ci = $caseInsensitive || self::optionsImplyIgnoreCase($optionsOverride);
+        $regex = self::mbEregRegex($pattern, $ci, $optionsOverride);
         if (null === $regex) {
             return false;
         }
@@ -2618,6 +2654,276 @@ final class VmMbstring
         }
 
         return $result;
+    }
+
+    /**
+     * mb_ereg_search_init() (php-src php_mbregex.c; #20024).
+     */
+    public static function eregSearchInit(
+        string $string,
+        ?string $pattern = null,
+        ?string $options = null
+    ): bool {
+        if (null !== $pattern && '' === $pattern) {
+            throw new \ValueError('mb_ereg_search_init(): Argument #2 ($pattern) must not be empty');
+        }
+
+        if (null !== $pattern) {
+            $ci = self::optionsImplyIgnoreCase($options);
+            $regex = self::mbEregRegex($pattern, $ci, $options);
+            if (null === $regex) {
+                return false;
+            }
+            @preg_match($regex, '');
+            if (PREG_NO_ERROR !== preg_last_error()) {
+                return false;
+            }
+            MbstringState::setSearchPattern($pattern, $ci, $options);
+        }
+
+        MbstringState::setSearchString($string);
+        MbstringState::setSearchRegs(null);
+
+        if (self::checkEncoding($string, MbstringState::regexEncoding())) {
+            MbstringState::setSearchPos(0);
+
+            return true;
+        }
+
+        MbstringState::setSearchPos(\strlen($string));
+
+        return false;
+    }
+
+    /**
+     * mb_ereg_search / search_pos / search_regs shared exec (php-src _php_mb_regex_ereg_search_exec; #20024).
+     *
+     * @return bool|array<int, int|string|false>
+     */
+    public static function eregSearchExec(int $mode, ?string $pattern = null, ?string $options = null): bool|array
+    {
+        MbstringState::setSearchRegs(null);
+
+        if (null !== $pattern) {
+            $ci = self::optionsImplyIgnoreCase($options);
+            $regex = self::mbEregRegex($pattern, $ci, $options);
+            if (null === $regex) {
+                return false;
+            }
+            @preg_match($regex, '');
+            if (PREG_NO_ERROR !== preg_last_error()) {
+                return false;
+            }
+            MbstringState::setSearchPattern($pattern, $ci, $options);
+        }
+
+        if (null === MbstringState::searchPattern()) {
+            throw new \Error('No pattern was provided');
+        }
+        $str = MbstringState::searchString();
+        if (null === $str) {
+            throw new \Error('No string was provided');
+        }
+
+        $pos = MbstringState::searchPos();
+        $len = \strlen($str);
+        $ci = MbstringState::searchCaseInsensitive();
+        $optOverride = MbstringState::searchOptionsOverride();
+        $regex = self::mbEregRegex(MbstringState::searchPattern(), $ci, $optOverride);
+        if (null === $regex) {
+            MbstringState::setSearchPos($len);
+
+            return false;
+        }
+
+        $matches = [];
+        $result = @preg_match($regex, $str, $matches, \PREG_OFFSET_CAPTURE, $pos);
+        if (false === $result || PREG_NO_ERROR !== preg_last_error() || 0 === $result) {
+            MbstringState::setSearchPos($len);
+
+            return false;
+        }
+
+        $regs = self::offsetCaptureToMbRegs($matches);
+        MbstringState::setSearchRegs($regs);
+
+        $beg = (int) $matches[0][1];
+        $matchText = (string) $matches[0][0];
+        $end = $beg + \strlen($matchText);
+        if ($pos <= $end) {
+            MbstringState::setSearchPos($end);
+        } else {
+            MbstringState::setSearchPos($pos + 1);
+        }
+
+        return match ($mode) {
+            1 => [$beg, $end - $beg],
+            2 => $regs,
+            default => true,
+        };
+    }
+
+    /**
+     * @return array<int, string|false>|false
+     */
+    public static function eregSearchGetRegs(): array|false
+    {
+        $regs = MbstringState::searchRegs();
+        if (null === $regs || null === MbstringState::searchString()) {
+            return false;
+        }
+
+        return $regs;
+    }
+
+    public static function eregSearchSetPos(int $position): bool
+    {
+        $str = MbstringState::searchString();
+        if ($position < 0 && null !== $str) {
+            $position += \strlen($str);
+        }
+        if ($position < 0 || (null !== $str && $position > \strlen($str))) {
+            throw new \ValueError('mb_ereg_search_setpos(): Argument #1 ($offset) is out of range');
+        }
+        MbstringState::setSearchPos($position);
+
+        return true;
+    }
+
+    /**
+     * mb_ereg_replace_callback() (php-src _php_mb_regex_ereg_replace_exec is_callable; #20024).
+     *
+     * @return string|false|null
+     */
+    public static function eregReplaceCallback(
+        \PHPCompiler\VM\Context $vmContext,
+        string $pattern,
+        Variable $callback,
+        string $string,
+        ?string $options = null
+    ): string|false|null {
+        if (!self::checkEncoding($string, MbstringState::regexEncoding())) {
+            return null;
+        }
+
+        $ci = self::optionsImplyIgnoreCase($options);
+        $regex = self::mbEregRegex($pattern, $ci, $options);
+        if (null === $regex) {
+            return false;
+        }
+
+        if (!VmCallable::isCallable($vmContext, $callback)) {
+            throw new \TypeError(VmCallable::invalidCallbackTypeError('mb_ereg_replace_callback'));
+        }
+
+        $result = '';
+        $offset = 0;
+        $len = \strlen($string);
+
+        while ($offset <= $len) {
+            $matches = [];
+            $matchCount = @preg_match($regex, $string, $matches, \PREG_OFFSET_CAPTURE, $offset);
+            if (false === $matchCount || PREG_NO_ERROR !== preg_last_error()) {
+                return false;
+            }
+            if (0 === $matchCount) {
+                $result .= \substr($string, $offset);
+
+                break;
+            }
+
+            $matchStart = (int) $matches[0][1];
+            $matchText = (string) $matches[0][0];
+            $matchLen = \strlen($matchText);
+            $result .= \substr($string, $offset, $matchStart - $offset);
+
+            $regs = self::offsetCaptureToMbRegs($matches);
+            $matchesVar = new Variable();
+            $matchesVar->array(self::mbRegsToHashTable($regs));
+            $replacement = VmCallable::invokeAs(
+                'mb_ereg_replace_callback',
+                $vmContext,
+                $callback,
+                $matchesVar
+            );
+            $result .= $vmContext->runtime->vm->coerceVariableToString($replacement->resolveIndirect());
+
+            $next = $matchStart + $matchLen;
+            if ($next <= $offset) {
+                if ($offset < $len) {
+                    $result .= $string[$offset];
+                }
+                $offset++;
+            } else {
+                $offset = $next;
+            }
+            if ($offset >= $len) {
+                break;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<int|string, array{0: string, 1: int}> $matches
+     *
+     * @return array<int, string|false>
+     */
+    private static function offsetCaptureToMbRegs(array $matches): array
+    {
+        $regs = [];
+        foreach ($matches as $key => $entry) {
+            if (!\is_int($key)) {
+                continue;
+            }
+            if (!\is_array($entry) || !\array_key_exists(0, $entry) || !\array_key_exists(1, $entry)) {
+                $regs[$key] = false;
+                continue;
+            }
+            $beg = (int) $entry[1];
+            if ($beg < 0) {
+                $regs[$key] = false;
+                continue;
+            }
+            $regs[$key] = (string) $entry[0];
+        }
+
+        return $regs;
+    }
+
+    /**
+     * @param array<int, string|false> $regs
+     */
+    public static function mbRegsToHashTable(array $regs): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($regs as $key => $value) {
+            $slot = new Variable();
+            if (false === $value) {
+                $slot->bool(false);
+            } else {
+                $slot->string($value);
+            }
+            $ht->updateIndex((int) $key, $slot);
+        }
+
+        return $ht;
+    }
+
+    /**
+     * @param array<int, int> $pair
+     */
+    public static function searchPosPairToHashTable(array $pair): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($pair as $value) {
+            $slot = new Variable();
+            $slot->int((int) $value);
+            $ht->append($slot);
+        }
+
+        return $ht;
     }
 
     /**
@@ -2882,19 +3188,29 @@ final class VmMbstring
         );
     }
 
-    private static function mbEregPcreSuffix(bool $caseInsensitive): string
-    {
+    private static function mbEregPcreSuffix(
+        bool $caseInsensitive,
+        ?string $optionsOverride = null,
+        bool $anchored = false
+    ): string {
         $flags = 'u';
         if ($caseInsensitive) {
             $flags .= 'i';
         }
-        foreach (str_split(MbstringState::regexOptions()) as $option) {
-            if ('i' === $option && $caseInsensitive) {
+        $options = $optionsOverride ?? MbstringState::regexOptions();
+        foreach (str_split($options) as $option) {
+            if ('i' === $option || 'I' === $option) {
+                if (!str_contains($flags, 'i')) {
+                    $flags .= 'i';
+                }
                 continue;
             }
             if (\in_array($option, ['m', 's', 'x', 'U'], true) && !str_contains($flags, $option)) {
                 $flags .= $option;
             }
+        }
+        if ($anchored && !str_contains($flags, 'A')) {
+            $flags .= 'A';
         }
 
         return $flags;
