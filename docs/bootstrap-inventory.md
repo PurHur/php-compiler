@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5288 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14677 |
+| Source constructs flagged (warnings) | 14678 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3358,7 +3358,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/VmXmlStructBuilder.php` | 0 | 18 |
 | `ext/xml/XmlConstants.php` | 0 | 1 |
 | `ext/xml/XmlFunction.php` | 0 | 1 |
-| `ext/xml/XmlParserHandlers.php` | 0 | 6 |
+| `ext/xml/XmlParserHandlers.php` | 0 | 7 |
 | `ext/xml/XmlParserSupport.php` | 0 | 4 |
 | `ext/xml/XmlSetHandlerFunction.php` | 0 | 4 |
 | `ext/xml/xml_error_string.php` | 0 | 2 |
@@ -27727,12 +27727,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/XmlParserHandlers.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 176)
-- new Variable (line 178)
-- new Variable (line 181)
-- new Variable (line 186)
-- new Variable (line 194)
-- 10 class method(s)
+- new HashTable (line 224)
+- new Variable (line 226)
+- new Variable (line 229)
+- new Variable (line 234)
+- new Variable (line 242)
+- new Variable (line 263)
+- 15 class method(s)
 
 ### `ext/xml/XmlParserSupport.php`
 
@@ -27746,8 +27747,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 56)
-- new Variable (line 62)
-- new Variable (line 68)
+- new Variable (line 63)
+- new Variable (line 69)
 - 3 class method(s)
 
 ### `ext/xml/xml_error_string.php`
