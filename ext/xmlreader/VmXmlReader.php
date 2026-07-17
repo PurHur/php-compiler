@@ -70,6 +70,21 @@ final class VmXmlReader
         $entry->methods['expand'] = new XmlReaderExpand();
         $entry->methodVisibility['expand'] = $pub;
         $entry->methodNames['expand'] = 'expand';
+        $entry->methods['movetoattribute'] = new XmlReaderMoveToAttribute();
+        $entry->methodVisibility['movetoattribute'] = $pub;
+        $entry->methodNames['movetoattribute'] = 'moveToAttribute';
+        $entry->methods['movetofirstattribute'] = new XmlReaderMoveToFirstAttribute();
+        $entry->methodVisibility['movetofirstattribute'] = $pub;
+        $entry->methodNames['movetofirstattribute'] = 'moveToFirstAttribute';
+        $entry->methods['movetonextattribute'] = new XmlReaderMoveToNextAttribute();
+        $entry->methodVisibility['movetonextattribute'] = $pub;
+        $entry->methodNames['movetonextattribute'] = 'moveToNextAttribute';
+        $entry->methods['movetoelement'] = new XmlReaderMoveToElement();
+        $entry->methodVisibility['movetoelement'] = $pub;
+        $entry->methodNames['movetoelement'] = 'moveToElement';
+        $entry->methods['next'] = new XmlReaderNext();
+        $entry->methodVisibility['next'] = $pub;
+        $entry->methodNames['next'] = 'next';
 
         if (CompilerVersion::supportsXmlReaderFactories()) {
             $entry->methods['fromstring'] = new XmlReaderFromString();
@@ -232,6 +247,7 @@ final class VmXmlReader
         $state->events = $events;
         $state->position = -1;
         $state->current = null;
+        $state->attributeIndex = null;
         $state->closed = false;
         XmlReaderRegistry::attach($entry, $state);
     }
@@ -249,6 +265,7 @@ final class VmXmlReader
         if ($state->closed) {
             return false;
         }
+        $state->attributeIndex = null;
         ++$state->position;
         if ($state->position >= \count($state->events)) {
             $state->current = null;
@@ -265,6 +282,7 @@ final class VmXmlReader
         $state = XmlReaderRegistry::state($entry);
         $state->closed = true;
         $state->current = null;
+        $state->attributeIndex = null;
         $state->position = \count($state->events);
         XmlReaderRegistry::detach($entry);
 
@@ -274,12 +292,148 @@ final class VmXmlReader
     public static function getAttribute(ObjectEntry $entry, string $name): ?string
     {
         $state = XmlReaderRegistry::state($entry);
+        if (null !== $state->attributeIndex) {
+            // On an attribute node, getAttribute() does not consult the parent element (php-src).
+            return null;
+        }
         $current = $state->current;
         if (null === $current || XmlReaderConstants::ELEMENT !== $current->nodeType) {
             return null;
         }
 
         return $current->attributes[$name] ?? null;
+    }
+
+    /**
+     * XMLReader::moveToAttribute() — php-src zim_XMLReader_moveToAttribute (#19395).
+     */
+    public static function moveToAttribute(ObjectEntry $entry, string $name): bool
+    {
+        $state = XmlReaderRegistry::state($entry);
+        $current = $state->current;
+        if (null === $current || XmlReaderConstants::ELEMENT !== $current->nodeType) {
+            return false;
+        }
+        $keys = array_keys($current->attributes);
+        $idx = array_search($name, $keys, true);
+        if (false === $idx) {
+            return false;
+        }
+        $state->attributeIndex = $idx;
+
+        return true;
+    }
+
+    /**
+     * XMLReader::moveToFirstAttribute() — php-src zim_XMLReader_moveToFirstAttribute (#19395).
+     */
+    public static function moveToFirstAttribute(ObjectEntry $entry): bool
+    {
+        $state = XmlReaderRegistry::state($entry);
+        $current = $state->current;
+        if (null === $current || XmlReaderConstants::ELEMENT !== $current->nodeType) {
+            return false;
+        }
+        if (0 === $current->attributeCount) {
+            return false;
+        }
+        $state->attributeIndex = 0;
+
+        return true;
+    }
+
+    /**
+     * XMLReader::moveToNextAttribute() — php-src zim_XMLReader_moveToNextAttribute (#19395).
+     */
+    public static function moveToNextAttribute(ObjectEntry $entry): bool
+    {
+        $state = XmlReaderRegistry::state($entry);
+        $current = $state->current;
+        if (null === $current || XmlReaderConstants::ELEMENT !== $current->nodeType) {
+            return false;
+        }
+        if (null === $state->attributeIndex) {
+            return self::moveToFirstAttribute($entry);
+        }
+        $next = $state->attributeIndex + 1;
+        if ($next >= $current->attributeCount) {
+            return false;
+        }
+        $state->attributeIndex = $next;
+
+        return true;
+    }
+
+    /**
+     * XMLReader::moveToElement() — php-src zim_XMLReader_moveToElement (#19395).
+     *
+     * Returns true only when leaving an attribute cursor; false when already on the element.
+     */
+    public static function moveToElement(ObjectEntry $entry): bool
+    {
+        $state = XmlReaderRegistry::state($entry);
+        if (null === $state->attributeIndex) {
+            return false;
+        }
+        $state->attributeIndex = null;
+
+        return true;
+    }
+
+    /**
+     * XMLReader::next([string $name]) — php-src zim_XMLReader_next / xmlTextReaderNext (#19395).
+     *
+     * Skips the current node subtree to the following sibling-level node. Optional $name
+     * keeps advancing until a node with that name is found (any node type).
+     */
+    public static function next(ObjectEntry $entry, ?string $name = null): bool
+    {
+        if (null === $name) {
+            return self::nextSibling($entry);
+        }
+        while (self::nextSibling($entry)) {
+            $view = self::currentEvent($entry);
+            if (null !== $view && $name === $view->name) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Advance past the current node (and descendants) to the following document-order node.
+     */
+    private static function nextSibling(ObjectEntry $entry): bool
+    {
+        $state = XmlReaderRegistry::state($entry);
+        if ($state->closed || null === $state->current) {
+            $state->attributeIndex = null;
+
+            return false;
+        }
+        // Attribute cursor is treated as the parent element (php-src).
+        $state->attributeIndex = null;
+        $current = $state->current;
+        $depth = $current->depth;
+        if (XmlReaderConstants::ELEMENT === $current->nodeType && !$current->isEmptyElement) {
+            while (self::read($entry)) {
+                $ev = $state->current;
+                if (null !== $ev
+                    && XmlReaderConstants::END_ELEMENT === $ev->nodeType
+                    && $ev->depth === $depth
+                ) {
+                    break;
+                }
+            }
+            if (null === $state->current) {
+                return false;
+            }
+
+            return self::read($entry);
+        }
+
+        return self::read($entry);
     }
 
     public static function isValid(ObjectEntry $entry): bool
@@ -349,8 +503,38 @@ final class VmXmlReader
         if (!XmlReaderRegistry::has($entry)) {
             return null;
         }
+        $state = XmlReaderRegistry::state($entry);
+        $current = $state->current;
+        if (null === $current) {
+            return null;
+        }
+        if (null === $state->attributeIndex) {
+            return $current;
+        }
+        if (XmlReaderConstants::ELEMENT !== $current->nodeType) {
+            return $current;
+        }
+        $keys = array_keys($current->attributes);
+        $idx = $state->attributeIndex;
+        if (!isset($keys[$idx])) {
+            return $current;
+        }
+        $attrName = $keys[$idx];
+        $attrValue = $current->attributes[$attrName];
+        $nameParts = self::splitQName($attrName);
+        // Attribute nodes always report hasValue=true (php-src / libxml), even for "".
+        $event = self::makeEvent(
+            XmlReaderConstants::ATTRIBUTE,
+            $attrName,
+            $attrValue,
+            [],
+            $current->depth + 1,
+            false,
+            $nameParts
+        );
+        $event->hasValue = true;
 
-        return XmlReaderRegistry::state($entry)->current;
+        return $event;
     }
 
     /** @return list<XmlReaderEvent> */
