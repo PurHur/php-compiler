@@ -516,7 +516,8 @@ final class VmSimpleXml
         return self::localNameFromQualified(SimpleXmlRegistry::state($entry)->name);
     }
 
-    private static function localNameFromQualified(string $qualifiedName): string
+    /** Local name after optional `prefix:` (php-src sxe iterator key / getName; #20136). */
+    public static function localNameFromQualified(string $qualifiedName): string
     {
         $colon = strpos($qualifiedName, ':');
 

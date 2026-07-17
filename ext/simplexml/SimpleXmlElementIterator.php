@@ -157,7 +157,8 @@ final class SimpleXmlElementKey extends VmClassMethod
 
             return;
         }
-        $frame->returnVar->string($children[$index]->name);
+        // php-src sxe.c iterator key: local name, not prefixed QName (#20136).
+        $frame->returnVar->string(VmSimpleXml::localNameFromQualified($children[$index]->name));
     }
 }
 
