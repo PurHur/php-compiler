@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -34,7 +35,7 @@ final class parse_ini_string extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $ini = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'parse_ini_string', 0, 'ini_string');
+        $ini = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'parse_ini_string', 0, 'ini_string');
         $processSections = false;
         $scannerMode = ParseIniEngine::SCANNER_NORMAL;
         if (isset($frame->calledArgs[1])) {
@@ -55,9 +56,20 @@ final class parse_ini_string extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('parse_ini_string() expects between 1 and 3 arguments in this compiler build');
         }
-        $literal = JitStringArg::compileTimeLiteral($args[0]);
-        if (null === $literal) {
-            throw new \LogicException('parse_ini_string() requires compile-time ini_string in this compiler build');
+        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+            if (VmString::requiresZparamStrStrictNullOnForwardProfile()) {
+                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'parse_ini_string', 0, 'ini_string');
+                $slot = JitValueBox::alloc($context);
+
+                return JitValueBox::pointer($context, $slot);
+            }
+
+            $literal = '';
+        } else {
+            $literal = JitStringArg::compileTimeLiteral($args[0]);
+            if (null === $literal) {
+                throw new \LogicException('parse_ini_string() requires compile-time ini_string in this compiler build');
+            }
         }
         $processSections = false;
         if (isset($args[1])) {
