@@ -13,8 +13,8 @@ use PHPCompiler\VM\Context;
  *
  * Locale / IntlDateFormatter / IntlCalendar / IntlTimeZone / NumberFormatter / Normalizer / Collator /
  * MessageFormatter / Transliterator / ResourceBundle / IntlBreakIterator / IntlChar / UConverter /
- * IntlException all gate on {@see IntlExtensionPolicy} advertisement (no phantom class_exists;
- * #6366, #6171, #6139, #6188).
+ * Spoofchecker / IntlException all gate on {@see IntlExtensionPolicy} advertisement (no phantom
+ * class_exists; #6366, #6171, #6139, #6188, #20035).
  */
 final class BuiltinClasses
 {
@@ -69,6 +69,7 @@ final class BuiltinClasses
         VmBreakIterator::registerClass($ctx);
         VmIntlChar::registerClass($ctx);
         VmUConverter::registerClass($ctx);
+        VmSpoofchecker::registerClass($ctx);
         self::registerIntlException($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
@@ -210,6 +211,16 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         VmUConverter::registerClass($ctx);
+        foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
+            $ctx->classes[$lc]->isInternal = true;
+        }
+    }
+
+    /** Spoofchecker — gated with ext/intl (#20035 / deferred #6171). */
+    public static function registerSpoofchecker(Context $ctx): void
+    {
+        $before = array_keys($ctx->classes);
+        VmSpoofchecker::registerClass($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
