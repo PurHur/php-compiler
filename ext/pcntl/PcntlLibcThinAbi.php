@@ -271,6 +271,56 @@ final class PcntlLibcThinAbi
         return ($status >> 8) & 0xff;
     }
 
+    public static function priorityAvailable(): bool
+    {
+        return null !== self::ffi();
+    }
+
+    public static function getpriority(?int $pid, int $who): int|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $processId = null === $pid ? (int) $ffi->getpid() : $pid;
+        self::clearErrno($ffi);
+        $pri = (int) $ffi->getpriority($who, $processId);
+        if (0 !== self::errno($ffi)) {
+            return false;
+        }
+
+        return $pri;
+    }
+
+    public static function setpriority(int $priority, ?int $pid, int $who): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $processId = null === $pid ? (int) $ffi->getpid() : $pid;
+
+        return 0 === (int) $ffi->setpriority($who, $processId, $priority);
+    }
+
+    private static function clearErrno(\FFI $ffi): void
+    {
+        if (!\method_exists($ffi, '__errno_location')) {
+            return;
+        }
+        $errnoPtr = $ffi->__errno_location();
+        $errnoPtr[0] = 0;
+    }
+
+    private static function errno(\FFI $ffi): int
+    {
+        if (!\method_exists($ffi, '__errno_location')) {
+            return 0;
+        }
+
+        return (int) $ffi->__errno_location()[0];
+    }
+
     private static function ffi(): ?\FFI
     {
         if (!self::ffiEnabled()) {
@@ -290,17 +340,21 @@ final class PcntlLibcThinAbi
 
         $cdef = <<<'CDEF'
 typedef int pid_t;
+typedef unsigned int id_t;
 typedef void (*sighandler_t)(int);
 typedef unsigned long sigset_t;
 sighandler_t signal(int signum, sighandler_t handler);
 int sigprocmask(int how, const sigset_t *set, sigset_t *oldset);
 pid_t fork(void);
 pid_t waitpid(pid_t pid, int *status, int options);
+pid_t getpid(void);
+int getpriority(int which, id_t who);
+int setpriority(int which, id_t who, int prio);
+int *__errno_location(void);
 unsigned int alarm(unsigned int seconds);
 int execv(const char *path, char *const argv[]);
 int execve(const char *path, char *const argv[], char *const envp[]);
 typedef int idtype_t;
-typedef unsigned int id_t;
 typedef struct { int si_signo; int si_errno; int si_code; } siginfo_t;
 int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
 CDEF;

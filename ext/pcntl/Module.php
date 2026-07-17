@@ -42,6 +42,8 @@ class Module extends ModuleAbstract
             new pcntl_sigprocmask(),
             new pcntl_sigtimedwait(),
             new pcntl_waitid(),
+            new pcntl_getpriority(),
+            new pcntl_setpriority(),
         ];
     }
 }

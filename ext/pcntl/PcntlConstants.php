@@ -65,10 +65,18 @@ final class PcntlConstants
     /** Upper bound for valid POSIX signal numbers on Linux (php-src NSIG). */
     public const NSIG = 64;
 
+    /** getpriority(2) / setpriority(2) who (Linux; php-src sys/resource.h). */
+    public const PRIO_PROCESS = 0;
+    public const PRIO_PGRP = 1;
+    public const PRIO_USER = 2;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
         return [
+            'PRIO_PROCESS' => self::PRIO_PROCESS,
+            'PRIO_PGRP' => self::PRIO_PGRP,
+            'PRIO_USER' => self::PRIO_USER,
             'WNOHANG' => self::WNOHANG,
             'WUNTRACED' => self::WUNTRACED,
             'WCONTINUED' => self::WCONTINUED,

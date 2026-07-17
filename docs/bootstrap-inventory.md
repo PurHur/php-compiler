@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5388 |
-| Phase A inventory files (M2 ratio SSOT) | 5388 |
+| PHP files on vm.php path | 5390 |
+| Phase A inventory files (M2 ratio SSOT) | 5390 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15144 |
+| Source constructs flagged (warnings) | 15156 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -867,16 +867,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_x509_parse.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_verify.php` | 0 | 2 |
-| `ext/pcntl/Module.php` | 0 | 20 |
+| `ext/pcntl/Module.php` | 0 | 22 |
 | `ext/pcntl/PcntlConstants.php` | 0 | 1 |
 | `ext/pcntl/PcntlHostBridge.php` | 0 | 2 |
 | `ext/pcntl/PcntlLibcThinAbi.php` | 0 | 2 |
-| `ext/pcntl/VmPcntl.php` | 0 | 19 |
+| `ext/pcntl/VmPcntl.php` | 0 | 21 |
 | `ext/pcntl/VmPcntlArg.php` | 0 | 3 |
 | `ext/pcntl/pcntl_alarm.php` | 0 | 3 |
 | `ext/pcntl/pcntl_async_signals.php` | 0 | 3 |
 | `ext/pcntl/pcntl_exec.php` | 0 | 3 |
 | `ext/pcntl/pcntl_fork.php` | 0 | 4 |
+| `ext/pcntl/pcntl_getpriority.php` | 0 | 4 |
+| `ext/pcntl/pcntl_setpriority.php` | 0 | 4 |
 | `ext/pcntl/pcntl_signal.php` | 0 | 3 |
 | `ext/pcntl/pcntl_signal_dispatch.php` | 0 | 3 |
 | `ext/pcntl/pcntl_signal_get_handler.php` | 0 | 4 |
@@ -11337,6 +11339,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new pcntl_sigprocmask (line 42)
 - new pcntl_sigtimedwait (line 43)
 - new pcntl_waitid (line 44)
+- new pcntl_getpriority (line 45)
+- new pcntl_setpriority (line 46)
 - 2 class method(s)
 
 ### `ext/pcntl/PcntlConstants.php`
@@ -11347,13 +11351,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pcntl/PcntlHostBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- 23 class method(s)
+- 26 class method(s)
 - 1 closure(s)
 
 ### `ext/pcntl/PcntlLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
-- 24 class method(s)
+- 29 class method(s)
 - 1 closure(s)
 
 ### `ext/pcntl/VmPcntl.php`
@@ -11369,15 +11373,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 144)
 - new Error (line 156)
 - new Error (line 168)
-- new Variable (line 204)
-- new Variable (line 212)
-- new Variable (line 226)
-- new Error (line 307)
-- new Error (line 322)
-- new Variable (line 350)
-- new HashTable (line 432)
-- new Variable (line 434)
-- 28 class method(s)
+- new Error (line 195)
+- new Error (line 215)
+- new Variable (line 258)
+- new Variable (line 266)
+- new Variable (line 280)
+- new Error (line 361)
+- new Error (line 376)
+- new Variable (line 404)
+- new HashTable (line 486)
+- new Variable (line 488)
+- 32 class method(s)
 
 ### `ext/pcntl/VmPcntlArg.php`
 
@@ -11413,6 +11419,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 24)
 - new Error (line 30)
 - new Error (line 37)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_getpriority.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Error (line 36)
+- new Error (line 62)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_setpriority.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Error (line 36)
+- new Error (line 57)
 - 2 class method(s)
 
 ### `ext/pcntl/pcntl_signal.php`
