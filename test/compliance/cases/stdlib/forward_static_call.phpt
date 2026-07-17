@@ -1,5 +1,5 @@
 --TEST--
-forward_static_call() — late-static scope dispatch (VM, #3197)
+forward_static_call() — callable-class dispatch + late-static scope (VM, #3197, #20251)
 --FILE--
 <?php
 class FscBase {
@@ -37,9 +37,49 @@ try {
     echo get_class($e), "\n";
     echo $e->getMessage(), "\n";
 }
+
+// #20251 — overridden parent method must not re-enter child
+class FscOwnerA {
+    public static function f(): string {
+        return 'A';
+    }
+}
+class FscOwnerB extends FscOwnerA {
+    public static function f(): string {
+        return forward_static_call(['FscOwnerA', 'f']);
+    }
+}
+echo FscOwnerB::f(), "\n";
+
+class FscLsbA {
+    public static function f(): string {
+        return static::class . '-A';
+    }
+}
+class FscLsbB extends FscLsbA {
+    public static function f(): string {
+        return forward_static_call([FscLsbA::class, 'f']);
+    }
+}
+echo FscLsbB::f(), "\n";
+
+class FscArrA {
+    public static function f(): string {
+        return static::class . '-arr';
+    }
+}
+class FscArrB extends FscArrA {
+    public static function f(): string {
+        return forward_static_call_array([FscArrA::class, 'f'], []);
+    }
+}
+echo FscArrB::f(), "\n";
 --EXPECT--
-child
-child
+base
+base
 array_ok
 Error
 Cannot call forward_static_call() when no class scope is active
+A
+FscLsbB-A
+FscArrB-arr

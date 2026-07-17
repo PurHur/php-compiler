@@ -334,13 +334,35 @@ class VM {
 
     /**
      * Invoke a static method in the caller's late-static scope (forward_static_call, #3197).
+     *
+     * Method body is resolved on {@see $calledScopeClass} (same as owner). Prefer
+     * {@see invokeDeclaredStaticWithCalledScope()} when the callable names a different class (#20251).
      */
     public function invokeStaticWithCalledScope(
         string $calledScopeClass,
         string $methodName,
         Variable ...$args
     ): Variable {
-        $func = VmForwardStaticCall::resolveStaticMethod($this->context, $calledScopeClass, $methodName);
+        return $this->invokeDeclaredStaticWithCalledScope(
+            $calledScopeClass,
+            $calledScopeClass,
+            $methodName,
+            ...$args
+        );
+    }
+
+    /**
+     * Run {@see $methodOwnerClass}::{@see $methodName} with late-static called-scope {@see $calledScopeClass}.
+     *
+     * php-src forward_static_call*: lookup uses the callable class; EG called-scope stays the caller LSB (#20251).
+     */
+    public function invokeDeclaredStaticWithCalledScope(
+        string $methodOwnerClass,
+        string $calledScopeClass,
+        string $methodName,
+        Variable ...$args
+    ): Variable {
+        $func = VmForwardStaticCall::resolveStaticMethod($this->context, $methodOwnerClass, $methodName);
         $savedStack = $this->context->swapRunStack(null);
         try {
             $child = $func->getFrame($this->context, null);

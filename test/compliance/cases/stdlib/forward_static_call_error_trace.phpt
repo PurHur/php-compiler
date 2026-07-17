@@ -13,8 +13,8 @@ try {
     echo $trace[0]['function'] ?? 'none', "\n";
 }
 try {
-    forward_static_call_array('FscTraceProbe::noop', []);
-} catch (Error $e) {
+    forward_static_call_array(['parent', 'noop'], []);
+} catch (TypeError $e) {
     $trace = $e->getTrace();
     echo count($trace), "\n";
     echo $trace[0]['function'] ?? 'none', "\n";

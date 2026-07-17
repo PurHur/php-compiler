@@ -35,19 +35,91 @@ final class VmForwardStaticCall
                 )
             );
         }
+        // Magic parent/self/static TypeError at global scope precedes the no-scope Error (#10361).
+        self::validateCallbackAtGlobalScope($frame, $callable, $builtinName);
         if ('forward_static_call' === $builtinName && !self::hasActiveClassScope($frame)) {
             throw new \Error("Cannot call {$builtinName}() when no class scope is active");
         }
         if (self::isPlainFunctionNameCallable($callable)) {
             return VmCallable::invoke($frame->vmContext, $callable, ...$extraArgs);
         }
-        self::validateCallbackAtGlobalScope($frame, $callable, $builtinName);
         $calledScope = self::calledScopeClass($frame, $builtinName, $callable);
         $methodName = self::parseMethodName($callable, $builtinName);
-        self::assertForwardStaticCallable($frame->vmContext, $builtinName, $calledScope, $methodName);
+        // php-src: method lookup uses the callable's class; called-scope stays the caller LSB (#20251).
+        $methodOwner = self::resolveMethodOwnerClass($frame, $callable, $calledScope, $builtinName);
+        self::assertForwardStaticCallable(
+            $frame->vmContext,
+            $builtinName,
+            $methodOwner,
+            $calledScope,
+            $methodName
+        );
         $vm = $frame->vmContext->runtime->vm;
 
-        return $vm->invokeStaticWithCalledScope($calledScope, $methodName, ...$extraArgs);
+        return $vm->invokeDeclaredStaticWithCalledScope(
+            $methodOwner,
+            $calledScope,
+            $methodName,
+            ...$extraArgs
+        );
+    }
+
+    /**
+     * Class that owns the method body named by the callable (after parent/self/static resolution).
+     *
+     * Distinct from late-static called-scope: forward_static_call(['A','f']) from B runs A::f with scope B.
+     */
+    public static function resolveMethodOwnerClass(
+        Frame $frame,
+        Variable $callable,
+        string $calledScope,
+        string $builtinName
+    ): string {
+        $explicit = self::parseExplicitClassFromCallable($callable, $builtinName);
+        if (null === $explicit || '' === $explicit) {
+            return $calledScope;
+        }
+        $lc = strtolower($explicit);
+        if ('static' === $lc) {
+            return $calledScope;
+        }
+        if ('self' === $lc) {
+            try {
+                return VmReflection::zeroArgGetClassName($frame);
+            } catch (\Error) {
+                return $calledScope;
+            }
+        }
+        if ('parent' === $lc) {
+            try {
+                $defining = VmReflection::zeroArgGetClassName($frame);
+            } catch (\Error) {
+                $defining = $calledScope;
+            }
+            $ctx = $frame->vmContext;
+            if (null === $ctx) {
+                throw new \LogicException(
+                    "{$builtinName}() requires VM context in this compiler build"
+                );
+            }
+            $lcDefining = strtolower($defining);
+            if (!isset($ctx->classes[$lcDefining])) {
+                $ctx->autoloadClass($defining);
+            }
+            if (!isset($ctx->classes[$lcDefining]) || null === $ctx->classes[$lcDefining]->parentLc) {
+                throw new \TypeError(
+                    \sprintf(
+                        '%s(): Argument #1 ($callback) must be a valid callback, cannot access "parent" when current class scope has no parent',
+                        $builtinName
+                    )
+                );
+            }
+            $parentLc = $ctx->classes[$lcDefining]->parentLc;
+
+            return $ctx->classes[$parentLc]->name;
+        }
+
+        return $explicit;
     }
 
     /**
@@ -286,16 +358,19 @@ final class VmForwardStaticCall
 
     /**
      * php-src zend_is_callable — forward_static_call* rejects inaccessible inherited private static (#11919).
+     *
+     * Lookup walks from {@see $methodOwnerClass}; accessibility is checked from {@see $callerScopeClass} (LSB).
      */
     private static function assertForwardStaticCallable(
         Context $ctx,
         string $builtinName,
-        string $calledScopeClass,
+        string $methodOwnerClass,
+        string $callerScopeClass,
         string $methodName
     ): void {
-        [$declaringClass, $methodLc] = self::locateStaticMethod($ctx, $calledScopeClass, $methodName);
+        [$declaringClass, $methodLc] = self::locateStaticMethod($ctx, $methodOwnerClass, $methodName);
         $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-        $callerClassLc = strtolower($calledScopeClass);
+        $callerClassLc = strtolower($callerScopeClass);
         $declaringClassLc = strtolower($declaringClass->name);
         $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodName;
         try {
@@ -307,7 +382,7 @@ final class VmForwardStaticCall
                 $declaredName,
                 false,
                 fn (string $classLc, string $ancestorLc): bool => self::isSameOrSubclassOf($ctx, $classLc, $ancestorLc),
-                $calledScopeClass
+                $callerScopeClass
             );
         } catch (\LogicException) {
             $kind = ($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
@@ -316,7 +391,7 @@ final class VmForwardStaticCall
                     '%s(): Argument #1 ($callback) must be a valid callback, cannot access %s method %s::%s()',
                     $builtinName,
                     $kind,
-                    $calledScopeClass,
+                    $declaringClass->name,
                     $declaredName
                 )
             );

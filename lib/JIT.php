@@ -8293,6 +8293,26 @@ class JIT {
                     $classOp = $block->getOperand($op->arg2);
                     $nameOp = $block->getOperand($op->arg3);
                     if ($nameOp instanceof Operand\Literal && 'class' === strtolower($nameOp->value)) {
+                        // Literal `static::class` must resolve at runtime (LSB) under AOT —
+                        // same rule as `static::CONST` below (#20251, #19614, zend_execute.c).
+                        $classIsStaticKeyword = $classOp instanceof Operand\Literal
+                            && \is_string($classOp->value)
+                            && 'static' === strtolower($classOp->value);
+                        if (
+                            $classIsStaticKeyword
+                            && JIT\LateStaticBindingHelper::useRuntimeLateStatic($this->context)
+                        ) {
+                            $classIdVal = JIT\ClassConstFetchHelper::emitStaticKeywordClassIdForPseudoConst(
+                                $this->context->type->object,
+                                $block
+                            );
+                            $classNameVal = JIT\ClassConstFetchHelper::emitClassNameStringFromClassId(
+                                $this->context->type->object,
+                                $classIdVal
+                            );
+                            $this->assignOperandValue($block->getOperand($op->arg1), $classNameVal);
+                            break;
+                        }
                         if ($classOp instanceof Operand\Literal) {
                             $className = $this->resolveClassNameForPseudoConst($block, $classOp);
                             $lit = new Operand\Literal($className);
