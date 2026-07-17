@@ -1174,6 +1174,146 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_pkey_get_public() / openssl_get_publickey() (php-src ext/openssl/openssl.c; #20240).
+     *
+     * @return \PHPCompiler\VM\Variable|false
+     */
+    public static function pkeyGetPublic(
+        Variable $arg,
+        Context $ctx,
+        string $function = 'openssl_pkey_get_public',
+        ?Frame $frame = null
+    ): Variable|false {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning($function.'(): OpenSSL is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $object = $arg->toObject();
+            $lc = strtolower($object->class->name);
+            if (VmOpensslObjects::isAsymmetricKey($arg)) {
+                $pem = VmOpensslObjects::keyPem($object);
+                $normalized = VmOpensslPkeyNative::normalizePublicKeyPem($pem);
+                if (false === $normalized) {
+                    self::userWarning(
+                        $function.'(): Don\'t know how to get public key from this private key',
+                        $frame
+                    );
+
+                    return false;
+                }
+
+                return VmOpensslObjects::wrapKey($ctx, $normalized);
+            }
+            if (VmOpensslObjects::isCertificate($arg)) {
+                $certPem = VmOpensslObjects::certificatePem($object);
+                $pub = VmOpensslX509Native::extractPublicKeyPem($certPem);
+                if (false === $pub) {
+                    self::userWarning($function.'(): Unable to load key', $frame);
+
+                    return false;
+                }
+
+                return VmOpensslObjects::wrapKey($ctx, $pub);
+            }
+
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #1 ($public_key) must be of type OpenSSLAsymmetricKey|OpenSSLCertificate|array|string, %s given',
+                $function,
+                $object->class->name
+            ));
+        }
+        if (Variable::TYPE_ARRAY === $arg->type) {
+            // php-src accepts array DN form for some key APIs; public load treats it as invalid material.
+            self::userWarning($function.'(): Unable to load key', $frame);
+
+            return false;
+        }
+        if (Variable::TYPE_STRING !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #1 ($public_key) must be of type OpenSSLAsymmetricKey|OpenSSLCertificate|array|string, %s given',
+                $function,
+                match ($arg->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_BOOLEAN => 'bool',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_FLOAT => 'float',
+                    default => 'mixed',
+                }
+            ));
+        }
+
+        $material = self::resolvePemMaterial($arg->toString(), $function, $frame);
+        if (false === $material) {
+            return false;
+        }
+
+        if (str_contains($material, 'BEGIN CERTIFICATE')) {
+            $pub = VmOpensslX509Native::extractPublicKeyPem($material);
+            if (false === $pub) {
+                self::userWarning($function.'(): Unable to load key', $frame);
+
+                return false;
+            }
+
+            return VmOpensslObjects::wrapKey($ctx, $pub);
+        }
+
+        $pem = VmOpensslPkeyNative::normalizePublicKeyPem($material);
+        if (false === $pem) {
+            self::userWarning($function.'(): Unable to load key', $frame);
+
+            return false;
+        }
+
+        return VmOpensslObjects::wrapKey($ctx, $pem);
+    }
+
+    /**
+     * openssl_pkey_get_details() (php-src ext/openssl/openssl.c; #20240).
+     *
+     * @return \PHPCompiler\VM\Variable|false
+     */
+    public static function pkeyGetDetails(Variable $arg, ?Frame $frame = null): Variable|false
+    {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning('openssl_pkey_get_details(): OpenSSL is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $arg->type || !VmOpensslObjects::isAsymmetricKey($arg)) {
+            throw new \TypeError(\sprintf(
+                'openssl_pkey_get_details(): Argument #1 ($key) must be of type OpenSSLAsymmetricKey, %s given',
+                match ($arg->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_BOOLEAN => 'bool',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_FLOAT => 'float',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_ARRAY => 'array',
+                    Variable::TYPE_OBJECT => $arg->toObject()->class->name,
+                    default => 'mixed',
+                }
+            ));
+        }
+
+        $pem = VmOpensslObjects::keyPem($arg->toObject());
+        $details = VmOpensslPkeyNative::getDetails($pem);
+        if (false === $details) {
+            self::userWarning('openssl_pkey_get_details(): Unable to get key details', $frame);
+
+            return false;
+        }
+
+        return VmOpensslObjects::variableFromPhpValue($details);
+    }
+
+    /**
      * openssl_pkey_export() — export OpenSSLAsymmetricKey to PEM (php-src ext/openssl/xp.c; #6295).
      *
      * @return string|false
