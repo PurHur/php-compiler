@@ -34,6 +34,10 @@ final class JitForwardStaticCall
     {
         $block = self::requireClassScope($context, $builtinName);
         $methodLc = self::parseMethodLc($context, $callable, $builtinName);
+        $ownerClass = self::resolveMethodOwnerClassName($context, $block, $callable);
+        if (null !== $ownerClass) {
+            return self::dispatchOwnerPreservingLsb($context, $block, $ownerClass, $methodLc, $extraArgs);
+        }
         $candidates = self::buildStaticMethodCandidatesByClassId($context, $methodLc);
         if ([] === $candidates) {
             throw new \LogicException(
@@ -69,6 +73,10 @@ final class JitForwardStaticCall
 
             return self::dispatchExplicitClass($context, $explicitClass, $methodLc, []);
         }
+        $ownerClass = self::resolveMethodOwnerClassName($context, $block, $callable);
+        if (null !== $ownerClass) {
+            return self::dispatchOwnerPreservingLsb($context, $block, $ownerClass, $methodLc, []);
+        }
         $candidates = self::buildStaticMethodCandidatesByClassId($context, $methodLc);
         if ([] === $candidates) {
             throw new \LogicException(
@@ -77,6 +85,83 @@ final class JitForwardStaticCall
         }
 
         return self::dispatchFromCalledScope($context, $block, $candidates, []);
+    }
+
+    /**
+     * Callable class for method-body lookup (php-src #20251): explicit class, or self/parent/static keywords.
+     */
+    private static function resolveMethodOwnerClassName(Context $context, Block $block, JITVariable $callable): ?string
+    {
+        $explicit = self::resolveExplicitClassName($context, $callable);
+        if (null === $explicit || '' === $explicit) {
+            return null;
+        }
+        $lc = strtolower($explicit);
+        $defining = $block->func->class->value ?? '';
+        if ('self' === $lc) {
+            return '' !== $defining ? $defining : null;
+        }
+        if ('static' === $lc) {
+            return null;
+        }
+        if ('parent' === $lc) {
+            if ('' === $defining) {
+                return null;
+            }
+            $parent = $context->type->object->parentClassLc(strtolower(ltrim($defining, '\\')));
+            if (null === $parent) {
+                return null;
+            }
+            foreach ($context->type->object->allClassNamesById() as $className) {
+                if (strtolower(ltrim($className, '\\')) === $parent) {
+                    return $className;
+                }
+            }
+
+            return $parent;
+        }
+
+        return $explicit;
+    }
+
+    /**
+     * Call the method declared on {@see $ownerClass} while keeping the caller's late-static class (#20251).
+     *
+     * @param list<JITVariable> $extraArgs
+     */
+    private static function dispatchOwnerPreservingLsb(
+        Context $context,
+        Block $block,
+        string $ownerClass,
+        string $methodLc,
+        array $extraArgs
+    ): Value {
+        $classLc = strtolower(ltrim($ownerClass, '\\'));
+        $proxyName = self::resolveStaticProxyForClass($context, $classLc, $methodLc);
+        if (null === $proxyName || !$context->functionIsRegistered($proxyName)) {
+            throw new \LogicException(
+                "Call to undefined static method {$ownerClass}::{$methodLc}() in this compiler build"
+            );
+        }
+        $objectType = $context->type->object;
+        if (LateStaticBindingHelper::useRuntimeLateStatic($context)) {
+            // Keep LSB as the caller's late-static class (not the method owner). Same constant
+            // store pattern as dispatchByClassId / INIT_STATIC_CALL (#20251).
+            $called = $context->scope->calledClassName;
+            if ('' === $called) {
+                $called = $block->func->class->value ?? '';
+            }
+            if ('' !== $called) {
+                LateStaticBindingHelper::emitStoreClassId(
+                    $context,
+                    $context->constantFromInteger($objectType->lookup($called), 'int64')
+                );
+            }
+        }
+        $proxy = $context->resolveFunctionProxy($proxyName);
+        assert($proxy instanceof Call);
+
+        return $proxy->call($context, ...$extraArgs);
     }
 
     private static function emitRequireEmptyParamsArray(

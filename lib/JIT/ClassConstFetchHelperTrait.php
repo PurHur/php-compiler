@@ -65,6 +65,17 @@ trait ClassConstFetchHelperTrait
     ): Value {
         $literal = JitStringArg::compileTimeLiteral($classVar);
         if (null !== $literal) {
+            $lcLiteral = strtolower(ltrim($literal, '\\'));
+            // AOT/standalone: `static::class` must read runtime LSB (inherited methods +
+            // forward_static_call), not fold to the declaring class (#20251, #19614).
+            if (
+                'static' === $lcLiteral
+                && LateStaticBindingHelper::useRuntimeLateStatic($objectType->jitContext())
+            ) {
+                $classId = self::emitStaticKeywordClassId($objectType, $block);
+
+                return self::emitClassNameStringFromClassId($objectType, $classId);
+            }
             $resolved = self::resolveJitSelfClassPseudoConstDisplayName($objectType, $block, $literal)
                 ?? self::resolveJitClassNameString($objectType, $block, $literal);
             $objectType->lookup($resolved);
@@ -287,6 +298,16 @@ trait ClassConstFetchHelperTrait
         $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
 
         return self::emitResolveClassIdFromNameString($objectType, $resolvedStr);
+    }
+
+    /**
+     * Runtime class id for literal `static::` / `static::class` (#19614, #20251).
+     *
+     * @return Value int64
+     */
+    public static function emitStaticKeywordClassIdForPseudoConst(Object_ $objectType, Block $block): Value
+    {
+        return self::emitStaticKeywordClassId($objectType, $block);
     }
 
     /**
