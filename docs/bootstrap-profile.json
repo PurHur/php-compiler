@@ -1833,6 +1833,7 @@
         "ext/standard/JitStreamContextGetDefault.php",
         "ext/standard/JitStreamContextGetOptions.php",
         "ext/standard/JitStreamContextGetParams.php",
+        "ext/standard/JitStreamContextKernel.php",
         "ext/standard/JitStreamContextOptionalArg.php",
         "ext/standard/JitStreamContextRepresentation.php",
         "ext/standard/JitStreamContextRequiredArg.php",
@@ -3441,6 +3442,9 @@
         "ext/xmlreader/XmlReaderEvent.php",
         "ext/xmlreader/XmlReaderExpand.php",
         "ext/xmlreader/XmlReaderExpandHelper.php",
+        "ext/xmlreader/XmlReaderFromStream.php",
+        "ext/xmlreader/XmlReaderFromString.php",
+        "ext/xmlreader/XmlReaderFromUri.php",
         "ext/xmlreader/XmlReaderGetAttribute.php",
         "ext/xmlreader/XmlReaderIsValid.php",
         "ext/xmlreader/XmlReaderOpen.php",
@@ -5507,9 +5511,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5273,
+        "inventory_files": 5277,
         "excluded": 0,
-        "eligible": 5273,
+        "eligible": 5277,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
