@@ -11,7 +11,7 @@ use PHPCompiler\ext\standard\VmFsWriteNative;
 use PHPCompiler\ext\standard\VmFsWritePure;
 use PHPUnit\Framework\TestCase;
 
-/** VmFsOpenPure / VmFsWritePure — fopen and file_put_contents without libc FFI (#8950). */
+/** VmFsOpenPure / VmFsWritePure — fopen/fwrite without libc FFI (#8950, #20266). */
 final class VmFsOpenPureRuntimeShrinkTest extends TestCase
 {
     public function testVmFsOpenNativeDelegatesToPureWithoutFfi(): void
@@ -41,7 +41,9 @@ final class VmFsOpenPureRuntimeShrinkTest extends TestCase
     public function testVmFsWritePureDoesNotUseLibcFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsWritePure.php');
-        $this->assertStringContainsString('file_put_contents', $source);
+        $this->assertStringContainsString('fopen', $source);
+        $this->assertStringContainsString('fwrite', $source);
+        $this->assertStringNotContainsString('\\file_put_contents', $source);
         $this->assertStringNotContainsString('FFI::cdef', $source);
         $this->assertStringNotContainsString('ssize_t write(int fd', $source);
     }
@@ -49,7 +51,7 @@ final class VmFsOpenPureRuntimeShrinkTest extends TestCase
     public function testFopenReadWriteRoundTripWhenFfiDisabled(): void
     {
         if (!VmFsOpenPure::available() || !VmFsWritePure::available()) {
-            $this->markTestSkipped('host fopen/file_put_contents unavailable');
+            $this->markTestSkipped('host fopen/fwrite unavailable');
         }
 
         $path = tempnam(sys_get_temp_dir(), 'phpc_fopen_pure_');
@@ -88,7 +90,7 @@ final class VmFsOpenPureRuntimeShrinkTest extends TestCase
     public function testFilePutContentsAppendAndLockExWhenFfiDisabled(): void
     {
         if (!VmFsWritePure::available()) {
-            $this->markTestSkipped('host file_put_contents unavailable');
+            $this->markTestSkipped('host fopen/fwrite unavailable');
         }
 
         $path = tempnam(sys_get_temp_dir(), 'phpc_fpc_pure_');

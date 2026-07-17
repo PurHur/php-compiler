@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -55,14 +56,10 @@ final class phpc_file_put_contents_kernel extends Internal
         $path = JitStringBuiltinArg::lowerPath($context, $args[0], 'phpc_file_put_contents_kernel', 0, 'filename');
         $data = JitStringBuiltinArg::lower($context, $args[1], 'phpc_file_put_contents_kernel', 1, 'data');
         $i64 = $context->getTypeFromString('int64');
-        if (2 === $argc) {
-            $flags = $i64->constInt(0, false);
-        } else {
-            $flags = $context->builder->truncOrBitCast(
-                $context->helper->loadValue($args[2]),
-                $i64
-            );
-        }
+        // NestedJIT helpers pass flags as __value__ boxes — trunc(loadValue) is invalid IR (#20266).
+        $flags = 2 === $argc
+            ? $i64->constInt(0, false)
+            : JitLongArg::lower($context, $args[2], 'phpc_file_put_contents_kernel() flags');
         self::ensureLibcFunction($context);
 
         return $context->builder->call($context->lookupFunction(self::ABI), $path, $data, $flags);

@@ -28,6 +28,10 @@ final class FilePutContentsRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/FilePutContentsJitHelper.php');
         $this->assertMatchesRegularExpression('/return\s+\\\\phpc_file_put_contents_kernel\s*\(/', $source);
         $this->assertFileExists(__DIR__.'/../../ext/standard/phpc_file_put_contents_kernel.php');
+        $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/phpc_file_put_contents_kernel.php');
+        // NestedJIT flags are __value__ boxes — must use JitLongArg, not trunc(loadValue) (#20266).
+        $this->assertStringContainsString('JitLongArg::lower', $kernel);
+        $this->assertStringNotContainsString('truncOrBitCast', $kernel);
     }
 
     public function testFilePutContentsJitHelperWritesViaKernel(): void
