@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * parse_str() LLVM micro-runtime shrink guard (#6308 phase 2, #13429).
+ * parse_str() LLVM micro-runtime shrink guard (#6308 phase 2, #13429, #20132).
  */
 final class ParseStrRuntimeShrinkTest extends TestCase
 {
@@ -76,7 +76,8 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertFileExists($this->repoRoot.'/ext/standard/JitParseStrUserScriptCstrKernel.php');
         $stringParseStr = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringParseStr.php');
         $this->assertStringContainsString('ensureUserScriptLinked', $stringParseStr);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $stringParseStr);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $stringParseStr);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $stringParseStr);
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeLlvm.php');
         $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/MultipartRuntime.php');
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
@@ -103,7 +104,9 @@ final class ParseStrRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringParseStr.php');
         $this->assertStringContainsString('ensureUserScriptLinked', $source);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('shouldDefer', $source);
     }
 
     public function testParseStrBridgeReplacesDeferredStubBody(): void
