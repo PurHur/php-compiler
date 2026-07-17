@@ -60,6 +60,8 @@ class Module extends ModuleAbstract
             new openssl_x509_read(),
             new openssl_x509_parse(),
             new openssl_x509_fingerprint(),
+            new openssl_x509_export(),
+            new openssl_x509_export_to_file(),
             new openssl_pkcs12_read(),
             new openssl_pkcs12_export(),
             new openssl_pkcs12_export_to_file(),

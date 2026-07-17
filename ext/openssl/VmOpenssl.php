@@ -825,6 +825,37 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_x509_export() — PEM (+ optional text) export (php-src ext/openssl/openssl.c; #20273).
+     */
+    public static function x509ExportPem(
+        Variable $certArg,
+        bool $noText = true,
+        ?Frame $frame = null,
+        string $function = 'openssl_x509_export',
+    ): string|false {
+        if (!VmOpensslX509Native::available()) {
+            self::userWarning($function.'(): OpenSSL X.509 is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        $material = self::coerceCertificatePem($certArg, $function, 0, 'certificate');
+        $pem = self::resolvePemMaterial($material, $function, $frame);
+        if (false === $pem) {
+            return false;
+        }
+
+        $exported = VmOpensslX509Native::exportCertificatePem($pem, $noText);
+        if (false === $exported) {
+            self::userWarningForFrame($function.'(): X.509 Certificate cannot be retrieved', $frame);
+
+            return false;
+        }
+
+        return $exported;
+    }
+
+    /**
      * openssl_csr_get_subject() — DN fields (php-src ext/openssl/xp.c; #6421).
      *
      * @return Variable|false

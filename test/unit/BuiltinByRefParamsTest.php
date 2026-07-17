@@ -89,6 +89,11 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_pkcs12_export'));
     }
 
+    public function testOpensslX509ExportByRefIndices(): void
+    {
+        $this->assertSame([1], BuiltinByRefParams::forFunction('openssl_x509_export'));
+    }
+
     public function testIsCallableThirdArgument(): void
     {
         $this->assertSame([2], BuiltinByRefParams::forFunction('is_callable'));
