@@ -2280,6 +2280,7 @@ require_once __DIR__.'/../../../ext/standard/VmFsPathNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsPathPure.php';
 require_once __DIR__.'/../../../ext/standard/VmFsPhpWrapper.php';
 require_once __DIR__.'/../../../ext/standard/VmFsReadNative.php';
+require_once __DIR__.'/../../../ext/standard/VmFsLocalPath.php';
 require_once __DIR__.'/../../../ext/standard/VmFsReadPure.php';
 require_once __DIR__.'/../../../ext/standard/VmFsStdio.php';
 require_once __DIR__.'/../../../ext/standard/VmFsStdioNative.php';
@@ -3064,6 +3065,10 @@ require_once __DIR__.'/../../../ext/standard/phpc_object_invoke_destructor_nativ
 require_once __DIR__.'/../../../ext/standard/phpc_object_is_constructed_native.php';
 require_once __DIR__.'/../../../ext/standard/phpc_object_release_storage_native.php';
 require_once __DIR__.'/../../../ext/standard/phpc_rename_kernel.php';
+require_once __DIR__.'/../../../ext/standard/phpc_readfile_kernel.php';
+require_once __DIR__.'/../../../ext/standard/phpc_file_put_contents_kernel.php';
+require_once __DIR__.'/../../../ext/standard/JitReadfileLibc.php';
+require_once __DIR__.'/../../../ext/standard/JitFilePutContentsLibc.php';
 require_once __DIR__.'/../../../ext/standard/phpc_run_command.php';
 require_once __DIR__.'/../../../ext/standard/phpc_stat_mode_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_weakref_null_slot.php';

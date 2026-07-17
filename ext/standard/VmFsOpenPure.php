@@ -26,6 +26,7 @@ final class VmFsOpenPure
         if ('' === $path || str_contains($path, "\0")) {
             return false;
         }
+        $path = VmFsLocalPath::resolveAgainstCwd($path);
         $phpMode = self::phpStreamMode($mode);
         $fp = @\fopen($path, $phpMode);
         if (false === $fp) {

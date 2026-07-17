@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5337 |
-| Phase A inventory files (M2 ratio SSOT) | 5337 |
+| PHP files on vm.php path | 5340 |
+| Phase A inventory files (M2 ratio SSOT) | 5340 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14942 |
+| Source constructs flagged (warnings) | 14945 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1512,6 +1512,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitFile.php` | 0 | 1 |
 | `ext/standard/JitFileGetContents.php` | 0 | 1 |
 | `ext/standard/JitFilePutContents.php` | 0 | 1 |
+| `ext/standard/JitFilePutContentsLibc.php` | 0 | 1 |
 | `ext/standard/JitFileatime.php` | 0 | 1 |
 | `ext/standard/JitFilectime.php` | 0 | 1 |
 | `ext/standard/JitFilegroup.php` | 0 | 1 |
@@ -1738,6 +1739,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitRandomIntArg.php` | 0 | 1 |
 | `ext/standard/JitReaddir.php` | 0 | 1 |
 | `ext/standard/JitReadfile.php` | 0 | 1 |
+| `ext/standard/JitReadfileLibc.php` | 0 | 1 |
 | `ext/standard/JitReadgzfile.php` | 0 | 1 |
 | `ext/standard/JitReadline.php` | 0 | 1 |
 | `ext/standard/JitReadlink.php` | 0 | 1 |
@@ -2208,6 +2210,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmFsDiskPure.php` | 0 | 1 |
 | `ext/standard/VmFsGlob.php` | 0 | 1 |
 | `ext/standard/VmFsGlobPure.php` | 0 | 1 |
+| `ext/standard/VmFsLocalPath.php` | 0 | 1 |
 | `ext/standard/VmFsOpenNative.php` | 0 | 1 |
 | `ext/standard/VmFsOpenPure.php` | 0 | 1 |
 | `ext/standard/VmFsPathNative.php` | 0 | 1 |
@@ -15926,6 +15929,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/JitFilePutContentsLibc.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/JitFileatime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -17097,6 +17105,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/JitReadfile.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitReadfileLibc.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -20732,6 +20745,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 12 class method(s)
+
+### `ext/standard/VmFsLocalPath.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/VmFsOpenNative.php`
 

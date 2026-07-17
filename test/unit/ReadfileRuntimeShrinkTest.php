@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** __compiler_readfile: always PHP helper bridge, no libc kernel (#9188, #19966). */
+/** __compiler_readfile: always PHP helper bridge, no defer libc kernel (#9188, #19966). */
 final class ReadfileRuntimeShrinkTest extends TestCase
 {
     public function testStringReadfileUsesPhpBridgeNotDeferKernel(): void
@@ -24,19 +24,24 @@ final class ReadfileRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitReadfileKernel.php');
     }
 
-    public function testReadfileJitHelperDelegatesToVmFs(): void
+    public function testReadfileJitHelperUsesPhpcReadfileKernel(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/ReadfileJitHelper.php');
-        $this->assertStringContainsString('VmFs::readfile', $source);
-        $this->assertStringNotContainsString("lookupFunction('open')", $source);
-        $this->assertStringNotContainsString("lookupFunction('read')", $source);
+        $this->assertMatchesRegularExpression('/return\s+\\\\phpc_readfile_kernel\s*\(/', $source);
+        $this->assertFileExists(__DIR__.'/../../ext/standard/phpc_readfile_kernel.php');
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitReadfileLibc.php');
     }
 
     public function testReadfileJitHelperReturnsMinusOneWhenOpenFails(): void
     {
+        if (!\function_exists('phpc_readfile_kernel')) {
+            $this->markTestSkipped('phpc_readfile_kernel requires compiler runtime');
+        }
         $this->assertSame(
             -1,
-            \PHPCompiler\ext\standard\ReadfileJitHelper::readfile('/no/such/phpc-readfile-jit-helper-'.bin2hex(random_bytes(4)))
+            \PHPCompiler\ext\standard\ReadfileJitHelper::readfile(
+                sys_get_temp_dir().'/phpc-no-such-readfile-'.bin2hex(random_bytes(4))
+            )
         );
     }
 
@@ -45,6 +50,8 @@ final class ReadfileRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('ReadfileJitHelper.php', $spine);
         $this->assertStringContainsString('StringReadfile.php', $spine);
+        $this->assertStringContainsString('phpc_readfile_kernel.php', $spine);
+        $this->assertStringContainsString('JitReadfileLibc.php', $spine);
         $this->assertStringNotContainsString('JitReadfileKernel.php', $spine);
         $this->assertStringNotContainsString('StringReadfileLibc.php', $spine);
     }
