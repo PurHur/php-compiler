@@ -30,6 +30,16 @@ final class JitDnsGetRecord
             );
         }
 
+        return self::invokeLiteral($context, $literal, $typeArg, $authnsArg, $addtlArg);
+    }
+
+    public static function invokeLiteral(
+        Context $context,
+        string $literal,
+        ?JITVariable $typeArg,
+        ?JITVariable $authnsArg,
+        ?JITVariable $addtlArg,
+    ): Value {
         $typeInt = StdlibConstants::DNS_A;
         if (null !== $typeArg) {
             $typeInt = self::compileTimeInt($context, $typeArg)
