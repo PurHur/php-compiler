@@ -79,9 +79,9 @@ final class VmString
      *
      * Distinct from {@see requiresForwardProfileStrictStringNull} (legacy global switch, currently off).
      * wordwrap/str_pad, unserialize/substr, and other typed string builtins use this guard
-     * (php-src ext/standard/string.c, var_unserializer.c). trim/ltrim/rtrim/chop and
-     * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords coerce null with deprecation on forward
-     * profile (php_trim / string.c, re-#18850 #19983 #19998).
+     * (php-src ext/standard/string.c, var_unserializer.c). trim/ltrim/rtrim/chop,
+     * str_repeat/str_shuffle/ucfirst/lcfirst/ucwords, and strlen/strtolower/strtoupper/strrev/bin2hex
+     * coerce null with deprecation on forward profile (php_trim / string.c, re-#18850 #19983 #19998 #20007).
      */
     public static function requiresZparamStrStrictNullOnForwardProfile(): bool
     {
@@ -91,7 +91,8 @@ final class VmString
     /**
      * String builtins that coerce null with deprecation (not Z_PARAM_STR TypeError on 8.4).
      *
-     * Used by trim/ltrim/rtrim/chop (#19983) and str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998).
+     * Used by trim/ltrim/rtrim/chop (#19983), str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
+     * and strlen/strtolower/strtoupper/strrev/bin2hex (#20007).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,

@@ -1,10 +1,9 @@
 --TEST--
-AOT: strrev null — TypeError on 8.4 forward profile (#19276)
+AOT: strrev null — coerce on 8.4 forward profile (#20007)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-strrev(null);
+echo strrev(null) === '' ? 'ok' : 'bad', "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+ok
