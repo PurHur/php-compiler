@@ -27,6 +27,31 @@ final class DatePeriodSupport
     public const OPTION_INCLUDE_END_DATE = 2;
 
     /**
+     * php-src REGISTER_DATEPERIOD_CLASS_CONST_LONG — discovery via defined()/Reflection (#20071).
+     *
+     * @var array<string, int> lowercase constant name => value
+     */
+    private const CLASS_CONSTANTS = [
+        'exclude_start_date' => self::OPTION_EXCLUDE_START_DATE,
+        'include_end_date' => self::OPTION_INCLUDE_END_DATE,
+    ];
+
+    /**
+     * Register DatePeriod::EXCLUDE_START_DATE / INCLUDE_END_DATE on the class entry (#20071).
+     *
+     * php-src: ext/date/php_date.c — REGISTER_DATEPERIOD_CLASS_CONST_LONG
+     */
+    public static function registerClassConstants(ClassEntry $entry): void
+    {
+        foreach (self::CLASS_CONSTANTS as $name => $value) {
+            $const = new Variable(Variable::TYPE_INTEGER);
+            $const->int($value);
+            $entry->constants[$name] = $const;
+            $entry->constNames[$name] = strtoupper($name);
+        }
+    }
+
+    /**
      * php-src date_period_construct — reject unknown overload shapes before mutating state (#15431).
      */
     public static function assertConstructorOverload(Frame $frame, int $argc, Context $ctx): void

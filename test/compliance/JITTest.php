@@ -1360,6 +1360,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'stream_resource_compare') && !str_contains($name, '_jit')) {
                 continue;
             }
+            // DatePeriod option-flag ReflectionClass map: VM + AOT (#20071); MCJIT OOM on Reflection — light *_jit.phpt.
+            if (str_contains($name, 'dateperiod_option_flags_defined') && !str_contains($name, '_jit')) {
+                continue;
+            }
             // stream_set_timeout/chunk_size MCJIT: VM + AOT (#3754); jit.php execute exit -1 until stable.
             if (str_contains($name, 'stream_set_timeout')) {
                 continue;
