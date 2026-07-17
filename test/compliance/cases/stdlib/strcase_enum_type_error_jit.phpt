@@ -1,5 +1,5 @@
 --TEST--
-stdlib strtolower()/strtoupper() JIT — backed enum case TypeError (#5943)
+stdlib strtolower()/strtoupper() JIT — backed enum case TypeError (#5943, #8846)
 --FILE--
 <?php
 declare(strict_types=1);
