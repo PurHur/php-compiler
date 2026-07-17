@@ -35,8 +35,8 @@ final class hash_hmac extends Internal
             return;
         }
         $algo = VmString::stringBuiltinArgForFrame($frame, 0, 'hash_hmac', 0, 'algo');
-        $data = self::vmDataArg($frame);
-        $key = VmString::stringBuiltinArgForFrame($frame, 2, 'hash_hmac', 2, 'key');
+        $data = self::vmZparamStrArg($frame, 1, 'data');
+        $key = self::vmZparamStrArg($frame, 2, 'key');
         $raw = false;
         if (4 === $argc) {
             $raw = VmMath::parseBoolBuiltinArg($frame->calledArgs[3], 'hash_hmac', 4, 'binary');
@@ -66,38 +66,44 @@ final class hash_hmac extends Internal
         return JitHash::hashHmac(
             $context,
             JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hash_hmac', 0, 'algo'),
-            self::jitDataArg($context, $args[1]),
-            JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[2], 'hash_hmac', 2, 'key'),
+            self::jitZparamStrArg($context, $args[1], 1, 'data'),
+            self::jitZparamStrArg($context, $args[2], 2, 'key'),
             $raw
         );
     }
 
-    /** Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#19275, ext/hash/hash.c). */
-    private static function vmDataArg(Frame $frame): string
+    /**
+     * Z_PARAM_STR $data / $key — null TypeError on 8.4 forward profile (#19275, #20175, ext/hash/hash.c).
+     */
+    private static function vmZparamStrArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
-            InternalStrictArg::requireString($frame, 1, 'hash_hmac', 'data');
+            InternalStrictArg::requireString($frame, $argIndex, 'hash_hmac', $paramName);
 
-            return $frame->calledArgs[1]->resolveIndirect()->toString();
+            return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
         }
 
         return VmString::coerceZparamStrBuiltinArg(
-            $frame->calledArgs[1],
+            $frame->calledArgs[$argIndex],
             'hash_hmac',
-            1,
-            'data'
+            $argIndex,
+            $paramName
         );
     }
 
-    private static function jitDataArg(Context $context, JITVariable $arg): Value
-    {
+    private static function jitZparamStrArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
         if ($context->callerStrictTypes) {
             return JitStringBuiltinArg::lowerStrictOrCoercible(
                 $context,
                 $arg,
                 'hash_hmac',
-                1,
-                'data'
+                $argIndex,
+                $paramName
             );
         }
 
@@ -105,8 +111,8 @@ final class hash_hmac extends Internal
             $context,
             $arg,
             'hash_hmac',
-            1,
-            'data'
+            $argIndex,
+            $paramName
         );
     }
 }
