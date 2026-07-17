@@ -83,6 +83,11 @@ final class CachingIteratorBuiltin
             'count' => CachingIteratorCount::class,
             'getcache' => CachingIteratorGetCache::class,
             '__tostring' => CachingIteratorToString::class,
+            // ArrayAccess over FULL_CACHE (php-src spl_caching_it_offset_*; #20143).
+            'offsetexists' => CachingIteratorOffsetExists::class,
+            'offsetget' => CachingIteratorOffsetGet::class,
+            'offsetset' => CachingIteratorOffsetSet::class,
+            'offsetunset' => CachingIteratorOffsetUnset::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -93,6 +98,10 @@ final class CachingIteratorBuiltin
         $entry->methodNames['setflags'] = 'setFlags';
         $entry->methodNames['getcache'] = 'getCache';
         $entry->methodNames['__tostring'] = '__toString';
+        $entry->methodNames['offsetexists'] = 'offsetExists';
+        $entry->methodNames['offsetget'] = 'offsetGet';
+        $entry->methodNames['offsetset'] = 'offsetSet';
+        $entry->methodNames['offsetunset'] = 'offsetUnset';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -105,6 +114,7 @@ final class CachingIteratorBuiltin
             $entry->methods['valid'],
             $entry->methods['hasnext'],
             $entry->methods['getcache'],
+            $entry->methods['offsetget'],
             $entry->methods['__construct']
         )
             && $entry->constructor instanceof CachingIteratorConstruct;
@@ -270,6 +280,62 @@ final class SplCachingIteratorStorage
         return self::requireFullCache($object);
     }
 
+    /**
+     * php-src spl_caching_it_offset_exists — FULL_CACHE ArrayAccess (#20143).
+     *
+     * @throws \BadMethodCallException when FULL_CACHE is not set
+     */
+    public static function offsetExists(ObjectEntry $object, Variable $offset): bool
+    {
+        $cache = self::requireFullCache($object);
+
+        return null !== self::findCacheOffset($cache, $offset);
+    }
+
+    /**
+     * php-src spl_caching_it_offset_get — FULL_CACHE ArrayAccess (#20143).
+     *
+     * @throws \BadMethodCallException when FULL_CACHE is not set
+     */
+    public static function offsetGet(ObjectEntry $object, Variable $offset): Variable
+    {
+        $found = self::findCacheOffset(self::requireFullCache($object), $offset);
+        if (null === $found) {
+            $null = new Variable();
+            $null->null();
+
+            return $null;
+        }
+        $resolved = $found->resolveIndirect();
+        $out = new Variable($resolved->type);
+        $out->copyFrom($resolved);
+
+        return $out;
+    }
+
+    /**
+     * php-src spl_caching_it_offset_set — mutate FULL_CACHE (#20143).
+     *
+     * @throws \BadMethodCallException when FULL_CACHE is not set
+     */
+    public static function offsetSet(ObjectEntry $object, Variable $offset, Variable $value): void
+    {
+        $cache = self::requireFullCache($object);
+        self::storeFullCacheEntry($cache, $offset, $value);
+    }
+
+    /**
+     * php-src spl_caching_it_offset_unset — mutate FULL_CACHE (#20143).
+     *
+     * @throws \BadMethodCallException when FULL_CACHE is not set
+     */
+    public static function offsetUnset(ObjectEntry $object, Variable $offset): void
+    {
+        $cache = self::requireFullCache($object);
+        [$keyVar] = self::cacheOffsetKeyVar($offset);
+        $cache->offsetUnset($keyVar);
+    }
+
     public static function toString(ObjectEntry $object): string
     {
         $state = self::state($object);
@@ -345,6 +411,53 @@ final class SplCachingIteratorStorage
         } else {
             $cache->add($strKey, $stored);
         }
+    }
+
+    private static function findCacheOffset(HashTable $cache, Variable $offset): ?Variable
+    {
+        [$keyVar, $isInt] = self::cacheOffsetKeyVar($offset);
+
+        return $isInt
+            ? $cache->findIndex($keyVar->toInt())
+            : $cache->find($keyVar->toString());
+    }
+
+    /** @return array{0: Variable, 1: bool} */
+    private static function cacheOffsetKeyVar(Variable $offset): array
+    {
+        $resolved = $offset->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            $key = new Variable(Variable::TYPE_INTEGER);
+            $key->int($resolved->toInt());
+
+            return [$key, true];
+        }
+        if (Variable::TYPE_STRING === $resolved->type) {
+            $key = new Variable(Variable::TYPE_STRING);
+            $key->string($resolved->toString());
+
+            return [$key, false];
+        }
+        if (Variable::TYPE_NULL === $resolved->type) {
+            $key = new Variable(Variable::TYPE_STRING);
+            $key->string('');
+
+            return [$key, false];
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type) {
+            $key = new Variable(Variable::TYPE_INTEGER);
+            $key->int((int) $resolved->toFloat());
+
+            return [$key, true];
+        }
+        if (Variable::TYPE_BOOLEAN === $resolved->type) {
+            $key = new Variable(Variable::TYPE_STRING);
+            $key->string($resolved->toBool() ? '1' : '');
+
+            return [$key, false];
+        }
+
+        throw new \TypeError('Illegal offset type');
     }
 
     private static function requireFullCache(ObjectEntry $object): HashTable
@@ -712,5 +825,120 @@ final class CachingIteratorToString extends VmClassMethod
             return;
         }
         $frame->returnVar->string(SplCachingIteratorStorage::toString($object));
+    }
+}
+
+/** php-src CachingIterator::offsetExists — FULL_CACHE ArrayAccess (#20143). */
+final class CachingIteratorOffsetExists extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetExists');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            CachingIteratorBuiltin::CLASS_LC,
+            'CachingIterator::offsetExists()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'CachingIterator::offsetExists() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(
+            SplCachingIteratorStorage::offsetExists($object, $frame->calledArgs[1])
+        );
+    }
+}
+
+/** php-src CachingIterator::offsetGet — FULL_CACHE ArrayAccess (#20143). */
+final class CachingIteratorOffsetGet extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetGet');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            CachingIteratorBuiltin::CLASS_LC,
+            'CachingIterator::offsetGet()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'CachingIterator::offsetGet() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        SplIteratorSupport::copyReturnFrom(
+            $frame,
+            SplCachingIteratorStorage::offsetGet($object, $frame->calledArgs[1])
+        );
+    }
+}
+
+/** php-src CachingIterator::offsetSet — FULL_CACHE ArrayAccess (#20143). */
+final class CachingIteratorOffsetSet extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetSet');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            CachingIteratorBuiltin::CLASS_LC,
+            'CachingIterator::offsetSet()'
+        );
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'CachingIterator::offsetSet() expects exactly 2 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplCachingIteratorStorage::offsetSet(
+            $object,
+            $frame->calledArgs[1],
+            $frame->calledArgs[2]
+        );
+    }
+}
+
+/** php-src CachingIterator::offsetUnset — FULL_CACHE ArrayAccess (#20143). */
+final class CachingIteratorOffsetUnset extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetUnset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            CachingIteratorBuiltin::CLASS_LC,
+            'CachingIterator::offsetUnset()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'CachingIterator::offsetUnset() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplCachingIteratorStorage::offsetUnset($object, $frame->calledArgs[1]);
     }
 }
