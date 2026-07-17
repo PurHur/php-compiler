@@ -47,7 +47,12 @@ final class VmPDOStatement
             'execute' => new PDOStatementExecute(),
             'fetch' => new PDOStatementFetch(),
             'fetchall' => new PDOStatementFetchAll(),
+            'fetchcolumn' => new PDOStatementFetchColumn(),
+            'fetchobject' => new PDOStatementFetchObject(),
             'bindvalue' => new PDOStatementBindValue(),
+            'rowcount' => new PDOStatementRowCount(),
+            'columncount' => new PDOStatementColumnCount(),
+            'closecursor' => new PDOStatementCloseCursor(),
             'rewind' => new PDOStatementRewind(),
             'valid' => new PDOStatementValid(),
             'current' => new PDOStatementCurrent(),
@@ -58,7 +63,12 @@ final class VmPDOStatement
             $entry->methodVisibility[$name] = $pub;
         }
         $entry->methodNames['fetchall'] = 'fetchAll';
+        $entry->methodNames['fetchcolumn'] = 'fetchColumn';
+        $entry->methodNames['fetchobject'] = 'fetchObject';
         $entry->methodNames['bindvalue'] = 'bindValue';
+        $entry->methodNames['rowcount'] = 'rowCount';
+        $entry->methodNames['columncount'] = 'columnCount';
+        $entry->methodNames['closecursor'] = 'closeCursor';
 
         self::$classEntry = $entry;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -67,7 +77,7 @@ final class VmPDOStatement
     /**
      * @param \FFI\CData $stmt sqlite3_stmt*
      */
-    public static function create(ObjectEntry $pdo, $stmt, string $sql, bool $executed): ObjectEntry
+    public static function create(ObjectEntry $pdo, $stmt, string $sql, bool $executed, int $rowCount = 0): ObjectEntry
     {
         if (null === self::$classEntry) {
             throw new \LogicException('PDOStatement class not registered');
@@ -78,11 +88,28 @@ final class VmPDOStatement
         $state->stmt = $stmt;
         $state->sql = $sql;
         $state->executed = $executed;
+        $state->rowCount = $rowCount;
         $state->fetchMode = VmPDO::state($pdo)->fetchMode;
         self::$store[$entry->id] = $state;
         $entry->constructed = true;
 
         return $entry;
+    }
+
+    /**
+     * php-src pdo_sqlite execute: SQLITE_DONE sets row_count from sqlite3_changes();
+     * SQLITE_ROW (SELECT with data) leaves row_count at 0.
+     *
+     * @param \FFI\CData $stmt sqlite3_stmt*
+     * @param \FFI\CData $db sqlite3*
+     */
+    public static function rowCountAfterStep($stmt, $db, int $stepRc): int
+    {
+        if (VmSqlite3Native::STEP_DONE === $stepRc) {
+            return VmSqlite3Native::changes($db);
+        }
+
+        return 0;
     }
 
     private static ?ClassEntry $classEntry = null;
@@ -154,6 +181,9 @@ final class PdoStatementState
 
     public int $fetchMode = PdoConstants::FETCH_BOTH;
 
+    /** Rows affected by last DML execute (php-src stmt->row_count / sqlite3_changes). */
+    public int $rowCount = 0;
+
     public int $key = -1;
 
     /** @var array<string|int, mixed>|null */
@@ -218,6 +248,11 @@ final class PDOStatementExecute extends PdoClassMethod
 
                 return;
             }
+            $db = $pdoState->db;
+            if (null === $db) {
+                throw new \LogicException('PDO object has not been correctly initialized by its constructor');
+            }
+            $st->rowCount = VmPDOStatement::rowCountAfterStep($st->stmt, $db, $rc);
             // Leave cursor at start for subsequent fetch/foreach (SELECT).
             VmSqlite3Native::reset($st->stmt);
             $st->executed = true;
@@ -315,6 +350,151 @@ final class PDOStatementBindValue extends PdoClassMethod
         $value = VmPDO::phpValueFromVariable($frame->calledArgs[2]);
         // 1-based param index → 0-based sparse list storage offset param-1
         $st->bound[$param - 1] = $value;
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+}
+
+/** php-src zim_PDOStatement_fetchColumn — next row, return column $column (default 0). */
+final class PDOStatementFetchColumn extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fetchColumn');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::fetchColumn()');
+        $st = VmPDOStatement::state($receiver);
+        $column = 0;
+        if (\count($frame->calledArgs) >= 2) {
+            $column = $this->intArg($frame->calledArgs[1], 'PDOStatement::fetchColumn', 0, 'column');
+        }
+        $row = VmPDOStatement::fetchRow($st, PdoConstants::FETCH_NUM);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $row || !\array_key_exists($column, $row)) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        VmPDO::assignScalar($frame->returnVar, $row[$column]);
+    }
+}
+
+/**
+ * php-src zim_PDOStatement_fetchObject — FETCH_CLASS into stdClass (custom class args deferred).
+ */
+final class PDOStatementFetchObject extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fetchObject');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::fetchObject()');
+        $st = VmPDOStatement::state($receiver);
+        $className = 'stdClass';
+        if (\count($frame->calledArgs) >= 2) {
+            $arg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $arg->type) {
+                $className = $this->stringArg($frame->calledArgs[1], 'PDOStatement::fetchObject', 0, 'class');
+            }
+        }
+        if ('stdclass' !== strtolower($className)) {
+            throw new \LogicException(
+                'PDOStatement::fetchObject() custom class is not supported in this compiler build'
+            );
+        }
+        $row = VmPDOStatement::fetchRow($st, PdoConstants::FETCH_ASSOC);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $row) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx || !isset($ctx->classes['stdclass'])) {
+            throw new \LogicException('stdClass is not registered');
+        }
+        $object = new ObjectEntry($ctx->classes['stdclass']);
+        $object->constructed = true;
+        foreach ($row as $key => $value) {
+            $slot = $object->allocateProperty((string) $key);
+            VmPDO::assignScalar($slot, $value);
+        }
+        $frame->returnVar->object($object);
+    }
+}
+
+/** php-src zim_PDOStatement_rowCount — stmt->row_count (sqlite3_changes on DML DONE). */
+final class PDOStatementRowCount extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('rowCount');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::rowCount()');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmPDOStatement::state($receiver)->rowCount);
+        }
+    }
+}
+
+/** php-src zim_PDOStatement_columnCount — number of result columns. */
+final class PDOStatementColumnCount extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('columnCount');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::columnCount()');
+        $st = VmPDOStatement::state($receiver);
+        $count = 0;
+        if (null !== $st->stmt) {
+            $count = VmSqlite3Native::columnCount($st->stmt);
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int($count);
+        }
+    }
+}
+
+/**
+ * php-src zim_PDOStatement_closeCursor + pdo_sqlite_stmt_cursor_closer —
+ * sqlite3_reset; stmt->executed = 0.
+ */
+final class PDOStatementCloseCursor extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('closeCursor');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'PDOStatement::closeCursor()');
+        $st = VmPDOStatement::state($receiver);
+        if (null !== $st->stmt) {
+            VmSqlite3Native::reset($st->stmt);
+        }
+        $st->executed = false;
+        $st->exhausted = false;
+        $st->key = -1;
+        $st->current = null;
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }

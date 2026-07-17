@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5281 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14635 |
+| Source constructs flagged (warnings) | 14641 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -869,7 +869,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
 | `ext/pdo/VmPDO.php` | 0 | 26 |
-| `ext/pdo/VmPDOStatement.php` | 0 | 16 |
+| `ext/pdo/VmPDOStatement.php` | 0 | 22 |
 | `ext/phar/BuiltinClasses.php` | 0 | 3 |
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 9 |
@@ -11220,10 +11220,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 239)
 - new ArgumentCountError (line 272)
 - new ArgumentCountError (line 305)
-- new ArgumentCountError (line 352)
-- new ArgumentCountError (line 381)
-- new HashTable (line 408)
-- new Variable (line 410)
+- new ArgumentCountError (line 353)
+- new ArgumentCountError (line 382)
+- new HashTable (line 409)
+- new Variable (line 411)
 - 17 class method(s)
 
 ### `ext/pdo/VmPDOStatement.php`
@@ -11233,18 +11233,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new PDOStatementExecute (line 47)
 - new PDOStatementFetch (line 48)
 - new PDOStatementFetchAll (line 49)
-- new PDOStatementBindValue (line 50)
-- new PDOStatementRewind (line 51)
-- new PDOStatementValid (line 52)
-- new PDOStatementCurrent (line 53)
-- new PDOStatementKey (line 54)
-- new PDOStatementNext (line 55)
-- new ObjectEntry (line 75)
-- new PdoStatementState (line 76)
-- new HashTable (line 284)
-- new Variable (line 287)
-- new ArgumentCountError (line 309)
-- 14 class method(s)
+- new PDOStatementFetchColumn (line 50)
+- new PDOStatementFetchObject (line 51)
+- new PDOStatementBindValue (line 52)
+- new PDOStatementRowCount (line 53)
+- new PDOStatementColumnCount (line 54)
+- new PDOStatementCloseCursor (line 55)
+- new PDOStatementRewind (line 56)
+- new PDOStatementValid (line 57)
+- new PDOStatementCurrent (line 58)
+- new PDOStatementKey (line 59)
+- new PDOStatementNext (line 60)
+- new ObjectEntry (line 85)
+- new PdoStatementState (line 86)
+- new HashTable (line 319)
+- new Variable (line 322)
+- new ArgumentCountError (line 344)
+- new ObjectEntry (line 427)
+- 20 class method(s)
 
 ### `ext/phar/BuiltinClasses.php`
 
@@ -19881,15 +19887,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmCallable.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 113)
-- new Variable (line 148)
-- new Variable (line 278)
-- new Variable (line 280)
-- new Variable (line 432)
-- new Variable (line 438)
-- new Variable (line 450)
-- new Variable (line 452)
-- 21 class method(s)
+- new Variable (line 125)
+- new Variable (line 169)
+- new Variable (line 310)
+- new Variable (line 312)
+- new Variable (line 472)
+- new Variable (line 478)
+- new Variable (line 494)
+- new Variable (line 496)
+- 22 class method(s)
 
 ### `ext/standard/VmCallableInvoke.php`
 
@@ -22656,12 +22662,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_walk.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 122)
-- new HashTable (line 140)
-- new Variable (line 142)
-- new Variable (line 145)
-- new Variable (line 203)
-- 5 class method(s)
+- new Variable (line 131)
+- new HashTable (line 149)
+- new Variable (line 151)
+- new Variable (line 154)
+- new Variable (line 212)
+- 6 class method(s)
 
 ### `ext/standard/array_walk_recursive.php`
 
@@ -22769,7 +22775,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
-- new ArgumentCountError (line 57)
+- new ArgumentCountError (line 58)
 - 3 class method(s)
 
 ### `ext/standard/ceil.php`

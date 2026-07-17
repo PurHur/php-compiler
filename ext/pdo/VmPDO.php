@@ -321,6 +321,7 @@ final class PDOQuery extends PdoClassMethod
 
                 return;
             }
+            $rowCount = VmPDOStatement::rowCountAfterStep($stmt, $db, $rc);
             // Rewind so Iterator/fetch can re-step from the start.
             VmSqlite3Native::reset($stmt);
         } catch (\SQLite3Exception $e) {
@@ -331,7 +332,7 @@ final class PDOQuery extends PdoClassMethod
 
             return;
         }
-        $statement = VmPDOStatement::create($receiver, $stmt, $sql, true);
+        $statement = VmPDOStatement::create($receiver, $stmt, $sql, true, $rowCount);
         if (null !== $frame->returnVar) {
             $frame->returnVar->object($statement);
         }
