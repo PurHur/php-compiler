@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5452 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15374 |
+| Source constructs flagged (warnings) | 15379 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1243,7 +1243,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplClassConstants.php` | 0 | 2 |
 | `ext/spl/SplDllistSerializeSupport.php` | 0 | 2 |
 | `ext/spl/SplDoublyLinkedListBuiltin.php` | 0 | 32 |
-| `ext/spl/SplFileInfoBuiltin.php` | 0 | 4 |
+| `ext/spl/SplFileInfoBuiltin.php` | 0 | 9 |
 | `ext/spl/SplFileInfoStorage.php` | 0 | 1 |
 | `ext/spl/SplFileIteratorSerializeDeny.php` | 0 | 3 |
 | `ext/spl/SplFileObjectBuiltin.php` | 0 | 16 |
@@ -14506,15 +14506,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplFileInfoBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 32)
-- new SplFileInfoConstruct (line 38)
-- new ArgumentCountError (line 123)
-- 26 class method(s)
+- new ClassEntry (line 37)
+- new SplFileInfoConstruct (line 43)
+- new ObjectEntry (line 195)
+- new Variable (line 201)
+- new ObjectEntry (line 234)
+- new Variable (line 241)
+- new Variable (line 243)
+- new ArgumentCountError (line 289)
+- 36 class method(s)
 
 ### `ext/spl/SplFileInfoStorage.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 8 class method(s)
 
 ### `ext/spl/SplFileIteratorSerializeDeny.php`
 

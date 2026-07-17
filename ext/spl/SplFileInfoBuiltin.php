@@ -5,12 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\ext\standard\VmMath;
+use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\ext\standard\VmStatPath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\InterfaceCheck;
+use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
@@ -62,6 +67,11 @@ final class SplFileInfoBuiltin
             'getinode' => SplFileInfoGetInode::class,
             'getlinktarget' => SplFileInfoGetLinkTarget::class,
             '__tostring' => SplFileInfoToString::class,
+            'getfileinfo' => SplFileInfoGetFileInfo::class,
+            'getpathinfo' => SplFileInfoGetPathInfo::class,
+            'openfile' => SplFileInfoOpenFile::class,
+            'setfileclass' => SplFileInfoSetFileClass::class,
+            'setinfoclass' => SplFileInfoSetInfoClass::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -84,6 +94,11 @@ final class SplFileInfoBuiltin
         $entry->methodNames['getgroup'] = 'getGroup';
         $entry->methodNames['getinode'] = 'getInode';
         $entry->methodNames['getlinktarget'] = 'getLinkTarget';
+        $entry->methodNames['getfileinfo'] = 'getFileInfo';
+        $entry->methodNames['getpathinfo'] = 'getPathInfo';
+        $entry->methodNames['openfile'] = 'openFile';
+        $entry->methodNames['setfileclass'] = 'setFileClass';
+        $entry->methodNames['setinfoclass'] = 'setInfoClass';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -100,8 +115,159 @@ final class SplFileInfoBuiltin
             $entry->methods['isfile'],
             $entry->methods['islink'],
             $entry->methods['getperms'],
-            $entry->methods['getsize']
+            $entry->methods['getsize'],
+            $entry->methods['getfileinfo'],
+            $entry->methods['getpathinfo'],
+            $entry->methods['openfile'],
+            $entry->methods['setfileclass'],
+            $entry->methods['setinfoclass']
         );
+    }
+
+    /**
+     * Resolve optional class-string for setInfoClass/setFileClass/getFileInfo/getPathInfo
+     * (php-src `|C` / `|C!` in spl_directory.c).
+     */
+    public static function resolveFactoryClass(
+        Frame $frame,
+        ?Variable $arg,
+        string $method,
+        string $paramName,
+        string $baseClassLc,
+        string $baseClassName,
+        bool $allowNull,
+        string $defaultClassLc
+    ): ClassEntry {
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException($method.'() requires VM context');
+        }
+        if (null === $arg) {
+            $entry = $ctx->classes[$defaultClassLc] ?? null;
+            if (null === $entry) {
+                throw new \LogicException($baseClassName.' is not registered in this compiler build');
+            }
+
+            return $entry;
+        }
+        $resolved = $arg->resolveIndirect();
+        if ($allowNull && Variable::TYPE_NULL === $resolved->type) {
+            $entry = $ctx->classes[$defaultClassLc] ?? null;
+            if (null === $entry) {
+                throw new \LogicException($baseClassName.' is not registered in this compiler build');
+            }
+
+            return $entry;
+        }
+        $className = VmString::coerceStringBuiltinArg($arg, $method, 0, $paramName);
+        $entry = self::lookupClassEntry($ctx, $className);
+        if (null === $entry || !InterfaceCheck::entryIsInstanceOf($entry, $baseClassLc, $ctx)) {
+            $suffix = $allowNull ? ' or null' : '';
+            throw new \TypeError(
+                $method.'(): Argument #1 ($'.$paramName.') must be a class name derived from '
+                .$baseClassName.$suffix.', '.$className.' given'
+            );
+        }
+
+        return $entry;
+    }
+
+    public static function lookupClassEntry(Context $ctx, string $className): ?ClassEntry
+    {
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null !== $entry) {
+            return $entry;
+        }
+        $ctx->autoloadClass($className);
+
+        return VmReflection::resolveClassEntry($ctx, $className);
+    }
+
+    /** php-src spl_filesystem_object_create_type(SPL_FS_INFO) / create_info. */
+    public static function createInfoObject(Frame $frame, ClassEntry $ce, string $pathname): ObjectEntry
+    {
+        $ctx = $frame->vmContext;
+        if (null === $ctx || null === $ctx->runtime) {
+            throw new \LogicException('SplFileInfo factory requires VM runtime');
+        }
+        $declaringLc = self::constructorDeclaringClassLc($ce, $ctx);
+        if (null === $declaringLc || self::CLASS_LC === $declaringLc) {
+            $obj = new ObjectEntry($ce);
+            $obj->constructed = true;
+            SplFileInfoStorage::init($obj, $pathname);
+
+            return $obj;
+        }
+        $pathArg = new Variable();
+        $pathArg->string($pathname);
+
+        return $ctx->runtime->vm->instantiateFromNewCallable($ce, $frame, $pathArg);
+    }
+
+    /** php-src spl_filesystem_object_create_type(SPL_FS_FILE). */
+    public static function createFileObject(
+        Frame $frame,
+        ClassEntry $ce,
+        string $pathname,
+        string $mode,
+        bool $useIncludePath
+    ): ObjectEntry {
+        $ctx = $frame->vmContext;
+        if (null === $ctx || null === $ctx->runtime) {
+            throw new \LogicException('SplFileInfo::openFile() requires VM runtime');
+        }
+        SplFileObjectBuiltin::registerClass($ctx);
+        if ($useIncludePath) {
+            $resolved = VmFs::resolveIncludePath($pathname);
+            if (false !== $resolved) {
+                $pathname = $resolved;
+            }
+        }
+        $declaringLc = self::constructorDeclaringClassLc($ce, $ctx);
+        if (null === $declaringLc || SplFileObjectBuiltin::CLASS_LC === $declaringLc) {
+            $handle = VmFs::fopen($pathname, $mode, $ctx);
+            if (false === $handle) {
+                throw new \RuntimeException(
+                    'SplFileObject::__construct('.$pathname.'): Failed to open stream: No such file or directory'
+                );
+            }
+            $obj = new ObjectEntry($ce);
+            $obj->constructed = true;
+            SplFileInfoStorage::init($obj, $pathname);
+            SplFileObjectStorage::setHandle($obj, $handle);
+
+            return $obj;
+        }
+        $pathArg = new Variable();
+        $pathArg->string($pathname);
+        $modeArg = new Variable();
+        $modeArg->string($mode);
+
+        return $ctx->runtime->vm->instantiateFromNewCallable($ce, $frame, $pathArg, $modeArg);
+    }
+
+    private static function constructorDeclaringClassLc(ClassEntry $ce, Context $ctx): ?string
+    {
+        $current = $ce;
+        while (true) {
+            $ctor = $current->constructor ?? $current->methods['__construct'] ?? null;
+            if (null !== $ctor) {
+                // Inherited builtin SplFileInfo/SplFileObject ctors must use the C fast path
+                // (php-src: constructor scope == spl_ce_SplFileInfo / SplFileObject).
+                if ($ctor instanceof SplFileInfoConstruct) {
+                    return SplFileInfoBuiltin::CLASS_LC;
+                }
+                if ($ctor instanceof SplFileObjectConstruct) {
+                    return SplFileObjectBuiltin::CLASS_LC;
+                }
+
+                return strtolower(ltrim($current->name, '\\'));
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return null;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
     }
 }
 
@@ -710,5 +876,203 @@ final class SplFileInfoGetLinkTarget extends VmClassMethod
         throw new \RuntimeException(
             'Unable to read link '.$pathname.', error: '.$errnoMsg
         );
+    }
+}
+
+/** php-src SplFileInfo::getFileInfo — spl_filesystem_object_create_type(SPL_FS_INFO). */
+final class SplFileInfoGetFileInfo extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getFileInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::getFileInfo()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ce = SplFileInfoBuiltin::resolveFactoryClass(
+            $frame,
+            $frame->calledArgs[1] ?? null,
+            'SplFileInfo::getFileInfo',
+            'class',
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo',
+            true,
+            SplFileInfoStorage::infoClassLc($object)
+        );
+        $info = SplFileInfoBuiltin::createInfoObject(
+            $frame,
+            $ce,
+            SplFileInfoStorage::pathname($object)
+        );
+        $frame->returnVar->object($info);
+    }
+}
+
+/** php-src SplFileInfo::getPathInfo — dirname pathname as SplFileInfo. */
+final class SplFileInfoGetPathInfo extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPathInfo');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::getPathInfo()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $pathname = SplFileInfoStorage::pathname($object);
+        if ('' === $pathname) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $ce = SplFileInfoBuiltin::resolveFactoryClass(
+            $frame,
+            $frame->calledArgs[1] ?? null,
+            'SplFileInfo::getPathInfo',
+            'class',
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo',
+            true,
+            SplFileInfoStorage::infoClassLc($object)
+        );
+        $info = SplFileInfoBuiltin::createInfoObject(
+            $frame,
+            $ce,
+            VmString::dirname($pathname)
+        );
+        $frame->returnVar->object($info);
+    }
+}
+
+/** php-src SplFileInfo::openFile — spl_filesystem_object_create_type(SPL_FS_FILE). */
+final class SplFileInfoOpenFile extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('openFile');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::openFile()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException('SplFileInfo::openFile() requires VM context');
+        }
+        $mode = 'r';
+        if (isset($frame->calledArgs[1])) {
+            $mode = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[1],
+                'SplFileInfo::openFile',
+                0,
+                'mode'
+            );
+        }
+        $useIncludePath = false;
+        if (isset($frame->calledArgs[2])) {
+            $useIncludePath = VmMath::parseBoolBuiltinArg(
+                $frame->calledArgs[2],
+                'SplFileInfo::openFile',
+                1,
+                'useIncludePath'
+            );
+        }
+        // Arg #3 ($context) accepted for signature parity; SplFileObject fopen path ignores it today.
+        SplFileObjectBuiltin::registerClass($frame->vmContext);
+        $ce = $frame->vmContext->classes[SplFileInfoStorage::fileClassLc($object)] ?? null;
+        if (null === $ce) {
+            throw new \LogicException('SplFileObject is not registered in this compiler build');
+        }
+        $file = SplFileInfoBuiltin::createFileObject(
+            $frame,
+            $ce,
+            SplFileInfoStorage::pathname($object),
+            $mode,
+            $useIncludePath
+        );
+        $frame->returnVar->object($file);
+    }
+}
+
+/** php-src SplFileInfo::setFileClass — class used by openFile(). */
+final class SplFileInfoSetFileClass extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setFileClass');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::setFileClass()'
+        );
+        if (null === $frame->vmContext) {
+            throw new \LogicException('SplFileInfo::setFileClass() requires VM context');
+        }
+        SplFileObjectBuiltin::registerClass($frame->vmContext);
+        $ce = SplFileInfoBuiltin::resolveFactoryClass(
+            $frame,
+            $frame->calledArgs[1] ?? null,
+            'SplFileInfo::setFileClass',
+            'class',
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject',
+            false,
+            SplFileObjectBuiltin::CLASS_LC
+        );
+        SplFileInfoStorage::setFileClassLc($object, strtolower(ltrim($ce->name, '\\')));
+    }
+}
+
+/** php-src SplFileInfo::setInfoClass — class used by getFileInfo()/getPathInfo(). */
+final class SplFileInfoSetInfoClass extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setInfoClass');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo::setInfoClass()'
+        );
+        $ce = SplFileInfoBuiltin::resolveFactoryClass(
+            $frame,
+            $frame->calledArgs[1] ?? null,
+            'SplFileInfo::setInfoClass',
+            'class',
+            SplFileInfoBuiltin::CLASS_LC,
+            'SplFileInfo',
+            false,
+            SplFileInfoBuiltin::CLASS_LC
+        );
+        SplFileInfoStorage::setInfoClassLc($object, strtolower(ltrim($ce->name, '\\')));
     }
 }
