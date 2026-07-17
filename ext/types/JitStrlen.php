@@ -27,11 +27,8 @@ final class JitStrlen
     public static function lowerLength(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19276, string.c).
-            if (
-                $context->callerStrictTypes
-                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-            ) {
+            // Soft-null — coerce+deprecate on forward profile (#20007, string.c); TypeError only under strict_types.
+            if ($context->callerStrictTypes) {
                 self::emitTypeErrorAndAbort($context, 'null');
 
                 return $context->getTypeFromString('int64')->constInt(0, false);
@@ -165,11 +162,8 @@ final class JitStrlen
         $mergeBlock = null;
         $nullEnd = null;
         $nullLen = null;
-        if (
-            $context->callerStrictTypes
-            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
-        ) {
-            // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19276, string.c).
+        if ($context->callerStrictTypes) {
+            // strict_types — null TypeError; soft-null coerce on forward profile (#20007, string.c).
             $context->builder->branchIf($isNull, $nullErrBlock, $okBlock);
             $context->builder->positionAtEnd($nullErrBlock);
             self::emitTypeErrorAndAbort($context, 'null');

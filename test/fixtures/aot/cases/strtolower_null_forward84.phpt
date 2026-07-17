@@ -1,10 +1,9 @@
 --TEST--
-AOT: strtolower null — TypeError on 8.4 forward profile (#19276)
+AOT: strtolower null — coerce on 8.4 forward profile (#20007)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-strtolower(null);
+echo strtolower(null) === '' ? 'ok' : 'bad', "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+ok

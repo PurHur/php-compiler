@@ -1,10 +1,9 @@
 --TEST--
-AOT: strlen null — TypeError on 8.4 forward profile (#19276)
+AOT: strlen null — coerce on 8.4 forward profile (#20007)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-strlen(null);
+echo strlen(null) === 0 ? 'ok' : 'bad', "\n";
 --EXPECT--
---EXPECT_EXIT--
-255
+ok

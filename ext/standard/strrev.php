@@ -50,14 +50,17 @@ final class strrev extends Internal
             throw new \LogicException('strrev() requires exactly one argument');
         }
 
-        // Early TypeError return before StringStrrev::ensureLinked (AOT helper IR gap; #19276).
-        if (
-            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
-            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
-        ) {
-            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strrev', 0, 'string');
+        // Null operand: TypeError under strict_types; soft-null coerces to "" without
+        // StringStrrev::ensureLinked (user-script AOT helper IR still clears insert block; #20007).
+        // strrev("") === "" so returning the coerced empty string is correct.
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'strrev', 0, 'string');
 
-            return $context->getTypeFromString('__string__*')->constNull();
+                return $context->getTypeFromString('__string__*')->constNull();
+            }
+
+            return JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'strrev', 0, 'string');
         }
 
         StringStrrev::ensureLinked($context);
@@ -74,8 +77,8 @@ final class strrev extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'strrev', $paramName)->toString();
         }
 
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19276, string.c).
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null — coerce+deprecate on forward profile (#20007, string.c).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'strrev',
             $argIndex,
@@ -99,7 +102,7 @@ final class strrev extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'strrev',

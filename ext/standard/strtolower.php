@@ -59,8 +59,8 @@ final class strtolower extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'strtolower', $paramName)->toString();
         }
 
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19276, string.c).
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null — coerce+deprecate on forward profile (#20007, string.c).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'strtolower',
             $argIndex,
@@ -84,7 +84,7 @@ final class strtolower extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'strtolower',
