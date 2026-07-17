@@ -183,6 +183,7 @@ require_once __DIR__.'/../../../ext/curl/curl_file_create.php';
 require_once __DIR__.'/../../../ext/curl/curl_init.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_strerror.php';
 require_once __DIR__.'/../../../ext/curl/curl_setopt.php';
+require_once __DIR__.'/../../../ext/curl/curl_setopt_array.php';
 require_once __DIR__.'/../../../ext/curl/curl_share_close.php';
 require_once __DIR__.'/../../../ext/curl/curl_share_init.php';
 require_once __DIR__.'/../../../ext/curl/curl_share_setopt.php';

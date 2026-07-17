@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\curl;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 
 /**
@@ -70,6 +72,35 @@ final class VmCurlEasy
         return true;
     }
 
+    public static function setoptArray(ObjectEntry $easy, Variable $optionsVar, Frame $frame): bool
+    {
+        self::ensureLive($easy, 'curl_setopt_array');
+        $optionsVar = $optionsVar->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $optionsVar->type) {
+            throw new \TypeError(\sprintf(
+                'curl_setopt_array(): Argument #2 ($options) must be of type array, %s given',
+                EnumCaseSupport::typeNameForVariable($optionsVar)
+            ));
+        }
+
+        foreach ($optionsVar->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $keyVar = $keyVar->resolveIndirect();
+            $option = self::parseOptionKey($keyVar);
+            if (!CurlConstants::isValidEasyOption($option)) {
+                throw new \ValueError(
+                    Variable::TYPE_STRING === $keyVar->type && !is_numeric($keyVar->toString())
+                        ? 'curl_setopt_array(): Argument #2 ($options) contains an invalid cURL option'
+                        : 'curl_setopt_array(): Argument #2 ($options) must contain only valid cURL options'
+                );
+            }
+            if (!self::setopt($easy, $option, $valueVar, $frame)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public static function close(ObjectEntry $easy): void
     {
         if (!isset(self::$state[$easy->id])) {
@@ -102,5 +133,22 @@ final class VmCurlEasy
         if (!isset(self::$state[$easy->id])) {
             return;
         }
+    }
+
+    private static function parseOptionKey(Variable $keyVar): int
+    {
+        if (Variable::TYPE_INTEGER === $keyVar->type) {
+            return $keyVar->toInt();
+        }
+        if (Variable::TYPE_STRING === $keyVar->type) {
+            $s = $keyVar->toString();
+            if ('' === $s || !is_numeric($s)) {
+                throw new \ValueError('curl_setopt_array(): Argument #2 ($options) contains an invalid cURL option');
+            }
+
+            return VmMath::parseIntBuiltinArg($keyVar, 'curl_setopt_array', 2, 'options');
+        }
+
+        throw new \ValueError('curl_setopt_array(): Argument #2 ($options) contains an invalid cURL option');
     }
 }

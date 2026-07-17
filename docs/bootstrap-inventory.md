@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5343 |
-| Phase A inventory files (M2 ratio SSOT) | 5343 |
+| PHP files on vm.php path | 5344 |
+| Phase A inventory files (M2 ratio SSOT) | 5344 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14952 |
+| Source constructs flagged (warnings) | 14955 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -124,7 +124,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/CurlFileBuiltin.php` | 0 | 12 |
 | `ext/curl/CurlFunction.php` | 0 | 1 |
 | `ext/curl/CurlStringFileBuiltin.php` | 0 | 7 |
-| `ext/curl/Module.php` | 0 | 15 |
+| `ext/curl/Module.php` | 0 | 16 |
 | `ext/curl/VmCurlArg.php` | 0 | 1 |
 | `ext/curl/VmCurlCore.php` | 0 | 3 |
 | `ext/curl/VmCurlEasy.php` | 0 | 4 |
@@ -136,6 +136,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_init.php` | 0 | 2 |
 | `ext/curl/curl_multi_strerror.php` | 0 | 2 |
 | `ext/curl/curl_setopt.php` | 0 | 2 |
+| `ext/curl/curl_setopt_array.php` | 0 | 2 |
 | `ext/curl/curl_share_close.php` | 0 | 2 |
 | `ext/curl/curl_share_init.php` | 0 | 2 |
 | `ext/curl/curl_share_setopt.php` | 0 | 2 |
@@ -5862,12 +5863,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/CurlConstants.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/curl/CurlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `ext/curl/CurlFileBuiltin.php`
 
@@ -5917,7 +5918,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new curl_share_close (line 74)
 - new curl_init (line 77)
 - new curl_setopt (line 78)
-- new curl_close (line 79)
+- new curl_setopt_array (line 79)
+- new curl_close (line 80)
 - 5 class method(s)
 
 ### `ext/curl/VmCurlArg.php`
@@ -5935,10 +5937,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/VmCurlEasy.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 32)
-- new Variable (line 40)
-- new ObjectEntry (line 41)
-- 8 class method(s)
+- new ClassEntry (line 34)
+- new Variable (line 42)
+- new ObjectEntry (line 43)
+- 10 class method(s)
 
 ### `ext/curl/VmCurlEscape.php`
 
@@ -5989,6 +5991,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/curl/curl_setopt_array.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
 - 2 class method(s)
 
 ### `ext/curl/curl_share_close.php`
@@ -9214,9 +9222,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/JitGrapheme.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 311)
-- new Variable (line 313)
-- 16 class method(s)
+- new HashTable (line 354)
+- new Variable (line 356)
+- 17 class method(s)
 - 3 closure(s)
 
 ### `ext/intl/JitGraphemeStrSplit.php`
@@ -21238,7 +21246,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMath.php`
 
 **Warnings** (review for bootstrap subset):
-- 85 class method(s)
+- 84 class method(s)
 
 ### `ext/standard/VmMemory.php`
 
@@ -32176,12 +32184,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MultipartRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 329)
-- new phpc_native_ht_set_string_key (line 330)
-- new phpc_native_ht_set_string_key_ht (line 331)
-- new phpc_native_ht_set_string_at (line 332)
-- new phpc_native_ht_set_hashtable_at (line 333)
-- 16 class method(s)
+- new phpc_native_ht_alloc (line 291)
+- new phpc_native_ht_set_string_key (line 292)
+- new phpc_native_ht_set_string_key_ht (line 293)
+- new phpc_native_ht_set_string_at (line 294)
+- new phpc_native_ht_set_hashtable_at (line 295)
+- 14 class method(s)
 
 ### `lib/JIT/Builtin/MultisortRuntime.php`
 

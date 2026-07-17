@@ -76,6 +76,7 @@ class Module extends ModuleAbstract
         if (CurlExtensionPolicy::advertisesEasyHandleStubs()) {
             $functions[] = new curl_init();
             $functions[] = new curl_setopt();
+            $functions[] = new curl_setopt_array();
             $functions[] = new curl_close();
         }
 
