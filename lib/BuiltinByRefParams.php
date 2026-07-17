@@ -146,6 +146,9 @@ final class BuiltinByRefParams
             case 'collator::asort':
                 // $this + &$array (+ optional flags) — php-src collator.stub.php (#5747)
                 return [1];
+            case 'sqlite3stmt::bindparam':
+                // $this + $param + &$var (+ optional $type) — php-src sqlite3.stub.php (#19854)
+                return [2];
             case 'msg_send':
                 // php-src ext/sysvmsg/sysvmsg.stub.php — &$error_code (#3666)
                 return [5];
