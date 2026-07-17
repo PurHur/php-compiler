@@ -58,6 +58,8 @@ class Module extends ModuleAbstract
             new socket_getpeername(),
             new socket_sendto(),
             new socket_recvfrom(),
+            new socket_send(),
+            new socket_recv(),
             new socket_addrinfo_lookup(),
             new socket_addrinfo_connect(),
             new socket_addrinfo_bind(),

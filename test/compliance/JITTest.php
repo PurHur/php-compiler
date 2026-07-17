@@ -1051,6 +1051,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'socket_create_connect_rw')) {
                 continue;
             }
+            // socket_recv/socket_send — VM + libc FFI first; JIT lowering follows (#20238).
+            if (str_contains($name, 'socket_recv_send')) {
+                continue;
+            }
             // socket_strerror/last_error/clear_error — VM first (#6227).
             if (str_contains($name, 'socket_strerror')) {
                 continue;

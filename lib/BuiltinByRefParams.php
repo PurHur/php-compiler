@@ -68,6 +68,8 @@ final class BuiltinByRefParams
                 return [1, 2];
             case 'socket_recvfrom':
                 return [1, 4, 5];
+            case 'socket_recv':
+                return [1];
             case 'socket_recvmsg':
                 return [1];
             case 'fsockopen':
