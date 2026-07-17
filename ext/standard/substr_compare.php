@@ -69,13 +69,27 @@ final class substr_compare extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        StringSubstrCompare::ensureLinked($context);
         $argc = \count($args);
         if ($argc < 3 || $argc > 5) {
             throw new \LogicException('substr_compare() accepts three to five arguments in this compiler build');
         }
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
+
+        // Null Z_PARAM_STR before ensureLinked — helper link clears insert block (#20164 / #20007).
+        if (self::isCompileTimeNull($args[0])) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'substr_compare', 0, 'haystack');
+            if ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()) {
+                return $i64->constInt(0, false);
+            }
+        } elseif (self::isCompileTimeNull($args[1])) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'substr_compare', 1, 'needle');
+            if ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()) {
+                return $i64->constInt(0, false);
+            }
+        }
+
+        StringSubstrCompare::ensureLinked($context);
         $lengthVal = $i64->constInt(-1, false);
         if ($argc >= 4) {
             if (JITVariable::TYPE_VALUE === $args[3]->type && $args[3]->isNullConstant) {
@@ -94,14 +108,19 @@ final class substr_compare extends Internal
                 $i32
             );
         }
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'substr_compare', 0, 'haystack'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'substr_compare', 1, 'needle'));
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20164; same as strncmp/substr).
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'substr_compare', 0, 'haystack'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'substr_compare', 1, 'needle'));
         $offset = self::lowerStrictIntArg($context, $args[2], 'substr_compare', 3, 'offset');
         $fn = $context->lookupFunction('substr_compare');
         $raw = $context->builder->call($fn, $p0, $p1, $offset, $lengthVal, $ci);
-        $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->sExt($raw, $i64);
+    }
+
+    private static function isCompileTimeNull(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false);
     }
 
     /**
@@ -129,7 +148,8 @@ final class substr_compare extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'substr_compare', $paramName)->toString();
         }
 
-        return VmString::coerceStringBuiltinArg(
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20164; same as strncmp/substr).
+        return VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[$argIndex],
             'substr_compare',
             $argIndex,
