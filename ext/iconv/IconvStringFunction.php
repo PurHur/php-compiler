@@ -9,7 +9,6 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
@@ -25,9 +24,12 @@ abstract class IconvStringFunction extends Internal
         return JitIconvString::dispatch($context, $this->getName(), ...$args);
     }
 
+    /**
+     * Z_PARAM_STR — null TypeError on 8.4 forward profile (#20208; iconv.c / iconv.stub.php).
+     */
     protected function coerceInputString(Frame $frame, int $index, string $param): string
     {
-        return VmString::coerceStringBuiltinArg($frame->calledArgs[$index], $this->getName(), $index, $param);
+        return VmString::zparamStrBuiltinArgForFrame($frame, $index, $this->getName(), $index, $param);
     }
 
     protected function coerceEncoding(Frame $frame, int $index): string
