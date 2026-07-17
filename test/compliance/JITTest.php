@@ -1340,6 +1340,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'ziparchive_forward_profile')) {
                 continue;
             }
+            // SoapClient v1 — VM-only until JIT class-method lowering (#20037 / #3724).
+            if (str_contains($name, 'soap_client')) {
+                continue;
+            }
             // get_defined_functions()/get_declared_functions() MCJIT: VM + dedicated PHPT (#3128/#3739); jit.php execute segfaults on merge runtime.
             if (str_contains($name, 'get_defined_functions') || str_contains($name, 'get_declared_functions')) {
                 continue;

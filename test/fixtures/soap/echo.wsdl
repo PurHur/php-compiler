@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions name="EchoService"
+  targetNamespace="http://example.com/echo"
+  xmlns="http://schemas.xmlsoap.org/wsdl/"
+  xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+  xmlns:tns="http://example.com/echo"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <types>
+    <xsd:schema targetNamespace="http://example.com/echo">
+      <xsd:element name="echo">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="input" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+      <xsd:element name="echoResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="output" type="xsd:string"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:schema>
+  </types>
+  <message name="echoRequest">
+    <part name="parameters" element="tns:echo"/>
+  </message>
+  <message name="echoResponse">
+    <part name="parameters" element="tns:echoResponse"/>
+  </message>
+  <portType name="EchoPortType">
+    <operation name="echo">
+      <input message="tns:echoRequest"/>
+      <output message="tns:echoResponse"/>
+    </operation>
+  </portType>
+  <binding name="EchoBinding" type="tns:EchoPortType">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="rpc"/>
+    <operation name="echo">
+      <soap:operation soapAction="http://example.com/echo/echo"/>
+      <input><soap:body use="encoded" namespace="http://example.com/echo" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/></input>
+      <output><soap:body use="encoded" namespace="http://example.com/echo" encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"/></output>
+    </operation>
+  </binding>
+  <service name="EchoService">
+    <port name="EchoPort" binding="tns:EchoBinding">
+      <soap:address location="PLACEHOLDER"/>
+    </port>
+  </service>
+</definitions>
