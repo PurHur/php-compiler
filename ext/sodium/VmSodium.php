@@ -829,6 +829,134 @@ final class VmSodium
     }
 
     /**
+     * JIT/AOT helper path — pure only (never function_exists → PHP sodium_* recursion).
+     */
+    public static function memcmpStandalone(string $string1, string $string2): int
+    {
+        if (\strlen($string1) !== \strlen($string2)) {
+            self::throwSodium(
+                'sodium_memcmp(): Argument #1 ($string1) and argument #2 ($string_2) must have the same length'
+            );
+        }
+
+        return self::pureMemcmp($string1, $string2);
+    }
+
+    /**
+     * sodium_increment() — little-endian constant-time increment in place (php-src ext/sodium/libsodium.c; #20081).
+     */
+    public static function increment(Variable $var): void
+    {
+        $target = $var->resolveIndirect();
+        if (Variable::TYPE_STRING !== $target->type) {
+            self::throwSodium('a PHP string is required');
+        }
+        $buf = $target->toString();
+        if (\function_exists('sodium_increment')) {
+            \sodium_increment($buf);
+        } elseif (null !== self::ffi()) {
+            $buf = self::ffiIncrement($buf);
+        } else {
+            $buf = self::pureIncrement($buf);
+        }
+        $target->string($buf);
+    }
+
+    /**
+     * sodium_add() — little-endian constant-time add into &$string1 (php-src ext/sodium/libsodium.c; #20081).
+     */
+    public static function add(Variable $var, string $string2): void
+    {
+        $target = $var->resolveIndirect();
+        if (Variable::TYPE_STRING !== $target->type) {
+            self::throwSodium('PHP strings are required');
+        }
+        $buf = $target->toString();
+        if (\strlen($buf) !== \strlen($string2)) {
+            self::throwSodium(
+                'sodium_add(): Argument #1 ($string1) and argument #2 ($string_2) must have the same length'
+            );
+        }
+        if (\function_exists('sodium_add')) {
+            \sodium_add($buf, $string2);
+        } elseif (null !== self::ffi()) {
+            $buf = self::ffiAdd($buf, $string2);
+        } else {
+            $buf = self::pureAdd($buf, $string2);
+        }
+        $target->string($buf);
+    }
+
+    /**
+     * sodium_compare() — constant-time lexicographic compare (-1/0/1) (php-src ext/sodium/libsodium.c; #20081).
+     */
+    public static function compare(string $string1, string $string2): int
+    {
+        if (\strlen($string1) !== \strlen($string2)) {
+            self::throwSodium(
+                'sodium_compare(): Argument #1 ($string1) and argument #2 ($string_2) must have the same length'
+            );
+        }
+        if (\function_exists('sodium_compare')) {
+            return \sodium_compare($string1, $string2);
+        }
+        if (null !== self::ffi()) {
+            return self::ffiCompare($string1, $string2);
+        }
+
+        return self::pureCompare($string1, $string2);
+    }
+
+    /** JIT/AOT helper path — never call back into PHP sodium_compare(). */
+    public static function compareStandalone(string $string1, string $string2): int
+    {
+        if (\strlen($string1) !== \strlen($string2)) {
+            self::throwSodium(
+                'sodium_compare(): Argument #1 ($string1) and argument #2 ($string_2) must have the same length'
+            );
+        }
+
+        return self::pureCompare($string1, $string2);
+    }
+
+    /** Pure/FFI path used by optional helpers — returns mutated copy. */
+    public static function incrementCopy(string $string): string
+    {
+        if (\function_exists('sodium_increment')) {
+            $buf = $string;
+            \sodium_increment($buf);
+
+            return $buf;
+        }
+        if (null !== self::ffi()) {
+            return self::ffiIncrement($string);
+        }
+
+        return self::pureIncrement($string);
+    }
+
+    /** Pure/FFI path used by optional helpers — returns mutated copy of $string1. */
+    public static function addCopy(string $string1, string $string2): string
+    {
+        if (\strlen($string1) !== \strlen($string2)) {
+            self::throwSodium(
+                'sodium_add(): Argument #1 ($string1) and argument #2 ($string_2) must have the same length'
+            );
+        }
+        if (\function_exists('sodium_add')) {
+            $buf = $string1;
+            \sodium_add($buf, $string2);
+
+            return $buf;
+        }
+        if (null !== self::ffi()) {
+            return self::ffiAdd($string1, $string2);
+        }
+
+        return self::pureAdd($string1, $string2);
+    }
+
+    /**
      * sodium_bin2hex() — constant-time binary→hex (php-src ext/sodium/libsodium.c; #3438).
      */
     public static function bin2hex(string $string): string
@@ -1014,6 +1142,115 @@ final class VmSodium
         $s2 = self::stringToUnsignedCharArray($ffi, $string2);
 
         return $ffi->sodium_memcmp($s1, $s2, $len);
+    }
+
+    /** Constant-time equality → 0 / -1 (libsodium sodium_memcmp). */
+    private static function pureMemcmp(string $string1, string $string2): int
+    {
+        $len = \strlen($string1);
+        $d = 0;
+        for ($i = 0; $i < $len; ++$i) {
+            $d |= \ord($string1[$i]) ^ \ord($string2[$i]);
+        }
+
+        return (1 & (($d - 1) >> 8)) - 1;
+    }
+
+    private static function ffiIncrement(string $string): string
+    {
+        $ffi = self::requireFfi();
+        $len = \strlen($string);
+        if ($len <= 0) {
+            return $string;
+        }
+        $buf = self::stringToUnsignedCharArray($ffi, $string);
+        $ffi->sodium_increment($buf, $len);
+
+        return self::unsignedCharArrayToString($buf, $len);
+    }
+
+    private static function ffiAdd(string $string1, string $string2): string
+    {
+        $ffi = self::requireFfi();
+        $len = \strlen($string1);
+        $a = self::stringToUnsignedCharArray($ffi, $string1);
+        $b = self::stringToUnsignedCharArray($ffi, $string2);
+        $ffi->sodium_add($a, $b, $len);
+
+        return self::unsignedCharArrayToString($a, $len);
+    }
+
+    private static function ffiCompare(string $string1, string $string2): int
+    {
+        $ffi = self::requireFfi();
+        $len = \strlen($string1);
+        $s1 = self::stringToUnsignedCharArray($ffi, $string1);
+        $s2 = self::stringToUnsignedCharArray($ffi, $string2);
+
+        return (int) $ffi->sodium_compare($s1, $s2, $len);
+    }
+
+    /** libsodium sodium_increment — little-endian with carry. */
+    private static function pureIncrement(string $string): string
+    {
+        $len = \strlen($string);
+        if ($len <= 0) {
+            return $string;
+        }
+        $bytes = \array_values(\unpack('C*', $string) ?: []);
+        $c = 1;
+        for ($i = 0; $i < $len; ++$i) {
+            $c += $bytes[$i];
+            $bytes[$i] = $c & 0xff;
+            $c >>= 8;
+        }
+        $out = '';
+        foreach ($bytes as $b) {
+            $out .= \chr($b);
+        }
+
+        return $out;
+    }
+
+    /** libsodium sodium_add — little-endian with carry. */
+    private static function pureAdd(string $string1, string $string2): string
+    {
+        $len = \strlen($string1);
+        $a = \array_values(\unpack('C*', $string1) ?: []);
+        $b = \array_values(\unpack('C*', $string2) ?: []);
+        $c = 0;
+        for ($i = 0; $i < $len; ++$i) {
+            $c += $a[$i] + $b[$i];
+            $a[$i] = $c & 0xff;
+            $c >>= 8;
+        }
+        $out = '';
+        foreach ($a as $byte) {
+            $out .= \chr($byte);
+        }
+
+        return $out;
+    }
+
+    /**
+     * libsodium sodium_compare — constant-time from MSB end; returns -1/0/1.
+     *
+     * @see https://doc.libsodium.org/helpers#constant-time-comparison
+     */
+    private static function pureCompare(string $string1, string $string2): int
+    {
+        $len = \strlen($string1);
+        $gt = 0;
+        $eq = 1;
+        for ($i = $len; $i !== 0; ) {
+            --$i;
+            $b1 = \ord($string1[$i]);
+            $b2 = \ord($string2[$i]);
+            $gt |= (($b2 - $b1) >> 8) & $eq;
+            $eq &= (($b2 ^ $b1) - 1) >> 8;
+        }
+
+        return ($gt + $gt + $eq) - 1;
     }
 
     private static function ffiBin2hex(string $string): string
@@ -2046,6 +2283,9 @@ final class VmSodium
                     int crypto_aead_xchacha20poly1305_ietf_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k);
                     int crypto_aead_xchacha20poly1305_ietf_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);
                     int sodium_memcmp(const unsigned char *s1, const unsigned char *s2, size_t len);
+                    void sodium_increment(unsigned char *n, size_t nlen);
+                    void sodium_add(unsigned char *a, const unsigned char *b, size_t len);
+                    int sodium_compare(const unsigned char *b1, const unsigned char *b2, size_t len);
                     char *sodium_bin2hex(char *hex, size_t hex_maxlen, const unsigned char *bin, size_t bin_len);
                     void sodium_memzero(void *pnt, size_t len);
                     int sodium_pad(size_t *unpadded_buf_len_p, unsigned char *buf, size_t unpadded_buf_len, size_t blocksize);

@@ -143,6 +143,9 @@ final class BuiltinByRefParams
             case 'sodium_crypto_generichash_final':
                 return [0];
             case 'sodium_memzero':
+            case 'sodium_increment':
+                return [0];
+            case 'sodium_add':
                 return [0];
             case 'uuid_generate':
                 return [0];

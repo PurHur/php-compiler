@@ -1293,7 +1293,10 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20_keygen
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20_xor.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20_xor_ic.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xor.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_add.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_compare.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_hex2bin.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_increment.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_memcmp.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_memzero.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_pad.php';
