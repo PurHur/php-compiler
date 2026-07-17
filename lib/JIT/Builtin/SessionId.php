@@ -176,33 +176,52 @@ final class SessionId
         $i32 = $context->getTypeFromString('int32');
         $zero = $i64->constInt(0, false);
         $maxLen = $i64->constInt(VmSession::MAX_ID_LEN, false);
+        $fn = $context->builder->getInsertBlock()->getParent();
+        assert($fn instanceof Value\Function_);
 
+        $bbCheckHeaders = $fn->appendBasicBlock('sid_check_headers');
+        $bbFail = $fn->appendBasicBlock('sid_set_fail');
+        $bbAfterGuards = $fn->appendBasicBlock('sid_after_guards');
+        $bbEmptyNoop = $fn->appendBasicBlock('sid_empty_noop');
+        $bbLenCheck = $fn->appendBasicBlock('sid_len_check');
+        $bbClamp = $fn->appendBasicBlock('sid_clamp_len');
+        $bbCopy = $fn->appendBasicBlock('sid_copy');
+        $bbDone = $fn->appendBasicBlock('sid_set_done');
+
+        $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
+        $isActive = $context->builder->icmp(Builder::INT_NE, $active, $i8->constInt(0, false));
+        $context->builder->branchIf($isActive, $bbFail, $bbCheckHeaders);
+
+        $context->builder->positionAtEnd($bbCheckHeaders);
+        $headersSent = $context->builder->call($context->lookupFunction('__phpc_headers_sent'));
+        $headersSentNonZero = $context->builder->icmp(Builder::INT_NE, $headersSent, $i32->constInt(0, false));
+        $context->builder->branchIf($headersSentNonZero, $bbFail, $bbAfterGuards);
+
+        $context->builder->positionAtEnd($bbFail);
+        self::emitWriteBoolFalse($context, $outPtr);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbAfterGuards);
         self::emitWriteCurrentAsString($context, $outPtr);
 
         $newLen = $context->builder->load(
             $context->builder->structGep($newStr, $strMap['length'])
         );
-        $fn = $context->builder->getInsertBlock()->getParent();
-        assert($fn instanceof Value\Function_);
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $newLen, $zero);
-        $bbEmptyNoop = $fn->appendBasicBlock('sid_empty_noop');
-        $bbLenCheck = $fn->appendBasicBlock('sid_len_check');
         $context->builder->branchIf($isEmpty, $bbEmptyNoop, $bbLenCheck);
 
         $context->builder->positionAtEnd($bbEmptyNoop);
         $context->builder->store($zero, SessionStorageGlobals::$idLenGlobal);
         $bufPtr = $context->builder->inBoundsGEP(
             SessionStorageGlobals::$idBufGlobal,
-            $context->getTypeFromString('int32')->constInt(0, false),
+            $i32->constInt(0, false),
             $zero
         );
         $context->builder->store($i8->constInt(0, false), $bufPtr);
-        $context->builder->returnVoid();
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbLenCheck);
         $tooLong = $context->builder->icmp(Builder::INT_UGT, $newLen, $maxLen);
-        $bbClamp = $fn->appendBasicBlock('sid_clamp_len');
-        $bbCopy = $fn->appendBasicBlock('sid_copy');
         $context->builder->branchIf($tooLong, $bbClamp, $bbCopy);
 
         $context->builder->positionAtEnd($bbClamp);
@@ -220,6 +239,9 @@ final class SessionId
         $context->intrinsic->memcpy($bufPtr, $newBytes, $storeLen, false);
         $nulPtr = $context->builder->inBoundsGEP($bufPtr, $storeLen);
         $context->builder->store($i8->constInt(0, false), $nulPtr);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
     }
 
     private static function emitWriteBoolFalse(Context $context, Value $outPtr): void
