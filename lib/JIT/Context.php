@@ -925,6 +925,18 @@ class Context {
     }
 
     /**
+     * Nested *JitHelper compile under user-script standalone: temporarily clear
+     * PHP_COMPILER_AOT_USER_SCRIPT so helpers get full NestedJIT (#15407, #16734, #20246).
+     *
+     * Former {@see UserScriptAotDeferNestedJit::shouldDefer} — keep STANDALONE + user-script
+     * only (do not widen to bootstrap-aot-link thin path).
+     */
+    public function shouldClearUserScriptEnvForNestedHelperCompile(): bool
+    {
+        return Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isUserScriptAot();
+    }
+
+    /**
      * After preg prelink on a temporary full-init Context, restore user-script standalone bodies (#16075).
      */
     public function retrofitUserScriptStandaloneAfterPregPrelink(): void

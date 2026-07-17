@@ -4903,7 +4903,6 @@ require_once __DIR__.'/../../../lib/JIT/UndefinedPropertyFetchHelper.php';
 require_once __DIR__.'/../../../lib/JIT/UndefinedVariableHelper.php';
 require_once __DIR__.'/../../../lib/JIT/UnsetHelper.php';
 require_once __DIR__.'/../../../lib/JIT/UnsetHelperLlvm.php';
-require_once __DIR__.'/../../../lib/JIT/UserScriptAotDeferNestedJit.php';
 require_once __DIR__.'/../../../lib/JIT/UsortCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/ValueEchoHelper.php';
 require_once __DIR__.'/../../../lib/JIT/VarFetchHelper.php';

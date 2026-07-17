@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5515 |
-| Phase A inventory files (M2 ratio SSOT) | 5515 |
+| PHP files on vm.php path | 5514 |
+| Phase A inventory files (M2 ratio SSOT) | 5514 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15667 |
+| Source constructs flagged (warnings) | 15666 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4785,7 +4785,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/UndefinedVariableHelper.php` | 0 | 1 |
 | `lib/JIT/UnsetHelper.php` | 0 | 1 |
 | `lib/JIT/UnsetHelperLlvm.php` | 0 | 4 |
-| `lib/JIT/UserScriptAotDeferNestedJit.php` | 0 | 1 |
 | `lib/JIT/UsortCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 1 |
 | `lib/JIT/VarFetchHelper.php` | 0 | 1 |
@@ -36872,20 +36871,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 911)
 - new Call\DateTimeFormat (line 914)
 - new Call\DateTimeFormat (line 915)
-- new Result (line 1242)
-- new Result (line 1263)
-- new Variable (line 1864)
-- new Variable (line 2001)
-- new Variable (line 2227)
-- new Variable (line 2285)
-- new VMVariable (line 2423)
-- new VMVariable (line 2439)
-- new VMVariable (line 2445)
+- new Result (line 1254)
+- new Result (line 1275)
+- new Variable (line 1876)
+- new Variable (line 2013)
+- new Variable (line 2239)
+- new Variable (line 2297)
+- new VMVariable (line 2435)
 - new VMVariable (line 2451)
-- new VMVariable (line 2462)
-- new Variable (line 2492)
-- new Variable (line 2532)
-- 100 class method(s)
+- new VMVariable (line 2457)
+- new VMVariable (line 2463)
+- new VMVariable (line 2474)
+- new Variable (line 2504)
+- new Variable (line 2544)
+- 101 class method(s)
 - 28 closure(s)
 
 ### `lib/JIT/DnfParamCheck.php`
@@ -37770,11 +37769,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 168)
 - 5 class method(s)
 - 2 closure(s)
-
-### `lib/JIT/UserScriptAotDeferNestedJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
 
 ### `lib/JIT/UsortCallbackPolicy.php`
 

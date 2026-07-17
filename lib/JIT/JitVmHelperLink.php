@@ -52,11 +52,12 @@ final class JitVmHelperLink
         $path = self::resolveHelperPath($relativeHelperPath);
         $basename = \basename($path);
         NestedVmActiveContextLlvm::ensureMethod($context);
-        $deferUserScript = UserScriptAotDeferNestedJit::shouldDefer($context);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel, $deferUserScript): void {
+        // User-script standalone: clear env so nested *JitHelper compile is full NestedJIT (#15407, #20246).
+        $clearUserScriptEnv = $context->shouldClearUserScriptEnvForNestedHelperCompile();
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel, $clearUserScriptEnv): void {
             $prevUser = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
             $prevSelf = getenv('PHP_COMPILER_SELFHOST_AOT');
-            if ($deferUserScript && \function_exists('putenv')) {
+            if ($clearUserScriptEnv && \function_exists('putenv')) {
                 putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
                 unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
                 putenv('PHP_COMPILER_SELFHOST_AOT=0');
@@ -71,7 +72,7 @@ final class JitVmHelperLink
                 $jit = new \PHPCompiler\JIT($context);
                 $jit->compile($block);
             } finally {
-                if ($deferUserScript && \function_exists('putenv')) {
+                if ($clearUserScriptEnv && \function_exists('putenv')) {
                     if (false === $prevUser || '' === (string) $prevUser) {
                         putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
                         unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
