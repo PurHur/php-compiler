@@ -41,6 +41,8 @@ class Module extends ModuleAbstract
             new xmlwriter_write_cdata(),
             new xmlwriter_write_comment(),
             new xmlwriter_text(),
+            new xmlwriter_start_dtd_attlist(),
+            new xmlwriter_end_dtd_attlist(),
             new xmlwriter_output_memory(),
             new xmlwriter_flush(),
         ];
