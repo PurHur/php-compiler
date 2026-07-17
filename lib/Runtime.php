@@ -257,6 +257,7 @@ class Runtime {
         $this->load(new ext\pcntl\Module);
         $this->load(new ext\sockets\Module);
         $this->load(new ext\ftp\Module);
+        $this->load(new ext\soap\Module);
         $this->load(new ext\ctype\Module);
         $this->load(new ext\tokenizer\Module);
         $this->load(new ext\random\Module);

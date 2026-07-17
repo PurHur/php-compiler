@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5401 |
-| Phase A inventory files (M2 ratio SSOT) | 5401 |
+| PHP files on vm.php path | 5407 |
+| Phase A inventory files (M2 ratio SSOT) | 5407 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15193 |
+| Source constructs flagged (warnings) | 15233 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1051,6 +1051,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/simplexml_import_dom.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_string.php` | 0 | 2 |
+| `ext/soap/BuiltinClasses.php` | 0 | 1 |
+| `ext/soap/Module.php` | 0 | 1 |
+| `ext/soap/SoapClassMethod.php` | 0 | 1 |
+| `ext/soap/SoapConstants.php` | 0 | 1 |
+| `ext/soap/VmSoapClient.php` | 0 | 35 |
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
 | `ext/sockets/BuiltinEnums.php` | 0 | 3 |
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
@@ -4712,7 +4717,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 96 |
+| `lib/Runtime.php` | 0 | 97 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -12837,6 +12842,65 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
 - 2 class method(s)
+
+### `ext/soap/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/soap/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/soap/SoapClassMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/soap/SoapConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/soap/VmSoapClient.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 35)
+- new SoapClientConstruct (line 39)
+- new SoapClientSoapCall (line 44)
+- new SoapClientDoRequest (line 45)
+- new SoapClientGetFunctions (line 46)
+- new SoapClientGetTypes (line 47)
+- new SoapClientGetLastRequest (line 48)
+- new SoapClientGetLastResponse (line 49)
+- new SoapClientCall (line 50)
+- new SoapClientState (line 68)
+- new SoapFault (line 97)
+- new SoapFault (line 161)
+- new SoapFault (line 169)
+- new SoapFault (line 185)
+- new SoapFault (line 219)
+- new DOMDocument (line 221)
+- new SoapFault (line 223)
+- new DOMXPath (line 225)
+- new DOMDocument (line 338)
+- new SoapFault (line 340)
+- new DOMXPath (line 342)
+- new SoapFault (line 365)
+- new Variable (line 442)
+- new Variable (line 450)
+- new HashTable (line 477)
+- new ObjectEntry (line 495)
+- new ArgumentCountError (line 567)
+- new ArgumentCountError (line 605)
+- new ArgumentCountError (line 633)
+- new ArgumentCountError (line 661)
+- new HashTable (line 690)
+- new Variable (line 693)
+- new HashTable (line 715)
+- new Variable (line 718)
+- 25 class method(s)
 
 ### `ext/sockets/BuiltinClasses.php`
 
@@ -37082,39 +37146,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\pcntl\Module (line 257)
 - new ext\sockets\Module (line 258)
 - new ext\ftp\Module (line 259)
-- new ext\ctype\Module (line 260)
-- new ext\tokenizer\Module (line 261)
-- new ext\random\Module (line 262)
-- new ext\igbinary\Module (line 263)
-- new ext\msgpack\Module (line 264)
-- new ext\yaml\Module (line 265)
-- new ext\redis\Module (line 266)
-- new ext\zstd\Module (line 267)
-- new ext\lzf\Module (line 268)
-- new ext\bz2\Module (line 269)
-- new ext\brotli\Module (line 270)
-- new ext\sodium\Module (line 271)
-- new ext\sqlite3\Module (line 272)
-- new ext\pdo\Module (line 273)
-- new ext\phar\Module (line 274)
-- new ext\uri\Module (line 275)
-- new ext\uuid\Module (line 276)
-- new ext\uploadprogress\Module (line 277)
-- new ext\sysvshm\Module (line 278)
-- new ext\sysvsem\Module (line 279)
-- new ext\sysvmsg\Module (line 280)
-- new ext\reflection\Module (line 281)
-- new ext\standard\Module (line 282)
-- new JIT (line 358)
-- new JITContext (line 372)
-- new SealedClassPreprocessor (line 438)
-- new StaticClassPreprocessor (line 441)
-- new SourcePreprocessor\PropertyHooks (line 444)
-- new State (line 584)
-- new ReflectionProperty (line 611)
-- new ReflectionProperty (line 614)
-- new LintCompiler (line 1025)
-- new Variable (line 1155)
+- new ext\soap\Module (line 260)
+- new ext\ctype\Module (line 261)
+- new ext\tokenizer\Module (line 262)
+- new ext\random\Module (line 263)
+- new ext\igbinary\Module (line 264)
+- new ext\msgpack\Module (line 265)
+- new ext\yaml\Module (line 266)
+- new ext\redis\Module (line 267)
+- new ext\zstd\Module (line 268)
+- new ext\lzf\Module (line 269)
+- new ext\bz2\Module (line 270)
+- new ext\brotli\Module (line 271)
+- new ext\sodium\Module (line 272)
+- new ext\sqlite3\Module (line 273)
+- new ext\pdo\Module (line 274)
+- new ext\phar\Module (line 275)
+- new ext\uri\Module (line 276)
+- new ext\uuid\Module (line 277)
+- new ext\uploadprogress\Module (line 278)
+- new ext\sysvshm\Module (line 279)
+- new ext\sysvsem\Module (line 280)
+- new ext\sysvmsg\Module (line 281)
+- new ext\reflection\Module (line 282)
+- new ext\standard\Module (line 283)
+- new JIT (line 359)
+- new JITContext (line 373)
+- new SealedClassPreprocessor (line 439)
+- new StaticClassPreprocessor (line 442)
+- new SourcePreprocessor\PropertyHooks (line 445)
+- new State (line 585)
+- new ReflectionProperty (line 612)
+- new ReflectionProperty (line 615)
+- new LintCompiler (line 1026)
+- new Variable (line 1156)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
