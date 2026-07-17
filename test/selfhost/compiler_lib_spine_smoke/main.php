@@ -941,6 +941,7 @@ require_once __DIR__.'/../../../ext/openssl/openssl_get_cert_locations.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_get_cipher_methods.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_get_curve_names.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_get_md_methods.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_get_privatekey.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_get_publickey.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_open.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pbkdf2.php';

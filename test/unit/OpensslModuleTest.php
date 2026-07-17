@@ -19,7 +19,7 @@ final class OpensslModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_verify', 'openssl_seal', 'openssl_open', 'openssl_get_cipher_methods', 'openssl_get_md_methods', 'openssl_pkey_new', 'openssl_pkey_get_private', 'openssl_pkey_get_public', 'openssl_get_publickey', 'openssl_pkey_get_details', 'openssl_pkey_derive', 'openssl_cipher_iv_length', 'openssl_cipher_key_length', 'openssl_digest', 'openssl_pbkdf2'] as $fn) {
+        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_verify', 'openssl_seal', 'openssl_open', 'openssl_get_cipher_methods', 'openssl_get_md_methods', 'openssl_pkey_new', 'openssl_pkey_get_private', 'openssl_get_privatekey', 'openssl_pkey_get_public', 'openssl_get_publickey', 'openssl_pkey_get_details', 'openssl_pkey_derive', 'openssl_cipher_iv_length', 'openssl_cipher_key_length', 'openssl_digest', 'openssl_pbkdf2'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
