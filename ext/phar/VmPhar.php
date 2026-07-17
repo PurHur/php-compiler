@@ -5,11 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\phar;
 
 /**
- * Phar path helpers — php-src ext/phar/phar_object.c PHP_METHOD(Phar, running).
+ * Phar path + static capability helpers — php-src ext/phar/phar_object.c / phar.c (#3436, #19871).
  */
 final class VmPhar
 {
     public const CLASS_LC = 'phar';
+
+    /** php-src PHP_PHAR_API_VERSION (ext/phar/phar_internal.h). */
+    public const API_VERSION = '1.1.1';
+
+    /** php-src PHAR_ENT_COMPRESSED_* / Phar::NONE|GZ|BZ2. */
+    public const COMPRESSED_NONE = 0;
+
+    public const COMPRESSED_GZ = 0x00001000;
+
+    public const COMPRESSED_BZ2 = 0x00002000;
 
     /**
      * Resolve archive path from SCRIPT_FILENAME / phar:// URI (#3436).
@@ -32,6 +42,63 @@ final class VmPhar
         return $base;
     }
 
+    /**
+     * Phar::canWrite() — !PHAR_G(readonly); default phar.readonly=1 (phar.c PHP_INI).
+     */
+    public static function canWrite(): bool
+    {
+        $raw = \ini_get('phar.readonly');
+        if (false === $raw || '' === $raw) {
+            // Zend default when unset in this build is still readonly-on for CLI packages.
+            return false;
+        }
+
+        return !self::iniBool($raw);
+    }
+
+    /**
+     * Phar::canCompress($method = 0) — PHAR_G(has_zlib)/has_bz2 (phar_object.c).
+     */
+    public static function canCompress(int $method = 0): bool
+    {
+        $hasZlib = \extension_loaded('zlib');
+        $hasBz2 = \extension_loaded('bz2');
+        switch ($method) {
+            case self::COMPRESSED_GZ:
+                return $hasZlib;
+            case self::COMPRESSED_BZ2:
+                return $hasBz2;
+            default:
+                return $hasZlib || $hasBz2;
+        }
+    }
+
+    /**
+     * Phar::isValidPharFilename() — phar_detect_phar_fname_ext(..., for_create=2).
+     *
+     * for_create=2 treats missing relative paths as valid when the extension rules pass
+     * (parent cwd exists); we apply the extension rules only — php-src-strict for names.
+     */
+    public static function isValidPharFilename(string $filename, bool $executable = true): bool
+    {
+        $filenameLen = \strlen($filename);
+        if ($filenameLen <= 1) {
+            return false;
+        }
+
+        $slashPos = \strpos($filename, '/');
+        if (false !== $slashPos && $slashPos > 0
+            && ':' === $filename[$slashPos - 1]
+            && $slashPos + 1 < $filenameLen
+            && '/' === $filename[$slashPos + 1]
+        ) {
+            // URL schemes (http://, phar://, …) — not a plain filename.
+            return false;
+        }
+
+        return self::detectPharFnameExt($filename, $executable ? 1 : 0);
+    }
+
     private static function extractPharArchivePath(string $path): ?string
     {
         if ('' === $path) {
@@ -52,5 +119,101 @@ final class VmPhar
         }
 
         return substr($path, 0, $pos + 5);
+    }
+
+    /** php.ini boolean truthy values (zend_ini.c). */
+    private static function iniBool(string $raw): bool
+    {
+        $v = strtolower(trim($raw));
+
+        return !('' === $v || '0' === $v || 'off' === $v || 'false' === $v || 'no' === $v);
+    }
+
+    /**
+     * Subset of phar_detect_phar_fname_ext + phar_check_str (for_create ignored / always ok).
+     */
+    private static function detectPharFnameExt(string $filename, int $executable): bool
+    {
+        $filenameLen = \strlen($filename);
+        $pos = \strpos($filename, '.', 1);
+        while (false !== $pos) {
+            while ($pos > 0 && ('/' === $filename[$pos - 1] || "\0" === $filename[$pos - 1])) {
+                $pos = \strpos($filename, '.', $pos + 1);
+                if (false === $pos) {
+                    return false;
+                }
+            }
+
+            $slashPos = \strpos($filename, '/', $pos);
+            if (false === $slashPos) {
+                $ext = substr($filename, $pos);
+                $extLen = \strlen($ext);
+
+                return self::checkStr($ext, $extLen, $executable);
+            }
+
+            $ext = substr($filename, $pos, $slashPos - $pos);
+            $extLen = \strlen($ext);
+            if (self::checkStr($ext, $extLen, $executable)) {
+                return true;
+            }
+            $pos = \strpos($filename, '.', $pos + 1);
+        }
+
+        return false;
+    }
+
+    /** php-src phar_check_str — extension rules only. */
+    private static function checkStr(string $extStr, int $extLen, int $executable): bool
+    {
+        if ($extLen >= 50) {
+            return false;
+        }
+
+        if (1 === $executable) {
+            $pos = \strpos($extStr, '.phar');
+            if (false === $pos
+                || ($pos > 0 && '/' === $extStr[$pos - 1])
+                || ($extLen - $pos) < 5
+            ) {
+                return false;
+            }
+            $after = $pos + 5;
+            if ($after < $extLen) {
+                $ch = $extStr[$after];
+                if ('/' !== $ch && '.' !== $ch) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        if (0 === $executable) {
+            $pos = \strpos($extStr, '.phar');
+            $hasPhar = false !== $pos
+                && (0 === $pos || '/' !== $extStr[$pos - 1])
+                && ($pos + 5) <= $extLen
+                && (
+                    ($pos + 5) === $extLen
+                    || '/' === $extStr[$pos + 5]
+                    || '.' === $extStr[$pos + 5]
+                );
+            if (!$hasPhar && $extLen > 1
+                && '.' !== $extStr[1]
+                && '/' !== $extStr[1]
+            ) {
+                return true;
+            }
+
+            return false;
+        }
+
+        // executable == 2 (any) — rare for isValidPharFilename; treat like data/exec union.
+        if ($extLen > 1 && '.' !== $extStr[1] && '/' !== $extStr[1]) {
+            return true;
+        }
+
+        return false;
     }
 }
