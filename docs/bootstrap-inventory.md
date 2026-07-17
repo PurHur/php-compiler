@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5310 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 14805 |
+| Source constructs flagged (warnings) | 14812 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -870,7 +870,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
 | `ext/pdo/VmPDO.php` | 0 | 43 |
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
-| `ext/phar/BuiltinClasses.php` | 0 | 3 |
+| `ext/phar/BuiltinClasses.php` | 0 | 10 |
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 9 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
@@ -11317,9 +11317,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 28)
-- new PharRunning (line 29)
-- 2 class method(s)
+- new ClassEntry (line 33)
+- new PharRunning (line 36)
+- new PharCanWrite (line 40)
+- new PharCanCompress (line 44)
+- new PharApiVersion (line 48)
+- new PharIsValidPharFilename (line 52)
+- new Variable (line 61)
+- new ArgumentCountError (line 144)
+- 6 class method(s)
+- 8 closure(s)
 
 ### `ext/phar/Module.php`
 
@@ -11347,7 +11354,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPhar.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 8 class method(s)
 
 ### `ext/phar/VmPharData.php`
 
