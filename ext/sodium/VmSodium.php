@@ -76,6 +76,19 @@ final class VmSodium
 
     public const CRYPTO_SCALARMULT_SCALARBYTES = 32;
 
+    /** Ristretto255 core + scalarmult (php-src ext/sodium; #20084). */
+    public const CRYPTO_CORE_RISTRETTO255_BYTES = 32;
+
+    public const CRYPTO_CORE_RISTRETTO255_HASHBYTES = 64;
+
+    public const CRYPTO_CORE_RISTRETTO255_SCALARBYTES = 32;
+
+    public const CRYPTO_CORE_RISTRETTO255_NONREDUCEDSCALARBYTES = 64;
+
+    public const CRYPTO_SCALARMULT_RISTRETTO255_BYTES = 32;
+
+    public const CRYPTO_SCALARMULT_RISTRETTO255_SCALARBYTES = 32;
+
     public const CRYPTO_BOX_SECRETKEYBYTES = 32;
 
     public const CRYPTO_BOX_PUBLICKEYBYTES = 32;
@@ -347,6 +360,189 @@ final class VmSodium
         }
 
         return self::ffiScalarmultBase($n);
+    }
+
+    public static function ristretto255IsValidPoint(string $s): bool
+    {
+        if (\strlen($s) !== self::CRYPTO_CORE_RISTRETTO255_BYTES) {
+            self::throwSodium(
+                'sodium_crypto_core_ristretto255_is_valid_point(): Argument #1 ($s) must be SODIUM_CRYPTO_CORE_RISTRETTO255_BYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_core_ristretto255_is_valid_point')) {
+            return \sodium_crypto_core_ristretto255_is_valid_point($s);
+        }
+
+        return self::ffiRistretto255IsValidPoint($s);
+    }
+
+    public static function ristretto255Random(): string
+    {
+        if (\function_exists('sodium_crypto_core_ristretto255_random')) {
+            return \sodium_crypto_core_ristretto255_random();
+        }
+
+        return self::ffiRistretto255Random();
+    }
+
+    public static function ristretto255FromHash(string $s): string
+    {
+        if (\strlen($s) !== self::CRYPTO_CORE_RISTRETTO255_HASHBYTES) {
+            self::throwSodium(
+                'sodium_crypto_core_ristretto255_from_hash(): Argument #1 ($s) must be SODIUM_CRYPTO_CORE_RISTRETTO255_HASHBYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_core_ristretto255_from_hash')) {
+            return \sodium_crypto_core_ristretto255_from_hash($s);
+        }
+
+        return self::ffiRistretto255FromHash($s);
+    }
+
+    public static function ristretto255Add(string $p, string $q): string
+    {
+        self::requireRistretto255Point($p, 'sodium_crypto_core_ristretto255_add', 1, 'p');
+        self::requireRistretto255Point($q, 'sodium_crypto_core_ristretto255_add', 2, 'q');
+        if (\function_exists('sodium_crypto_core_ristretto255_add')) {
+            return \sodium_crypto_core_ristretto255_add($p, $q);
+        }
+
+        return self::ffiRistretto255Add($p, $q);
+    }
+
+    public static function ristretto255Sub(string $p, string $q): string
+    {
+        self::requireRistretto255Point($p, 'sodium_crypto_core_ristretto255_sub', 1, 'p');
+        self::requireRistretto255Point($q, 'sodium_crypto_core_ristretto255_sub', 2, 'q');
+        if (\function_exists('sodium_crypto_core_ristretto255_sub')) {
+            return \sodium_crypto_core_ristretto255_sub($p, $q);
+        }
+
+        return self::ffiRistretto255Sub($p, $q);
+    }
+
+    public static function ristretto255ScalarRandom(): string
+    {
+        if (\function_exists('sodium_crypto_core_ristretto255_scalar_random')) {
+            return \sodium_crypto_core_ristretto255_scalar_random();
+        }
+
+        return self::ffiRistretto255ScalarRandom();
+    }
+
+    public static function ristretto255ScalarInvert(string $s): string
+    {
+        self::requireRistretto255Scalar($s, 'sodium_crypto_core_ristretto255_scalar_invert', 1, 's');
+        if (\function_exists('sodium_crypto_core_ristretto255_scalar_invert')) {
+            return \sodium_crypto_core_ristretto255_scalar_invert($s);
+        }
+
+        return self::ffiRistretto255ScalarInvert($s);
+    }
+
+    public static function ristretto255ScalarNegate(string $s): string
+    {
+        self::requireRistretto255Scalar($s, 'sodium_crypto_core_ristretto255_scalar_negate', 1, 's');
+        if (\function_exists('sodium_crypto_core_ristretto255_scalar_negate')) {
+            return \sodium_crypto_core_ristretto255_scalar_negate($s);
+        }
+
+        return self::ffiRistretto255ScalarNegate($s);
+    }
+
+    public static function ristretto255ScalarComplement(string $s): string
+    {
+        self::requireRistretto255Scalar($s, 'sodium_crypto_core_ristretto255_scalar_complement', 1, 's');
+        if (\function_exists('sodium_crypto_core_ristretto255_scalar_complement')) {
+            return \sodium_crypto_core_ristretto255_scalar_complement($s);
+        }
+
+        return self::ffiRistretto255ScalarComplement($s);
+    }
+
+    public static function ristretto255ScalarAdd(string $x, string $y): string
+    {
+        self::requireRistretto255Scalar($x, 'sodium_crypto_core_ristretto255_scalar_add', 1, 'x');
+        self::requireRistretto255Scalar($y, 'sodium_crypto_core_ristretto255_scalar_add', 2, 'y');
+        if (\function_exists('sodium_crypto_core_ristretto255_scalar_add')) {
+            return \sodium_crypto_core_ristretto255_scalar_add($x, $y);
+        }
+
+        return self::ffiRistretto255ScalarAdd($x, $y);
+    }
+
+    public static function ristretto255ScalarSub(string $x, string $y): string
+    {
+        self::requireRistretto255Scalar($x, 'sodium_crypto_core_ristretto255_scalar_sub', 1, 'x');
+        self::requireRistretto255Scalar($y, 'sodium_crypto_core_ristretto255_scalar_sub', 2, 'y');
+        if (\function_exists('sodium_crypto_core_ristretto255_scalar_sub')) {
+            return \sodium_crypto_core_ristretto255_scalar_sub($x, $y);
+        }
+
+        return self::ffiRistretto255ScalarSub($x, $y);
+    }
+
+    public static function ristretto255ScalarMul(string $x, string $y): string
+    {
+        self::requireRistretto255Scalar($x, 'sodium_crypto_core_ristretto255_scalar_mul', 1, 'x');
+        self::requireRistretto255Scalar($y, 'sodium_crypto_core_ristretto255_scalar_mul', 2, 'y');
+        if (\function_exists('sodium_crypto_core_ristretto255_scalar_mul')) {
+            return \sodium_crypto_core_ristretto255_scalar_mul($x, $y);
+        }
+
+        return self::ffiRistretto255ScalarMul($x, $y);
+    }
+
+    public static function ristretto255ScalarReduce(string $s): string
+    {
+        if (\strlen($s) !== self::CRYPTO_CORE_RISTRETTO255_NONREDUCEDSCALARBYTES) {
+            self::throwSodium(
+                'sodium_crypto_core_ristretto255_scalar_reduce(): Argument #1 ($s) must be SODIUM_CRYPTO_CORE_RISTRETTO255_NONREDUCEDSCALARBYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_core_ristretto255_scalar_reduce')) {
+            return \sodium_crypto_core_ristretto255_scalar_reduce($s);
+        }
+
+        return self::ffiRistretto255ScalarReduce($s);
+    }
+
+    public static function scalarmultRistretto255(string $n, string $p): string
+    {
+        if (\strlen($n) !== self::CRYPTO_SCALARMULT_RISTRETTO255_SCALARBYTES) {
+            self::throwSodium(
+                'sodium_crypto_scalarmult_ristretto255(): Argument #1 ($n) must be SODIUM_CRYPTO_SCALARMULT_RISTRETTO255_SCALARBYTES bytes long'
+            );
+        }
+        if (\strlen($p) !== self::CRYPTO_SCALARMULT_RISTRETTO255_BYTES) {
+            self::throwSodium(
+                'sodium_crypto_scalarmult_ristretto255(): Argument #2 ($p) must be SODIUM_CRYPTO_SCALARMULT_RISTRETTO255_BYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_scalarmult_ristretto255')) {
+            return \sodium_crypto_scalarmult_ristretto255($n, $p);
+        }
+
+        return self::ffiScalarmultRistretto255($n, $p);
+    }
+
+    public static function scalarmultRistretto255Base(string $n): string
+    {
+        if (\strlen($n) !== self::CRYPTO_SCALARMULT_RISTRETTO255_SCALARBYTES) {
+            self::throwSodium(
+                'sodium_crypto_scalarmult_ristretto255_base(): Argument #1 ($n) must be SODIUM_CRYPTO_SCALARMULT_RISTRETTO255_SCALARBYTES bytes long'
+            );
+        }
+        if (self::isAllZeroBytes($n)) {
+            self::throwSodium(
+                'sodium_crypto_scalarmult_ristretto255_base(): Argument #1 ($n) must not be zero'
+            );
+        }
+        if (\function_exists('sodium_crypto_scalarmult_ristretto255_base')) {
+            return \sodium_crypto_scalarmult_ristretto255_base($n);
+        }
+
+        return self::ffiScalarmultRistretto255Base($n);
     }
 
     public static function boxKeypair(): string
@@ -1905,6 +2101,212 @@ final class VmSodium
         return self::unsignedCharArrayToString($qBuf, self::CRYPTO_SCALARMULT_BYTES);
     }
 
+    private static function requireRistretto255Point(string $value, string $fn, int $argNum, string $argName): void
+    {
+        if (\strlen($value) !== self::CRYPTO_CORE_RISTRETTO255_BYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($%s) must be SODIUM_CRYPTO_CORE_RISTRETTO255_BYTES bytes long',
+                $fn,
+                $argNum,
+                $argName
+            ));
+        }
+    }
+
+    private static function requireRistretto255Scalar(string $value, string $fn, int $argNum, string $argName): void
+    {
+        if (\strlen($value) !== self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($%s) must be SODIUM_CRYPTO_CORE_RISTRETTO255_SCALARBYTES bytes long',
+                $fn,
+                $argNum,
+                $argName
+            ));
+        }
+    }
+
+    private static function isAllZeroBytes(string $value): bool
+    {
+        $len = \strlen($value);
+        for ($i = 0; $i < $len; ++$i) {
+            if ("\0" !== $value[$i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function ffiRistretto255IsValidPoint(string $s): bool
+    {
+        $ffi = self::requireFfi();
+        $pBuf = self::stringToUnsignedCharArray($ffi, $s);
+
+        return 1 === (int) $ffi->crypto_core_ristretto255_is_valid_point($pBuf);
+    }
+
+    private static function ffiRistretto255Random(): string
+    {
+        $ffi = self::requireFfi();
+        $pBuf = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_BYTES.']');
+        $ffi->crypto_core_ristretto255_random($pBuf);
+
+        return self::unsignedCharArrayToString($pBuf, self::CRYPTO_CORE_RISTRETTO255_BYTES);
+    }
+
+    private static function ffiRistretto255FromHash(string $s): string
+    {
+        $ffi = self::requireFfi();
+        $pBuf = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_BYTES.']');
+        $rBuf = self::stringToUnsignedCharArray($ffi, $s);
+        $rc = $ffi->crypto_core_ristretto255_from_hash($pBuf, $rBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($pBuf, self::CRYPTO_CORE_RISTRETTO255_BYTES);
+    }
+
+    private static function ffiRistretto255Add(string $p, string $q): string
+    {
+        $ffi = self::requireFfi();
+        $rBuf = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_BYTES.']');
+        $pBuf = self::stringToUnsignedCharArray($ffi, $p);
+        $qBuf = self::stringToUnsignedCharArray($ffi, $q);
+        $rc = $ffi->crypto_core_ristretto255_add($rBuf, $pBuf, $qBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($rBuf, self::CRYPTO_CORE_RISTRETTO255_BYTES);
+    }
+
+    private static function ffiRistretto255Sub(string $p, string $q): string
+    {
+        $ffi = self::requireFfi();
+        $rBuf = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_BYTES.']');
+        $pBuf = self::stringToUnsignedCharArray($ffi, $p);
+        $qBuf = self::stringToUnsignedCharArray($ffi, $q);
+        $rc = $ffi->crypto_core_ristretto255_sub($rBuf, $pBuf, $qBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($rBuf, self::CRYPTO_CORE_RISTRETTO255_BYTES);
+    }
+
+    private static function ffiRistretto255ScalarRandom(): string
+    {
+        $ffi = self::requireFfi();
+        $rBuf = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES.']');
+        $ffi->crypto_core_ristretto255_scalar_random($rBuf);
+
+        return self::unsignedCharArrayToString($rBuf, self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES);
+    }
+
+    private static function ffiRistretto255ScalarInvert(string $s): string
+    {
+        $ffi = self::requireFfi();
+        $out = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES.']');
+        $in = self::stringToUnsignedCharArray($ffi, $s);
+        $rc = $ffi->crypto_core_ristretto255_scalar_invert($out, $in);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($out, self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES);
+    }
+
+    private static function ffiRistretto255ScalarNegate(string $s): string
+    {
+        $ffi = self::requireFfi();
+        $out = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES.']');
+        $in = self::stringToUnsignedCharArray($ffi, $s);
+        $ffi->crypto_core_ristretto255_scalar_negate($out, $in);
+
+        return self::unsignedCharArrayToString($out, self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES);
+    }
+
+    private static function ffiRistretto255ScalarComplement(string $s): string
+    {
+        $ffi = self::requireFfi();
+        $out = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES.']');
+        $in = self::stringToUnsignedCharArray($ffi, $s);
+        $ffi->crypto_core_ristretto255_scalar_complement($out, $in);
+
+        return self::unsignedCharArrayToString($out, self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES);
+    }
+
+    private static function ffiRistretto255ScalarAdd(string $x, string $y): string
+    {
+        $ffi = self::requireFfi();
+        $zBuf = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES.']');
+        $xBuf = self::stringToUnsignedCharArray($ffi, $x);
+        $yBuf = self::stringToUnsignedCharArray($ffi, $y);
+        $ffi->crypto_core_ristretto255_scalar_add($zBuf, $xBuf, $yBuf);
+
+        return self::unsignedCharArrayToString($zBuf, self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES);
+    }
+
+    private static function ffiRistretto255ScalarSub(string $x, string $y): string
+    {
+        $ffi = self::requireFfi();
+        $zBuf = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES.']');
+        $xBuf = self::stringToUnsignedCharArray($ffi, $x);
+        $yBuf = self::stringToUnsignedCharArray($ffi, $y);
+        $ffi->crypto_core_ristretto255_scalar_sub($zBuf, $xBuf, $yBuf);
+
+        return self::unsignedCharArrayToString($zBuf, self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES);
+    }
+
+    private static function ffiRistretto255ScalarMul(string $x, string $y): string
+    {
+        $ffi = self::requireFfi();
+        $zBuf = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES.']');
+        $xBuf = self::stringToUnsignedCharArray($ffi, $x);
+        $yBuf = self::stringToUnsignedCharArray($ffi, $y);
+        $ffi->crypto_core_ristretto255_scalar_mul($zBuf, $xBuf, $yBuf);
+
+        return self::unsignedCharArrayToString($zBuf, self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES);
+    }
+
+    private static function ffiRistretto255ScalarReduce(string $s): string
+    {
+        $ffi = self::requireFfi();
+        $rBuf = $ffi->new('unsigned char['.self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES.']');
+        $sBuf = self::stringToUnsignedCharArray($ffi, $s);
+        $ffi->crypto_core_ristretto255_scalar_reduce($rBuf, $sBuf);
+
+        return self::unsignedCharArrayToString($rBuf, self::CRYPTO_CORE_RISTRETTO255_SCALARBYTES);
+    }
+
+    private static function ffiScalarmultRistretto255(string $n, string $p): string
+    {
+        $ffi = self::requireFfi();
+        $qBuf = $ffi->new('unsigned char['.self::CRYPTO_SCALARMULT_RISTRETTO255_BYTES.']');
+        $nBuf = self::stringToUnsignedCharArray($ffi, $n);
+        $pBuf = self::stringToUnsignedCharArray($ffi, $p);
+        $rc = $ffi->crypto_scalarmult_ristretto255($qBuf, $nBuf, $pBuf);
+        if (0 !== $rc) {
+            self::throwSodium('Result is identity element');
+        }
+
+        return self::unsignedCharArrayToString($qBuf, self::CRYPTO_SCALARMULT_RISTRETTO255_BYTES);
+    }
+
+    private static function ffiScalarmultRistretto255Base(string $n): string
+    {
+        $ffi = self::requireFfi();
+        $qBuf = $ffi->new('unsigned char['.self::CRYPTO_SCALARMULT_RISTRETTO255_BYTES.']');
+        $nBuf = self::stringToUnsignedCharArray($ffi, $n);
+        $rc = $ffi->crypto_scalarmult_ristretto255_base($qBuf, $nBuf);
+        if (0 !== $rc) {
+            self::throwSodium('Result is identity element');
+        }
+
+        return self::unsignedCharArrayToString($qBuf, self::CRYPTO_SCALARMULT_RISTRETTO255_BYTES);
+    }
+
     private static function ffiBoxKeypair(): string
     {
         $ffi = self::requireFfi();
@@ -3031,6 +3433,21 @@ final class VmSodium
                     void crypto_generichash_keygen(unsigned char k[32]);
                     int crypto_scalarmult(unsigned char *q, const unsigned char *n, const unsigned char *p);
                     int crypto_scalarmult_base(unsigned char *q, const unsigned char *n);
+                    int crypto_core_ristretto255_is_valid_point(const unsigned char *p);
+                    void crypto_core_ristretto255_random(unsigned char *p);
+                    int crypto_core_ristretto255_from_hash(unsigned char *p, const unsigned char *r);
+                    int crypto_core_ristretto255_add(unsigned char *r, const unsigned char *p, const unsigned char *q);
+                    int crypto_core_ristretto255_sub(unsigned char *r, const unsigned char *p, const unsigned char *q);
+                    void crypto_core_ristretto255_scalar_random(unsigned char *r);
+                    int crypto_core_ristretto255_scalar_invert(unsigned char *recip, const unsigned char *s);
+                    void crypto_core_ristretto255_scalar_negate(unsigned char *neg, const unsigned char *s);
+                    void crypto_core_ristretto255_scalar_complement(unsigned char *comp, const unsigned char *s);
+                    void crypto_core_ristretto255_scalar_add(unsigned char *z, const unsigned char *x, const unsigned char *y);
+                    void crypto_core_ristretto255_scalar_sub(unsigned char *z, const unsigned char *x, const unsigned char *y);
+                    void crypto_core_ristretto255_scalar_mul(unsigned char *z, const unsigned char *x, const unsigned char *y);
+                    void crypto_core_ristretto255_scalar_reduce(unsigned char *r, const unsigned char *s);
+                    int crypto_scalarmult_ristretto255(unsigned char *q, const unsigned char *n, const unsigned char *p);
+                    int crypto_scalarmult_ristretto255_base(unsigned char *q, const unsigned char *n);
                     int crypto_box_keypair(unsigned char *pk, unsigned char *sk);
                     int crypto_box_easy(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n, const unsigned char *pk, const unsigned char *sk);
                     int crypto_box_open_easy(unsigned char *m, const unsigned char *c, unsigned long long clen, const unsigned char *n, const unsigned char *pk, const unsigned char *sk);
