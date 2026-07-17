@@ -391,9 +391,7 @@ final class ReflectionSupport
         }
         $enum = $ctx->classes[$lc];
         if (!$enum->isEnum) {
-            throw new \Error(
-                'Cannot access enum case '.$spec->caseName.' on non-enum class '.$enum->name
-            );
+            return self::materializeCompileTimeOrdinaryClassConst($ctx, $enum, $spec->caseName);
         }
         $result = new Variable();
         if (!EnumCaseSupport::tryMaterializeEnumCaseConstantFetch(
@@ -405,6 +403,59 @@ final class ReflectionSupport
         }
 
         return $result;
+    }
+
+    /**
+     * Attribute ctor args store ClassConstFetch as {@see CompileTimeEnumCase}; non-enums are ordinary constants (#19908).
+     */
+    private static function materializeCompileTimeOrdinaryClassConst(
+        Context $ctx,
+        ClassEntry $entry,
+        string $constName,
+    ): Variable {
+        $constLc = strtolower($constName);
+        $stored = self::lookupClassConstantVariable($ctx, $entry, $constLc);
+        if (null === $stored) {
+            $display = $entry->constNames[$constLc] ?? $constName;
+            throw new \Error("Undefined constant {$entry->name}::{$display}");
+        }
+        $result = new Variable();
+        $result->copyFrom($stored);
+
+        return $result;
+    }
+
+    private static function lookupClassConstantVariable(
+        Context $ctx,
+        ClassEntry $entry,
+        string $constLc,
+    ): ?Variable {
+        if (isset($entry->constants[$constLc])) {
+            return $entry->constants[$constLc];
+        }
+        foreach ($entry->interfaces as $ifaceLc) {
+            if (!isset($ctx->classes[$ifaceLc])) {
+                continue;
+            }
+            $fromIface = self::lookupClassConstantVariable($ctx, $ctx->classes[$ifaceLc], $constLc);
+            if (null !== $fromIface) {
+                return $fromIface;
+            }
+        }
+        if (null === $entry->parentLc || !isset($ctx->classes[$entry->parentLc])) {
+            return null;
+        }
+        $parent = $ctx->classes[$entry->parentLc];
+        if (isset($parent->constants[$constLc])) {
+            $vis = $parent->constVisibility[$constLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                return self::lookupClassConstantVariable($ctx, $parent, $constLc);
+            }
+
+            return $parent->constants[$constLc];
+        }
+
+        return self::lookupClassConstantVariable($ctx, $parent, $constLc);
     }
 
     /**
