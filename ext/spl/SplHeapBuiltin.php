@@ -14,7 +14,10 @@ use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * SplHeap / SplMinHeap / SplMaxHeap — binary heap (php-src ext/spl/spl_heap.c; #4387).
+ * SplHeap / SplMinHeap / SplMaxHeap — binary heap (php-src ext/spl/spl_heap.c; #4387, #19891).
+ *
+ * SplHeap has no PHP constructor in php-src (object handlers init storage). A throwing
+ * __construct here was inherited by user subclasses and fatally blocked `new H()`.
  */
 final class SplHeapBuiltin
 {
@@ -23,6 +26,9 @@ final class SplHeapBuiltin
     public const KIND_MAX = 1;
 
     public const KIND_MIN = -1;
+
+    /** User concrete subclass — ordering via overridden compare() (#19891). */
+    public const KIND_USER = 0;
 
     /** @var array<int, array{elements: list<Variable>, kind: int, flags: int, iterPos: int}> */
     private static array $store = [];
@@ -54,9 +60,9 @@ final class SplHeapBuiltin
         $entry->isAbstract = true;
         $entry->abstractMethods['compare'] = true;
         $entry->methodNames['compare'] = 'compare';
-        $entry->constructor = new SplHeapConstruct();
-        $entry->methods['__construct'] = $entry->constructor;
-        $entry->methodVisibility['__construct'] = $pub;
+        // No __construct — php-src SplHeap has none; create_object inits the heap (#19891).
+        $entry->constructor = null;
+        unset($entry->methods['__construct'], $entry->methodVisibility['__construct']);
         $entry->methods['compare'] = new SplHeapCompareAbstract();
         $entry->methodVisibility['compare'] = $prot;
         foreach ([
@@ -99,22 +105,32 @@ final class SplHeapBuiltin
         ];
     }
 
+    /** Lazy create_object equivalent for user SplHeap subclasses (#19891). */
+    public static function ensureInit(ObjectEntry $object, int $kind = self::KIND_USER): void
+    {
+        if (!isset(self::$store[$object->id])) {
+            self::init($object, $kind);
+        }
+    }
+
     public static function kind(ObjectEntry $object): int
     {
         return self::state($object)['kind'];
     }
 
-    public static function insert(ObjectEntry $object, Variable $value): void
+    public static function insert(ObjectEntry $object, Variable $value, Frame $frame): void
     {
+        self::ensureInit($object);
         $state = &self::$store[$object->id];
         $copy = new Variable();
         $copy->copyFrom($value->resolveIndirect());
         $state['elements'][] = $copy;
-        self::siftUp($object, \count($state['elements']) - 1);
+        self::siftUp($object, \count($state['elements']) - 1, $frame);
     }
 
-    public static function extract(ObjectEntry $object): Variable
+    public static function extract(ObjectEntry $object, Frame $frame): Variable
     {
+        self::ensureInit($object);
         $state = &self::$store[$object->id];
         $n = \count($state['elements']);
         if (0 === $n) {
@@ -124,7 +140,7 @@ final class SplHeapBuiltin
         $last = array_pop($state['elements']);
         if ($n > 1 && null !== $last) {
             $state['elements'][0] = $last;
-            self::siftDown($object, 0);
+            self::siftDown($object, 0, $frame);
         }
         $state['iterPos'] = -1;
         $result = new Variable();
@@ -135,6 +151,7 @@ final class SplHeapBuiltin
 
     public static function top(ObjectEntry $object): Variable
     {
+        self::ensureInit($object);
         $state = self::state($object);
         if ([] === $state['elements']) {
             throw new \RuntimeException("Can't peek at an empty heap");
@@ -147,6 +164,8 @@ final class SplHeapBuiltin
 
     public static function count(ObjectEntry $object): int
     {
+        self::ensureInit($object);
+
         return \count(self::state($object)['elements']);
     }
 
@@ -157,11 +176,14 @@ final class SplHeapBuiltin
 
     public static function rewind(ObjectEntry $object): void
     {
+        self::ensureInit($object);
         self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
     }
 
     public static function valid(ObjectEntry $object): bool
     {
+        self::ensureInit($object);
+
         return self::state($object)['iterPos'] >= 0 && self::count($object) > 0;
     }
 
@@ -172,21 +194,24 @@ final class SplHeapBuiltin
 
     public static function key(ObjectEntry $object): int
     {
+        self::ensureInit($object);
+
         return self::state($object)['iterPos'];
     }
 
-    public static function next(ObjectEntry $object): void
+    public static function next(ObjectEntry $object, Frame $frame): void
     {
         if (!self::valid($object)) {
             return;
         }
         // php-src: iterating SplHeap extracts elements (heap empties under foreach).
-        self::extract($object);
+        self::extract($object, $frame);
         self::$store[$object->id]['iterPos'] = self::count($object) > 0 ? 0 : -1;
     }
 
     public static function recoverFromCorruption(ObjectEntry $object): bool
     {
+        self::ensureInit($object);
         self::state($object);
 
         return true;
@@ -197,6 +222,7 @@ final class SplHeapBuiltin
      */
     public static function debugInfoTable(ObjectEntry $object): HashTable
     {
+        self::ensureInit($object);
         $state = self::state($object);
         $ht = new HashTable();
 
@@ -225,20 +251,30 @@ final class SplHeapBuiltin
         return $ht;
     }
 
-    public static function compareElements(ObjectEntry $object, Variable $a, Variable $b): int
+    /**
+     * Heap ordering: always call compare() (php-src spl_ptr_heap_cmp; #19891).
+     * SplMinHeap/SplMaxHeap provide builtins; user subclasses supply PHP compare().
+     */
+    public static function compareElements(ObjectEntry $object, Variable $a, Variable $b, Frame $frame): int
     {
-        $cmp = Variable::spaceshipCompare($a, $b);
         $kind = self::kind($object);
+        if (self::KIND_USER !== $kind) {
+            $cmp = Variable::spaceshipCompare($a, $b);
 
-        return $kind < 0 ? -$cmp : $cmp;
+            return $kind < 0 ? -$cmp : $cmp;
+        }
+
+        $result = self::vm($frame)->invokeInstanceMethod($object, 'compare', $a, $b)->resolveIndirect();
+
+        return $result->toInt();
     }
 
-    private static function siftUp(ObjectEntry $object, int $index): void
+    private static function siftUp(ObjectEntry $object, int $index, Frame $frame): void
     {
         $state = &self::$store[$object->id];
         while ($index > 0) {
             $parent = intdiv($index - 1, 2);
-            if (self::compareElements($object, $state['elements'][$index], $state['elements'][$parent]) <= 0) {
+            if (self::compareElements($object, $state['elements'][$index], $state['elements'][$parent], $frame) <= 0) {
                 break;
             }
             $tmp = $state['elements'][$index];
@@ -248,7 +284,7 @@ final class SplHeapBuiltin
         }
     }
 
-    private static function siftDown(ObjectEntry $object, int $index): void
+    private static function siftDown(ObjectEntry $object, int $index, Frame $frame): void
     {
         $state = &self::$store[$object->id];
         $n = \count($state['elements']);
@@ -257,11 +293,11 @@ final class SplHeapBuiltin
             $left = 2 * $index + 1;
             $right = 2 * $index + 2;
             if ($left < $n
-                && self::compareElements($object, $state['elements'][$left], $state['elements'][$largest]) > 0) {
+                && self::compareElements($object, $state['elements'][$left], $state['elements'][$largest], $frame) > 0) {
                 $largest = $left;
             }
             if ($right < $n
-                && self::compareElements($object, $state['elements'][$right], $state['elements'][$largest]) > 0) {
+                && self::compareElements($object, $state['elements'][$right], $state['elements'][$largest], $frame) > 0) {
                 $largest = $right;
             }
             if ($largest === $index) {
@@ -282,6 +318,15 @@ final class SplHeapBuiltin
         }
 
         return self::$store[$object->id];
+    }
+
+    private static function vm(Frame $frame): \PHPCompiler\VM
+    {
+        if (null === $frame->vmContext || null === $frame->vmContext->runtime) {
+            throw new \LogicException('SplHeap requires VM runtime');
+        }
+
+        return $frame->vmContext->runtime->vm;
     }
 }
 
@@ -707,19 +752,6 @@ final class SplPriorityQueueDebugInfo extends VmClassMethod
     }
 }
 
-final class SplHeapConstruct extends VmClassMethod
-{
-    public function __construct()
-    {
-        parent::__construct('__construct');
-    }
-
-    public function execute(Frame $frame): void
-    {
-        throw new \Error('Cannot instantiate abstract class SplHeap');
-    }
-}
-
 final class SplHeapCompareAbstract extends VmClassMethod
 {
     public function __construct()
@@ -816,7 +848,7 @@ final class SplHeapInsert extends VmClassMethod
                 'SplHeap::insert() expects exactly 1 argument, '.(\count($frame->calledArgs) - 1).' given'
             );
         }
-        SplHeapBuiltin::insert($object, $frame->calledArgs[1]);
+        SplHeapBuiltin::insert($object, $frame->calledArgs[1], $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
@@ -833,7 +865,7 @@ final class SplHeapExtract extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::extract()');
-        SplIteratorSupport::copyReturnFrom($frame, SplHeapBuiltin::extract($object));
+        SplIteratorSupport::copyReturnFrom($frame, SplHeapBuiltin::extract($object, $frame));
     }
 }
 
@@ -951,7 +983,7 @@ final class SplHeapNext extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $object = SplIteratorSupport::receiverIsA($frame, SplHeapBuiltin::CLASS_LC, 'SplHeap::next()');
-        SplHeapBuiltin::next($object);
+        SplHeapBuiltin::next($object, $frame);
     }
 }
 
