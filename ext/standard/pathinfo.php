@@ -21,7 +21,7 @@ final class pathinfo extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('pathinfo() requires one or two arguments in this compiler build');
         }
-        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'pathinfo', 'path');
+        $path = VmFilestatArg::pathComponentFilenameArgForFrame($frame, 0, 'pathinfo', 'path');
         $flags = 15;
         if (2 === $argc) {
             $flagVar = $frame->calledArgs[1]->resolveIndirect();

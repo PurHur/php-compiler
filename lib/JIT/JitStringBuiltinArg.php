@@ -245,7 +245,7 @@ final class JitStringBuiltinArg
                 return self::unreachableStringPtr($context);
             }
 
-            if (!$softNullPath && !self::requiresForwardProfileStrictStringNull()) {
+            if (!self::requiresForwardProfileStrictStringNull()) {
                 self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName, $expectedType);
             }
 

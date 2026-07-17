@@ -413,7 +413,7 @@ final class VmString
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
             // Z_PARAM_PATH: null coerces with deprecation on forward profile (re-#18850, #19997; php-src filestat.c).
-            if (!$softNullPath && !self::requiresForwardProfileStrictStringNull()) {
+            if (!self::requiresForwardProfileStrictStringNull()) {
                 VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
             }
 

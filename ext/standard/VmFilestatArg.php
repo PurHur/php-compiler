@@ -52,6 +52,25 @@ final class VmFilestatArg
         );
     }
 
+    /**
+     * basename/dirname/pathinfo $path — null coerces with deprecation on forward profile (#19997, php-src basename.c).
+     */
+    public static function pathComponentFilenameArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        string $paramName = 'path'
+    ): string {
+        return self::coerceFilenameArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $argIndex,
+            $paramName,
+            $frame,
+            true
+        );
+    }
+
     /** True when the path operand is null before Z_PARAM_PATH coercion (php-src filestat.c; #14641). */
     public static function wasNullFilenameArg(Variable $var): bool
     {

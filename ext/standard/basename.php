@@ -20,7 +20,7 @@ final class basename extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('basename() expects 1 or 2 arguments');
         }
-        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'basename', 'path');
+        $path = VmFilestatArg::pathComponentFilenameArgForFrame($frame, 0, 'basename', 'path');
         if (null === $frame->returnVar) {
             return;
         }
@@ -37,7 +37,7 @@ final class basename extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('basename() expects 1 or 2 arguments');
         }
-        $path = JitFilestatArg::lowerFilename($context, $args[0], 'basename', 0, 'path');
+        $path = JitFilestatArg::lowerPathComponentFilename($context, $args[0], 'basename', 0, 'path');
         if (2 === $argc) {
             $suffix = JitStringBuiltinArg::lower($context, $args[1], 'basename', 1, 'suffix');
 

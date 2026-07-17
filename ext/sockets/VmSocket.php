@@ -117,17 +117,48 @@ final class VmSocket
             return false;
         }
 
-        $uri = VmFs::handleUri($handle);
-        if (VmFsStdio::isStdioUri($uri)) {
-            return false;
-        }
-
-        $streamType = VmStreamMeta::streamTypeForUri($uri);
+        $streamType = self::streamTypeForImport($handle);
         if (null === $streamType || !\in_array($streamType, self::SOCKET_STREAM_TYPES, true)) {
             return false;
         }
 
         return \is_resource(VmFs::lookupResource($handle));
+    }
+
+    /** php-src ext/sockets/sockets.c — import follows stream_type, not php:// URI alone (#19996). */
+    public static function importFailureMessage(int $handle): string
+    {
+        if ($handle > 0) {
+            $uri = VmFs::handleUri($handle);
+            if ('MEMORY' === VmStreamMeta::phpNativeStreamType($uri)) {
+                return 'socket_import_stream(): Cannot represent a stream of type MEMORY as a Socket Descriptor';
+            }
+            if (VmFsStdio::isStdioUri($uri) && null === self::streamTypeForImport($handle)) {
+                return 'socket_import_stream(): Cannot represent a stream of type STDIO as a Socket Descriptor';
+            }
+        }
+
+        return 'socket_import_stream(): Unable to import stream';
+    }
+
+    private static function streamTypeForImport(int $handle): ?string
+    {
+        if (!VmFs::isValidHandle($handle)) {
+            return null;
+        }
+
+        $uri = VmFs::handleUri($handle);
+        $transportType = VmStreamMeta::streamTypeForUri($uri);
+        if (null !== $transportType) {
+            return $transportType;
+        }
+
+        $stream = VmFs::lookupResource($handle);
+        if (\is_resource($stream)) {
+            return VmStreamMeta::stdioInheritedStreamType($uri, $stream);
+        }
+
+        return null;
     }
 
     public static function importStreamHandle(int $handle, Context $ctx): Variable|false
