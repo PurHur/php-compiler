@@ -458,6 +458,22 @@ final class VmFtpCore
         return (bool) @\ftp_delete($hostConn, $filename);
     }
 
+    public static function rename(ObjectEntry $connection, string $from, string $to): bool
+    {
+        self::ensureLive($connection, 'ftp_rename');
+        $hostConn = self::requireHostConn($connection, 'ftp_rename');
+
+        return (bool) @\ftp_rename($hostConn, $from, $to);
+    }
+
+    public static function rmdir(ObjectEntry $connection, string $directory): bool
+    {
+        self::ensureLive($connection, 'ftp_rmdir');
+        $hostConn = self::requireHostConn($connection, 'ftp_rmdir');
+
+        return (bool) @\ftp_rmdir($hostConn, $directory);
+    }
+
     public static function size(ObjectEntry $connection, string $filename): int
     {
         self::ensureLive($connection, 'ftp_size');

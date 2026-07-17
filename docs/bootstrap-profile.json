@@ -459,6 +459,8 @@
         "ext/ftp/ftp_pwd.php",
         "ext/ftp/ftp_raw.php",
         "ext/ftp/ftp_rawlist.php",
+        "ext/ftp/ftp_rename.php",
+        "ext/ftp/ftp_rmdir.php",
         "ext/ftp/ftp_set_option.php",
         "ext/ftp/ftp_site.php",
         "ext/ftp/ftp_size.php",
@@ -5744,9 +5746,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5510,
+        "inventory_files": 5512,
         "excluded": 0,
-        "eligible": 5510,
+        "eligible": 5512,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

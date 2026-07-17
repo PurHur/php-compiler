@@ -76,6 +76,8 @@ class Module extends ModuleAbstract
             new ftp_cdup(),
             new ftp_mkdir(),
             new ftp_delete(),
+            new ftp_rename(),
+            new ftp_rmdir(),
             new ftp_size(),
             new ftp_mdtm(),
             new ftp_append(),
