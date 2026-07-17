@@ -1,5 +1,5 @@
 --TEST--
-stdlib socket_import_stream(STDIN) — STDIO import rejected with Warning (#18553, ext/sockets/sockets.c)
+stdlib socket_import_stream(STDIN) — plain STDIO import rejected (#18553, #19996, ext/sockets/sockets.c)
 --FILE--
 <?php
 
