@@ -54,7 +54,8 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StatPathJitHelper', $source);
         $this->assertStringContainsString('StatFieldsJitHelper', $source);
         $this->assertStringContainsString('JitStatKernel', $source);
-        $this->assertStringContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
         $this->assertLessThan(420, \substr_count($source, "\n") + 1);
     }
