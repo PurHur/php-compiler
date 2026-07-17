@@ -32,8 +32,9 @@ final class openssl_digest extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        // php-src Z_PARAM_STR null→'' on all profiles (ext/openssl/openssl.c; #19039, #19056).
-        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'openssl_digest', 0, 'data', false);
+        // Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#20207, ext/openssl/openssl.c);
+        // 8.2 still coerces+deprecates (re-#19039/#19056).
+        $data = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'openssl_digest', 0, 'data');
         $method = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'openssl_digest', 1, 'method');
         $rawOutput = false;
         if (3 === $argc) {
