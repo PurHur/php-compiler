@@ -1186,6 +1186,7 @@ require_once __DIR__.'/../../../ext/soap/VmSoapEncoding.php';
 require_once __DIR__.'/../../../ext/soap/VmSoapServer.php';
 require_once __DIR__.'/../../../ext/soap/bootstrap_soapfault.php';
 require_once __DIR__.'/../../../ext/soap/is_soap_fault.php';
+require_once __DIR__.'/../../../ext/soap/use_soap_error_handler.php';
 require_once __DIR__.'/../../../ext/sockets/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/sockets/BuiltinEnums.php';
 require_once __DIR__.'/../../../ext/sockets/JitSocketAtmark.php';

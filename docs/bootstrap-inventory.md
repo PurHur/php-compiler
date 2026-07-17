@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5521 |
-| Phase A inventory files (M2 ratio SSOT) | 5521 |
+| PHP files on vm.php path | 5522 |
+| Phase A inventory files (M2 ratio SSOT) | 5522 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15695 |
+| Source constructs flagged (warnings) | 15699 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1085,7 +1085,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_string.php` | 0 | 2 |
 | `ext/soap/BuiltinClasses.php` | 0 | 9 |
-| `ext/soap/Module.php` | 0 | 2 |
+| `ext/soap/Module.php` | 0 | 3 |
 | `ext/soap/SoapClassMethod.php` | 0 | 1 |
 | `ext/soap/SoapConstants.php` | 0 | 1 |
 | `ext/soap/SoapExtensionPolicy.php` | 0 | 1 |
@@ -1095,6 +1095,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/soap/VmSoapServer.php` | 0 | 40 |
 | `ext/soap/bootstrap_soapfault.php` | 0 | 1 |
 | `ext/soap/is_soap_fault.php` | 0 | 2 |
+| `ext/soap/use_soap_error_handler.php` | 0 | 3 |
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
 | `ext/sockets/BuiltinEnums.php` | 0 | 3 |
 | `ext/sockets/JitSocketAtmark.php` | 0 | 1 |
@@ -13237,7 +13238,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new is_soap_fault (line 42)
+- new is_soap_fault (line 44)
+- new use_soap_error_handler (line 45)
 - 4 class method(s)
 
 ### `ext/soap/SoapClassMethod.php`
@@ -13253,7 +13255,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/soap/SoapExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 5 class method(s)
 
 ### `ext/soap/SoapFaultConstruct.php`
 
@@ -13401,6 +13403,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 36)
 - 3 class method(s)
 
+### `ext/soap/use_soap_error_handler.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 34)
+- 2 class method(s)
+- 1 closure(s)
+
 ### `ext/sockets/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13493,7 +13502,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/SocketsLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
-- 41 class method(s)
+- 44 class method(s)
 
 ### `ext/sockets/VmAddressInfo.php`
 
@@ -13505,12 +13514,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/VmSocket.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 53)
-- new ObjectEntry (line 81)
-- new Variable (line 211)
-- new ObjectEntry (line 212)
-- new Variable (line 300)
-- 21 class method(s)
+- new ClassEntry (line 56)
+- new ObjectEntry (line 86)
+- new Variable (line 231)
+- new ObjectEntry (line 232)
+- new Variable (line 320)
+- 23 class method(s)
 
 ### `ext/sockets/VmSocketAddrinfo.php`
 
