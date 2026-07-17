@@ -8,15 +8,14 @@ use PHPCompiler\ext\hash\JitHashAlgosKernel;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\UserScriptAotDeferNestedJit;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_hash_hmac_algos via HashAlgosJitHelper PHP (#18908, #19355).
+ * JIT/AOT link for __compiler_hash_hmac_algos via HashAlgosJitHelper PHP (#18908, #19355, #20050).
  *
- * Embed / non-user-script: {@see HashAlgosJitHelper} via {@see JitVmHelperLink}.
- * User-script standalone AOT: thin {@see JitHashAlgosKernel} registry —
- * nested helper TUs skip __init__ under PHP_COMPILER_AOT_USER_SCRIPT (#16075 / #3357).
+ * Embed / non-thin: {@see HashAlgosJitHelper} via {@see JitVmHelperLink}.
+ * Thin standalone AOT main: {@see JitHashAlgosKernel} registry (#20028 Rename shape).
  * SSOT: {@see \PHPCompiler\ext\standard\VmHash::hmacAlgos()}
  * php-src: ext/hash/hash.c — php_hash_hmac_algos()
  */
@@ -42,21 +41,26 @@ final class StringHashHmacAlgos
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction(self::ABI_HASH_HMAC_ALGOS);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, 'hash_hmac_algos_bridge_entry')
+            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
             $context->registerFunction(self::ABI_HASH_HMAC_ALGOS, $probe);
 
             return;
         }
 
-        if (UserScriptAotDeferNestedJit::shouldDefer($context)) {
-            self::implementUserScriptKernel($context, $probe);
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementThinKernel($context, $probe);
 
             return;
         }
 
-        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#18908');
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::HMAC_ALGOS_HELPER, '#18908');
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#20050');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::HMAC_ALGOS_HELPER, '#20050');
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $fn = null !== $probe
@@ -79,7 +83,7 @@ final class StringHashHmacAlgos
         $context->builder->returnValue($ht);
     }
 
-    private static function implementUserScriptKernel(Context $context, ?LlvmFunction $probe): void
+    private static function implementThinKernel(Context $context, ?LlvmFunction $probe): void
     {
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $fn = null !== $probe
