@@ -149,6 +149,7 @@ final class ThrowableManifest
         'SQLite3Exception' => 'Exception',
         'PDOException' => 'RuntimeException',
         'RedisException' => 'Exception',
+        'SoapFault' => 'Exception',
     ];
 
     /** @var array<string, class-string> */
@@ -188,6 +189,7 @@ final class ThrowableManifest
         'SQLite3Exception' => 'SQLite3Exception',
         'PDOException' => 'PDOException',
         'RedisException' => 'RedisException',
+        'SoapFault' => 'SoapFault',
     ];
 
     /** @return list<string> */
@@ -214,6 +216,7 @@ final class ThrowableManifest
             'SQLite3Exception' => \PHPCompiler\ext\sqlite3\Sqlite3ExtensionPolicy::advertisesExceptionClass(),
             'PDOException' => \PHPCompiler\ext\pdo\PdoExtensionPolicy::advertisesExceptionClass(),
             'RedisException' => \PHPCompiler\ext\redis\RedisExtensionPolicy::advertisesExtension(),
+            'SoapFault' => \PHPCompiler\ext\soap\SoapExtensionPolicy::advertisesExceptionClass(),
             default => true,
         };
     }
