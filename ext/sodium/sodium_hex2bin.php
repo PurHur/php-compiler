@@ -13,7 +13,7 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** sodium_hex2bin() — hex to binary (php-src ext/sodium/libsodium.c; #3438). */
+/** sodium_hex2bin() — hex to binary (php-src ext/sodium/libsodium.c; #3438, #20196). */
 final class sodium_hex2bin extends Internal
 {
     public function __construct()
@@ -38,10 +38,11 @@ final class sodium_hex2bin extends Internal
                 $argc
             ));
         }
-        $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $this->getName(), 0, 'string');
+        // Z_PARAM_STR $string / $ignore — null TypeError on 8.4 forward profile (#20196, ext/sodium/sodium.c).
+        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'sodium_hex2bin', 0, 'string');
         $ignore = '';
         if ($argc >= 2) {
-            $ignore = VmString::coerceStringBuiltinArg($frame->calledArgs[1], $this->getName(), 1, 'ignore');
+            $ignore = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'sodium_hex2bin', 1, 'ignore');
         }
         $result = VmSodium::hex2bin($string, $ignore);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
