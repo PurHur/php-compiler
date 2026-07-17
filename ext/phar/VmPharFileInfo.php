@@ -79,8 +79,6 @@ final class VmPharFileInfo
             'content' => $content,
             'name' => $localname,
             'archive' => $archivePath,
-            // PharData .tar: getCRC32() is the ustar header checksum (php-src tar.c).
-            'crc' => VmPharTar::entryHeaderChecksum($localname, $content),
             'crcChecked' => true,
             'compressed' => false,
         ];
@@ -96,14 +94,13 @@ final class VmPharFileInfo
             'content' => '',
             'name' => VmString::basename($filename),
             'archive' => '',
-            'crc' => 0,
             'crcChecked' => false,
             'compressed' => false,
         ];
         $object->constructed = true;
     }
 
-    /** @return array{content: string, name: string, archive: string, crc: int, crcChecked: bool, compressed: bool} */
+    /** @return array{content: string, name: string, archive: string, crcChecked: bool, compressed: bool} */
     public static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
@@ -197,7 +194,7 @@ final class PharFileInfoGetCRC32 extends VmClassMethod
     {
         $object = VmPharFileInfo::requireReceiver($frame, 'PharFileInfo::getCRC32()');
         if (null !== $frame->returnVar) {
-            $frame->returnVar->int(VmPharFileInfo::state($object)['crc']);
+            $frame->returnVar->int((int) \crc32(VmPharFileInfo::state($object)['content']));
         }
     }
 }
