@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5364 |
-| Phase A inventory files (M2 ratio SSOT) | 5364 |
+| PHP files on vm.php path | 5374 |
+| Phase A inventory files (M2 ratio SSOT) | 5374 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15027 |
+| Source constructs flagged (warnings) | 15074 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -704,10 +704,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/MbstringLanguageRegistry.php` | 0 | 1 |
 | `ext/mbstring/MbstringMailProfile.php` | 0 | 1 |
 | `ext/mbstring/MbstringState.php` | 0 | 3 |
-| `ext/mbstring/Module.php` | 0 | 54 |
+| `ext/mbstring/Module.php` | 0 | 64 |
 | `ext/mbstring/Utf8CaseMap.php` | 0 | 1 |
 | `ext/mbstring/VmMbConvertVariables.php` | 0 | 3 |
-| `ext/mbstring/VmMbstring.php` | 0 | 9 |
+| `ext/mbstring/VmMbstring.php` | 0 | 16 |
 | `ext/mbstring/mb_check_encoding.php` | 0 | 2 |
 | `ext/mbstring/mb_chr.php` | 0 | 3 |
 | `ext/mbstring/mb_convert_case.php` | 0 | 3 |
@@ -722,8 +722,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_encode_numericentity.php` | 0 | 2 |
 | `ext/mbstring/mb_encoding_aliases.php` | 0 | 2 |
 | `ext/mbstring/mb_ereg.php` | 0 | 3 |
+| `ext/mbstring/mb_ereg_match.php` | 0 | 3 |
 | `ext/mbstring/mb_ereg_replace.php` | 0 | 3 |
+| `ext/mbstring/mb_ereg_replace_callback.php` | 0 | 3 |
+| `ext/mbstring/mb_ereg_search.php` | 0 | 3 |
+| `ext/mbstring/mb_ereg_search_getpos.php` | 0 | 3 |
+| `ext/mbstring/mb_ereg_search_getregs.php` | 0 | 3 |
+| `ext/mbstring/mb_ereg_search_init.php` | 0 | 3 |
+| `ext/mbstring/mb_ereg_search_pos.php` | 0 | 3 |
+| `ext/mbstring/mb_ereg_search_regs.php` | 0 | 3 |
+| `ext/mbstring/mb_ereg_search_setpos.php` | 0 | 3 |
 | `ext/mbstring/mb_eregi.php` | 0 | 3 |
+| `ext/mbstring/mb_eregi_replace.php` | 0 | 3 |
 | `ext/mbstring/mb_http_input.php` | 0 | 2 |
 | `ext/mbstring/mb_http_output.php` | 0 | 2 |
 | `ext/mbstring/mb_internal_encoding.php` | 0 | 2 |
@@ -10068,9 +10078,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/MbstringState.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 164)
-- new Variable (line 166)
-- 18 class method(s)
+- new HashTable (line 180)
+- new Variable (line 182)
+- 28 class method(s)
 
 ### `ext/mbstring/Module.php`
 
@@ -10126,8 +10136,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new mb_ereg (line 85)
 - new mb_eregi (line 86)
 - new mb_ereg_replace (line 87)
-- new mb_regex_encoding (line 88)
-- new mb_regex_set_options (line 89)
+- new mb_eregi_replace (line 88)
+- new mb_ereg_replace_callback (line 89)
+- new mb_ereg_match (line 90)
+- new mb_ereg_search (line 91)
+- new mb_ereg_search_pos (line 92)
+- new mb_ereg_search_regs (line 93)
+- new mb_ereg_search_init (line 94)
+- new mb_ereg_search_getregs (line 95)
+- new mb_ereg_search_getpos (line 96)
+- new mb_ereg_search_setpos (line 97)
+- new mb_regex_encoding (line 98)
+- new mb_regex_set_options (line 99)
 - 2 class method(s)
 
 ### `ext/mbstring/Utf8CaseMap.php`
@@ -10145,14 +10165,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/VmMbstring.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 378)
-- new Variable (line 381)
-- new ArgumentCountError (line 1441)
-- new ArgumentCountError (line 1449)
-- new ArgumentCountError (line 2630)
-- new MailBuiltin (line 2844)
-- new Variable (line 2849)
-- 139 class method(s)
+- new HashTable (line 379)
+- new Variable (line 382)
+- new ArgumentCountError (line 1442)
+- new ArgumentCountError (line 1450)
+- new Error (line 2721)
+- new Error (line 2725)
+- new Variable (line 2841)
+- new HashTable (line 2900)
+- new Variable (line 2902)
+- new HashTable (line 2919)
+- new Variable (line 2921)
+- new ArgumentCountError (line 2936)
+- new MailBuiltin (line 3150)
+- new Variable (line 3155)
+- 149 class method(s)
 - 1 closure(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
@@ -10245,6 +10272,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 - 1 closure(s)
 
+### `ext/mbstring/mb_ereg_match.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
+
 ### `ext/mbstring/mb_ereg_replace.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10252,10 +10286,73 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 - 1 closure(s)
 
+### `ext/mbstring/mb_ereg_replace_callback.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_ereg_search.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_ereg_search_getpos.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_ereg_search_getregs.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_ereg_search_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_ereg_search_pos.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_ereg_search_regs.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_ereg_search_setpos.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+- 1 closure(s)
+
 ### `ext/mbstring/mb_eregi.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_eregi_replace.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 - 1 closure(s)
 
