@@ -10913,6 +10913,9 @@ restart:
         if (is_array($propMeta) && !empty($propMeta['virtual'])) {
             $prop->propertyHookVirtual = true;
         }
+        if (is_array($propMeta) && !empty($propMeta['finalProperty'])) {
+            $prop->propertyFinal = true;
+        }
         if (is_array($propMeta) && !empty($propMeta['getParameterized'])) {
             $prop->getHookParameterized = true;
         }
@@ -15118,6 +15121,7 @@ restart:
         $cloned->setHookMethodLc = $property->setHookMethodLc;
         $cloned->unsetHookMethodLc = $property->unsetHookMethodLc;
         $cloned->propertyHookVirtual = $property->propertyHookVirtual;
+        $cloned->propertyFinal = $property->propertyFinal;
         $cloned->fromConstructorPromotion = $property->fromConstructorPromotion;
         $cloned->defaultInitBlock = $property->defaultInitBlock;
         $cloned->defaultInitResultSlot = $property->defaultInitResultSlot;

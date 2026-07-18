@@ -5442,6 +5442,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsAccessible.ph
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsDefaultValueAvailable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsDeprecated.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsDynamic.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsFinal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsInitialized.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsLazy.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsPrivate.php';

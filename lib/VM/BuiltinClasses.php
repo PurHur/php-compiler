@@ -317,6 +317,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyHasHook;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasHooks;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsDynamic;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsFinal;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsVirtual;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetRawValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetReadableType;
@@ -962,6 +963,7 @@ final class BuiltinClasses
                 [
                     'isabstract' => new ReflectionPropertyIsAbstract(),
                     'isvirtual' => new ReflectionPropertyIsVirtual(),
+                    'isfinal' => new ReflectionPropertyIsFinal(),
                     'hashook' => new ReflectionPropertyHasHook(),
                     'hashooks' => new ReflectionPropertyHasHooks(),
                     'gethook' => new ReflectionPropertyGetHook(),
