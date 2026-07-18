@@ -101,6 +101,10 @@ class Module extends ModuleAbstract
             $functions[] = new curl_multi_info_read();
             $functions[] = new curl_multi_setopt();
             $functions[] = new curl_multi_errno();
+            // curl_multi_get_handles — PHP 8.5+ (php-src multi.c; #20520)
+            if (CurlExtensionPolicy::advertisesMultiGetHandles()) {
+                $functions[] = new curl_multi_get_handles();
+            }
         }
 
         return $functions;

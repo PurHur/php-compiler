@@ -115,5 +115,32 @@ PHP;
         ] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
+        self::assertSame(
+            \PHPCompiler\CompilerVersion::advertisesCurlMultiGetHandles(),
+            VmReflection::functionExists($ctx, 'curl_multi_get_handles'),
+            'curl_multi_get_handles advertisement must match CompilerVersion gate (#20520)'
+        );
+    }
+
+    public function testCurlMultiGetHandlesRegisteredOnProfile85(): void
+    {
+        if (!VmCurlNative::available()) {
+            $this->markTestSkipped('libcurl FFI unavailable');
+        }
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(\PHPCompiler\CompilerVersion::advertisesCurlMultiGetHandles());
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            self::assertTrue(VmReflection::functionExists($ctx, 'curl_multi_get_handles'));
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 }

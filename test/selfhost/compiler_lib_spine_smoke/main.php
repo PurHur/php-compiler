@@ -201,6 +201,7 @@ require_once __DIR__.'/../../../ext/curl/curl_multi_add_handle.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_close.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_errno.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_exec.php';
+require_once __DIR__.'/../../../ext/curl/curl_multi_get_handles.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_getcontent.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_info_read.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_init.php';
