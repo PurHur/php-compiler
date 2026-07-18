@@ -23,6 +23,22 @@ final class ZipArchiveConstants
      */
     public const LENGTH_TO_END = 0;
 
+    /**
+     * Length sentinel — unknown/growing file size (libzip ZIP_LENGTH_UNCHECKED / php-src ZipArchive::LENGTH_UNCHECKED, #20712).
+     */
+    public const LENGTH_UNCHECKED = -2;
+
+    /**
+     * Open the backing file immediately (php-src php_zip.h ZIP_FL_OPEN_FILE_NOW = 1u<<30; #20712).
+     */
+    public const FL_OPEN_FILE_NOW = 1 << 30;
+
+    /**
+     * Advertised libzip feature level for the pure-PHP ZipEngine (php-src ZipArchive::LIBZIP_VERSION).
+     * Matches a libzip that defines LENGTH_UNCHECKED / ER_DATA_LENGTH / ER_TRUNCATED_ZIP (#20712).
+     */
+    public const LIBZIP_VERSION = '1.11.3';
+
     public const ER_OK = 0;
 
     public const ER_MULTIDISK = 1;
@@ -73,6 +89,12 @@ final class ZipArchiveConstants
 
     /** Read-only archive — libzip ZIP_ER_RDONLY / php-src ZipArchive::ER_RDONLY (#20412). */
     public const ER_RDONLY = 25;
+
+    /** Unexpected data length — libzip ZIP_ER_DATA_LENGTH / php-src ZipArchive::ER_DATA_LENGTH (#20712). */
+    public const ER_DATA_LENGTH = 33;
+
+    /** Truncated/corrupt archive — libzip ZIP_ER_TRUNCATED_ZIP / php-src ZipArchive::ER_TRUNCATED_ZIP (#20712). */
+    public const ER_TRUNCATED_ZIP = 35;
 
     /** Encryption methods — libzip ZIP_EM_* / php-src ZipArchive::EM_* (#19873). */
     public const EM_NONE = 0;
@@ -173,13 +195,16 @@ final class ZipArchiveConstants
 
     public const OPSYS_DEFAULT = self::OPSYS_UNIX;
 
-    /** @var array<string, int> */
+    /** @var array<string, int|string> */
     public const CLASS_CONSTANTS = [
         'create' => self::CREATE,
         'excl' => self::EXCL,
         'checkcons' => self::CHECKCONS,
         'overwrite' => self::OVERWRITE,
         'length_to_end' => self::LENGTH_TO_END,
+        'length_unchecked' => self::LENGTH_UNCHECKED,
+        'fl_open_file_now' => self::FL_OPEN_FILE_NOW,
+        'libzip_version' => self::LIBZIP_VERSION,
         'em_none' => self::EM_NONE,
         'em_trad_pkware' => self::EM_TRAD_PKWARE,
         'em_aes_128' => self::EM_AES_128,
@@ -253,6 +278,8 @@ final class ZipArchiveConstants
         'er_remove' => self::ER_REMOVE,
         'er_deleted' => self::ER_DELETED,
         'er_rdonly' => self::ER_RDONLY,
+        'er_data_length' => self::ER_DATA_LENGTH,
+        'er_truncated_zip' => self::ER_TRUNCATED_ZIP,
     ];
 
     /** @var array<string, string> lowercase key => php-src constant casing */
@@ -262,6 +289,9 @@ final class ZipArchiveConstants
         'checkcons' => 'CHECKCONS',
         'overwrite' => 'OVERWRITE',
         'length_to_end' => 'LENGTH_TO_END',
+        'length_unchecked' => 'LENGTH_UNCHECKED',
+        'fl_open_file_now' => 'FL_OPEN_FILE_NOW',
+        'libzip_version' => 'LIBZIP_VERSION',
         'em_none' => 'EM_NONE',
         'em_trad_pkware' => 'EM_TRAD_PKWARE',
         'em_aes_128' => 'EM_AES_128',
@@ -335,6 +365,8 @@ final class ZipArchiveConstants
         'er_remove' => 'ER_REMOVE',
         'er_deleted' => 'ER_DELETED',
         'er_rdonly' => 'ER_RDONLY',
+        'er_data_length' => 'ER_DATA_LENGTH',
+        'er_truncated_zip' => 'ER_TRUNCATED_ZIP',
     ];
 
     public static function statusString(int $code): string
@@ -365,6 +397,8 @@ final class ZipArchiveConstants
             self::ER_REMOVE => 'Can\'t remove file',
             self::ER_DELETED => 'Entry has been deleted',
             self::ER_RDONLY => 'Read-only archive',
+            self::ER_DATA_LENGTH => 'Unexpected length of data',
+            self::ER_TRUNCATED_ZIP => 'Possibly truncated or corrupted zip archive',
             default => 'Unknown status ' . $code,
         };
     }

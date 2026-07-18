@@ -68,8 +68,13 @@ final class VmZipArchive
         }
 
         foreach (ZipArchiveConstants::CLASS_CONSTANTS as $name => $value) {
-            $const = new Variable(Variable::TYPE_INTEGER);
-            $const->int($value);
+            if (\is_string($value)) {
+                $const = new Variable(Variable::TYPE_STRING);
+                $const->string($value);
+            } else {
+                $const = new Variable(Variable::TYPE_INTEGER);
+                $const->int($value);
+            }
             $entry->constants[$name] = $const;
             $entry->constNames[$name] = ZipArchiveConstants::CLASS_CONSTANT_NAMES[$name];
         }
