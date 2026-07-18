@@ -7,6 +7,12 @@ namespace PHPCompiler\ext\simplexml;
 /** In-memory XML element node for SimpleXML (php-src ext/simplexml/simplexml.c; #3338). */
 final class SimpleXmlNodeState
 {
+    /**
+     * True after the node is unlinked from its document tree (xpath handles stay
+     * alive but stringify empty — php-src sxe.c; #20483).
+     */
+    public bool $detached = false;
+
     /** @param array<string, string> $attributes */
     public function __construct(
         public string $name,
@@ -15,6 +21,15 @@ final class SimpleXmlNodeState
         public array $children = [],
         public string $text = '',
     ) {
+    }
+
+    /** Clear payload after unlink so live xpath/property handles match Zend. */
+    public function markDetached(): void
+    {
+        $this->detached = true;
+        $this->text = '';
+        $this->children = [];
+        $this->attributes = [];
     }
 
     /** @return list<SimpleXmlNodeState> */

@@ -42,6 +42,17 @@ final class SimpleXmlRegistry
      */
     private static array $childrenViewFilters = [];
 
+    /**
+     * Live `$sxe->childName` property views — parent node + local name filter.
+     * Length/iteration/offsetUnset re-read matching siblings (php-src sxe.c; #20483).
+     *
+     * @var array<int, true>
+     */
+    private static array $namedChildViews = [];
+
+    /** @var array<int, string> */
+    private static array $namedChildViewNames = [];
+
     /** @var array<int, int> */
     private static array $documentKeys = [];
 
@@ -56,6 +67,8 @@ final class SimpleXmlRegistry
         self::$attributeViewFilters = [];
         self::$childrenViews = [];
         self::$childrenViewFilters = [];
+        self::$namedChildViews = [];
+        self::$namedChildViewNames = [];
         self::$documentKeys = [];
         self::$xpathNamespaces = [];
     }
@@ -118,6 +131,22 @@ final class SimpleXmlRegistry
         return self::$childrenViewFilters[$entry->id] ?? ['ns' => null, 'isPrefix' => true];
     }
 
+    public static function attachNamedChildView(
+        ObjectEntry $entry,
+        SimpleXmlNodeState $parent,
+        string $childName,
+        ?int $documentKey = null
+    ): void {
+        self::attach($entry, $parent, $documentKey);
+        self::$namedChildViews[$entry->id] = true;
+        self::$namedChildViewNames[$entry->id] = $childName;
+    }
+
+    public static function namedChildViewName(ObjectEntry $entry): string
+    {
+        return self::$namedChildViewNames[$entry->id] ?? '';
+    }
+
     public static function state(ObjectEntry $entry): SimpleXmlNodeState
     {
         $state = self::$states[$entry->id] ?? null;
@@ -140,12 +169,19 @@ final class SimpleXmlRegistry
 
     public static function isView(ObjectEntry $entry): bool
     {
-        return isset(self::$views[$entry->id]) || isset(self::$childrenViews[$entry->id]);
+        return isset(self::$views[$entry->id])
+            || isset(self::$childrenViews[$entry->id])
+            || isset(self::$namedChildViews[$entry->id]);
     }
 
     public static function isChildrenView(ObjectEntry $entry): bool
     {
         return isset(self::$childrenViews[$entry->id]);
+    }
+
+    public static function isNamedChildView(ObjectEntry $entry): bool
+    {
+        return isset(self::$namedChildViews[$entry->id]);
     }
 
     public static function isAttributesView(ObjectEntry $entry): bool
