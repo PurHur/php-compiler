@@ -1133,8 +1133,8 @@ class Context {
         } finally {
             Builtin\StreamIoRuntime::endStandaloneInitPhase();
         }
-        // After init-phase: NestedJIT GetenvJitHelper (always-helper, #20156) — not during
-        // standaloneInitPhase where StreamIo defer forced the former libc kernel path.
+        // After init-phase: NestedJIT GetenvJitHelper (always-helper, #20156) — skipped during
+        // standaloneInitPhase so stream inventory stubs stay thin (#20576 / #20553).
         Builtin\StringGetenv::ensureStandaloneBodies($this);
         Builtin\StringGetenvAll::ensureStandaloneBodies($this);
     }

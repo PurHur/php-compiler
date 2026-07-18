@@ -42,6 +42,12 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
         $this->assertStringContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringContainsString('JitStreamIoKernel', $source);
         $this->assertStringContainsString('isStandaloneInitPhase', $source);
+        // Init-phase is not folded into the M3 defer bag (#20576).
+        $deferPos = strpos($source, 'function shouldDeferHeavyStreamIoEmitters');
+        $this->assertNotFalse($deferPos);
+        $this->assertStringNotContainsString('standaloneInitPhase', substr($source, $deferPos, 700));
+        $jit = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/StreamIoJit.php');
+        $this->assertStringContainsString('isStandaloneInitPhase', $jit);
         // User-script env SSOT (#20246) — not raw getenv in StreamIoRuntime after #20229 / #20553.
         $this->assertStringNotContainsString('PHP_COMPILER_AOT_USER_SCRIPT', $source);
         $env = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/UserScriptAotEnv.php');
