@@ -109,6 +109,13 @@ final class VmZipArchive
             'getstreamname' => new ZipArchiveGetStreamName(),
             'clearerror' => new ZipArchiveClearError(),
             'setencryptionindex' => new ZipArchiveSetEncryptionIndex(),
+            // entry / archive comments — php-src php_zip.c (#20386)
+            'setcommentname' => new ZipArchiveSetCommentName(),
+            'setcommentindex' => new ZipArchiveSetCommentIndex(),
+            'getcommentname' => new ZipArchiveGetCommentName(),
+            'getcommentindex' => new ZipArchiveGetCommentIndex(),
+            'setarchivecomment' => new ZipArchiveSetArchiveComment(),
+            'getarchivecomment' => new ZipArchiveGetArchiveComment(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -240,8 +247,10 @@ final class VmZipArchive
                 return ZipArchiveConstants::ER_NOENT;
             }
             $state->entries = [];
+            $state->archiveComment = '';
         } elseif ($flags & ZipArchiveConstants::OVERWRITE) {
             $state->entries = [];
+            $state->archiveComment = '';
         } else {
             $read = ZipEngine::readArchive($filename);
             if (!$read['ok']) {
@@ -250,6 +259,7 @@ final class VmZipArchive
                 return $read['code'];
             }
             $state->entries = $read['entries'];
+            $state->archiveComment = $read['comment'];
         }
 
         $state->filename = $filename;
@@ -274,7 +284,7 @@ final class VmZipArchive
             return false;
         }
         if ($state->dirty || $state->open) {
-            if (!ZipEngine::writeArchive($state->filename, $state->entries)) {
+            if (!ZipEngine::writeArchive($state->filename, $state->entries, $state->archiveComment)) {
                 self::setStatus($entry, $state, ZipArchiveConstants::ER_WRITE);
 
                 return false;
@@ -282,6 +292,7 @@ final class VmZipArchive
         }
         $state->open = false;
         $state->dirty = false;
+        $state->archiveComment = '';
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
         if (null !== $ctx) {
             self::fireProgress($entry, $ctx, 1.0);
@@ -869,6 +880,123 @@ final class VmZipArchive
     }
 
     /**
+     * ZipArchive::setCommentName — php-src zim_ZipArchive_setCommentName (#20386).
+     */
+    public static function setCommentName(ObjectEntry $entry, string $name, string $comment): bool
+    {
+        $state = self::requireOpen($entry);
+        if ('' === $name) {
+            throw new \ValueError('ZipArchive::setCommentName(): Argument #1 ($name) must not be empty');
+        }
+        if (strlen($comment) > 0xffff) {
+            throw new \ValueError('ZipArchive::setCommentName(): Argument #2 ($comment) must be less than 65535 bytes');
+        }
+        $index = self::locateEntryIndex($state, $name);
+        if (null === $index) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+            return false;
+        }
+
+        return self::setCommentIndex($entry, $index, $comment);
+    }
+
+    /**
+     * ZipArchive::setCommentIndex — php-src zim_ZipArchive_setCommentIndex (#20386).
+     */
+    public static function setCommentIndex(ObjectEntry $entry, int $index, string $comment): bool
+    {
+        $state = self::requireOpen($entry);
+        if (strlen($comment) > 0xffff) {
+            throw new \ValueError('ZipArchive::setCommentIndex(): Argument #2 ($comment) must be less than 65535 bytes');
+        }
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        if ('' === $comment) {
+            unset($state->entries[$index]['comment']);
+        } else {
+            $state->entries[$index]['comment'] = $comment;
+        }
+        $state->dirty = true;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::getCommentName — php-src zim_ZipArchive_getCommentName (#20386).
+     */
+    public static function getCommentName(ObjectEntry $entry, string $name, int $flags = 0): string|false
+    {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ('' === $name) {
+            throw new \ValueError('ZipArchive::getCommentName(): Argument #1 ($name) must not be empty');
+        }
+        $index = self::locateEntryIndex($state, $name);
+        if (null === $index) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+            return false;
+        }
+
+        return self::getCommentIndex($entry, $index, 0);
+    }
+
+    /**
+     * ZipArchive::getCommentIndex — php-src zim_ZipArchive_getCommentIndex (#20386).
+     */
+    public static function getCommentIndex(ObjectEntry $entry, int $index, int $flags = 0): string|false
+    {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return (string) ($state->entries[$index]['comment'] ?? '');
+    }
+
+    /**
+     * ZipArchive::setArchiveComment — php-src zim_ZipArchive_setArchiveComment (#20386).
+     */
+    public static function setArchiveComment(ObjectEntry $entry, string $comment): bool
+    {
+        $state = self::requireOpen($entry);
+        if (strlen($comment) > 0xffff) {
+            throw new \ValueError('ZipArchive::setArchiveComment(): Argument #1 ($comment) must be less than 65535 bytes');
+        }
+        $state->archiveComment = $comment;
+        $state->dirty = true;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::getArchiveComment — php-src zim_ZipArchive_getArchiveComment (#20386).
+     *
+     * Returns false when no archive comment is set (libzip NULL → false).
+     */
+    public static function getArchiveComment(ObjectEntry $entry, int $flags = 0): string|false
+    {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+        if ('' === $state->archiveComment) {
+            return false;
+        }
+
+        return $state->archiveComment;
+    }
+
+    /**
      * ZipArchive::setMtimeName — php-src zim_ZipArchive_setMtimeName (#20363).
      */
     public static function setMtimeName(ObjectEntry $entry, string $name, int $timestamp, int $flags = 0): bool
@@ -1314,6 +1442,12 @@ final class VmZipArchive
             'getstreamname' => 'getStreamName',
             'clearerror' => 'clearError',
             'setencryptionindex' => 'setEncryptionIndex',
+            'setcommentname' => 'setCommentName',
+            'setcommentindex' => 'setCommentIndex',
+            'getcommentname' => 'getCommentName',
+            'getcommentindex' => 'getCommentIndex',
+            'setarchivecomment' => 'setArchiveComment',
+            'getarchivecomment' => 'getArchiveComment',
             default => $lc,
         };
     }

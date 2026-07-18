@@ -22,6 +22,9 @@ final class ZipArchiveState
     /** Default archive password for setEncryptionName / decrypt (#19873). */
     public string $password = '';
 
+    /** EOCD archive comment — php-src zip_set_archive_comment (#20386). */
+    public string $archiveComment = '';
+
     /**
      * Progress callback for registerProgressCallback (#20378).
      * Honest subset: invoked at end of mutating ops with state=1.0 (no libzip progress ticks).
@@ -44,7 +47,8 @@ final class ZipArchiveState
      *     opsys?: int,
      *     external_attr?: int,
      *     encryption_method?: int,
-     *     encryption_password?: string
+     *     encryption_password?: string,
+     *     comment?: string
      * }>
      */
     public array $entries = [];
