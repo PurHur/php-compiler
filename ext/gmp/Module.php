@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
 
-/** gmp extension module entry (php-src ext/gmp/gmp.c; issues #3341, #19527, #19539, #19540). */
+/** gmp extension module entry (php-src ext/gmp/gmp.c; issues #3341, #19527, #19539, #19540, #20519). */
 class Module extends ModuleAbstract
 {
     public function init(Runtime $runtime): void
@@ -56,6 +56,7 @@ class Module extends ModuleAbstract
             new gmp_intval(),
             new gmp_powm(),
             new gmp_fact(),
+            new gmp_binomial(),
             new gmp_gcd(),
             new gmp_lcm(),
             new gmp_sqrt(),

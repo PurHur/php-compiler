@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5673 |
-| Phase A inventory files (M2 ratio SSOT) | 5673 |
+| PHP files on vm.php path | 5674 |
+| Phase A inventory files (M2 ratio SSOT) | 5674 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16215 |
+| Source constructs flagged (warnings) | 16218 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -624,12 +624,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gettext/textdomain.php` | 0 | 2 |
 | `ext/gmp/GmpFunction.php` | 0 | 1 |
 | `ext/gmp/GmpToString.php` | 0 | 1 |
-| `ext/gmp/Module.php` | 0 | 49 |
+| `ext/gmp/Module.php` | 0 | 50 |
 | `ext/gmp/VmGmp.php` | 0 | 6 |
 | `ext/gmp/VmGmpObject.php` | 0 | 7 |
 | `ext/gmp/gmp_abs.php` | 0 | 2 |
 | `ext/gmp/gmp_add.php` | 0 | 2 |
 | `ext/gmp/gmp_and.php` | 0 | 2 |
+| `ext/gmp/gmp_binomial.php` | 0 | 2 |
 | `ext/gmp/gmp_clrbit.php` | 0 | 2 |
 | `ext/gmp/gmp_cmp.php` | 0 | 2 |
 | `ext/gmp/gmp_com.php` | 0 | 2 |
@@ -9759,45 +9760,46 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new gmp_intval (line 56)
 - new gmp_powm (line 57)
 - new gmp_fact (line 58)
-- new gmp_gcd (line 59)
-- new gmp_lcm (line 60)
-- new gmp_sqrt (line 61)
-- new gmp_sqrtrem (line 62)
-- new gmp_perfect_square (line 63)
-- new gmp_com (line 64)
-- new gmp_random_seed (line 65)
-- new gmp_random_bits (line 66)
-- new gmp_random_range (line 67)
-- new gmp_import (line 68)
-- new gmp_export (line 69)
-- new gmp_sign (line 70)
-- new gmp_prob_prime (line 71)
-- new gmp_nextprime (line 72)
-- new gmp_invert (line 73)
-- new gmp_jacobi (line 74)
-- new gmp_legendre (line 75)
-- new gmp_gcdext (line 76)
-- new gmp_root (line 77)
-- new gmp_rootrem (line 78)
-- new gmp_perfect_power (line 79)
-- new gmp_testbit (line 80)
-- new gmp_setbit (line 81)
-- new gmp_clrbit (line 82)
-- new gmp_scan0 (line 83)
-- new gmp_scan1 (line 84)
-- new gmp_popcount (line 85)
-- new gmp_hamdist (line 86)
+- new gmp_binomial (line 59)
+- new gmp_gcd (line 60)
+- new gmp_lcm (line 61)
+- new gmp_sqrt (line 62)
+- new gmp_sqrtrem (line 63)
+- new gmp_perfect_square (line 64)
+- new gmp_com (line 65)
+- new gmp_random_seed (line 66)
+- new gmp_random_bits (line 67)
+- new gmp_random_range (line 68)
+- new gmp_import (line 69)
+- new gmp_export (line 70)
+- new gmp_sign (line 71)
+- new gmp_prob_prime (line 72)
+- new gmp_nextprime (line 73)
+- new gmp_invert (line 74)
+- new gmp_jacobi (line 75)
+- new gmp_legendre (line 76)
+- new gmp_gcdext (line 77)
+- new gmp_root (line 78)
+- new gmp_rootrem (line 79)
+- new gmp_perfect_power (line 80)
+- new gmp_testbit (line 81)
+- new gmp_setbit (line 82)
+- new gmp_clrbit (line 83)
+- new gmp_scan0 (line 84)
+- new gmp_scan1 (line 85)
+- new gmp_popcount (line 86)
+- new gmp_hamdist (line 87)
 - 3 class method(s)
 
 ### `ext/gmp/VmGmp.php`
 
 **Warnings** (review for bootstrap subset):
-- new DivisionByZeroError (line 274)
-- new DivisionByZeroError (line 302)
-- new DivisionByZeroError (line 380)
-- new DivisionByZeroError (line 654)
-- new DivisionByZeroError (line 1362)
-- 83 class method(s)
+- new DivisionByZeroError (line 275)
+- new DivisionByZeroError (line 303)
+- new DivisionByZeroError (line 381)
+- new DivisionByZeroError (line 727)
+- new DivisionByZeroError (line 1435)
+- 85 class method(s)
 
 ### `ext/gmp/VmGmpObject.php`
 
@@ -9826,6 +9828,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_binomial.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
 - 1 class method(s)
 
 ### `ext/gmp/gmp_clrbit.php`
