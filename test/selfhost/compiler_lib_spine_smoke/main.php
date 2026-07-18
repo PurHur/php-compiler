@@ -950,6 +950,7 @@ require_once __DIR__.'/../../../ext/openssl/openssl_pkcs12_export_to_file.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkcs12_read.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkcs7_decrypt.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkcs7_encrypt.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_pkcs7_read.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkcs7_sign.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkcs7_verify.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkey_derive.php';

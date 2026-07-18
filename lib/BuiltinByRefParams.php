@@ -120,6 +120,7 @@ final class BuiltinByRefParams
                 return [1];
             case 'openssl_pkcs12_read':
             case 'openssl_cms_read':
+            case 'openssl_pkcs7_read':
                 return [1];
             case 'openssl_seal':
                 return [1, 2, 5];

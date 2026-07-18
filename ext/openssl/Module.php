@@ -71,6 +71,7 @@ class Module extends ModuleAbstract
             new openssl_pkcs7_verify(),
             new openssl_pkcs7_encrypt(),
             new openssl_pkcs7_decrypt(),
+            new openssl_pkcs7_read(),
             new openssl_cms_sign(),
             new openssl_cms_verify(),
             new openssl_cms_encrypt(),
