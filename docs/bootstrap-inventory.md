@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5766 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16726 |
+| Source constructs flagged (warnings) | 16727 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -46,7 +46,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/NumberSqrt.php` | 0 | 1 |
 | `ext/bcmath/NumberSub.php` | 0 | 2 |
 | `ext/bcmath/NumberToString.php` | 0 | 1 |
-| `ext/bcmath/VmBcMathNumber.php` | 0 | 22 |
+| `ext/bcmath/VmBcMathNumber.php` | 0 | 23 |
 | `ext/bcmath/VmBcmath.php` | 0 | 5 |
 | `ext/bcmath/bcadd.php` | 0 | 1 |
 | `ext/bcmath/bcceil.php` | 0 | 1 |
@@ -5815,28 +5815,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bcmath/VmBcMathNumber.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 39)
 - new Variable (line 40)
-- new ClassEntry (line 44)
-- new ClassProperty (line 47)
+- new Variable (line 41)
+- new ClassEntry (line 45)
 - new ClassProperty (line 48)
-- new NumberConstruct (line 50)
-- new NumberFrom (line 54)
-- new NumberAdd (line 58)
-- new NumberSub (line 59)
-- new NumberMul (line 60)
-- new NumberDiv (line 61)
-- new NumberMod (line 62)
-- new NumberPow (line 63)
-- new NumberSqrt (line 64)
-- new NumberFloor (line 65)
-- new NumberCeil (line 66)
-- new NumberRound (line 67)
-- new NumberCompare (line 68)
-- new NumberToString (line 69)
-- new ObjectEntry (line 93)
-- new Variable (line 95)
-- 9 class method(s)
+- new ClassProperty (line 49)
+- new NumberConstruct (line 51)
+- new NumberFrom (line 55)
+- new NumberAdd (line 59)
+- new NumberSub (line 60)
+- new NumberMul (line 61)
+- new NumberDiv (line 62)
+- new NumberMod (line 63)
+- new NumberPow (line 64)
+- new NumberSqrt (line 65)
+- new NumberFloor (line 66)
+- new NumberCeil (line 67)
+- new NumberRound (line 68)
+- new NumberCompare (line 69)
+- new NumberToString (line 70)
+- new ObjectEntry (line 94)
+- new Variable (line 96)
+- new Variable (line 309)
+- 19 class method(s)
 
 ### `ext/bcmath/VmBcmath.php`
 
@@ -44544,26 +44545,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new EnumCaseEntry (line 1305)
 - new self (line 1788)
 - new self (line 1806)
-- new self (line 1956)
-- new self (line 1964)
-- new self (line 1972)
-- new self (line 1974)
-- new self (line 2186)
-- new self (line 2297)
-- new self (line 2382)
-- new Error (line 2389)
-- new DivisionByZeroError (line 2494)
-- new DivisionByZeroError (line 2501)
-- new self (line 2522)
-- new Error (line 2551)
-- new self (line 2572)
-- new self (line 2584)
-- new Error (line 2611)
-- new self (line 2632)
-- new self (line 2640)
-- new Error (line 2814)
-- new Error (line 2820)
-- new Error (line 2829)
+- new self (line 1965)
+- new self (line 1973)
+- new self (line 1981)
+- new self (line 1983)
+- new self (line 2210)
+- new self (line 2321)
+- new self (line 2412)
+- new Error (line 2419)
+- new DivisionByZeroError (line 2524)
+- new DivisionByZeroError (line 2531)
+- new self (line 2552)
+- new Error (line 2581)
+- new self (line 2602)
+- new self (line 2614)
+- new Error (line 2641)
+- new self (line 2662)
+- new self (line 2670)
+- new Error (line 2849)
+- new Error (line 2855)
+- new Error (line 2864)
 - 123 class method(s)
 
 ### `lib/VM/VariableFunctionCall.php`

@@ -1855,6 +1855,11 @@ restart:
                 ));
                 break;
             case TYPE_PAIR_OBJECT_OBJECT:
+                $bcCmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($left, $right);
+                if (null !== $bcCmp) {
+                    $this->bool($this->_compareFromSpaceship($opCode, $bcCmp));
+                    break;
+                }
                 self::throwObjectNumericCompareError($left);
             default:
                 if ($left->type === self::TYPE_INDIRECT) {
@@ -1863,6 +1868,10 @@ restart:
                 } elseif ($right->type === self::TYPE_INDIRECT) {
                     $right = $right->indirect;
                     goto restart;
+                }
+                $bcCmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($left, $right);
+                if (null !== $bcCmp) {
+                    $this->bool($this->_compareFromSpaceship($opCode, $bcCmp));
                 } elseif (self::needsZendUnlikeKindCompare($left, $right)) {
                     $this->bool($this->_compareFromSpaceship(
                         $opCode,
@@ -1999,6 +2008,11 @@ restart:
                 $this->int(0);
                 break;
             case TYPE_PAIR_OBJECT_OBJECT:
+                $bcCmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($leftCopy, $rightCopy);
+                if (null !== $bcCmp) {
+                    $this->int($bcCmp);
+                    break;
+                }
                 $this->int($leftCopy->object->compareSpaceship($rightCopy->object));
                 break;
             case TYPE_PAIR_ENUM_CASE_ENUM_CASE:
@@ -2038,9 +2052,19 @@ restart:
                         $this->int(1);
                     }
                 } elseif (self::needsZendUnlikeKindCompare($leftCopy, $rightCopy)) {
-                    $this->int(CompareJitHelper::zendUnlikeValueSpaceship($leftCopy, $rightCopy, $vm));
+                    $bcCmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($leftCopy, $rightCopy);
+                    if (null !== $bcCmp) {
+                        $this->int($bcCmp);
+                    } else {
+                        $this->int(CompareJitHelper::zendUnlikeValueSpaceship($leftCopy, $rightCopy, $vm));
+                    }
                 } else {
-                    $this->int(self::spaceshipMixedScalars($leftCopy, $rightCopy));
+                    $bcCmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($leftCopy, $rightCopy);
+                    if (null !== $bcCmp) {
+                        $this->int($bcCmp);
+                    } else {
+                        $this->int(self::spaceshipMixedScalars($leftCopy, $rightCopy));
+                    }
                 }
         }
     }
@@ -2313,6 +2337,12 @@ restart:
                 $this->array($left->array->unionCopy($right->array));
             }
 
+            return;
+        }
+        // BcMath\Number do_operation (+ - * / % **) — php-src ext/bcmath/bcmath.c (#20648).
+        $bcCtx = null !== $frame ? $frame->vmContext : (null !== $vm ? $vm->context : null);
+        if (null !== $bcCtx
+            && \PHPCompiler\ext\bcmath\VmBcMathNumber::tryDoOperation($this, $opCode, $left, $right, $bcCtx)) {
             return;
         }
         if (!self::operandsValidForNumericOp($left, $right)) {
@@ -2672,6 +2702,11 @@ restart:
                     $this->copyFrom($resolved);
                     $this->float *= -1.0;
 
+                    return;
+                }
+                $bcCtx = null !== $frame ? $frame->vmContext : (null !== $vm ? $vm->context : null);
+                if (null !== $bcCtx
+                    && \PHPCompiler\ext\bcmath\VmBcMathNumber::tryUnaryMinus($this, $resolved, $bcCtx)) {
                     return;
                 }
                 $number = self::coerceUnaryPlusOperand($resolved, $vm, $frame);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\bcmath;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\OpCode;
 use PHPCompiler\ext\standard\VmStreamArg;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\VM\ClassEntry;
@@ -225,5 +226,271 @@ final class VmBcMathNumber
         }
 
         return $scale;
+    }
+
+    public static function isNumberObject(ObjectEntry $object): bool
+    {
+        return self::CLASS_LC === strtolower($object->class->name) && $object->constructed;
+    }
+
+    public static function isNumberVariable(Variable $var): bool
+    {
+        $var = $var->resolveIndirect();
+
+        return Variable::TYPE_OBJECT === $var->type && self::isNumberObject($var->toObject());
+    }
+
+    /**
+     * php-src bcmath_number_do_operation — + - * / % ** overload (#20648).
+     *
+     * @return bool true when either operand is BcMath\Number and the op was handled
+     */
+    public static function tryDoOperation(
+        Variable $result,
+        int $opCode,
+        Variable $left,
+        Variable $right,
+        Context $ctx
+    ): bool {
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        $leftIsNumber = self::isNumberVariable($left);
+        $rightIsNumber = self::isNumberVariable($right);
+        if (!$leftIsNumber && !$rightIsNumber) {
+            return false;
+        }
+        switch ($opCode) {
+            case OpCode::TYPE_PLUS:
+            case OpCode::TYPE_MINUS:
+            case OpCode::TYPE_MUL:
+            case OpCode::TYPE_DIV:
+            case OpCode::TYPE_MODULO:
+            case OpCode::TYPE_POW:
+                break;
+            default:
+                return false;
+        }
+
+        $leftOperand = self::parseDoOperationOperand($left, true);
+        $rightOperand = self::parseDoOperationOperand($right, false);
+        if (null === $leftOperand || null === $rightOperand) {
+            throw new \TypeError(\sprintf(
+                'Unsupported operand types: %s %s %s',
+                EnumCaseSupport::typeNameForVariable($left),
+                self::opSymbol($opCode),
+                EnumCaseSupport::typeNameForVariable($right)
+            ));
+        }
+
+        [$leftValue, $leftScale] = $leftOperand;
+        [$rightValue, $rightScale] = $rightOperand;
+        [$outValue, $outScale] = self::computeBinary(
+            $opCode,
+            $leftValue,
+            $leftScale,
+            $rightValue,
+            $rightScale,
+            true
+        );
+        $result->copyFrom(self::fromComputedValue($ctx, $outValue, $outScale));
+
+        return true;
+    }
+
+    /**
+     * Unary minus for BcMath\Number — php-src routes via do_operation (0 - n).
+     */
+    public static function tryUnaryMinus(Variable $result, Variable $expr, Context $ctx): bool
+    {
+        $expr = $expr->resolveIndirect();
+        if (!self::isNumberVariable($expr)) {
+            return false;
+        }
+        $zero = new Variable(Variable::TYPE_INTEGER);
+        $zero->int(0);
+
+        return self::tryDoOperation($result, OpCode::TYPE_MINUS, $zero, $expr, $ctx);
+    }
+
+    /**
+     * php-src bcmath_number_compare — relational / spaceship when a Number is involved.
+     *
+     * @return int|null -1/0/1, or null when neither side is Number / incomparable
+     */
+    public static function tryCompare(Variable $left, Variable $right): ?int
+    {
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        if (!self::isNumberVariable($left) && !self::isNumberVariable($right)) {
+            return null;
+        }
+        $leftOperand = self::parseDoOperationOperand($left, true);
+        $rightOperand = self::parseDoOperationOperand($right, false);
+        if (null === $leftOperand || null === $rightOperand) {
+            return null;
+        }
+
+        return VmBcmath::comp($leftOperand[0], $rightOperand[0], null);
+    }
+
+    /**
+     * Shared auto-scale binary math for operators and method calc paths (php-src bcmath_number_*_internal).
+     *
+     * @return array{0: string, 1: int} result value and object scale
+     */
+    public static function computeBinary(
+        int $opCode,
+        string $left,
+        int $leftScale,
+        string $right,
+        int $rightScale,
+        bool $isOp
+    ): array {
+        switch ($opCode) {
+            case OpCode::TYPE_PLUS:
+                $scale = max($leftScale, $rightScale);
+                $value = VmBcmath::add($left, $right, $scale);
+
+                return [$value, $scale];
+            case OpCode::TYPE_MINUS:
+                $scale = max($leftScale, $rightScale);
+                $value = VmBcmath::sub($left, $right, $scale);
+
+                return [$value, $scale];
+            case OpCode::TYPE_MUL:
+                $scale = $leftScale + $rightScale;
+                if ($scale < $leftScale) {
+                    throw new \ValueError('scale of the result is too large');
+                }
+                $value = VmBcmath::mul($left, $right, $scale);
+
+                return [$value, $scale];
+            case OpCode::TYPE_DIV:
+                $requested = $leftScale + self::EXPAND_SCALE;
+                if ($requested < $leftScale) {
+                    throw new \ValueError('scale of the result is too large');
+                }
+                $value = VmBcmath::div($left, $right, $requested);
+                // php-src bc_rm_trailing_zeros + shrink object scale by unused expand digits
+                $value = self::stripTrailingFracZeros($value);
+                $scale = self::shrinkAutoExpandScale($value, $requested);
+
+                return [$value, $scale];
+            case OpCode::TYPE_MODULO:
+                $scale = max($leftScale, $rightScale);
+                $value = VmBcmath::mod($left, $right, $scale);
+
+                return [$value, $scale];
+            case OpCode::TYPE_POW:
+                if (VmBcmath::decimalScale($right) !== 0) {
+                    throw new \ValueError($isOp
+                        ? 'exponent cannot have a fractional part'
+                        : 'BcMath\\Number::pow(): Argument #1 ($exponent) exponent cannot have a fractional part');
+                }
+                $expo = (int) $right;
+                if ($expo > 0) {
+                    $scale = $leftScale * $expo;
+                    if ($scale > PHP_INT_MAX || $scale < $leftScale) {
+                        throw new \ValueError('scale of the result is too large');
+                    }
+                    $value = VmBcmath::pow($left, $right, $scale);
+
+                    return [$value, $scale];
+                }
+                if ($expo < 0) {
+                    $requested = $leftScale + self::EXPAND_SCALE;
+                    if ($requested < $leftScale) {
+                        throw new \ValueError('scale of the result is too large');
+                    }
+                    $value = self::stripTrailingFracZeros(VmBcmath::pow($left, $right, $requested));
+
+                    return [$value, self::shrinkAutoExpandScale($value, $requested)];
+                }
+                $value = VmBcmath::pow($left, $right, 0);
+
+                return [$value, 0];
+            default:
+                throw new \LogicException('BcMath\\Number do_operation opcode not supported in this compiler build');
+        }
+    }
+
+    /**
+     * php-src bcmath_number_parse_num + bc_num_from_obj_or_str_or_long for operator operands.
+     *
+     * @return array{0: string, 1: int}|null
+     */
+    private static function parseDoOperationOperand(Variable $var, bool $isLeft): ?array
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $object = $var->toObject();
+            if (!self::isNumberObject($object)) {
+                return null;
+            }
+
+            return [self::valueString($object), self::objectScale($object)];
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            $asString = (string) $var->toInt();
+
+            return [$asString, 0];
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            return [$var->toBool() ? '1' : '0', 0];
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            // php-src zend_parse_arg_long_slow — truncate toward zero
+            $asLong = (int) $var->toFloat();
+
+            return [(string) $asLong, 0];
+        }
+        if (Variable::TYPE_STRING === $var->type) {
+            $str = $var->toString();
+            try {
+                VmBcmath::assertValidNumber($str);
+            } catch (\ValueError $e) {
+                throw new \ValueError($isLeft
+                    ? 'Left string operand cannot be converted to BcMath\\Number'
+                    : 'Right string operand cannot be converted to BcMath\\Number');
+            }
+
+            return [$str, VmBcmath::decimalScale($str)];
+        }
+
+        return null;
+    }
+
+    private static function opSymbol(int $opCode): string
+    {
+        return match ($opCode) {
+            OpCode::TYPE_PLUS => '+',
+            OpCode::TYPE_MINUS => '-',
+            OpCode::TYPE_MUL => '*',
+            OpCode::TYPE_DIV => '/',
+            OpCode::TYPE_MODULO => '%',
+            OpCode::TYPE_POW => '**',
+            default => '?',
+        };
+    }
+
+    private static function stripTrailingFracZeros(string $num): string
+    {
+        if (!str_contains($num, '.')) {
+            return $num;
+        }
+        $num = rtrim($num, '0');
+
+        return rtrim($num, '.') ?: '0';
+    }
+
+    private static function shrinkAutoExpandScale(string $result, int $requestedScale): int
+    {
+        $resultScale = VmBcmath::decimalScale($result);
+        $diff = $requestedScale - $resultScale;
+        if ($diff <= 0) {
+            return $requestedScale;
+        }
+
+        return $requestedScale - min($diff, self::EXPAND_SCALE);
     }
 }

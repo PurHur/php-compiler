@@ -22,8 +22,23 @@ final class NumberDiv extends BcMathNumberMethod
         }
         $right = $this->coerceOperand($frame, 1, 'BcMath\\Number::div', 'num');
         $scale = $this->optionalScale($frame, 2, 'BcMath\\Number::div');
-        $effectiveScale = $this->effectiveDivScale($receiver, $scale);
-        $result = VmBcmath::div(VmBcMathNumber::valueString($receiver), $right, $effectiveScale);
-        $this->returnNumber($frame, $result, $effectiveScale);
+        $left = VmBcMathNumber::valueString($receiver);
+        $leftScale = VmBcMathNumber::objectScale($receiver);
+        $rightScale = VmBcmath::decimalScale($right);
+        if (null !== $scale) {
+            $result = VmBcmath::div($left, $right, $scale);
+            $this->returnNumber($frame, $result, $scale);
+
+            return;
+        }
+        [$result, $objectScale] = VmBcMathNumber::computeBinary(
+            \PHPCompiler\OpCode::TYPE_DIV,
+            $left,
+            $leftScale,
+            $right,
+            $rightScale,
+            false
+        );
+        $this->returnNumber($frame, $result, $objectScale);
     }
 }
