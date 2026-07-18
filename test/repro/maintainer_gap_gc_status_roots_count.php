@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 $s = gc_status();
 if (!array_key_exists('roots', $s)) {
-    echo "skip — PHP 8.4 gc_status schema has no roots key\n";
+    echo "skip — unexpected schema without roots\n";
     exit(0);
 }
 if (0 !== $s['roots']) {

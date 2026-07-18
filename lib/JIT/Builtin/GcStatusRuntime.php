@@ -123,18 +123,33 @@ final class GcStatusRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
+        $double = $context->getTypeFromString('double');
 
         $running = self::loadGlobalBool($context, self::G_RUNNING, $i32, $i1);
         $protected = self::loadGlobalBool($context, self::G_PROTECTED, $i32, $i1);
         $full = self::loadGlobalBool($context, self::G_FULL, $i32, $i1);
+        $runs = self::loadGlobalInt($context, self::G_RUNS, $i32, $i64);
+        $collected = self::loadGlobalInt($context, self::G_TOTAL_COLLECTED, $i32, $i64);
+        $threshold = $i64->constInt(CycleCollector::ROOT_THRESHOLD, false);
         $bufferSize = self::loadGlobalInt($context, self::G_BUFFER_SIZE, $i32, $i64);
+        $roots = self::loadGlobalInt($context, self::G_ROOT_COUNT, $i32, $i64);
+        // Timing floats: keys required (#20627); cold AOT/JIT starts at 0.0 (VM tracks via CycleCollector).
+        $zero = $double->constReal(0.0);
 
         $ht = $context->builder->call(
             self::helperFunction($context, self::BUILD_TABLE),
             $running,
             $protected,
             $full,
-            $bufferSize
+            $runs,
+            $collected,
+            $threshold,
+            $bufferSize,
+            $roots,
+            $zero,
+            $zero,
+            $zero,
+            $zero
         );
         $context->builder->returnValue($ht);
     }

@@ -32,6 +32,16 @@ final class CycleCollector
 
     private static bool $protected = false;
 
+    /** Nanoseconds from {@see hrtime(true)} when GC status timing starts (#20627). */
+    private static ?int $activatedAtNs = null;
+
+    /** Accumulated GC phase times in nanoseconds (zend_gc.c GC_G(*_time), #20627). */
+    private static int $collectorTimeNs = 0;
+
+    private static int $destructorTimeNs = 0;
+
+    private static int $freeTimeNs = 0;
+
     /** Highest {@see ObjectEntry::id} before user script execution (#13437). */
     private static int $baselineObjectMaxId = 0;
 
@@ -68,24 +78,66 @@ final class CycleCollector
     }
 
     /**
+     * PHP 8.3+/8.4 gc_status() payload — legacy counters + timing retained (#20627).
+     *
      * @return array{
      *     running: bool,
      *     protected: bool,
      *     full: bool,
-     *     buffer_size: int
+     *     runs: int,
+     *     collected: int,
+     *     threshold: int,
+     *     buffer_size: int,
+     *     roots: int,
+     *     application_time: float,
+     *     collector_time: float,
+     *     destructor_time: float,
+     *     free_time: float
      * }
      *
-     * @see https://github.com/php/php-src/blob/master/ext/standard/php_gc.c PHP_FUNCTION(gc_status)
+     * @see https://github.com/php/php-src/blob/master/Zend/zend_builtin_functions.c ZEND_FUNCTION(gc_status)
+     * @see https://github.com/php/php-src/blob/master/Zend/zend_gc.c zend_gc_get_status
      */
     public static function status(Context $ctx): array
     {
         $roots = self::countBufferedRoots($ctx);
+        $times = self::timingSeconds();
 
         return [
             'running' => self::$running,
             'protected' => self::$protected,
             'full' => $roots >= self::ROOT_THRESHOLD,
+            'runs' => self::$runs,
+            'collected' => self::$totalCollected,
+            'threshold' => self::ROOT_THRESHOLD,
             'buffer_size' => self::DEFAULT_BUFFER_SIZE,
+            'roots' => $roots,
+            'application_time' => $times['application_time'],
+            'collector_time' => $times['collector_time'],
+            'destructor_time' => $times['destructor_time'],
+            'free_time' => $times['free_time'],
+        ];
+    }
+
+    /**
+     * @return array{
+     *     application_time: float,
+     *     collector_time: float,
+     *     destructor_time: float,
+     *     free_time: float
+     * }
+     */
+    public static function timingSeconds(): array
+    {
+        self::ensureActivatedAt();
+        $now = self::hrtimeNs();
+        $activated = self::$activatedAtNs ?? $now;
+
+        return [
+            'application_time' => ($now - $activated) / 1_000_000_000.0,
+            'collector_time' => self::$collectorTimeNs / 1_000_000_000.0,
+            'destructor_time' => self::$destructorTimeNs / 1_000_000_000.0,
+            'free_time' => self::$freeTimeNs / 1_000_000_000.0,
         ];
     }
 
@@ -126,6 +178,8 @@ final class CycleCollector
         if (!GcToggleJitHelper::isEnabled()) {
             return 0;
         }
+        self::ensureActivatedAt();
+        $collectStartNs = self::hrtimeNs();
         self::$running = true;
         self::$protected = true;
         ++self::$runs;
@@ -210,8 +264,23 @@ final class CycleCollector
         self::$totalCollected += $collected;
         self::$running = false;
         self::$protected = false;
+        self::$collectorTimeNs += self::hrtimeNs() - $collectStartNs;
 
         return $collected;
+    }
+
+    private static function ensureActivatedAt(): void
+    {
+        if (null === self::$activatedAtNs) {
+            self::$activatedAtNs = self::hrtimeNs();
+        }
+    }
+
+    private static function hrtimeNs(): int
+    {
+        $ns = \hrtime(true);
+
+        return \is_int($ns) ? $ns : (int) $ns;
     }
 
     /**

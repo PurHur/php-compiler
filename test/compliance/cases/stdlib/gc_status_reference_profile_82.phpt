@@ -3,7 +3,7 @@ stdlib gc_status() Zend 8.2 reference profile legacy keys (issue #12790)
 --FILE--
 <?php
 $s = gc_status();
-if (!array_key_exists('runs', $s)) {
+if (array_key_exists('running', $s)) {
     echo "skip — requires reference profile legacy gc_status schema\n";
     exit(0);
 }

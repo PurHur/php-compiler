@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPCompiler\VM\MemoryAccounting;
 use PHPUnit\Framework\TestCase;
 
-/** gc_status() / gc_mem_caches() VM introspection (#3280, #12780, #12790). */
+/** gc_status() / gc_mem_caches() VM introspection (#3280, #12780, #12790, #20627). */
 final class GcStatusTest extends TestCase
 {
     public function testGcStatusAndMemCachesRegistered(): void
@@ -19,13 +19,15 @@ foreach (['gc_status', 'gc_mem_caches'] as $fn) {
 }
 $st = gc_status();
 gc_mem_caches();
-echo 'schema=', array_key_exists('runs', $st) ? 'legacy' : '84', "\n";
-if (array_key_exists('runs', $st)) {
-    echo 'runs=', $st['runs'], "\n";
-    echo 'threshold=', $st['threshold'], "\n";
-} else {
+echo 'schema=', array_key_exists('running', $st) ? '84' : 'legacy', "\n";
+if (array_key_exists('running', $st)) {
     echo 'running=', $st['running'] ? 'true' : 'false', "\n";
     echo 'buffer_size=', $st['buffer_size'], "\n";
+    echo 'runs=', $st['runs'], "\n";
+    echo 'has_application_time=', array_key_exists('application_time', $st) ? 'yes' : 'no', "\n";
+} else {
+    echo 'runs=', $st['runs'], "\n";
+    echo 'threshold=', $st['threshold'], "\n";
 }
 PHP;
 
@@ -41,6 +43,8 @@ PHP;
             $this->assertStringContainsString('schema=84', $output);
             $this->assertStringContainsString('running=false', $output);
             $this->assertStringContainsString('buffer_size=131072', $output);
+            $this->assertStringContainsString('runs=0', $output);
+            $this->assertStringContainsString('has_application_time=yes', $output);
         } else {
             $this->assertStringContainsString('schema=legacy', $output);
             $this->assertStringContainsString('runs=0', $output);
@@ -61,6 +65,9 @@ foreach (['running', 'protected', 'full', 'buffer_size'] as $key) {
 foreach (['runs', 'collected', 'threshold', 'roots'] as $key) {
     echo $key, '=', array_key_exists($key, $s) ? 'yes' : 'no', "\n";
 }
+foreach (['application_time', 'collector_time', 'destructor_time', 'free_time'] as $key) {
+    echo $key, '=', array_key_exists($key, $s) ? 'yes' : 'no', "\n";
+}
 PHP;
 
         $rt = new Runtime();
@@ -70,12 +77,13 @@ PHP;
         $output = ob_get_clean();
 
         if (CompilerVersion::supportsGcStatusPhp84Schema()) {
-            $this->assertStringContainsString('buffer_size,full,protected,running', $output);
-            foreach (['running', 'protected', 'full', 'buffer_size'] as $key) {
+            $this->assertStringContainsString(
+                'application_time,buffer_size,collected,collector_time,destructor_time,free_time,full,protected,roots,running,runs,threshold',
+                $output
+            );
+            foreach (['running', 'protected', 'full', 'buffer_size', 'runs', 'collected', 'threshold', 'roots',
+                'application_time', 'collector_time', 'destructor_time', 'free_time'] as $key) {
                 $this->assertStringContainsString($key.'=yes', $output);
-            }
-            foreach (['runs', 'collected', 'threshold', 'roots'] as $key) {
-                $this->assertStringContainsString($key.'=no', $output);
             }
         } else {
             $this->assertStringContainsString('collected,roots,runs,threshold', $output);
@@ -111,9 +119,8 @@ PHP;
 
     public function testGcStatusRootsZeroAtColdStart(): void
     {
-        if (CompilerVersion::supportsGcStatusPhp84Schema()) {
-            $this->markTestSkipped('PHP 8.4 gc_status schema has no roots key (#12790)');
-        }
+        // Use direct dim-fetch (not $s = gc_status()) so the call frame does not
+        // leave an unreachable temp HT counted as a root (#13437, #20627).
         $code = <<<'PHP'
 <?php
 echo 'roots=', gc_status()['roots'], "\n";
@@ -140,13 +147,15 @@ unset($a, $b);
 $n = gc_collect_cycles();
 $st = gc_status();
 echo 'collected=', $n, "\n";
-echo 'schema=', array_key_exists('runs', $st) ? 'legacy' : '84', "\n";
-if (array_key_exists('runs', $st)) {
+echo 'schema=', array_key_exists('running', $st) ? '84' : 'legacy', "\n";
+if (array_key_exists('running', $st)) {
     echo 'runs=', $st['runs'], "\n";
     echo 'gc_collected=', $st['collected'], "\n";
-} else {
     echo 'running=', $st['running'] ? 'true' : 'false', "\n";
     echo 'full=', $st['full'] ? 'true' : 'false', "\n";
+} else {
+    echo 'runs=', $st['runs'], "\n";
+    echo 'gc_collected=', $st['collected'], "\n";
 }
 PHP;
 
@@ -159,6 +168,8 @@ PHP;
         $this->assertStringContainsString('collected=2', $output);
         if (CompilerVersion::supportsGcStatusPhp84Schema()) {
             $this->assertStringContainsString('schema=84', $output);
+            $this->assertStringContainsString('runs=1', $output);
+            $this->assertStringContainsString('gc_collected=2', $output);
             $this->assertStringContainsString('running=false', $output);
             $this->assertStringContainsString('full=false', $output);
         } else {
