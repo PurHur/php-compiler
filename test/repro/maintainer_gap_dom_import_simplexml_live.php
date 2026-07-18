@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-// #20137 — dom_import_simplexml must share live node identity (php-src ext/dom/node.c).
+// #20137 / #20697 — dom_import_simplexml must share live node identity (php-src ext/dom/node.c).
+// Named-child property views ($sxe->a) must export the child element, not the parent (#20489).
 $sxe = simplexml_load_string('<root><a>1</a></root>');
 if (false === $sxe) {
     fwrite(STDERR, "fail: simplexml_load_string\n");
