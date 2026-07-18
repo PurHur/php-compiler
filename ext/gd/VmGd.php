@@ -1355,6 +1355,108 @@ final class VmGd
     }
 
     /**
+     * imageellipse() — mid-point stroke ellipse (php-src gdImageEllipse; #20438).
+     */
+    public static function ellipse(ObjectEntry $image, int $mx, int $my, int $w, int $h, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $a = $w >> 1;
+        $b = $h >> 1;
+        // Skip overflowMul3 — PHP int is wide enough for canvas sizes we support.
+        self::putPixel($state, $mx + $a, $my, $color);
+        self::putPixel($state, $mx - $a, $my, $color);
+        $mx1 = $mx - $a;
+        $my1 = $my;
+        $mx2 = $mx + $a;
+        $my2 = $my;
+        $aq = $a * $a;
+        $bq = $b * $b;
+        $dx = $aq << 1;
+        $dy = $bq << 1;
+        $r = $a * $bq;
+        $rx = $r << 1;
+        $ry = 0;
+        $x = $a;
+        while ($x > 0) {
+            if ($r > 0) {
+                ++$my1;
+                --$my2;
+                $ry += $dx;
+                $r -= $ry;
+            }
+            if ($r <= 0) {
+                --$x;
+                ++$mx1;
+                --$mx2;
+                $rx -= $dy;
+                $r += $rx;
+            }
+            self::putPixel($state, $mx1, $my1, $color);
+            self::putPixel($state, $mx1, $my2, $color);
+            self::putPixel($state, $mx2, $my1, $color);
+            self::putPixel($state, $mx2, $my2, $color);
+        }
+
+        return true;
+    }
+
+    /**
+     * imagefilledellipse() — mid-point filled ellipse (php-src gdImageFilledEllipse; #20438).
+     */
+    public static function filledEllipse(ObjectEntry $image, int $mx, int $my, int $w, int $h, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $a = $w >> 1;
+        $b = $h >> 1;
+        for ($x = $mx - $a; $x <= $mx + $a; ++$x) {
+            self::putPixel($state, $x, $my, $color);
+        }
+        $mx1 = $mx - $a;
+        $my1 = $my;
+        $mx2 = $mx + $a;
+        $my2 = $my;
+        $aq = $a * $a;
+        $bq = $b * $b;
+        $dx = $aq << 1;
+        $dy = $bq << 1;
+        $r = $a * $bq;
+        $rx = $r << 1;
+        $ry = 0;
+        $x = $a;
+        $oldY2 = -2;
+        while ($x > 0) {
+            if ($r > 0) {
+                ++$my1;
+                --$my2;
+                $ry += $dx;
+                $r -= $ry;
+            }
+            if ($r <= 0) {
+                --$x;
+                ++$mx1;
+                --$mx2;
+                $rx -= $dy;
+                $r += $rx;
+            }
+            if ($oldY2 !== $my2) {
+                for ($i = $mx1; $i <= $mx2; ++$i) {
+                    self::putPixel($state, $i, $my2, $color);
+                    self::putPixel($state, $i, $my1, $color);
+                }
+            }
+            $oldY2 = $my2;
+        }
+
+        return true;
+    }
+
+    /**
      * imagerectangle() — outline rect (php-src ext/gd/libgd/gd.c gdImageRectangle; #20457).
      */
     public static function rectangle(ObjectEntry $image, int $x1, int $y1, int $x2, int $y2, int $color): bool
