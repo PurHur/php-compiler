@@ -67,6 +67,9 @@ class Module extends ModuleAbstract
             $functions[] = new curl_share_init();
             $functions[] = new curl_share_setopt();
             $functions[] = new curl_share_close();
+            // curl_share_errno / curl_share_strerror — share error surface (php-src share.c; #20531)
+            $functions[] = new curl_share_errno();
+            $functions[] = new curl_share_strerror();
         }
         if (CurlExtensionPolicy::advertisesEasyHandleStubs()) {
             // curl_escape/unescape require CurlHandle (php-src curl.stub.php; #20493)
