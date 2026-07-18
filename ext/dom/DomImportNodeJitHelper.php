@@ -75,4 +75,32 @@ final class DomImportNodeJitHelper
 
         return $var->toObject();
     }
+
+    /** DOMDocument::createAttribute() — JIT/AOT (#20676). */
+    public static function createAttributeArgv(
+        Context $ctx,
+        ObjectEntry $document,
+        string $name
+    ): ObjectEntry {
+        $var = VmDom::createAttribute($ctx, $name, $document);
+        if (\PHPCompiler\VM\Variable::TYPE_OBJECT !== $var->type) {
+            throw new \DOMException('Invalid State Error', 11);
+        }
+
+        return $var->toObject();
+    }
+
+    /** DOMElement::setAttributeNode() — JIT/AOT (#20676). */
+    public static function setAttributeNodeArgv(ObjectEntry $element, ObjectEntry $attr): ?ObjectEntry
+    {
+        $ctx = VmDomJitFrame::vmContext();
+        $canonical = DomRegistry::entry($element->id) ?? $element;
+        $attrCanon = DomRegistry::entry($attr->id) ?? $attr;
+        $var = VmDom::setAttributeNode($ctx, $canonical, $attrCanon);
+        if (\PHPCompiler\VM\Variable::TYPE_OBJECT !== $var->type) {
+            return null;
+        }
+
+        return $var->toObject();
+    }
 }

@@ -49,6 +49,7 @@ final class DomInstanceMethodJit
         'domdocument::createelementns' => true,
         'domdocument::createcomment' => true,
         'domdocument::createattributens' => true,
+        'domdocument::createattribute' => true,
         'domdocument::load' => true,
         'domdocument::loadhtml' => true,
         'domdocument::loadhtmlfile' => true,
@@ -83,6 +84,7 @@ final class DomInstanceMethodJit
         'domelement::getattributenode' => true,
         'domelement::getattributenodens' => true,
         'domelement::setattributenodens' => true,
+        'domelement::setattributenode' => true,
         'domelement::toggleattribute' => true,
         'domnode::contains' => true,
         'domnode::getrootnode' => true,
@@ -182,6 +184,16 @@ final class DomInstanceMethodJit
             }
             if ('domdocument::createattributens' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentCreateAttributeNS();
+
+                return;
+            }
+            if ('domdocument::createattribute' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentCreateAttribute();
+
+                return;
+            }
+            if ('domelement::setattributenode' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomElementSetAttributeNode();
 
                 return;
             }
@@ -402,7 +414,9 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domelement::getattributenode');
             self::ensureProxy($context, 'domelement::getattributenodens');
             self::ensureProxy($context, 'domelement::setattributenodens');
+            self::ensureProxy($context, 'domelement::setattributenode');
             self::ensureProxy($context, 'domdocument::createattributens');
+            self::ensureProxy($context, 'domdocument::createattribute');
             self::ensureProxy($context, 'domnode::comparedocumentposition');
             self::ensureProxy($context, 'domxpath::registernamespace');
             self::ensureProxy($context, 'domxpath::registerphpfunctions');

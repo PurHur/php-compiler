@@ -217,6 +217,35 @@ final class JitDomDocumentMethodKernel
         );
     }
 
+    public static function ensureCreateAttributeBridge(Context $context): void
+    {
+        self::ensureContextBridge(
+            $context,
+            DomImportNodeRuntime::ABI_CREATE_ATTRIBUTE,
+            'dom_create_attribute_user_script',
+            [
+                $context->getTypeFromString('__object__*'),
+                $context->getTypeFromString('__string__*'),
+            ],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::createAttributeArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
+    public static function ensureSetAttributeNodeBridge(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            DomImportNodeRuntime::ABI_SET_ATTRIBUTE_NODE,
+            'dom_set_attribute_node_user_script',
+            [$context->getTypeFromString('__object__*'), $context->getTypeFromString('__object__*')],
+            $context->getTypeFromString('__object__*'),
+            'PHPCompiler\\ext\\dom\\DomImportNodeJitHelper::setAttributeNodeArgv',
+            '/ext/dom/DomImportNodeJitHelper.php'
+        );
+    }
+
     public static function ensureFirstChildBridge(Context $context): void
     {
         self::ensureBridge(
