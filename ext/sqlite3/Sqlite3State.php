@@ -44,4 +44,17 @@ final class Sqlite3State
      * }>
      */
     public array $aggregates = [];
+
+    /**
+     * Authorizer callback (php-src setAuthorizer; #20683).
+     *
+     * @var \PHPCompiler\VM\Variable|null
+     */
+    public $authorizer = null;
+
+    /** @var \PHPCompiler\VM\ClosureState|null */
+    public $authorizerClosure = null;
+
+    /** @var \PHPCompiler\VM\Context|null */
+    public $authorizerCtx = null;
 }

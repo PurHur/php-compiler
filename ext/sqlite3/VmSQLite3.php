@@ -35,10 +35,11 @@ final class VmSQLite3
             : new ClassEntry('SQLite3');
         $entry->isInternal = true;
         foreach (Sqlite3Constants::CLASS_CONSTANTS as $name => $value) {
+            $lc = strtolower($name);
             $const = new Variable(Variable::TYPE_INTEGER);
             $const->int($value);
-            $entry->constants[$name] = $const;
-            $entry->constNames[$name] = Sqlite3Constants::CLASS_CONSTANT_NAMES[$name];
+            $entry->constants[$lc] = $const;
+            $entry->constNames[$lc] = Sqlite3Constants::CLASS_CONSTANT_NAMES[$name];
         }
 
         $pub = CfgFunc::FLAG_PUBLIC;
@@ -63,6 +64,7 @@ final class VmSQLite3
             'createfunction' => new SQLite3CreateFunction(),
             'createaggregate' => new SQLite3CreateAggregate(),
             'createcollation' => new SQLite3CreateCollation(),
+            'setauthorizer' => new SQLite3SetAuthorizer(),
             'loadextension' => new SQLite3LoadExtension(),
             'backup' => new SQLite3Backup(),
             'openblob' => new SQLite3OpenBlob(),
@@ -301,6 +303,9 @@ final class VmSQLite3
     public static function expandSql(ObjectEntry $entry, string $sql): string
     {
         $state = self::state($entry);
+        if (!VmSqlite3Authorizer::allow($state, $sql)) {
+            throw new \SQLite3Exception('not authorized');
+        }
         if ([] !== $state->functions) {
             $sql = VmSqlite3Udf::expandSql($sql, $state->functions);
         }
