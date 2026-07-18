@@ -8,9 +8,12 @@ use PHPCompiler\Ast\NewDereferenceableDesugar;
 use PHPCompiler\Compiler\CompileFatal;
 
 /**
- * Reject PHP 8.4+ dereferencable `new` without outer parentheses on the Zend 8.2 reference profile (#19684).
+ * Reject illegal / profile-gated `new` dereference forms before desugar (#19684, #20598).
  *
- * Must run before {@see Ast\NewDereferenceableDesugar} so the construct is not lowered into valid PHP.
+ * - Always: bare named-class `new Name->…` / `new Name?->…` (no ctor `()`) — Zend rejects on 8.4+ too.
+ * - Reference profile only: `new Name()->…` without outer parentheses (#19684).
+ *
+ * Must run before {@see Ast\NewDereferenceableDesugar} so gated forms are not lowered into valid PHP.
  * php-src: Zend/zend_language_parser.y — new_dereferenceable / new_non_dereferenceable.
  */
 final class NewDereferenceableSyntaxRejector
@@ -20,6 +23,12 @@ final class NewDereferenceableSyntaxRejector
         if (ReferenceProfileTokenScan::shouldSkipReferenceProfileReject($code, $filename)) {
             return $code;
         }
+
+        $bare = NewDereferenceableDesugar::bareNamedClassObjectDerefSyntaxError($code);
+        if (null !== $bare) {
+            throw new CompileFatal($filename, $bare['line'], $bare['message']);
+        }
+
         if (CompilerVersion::supportsDereferencableNewWithoutOuterParens()) {
             return $code;
         }

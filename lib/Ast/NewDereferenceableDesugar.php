@@ -10,7 +10,8 @@ use PHPCompiler\CompilerVersion;
  * Desugar PHP 8.4+ dereferencable `new` without outer parentheses before nikic/php-parser (#6974).
  *
  * Rewrites `new Class()->m()` to `(new Class())->m()` so php-parser v4 accepts the source.
- * Only `new` with constructor parentheses (or anonymous class) is dereferencable per RFC.
+ * Only `new` with constructor parentheses (or anonymous class) is dereferencable per RFC —
+ * bare `new Class->m()` remains a parse error on PHP 8.4+ (ctor `()` required; #20598).
  * Withheld on 8.4.0-dev reference profile (#19684) — see {@see referenceProfileSyntaxError()}.
  * php-src: Zend/zend_language_parser.y — new_dereferenceable / new_non_dereferenceable.
  */
@@ -30,6 +31,76 @@ final class NewDereferenceableDesugar
 
     /** Zend 8.2 profile message for `new Class()[…]`. */
     public const REFERENCE_PROFILE_UNEXPECTED_BRACKET = 'syntax error, unexpected token "[", expecting "," or ";"';
+
+    /**
+     * Bare named-class `new Name->…` / `new Name?->…` (no ctor parentheses) — illegal on every PHP
+     * version including 8.4 (RFC new_without_parentheses requires ctor `()`; #20598).
+     *
+     * Does not touch `new $var->prop` (class name from property) or `new Name::…` (mixed Zend rules).
+     *
+     * @return array{line: int, message: string}|null
+     */
+    public static function bareNamedClassObjectDerefSyntaxError(string $code): ?array
+    {
+        if (!preg_match('/\bnew\b/i', $code)) {
+            return null;
+        }
+
+        $tokens = token_get_all($code);
+        if (!\is_array($tokens) || [] === $tokens) {
+            return null;
+        }
+
+        for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
+            $token = $tokens[$i];
+            if (!\is_array($token) || \T_NEW !== $token[0]) {
+                continue;
+            }
+
+            $pos = $i + 1;
+            self::skipForwardIgnorable($tokens, $pos);
+            if ($pos >= $c) {
+                continue;
+            }
+
+            if (self::isAnonymousClassToken($tokens[$pos])) {
+                continue;
+            }
+
+            if (!self::isBareNamedClassStartToken($tokens[$pos])) {
+                continue;
+            }
+
+            if (!self::skipBareNamedClassTarget($tokens, $pos)) {
+                continue;
+            }
+
+            self::skipForwardIgnorable($tokens, $pos);
+            if ($pos >= $c || '(' === $tokens[$pos]) {
+                continue;
+            }
+
+            $message = self::bareNamedClassObjectDerefMessageForToken($tokens[$pos]);
+            if (null === $message) {
+                continue;
+            }
+
+            $deref = $tokens[$pos];
+            if (\is_array($deref) && isset($deref[2])) {
+                $line = (int) $deref[2];
+            } else {
+                $offset = self::tokenByteOffset($tokens, $pos);
+                $line = null !== $offset ? self::byteOffsetToLine($code, $offset) : 1;
+            }
+
+            return [
+                'line' => max(1, $line),
+                'message' => $message,
+            ];
+        }
+
+        return null;
+    }
 
     /**
      * @return array{line: int, message: string}|null
@@ -160,6 +231,72 @@ final class NewDereferenceableDesugar
             \T_DOUBLE_COLON => self::REFERENCE_PROFILE_UNEXPECTED_DOUBLE_COLON,
             default => null,
         };
+    }
+
+    /**
+     * @param array{0: int, 1: string, 2: int}|string $token
+     */
+    private static function bareNamedClassObjectDerefMessageForToken($token): ?string
+    {
+        if (!\is_array($token)) {
+            return null;
+        }
+
+        return match ($token[0]) {
+            \T_OBJECT_OPERATOR => self::REFERENCE_PROFILE_UNEXPECTED_OBJECT_OPERATOR,
+            \T_NULLSAFE_OBJECT_OPERATOR => self::REFERENCE_PROFILE_UNEXPECTED_NULLSAFE,
+            default => null,
+        };
+    }
+
+    /**
+     * Named class after `new` without a variable / `(expr)` wrapper (#20598).
+     *
+     * @param array{0: int, 1: string, 2: int}|string $token
+     */
+    private static function isBareNamedClassStartToken($token): bool
+    {
+        if (!\is_array($token)) {
+            return false;
+        }
+
+        return \in_array($token[0], [
+            \T_STRING,
+            \T_STATIC,
+            \T_NAME_QUALIFIED,
+            \T_NAME_FULLY_QUALIFIED,
+            \T_NAME_RELATIVE,
+        ], true);
+    }
+
+    /**
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function skipBareNamedClassTarget(array $tokens, int &$pos): bool
+    {
+        if ($pos >= \count($tokens) || !self::isBareNamedClassStartToken($tokens[$pos])) {
+            return false;
+        }
+
+        ++$pos;
+        while ($pos < \count($tokens)) {
+            self::skipForwardIgnorable($tokens, $pos);
+            if ($pos >= \count($tokens)) {
+                break;
+            }
+            if ('\\' === $tokens[$pos]) {
+                ++$pos;
+                self::skipForwardIgnorable($tokens, $pos);
+                if ($pos >= \count($tokens) || !self::isClassNamePartToken($tokens[$pos])) {
+                    return false;
+                }
+                ++$pos;
+                continue;
+            }
+            break;
+        }
+
+        return true;
     }
 
     private static function byteOffsetToLine(string $code, int $offset): int

@@ -38,8 +38,15 @@ echo new Greeter()->greet(), "\n";
 echo new Greeter()->tag, "\n";
 echo new Greeter()::label(), "\n";
 echo (new Greeter())->greet(), "\n";
+echo new class {
+    public function hello(): string
+    {
+        return 'anon';
+    }
+}->hello(), "\n";
 --EXPECT--
 hello
 hi
 static
 hello
+anon

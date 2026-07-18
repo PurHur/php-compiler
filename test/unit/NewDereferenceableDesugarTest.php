@@ -90,6 +90,27 @@ final class NewDereferenceableDesugarTest extends TestCase
         $this->assertSame($code, NewDereferenceableDesugar::desugar($code));
     }
 
+    public function testDesugarDoesNotWrapBareNamedObjectDeref(): void
+    {
+        // Zend 8.4 still requires ctor `()` — desugar must not invent them (#20598).
+        $code = '<?php echo new Greeter->hello();';
+        $this->assertSame($code, NewDereferenceableDesugar::desugar($code));
+        $error = NewDereferenceableDesugar::bareNamedClassObjectDerefSyntaxError($code);
+        $this->assertNotNull($error);
+        $this->assertSame(
+            NewDereferenceableDesugar::REFERENCE_PROFILE_UNEXPECTED_OBJECT_OPERATOR,
+            $error['message']
+        );
+    }
+
+    public function testDesugarLeavesNewVariableObjectDerefAlone(): void
+    {
+        // `new $obj->prop` remains `new ($obj->prop)` — not a bare named-class form.
+        $code = '<?php $c = new $obj->factory;';
+        $this->assertNull(NewDereferenceableDesugar::bareNamedClassObjectDerefSyntaxError($code));
+        $this->assertSame($code, NewDereferenceableDesugar::desugar($code));
+    }
+
     public function testVmNewChainWithoutParens(): void
     {
         $code = <<<'PHP'
