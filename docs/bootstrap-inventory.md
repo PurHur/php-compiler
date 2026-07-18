@@ -35191,12 +35191,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ParseStrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 421)
-- new phpc_native_ht_set_string_key (line 422)
-- new phpc_native_ht_set_string_key_ht (line 423)
-- new phpc_native_ht_set_string_at (line 424)
-- new phpc_native_ht_set_hashtable_at (line 425)
-- 21 class method(s)
+- new phpc_native_ht_alloc (line 386)
+- new phpc_native_ht_set_string_key (line 387)
+- new phpc_native_ht_set_string_key_ht (line 388)
+- new phpc_native_ht_set_string_at (line 389)
+- new phpc_native_ht_set_hashtable_at (line 390)
+- 20 class method(s)
 - 5 closure(s)
 
 ### `lib/JIT/Builtin/ParseUrl.php`
@@ -38813,7 +38813,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/NestedVmHashTableMethodLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\HashTableWriteNested (line 53)
+- new Call\HashTableWriteNested (line 54)
 - 2 class method(s)
 
 ### `lib/JIT/NestedVmObjectMethodLlvm.php`
