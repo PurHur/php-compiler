@@ -26,13 +26,31 @@ final class JitHighlight
             throw new \LogicException('highlight_string() expects 1 or 2 arguments in this compiler build');
         }
 
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile before const-fold (#20262, re-#18779).
+        if (
+            (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'highlight_string', 0, 'string');
+
+            return $context->getTypeFromString('__value__*')->constNull();
+        }
+
         $codeLit = $args[0]->compileTimeString ?? null;
         $returnLit = self::compileTimeReturn($context, $args, $argc);
+        if (
+            null === $codeLit
+            && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))
+            && (1 === $argc || null !== $returnLit)
+        ) {
+            // Soft-null on 8.2 profile — coerce to '' and const-fold when $return is known (#20262).
+            $codeLit = '';
+        }
         if (null !== $codeLit) {
             return self::materializeHtml($context, HighlightEngine::render($codeLit), $returnLit ?? false);
         }
 
-        $codeStr = JitStringBuiltinArg::lowerStrictOrCoercible(
+        $codeStr = JitStringBuiltinArg::lowerZparamStr(
             $context,
             $args[0],
             'highlight_string',
@@ -239,15 +257,26 @@ final class JitHighlight
         if ($argc < 2) {
             return null;
         }
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type || JITVariable::KIND_VALUE !== $args[1]->kind) {
+        $arg = $args[1];
+        if (JITVariable::KIND_VALUE !== $arg->kind) {
             return null;
         }
         $lib = $context->llvm->lib;
-        if (null === $lib->LLVMIsAConstantInt($args[1]->value->value)) {
+        if (JITVariable::TYPE_NATIVE_BOOL === $arg->type) {
+            if (null === $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return null;
+            }
+
+            return 0 !== (int) $lib->LLVMConstIntGetZExtValue($arg->value->value);
+        }
+        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type) {
+            return null;
+        }
+        if (null === $lib->LLVMIsAConstantInt($arg->value->value)) {
             return null;
         }
 
-        return 0 !== (int) $lib->LLVMConstIntGetZExtValue($args[1]->value->value);
+        return 0 !== (int) $lib->LLVMConstIntGetZExtValue($arg->value->value);
     }
 
     private static function boolValForBranch(Context $context, JITVariable $arg, string $functionName): Value
