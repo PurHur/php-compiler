@@ -755,7 +755,10 @@ class Context {
             'phpc_hypot_kernel',
             'phpc_sqrt_kernel',
             'phpc_rename_kernel',
-            'phpc_getenv_kernel' => true,
+            'phpc_getenv_kernel',
+            // Hash algos always-helper NestedJIT leaves (#20652).
+            'phpc_hash_algos_kernel',
+            'phpc_hash_hmac_algos_kernel' => true,
             default => false,
         };
     }
