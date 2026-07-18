@@ -1578,6 +1578,76 @@ final class VmPgsqlCore
         return true;
     }
 
+    /**
+     * pg_result_error — PQresultErrorMessage; false when result already freed (#20720).
+     *
+     * @return string|false
+     */
+    public static function resultError(ObjectEntry $resultObj): string|false
+    {
+        $result = VmPgsqlResult::nativeOrNull($resultObj);
+        if (null === $result) {
+            return false;
+        }
+
+        return VmPgsqlNative::resultErrorMessage($result);
+    }
+
+    /**
+     * Mask of PG_DIAG_* char codes accepted by php-src pg_result_error_field.
+     * (SCHEMA/TABLE/… constants exist but share this low-7-bit mask.)
+     */
+    private const RESULT_ERROR_FIELD_MASK = 0
+        | 83 /* S severity */
+        | 67 /* C sqlstate */
+        | 77 /* M primary */
+        | 68 /* D detail */
+        | 72 /* H hint */
+        | 80 /* P statement position */
+        | 112 /* p internal position */
+        | 113 /* q internal query */
+        | 87 /* W context */
+        | 70 /* F source file */
+        | 76 /* L source line */
+        | 82 /* R source function */;
+
+    /**
+     * pg_result_error_field (#20720).
+     *
+     * @return string|null|false
+     */
+    public static function resultErrorField(ObjectEntry $resultObj, int $fieldcode): string|null|false
+    {
+        $result = VmPgsqlResult::nativeOrNull($resultObj);
+        if (null === $result) {
+            return false;
+        }
+        if (0 === ($fieldcode & self::RESULT_ERROR_FIELD_MASK)) {
+            return false;
+        }
+        $field = VmPgsqlNative::resultErrorField($result, $fieldcode);
+        if (null === $field) {
+            return null;
+        }
+
+        return $field;
+    }
+
+    /**
+     * pg_last_oid (#20720).
+     *
+     * @return int|false
+     */
+    public static function lastOid(ObjectEntry $resultObj): int|false
+    {
+        $oid = VmPgsqlNative::oidValue(VmPgsqlResult::native($resultObj));
+        if (VmPgsqlNative::INVALID_OID === $oid) {
+            return false;
+        }
+
+        return $oid;
+    }
+
     private static function convertValueToSql(\FFI\CData $conn, Variable $val): string
     {
         if (Variable::TYPE_NULL === $val->type) {

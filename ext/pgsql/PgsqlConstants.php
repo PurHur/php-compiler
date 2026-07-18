@@ -97,6 +97,60 @@ final class PgsqlConstants
     /** php-src PGSQL_STATUS_STRING — return PQcmdStatus string */
     public const PGSQL_STATUS_STRING = 2;
 
+    /** libpq PG_DIAG_SEVERITY ('S') */
+    public const PGSQL_DIAG_SEVERITY = 83;
+
+    /** libpq PG_DIAG_SQLSTATE ('C') */
+    public const PGSQL_DIAG_SQLSTATE = 67;
+
+    /** libpq PG_DIAG_MESSAGE_PRIMARY ('M') */
+    public const PGSQL_DIAG_MESSAGE_PRIMARY = 77;
+
+    /** libpq PG_DIAG_MESSAGE_DETAIL ('D') */
+    public const PGSQL_DIAG_MESSAGE_DETAIL = 68;
+
+    /** libpq PG_DIAG_MESSAGE_HINT ('H') */
+    public const PGSQL_DIAG_MESSAGE_HINT = 72;
+
+    /** libpq PG_DIAG_STATEMENT_POSITION ('P') */
+    public const PGSQL_DIAG_STATEMENT_POSITION = 80;
+
+    /** libpq PG_DIAG_INTERNAL_POSITION ('p') */
+    public const PGSQL_DIAG_INTERNAL_POSITION = 112;
+
+    /** libpq PG_DIAG_INTERNAL_QUERY ('q') */
+    public const PGSQL_DIAG_INTERNAL_QUERY = 113;
+
+    /** libpq PG_DIAG_CONTEXT ('W') */
+    public const PGSQL_DIAG_CONTEXT = 87;
+
+    /** libpq PG_DIAG_SOURCE_FILE ('F') */
+    public const PGSQL_DIAG_SOURCE_FILE = 70;
+
+    /** libpq PG_DIAG_SOURCE_LINE ('L') */
+    public const PGSQL_DIAG_SOURCE_LINE = 76;
+
+    /** libpq PG_DIAG_SOURCE_FUNCTION ('R') */
+    public const PGSQL_DIAG_SOURCE_FUNCTION = 82;
+
+    /** libpq PG_DIAG_SCHEMA_NAME ('s') */
+    public const PGSQL_DIAG_SCHEMA_NAME = 115;
+
+    /** libpq PG_DIAG_TABLE_NAME ('t') */
+    public const PGSQL_DIAG_TABLE_NAME = 116;
+
+    /** libpq PG_DIAG_COLUMN_NAME ('c') */
+    public const PGSQL_DIAG_COLUMN_NAME = 99;
+
+    /** libpq PG_DIAG_DATATYPE_NAME ('d') */
+    public const PGSQL_DIAG_DATATYPE_NAME = 100;
+
+    /** libpq PG_DIAG_CONSTRAINT_NAME ('n') */
+    public const PGSQL_DIAG_CONSTRAINT_NAME = 110;
+
+    /** libpq PG_DIAG_SEVERITY_NONLOCALIZED ('V') */
+    public const PGSQL_DIAG_SEVERITY_NONLOCALIZED = 86;
+
     /**
      * @return array<string, int>
      */
@@ -136,6 +190,24 @@ final class PgsqlConstants
             'PGSQL_TRANSACTION_UNKNOWN' => self::PGSQL_TRANSACTION_UNKNOWN,
             'PGSQL_STATUS_LONG' => self::PGSQL_STATUS_LONG,
             'PGSQL_STATUS_STRING' => self::PGSQL_STATUS_STRING,
+            'PGSQL_DIAG_SEVERITY' => self::PGSQL_DIAG_SEVERITY,
+            'PGSQL_DIAG_SQLSTATE' => self::PGSQL_DIAG_SQLSTATE,
+            'PGSQL_DIAG_MESSAGE_PRIMARY' => self::PGSQL_DIAG_MESSAGE_PRIMARY,
+            'PGSQL_DIAG_MESSAGE_DETAIL' => self::PGSQL_DIAG_MESSAGE_DETAIL,
+            'PGSQL_DIAG_MESSAGE_HINT' => self::PGSQL_DIAG_MESSAGE_HINT,
+            'PGSQL_DIAG_STATEMENT_POSITION' => self::PGSQL_DIAG_STATEMENT_POSITION,
+            'PGSQL_DIAG_INTERNAL_POSITION' => self::PGSQL_DIAG_INTERNAL_POSITION,
+            'PGSQL_DIAG_INTERNAL_QUERY' => self::PGSQL_DIAG_INTERNAL_QUERY,
+            'PGSQL_DIAG_CONTEXT' => self::PGSQL_DIAG_CONTEXT,
+            'PGSQL_DIAG_SOURCE_FILE' => self::PGSQL_DIAG_SOURCE_FILE,
+            'PGSQL_DIAG_SOURCE_LINE' => self::PGSQL_DIAG_SOURCE_LINE,
+            'PGSQL_DIAG_SOURCE_FUNCTION' => self::PGSQL_DIAG_SOURCE_FUNCTION,
+            'PGSQL_DIAG_SCHEMA_NAME' => self::PGSQL_DIAG_SCHEMA_NAME,
+            'PGSQL_DIAG_TABLE_NAME' => self::PGSQL_DIAG_TABLE_NAME,
+            'PGSQL_DIAG_COLUMN_NAME' => self::PGSQL_DIAG_COLUMN_NAME,
+            'PGSQL_DIAG_DATATYPE_NAME' => self::PGSQL_DIAG_DATATYPE_NAME,
+            'PGSQL_DIAG_CONSTRAINT_NAME' => self::PGSQL_DIAG_CONSTRAINT_NAME,
+            'PGSQL_DIAG_SEVERITY_NONLOCALIZED' => self::PGSQL_DIAG_SEVERITY_NONLOCALIZED,
         ];
     }
 }

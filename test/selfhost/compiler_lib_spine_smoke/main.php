@@ -1187,6 +1187,7 @@ require_once __DIR__.'/../../../ext/pgsql/pg_dml_builtins.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_params_escape_builtins.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_connection_info_builtins.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_fetch_extra_builtins.php';
+require_once __DIR__.'/../../../ext/pgsql/pg_result_diag_builtins.php';
 require_once __DIR__.'/../../../ext/phar/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/phar/Module.php';
 require_once __DIR__.'/../../../ext/phar/PharDataBuiltin.php';
