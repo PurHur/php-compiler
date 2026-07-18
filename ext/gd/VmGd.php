@@ -1273,6 +1273,311 @@ final class VmGd
     }
 
     /**
+     * imageaffine() — gdTransformAffineGetImage (php-src ext/gd/gd.c / libgd; #20404).
+     *
+     * @param list<float> $affine 6-element matrix [a,b,c,d,e,f]: x'=a*x+c*y+e, y'=b*x+d*y+f
+     * @param array{x: int, y: int, width: int, height: int}|null $clip
+     */
+    public static function affine(
+        Frame $frame,
+        ObjectEntry $image,
+        array $affine,
+        ?array $clip
+    ): ObjectEntry|false {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if (!$state->truecolor) {
+            if (!self::paletteToTrueColor($image)) {
+                return false;
+            }
+            $state = GdRegistry::state($image);
+            if (null === $state || !$state->hasRaster()) {
+                return false;
+            }
+        }
+
+        $srcX = 0;
+        $srcY = 0;
+        $srcW = $state->width;
+        $srcH = $state->height;
+        if (null !== $clip) {
+            $srcX = $clip['x'];
+            $srcY = $clip['y'];
+            $srcW = $clip['width'];
+            $srcH = $clip['height'];
+            if ($srcW <= 0 || $srcH <= 0) {
+                return false;
+            }
+            if ($srcX < 0 || $srcY < 0
+                || $srcX + $srcW > $state->width
+                || $srcY + $srcH > $state->height) {
+                return false;
+            }
+        }
+
+        $bbox = self::affineBoundingBox($srcW, $srcH, $affine);
+        if (null === $bbox) {
+            return false;
+        }
+        [$bboxX, $bboxY, $dstW, $dstH] = $bbox;
+        if ($dstW <= 0 || $dstH <= 0) {
+            return false;
+        }
+
+        // Translate so bbox origin lands at (0,0) — gdAffineTranslate(-bbox) ∘ affine.
+        $m = self::affineConcat($affine, [1.0, 0.0, 0.0, 1.0, (float) (-$bboxX), (float) (-$bboxY)]);
+        $inv = self::affineInvert($m);
+        if (null === $inv) {
+            return false;
+        }
+
+        $srcPixels = $state->pixels;
+        $srcWidth = $state->width;
+        $srcHeight = $state->height;
+        $nearest = GdConstants::REGISTERED['IMG_NEAREST_NEIGHBOUR'] === $state->interpolationId;
+        $dstPixels = array_fill(0, $dstW * $dstH, 0);
+
+        for ($y = 0; $y < $dstH; ++$y) {
+            for ($x = 0; $x < $dstW; ++$x) {
+                $ptX = $x + 0.5;
+                $ptY = $y + 0.5;
+                $srcPtX = $ptX * $inv[0] + $ptY * $inv[2] + $inv[4];
+                $srcPtY = $ptX * $inv[1] + $ptY * $inv[3] + $inv[5];
+                $sx = $srcX + $srcPtX;
+                $sy = $srcY + $srcPtY;
+                if ($nearest) {
+                    $ix = (int) floor($sx);
+                    $iy = (int) floor($sy);
+                    if ($ix < $srcX || $iy < $srcY
+                        || $ix >= $srcX + $srcW || $iy >= $srcY + $srcH
+                        || $ix < 0 || $iy < 0 || $ix >= $srcWidth || $iy >= $srcHeight) {
+                        $dstPixels[$y * $dstW + $x] = 0;
+
+                        continue;
+                    }
+                    $dstPixels[$y * $dstW + $x] = $srcPixels[$iy * $srcWidth + $ix];
+                } else {
+                    if ($sx < $srcX || $sy < $srcY
+                        || $sx >= $srcX + $srcW || $sy >= $srcY + $srcH) {
+                        $dstPixels[$y * $dstW + $x] = 0;
+
+                        continue;
+                    }
+                    $dstPixels[$y * $dstW + $x] = self::sampleBilinear(
+                        $srcPixels,
+                        $srcWidth,
+                        $srcHeight,
+                        $sx,
+                        $sy
+                    );
+                }
+            }
+        }
+
+        $out = self::createTruecolorFromPixels($frame, $dstW, $dstH, $dstPixels);
+        if (false === $out) {
+            return false;
+        }
+        $outState = GdRegistry::state($out);
+        if (null !== $outState) {
+            $outState->interpolationId = $state->interpolationId;
+            $outState->saveAlpha = true;
+            $outState->alphaBlending = false;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<float> $affine
+     * @return array{0: int, 1: int, 2: int, 3: int}|null bbox x,y,width,height
+     */
+    private static function affineBoundingBox(int $width, int $height, array $affine): ?array
+    {
+        $corners = [
+            [0.0, 0.0],
+            [(float) $width, 0.0],
+            [(float) $width, (float) $height],
+            [0.0, (float) $height],
+        ];
+        $minX = INF;
+        $minY = INF;
+        $maxX = -INF;
+        $maxY = -INF;
+        foreach ($corners as [$cx, $cy]) {
+            $x = $cx * $affine[0] + $cy * $affine[2] + $affine[4];
+            $y = $cx * $affine[1] + $cy * $affine[3] + $affine[5];
+            if (!is_finite($x) || !is_finite($y)) {
+                return null;
+            }
+            if ($x < $minX) {
+                $minX = $x;
+            }
+            if ($y < $minY) {
+                $minY = $y;
+            }
+            if ($x > $maxX) {
+                $maxX = $x;
+            }
+            if ($y > $maxY) {
+                $maxY = $y;
+            }
+        }
+        $dstW = (int) floor($maxX - $minX);
+        $dstH = (int) floor($maxY - $minY);
+        // Match php-src identity “same dimensions” (libgd bbox_width uses width-1 + inclusive loops).
+        if ($dstW < 1) {
+            $dstW = 1;
+        }
+        if ($dstH < 1) {
+            $dstH = 1;
+        }
+
+        return [(int) $minX, (int) $minY, $dstW, $dstH];
+    }
+
+    /**
+     * @param list<float> $m1
+     * @param list<float> $m2
+     * @return list<float>
+     */
+    private static function affineConcat(array $m1, array $m2): array
+    {
+        return [
+            $m1[0] * $m2[0] + $m1[1] * $m2[2],
+            $m1[0] * $m2[1] + $m1[1] * $m2[3],
+            $m1[2] * $m2[0] + $m1[3] * $m2[2],
+            $m1[2] * $m2[1] + $m1[3] * $m2[3],
+            $m1[4] * $m2[0] + $m1[5] * $m2[2] + $m2[4],
+            $m1[4] * $m2[1] + $m1[5] * $m2[3] + $m2[5],
+        ];
+    }
+
+    /**
+     * @param list<float> $src
+     * @return list<float>|null
+     */
+    private static function affineInvert(array $src): ?array
+    {
+        $det = $src[0] * $src[3] - $src[1] * $src[2];
+        if ($det <= 0.0) {
+            return null;
+        }
+        $rDet = 1.0 / $det;
+        $dst0 = $src[3] * $rDet;
+        $dst1 = -$src[1] * $rDet;
+        $dst2 = -$src[2] * $rDet;
+        $dst3 = $src[0] * $rDet;
+
+        return [
+            $dst0,
+            $dst1,
+            $dst2,
+            $dst3,
+            -$src[4] * $dst0 - $src[5] * $dst2,
+            -$src[4] * $dst1 - $src[5] * $dst3,
+        ];
+    }
+
+    /**
+     * @return list<float>
+     */
+    public static function coerceAffineMatrix(Variable $arg, string $function, int $position): array
+    {
+        $arg = $arg->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($affine) must be of type array, %s given',
+                $function,
+                $position,
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($affine) must be of type array, %s given',
+                $function,
+                $position,
+                self::typeLabel($arg)
+            ));
+        }
+        $table = $arg->toArray();
+        if (6 !== $table->getNumElements()) {
+            throw new \ValueError($function.'(): Argument #'.$position.' ($affine) must have 6 elements');
+        }
+        $affine = [];
+        for ($i = 0; $i < 6; ++$i) {
+            $elem = $table->findIndex($i);
+            if (null === $elem) {
+                throw new \ValueError($function.'(): Argument #'.$position.' ($affine) must have 6 elements');
+            }
+            $elem = $elem->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $elem->type) {
+                $affine[] = (float) $elem->toInt();
+            } elseif (Variable::TYPE_FLOAT === $elem->type) {
+                $affine[] = $elem->toFloat();
+            } elseif (Variable::TYPE_STRING === $elem->type) {
+                $affine[] = (float) $elem->toString();
+            } else {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d ($affine) contains invalid type for element %d',
+                    $function,
+                    $position,
+                    $i
+                ));
+            }
+        }
+
+        return $affine;
+    }
+
+    /**
+     * @return array{x: int, y: int, width: int, height: int}
+     */
+    public static function coerceAffineClipRect(Variable $arg, string $function, int $position): array
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($clip) must be of type ?array, %s given',
+                $function,
+                $position,
+                self::typeLabel($arg)
+            ));
+        }
+        $table = $arg->toArray();
+        $values = [];
+        foreach (['x', 'y', 'width', 'height'] as $key) {
+            $valueVar = $table->find($key);
+            if (null === $valueVar) {
+                throw new \ValueError(\sprintf(
+                    '%s(): Argument #%d ($clip) must have a "%s" key',
+                    $function,
+                    $position,
+                    $key
+                ));
+            }
+            $valueVar = $valueVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $valueVar->type) {
+                $values[$key] = $valueVar->toInt();
+            } elseif (Variable::TYPE_FLOAT === $valueVar->type) {
+                $values[$key] = (int) $valueVar->toFloat();
+            } else {
+                $values[$key] = (int) $valueVar->toInt();
+            }
+        }
+
+        return [
+            'x' => $values['x'],
+            'y' => $values['y'],
+            'width' => $values['width'],
+            'height' => $values['height'],
+        ];
+    }
+
+    /**
      * imageconvolution() — in-place 3×3 kernel (php-src gdImageConvolution; #20405).
      *
      * @param list<list<float>> $matrix
@@ -2312,6 +2617,12 @@ final class VmGd
             'imagecreatefromstring' => 'image',
             'imagecreatefromwebp', 'imagecreatefromavif' => 'filename',
             'imagesx', 'imagesy', 'imageistruecolor', 'imagepalettetotruecolor', 'imagedestroy', 'imagegetinterpolation' => 'image',
+            'imageaffine' => match ($position) {
+                1 => 'image',
+                2 => 'affine',
+                3 => 'clip',
+                default => 'arg',
+            },
             'imagesetinterpolation' => match ($position) {
                 1 => 'image',
                 2 => 'method',
