@@ -254,6 +254,24 @@ class AotTest extends BaseTest
                 && str_contains($name, 'strxfrm')) {
                 continue;
             }
+            if (\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesBuiltins()
+                && (str_contains($name, 'grapheme_phantom')
+                    || str_contains($name, 'grapheme_stripos_intl_gated')
+                    || str_contains($name, 'grapheme_forward_profile')
+                    || str_contains($name, 'grapheme_profile_84')
+                    || str_contains($name, 'idn_phantom')
+                    || str_contains($name, 'normalizer_phantom')
+                    || str_contains($name, 'intl_phantom')
+                    || str_contains($name, 'intl_phantom_classes')
+                    || str_contains($name, 'intl_skeleton_stub')
+                    || str_contains($name, 'locale_gated'))) {
+                continue;
+            }
+            if (!CompilerVersion::supportsGraphemeStrimwidth()
+                && str_contains($name, 'grapheme_strimwidth')
+                && !str_contains($name, 'grapheme_phantom')) {
+                continue;
+            }
             if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsGraphemeCompliance($name)
                 && str_contains($name, 'grapheme_')
                 && !str_contains($name, 'grapheme_phantom')) {

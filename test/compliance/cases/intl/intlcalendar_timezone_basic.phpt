@@ -30,10 +30,10 @@ $tz2 = $cal->getTimeZone();
 echo 'cal_tz=', $tz2->getID(), "\n";
 ?>
 --EXPECT--
-intl_loaded=0
+intl_loaded=1
 calendar=1
 timezone=1
-collator=0
+collator=1
 tz_ok=1
 tz_id=UTC
 cal_ok=1

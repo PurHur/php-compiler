@@ -5,19 +5,84 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\CompilerVersion;
-use PHPCompiler\ext\standard\ModuleRegistry;
 
 /**
- * ext/intl builtin advertisement — php-src ext/intl/php_intl.c module registration (#11768, #11825).
+ * ext/intl builtin advertisement — php-src ext/intl/php_intl.c module registration (#11768, #11825, #20630).
  *
  * Grapheme helpers, IDN converters, Normalizer / normalizer_*, Locale / locale_*, IntlDateFormatter,
  * IntlCalendar / IntlTimeZone, NumberFormatter, and intl_* error functions require a loaded intl
- * extension on Zend; they stay withheld from function_exists()/class_exists() until
- * {@see ModuleRegistry::extensionLoaded}('intl') (#11472, #16214, #17694, #19593, #19594, #19670).
- * Implementations stay in-tree for when intl loads; Zend never splits classes from the module.
+ * extension on Zend. Advertise the logical {@code intl} module once ICU (libicuuc) is available —
+ * same pattern as curl/libcurl ({@see advertisesExtension()}); break the chicken-egg where
+ * {@see ModuleRegistry::extensionLoaded}('intl') stayed false forever because Module registered
+ * only under {@code standard} (#11472, #17694, #19593, #19594, #19670, #20630).
+ *
+ * Zend never splits classes from the module: when extension_loaded('intl') is true, grapheme /
+ * idn / Normalizer / Locale / formatters advertise together. Deeper ICU formatter fidelity remains
+ * #3336.
  */
 final class IntlExtensionPolicy
 {
+    private static ?bool $icuAvailable = null;
+
+    /**
+     * extension_loaded('intl') / CREDITS_MODULES — true once ICU libs are present (#20630).
+     *
+     * Grapheme / Normalizer are pure-PHP; IDN prefers libidn2 FFI. Claiming the module matches
+     * host capability (libicuuc) rather than Zend's php-intl package load state.
+     */
+    public static function advertisesExtension(): bool
+    {
+        return self::icuAvailable();
+    }
+
+    /** libicuuc present — gate for claiming ext/intl (#20630). */
+    public static function icuAvailable(): bool
+    {
+        if (null !== self::$icuAvailable) {
+            return self::$icuAvailable;
+        }
+
+        if (!\class_exists(\FFI::class, false) && !\extension_loaded('FFI')) {
+            return self::$icuAvailable = false;
+        }
+
+        $candidates = [
+            ['libicuuc.so.74', '_74'],
+            ['libicuuc.so.72', '_72'],
+            ['libicuuc.so.71', '_71'],
+            ['libicuuc.so.70', '_70'],
+            ['libicuuc.so', '_70'],
+            ['libicuuc.dylib', ''],
+        ];
+        foreach ($candidates as [$lib, $suffix]) {
+            try {
+                $sym = 'u_errorName'.$suffix;
+                $ffi = \FFI::cdef('const char *'.$sym.'(int code);', $lib);
+                $ffi->$sym(0);
+
+                return self::$icuAvailable = true;
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        // Fallback: shared object on disk (CI images ship libicu without php-intl).
+        foreach ([
+            '/lib/x86_64-linux-gnu/libicuuc.so.70',
+            '/lib/x86_64-linux-gnu/libicuuc.so.74',
+            '/usr/lib/x86_64-linux-gnu/libicuuc.so.70',
+            '/usr/lib/x86_64-linux-gnu/libicuuc.so.74',
+            '/usr/lib/libicuuc.so',
+            '/opt/homebrew/lib/libicuuc.dylib',
+        ] as $path) {
+            if (\is_file($path)) {
+                return self::$icuAvailable = true;
+            }
+        }
+
+        return self::$icuAvailable = false;
+    }
+
     /**
      * locale_get_default()/Locale — require loaded ext/intl (php-src ext/intl/locale; #19670, re-#16214).
      *
@@ -38,17 +103,14 @@ final class IntlExtensionPolicy
             || CompilerVersion::advertisesLocaleParserForwardProfile();
     }
 
-    /** grapheme_* / intl_get_error_* — withheld until full ext/intl (#11472, #5156). */
+    /** grapheme_* / intl_get_error_* — with ICU-backed ext/intl (#11472, #5156, #20630). */
     public static function advertisesBuiltins(): bool
     {
-        return ModuleRegistry::extensionLoaded('intl');
+        return self::advertisesExtension();
     }
 
     /**
-     * normalizer_* + Normalizer — require loaded ext/intl (php-src ext/intl/normalizer; #19594).
-     *
-     * Implementation stays in-tree (#5153 / #19535) but must not phantom-advertise when
-     * extension_loaded('intl') is false (Zend 8.2 reference without intl).
+     * normalizer_* + Normalizer — with loaded ext/intl (php-src ext/intl/normalizer; #19594, #20630).
      */
     public static function advertisesNormalizer(): bool
     {
@@ -162,14 +224,11 @@ final class IntlExtensionPolicy
     }
 
     /**
-     * idn_to_ascii()/idn_to_utf8() — require loaded ext/intl (php-src ext/intl/idn/idn.c; #19593).
-     *
-     * Implementation stays in-tree (#6169) but must not phantom-advertise when
-     * extension_loaded('intl') is false (Zend 8.2 reference without intl).
+     * idn_to_ascii()/idn_to_utf8() — with loaded ext/intl + libidn2 (php-src ext/intl/idn/idn.c; #19593, #20630).
      */
     public static function advertisesIdn(): bool
     {
-        return self::advertisesBuiltins();
+        return self::advertisesBuiltins() && VmIdn::available();
     }
 
     /** Run IDN compliance when ext/intl is loaded or a phantom-registration guard matches (#19593). */

@@ -17,11 +17,13 @@ echo method_exists('Normalizer', 'normalize') ? "yes\n" : "no\n";
 echo method_exists('Normalizer', 'isNormalized') ? "yes\n" : "no\n";
 echo method_exists('Normalizer', 'getRawDecomposition') ? "yes\n" : "no\n";
 
-echo bin2hex(Normalizer::normalize($decomposed, Normalizer::FORM_C)), "\n";
-echo Normalizer::normalize($composed, Normalizer::FORM_C) === normalizer_normalize($composed, Normalizer::FORM_C)
+$formC = Normalizer::FORM_C;
+$nfc = Normalizer::normalize($decomposed, $formC);
+echo bin2hex($nfc), "\n";
+echo Normalizer::normalize($composed, $formC) === normalizer_normalize($composed, $formC)
     ? "oop_proc_match\n" : "oop_proc_mismatch\n";
-echo Normalizer::isNormalized($composed, Normalizer::FORM_C) ? "norm\n" : "not\n";
-echo Normalizer::isNormalized($decomposed, Normalizer::FORM_C) ? "decomposed_norm\n" : "decomposed_not\n";
+echo Normalizer::isNormalized($composed, $formC) ? "norm\n" : "not\n";
+echo Normalizer::isNormalized($decomposed, $formC) ? "decomposed_norm\n" : "decomposed_not\n";
 
 $raw = Normalizer::getRawDecomposition($composed);
 echo null === $raw ? "raw_null\n" : ("raw_" . bin2hex($raw) . "\n");

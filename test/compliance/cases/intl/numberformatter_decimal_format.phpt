@@ -17,10 +17,10 @@ $pct = NumberFormatter::create('en_US', NumberFormatter::PERCENT);
 echo $pct->format(0.25), "\n";
 ?>
 --EXPECT--
-intl_loaded=0
+intl_loaded=1
 formatter=1
 calendar=1
-collator=0
+collator=1
 1,234.5
 1.234,5
 25%

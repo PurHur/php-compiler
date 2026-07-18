@@ -22,7 +22,7 @@ try {
     echo 'err=', str_contains($e->getMessage(), 'valid locale') ? 'yes' : 'no', "\n";
 }
 --EXPECT--
-loaded=0
+loaded=1
 fn=1
 class=1
 bool(true)

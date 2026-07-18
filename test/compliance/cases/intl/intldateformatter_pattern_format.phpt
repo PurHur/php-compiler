@@ -24,9 +24,9 @@ $f3 = IntlDateFormatter::create('en_US', -1, -1, 'America/New_York', 1, 'yyyy-MM
 echo $f3->format($dt), "\n";
 ?>
 --EXPECT--
-intl_loaded=0
+intl_loaded=1
 formatter=1
-collator=0
+collator=1
 2024-03-15
 2024-03-15 12:34:56
 2024-03-15 08:34:56

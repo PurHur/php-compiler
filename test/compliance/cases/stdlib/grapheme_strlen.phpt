@@ -7,7 +7,7 @@ echo grapheme_strlen('café'), "\n";
 echo grapheme_strlen(''), "\n";
 var_dump(grapheme_strlen("\xFF"));
 --EXPECT--
-0
+1
 4
 0
 bool(false)

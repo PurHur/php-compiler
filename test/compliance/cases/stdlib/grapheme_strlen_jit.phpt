@@ -6,6 +6,6 @@ echo (int) function_exists('grapheme_strlen'), "\n";
 echo grapheme_strlen('café'), "\n";
 echo grapheme_strlen(''), "\n";
 --EXPECT--
-0
+1
 4
 0

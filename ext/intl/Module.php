@@ -10,21 +10,32 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 
 /**
- * intl extension module entry (php-src ext/intl/php_intl.c; issue #5774).
+ * intl extension module entry (php-src ext/intl/php_intl.c; issue #5774, #20630).
  *
- * Grapheme builtins are partial PHP implementations without ICU. Register under
- * {@see standard} so extension_loaded('intl') stays false until full ext/intl (#11472).
- * Locale / locale_* / IntlDateFormatter / IntlCalendar / IntlTimeZone / NumberFormatter stay
- * gated with grapheme / IDN / Normalizer / Collator / MessageFormatter / Transliterator /
- * ResourceBundle / IntlBreakIterator / IntlChar / UConverter / Spoofchecker — no phantom
- * class_exists (#19670, #11768, #12115, #17694, #19593, #19594, #6366, #6171, #6139, #6187,
- * #6188, #20035). Implementations remain in-tree for when intl loads.
+ * Register under {@see standard}; advertise logical {@code intl} via
+ * {@see getAdditionalExtensionNames()} when {@see IntlExtensionPolicy::advertisesExtension()}
+ * (ICU libs present — curl/bz2 pattern). Grapheme / IDN / Normalizer / Locale / formatters /
+ * Collator / MessageFormatter / Transliterator / ResourceBundle / IntlBreakIterator / IntlChar /
+ * UConverter / Spoofchecker gate together — no phantom class_exists (#19670, #11768, #17694,
+ * #19593, #19594, #6366, #6171, #6139, #6187, #6188, #20035, #20630).
  */
 class Module extends ModuleAbstract
 {
     public function getExtensionName(): string
     {
         return 'standard';
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array
+    {
+        if (!IntlExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
+        return ['intl'];
     }
 
     public function init(Runtime $runtime): void

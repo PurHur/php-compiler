@@ -386,6 +386,9 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
 
     public function testReferenceProfileGraphemeBuiltinsNotCallableWithoutIntl(): void
     {
+        if (\PHPCompiler\ext\intl\IntlExtensionPolicy::icuAvailable()) {
+            $this->markTestSkipped('ICU-backed ext/intl advertises grapheme_* (#20630)');
+        }
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
@@ -427,6 +430,9 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
 
     public function testGraphemeProfile84BuiltinsNotAdvertisedWithoutIntl(): void
     {
+        if (\PHPCompiler\ext\intl\IntlExtensionPolicy::icuAvailable()) {
+            $this->markTestSkipped('ICU-backed ext/intl advertises grapheme_* (#20630)');
+        }
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {

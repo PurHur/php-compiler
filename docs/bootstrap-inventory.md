@@ -10972,10 +10972,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- new locale_get_primary_language (line 215)
-- new locale_get_region (line 216)
-- new locale_get_script (line 217)
-- 23 class method(s)
+- new locale_get_primary_language (line 274)
+- new locale_get_region (line 275)
+- new locale_get_script (line 276)
+- 25 class method(s)
 
 ### `ext/intl/JitGrapheme.php`
 
@@ -11060,42 +11060,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 67)
-- new locale_get_default (line 77)
-- new locale_set_default (line 78)
-- new locale_get_primary_language (line 79)
-- new locale_get_region (line 80)
-- new locale_get_script (line 81)
-- new locale_lookup (line 82)
-- new locale_filter_matches (line 83)
-- new locale_accept_from_http (line 84)
-- new normalizer_normalize (line 88)
-- new normalizer_is_normalized (line 89)
-- new normalizer_get_raw_decomposition (line 90)
-- new idn_to_ascii (line 94)
-- new idn_to_utf8 (line 94)
-- new collator_create (line 98)
-- new msgfmt_create (line 103)
-- new msgfmt_format (line 104)
-- new msgfmt_format_message (line 105)
-- new transliterator_create (line 111)
-- new transliterator_transliterate (line 112)
-- new grapheme_strlen (line 135)
-- new grapheme_substr (line 136)
-- new grapheme_strpos (line 137)
-- new grapheme_str_contains (line 138)
-- new grapheme_strstr (line 139)
-- new grapheme_stristr (line 140)
-- new grapheme_stripos (line 141)
-- new grapheme_strrpos (line 142)
-- new grapheme_extract (line 143)
-- new grapheme_levenshtein (line 144)
-- new grapheme_str_split (line 145)
-- new grapheme_strimwidth (line 146)
-- new intl_get_error_code (line 147)
-- new intl_get_error_message (line 148)
-- new intl_is_failure (line 149)
-- 3 class method(s)
+- new VM\Variable (line 78)
+- new locale_get_default (line 88)
+- new locale_set_default (line 89)
+- new locale_get_primary_language (line 90)
+- new locale_get_region (line 91)
+- new locale_get_script (line 92)
+- new locale_lookup (line 93)
+- new locale_filter_matches (line 94)
+- new locale_accept_from_http (line 95)
+- new normalizer_normalize (line 99)
+- new normalizer_is_normalized (line 100)
+- new normalizer_get_raw_decomposition (line 101)
+- new idn_to_ascii (line 105)
+- new idn_to_utf8 (line 105)
+- new collator_create (line 109)
+- new msgfmt_create (line 114)
+- new msgfmt_format (line 115)
+- new msgfmt_format_message (line 116)
+- new transliterator_create (line 122)
+- new transliterator_transliterate (line 123)
+- new grapheme_strlen (line 146)
+- new grapheme_substr (line 147)
+- new grapheme_strpos (line 148)
+- new grapheme_str_contains (line 149)
+- new grapheme_strstr (line 150)
+- new grapheme_stristr (line 151)
+- new grapheme_stripos (line 152)
+- new grapheme_strrpos (line 153)
+- new grapheme_extract (line 154)
+- new grapheme_levenshtein (line 155)
+- new grapheme_str_split (line 156)
+- new grapheme_strimwidth (line 157)
+- new intl_get_error_code (line 158)
+- new intl_get_error_message (line 159)
+- new intl_is_failure (line 160)
+- 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
 
@@ -27039,7 +27039,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/error_log.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 32)
 - 3 class method(s)
 
 ### `ext/standard/error_reporting.php`

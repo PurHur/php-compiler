@@ -19,6 +19,9 @@ final class LocaleDefaultTest extends TestCase
 
     public function test_locale_default_withheld_without_intl_extension(): void
     {
+        if (IntlExtensionPolicy::advertisesLocale()) {
+            self::markTestSkipped('Locale advertises with ICU-backed ext/intl (#20630)');
+        }
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
@@ -40,6 +43,30 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame('0000', ob_get_clean());
+    }
+
+    public function test_locale_default_advertised_with_icu_intl(): void
+    {
+        if (!IntlExtensionPolicy::advertisesLocale()) {
+            self::markTestSkipped('ICU-backed ext/intl not available');
+        }
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+
+        self::assertTrue(VmReflection::functionExists($ctx, 'locale_get_default'));
+        self::assertTrue(VmReflection::classExists($ctx, 'Locale'));
+        self::assertTrue(\PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl'));
+
+        $code = <<<'PHP'
+<?php
+echo (int) extension_loaded('intl');
+echo (int) function_exists('locale_get_default');
+echo (int) class_exists('Locale', false);
+PHP;
+        $block = $runtime->parseAndCompile($code, 'locale_default_icu.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('111', ob_get_clean());
     }
 
     public function test_locale_set_default_repro(): void
