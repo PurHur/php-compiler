@@ -336,3 +336,112 @@ final class pg_field_is_null extends Internal
         throw new \LogicException('pg_field_is_null() is not implemented for JIT (#20629)');
     }
 }
+
+/**
+ * pg_put_line — PQputline (php-src ext/pgsql/pgsql.c; #20673).
+ *
+ * Overloads: pg_put_line(string $data) | pg_put_line(PgSql\Connection $connection, string $data).
+ */
+final class pg_put_line extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_put_line');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_put_line() expects 1 or 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (1 === $argc) {
+            $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pg_put_line', 0, 'query');
+            $connObj = VmPgsqlConnection::resolveOptionalConnection(null);
+            if (null === $connObj) {
+                @\trigger_error('pg_put_line(): No PostgreSQL connection opened yet', \E_USER_WARNING);
+                $frame->returnVar->bool(false);
+
+                return;
+            }
+        } else {
+            $connObj = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_put_line', 1);
+            $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_put_line', 1, 'query');
+        }
+        $native = VmPgsqlConnection::native($connObj);
+        $result = VmPgsqlNative::putline($native, $data);
+        // libpq: 0 success, EOF (-1) failure
+        if (-1 === $result) {
+            $msg = VmPgsqlNative::errorMessage($native);
+            VmPgsqlConnection::setLastError($msg);
+            @\trigger_error('pg_put_line(): Query failed: '.$msg, \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(true);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_put_line() is not implemented for JIT (#20673)');
+    }
+}
+
+/**
+ * pg_end_copy — PQendcopy (php-src ext/pgsql/pgsql.c; #20673).
+ */
+final class pg_end_copy extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_end_copy');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_end_copy() expects at most 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $provided = null;
+        if (1 === $argc) {
+            $provided = VmPgsqlArg::optionalConnection($frame->calledArgs[0], 'pg_end_copy', 1);
+        }
+        $connObj = VmPgsqlConnection::resolveOptionalConnection($provided);
+        if (null === $connObj) {
+            @\trigger_error('pg_end_copy(): No PostgreSQL connection opened yet', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $native = VmPgsqlConnection::native($connObj);
+        $result = VmPgsqlNative::endcopy($native);
+        if (0 !== $result) {
+            $msg = VmPgsqlNative::errorMessage($native);
+            VmPgsqlConnection::setLastError($msg);
+            @\trigger_error('pg_end_copy(): Query failed: '.$msg, \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(true);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_end_copy() is not implemented for JIT (#20673)');
+    }
+}

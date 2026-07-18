@@ -131,6 +131,24 @@ final class VmPgsqlNative
     }
 
     /**
+     * PQputline — legacy COPY … FROM STDIN line protocol (php-src pg_put_line; #20673).
+     * Returns 0 on success, EOF (-1) on failure.
+     */
+    public static function putline(\FFI\CData $conn, string $line): int
+    {
+        return (int) self::requireFfi()->PQputline($conn, $line);
+    }
+
+    /**
+     * PQendcopy — finish legacy COPY … FROM STDIN (php-src pg_end_copy; #20673).
+     * Returns 0 on success, nonzero on failure.
+     */
+    public static function endcopy(\FFI\CData $conn): int
+    {
+        return (int) self::requireFfi()->PQendcopy($conn);
+    }
+
+    /**
      * Drain pending results (php-src pg_copy_* pre/post loops).
      */
     public static function drainResults(\FFI\CData $conn): void
@@ -628,6 +646,8 @@ void PQclear(PGresult *res);
 size_t PQresultMemorySize(const PGresult *res);
 int PQputCopyData(PGconn *conn, const char *buffer, int nbytes);
 int PQputCopyEnd(PGconn *conn, const char *errormsg);
+int PQputline(PGconn *conn, const char *string);
+int PQendcopy(PGconn *conn);
 int PQgetCopyData(PGconn *conn, char **buffer, int async);
 PGresult *PQgetResult(PGconn *conn);
 int PQsocket(const PGconn *conn);

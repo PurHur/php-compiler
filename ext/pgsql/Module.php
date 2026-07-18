@@ -99,6 +99,8 @@ class Module extends ModuleAbstract
             new pg_lo_export(),
             new pg_copy_to(),
             new pg_copy_from(),
+            new pg_put_line(),
+            new pg_end_copy(),
             new pg_meta_data(),
             new pg_convert(),
             new pg_field_table(),
