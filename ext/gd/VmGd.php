@@ -369,6 +369,135 @@ final class VmGd
     }
 
     /**
+     * imagecolorexact() — opaque exact match (php-src gdImageColorExact; #20459).
+     */
+    public static function colorExact(ObjectEntry $image, int $red, int $green, int $blue): int
+    {
+        return self::colorExactAlpha($image, $red, $green, $blue, 0);
+    }
+
+    /**
+     * gdImageColorExactAlpha — truecolor packs ARGB; palette exact RGBA (#20459).
+     */
+    public static function colorExactAlpha(
+        ObjectEntry $image,
+        int $red,
+        int $green,
+        int $blue,
+        int $alpha
+    ): int {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return -1;
+        }
+        if ($state->truecolor) {
+            return (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+        }
+        $want = (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+        foreach ($state->colors as $i => $packed) {
+            if ($packed === $want) {
+                return (int) $i;
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * imagecolorresolve() — exact or allocate or closest (php-src gdImageColorResolve; #20459).
+     */
+    public static function colorResolve(ObjectEntry $image, int $red, int $green, int $blue): int
+    {
+        return self::colorResolveAlpha($image, $red, $green, $blue, 0);
+    }
+
+    /**
+     * gdImageColorResolveAlpha without open-slot reuse (dense palette; #20459).
+     */
+    public static function colorResolveAlpha(
+        ObjectEntry $image,
+        int $red,
+        int $green,
+        int $blue,
+        int $alpha
+    ): int {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return -1;
+        }
+        if ($state->truecolor) {
+            return (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+        }
+        $exact = self::colorExactAlpha($image, $red, $green, $blue, $alpha);
+        if (-1 !== $exact && $exact !== $state->transparent) {
+            return $exact;
+        }
+        // Prefer allocate when room (skip transparent index as resolve target).
+        if (\count($state->colors) < 256) {
+            $state->colors[] = (($alpha & 0x7F) << 24)
+                | (($red & 0xFF) << 16)
+                | (($green & 0xFF) << 8)
+                | ($blue & 0xFF);
+
+            return \count($state->colors) - 1;
+        }
+        $ct = -1;
+        $mindist = 4 * 255 * 255;
+        foreach ($state->colors as $i => $packed) {
+            if ((int) $i === $state->transparent) {
+                continue;
+            }
+            $rd = (($packed >> 16) & 0xFF) - $red;
+            $gd = (($packed >> 8) & 0xFF) - $green;
+            $bd = ($packed & 0xFF) - $blue;
+            $ad = (($packed >> 24) & 0x7F) - $alpha;
+            $dist = $rd * $rd + $gd * $gd + $bd * $bd + $ad * $ad;
+            if (0 === $dist) {
+                return (int) $i;
+            }
+            if ($dist < $mindist) {
+                $mindist = $dist;
+                $ct = (int) $i;
+            }
+        }
+
+        return $ct;
+    }
+
+    /**
+     * imagecolortransparent() get/set (php-src gdImageColorTransparent; #20459).
+     */
+    public static function colorTransparent(ObjectEntry $image, ?int $color): int
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return -1;
+        }
+        if (null !== $color) {
+            if (-1 === $color) {
+                if (!$state->truecolor && $state->transparent >= 0 && isset($state->colors[$state->transparent])) {
+                    $state->colors[$state->transparent] = $state->colors[$state->transparent] & 0xFFFFFF;
+                }
+                $state->transparent = -1;
+            } elseif ($color >= -1) {
+                if ($state->truecolor) {
+                    $state->transparent = $color;
+                } elseif ($color < 256) {
+                    if ($state->transparent !== -1 && isset($state->colors[$state->transparent])) {
+                        $state->colors[$state->transparent] = $state->colors[$state->transparent] & 0xFFFFFF;
+                    }
+                    if (isset($state->colors[$color])) {
+                        $state->colors[$color] = ($state->colors[$color] & 0xFFFFFF) | (127 << 24);
+                    }
+                    $state->transparent = $color;
+                }
+            }
+        }
+
+        return $state->transparent;
+    }
+
+    /**
      * imagecolorset() — mutate palette slot (php-src; success null / failure false; #20440).
      *
      * @return null|false
