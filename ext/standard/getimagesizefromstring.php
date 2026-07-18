@@ -13,7 +13,10 @@ use PHPLLVM\Value;
 /**
  * getimagesizefromstring() — image metadata from bytes (ext/standard/image.c; #3271).
  *
+ * Z_PARAM_STR: null coerces on default/8.2 profile; TypeError on PROFILE=8.4 (#20353, re-#19100).
+ *
  * @see https://github.com/php/php-src/blob/master/ext/standard/image.c PHP_FUNCTION(getimagesizefromstring)
+ * @see https://github.com/php/php-src/blob/master/ext/standard/image.stub.php
  */
 final class getimagesizefromstring extends Internal
 {
@@ -31,7 +34,7 @@ final class getimagesizefromstring extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $data = VmString::stringBuiltinArgForFrame($frame, 0, 'getimagesizefromstring', 0, 'string');
+        $data = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'getimagesizefromstring', 0, 'string');
         $imageinfo = null;
         if (2 === $argc) {
             $imageinfo = [];
