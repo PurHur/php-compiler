@@ -38,6 +38,22 @@ final class VmNumberFormatter
     public const CURRENCY_ACCOUNTING = 12;
     public const DEFAULT_STYLE = 1;
 
+    /** ICU UNumberFormatRoundingMode (unicode/unum.h; #20710). */
+    public const ROUND_CEILING = 0;
+    public const ROUND_FLOOR = 1;
+    public const ROUND_DOWN = 2;
+    public const ROUND_UP = 3;
+    public const ROUND_HALFEVEN = 4;
+    public const ROUND_HALFDOWN = 5;
+    public const ROUND_HALFUP = 6;
+    public const ROUND_UNNECESSARY = 7;
+    /** ICU UNUM_ROUND_HALF_ODD (PHP 8.4+). */
+    public const ROUND_HALFODD = 8;
+    /** Alias of ROUND_DOWN (php-src formatter.stub.php). */
+    public const ROUND_TOWARD_ZERO = 2;
+    /** Alias of ROUND_UP (php-src formatter.stub.php). */
+    public const ROUND_AWAY_FROM_ZERO = 3;
+
     /** @var array<int, array{locale: string, style: int, pattern: ?string}> */
     private static array $state = [];
 
@@ -57,6 +73,17 @@ final class VmNumberFormatter
             'IGNORE' => self::IGNORE,
             'CURRENCY_ACCOUNTING' => self::CURRENCY_ACCOUNTING,
             'DEFAULT_STYLE' => self::DEFAULT_STYLE,
+            'ROUND_CEILING' => self::ROUND_CEILING,
+            'ROUND_FLOOR' => self::ROUND_FLOOR,
+            'ROUND_DOWN' => self::ROUND_DOWN,
+            'ROUND_UP' => self::ROUND_UP,
+            'ROUND_TOWARD_ZERO' => self::ROUND_TOWARD_ZERO,
+            'ROUND_AWAY_FROM_ZERO' => self::ROUND_AWAY_FROM_ZERO,
+            'ROUND_HALFEVEN' => self::ROUND_HALFEVEN,
+            'ROUND_HALFODD' => self::ROUND_HALFODD,
+            'ROUND_HALFDOWN' => self::ROUND_HALFDOWN,
+            'ROUND_HALFUP' => self::ROUND_HALFUP,
+            'ROUND_UNNECESSARY' => self::ROUND_UNNECESSARY,
         ];
     }
 
