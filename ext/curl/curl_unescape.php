@@ -37,7 +37,8 @@ final class curl_unescape extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $value = VmString::coerceStringBuiltinArg(
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20695, ext/curl/interface.c)
+        $value = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[1],
             'curl_unescape',
             1,
@@ -54,7 +55,15 @@ final class curl_unescape extends Internal
                 \count($args)
             ));
         }
-        $str = JitStringBuiltinArg::lower($context, $args[1], 'curl_unescape', 1, 'string');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20695).
+        // Early-return like urlencode: after TypeError+abort, do not link rawurldecode (#20695 AOT).
+        if (
+            (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            return JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'curl_unescape', 1, 'string');
+        }
+        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'curl_unescape', 1, 'string');
 
         return JitUrlencode::rawurldecode($context, $str);
     }
