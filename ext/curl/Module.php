@@ -86,6 +86,8 @@ class Module extends ModuleAbstract
             // curl_reset / curl_pause — easy-handle lifecycle (php-src interface.c; #20494)
             $functions[] = new curl_reset();
             $functions[] = new curl_pause();
+            // curl_copy_handle — easy clone (php-src interface.c; #20495)
+            $functions[] = new curl_copy_handle();
         }
         if (CurlExtensionPolicy::advertisesMultiHandles()) {
             $functions[] = new curl_multi_init();
@@ -95,6 +97,10 @@ class Module extends ModuleAbstract
             $functions[] = new curl_multi_getcontent();
             $functions[] = new curl_multi_remove_handle();
             $functions[] = new curl_multi_close();
+            // curl_multi_info_read / setopt / errno (php-src multi.c; #20495)
+            $functions[] = new curl_multi_info_read();
+            $functions[] = new curl_multi_setopt();
+            $functions[] = new curl_multi_errno();
         }
 
         return $functions;

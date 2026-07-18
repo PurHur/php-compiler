@@ -8,6 +8,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\VmMath;
 
 /**
  * CurlMultiHandle multi API — libcurl FFI via {@see VmCurlNative}
@@ -167,6 +168,70 @@ final class VmCurlMulti
         return VmCurlEasy::lastBody($easy);
     }
 
+    /**
+     * curl_multi_info_read() — dequeue CURLMsg (php-src ext/curl/multi.c; #20495).
+     *
+     * @return array{0: ?array{msg: int, result: int, handle: ?ObjectEntry}, 1: int}
+     */
+    public static function infoRead(ObjectEntry $multi): array
+    {
+        self::ensureLive($multi, 'curl_multi_info_read');
+        $mh = self::$state[$multi->id]['native'] ?? null;
+        if (null === $mh) {
+            return [null, 0];
+        }
+        [$payload, $queued] = VmCurlNative::multiInfoRead($mh);
+        if (null === $payload) {
+            return [null, $queued];
+        }
+        $easy = self::findEasyByNative($multi, $payload['easy']);
+        if (null !== $easy) {
+            VmCurlEasy::saveTransferResult($easy, $payload['result']);
+        }
+
+        return [[
+            'msg' => $payload['msg'],
+            'result' => $payload['result'],
+            'handle' => $easy,
+        ], $queued];
+    }
+
+    /**
+     * curl_multi_setopt() — long multi options (php-src ext/curl/multi.c; #20495).
+     */
+    public static function setopt(ObjectEntry $multi, int $option, Variable $value): bool
+    {
+        self::ensureLive($multi, 'curl_multi_setopt');
+        if (!CurlConstants::isValidMultiOption($option)) {
+            self::$state[$multi->id]['errno'] = CurlConstants::CURLM_UNKNOWN_OPTION;
+            throw new \ValueError('curl_multi_setopt(): Argument #2 ($option) is not a valid cURL multi option');
+        }
+        $mh = self::$state[$multi->id]['native'] ?? null;
+        if (null === $mh) {
+            self::$state[$multi->id]['errno'] = CurlConstants::CURLM_BAD_HANDLE;
+
+            return false;
+        }
+        $lval = VmMath::parseIntBuiltinArg($value, 'curl_multi_setopt', 3, 'value');
+        $rc = VmCurlNative::multiSetoptLong($mh, $option, $lval);
+        self::$state[$multi->id]['errno'] = $rc;
+
+        return CurlConstants::CURLM_OK === $rc;
+    }
+
+    /**
+     * curl_multi_errno() — last CURLMcode (php-src ext/curl/multi.c; #20495).
+     */
+    public static function errno(ObjectEntry $multi): int
+    {
+        self::ensureLive($multi, 'curl_multi_errno');
+        if (!isset(self::$state[$multi->id])) {
+            return CurlConstants::CURLM_OK;
+        }
+
+        return self::$state[$multi->id]['errno'];
+    }
+
     public static function close(ObjectEntry $multi): void
     {
         if (!isset(self::$state[$multi->id])) {
@@ -194,6 +259,22 @@ final class VmCurlMulti
     public static function isMultiObject(?ObjectEntry $object): bool
     {
         return null !== $object && self::CLASS_LC === strtolower($object->class->name);
+    }
+
+    /**
+     * @param \FFI\CData $easyNative CURL*
+     */
+    private static function findEasyByNative(ObjectEntry $multi, \FFI\CData $easyNative): ?ObjectEntry
+    {
+        $want = VmCurlNative::pointerId($easyNative);
+        foreach (self::$state[$multi->id]['easy_ids'] as $easy) {
+            $ch = VmCurlEasy::nativeHandle($easy);
+            if (null !== $ch && VmCurlNative::pointerId($ch) === $want) {
+                return $easy;
+            }
+        }
+
+        return null;
     }
 
     private static function ensureLive(ObjectEntry $multi, string $function): void

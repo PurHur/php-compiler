@@ -1,0 +1,61 @@
+{
+    "scanned": 5682,
+    "top": 50,
+    "rows": [
+        {
+            "message": "Cannot redeclare class::$func",
+            "file_count": 1,
+            "examples": [
+                "ext/standard/VmSplAutoload.php"
+            ],
+            "issue": null,
+            "rank": 1
+        },
+        {
+            "message": "Cannot redeclare class::$multiline",
+            "file_count": 1,
+            "examples": [
+                "ext/standard/VmPregEngine.php"
+            ],
+            "issue": null,
+            "rank": 2
+        },
+        {
+            "message": "Cannot redeclare class::$ownerLc",
+            "file_count": 1,
+            "examples": [
+                "ext/spl/SplLegacySerializableMethods.php"
+            ],
+            "issue": null,
+            "rank": 3
+        },
+        {
+            "message": "Stmt_TraitUse",
+            "file_count": 1,
+            "examples": [
+                "lib/JIT/ClassConstFetchHelper.php"
+            ],
+            "issue": null,
+            "rank": 4
+        },
+        {
+            "message": "Trait \"ClassConstFetchHelperTrait\" not found",
+            "file_count": 1,
+            "examples": [
+                "lib/JIT/ClassConstFetchHelper.php"
+            ],
+            "issue": null,
+            "rank": 5
+        },
+        {
+            "message": "Unknown type declaration found: ''",
+            "file_count": 1,
+            "examples": [
+                "ext/dom/VmDom.php"
+            ],
+            "issue": null,
+            "rank": 6
+        }
+    ],
+    "source": "live"
+}

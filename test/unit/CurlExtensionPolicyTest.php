@@ -109,6 +109,9 @@ PHP;
             'curl_multi_getcontent',
             'curl_multi_remove_handle',
             'curl_multi_close',
+            'curl_multi_info_read',
+            'curl_multi_setopt',
+            'curl_multi_errno',
         ] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }

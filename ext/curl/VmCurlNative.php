@@ -66,6 +66,32 @@ final class VmCurlNative
 
     /**
      * @param \FFI\CData $ch CURL*
+     *
+     * @return \FFI\CData|null duplicated CURL* (null on failure)
+     */
+    public static function easyDuphandle(\FFI\CData $ch): ?\FFI\CData
+    {
+        $dup = self::requireCurl()->curl_easy_duphandle($ch);
+
+        return null === $dup ? null : $dup;
+    }
+
+    /**
+     * Stable address for matching CURL* across FFI CData wrappers.
+     *
+     * @param \FFI\CData $ptr CURL* / void*
+     */
+    public static function pointerId(\FFI\CData $ptr): int
+    {
+        // Cast via void* then read uintptr_t->cdata (direct (int) on CData warns).
+        $asVoid = \FFI::cast('void*', $ptr);
+        $asInt = \FFI::cast('uintptr_t', $asVoid);
+
+        return (int) $asInt->cdata;
+    }
+
+    /**
+     * @param \FFI\CData $ch CURL*
      */
     public static function easySetoptLong(\FFI\CData $ch, int $option, int $value): int
     {
@@ -226,6 +252,37 @@ final class VmCurlNative
     }
 
     /**
+     * @param \FFI\CData $mh CURLM*
+     *
+     * @return array{0: ?array{msg: int, result: int, easy: \FFI\CData}, 1: int}
+     *         message payload (null when queue empty) + msgs still queued
+     */
+    public static function multiInfoRead(\FFI\CData $mh): array
+    {
+        $ffi = self::requireCurl();
+        $queued = $ffi->new('int');
+        $queued->cdata = 0;
+        $msg = $ffi->curl_multi_info_read($mh, \FFI::addr($queued));
+        if (null === $msg) {
+            return [null, (int) $queued->cdata];
+        }
+
+        return [[
+            'msg' => (int) $msg->msg,
+            'result' => (int) $msg->data->result,
+            'easy' => $msg->easy_handle,
+        ], (int) $queued->cdata];
+    }
+
+    /**
+     * @param \FFI\CData $mh CURLM*
+     */
+    public static function multiSetoptLong(\FFI\CData $mh, int $option, int $value): int
+    {
+        return (int) self::requireCurl()->curl_multi_setopt($mh, $option, $value);
+    }
+
+    /**
      * @return \FFI\CData FILE*
      */
     public static function fopen(string $path, string $mode): \FFI\CData
@@ -342,15 +399,26 @@ final class VmCurlNative
         $cdef = <<<'CDEF'
 typedef void CURL;
 typedef void CURLM;
+typedef unsigned long uintptr_t;
 struct curl_slist {
     char *data;
     struct curl_slist *next;
 };
 typedef struct curl_slist curl_slist;
+struct CURLMsg {
+    int msg;
+    CURL *easy_handle;
+    union {
+        void *whatever;
+        int result;
+    } data;
+};
+typedef struct CURLMsg CURLMsg;
 CURL *curl_easy_init(void);
 void curl_easy_cleanup(CURL *curl);
 void curl_easy_reset(CURL *curl);
 int curl_easy_pause(CURL *curl, int bitmask);
+CURL *curl_easy_duphandle(CURL *curl);
 int curl_easy_setopt(CURL *curl, int option, ...);
 int curl_easy_perform(CURL *curl);
 int curl_easy_getinfo(CURL *curl, int info, ...);
@@ -363,6 +431,8 @@ int curl_multi_add_handle(CURLM *multi_handle, CURL *curl_handle);
 int curl_multi_remove_handle(CURLM *multi_handle, CURL *curl_handle);
 int curl_multi_perform(CURLM *multi_handle, int *running_handles);
 int curl_multi_wait(CURLM *multi_handle, void *extra_fds, unsigned int extra_nfds, int timeout_ms, int *numfds);
+CURLMsg *curl_multi_info_read(CURLM *multi_handle, int *msgs_in_queue);
+int curl_multi_setopt(CURLM *multi_handle, int option, ...);
 const char *curl_multi_strerror(int code);
 CDEF;
 
