@@ -5853,4 +5853,10 @@ require_once __DIR__.'/../../../ext/enchant/enchant_dict_remove_from_session.php
 require_once __DIR__.'/../../../ext/enchant/enchant_dict_store_replacement.php';
 require_once __DIR__.'/../../../ext/phar/PharBuiltin.php';
 require_once __DIR__.'/../../../ext/phar/VmPharArchive.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aegis128l_decrypt.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aegis128l_encrypt.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aegis128l_keygen.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aegis256_decrypt.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aegis256_encrypt.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aegis256_keygen.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
