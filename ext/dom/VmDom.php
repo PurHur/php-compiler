@@ -5785,26 +5785,26 @@ final class VmDom
                 throw new \TypeError('DOMDocument::saveHTML(): Argument #1 ($node) must be of type ?DOMNode');
             }
 
-            return self::serializeHtmlNode($node, !$state->loadedViaXml);
+            // libxml htmlNodeDump: never XML self-close; HTML_EMPTY → <br>; else <tag></tag> (#20625).
+            return self::serializeHtmlNode($node, false);
         }
 
-        $emptySelfClosing = !$state->loadedViaXml;
         $lines = [];
         if ([] !== $state->childIds) {
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
                 if (null !== $child) {
-                    $lines[] = self::serializeHtmlNode($child, $emptySelfClosing);
+                    $lines[] = self::serializeHtmlNode($child, false);
                 }
             }
         } else {
             $lines[] = self::serializeHtmlDoctypeFromDocumentState($state);
             $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
             if (Variable::TYPE_OBJECT === $rootVar->type) {
-                $lines[] = self::serializeHtmlNode($rootVar->toObject(), $emptySelfClosing);
+                $lines[] = self::serializeHtmlNode($rootVar->toObject(), false);
             } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
                 $name = self::escapeName($state->documentElementName);
-                $lines[] = $emptySelfClosing ? '<'.$name.'/>' : '<'.$name.'></'.$name.'>';
+                $lines[] = self::formatHtmlEmptyElementDump($name, '');
             }
         }
 
@@ -6291,6 +6291,39 @@ final class VmDom
             || 'wbr' === $tagLc;
     }
 
+    /**
+     * libxml2 HTML_EMPTY tags as dumped by htmlNodeDump / DOMDocument::saveHTML() (#20625).
+     *
+     * Narrower than HTML5 void used for loadHTML parsing — embed/source/track/wbr expand as
+     * <tag></tag> under Zend/libxml HTML serialize.
+     */
+    private static function isLibxmlHtmlDumpEmptyElement(string $tagLc): bool
+    {
+        return 'area' === $tagLc
+            || 'base' === $tagLc
+            || 'basefont' === $tagLc
+            || 'br' === $tagLc
+            || 'col' === $tagLc
+            || 'frame' === $tagLc
+            || 'hr' === $tagLc
+            || 'img' === $tagLc
+            || 'input' === $tagLc
+            || 'isindex' === $tagLc
+            || 'link' === $tagLc
+            || 'meta' === $tagLc
+            || 'param' === $tagLc;
+    }
+
+    /** Format an empty element for saveHTML dump (php-src htmlNodeDump; #20625). */
+    private static function formatHtmlEmptyElementDump(string $escapedName, string $attrPart): string
+    {
+        if (self::isLibxmlHtmlDumpEmptyElement(strtolower($escapedName))) {
+            return '<'.$escapedName.$attrPart.'>';
+        }
+
+        return '<'.$escapedName.$attrPart.'></'.$escapedName.'>';
+    }
+
     /** @return null|array{tag:string, end:int} */
     private static function scanHtmlCloseTagAt(string $content, int $pos): ?array
     {
@@ -6415,10 +6448,12 @@ final class VmDom
         $attrPart = self::serializeAttributes($state);
         if ([] === $state->childIds) {
             if ($emptySelfClosing) {
+                // Living getOuterHTML / innerHTML child serialize (#18618): XML-style <tag/>.
                 return '<'.$name.$attrPart.'/>';
             }
 
-            return '<'.$name.$attrPart.'></'.$name.'>';
+            // saveHTML dump (#20625 / re-#18668): HTML_EMPTY → <br>; else <tag></tag>.
+            return self::formatHtmlEmptyElementDump($name, $attrPart);
         }
         $parts = [];
         foreach ($state->childIds as $childId) {
