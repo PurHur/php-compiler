@@ -1488,6 +1488,8 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_shorthash.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_shorthash_keygen.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_detached.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_ed25519_pk_to_curve25519.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_ed25519_sk_to_curve25519.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_keypair.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_open.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_publickey.php';

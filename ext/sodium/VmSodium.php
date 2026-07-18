@@ -1087,6 +1087,36 @@ final class VmSodium
         return self::ffiSignVerifyDetached($signature, $message, $publickey);
     }
 
+    /**
+     * php-src: ext/sodium/libsodium.c — PHP_FUNCTION(sodium_crypto_sign_ed25519_sk_to_curve25519) (#20573).
+     */
+    public static function signEd25519SkToCurve25519(string $secretkey): string
+    {
+        self::validateSignSecretkey($secretkey, 'sodium_crypto_sign_ed25519_sk_to_curve25519');
+        if (\function_exists('sodium_crypto_sign_ed25519_sk_to_curve25519')) {
+            return \sodium_crypto_sign_ed25519_sk_to_curve25519($secretkey);
+        }
+
+        return self::ffiSignEd25519SkToCurve25519($secretkey);
+    }
+
+    /**
+     * php-src: ext/sodium/libsodium.c — PHP_FUNCTION(sodium_crypto_sign_ed25519_pk_to_curve25519) (#20573).
+     */
+    public static function signEd25519PkToCurve25519(string $publickey): string
+    {
+        if (\strlen($publickey) !== self::CRYPTO_SIGN_PUBLICKEYBYTES) {
+            self::throwSodium(
+                'sodium_crypto_sign_ed25519_pk_to_curve25519(): Argument #1 ($public_key) must be SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_sign_ed25519_pk_to_curve25519')) {
+            return \sodium_crypto_sign_ed25519_pk_to_curve25519($publickey);
+        }
+
+        return self::ffiSignEd25519PkToCurve25519($publickey);
+    }
+
     public static function secretstreamKeygen(): string
     {
         if (\function_exists('sodium_crypto_secretstream_xchacha20poly1305_keygen')) {
@@ -2831,6 +2861,32 @@ final class VmSodium
         return self::unsignedCharArrayToString($pkBuf, self::CRYPTO_SIGN_PUBLICKEYBYTES);
     }
 
+    private static function ffiSignEd25519SkToCurve25519(string $secretkey): string
+    {
+        $ffi = self::requireFfi();
+        $out = $ffi->new('unsigned char['.self::CRYPTO_BOX_SECRETKEYBYTES.']');
+        $skBuf = self::stringToUnsignedCharArray($ffi, $secretkey);
+        $rc = $ffi->crypto_sign_ed25519_sk_to_curve25519($out, $skBuf);
+        if (0 !== $rc) {
+            self::throwSodium('conversion failed');
+        }
+
+        return self::unsignedCharArrayToString($out, self::CRYPTO_BOX_SECRETKEYBYTES);
+    }
+
+    private static function ffiSignEd25519PkToCurve25519(string $publickey): string
+    {
+        $ffi = self::requireFfi();
+        $out = $ffi->new('unsigned char['.self::CRYPTO_BOX_PUBLICKEYBYTES.']');
+        $pkBuf = self::stringToUnsignedCharArray($ffi, $publickey);
+        $rc = $ffi->crypto_sign_ed25519_pk_to_curve25519($out, $pkBuf);
+        if (0 !== $rc) {
+            self::throwSodium('conversion failed');
+        }
+
+        return self::unsignedCharArrayToString($out, self::CRYPTO_BOX_PUBLICKEYBYTES);
+    }
+
     private static function ffiSign(string $message, string $secretkey): string
     {
         $ffi = self::requireFfi();
@@ -3458,6 +3514,8 @@ final class VmSodium
                     int crypto_aead_aes256gcm_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);
                     int crypto_sign_keypair(unsigned char *pk, unsigned char *sk);
                     int crypto_sign_ed25519_sk_to_pk(unsigned char *pk, const unsigned char *sk);
+                    int crypto_sign_ed25519_sk_to_curve25519(unsigned char *curve25519_sk, const unsigned char *ed25519_sk);
+                    int crypto_sign_ed25519_pk_to_curve25519(unsigned char *curve25519_pk, const unsigned char *ed25519_pk);
                     int crypto_sign(unsigned char *sm, unsigned long long *smlen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *sk);
                     int crypto_sign_open(unsigned char *m, unsigned long long *mlen_p, const unsigned char *sm, unsigned long long smlen, const unsigned char *pk);
                     int crypto_sign_detached(unsigned char *sig, unsigned long long *siglen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *sk);

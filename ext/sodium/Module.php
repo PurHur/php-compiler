@@ -114,6 +114,8 @@ class Module extends ModuleAbstract
             new sodium_crypto_sign_publickey(),
             new sodium_crypto_sign_secretkey(),
             new sodium_crypto_sign_publickey_from_secretkey(),
+            new sodium_crypto_sign_ed25519_sk_to_curve25519(),
+            new sodium_crypto_sign_ed25519_pk_to_curve25519(),
             new sodium_crypto_sign(),
             new sodium_crypto_sign_open(),
             new sodium_crypto_sign_detached(),
