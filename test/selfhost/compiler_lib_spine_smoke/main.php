@@ -779,6 +779,8 @@ require_once __DIR__.'/../../../ext/hash/mhash_count.php';
 require_once __DIR__.'/../../../ext/hash/mhash_get_block_size.php';
 require_once __DIR__.'/../../../ext/hash/mhash_get_hash_name.php';
 require_once __DIR__.'/../../../ext/hash/mhash_keygen_s2k.php';
+require_once __DIR__.'/../../../ext/hash/phpc_hash_algos_kernel.php';
+require_once __DIR__.'/../../../ext/hash/phpc_hash_hmac_algos_kernel.php';
 require_once __DIR__.'/../../../ext/iconv/CharsetEngine.php';
 require_once __DIR__.'/../../../ext/iconv/CharsetString.php';
 require_once __DIR__.'/../../../ext/iconv/IconvConstants.php';

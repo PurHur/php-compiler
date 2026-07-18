@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5799 |
-| Phase A inventory files (M2 ratio SSOT) | 5799 |
+| PHP files on vm.php path | 5801 |
+| Phase A inventory files (M2 ratio SSOT) | 5801 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17085 |
+| Source constructs flagged (warnings) | 17089 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -738,7 +738,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/JitHashContext.php` | 0 | 3 |
 | `ext/hash/JitHashCryptoKernel.php` | 0 | 1 |
 | `ext/hash/MhashRegistry.php` | 0 | 1 |
-| `ext/hash/Module.php` | 0 | 16 |
+| `ext/hash/Module.php` | 0 | 18 |
 | `ext/hash/VmHashContext.php` | 0 | 6 |
 | `ext/hash/VmMhash.php` | 0 | 1 |
 | `ext/hash/hash_algos.php` | 0 | 2 |
@@ -755,6 +755,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/mhash_get_block_size.php` | 0 | 3 |
 | `ext/hash/mhash_get_hash_name.php` | 0 | 3 |
 | `ext/hash/mhash_keygen_s2k.php` | 0 | 3 |
+| `ext/hash/phpc_hash_algos_kernel.php` | 0 | 1 |
+| `ext/hash/phpc_hash_hmac_algos_kernel.php` | 0 | 1 |
 | `ext/iconv/CharsetEngine.php` | 0 | 1 |
 | `ext/iconv/CharsetString.php` | 0 | 1 |
 | `ext/iconv/IconvConstants.php` | 0 | 1 |
@@ -10693,7 +10695,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/hash/JitHashAlgosKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 7 class method(s)
 
 ### `ext/hash/JitHashContext.php`
 
@@ -10723,13 +10725,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new hash_final (line 36)
 - new hash_copy (line 37)
 - new hash_algos (line 38)
-- new hash_file (line 39)
-- new hash_hmac_file (line 40)
-- new mhash (line 41)
-- new mhash_count (line 42)
-- new mhash_get_hash_name (line 43)
-- new mhash_get_block_size (line 44)
-- new mhash_keygen_s2k (line 45)
+- new phpc_hash_algos_kernel (line 39)
+- new phpc_hash_hmac_algos_kernel (line 40)
+- new hash_file (line 41)
+- new hash_hmac_file (line 42)
+- new mhash (line 43)
+- new mhash_count (line 44)
+- new mhash_get_hash_name (line 45)
+- new mhash_get_block_size (line 46)
+- new mhash_keygen_s2k (line 47)
 - 2 class method(s)
 
 ### `ext/hash/VmHashContext.php`
@@ -10832,6 +10836,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
 - new Error (line 48)
+- 2 class method(s)
+
+### `ext/hash/phpc_hash_algos_kernel.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/hash/phpc_hash_hmac_algos_kernel.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `ext/iconv/CharsetEngine.php`
@@ -11592,8 +11606,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/grapheme_strpos.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 34)
-- new ArgumentCountError (line 76)
+- new ArgumentCountError (line 35)
+- new ArgumentCountError (line 68)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -11616,8 +11630,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/grapheme_substr.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 34)
-- new ArgumentCountError (line 76)
+- new ArgumentCountError (line 35)
+- new ArgumentCountError (line 73)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -37685,7 +37699,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHashAlgos.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StringHashCrypto.php`
 
@@ -37712,7 +37726,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHashHmacAlgos.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StringHex2bin.php`
 
@@ -39635,69 +39649,69 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Builtin\ErrorHandler (line 578)
 - new Scope (line 598)
 - new Call\ExternalMethod (line 648)
-- new Builtin\IsNullFn (line 891)
-- new Builtin\IsNullFn (line 892)
-- new Call\SplObjectStorageMethod (line 893)
-- new Call\SplObjectStorageMethod (line 894)
-- new Call\SplObjectStorageMethod (line 895)
+- new Builtin\IsNullFn (line 894)
+- new Builtin\IsNullFn (line 895)
 - new Call\SplObjectStorageMethod (line 896)
 - new Call\SplObjectStorageMethod (line 897)
 - new Call\SplObjectStorageMethod (line 898)
-- new Call\WeakReferenceCreate (line 900)
-- new Call\WeakReferenceGet (line 901)
-- new Call\WeakMapMethod (line 902)
-- new Call\WeakMapMethod (line 903)
-- new Call\WeakMapMethod (line 904)
+- new Call\SplObjectStorageMethod (line 899)
+- new Call\SplObjectStorageMethod (line 900)
+- new Call\SplObjectStorageMethod (line 901)
+- new Call\WeakReferenceCreate (line 903)
+- new Call\WeakReferenceGet (line 904)
 - new Call\WeakMapMethod (line 905)
 - new Call\WeakMapMethod (line 906)
-- new Call\ReflectionClassConstruct (line 908)
-- new Call\ReflectionObjectConstruct (line 909)
-- new Call\ReflectionClassGetName (line 910)
-- new Call\ReflectionClassGetShortName (line 911)
-- new Call\ReflectionClassGetAttributes (line 912)
-- new Call\ReflectionClassGetMethod (line 913)
-- new Call\ReflectionClassGetReflectionConstant (line 914)
-- new Call\ReflectionClassIsFinal (line 915)
-- new Call\ReflectionClassIsIterateable (line 916)
-- new Call\ReflectionClassNewLazyProxy (line 918)
-- new Call\ReflectionClassNewLazyGhost (line 919)
-- new Call\ReflectionClassCreateLazyGhost (line 920)
-- new Call\ReflectionClassCreateLazyProxy (line 921)
-- new Call\ReflectionPropertyConstruct (line 923)
-- new Call\ReflectionPropertyGetAttributes (line 924)
-- new Call\ReflectionConstantConstruct (line 925)
-- new Call\ReflectionConstantGetAttributes (line 926)
-- new Call\ReflectionMethodGetAttributes (line 927)
-- new Call\ReflectionParameterIsSensitiveParameter (line 929)
-- new Call\ReflectionFunctionGetNamedArguments (line 932)
-- new Call\ReflectionMethodGetNamedArguments (line 933)
-- new Call\ReflectionAttributeGetName (line 935)
-- new Call\ReflectionAttributeNewInstance (line 936)
-- new Call\ReflectionEnumConstruct (line 937)
-- new Call\ReflectionEnumGetName (line 938)
-- new Call\ReflectionEnumHasCase (line 939)
-- new Call\ReflectionEnumGetCase (line 940)
-- new Call\ReflectionEnumIsBacked (line 941)
-- new Call\ReflectionEnumUnitCaseGetName (line 942)
-- new Call\ReflectionEnumUnitCaseGetName (line 943)
-- new Call\ExceptionGetMessage (line 944)
-- new Call\DatePeriodCreateFromISO8601String (line 950)
-- new Call\DatePeriodIteratorMethod (line 952)
-- new Call\DateTimeFormat (line 955)
-- new Call\DateTimeFormat (line 956)
-- new Result (line 1292)
-- new Result (line 1313)
-- new Variable (line 1914)
-- new Variable (line 2051)
-- new Variable (line 2277)
-- new Variable (line 2335)
-- new VMVariable (line 2473)
-- new VMVariable (line 2489)
-- new VMVariable (line 2495)
-- new VMVariable (line 2501)
-- new VMVariable (line 2512)
-- new Variable (line 2542)
-- new Variable (line 2582)
+- new Call\WeakMapMethod (line 907)
+- new Call\WeakMapMethod (line 908)
+- new Call\WeakMapMethod (line 909)
+- new Call\ReflectionClassConstruct (line 911)
+- new Call\ReflectionObjectConstruct (line 912)
+- new Call\ReflectionClassGetName (line 913)
+- new Call\ReflectionClassGetShortName (line 914)
+- new Call\ReflectionClassGetAttributes (line 915)
+- new Call\ReflectionClassGetMethod (line 916)
+- new Call\ReflectionClassGetReflectionConstant (line 917)
+- new Call\ReflectionClassIsFinal (line 918)
+- new Call\ReflectionClassIsIterateable (line 919)
+- new Call\ReflectionClassNewLazyProxy (line 921)
+- new Call\ReflectionClassNewLazyGhost (line 922)
+- new Call\ReflectionClassCreateLazyGhost (line 923)
+- new Call\ReflectionClassCreateLazyProxy (line 924)
+- new Call\ReflectionPropertyConstruct (line 926)
+- new Call\ReflectionPropertyGetAttributes (line 927)
+- new Call\ReflectionConstantConstruct (line 928)
+- new Call\ReflectionConstantGetAttributes (line 929)
+- new Call\ReflectionMethodGetAttributes (line 930)
+- new Call\ReflectionParameterIsSensitiveParameter (line 932)
+- new Call\ReflectionFunctionGetNamedArguments (line 935)
+- new Call\ReflectionMethodGetNamedArguments (line 936)
+- new Call\ReflectionAttributeGetName (line 938)
+- new Call\ReflectionAttributeNewInstance (line 939)
+- new Call\ReflectionEnumConstruct (line 940)
+- new Call\ReflectionEnumGetName (line 941)
+- new Call\ReflectionEnumHasCase (line 942)
+- new Call\ReflectionEnumGetCase (line 943)
+- new Call\ReflectionEnumIsBacked (line 944)
+- new Call\ReflectionEnumUnitCaseGetName (line 945)
+- new Call\ReflectionEnumUnitCaseGetName (line 946)
+- new Call\ExceptionGetMessage (line 947)
+- new Call\DatePeriodCreateFromISO8601String (line 953)
+- new Call\DatePeriodIteratorMethod (line 955)
+- new Call\DateTimeFormat (line 958)
+- new Call\DateTimeFormat (line 959)
+- new Result (line 1295)
+- new Result (line 1316)
+- new Variable (line 1917)
+- new Variable (line 2054)
+- new Variable (line 2280)
+- new Variable (line 2338)
+- new VMVariable (line 2476)
+- new VMVariable (line 2492)
+- new VMVariable (line 2498)
+- new VMVariable (line 2504)
+- new VMVariable (line 2515)
+- new Variable (line 2545)
+- new Variable (line 2585)
 - 102 class method(s)
 - 28 closure(s)
 

@@ -18,8 +18,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Nested HashCryptoJitHelper does not run reliably in minimal standalone init
  * (helper unit __init__ skipped under PHP_COMPILER_AOT_USER_SCRIPT). OpenSSL
  * EVP_Digest/HMAC match php-src ext/hash without nested PHP lowering.
- * Moved out of lib/JIT/Builtin/StringHashCryptoLlvm so Builtin surface shrinks
- * (same shape as {@see JitHashAlgosKernel} / #19355).
+ * Moved out of lib/JIT/Builtin/StringHashCryptoLlvm so Builtin surface shrinks (#19355 / #19274).
  *
  * Digest buffers must use {@see allocaI8Bytes()} / {@see arrayAlloca} — PHPLLVM
  * {@see \PHPLLVM\Builder::alloca()} takes only a Type; bare `alloca($i8, N)`
