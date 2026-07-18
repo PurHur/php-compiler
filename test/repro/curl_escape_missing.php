@@ -10,11 +10,12 @@ if (!function_exists('curl_escape') || !function_exists('curl_unescape')) {
     exit(0);
 }
 
-var_export(curl_escape('foo@bar/baz'));
+$ch = curl_init();
+var_export(curl_escape($ch, 'foo@bar/baz'));
 echo "\n";
-var_export(curl_unescape('foo%40bar%2Fbaz'));
+var_export(curl_unescape($ch, 'foo%40bar%2Fbaz'));
 echo "\n";
-var_export(curl_escape("caf\xe9"));
+var_export(curl_escape($ch, "caf\xe9"));
 echo "\n";
-var_export(curl_unescape('caf%C3%A9'));
+var_export(curl_unescape($ch, 'caf%C3%A9'));
 echo "\n";

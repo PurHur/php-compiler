@@ -14,7 +14,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * curl_escape() — URL-encode a string (php-src ext/curl/interface.c; #6351).
+ * curl_escape() — URL-encode a string (php-src ext/curl/interface.c; #6351, #20493).
+ *
+ * Signature: curl_escape(CurlHandle $handle, string $string): string|false
  */
 final class curl_escape extends Internal
 {
@@ -25,19 +27,20 @@ final class curl_escape extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
+        if (2 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError(\sprintf(
-                'curl_escape() expects exactly 1 argument, %d given',
+                'curl_escape() expects exactly 2 arguments, %d given',
                 \count($frame->calledArgs)
             ));
         }
+        VmCurlArg::requireEasyObject($frame->calledArgs[0], 'curl_escape', 1);
         if (null === $frame->returnVar) {
             return;
         }
         $value = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+            $frame->calledArgs[1],
             'curl_escape',
-            0,
+            1,
             'string'
         );
         $frame->returnVar->string(VmCurlEscape::escape($value));
@@ -45,13 +48,15 @@ final class curl_escape extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
+        if (2 !== \count($args)) {
             throw new \ArgumentCountError(\sprintf(
-                'curl_escape() expects exactly 1 argument, %d given',
+                'curl_escape() expects exactly 2 arguments, %d given',
                 \count($args)
             ));
         }
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'curl_escape', 0, 'string');
+        // Handle is required for php-src-strict arity/type; encoding matches curl_easy_escape
+        // unreserved set (rawurlencode) and does not depend on handle state.
+        $str = JitStringBuiltinArg::lower($context, $args[1], 'curl_escape', 1, 'string');
 
         return JitUrlencode::rawurlencode($context, $str);
     }

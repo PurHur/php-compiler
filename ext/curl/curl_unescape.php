@@ -14,7 +14,9 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * curl_unescape() — URL-decode a string (php-src ext/curl/interface.c; #6351).
+ * curl_unescape() — URL-decode a string (php-src ext/curl/interface.c; #6351, #20493).
+ *
+ * Signature: curl_unescape(CurlHandle $handle, string $string): string|false
  */
 final class curl_unescape extends Internal
 {
@@ -25,19 +27,20 @@ final class curl_unescape extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
+        if (2 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError(\sprintf(
-                'curl_unescape() expects exactly 1 argument, %d given',
+                'curl_unescape() expects exactly 2 arguments, %d given',
                 \count($frame->calledArgs)
             ));
         }
+        VmCurlArg::requireEasyObject($frame->calledArgs[0], 'curl_unescape', 1);
         if (null === $frame->returnVar) {
             return;
         }
         $value = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+            $frame->calledArgs[1],
             'curl_unescape',
-            0,
+            1,
             'string'
         );
         $frame->returnVar->string(VmCurlEscape::unescape($value));
@@ -45,13 +48,13 @@ final class curl_unescape extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
+        if (2 !== \count($args)) {
             throw new \ArgumentCountError(\sprintf(
-                'curl_unescape() expects exactly 1 argument, %d given',
+                'curl_unescape() expects exactly 2 arguments, %d given',
                 \count($args)
             ));
         }
-        $str = JitStringBuiltinArg::lower($context, $args[0], 'curl_unescape', 0, 'string');
+        $str = JitStringBuiltinArg::lower($context, $args[1], 'curl_unescape', 1, 'string');
 
         return JitUrlencode::rawurldecode($context, $str);
     }

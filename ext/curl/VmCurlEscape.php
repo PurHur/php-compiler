@@ -9,7 +9,8 @@ use PHPCompiler\ext\standard\VmString;
 /**
  * curl_escape() / curl_unescape() — RFC 3986 percent encoding (php-src ext/curl/interface.c).
  *
- * curl_easy_escape/unescape use the same unreserved set as rawurlencode/rawurldecode.
+ * Procedural API requires CurlHandle + string (#20493); encoding matches curl_easy_escape /
+ * curl_easy_unescape unreserved set (same as rawurlencode/rawurldecode).
  */
 final class VmCurlEscape
 {
