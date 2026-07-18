@@ -1,5 +1,7 @@
 --TEST--
 stdlib ctype_*(null) emits E_DEPRECATED then false (issue #19717, php-src ext/ctype/ctype.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.2
 --FILE--
 <?php
 error_reporting(E_ALL);

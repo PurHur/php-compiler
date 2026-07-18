@@ -26,7 +26,8 @@ abstract class CtypeFunction extends Internal
             $this->getName(),
             $spec['kind'],
             $spec['allow_digits'],
-            $spec['allow_minus']
+            $spec['allow_minus'],
+            $frame
         );
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($result);
