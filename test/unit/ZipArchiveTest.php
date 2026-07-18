@@ -88,10 +88,24 @@ final class ZipArchiveTest extends TestCase
         self::assertSame(ZipArchiveConstants::CREATE, $entry->constants['create']->toInt());
         self::assertArrayHasKey('length_to_end', $entry->constants);
         self::assertSame(ZipArchiveConstants::LENGTH_TO_END, $entry->constants['length_to_end']->toInt());
+        self::assertArrayHasKey('length_unchecked', $entry->constants);
+        self::assertSame(ZipArchiveConstants::LENGTH_UNCHECKED, $entry->constants['length_unchecked']->toInt());
+        self::assertArrayHasKey('fl_open_file_now', $entry->constants);
+        self::assertSame(ZipArchiveConstants::FL_OPEN_FILE_NOW, $entry->constants['fl_open_file_now']->toInt());
+        self::assertArrayHasKey('er_data_length', $entry->constants);
+        self::assertSame(ZipArchiveConstants::ER_DATA_LENGTH, $entry->constants['er_data_length']->toInt());
+        self::assertArrayHasKey('er_truncated_zip', $entry->constants);
+        self::assertSame(ZipArchiveConstants::ER_TRUNCATED_ZIP, $entry->constants['er_truncated_zip']->toInt());
+        self::assertArrayHasKey('libzip_version', $entry->constants);
+        self::assertSame(ZipArchiveConstants::LIBZIP_VERSION, $entry->constants['libzip_version']->toString());
         self::assertSame('CREATE', $entry->constNames['create']);
+        self::assertSame('LENGTH_UNCHECKED', $entry->constNames['length_unchecked']);
+        self::assertSame('LIBZIP_VERSION', $entry->constNames['libzip_version']);
         self::assertSame('ER_OK', $entry->constNames['er_ok']);
         self::assertSame(ZipArchiveConstants::CM_STORE, $entry->constants['cm_store']->toInt());
         self::assertSame(ZipArchiveConstants::OPSYS_UNIX, $entry->constants['opsys_unix']->toInt());
+        self::assertSame('Unexpected length of data', ZipArchiveConstants::statusString(ZipArchiveConstants::ER_DATA_LENGTH));
+        self::assertSame('Possibly truncated or corrupted zip archive', ZipArchiveConstants::statusString(ZipArchiveConstants::ER_TRUNCATED_ZIP));
     }
 
     public function test_zip_archive_create_add_extract_roundtrip(): void

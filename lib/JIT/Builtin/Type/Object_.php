@@ -15,6 +15,7 @@ use PHPCompiler\Block;
 use PHPCompiler\ClassConstVisibility;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\dom\DomConstants;
+use PHPCompiler\ext\zip\ZipArchiveConstants;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
@@ -2860,15 +2861,46 @@ class Object_ extends Type {
                 'include_end_date' => \PHPCompiler\VM\DatePeriodSupport::OPTION_INCLUDE_END_DATE,
             ]);
         }
+        if ('ziparchive' === $lcname && CompilerVersion::supportsZip()) {
+            // php-src ext/zip/php_zip.c REGISTER_ZIPARCHIVE_CLASS_CONST_* (#20712).
+            // Host PHP often lacks ext-zip; seed from ZipArchiveConstants for AOT/JIT.
+            $this->seedExternalClassConstants($id, ZipArchiveConstants::CLASS_CONSTANTS);
+        }
     }
 
+    /**
+     * @param array<string, int|float|bool|string|null> $constants
+     */
     private function seedExternalClassConstants(int $id, array $constants): void
     {
         foreach ($constants as $name => $value) {
-            if (!isset($this->classConstants[$id][$name])) {
+            if (isset($this->classConstants[$id][$name])) {
+                continue;
+            }
+            if (\is_string($value)) {
+                $this->classConstants[$id][$name] = [
+                    'type' => Variable::TYPE_STRING,
+                    'value' => $value,
+                ];
+            } elseif (\is_float($value)) {
+                $this->classConstants[$id][$name] = [
+                    'type' => Variable::TYPE_NATIVE_DOUBLE,
+                    'value' => $value,
+                ];
+            } elseif (\is_bool($value)) {
+                $this->classConstants[$id][$name] = [
+                    'type' => Variable::TYPE_NATIVE_BOOL,
+                    'value' => $value,
+                ];
+            } elseif (null === $value) {
+                $this->classConstants[$id][$name] = [
+                    'type' => Variable::TYPE_NULL,
+                    'value' => null,
+                ];
+            } else {
                 $this->classConstants[$id][$name] = [
                     'type' => Variable::TYPE_NATIVE_LONG,
-                    'value' => $value,
+                    'value' => (int) $value,
                 ];
             }
         }
