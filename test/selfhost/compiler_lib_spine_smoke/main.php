@@ -476,6 +476,7 @@ require_once __DIR__.'/../../../ext/dom/XPathRegisterPhpFunctions.php';
 require_once __DIR__.'/../../../ext/dom/XmlDocumentCreateEmpty.php';
 require_once __DIR__.'/../../../ext/dom/XmlDocumentCreateFromString.php';
 require_once __DIR__.'/../../../ext/dom/dom_import_simplexml.php';
+require_once __DIR__.'/../../../ext/dom/ns_import_simplexml.php';
 require_once __DIR__.'/../../../ext/exif/ExifImagetypeJitHelper.php';
 require_once __DIR__.'/../../../ext/exif/JitExifImagetype.php';
 require_once __DIR__.'/../../../ext/exif/Module.php';

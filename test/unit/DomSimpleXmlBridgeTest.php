@@ -13,6 +13,7 @@ final class DomSimpleXmlBridgeTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/dom/Module.php');
         $this->assertStringContainsString('dom_import_simplexml', $source);
+        $this->assertStringContainsString('ns_import_simplexml', $source);
     }
 
     public function testSimpleXmlModuleRegistersImportDom(): void
