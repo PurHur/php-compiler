@@ -26,6 +26,22 @@ final class SimpleXmlRegistry
      */
     private static array $attributeViewFilters = [];
 
+    /**
+     * Live children() views hold the parent element node; length/iteration re-read
+     * `$parent->children` (php-src sxe.c; #20331).
+     *
+     * @var array<int, true>
+     */
+    private static array $childrenViews = [];
+
+    /**
+     * Namespace filter for live children() views.
+     * null ⇒ no-namespace children only; `''` ⇒ all; non-empty ⇒ URI/prefix filter.
+     *
+     * @var array<int, array{ns: ?string, isPrefix: bool}>
+     */
+    private static array $childrenViewFilters = [];
+
     /** @var array<int, int> */
     private static array $documentKeys = [];
 
@@ -38,6 +54,8 @@ final class SimpleXmlRegistry
         self::$views = [];
         self::$attributeViews = [];
         self::$attributeViewFilters = [];
+        self::$childrenViews = [];
+        self::$childrenViewFilters = [];
         self::$documentKeys = [];
         self::$xpathNamespaces = [];
     }
@@ -79,6 +97,27 @@ final class SimpleXmlRegistry
         return self::$attributeViewFilters[$entry->id] ?? ['ns' => null, 'isPrefix' => true];
     }
 
+    public static function attachChildrenView(
+        ObjectEntry $entry,
+        SimpleXmlNodeState $parent,
+        ?int $documentKey = null,
+        ?string $namespaceOrPrefix = null,
+        bool $isPrefix = true
+    ): void {
+        self::attach($entry, $parent, $documentKey);
+        self::$childrenViews[$entry->id] = true;
+        self::$childrenViewFilters[$entry->id] = [
+            'ns' => $namespaceOrPrefix,
+            'isPrefix' => $isPrefix,
+        ];
+    }
+
+    /** @return array{ns: ?string, isPrefix: bool} */
+    public static function childrenViewFilter(ObjectEntry $entry): array
+    {
+        return self::$childrenViewFilters[$entry->id] ?? ['ns' => null, 'isPrefix' => true];
+    }
+
     public static function state(ObjectEntry $entry): SimpleXmlNodeState
     {
         $state = self::$states[$entry->id] ?? null;
@@ -101,7 +140,12 @@ final class SimpleXmlRegistry
 
     public static function isView(ObjectEntry $entry): bool
     {
-        return isset(self::$views[$entry->id]);
+        return isset(self::$views[$entry->id]) || isset(self::$childrenViews[$entry->id]);
+    }
+
+    public static function isChildrenView(ObjectEntry $entry): bool
+    {
+        return isset(self::$childrenViews[$entry->id]);
     }
 
     public static function isAttributesView(ObjectEntry $entry): bool

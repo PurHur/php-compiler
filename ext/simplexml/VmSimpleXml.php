@@ -244,7 +244,7 @@ final class VmSimpleXml
         }
         if (SimpleXmlRegistry::isView($entry)) {
             $docKey = SimpleXmlRegistry::documentKey($entry);
-            foreach (SimpleXmlRegistry::view($entry) as $node) {
+            foreach (self::viewElements($entry) as $node) {
                 self::removeNodeFromTree($docKey, $node);
             }
 
@@ -300,7 +300,7 @@ final class VmSimpleXml
 
                 return $result;
             }
-            $elements = SimpleXmlRegistry::view($entry);
+            $elements = self::viewElements($entry);
             if ($index < 0 || $index >= \count($elements)) {
                 $result = new Variable();
                 $result->null();
@@ -343,7 +343,7 @@ final class VmSimpleXml
 
                 return $index >= 0 && $index < \count($values);
             }
-            $elements = SimpleXmlRegistry::view($entry);
+            $elements = self::viewElements($entry);
 
             return $index >= 0 && $index < \count($elements);
         }
@@ -391,7 +391,7 @@ final class VmSimpleXml
 
                 return;
             }
-            $elements = SimpleXmlRegistry::view($entry);
+            $elements = self::viewElements($entry);
             if ($index < 0 || $index >= \count($elements)) {
                 $label = ([] !== $elements) ? $elements[0]->name : self::elementName($entry);
                 self::warn(
@@ -431,7 +431,7 @@ final class VmSimpleXml
         }
 
         if (SimpleXmlRegistry::isView($entry)) {
-            $elements = SimpleXmlRegistry::view($entry);
+            $elements = self::viewElements($entry);
             if ([] === $elements) {
                 return;
             }
@@ -472,7 +472,7 @@ final class VmSimpleXml
 
                 return;
             }
-            $elements = SimpleXmlRegistry::view($entry);
+            $elements = self::viewElements($entry);
             if ($index >= 0 && $index < \count($elements)) {
                 self::removeNodeFromTree(SimpleXmlRegistry::documentKey($entry), $elements[$index]);
             }
@@ -501,8 +501,11 @@ final class VmSimpleXml
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             return \count(self::attributesMap($entry));
         }
+        if (SimpleXmlRegistry::isChildrenView($entry)) {
+            return \count(self::childrenViewElements($entry));
+        }
         if (SimpleXmlRegistry::isView($entry)) {
-            return \count(SimpleXmlRegistry::view($entry));
+            return \count(self::viewElements($entry));
         }
 
         return \count(SimpleXmlRegistry::state($entry)->children);
@@ -520,8 +523,16 @@ final class VmSimpleXml
 
             return self::localNameFromQualified($first);
         }
+        if (SimpleXmlRegistry::isChildrenView($entry)) {
+            $view = self::childrenViewElements($entry);
+            if ([] === $view) {
+                return '';
+            }
+
+            return self::localNameFromQualified($view[0]->name);
+        }
         if (SimpleXmlRegistry::isView($entry)) {
-            $view = SimpleXmlRegistry::view($entry);
+            $view = self::viewElements($entry);
             if ([] === $view) {
                 return '';
             }
@@ -546,18 +557,31 @@ final class VmSimpleXml
             return self::wrapView($ctx, $entry->class, [], SimpleXmlRegistry::documentKey($entry));
         }
 
-        $elements = self::directElementChildren($entry);
-        $scope = self::inScopeNamespacesForEntry($entry);
-        if (null === $namespaceOrPrefix) {
-            $elements = array_values(array_filter(
-                $elements,
-                static fn (SimpleXmlNodeState $element): bool => '' === self::resolveElementNamespaceUri($element, $scope)
-            ));
-        } elseif ('' !== $namespaceOrPrefix) {
-            $elements = self::filterChildrenByNamespace($elements, $namespaceOrPrefix, $isPrefix, $entry, $scope);
+        // Snapshot multi-match property views (`$sxe->foo` with N matches) stay frozen.
+        if (SimpleXmlRegistry::isView($entry) && !SimpleXmlRegistry::isChildrenView($entry)) {
+            $elements = self::directElementChildren($entry);
+            $scope = self::inScopeNamespacesForEntry($entry);
+            if (null === $namespaceOrPrefix) {
+                $elements = array_values(array_filter(
+                    $elements,
+                    static fn (SimpleXmlNodeState $element): bool => '' === self::resolveElementNamespaceUri($element, $scope)
+                ));
+            } elseif ('' !== $namespaceOrPrefix) {
+                $elements = self::filterChildrenByNamespace($elements, $namespaceOrPrefix, $isPrefix, $entry, $scope);
+            }
+
+            return self::wrapView($ctx, $entry->class, $elements, SimpleXmlRegistry::documentKey($entry));
         }
 
-        return self::wrapView($ctx, $entry->class, $elements, SimpleXmlRegistry::documentKey($entry));
+        // Live children view: share the parent node state; filter is applied on each read (#20331).
+        return self::wrapChildrenView(
+            $ctx,
+            $entry->class,
+            SimpleXmlRegistry::state($entry),
+            SimpleXmlRegistry::documentKey($entry),
+            $namespaceOrPrefix,
+            $isPrefix
+        );
     }
 
     public static function attributes(Context $ctx, ObjectEntry $entry, ?string $namespaceOrPrefix = null, bool $isPrefix = true): ObjectEntry
@@ -582,9 +606,22 @@ final class VmSimpleXml
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             return false;
         }
+        if (SimpleXmlRegistry::isChildrenView($entry)) {
+            $parts = [];
+            foreach (self::childrenViewElements($entry) as $node) {
+                $parts[] = self::serializeNode($node);
+            }
+            $body = implode('', $parts);
+            if ('' === $body) {
+                return false;
+            }
+
+            // php-src sxe_as_xml: document serialization ends with trailing newline (#19934, re-#19681).
+        return $includeDeclaration ? '<?xml version="1.0"?>'."\n".$body."\n" : $body;
+        }
         if (SimpleXmlRegistry::isView($entry)) {
             $parts = [];
-            foreach (SimpleXmlRegistry::view($entry) as $node) {
+            foreach (self::viewElements($entry) as $node) {
                 $parts[] = self::serializeNode($node);
             }
             $body = implode('', $parts);
@@ -801,8 +838,11 @@ final class VmSimpleXml
 
             return $out;
         }
+        if (SimpleXmlRegistry::isChildrenView($entry)) {
+            return self::childrenViewElements($entry);
+        }
         if (SimpleXmlRegistry::isView($entry)) {
-            return SimpleXmlRegistry::view($entry);
+            return self::viewElements($entry);
         }
 
         return SimpleXmlRegistry::state($entry)->children;
@@ -825,9 +865,17 @@ final class VmSimpleXml
 
     public static function textContent(ObjectEntry $entry): string
     {
+        if (SimpleXmlRegistry::isChildrenView($entry)) {
+            $parts = [];
+            foreach (self::childrenViewElements($entry) as $node) {
+                $parts[] = $node->text;
+            }
+
+            return implode('', $parts);
+        }
         if (SimpleXmlRegistry::isView($entry)) {
             $parts = [];
-            foreach (SimpleXmlRegistry::view($entry) as $node) {
+            foreach (self::viewElements($entry) as $node) {
                 $parts[] = $node->text;
             }
 
@@ -840,9 +888,19 @@ final class VmSimpleXml
     /** @return list<SimpleXmlNodeState> */
     private static function matchingElements(ObjectEntry $entry, string $name): array
     {
+        if (SimpleXmlRegistry::isChildrenView($entry)) {
+            $out = [];
+            foreach (self::childrenViewElements($entry) as $node) {
+                if ($node->name === $name) {
+                    $out[] = $node;
+                }
+            }
+
+            return $out;
+        }
         if (SimpleXmlRegistry::isView($entry)) {
             $out = [];
-            foreach (SimpleXmlRegistry::view($entry) as $node) {
+            foreach (self::viewElements($entry) as $node) {
                 if ($node->name === $name) {
                     $out[] = $node;
                 }
@@ -879,6 +937,67 @@ final class VmSimpleXml
         }
 
         return $entry;
+    }
+
+    private static function wrapChildrenView(
+        Context $ctx,
+        ClassEntry $class,
+        SimpleXmlNodeState $parent,
+        ?int $documentKey = null,
+        ?string $namespaceOrPrefix = null,
+        bool $isPrefix = true
+    ): ObjectEntry {
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $docKey = $documentKey ?? $entry->id;
+        SimpleXmlRegistry::attachChildrenView($entry, $parent, $docKey, $namespaceOrPrefix, $isPrefix);
+
+        return $entry;
+    }
+
+    /**
+     * Elements represented by a collection view (frozen multi-match or live children(); #20331).
+     *
+     * @return list<SimpleXmlNodeState>
+     */
+    public static function viewElements(ObjectEntry $entry): array
+    {
+        if (SimpleXmlRegistry::isChildrenView($entry)) {
+            return self::childrenViewElements($entry);
+        }
+
+        return SimpleXmlRegistry::view($entry);
+    }
+
+    /**
+     * Resolve live children() view elements from the shared parent node (php-src sxe.c; #20331).
+     *
+     * @return list<SimpleXmlNodeState>
+     */
+    public static function childrenViewElements(ObjectEntry $entry): array
+    {
+        $parent = SimpleXmlRegistry::state($entry);
+        $filter = SimpleXmlRegistry::childrenViewFilter($entry);
+        $elements = $parent->children;
+        $scope = self::inScopeNamespacesForEntry($entry);
+        $namespaceOrPrefix = $filter['ns'];
+        if (null === $namespaceOrPrefix) {
+            return array_values(array_filter(
+                $elements,
+                static fn (SimpleXmlNodeState $element): bool => '' === self::resolveElementNamespaceUri($element, $scope)
+            ));
+        }
+        if ('' !== $namespaceOrPrefix) {
+            return self::filterChildrenByNamespace(
+                $elements,
+                $namespaceOrPrefix,
+                $filter['isPrefix'],
+                $entry,
+                $scope
+            );
+        }
+
+        return $elements;
     }
 
     private static function wrapAttributesView(
@@ -947,8 +1066,11 @@ final class VmSimpleXml
     /** @return list<SimpleXmlNodeState> */
     private static function xpathContextNodes(ObjectEntry $entry): array
     {
+        if (SimpleXmlRegistry::isChildrenView($entry)) {
+            return self::childrenViewElements($entry);
+        }
         if (SimpleXmlRegistry::isView($entry)) {
-            return SimpleXmlRegistry::view($entry);
+            return self::viewElements($entry);
         }
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             return [];
@@ -1007,7 +1129,12 @@ final class VmSimpleXml
 
         $docKey = SimpleXmlRegistry::documentKey($entry);
         $root = SimpleXmlRegistry::rootState($docKey);
-        $nodes = SimpleXmlRegistry::isView($entry) ? SimpleXmlRegistry::view($entry) : [SimpleXmlRegistry::state($entry)];
+        // Live children() views share the parent element — use that node for xmlns scope (#20331).
+        if (SimpleXmlRegistry::isChildrenView($entry)) {
+            $nodes = [SimpleXmlRegistry::state($entry)];
+        } else {
+            $nodes = SimpleXmlRegistry::isView($entry) ? self::viewElements($entry) : [SimpleXmlRegistry::state($entry)];
+        }
         $merged = [];
         foreach ($nodes as $node) {
             $scope = self::namespacesAtNodeWalk($root, $node, []);
@@ -1088,13 +1215,13 @@ final class VmSimpleXml
     private static function namespaceMapForEntry(ObjectEntry $entry): array
     {
         $map = SimpleXmlRegistry::xpathNamespaces($entry);
-        if (SimpleXmlRegistry::isAttributesView($entry)) {
-            // Live attributes views share the element node — read xmlns from that state (#20332).
+        if (SimpleXmlRegistry::isAttributesView($entry) || SimpleXmlRegistry::isChildrenView($entry)) {
+            // Live attributes/children views share the element node — read xmlns from that state.
             self::collectNamespacesFromNode(SimpleXmlRegistry::state($entry), $map, false);
 
             return $map;
         }
-        $nodes = SimpleXmlRegistry::isView($entry) ? SimpleXmlRegistry::view($entry) : [SimpleXmlRegistry::state($entry)];
+        $nodes = SimpleXmlRegistry::isView($entry) ? self::viewElements($entry) : [SimpleXmlRegistry::state($entry)];
         foreach ($nodes as $node) {
             self::collectNamespacesFromNode($node, $map, false);
         }
@@ -1172,7 +1299,7 @@ final class VmSimpleXml
 
         $nodes = [];
         if (SimpleXmlRegistry::isView($entry)) {
-            $nodes = SimpleXmlRegistry::view($entry);
+            $nodes = self::viewElements($entry);
         } else {
             $nodes = [SimpleXmlRegistry::state($entry)];
         }
