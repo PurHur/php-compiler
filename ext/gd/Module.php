@@ -59,6 +59,9 @@ class Module extends ModuleAbstract
         if (GdExtensionPolicy::advertisesDrawing()) {
             $functions[] = new imagecolorallocate();
             $functions[] = new imagecolorallocatealpha();
+            $functions[] = new imagecolorsforindex();
+            $functions[] = new imagecolorclosest();
+            $functions[] = new imagecolorset();
             $functions[] = new imagealphablending();
             $functions[] = new imagelayereffect();
             $functions[] = new imageresolution();

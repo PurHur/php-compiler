@@ -325,6 +325,148 @@ final class VmGd
     }
 
     /**
+     * imagecolorclosest() — gdImageColorClosest (php-src ext/gd/libgd/gd.c; #20440).
+     */
+    public static function colorClosest(ObjectEntry $image, int $red, int $green, int $blue): int
+    {
+        return self::colorClosestAlpha($image, $red, $green, $blue, 0);
+    }
+
+    /**
+     * gdImageColorClosestAlpha — truecolor packs ARGB; palette uses Euclidean distance (#20440).
+     */
+    public static function colorClosestAlpha(
+        ObjectEntry $image,
+        int $red,
+        int $green,
+        int $blue,
+        int $alpha
+    ): int {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return -1;
+        }
+        if ($state->truecolor) {
+            return (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+        }
+        $ct = -1;
+        $first = true;
+        $mindist = 0;
+        foreach ($state->colors as $i => $packed) {
+            $rd = (($packed >> 16) & 0xFF) - $red;
+            $gd = (($packed >> 8) & 0xFF) - $green;
+            $bd = ($packed & 0xFF) - $blue;
+            $ad = (($packed >> 24) & 0x7F) - $alpha;
+            $dist = $rd * $rd + $gd * $gd + $bd * $bd + $ad * $ad;
+            if ($first || $dist < $mindist) {
+                $mindist = $dist;
+                $ct = (int) $i;
+                $first = false;
+            }
+        }
+
+        return $ct;
+    }
+
+    /**
+     * imagecolorset() — mutate palette slot (php-src; success null / failure false; #20440).
+     *
+     * @return null|false
+     */
+    public static function colorSet(
+        ObjectEntry $image,
+        int $color,
+        int $red,
+        int $green,
+        int $blue,
+        int $alpha = 0
+    ): mixed {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster() || $state->truecolor) {
+            return false;
+        }
+        if ($color < 0 || $color >= \count($state->colors)) {
+            return false;
+        }
+        $state->colors[$color] = (($alpha & 0x7F) << 24)
+            | (($red & 0xFF) << 16)
+            | (($green & 0xFF) << 8)
+            | ($blue & 0xFF);
+
+        return null;
+    }
+
+    /**
+     * imagecolorsforindex() — red/green/blue/alpha assoc (php-src; #20440).
+     *
+     * @return array{red: int, green: int, blue: int, alpha: int}
+     */
+    public static function colorsForIndex(ObjectEntry $image, int $index): array
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            throw new \ValueError('imagecolorsforindex(): Argument #2 ($color) is out of range');
+        }
+        if ($state->truecolor) {
+            if ($index < 0) {
+                throw new \ValueError('imagecolorsforindex(): Argument #2 ($color) is out of range');
+            }
+
+            return [
+                'red' => ($index >> 16) & 0xFF,
+                'green' => ($index >> 8) & 0xFF,
+                'blue' => $index & 0xFF,
+                'alpha' => ($index >> 24) & 0x7F,
+            ];
+        }
+        if ($index < 0 || $index >= \count($state->colors)) {
+            throw new \ValueError('imagecolorsforindex(): Argument #2 ($color) is out of range');
+        }
+        $packed = $state->colors[$index];
+
+        return [
+            'red' => ($packed >> 16) & 0xFF,
+            'green' => ($packed >> 8) & 0xFF,
+            'blue' => $packed & 0xFF,
+            'alpha' => ($packed >> 24) & 0x7F,
+        ];
+    }
+
+    /**
+     * @param array{red: int, green: int, blue: int, alpha: int} $components
+     */
+    public static function colorsForIndexToHashTable(array $components): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($components as $key => $value) {
+            $var = new Variable();
+            $var->int($value);
+            $ht->update($key, $var);
+        }
+
+        return $ht;
+    }
+
+    /** php-src CHECK_RGBA_RANGE for Red/Green/Blue (0..255) or Alpha (0..127). */
+    public static function requireRgbaComponent(
+        int $value,
+        string $function,
+        int $position,
+        string $paramName,
+        int $max
+    ): void {
+        if ($value < 0 || $value > $max) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($%s) must be between 0 and %d (inclusive)',
+                $function,
+                $position,
+                $paramName,
+                $max
+            ));
+        }
+    }
+
+    /**
      * imagecolorallocatealpha() — GD truecolor ARGB (alpha 0 opaque .. 127 transparent; #6535).
      */
     public static function colorAllocateAlpha(
