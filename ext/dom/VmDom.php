@@ -3121,6 +3121,10 @@ final class VmDom
         // Resolve after the full parent chain exists — nested parse only sees local parents (#19467).
         self::resolveSubtreeNamespaceUris($root);
         self::propagateDocumentId($root, $document->id);
+        // php-src: preserveWhiteSpace=false and/or LIBXML_NOBLANKS → XML_PARSE_NOBLANKS (#20476).
+        if (self::shouldStripBlankNodesOnLoad($document, $options)) {
+            self::stripBlankTextNodesFromSubtree($root);
+        }
         self::syncSubtree($ctx, $document);
         self::reindexDocumentIds($document, $root);
         self::syncElementIdMapProperty($document);
@@ -3248,6 +3252,51 @@ final class VmDom
         } catch (\Error) {
             return false;
         }
+    }
+
+    /**
+     * DOMDocument::$preserveWhiteSpace default true (php-src ext/dom/document.c; #14368 / #20476).
+     */
+    private static function documentPreserveWhiteSpace(ObjectEntry $document): bool
+    {
+        return self::ensureDomDocumentBoolProperty($document, self::PROP_PRESERVE_WHITE_SPACE, true);
+    }
+
+    /**
+     * libxml XML_PARSE_NOBLANKS when preserveWhiteSpace is false or LIBXML_NOBLANKS is set
+     * (php-src ext/dom/document.c + ext/libxml/libxml.c; #20476).
+     */
+    private static function shouldStripBlankNodesOnLoad(ObjectEntry $document, int $options): bool
+    {
+        if (0 !== ($options & LibxmlConstants::LIBXML_NOBLANKS)) {
+            return true;
+        }
+
+        return !self::documentPreserveWhiteSpace($document);
+    }
+
+    /**
+     * Drop whitespace-only text/CDATA descendants (libxml xmlIsBlankNode under XML_PARSE_NOBLANKS).
+     *
+     * Does not touch loadHTML — Zend does not apply this property the same way on the HTML parser.
+     */
+    private static function stripBlankTextNodesFromSubtree(ObjectEntry $node): void
+    {
+        $state = DomRegistry::state($node);
+        $kept = [];
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            if (self::isTextOrCdataNode($child) && self::textIsWhitespaceInElementContent($child)) {
+                self::linkChildToParent($child, null);
+                continue;
+            }
+            $kept[] = $childId;
+            self::stripBlankTextNodesFromSubtree($child);
+        }
+        $state->childIds = $kept;
     }
 
     /** php-src ext/dom/node.c — xml:id namespace URI. */

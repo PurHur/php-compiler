@@ -30,7 +30,13 @@ final class JitDomLoadXML
         }
 
         $xmlLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
-        if (null !== $xmlLit && '' !== trim($xmlLit)) {
+        // Seed user-script XML cache only for compact literals. Whitespace between tags means a
+        // full DomRegistry tree (preserveWhiteSpace / NOBLANKS); saveXML must serialize that (#20476).
+        if (
+            null !== $xmlLit
+            && '' !== trim($xmlLit)
+            && !JitDomLoadXMLUserScript::xmlContainsInterElementBlankText($xmlLit)
+        ) {
             JitDomLoadXMLUserScript::rememberCompileTimeXml($xmlLit);
         }
 

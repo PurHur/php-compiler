@@ -58,6 +58,12 @@ final class JitDomLoadXMLUserScript
             return null;
         }
 
+        // Inter-element blank text needs a real DomRegistry tree so preserveWhiteSpace=false
+        // / LIBXML_NOBLANKS can strip via VmDom::loadXML (#20476). Compact ID-map fixtures stay here.
+        if (self::xmlContainsInterElementBlankText($lit)) {
+            return null;
+        }
+
         self::$lastCompileTimeXml = $lit;
         foreach (DomParseSimpleXmlIdsJitHelper::parseIndexedElementIds($lit) as $parsed) {
             self::materializeIndexedElement($context, $args[0], $parsed);
@@ -202,5 +208,15 @@ final class JitDomLoadXMLUserScript
         }
 
         throw new \LogicException('DOMDocument::loadXML() receiver must be an object');
+    }
+
+    /**
+     * True when libxml would see whitespace-only text between elements (xmlIsBlankNode candidates).
+     *
+     * @internal used by {@see JitDomLoadXML} to skip the user-script XML cache on full-tree loads (#20476)
+     */
+    public static function xmlContainsInterElementBlankText(string $xml): bool
+    {
+        return 1 === preg_match('/\>[ \t\r\n]+</', $xml);
     }
 }
