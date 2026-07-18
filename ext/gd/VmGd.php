@@ -1106,6 +1106,253 @@ final class VmGd
     }
 
     /**
+     * imagearc() — outline arc (php-src gdImageArc → gdImageFilledArc + gdNoFill; #20437).
+     */
+    public static function arc(
+        ObjectEntry $image,
+        int $cx,
+        int $cy,
+        int $w,
+        int $h,
+        int $s,
+        int $e,
+        int $color
+    ): bool {
+        return self::filledArc($image, $cx, $cy, $w, $h, $s, $e, $color, GdConstants::ARC_NOFILL);
+    }
+
+    /**
+     * imagefilledarc() — libgd gdImageFilledArc (php-src ext/gd/libgd/gd.c; #20437).
+     *
+     * Angles are degrees, 0 at +x, increasing clockwise (libgd convention).
+     */
+    public static function filledArc(
+        ObjectEntry $image,
+        int $cx,
+        int $cy,
+        int $w,
+        int $h,
+        int $s,
+        int $e,
+        int $color,
+        int $style
+    ): bool {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+
+        // php-src PHP_FUNCTION(imagearc/imagefilledarc): negative angles %= 360 before libgd.
+        if ($e < 0) {
+            $e %= 360;
+        }
+        if ($s < 0) {
+            $s %= 360;
+        }
+
+        // Mirror C gdPoint pts[363] with dense indices 0..pti (libgd gdImageFilledArc).
+        /** @var array<int, array{0: int, 1: int}> $pts */
+        $pts = [];
+        $lx = 0;
+        $ly = 0;
+        $fx = 0;
+        $fy = 0;
+        $startx = -1;
+        $starty = -1;
+        $endx = -1;
+        $endy = -1;
+
+        if (($s % 360) === ($e % 360)) {
+            $s = 0;
+            $e = 360;
+        } else {
+            if ($s > 360) {
+                $s %= 360;
+            }
+            if ($e > 360) {
+                $e %= 360;
+            }
+            while ($s < 0) {
+                $s += 360;
+            }
+            while ($e < $s) {
+                $e += 360;
+            }
+            if ($s === $e) {
+                $s = 0;
+                $e = 360;
+            }
+        }
+
+        $pti = 1;
+        for ($i = $s; $i <= $e; ++$i, ++$pti) {
+            $deg = $i % 360;
+            if ($deg < 0) {
+                $deg += 360;
+            }
+            $x = $endx = intdiv(GdTrigTables::COS[$deg] * $w, 2 * 1024) + $cx;
+            $y = $endy = intdiv(GdTrigTables::SIN[$deg] * $h, 2 * 1024) + $cy;
+            if ($i !== $s) {
+                if (0 === ($style & GdConstants::ARC_CHORD)) {
+                    if (0 !== ($style & GdConstants::ARC_NOFILL)) {
+                        self::line($image, $lx, $ly, $x, $y, $color);
+                    } else {
+                        if ($y === $ly) {
+                            --$pti; // don't add this point
+                            if ((($i > 270 || $i < 90) && $x > $lx) || (($i > 90 && $i < 270) && $x < $lx)) {
+                                // replace the old x coord
+                                $pts[$pti][0] = $x;
+                            }
+                        } else {
+                            $pts[$pti] = [$x, $y];
+                        }
+                    }
+                }
+            } else {
+                $fx = $x;
+                $fy = $y;
+                if (0 === ($style & (GdConstants::ARC_CHORD | GdConstants::ARC_NOFILL))) {
+                    $pts[0] = [$cx, $cy];
+                    $pts[$pti] = [$x, $y];
+                    $startx = $x;
+                    $starty = $y;
+                }
+            }
+            $lx = $x;
+            $ly = $y;
+        }
+
+        if (0 !== ($style & GdConstants::ARC_CHORD)) {
+            if (0 !== ($style & GdConstants::ARC_NOFILL)) {
+                if (0 !== ($style & GdConstants::ARC_EDGED)) {
+                    self::line($image, $cx, $cy, $lx, $ly, $color);
+                    self::line($image, $cx, $cy, $fx, $fy, $color);
+                }
+                self::line($image, $fx, $fy, $lx, $ly, $color);
+            } else {
+                self::filledPolygon($image, [[$fx, $fy], [$lx, $ly], [$cx, $cy]], $color);
+            }
+        } else {
+            if (0 !== ($style & GdConstants::ARC_NOFILL)) {
+                if (0 !== ($style & GdConstants::ARC_EDGED)) {
+                    self::line($image, $cx, $cy, $lx, $ly, $color);
+                    self::line($image, $cx, $cy, $fx, $fy, $color);
+                }
+            } else {
+                if (($e - $s) < 360) {
+                    if ($pts[1][0] !== $startx && $pts[1][1] === $starty) {
+                        for ($j = $pti; $j > 1; --$j) {
+                            $pts[$j] = $pts[$j - 1];
+                        }
+                        $pts[1] = [$startx, $starty];
+                        ++$pti;
+                    }
+                    if ($pts[$pti - 1][0] !== $endx && $pts[$pti - 1][1] === $endy) {
+                        $pts[$pti] = [$endx, $endy];
+                        ++$pti;
+                    }
+                }
+                $pts[$pti] = [$cx, $cy];
+                $packed = [];
+                for ($j = 0; $j <= $pti; ++$j) {
+                    $packed[] = $pts[$j];
+                }
+                self::filledPolygon($image, $packed, $color);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * libgd gdImageFilledPolygon scanline fill (php-src ext/gd/libgd/gd.c; #20437).
+     *
+     * @param list<array{0: int, 1: int}> $points
+     */
+    public static function filledPolygon(ObjectEntry $image, array $points, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $n = \count($points);
+        if ($n <= 0) {
+            return true;
+        }
+
+        $miny = $points[0][1];
+        $maxy = $points[0][1];
+        for ($i = 1; $i < $n; ++$i) {
+            $y = $points[$i][1];
+            if ($y < $miny) {
+                $miny = $y;
+            }
+            if ($y > $maxy) {
+                $maxy = $y;
+            }
+        }
+        if ($n > 1 && $miny === $maxy) {
+            $x1 = $x2 = $points[0][0];
+            for ($i = 1; $i < $n; ++$i) {
+                $x = $points[$i][0];
+                if ($x < $x1) {
+                    $x1 = $x;
+                } elseif ($x > $x2) {
+                    $x2 = $x;
+                }
+            }
+            self::line($image, $x1, $miny, $x2, $miny, $color);
+
+            return true;
+        }
+        $pmaxy = $maxy;
+        if ($miny < 0) {
+            $miny = 0;
+        }
+        if ($maxy >= $state->height) {
+            $maxy = $state->height - 1;
+        }
+
+        for ($y = $miny; $y <= $maxy; ++$y) {
+            $ints = [];
+            for ($i = 0; $i < $n; ++$i) {
+                if (0 === $i) {
+                    $ind1 = $n - 1;
+                    $ind2 = 0;
+                } else {
+                    $ind1 = $i - 1;
+                    $ind2 = $i;
+                }
+                $y1 = $points[$ind1][1];
+                $y2 = $points[$ind2][1];
+                if ($y1 < $y2) {
+                    $x1 = $points[$ind1][0];
+                    $x2 = $points[$ind2][0];
+                } elseif ($y1 > $y2) {
+                    $y2 = $points[$ind1][1];
+                    $y1 = $points[$ind2][1];
+                    $x2 = $points[$ind1][0];
+                    $x1 = $points[$ind2][0];
+                } else {
+                    continue;
+                }
+                if ($y >= $y1 && $y < $y2) {
+                    $ints[] = (int) (((float) (($y - $y1) * ($x2 - $x1)) / (float) ($y2 - $y1)) + 0.5 + $x1);
+                } elseif ($y === $pmaxy && $y === $y2) {
+                    $ints[] = $x2;
+                }
+            }
+            sort($ints, SORT_NUMERIC);
+            $count = \count($ints);
+            for ($i = 0; $i < $count - 1; $i += 2) {
+                self::line($image, $ints[$i], $y, $ints[$i + 1], $y, $color);
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * imagefilledrectangle() — clipped fill (php-src _gdImageFilledVRectangle; #6534).
      */
     public static function filledRectangle(ObjectEntry $image, int $x1, int $y1, int $x2, int $y2, int $color): bool

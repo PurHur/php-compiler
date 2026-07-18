@@ -68,7 +68,25 @@ final class GdConstants
         'IMG_AFFINE_ROTATE' => 2,
         'IMG_AFFINE_SHEAR_HORIZONTAL' => 3,
         'IMG_AFFINE_SHEAR_VERTICAL' => 4,
+        // gdArc style flags (php-src ext/gd/libgd/gd.h; #20437)
+        'IMG_ARC_ROUNDED' => 0,
+        'IMG_ARC_PIE' => 0,
+        'IMG_ARC_CHORD' => 1,
+        'IMG_ARC_NOFILL' => 2,
+        'IMG_ARC_EDGED' => 4,
     ];
+
+    /** gdArc / IMG_ARC_PIE — rounded pie edge (php-src gd.h; #20437). */
+    public const ARC_PIE = 0;
+
+    /** gdChord / IMG_ARC_CHORD. */
+    public const ARC_CHORD = 1;
+
+    /** gdNoFill / IMG_ARC_NOFILL. */
+    public const ARC_NOFILL = 2;
+
+    /** gdEdged / IMG_ARC_EDGED. */
+    public const ARC_EDGED = 4;
 
     /** GD_METHOD_COUNT — exclusive upper bound for imagescale() $mode (#20405). */
     public const INTERPOLATION_METHOD_COUNT = 22;
