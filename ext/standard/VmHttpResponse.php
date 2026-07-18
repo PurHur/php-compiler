@@ -23,8 +23,9 @@ final class VmHttpResponse
             return $fromEnum;
         }
         if (EnumCaseSupport::isEnumCaseVariable($resolved)) {
+            // php-src-strict (#6037): Z_PARAM_LONG message shape — ResponseCode is accepted above (#7322).
             throw new \TypeError(sprintf(
-                '%s(): Argument #1 ($response_code) must be of type int|ResponseCode|null, %s given',
+                '%s(): Argument #1 ($response_code) must be of type int, %s given',
                 $fn,
                 EnumCaseSupport::typeNameForVariable($resolved)
             ));
