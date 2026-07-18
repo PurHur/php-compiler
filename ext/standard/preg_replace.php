@@ -41,7 +41,11 @@ final class preg_replace extends Internal
         }
         $patternRaw = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_NULL === $patternRaw->type) {
-            if (InternalStrictArg::isCallerStrict($frame)) {
+            // Z_PARAM_STR_OR_ARRAY — null TypeError on strict_types or 8.4 forward profile (#20226).
+            if (
+                InternalStrictArg::isCallerStrict($frame)
+                || VmString::requiresZparamStrStrictNullOnForwardProfile()
+            ) {
                 throw new \TypeError(
                     'preg_replace(): Argument #1 ($pattern) must be of type array|string, null given'
                 );

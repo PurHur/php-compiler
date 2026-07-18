@@ -7,9 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -22,18 +20,9 @@ final class preg_match extends Internal
         if ($argc < 2 || $argc > 5) {
             throw new \LogicException('preg_match() requires 2 to 5 arguments in this compiler build');
         }
-        $pattern = InternalStrictArg::resolveCoercibleStringArg($frame, 0, 'preg_match', 'pattern');
-        // Z_PARAM_STR $subject — null TypeError on 8.4 forward profile (#19320, ext/pcre/php_pcre.c).
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            $subject = InternalStrictArg::requireString($frame, 1, 'preg_match', 'subject')->toString();
-        } else {
-            $subject = VmString::coerceZparamStrBuiltinArg(
-                $frame->calledArgs[1],
-                'preg_match',
-                1,
-                'subject'
-            );
-        }
+        // Z_PARAM_STR $pattern/$subject — null TypeError on 8.4 forward profile (#20226, #19320).
+        $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'preg_match', 0, 'pattern');
+        $subject = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'preg_match', 1, 'subject');
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_match', $pattern);
 
         $flags = 0;
