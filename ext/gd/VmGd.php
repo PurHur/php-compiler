@@ -149,6 +149,38 @@ final class VmGd
         return true;
     }
 
+    /**
+     * imagesetthickness() — always true like php-src RETURN_TRUE (#20406).
+     * php-src: ext/gd/gd.c PHP_FUNCTION(imagesetthickness) → gdImageSetThickness.
+     */
+    public static function setThickness(ObjectEntry $image, int $thickness): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        $state->thick = $thickness;
+
+        return true;
+    }
+
+    /**
+     * imageantialias() — always true like php-src RETURN_TRUE (#20406).
+     * php-src: ext/gd/gd.c PHP_FUNCTION(imageantialias) — sets im->AA only on truecolor.
+     */
+    public static function setAntiAlias(ObjectEntry $image, bool $enable): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        if ($state->truecolor) {
+            $state->antiAlias = $enable;
+        }
+
+        return true;
+    }
+
     public static function fill(ObjectEntry $image, int $x, int $y, int $color): bool
     {
         $state = GdRegistry::state($image);
@@ -376,7 +408,7 @@ final class VmGd
     }
 
     /**
-     * imageline() — Bresenham stroke with libgd clip (php-src ext/gd/libgd/gd.c gdImageLine; #6534).
+     * imageline() — Bresenham stroke with libgd clip/thickness/AA (php-src ext/gd/libgd/gd.c gdImageLine; #6534, #20406).
      */
     public static function line(ObjectEntry $image, int $x1, int $y1, int $x2, int $y2, int $color): bool
     {
@@ -384,6 +416,13 @@ final class VmGd
         if (null === $state || !$state->hasRaster()) {
             return false;
         }
+        // php-src PHP_FUNCTION(imageline): if (im->AA) { gdImageSetAntiAliased(im, col); col = gdAntiAliased; }
+        if ($state->antiAlias && $state->truecolor) {
+            self::aaLine($state, $x1, $y1, $x2, $y2, $color);
+
+            return true;
+        }
+
         $maxX = $state->width - 1;
         $maxY = $state->height - 1;
         if (!self::clip1d($x1, $y1, $x2, $y2, $maxX) || !self::clip1d($y1, $x1, $y2, $x2, $maxY)) {
@@ -403,7 +442,18 @@ final class VmGd
             return true;
         }
 
+        $thick = $state->thick;
         if ($dy <= $dx) {
+            // More-or-less horizontal — wid is vertical stroke (libgd gdImageLine).
+            if (0 === $dx && 0 === $dy) {
+                $wid = 1;
+            } else {
+                $ac = \cos(\atan2($dy, $dx));
+                $wid = (0.0 !== $ac) ? (int) ($thick / $ac) : 1;
+                if (0 === $wid) {
+                    $wid = 1;
+                }
+            }
             $d = 2 * $dy - $dx;
             $incr1 = 2 * $dy;
             $incr2 = 2 * ($dy - $dx);
@@ -418,7 +468,10 @@ final class VmGd
                 $ydirflag = 1;
                 $xend = $x2;
             }
-            self::putPixel($state, $x, $y, $color);
+            $wstart = $y - intdiv($wid, 2);
+            for ($w = $wstart; $w < $wstart + $wid; ++$w) {
+                self::putPixel($state, $x, $w, $color);
+            }
             if ((($y2 - $y1) * $ydirflag) > 0) {
                 while ($x < $xend) {
                     ++$x;
@@ -428,7 +481,10 @@ final class VmGd
                         ++$y;
                         $d += $incr2;
                     }
-                    self::putPixel($state, $x, $y, $color);
+                    $wstart = $y - intdiv($wid, 2);
+                    for ($w = $wstart; $w < $wstart + $wid; ++$w) {
+                        self::putPixel($state, $x, $w, $color);
+                    }
                 }
             } else {
                 while ($x < $xend) {
@@ -439,10 +495,19 @@ final class VmGd
                         --$y;
                         $d += $incr2;
                     }
-                    self::putPixel($state, $x, $y, $color);
+                    $wstart = $y - intdiv($wid, 2);
+                    for ($w = $wstart; $w < $wstart + $wid; ++$w) {
+                        self::putPixel($state, $x, $w, $color);
+                    }
                 }
             }
         } else {
+            // More-or-less vertical — wid is horizontal stroke.
+            $as = \sin(\atan2($dy, $dx));
+            $wid = (0.0 !== $as) ? (int) ($thick / $as) : 1;
+            if (0 === $wid) {
+                $wid = 1;
+            }
             $d = 2 * $dx - $dy;
             $incr1 = 2 * $dx;
             $incr2 = 2 * ($dx - $dy);
@@ -457,7 +522,10 @@ final class VmGd
                 $yend = $y2;
                 $xdirflag = 1;
             }
-            self::putPixel($state, $x, $y, $color);
+            $wstart = $x - intdiv($wid, 2);
+            for ($w = $wstart; $w < $wstart + $wid; ++$w) {
+                self::putPixel($state, $w, $y, $color);
+            }
             if ((($x2 - $x1) * $xdirflag) > 0) {
                 while ($y < $yend) {
                     ++$y;
@@ -467,7 +535,10 @@ final class VmGd
                         ++$x;
                         $d += $incr2;
                     }
-                    self::putPixel($state, $x, $y, $color);
+                    $wstart = $x - intdiv($wid, 2);
+                    for ($w = $wstart; $w < $wstart + $wid; ++$w) {
+                        self::putPixel($state, $w, $y, $color);
+                    }
                 }
             } else {
                 while ($y < $yend) {
@@ -478,12 +549,118 @@ final class VmGd
                         --$x;
                         $d += $incr2;
                     }
-                    self::putPixel($state, $x, $y, $color);
+                    $wstart = $x - intdiv($wid, 2);
+                    for ($w = $wstart; $w < $wstart + $wid; ++$w) {
+                        self::putPixel($state, $w, $y, $color);
+                    }
                 }
             }
         }
 
         return true;
+    }
+
+    /**
+     * libgd gdImageAALine (php-src ext/gd/libgd/gd.c; #20406).
+     */
+    private static function aaLine(GdImageState $state, int $x1, int $y1, int $x2, int $y2, int $color): void
+    {
+        $maxX = $state->width - 1;
+        $maxY = $state->height - 1;
+        if (!self::clip1d($x1, $y1, $x2, $y2, $maxX) || !self::clip1d($y1, $x1, $y2, $x2, $maxY)) {
+            return;
+        }
+        $dx = $x2 - $x1;
+        $dy = $y2 - $y1;
+        if (0 === $dx && 0 === $dy) {
+            return;
+        }
+        if (\abs($dx) > \abs($dy)) {
+            if ($dx < 0) {
+                $tmp = $x1;
+                $x1 = $x2;
+                $x2 = $tmp;
+                $tmp = $y1;
+                $y1 = $y2;
+                $y2 = $tmp;
+                $dx = $x2 - $x1;
+                $dy = $y2 - $y1;
+            }
+            $y = $y1;
+            $inc = intdiv($dy * 65536, $dx);
+            $frac = 0;
+            for ($x = $x1; $x <= $x2; ++$x) {
+                self::putAaPixel($state, $x, $y, $color, ($frac >> 8) & 0xFF);
+                if ($y + 1 < $state->height) {
+                    self::putAaPixel($state, $x, $y + 1, $color, (~$frac >> 8) & 0xFF);
+                }
+                $frac += $inc;
+                if ($frac >= 65536) {
+                    $frac -= 65536;
+                    ++$y;
+                } elseif ($frac < 0) {
+                    $frac += 65536;
+                    --$y;
+                }
+            }
+        } else {
+            if ($dy < 0) {
+                $tmp = $x1;
+                $x1 = $x2;
+                $x2 = $tmp;
+                $tmp = $y1;
+                $y1 = $y2;
+                $y2 = $tmp;
+                $dx = $x2 - $x1;
+                $dy = $y2 - $y1;
+            }
+            $x = $x1;
+            $inc = intdiv($dx * 65536, $dy);
+            $frac = 0;
+            for ($y = $y1; $y <= $y2; ++$y) {
+                self::putAaPixel($state, $x, $y, $color, ($frac >> 8) & 0xFF);
+                if ($x + 1 < $state->width) {
+                    self::putAaPixel($state, $x + 1, $y, $color, (~$frac >> 8) & 0xFF);
+                }
+                $frac += $inc;
+                if ($frac >= 65536) {
+                    $frac -= 65536;
+                    ++$x;
+                } elseif ($frac < 0) {
+                    $frac += 65536;
+                    --$x;
+                }
+            }
+        }
+    }
+
+    /**
+     * libgd gdImageSetAAPixelColor — BLEND_COLOR coverage blend (php-src ext/gd/libgd/gd.c).
+     */
+    private static function putAaPixel(GdImageState $state, int $x, int $y, int $color, int $t): void
+    {
+        if ($x < 0 || $y < 0 || $x >= $state->width || $y >= $state->height) {
+            return;
+        }
+        $index = $y * $state->width + $x;
+        $p = $state->pixels[$index];
+        $dr = ($color >> 16) & 0xFF;
+        $dg = ($color >> 8) & 0xFF;
+        $db = $color & 0xFF;
+        $r = ($p >> 16) & 0xFF;
+        $g = ($p >> 8) & 0xFF;
+        $b = $p & 0xFF;
+        // BLEND_COLOR(t, nc, c, cc): nc = cc + ((((c - cc) * t) + (((c - cc) * t) >> 8) + 0x80) >> 8)
+        $dr = self::blendColorChannel($t, $r, $dr);
+        $dg = self::blendColorChannel($t, $g, $dg);
+        $db = self::blendColorChannel($t, $b, $db);
+        // gdAlphaOpaque = 0
+        $state->pixels[$index] = (($dr & 0xFF) << 16) | (($dg & 0xFF) << 8) | ($db & 0xFF);
+    }
+
+    private static function blendColorChannel(int $t, int $c, int $cc): int
+    {
+        return $cc + ((((($c - $cc) * $t) + ((($c - $cc) * $t) >> 8) + 0x80) >> 8));
     }
 
     /**
@@ -1810,9 +1987,14 @@ final class VmGd
             'imagecreatefromstring' => 'image',
             'imagecreatefromwebp', 'imagecreatefromavif' => 'filename',
             'imagesx', 'imagesy' => 'image',
-            'imagealphablending', 'imagesavealpha' => match ($position) {
+            'imagealphablending', 'imagesavealpha', 'imageantialias' => match ($position) {
                 1 => 'image',
                 2 => 'enable',
+                default => 'arg',
+            },
+            'imagesetthickness' => match ($position) {
+                1 => 'image',
+                2 => 'thickness',
                 default => 'arg',
             },
             'imagecolorallocatealpha' => match ($position) {
@@ -1913,6 +2095,19 @@ final class VmGd
 
     private static function hLine(GdImageState $state, int $y, int $x1, int $x2, int $color): void
     {
+        if ($state->thick > 1) {
+            $thickhalf = $state->thick >> 1;
+            self::fillRectOnState(
+                $state,
+                $x1,
+                $y - $thickhalf,
+                $x2,
+                $y + $state->thick - $thickhalf - 1,
+                $color
+            );
+
+            return;
+        }
         if ($x2 < $x1) {
             $t = $x2;
             $x2 = $x1;
@@ -1925,6 +2120,19 @@ final class VmGd
 
     private static function vLine(GdImageState $state, int $x, int $y1, int $y2, int $color): void
     {
+        if ($state->thick > 1) {
+            $thickhalf = $state->thick >> 1;
+            self::fillRectOnState(
+                $state,
+                $x - $thickhalf,
+                $y1,
+                $x + $state->thick - $thickhalf - 1,
+                $y2,
+                $color
+            );
+
+            return;
+        }
         if ($y2 < $y1) {
             $t = $y1;
             $y1 = $y2;
@@ -1932,6 +2140,41 @@ final class VmGd
         }
         for (; $y1 <= $y2; ++$y1) {
             self::putPixel($state, $x, $y1, $color);
+        }
+    }
+
+    /** Thick h/v stroke helper — clipped filled rect (libgd _gdImageFilledHRectangle). */
+    private static function fillRectOnState(GdImageState $state, int $x1, int $y1, int $x2, int $y2, int $color): void
+    {
+        if ($x1 > $x2) {
+            $t = $x1;
+            $x1 = $x2;
+            $x2 = $t;
+        }
+        if ($y1 > $y2) {
+            $t = $y1;
+            $y1 = $y2;
+            $y2 = $t;
+        }
+        if ($x1 < 0) {
+            $x1 = 0;
+        }
+        if ($x2 >= $state->width) {
+            $x2 = $state->width - 1;
+        }
+        if ($y1 < 0) {
+            $y1 = 0;
+        }
+        if ($y2 >= $state->height) {
+            $y2 = $state->height - 1;
+        }
+        if ($x1 > $x2 || $y1 > $y2) {
+            return;
+        }
+        for ($y = $y1; $y <= $y2; ++$y) {
+            for ($x = $x1; $x <= $x2; ++$x) {
+                self::putPixel($state, $x, $y, $color);
+            }
         }
     }
 

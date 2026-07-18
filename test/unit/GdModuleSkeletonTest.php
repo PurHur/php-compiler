@@ -19,7 +19,7 @@ final class GdModuleSkeletonTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['imagecreate', 'imagecreatetruecolor', 'imagealphablending', 'imagesavealpha', 'imagecolorallocatealpha'] as $fn) {
+        foreach (['imagecreate', 'imagecreatetruecolor', 'imagealphablending', 'imagesavealpha', 'imagecolorallocatealpha', 'imageantialias', 'imagesetthickness'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
@@ -30,12 +30,14 @@ echo (int) function_exists('imagecreatetruecolor');
 echo (int) function_exists('imagealphablending');
 echo (int) function_exists('imagesavealpha');
 echo (int) function_exists('imagecolorallocatealpha');
+echo (int) function_exists('imageantialias');
+echo (int) function_exists('imagesetthickness');
 echo (int) extension_loaded('gd');
 PHP;
         $block = $runtime->parseAndCompile($code, 'gd_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111111', ob_get_clean());
+        self::assertSame('11111111', ob_get_clean());
     }
 
     public function test_imagecreate_stub_throws_error(): void

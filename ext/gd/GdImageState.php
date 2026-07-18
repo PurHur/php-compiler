@@ -37,6 +37,16 @@ final class GdImageState
     public bool $saveAlpha;
 
     /**
+     * libgd thick — line stroke width, default 1 (php-src ext/gd/libgd/gd.c; #20406).
+     */
+    public int $thick;
+
+    /**
+     * libgd AA — when true, imageline uses gdImageAALine (php-src ext/gd/gd.c imageantialias; #20406).
+     */
+    public bool $antiAlias;
+
+    /**
      * @param list<int> $pixels
      */
     private function __construct(
@@ -47,7 +57,9 @@ final class GdImageState
         array $pixels,
         bool $truecolor,
         bool $alphaBlending = true,
-        bool $saveAlpha = false
+        bool $saveAlpha = false,
+        int $thick = 1,
+        bool $antiAlias = false
     ) {
         $this->encoded = $encoded;
         $this->imageType = $imageType;
@@ -57,6 +69,8 @@ final class GdImageState
         $this->truecolor = $truecolor;
         $this->alphaBlending = $alphaBlending;
         $this->saveAlpha = $saveAlpha;
+        $this->thick = $thick;
+        $this->antiAlias = $antiAlias;
     }
 
     public static function fromEncoded(string $encoded, int $imageType): self
