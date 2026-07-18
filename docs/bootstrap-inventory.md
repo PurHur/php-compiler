@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5798 |
-| Phase A inventory files (M2 ratio SSOT) | 5798 |
+| PHP files on vm.php path | 5799 |
+| Phase A inventory files (M2 ratio SSOT) | 5799 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17076 |
+| Source constructs flagged (warnings) | 17085 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -234,7 +234,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomImportNodeJitHelper.php` | 0 | 3 |
 | `ext/dom/DomIsConnectedJitHelper.php` | 0 | 1 |
 | `ext/dom/DomIsEqualNodeJitHelper.php` | 0 | 1 |
-| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 44 |
+| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 48 |
 | `ext/dom/DomLoadHTMLFileJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadHTMLJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadJitHelper.php` | 0 | 1 |
@@ -293,6 +293,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/FragmentAppendChild.php` | 0 | 1 |
 | `ext/dom/FragmentAppendXML.php` | 0 | 1 |
 | `ext/dom/FragmentConstruct.php` | 0 | 1 |
+| `ext/dom/HtmlCollectionNamedItem.php` | 0 | 2 |
 | `ext/dom/HtmlDocumentCreateEmpty.php` | 0 | 2 |
 | `ext/dom/HtmlDocumentCreateFromFile.php` | 0 | 3 |
 | `ext/dom/HtmlDocumentCreateFromString.php` | 0 | 3 |
@@ -404,7 +405,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListReplace.php` | 0 | 1 |
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 393 |
+| `ext/dom/VmDom.php` | 0 | 396 |
 | `ext/dom/VmDomCollectionDimension.php` | 0 | 1 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 42 |
@@ -7085,24 +7086,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 119)
 - new ClassProperty (line 120)
 - new Variable (line 120)
-- new ClassEntry (line 125)
-- new ClassProperty (line 128)
-- new DocumentGetElementsByClassName (line 136)
-- new ClassEntry (line 141)
-- new ClassProperty (line 144)
+- new ClassEntry (line 126)
+- new ClassProperty (line 135)
+- new Variable (line 135)
+- new HtmlCollectionNamedItem (line 137)
+- new ClassEntry (line 142)
 - new ClassProperty (line 145)
-- new ClassProperty (line 146)
-- new HtmlDocumentCreateFromString (line 147)
-- new HtmlDocumentCreateEmpty (line 150)
-- new HtmlDocumentCreateFromFile (line 153)
-- new HtmlDocumentGetElementById (line 156)
-- new HtmlDocumentQuerySelector (line 159)
-- new HtmlDocumentQuerySelectorAll (line 162)
-- new HtmlDocumentSaveHtml (line 165)
-- new ClassEntry (line 182)
-- new ClassProperty (line 185)
-- new XmlDocumentCreateFromString (line 186)
-- new XmlDocumentCreateEmpty (line 189)
+- new DocumentGetElementsByClassName (line 153)
+- new ClassEntry (line 158)
+- new ClassProperty (line 161)
+- new ClassProperty (line 162)
+- new ClassProperty (line 163)
+- new HtmlDocumentCreateFromString (line 164)
+- new HtmlDocumentCreateEmpty (line 167)
+- new HtmlDocumentCreateFromFile (line 170)
+- new HtmlDocumentGetElementById (line 173)
+- new HtmlDocumentQuerySelector (line 176)
+- new HtmlDocumentQuerySelectorAll (line 179)
+- new HtmlDocumentSaveHtml (line 182)
+- new ClassEntry (line 199)
+- new ClassProperty (line 202)
+- new XmlDocumentCreateFromString (line 203)
+- new XmlDocumentCreateEmpty (line 206)
 - 3 class method(s)
 
 ### `ext/dom/DomLoadHTMLFileJitHelper.php`
@@ -7408,6 +7413,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/FragmentConstruct.php`
 
 **Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/HtmlCollectionNamedItem.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
 - 1 class method(s)
 
 ### `ext/dom/HtmlDocumentCreateEmpty.php`
@@ -8389,40 +8400,43 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 6996)
 - new DomNodeState (line 7000)
 - new Variable (line 7007)
-- new DOMException (line 7061)
-- new ObjectEntry (line 7278)
-- new DomNodeState (line 7282)
-- new Variable (line 7289)
-- new ObjectEntry (line 7316)
-- new DomNodeState (line 7319)
-- new Variable (line 7327)
-- new Variable (line 7518)
-- new DOMException (line 7655)
-- new DOMException (line 7662)
-- new DOMException (line 7669)
-- new DOMException (line 7673)
-- new DOMException (line 7676)
-- new DOMException (line 7685)
-- new DOMException (line 7697)
-- new DOMException (line 8758)
-- new Variable (line 8817)
-- new Variable (line 8830)
-- new Variable (line 8868)
-- new DOMException (line 8879)
-- new Variable (line 8881)
-- new DOMException (line 9042)
-- new DOMException (line 9069)
-- new DOMException (line 9105)
-- new DOMException (line 9169)
-- new DOMException (line 9177)
-- new DOMException (line 9190)
-- new DOMException (line 9195)
-- new DOMException (line 9198)
-- new DOMException (line 9201)
-- new DOMException (line 9230)
-- new Error (line 10122)
-- new Error (line 10126)
-- 417 class method(s)
+- new ObjectEntry (line 7025)
+- new DomNodeState (line 7029)
+- new Variable (line 7036)
+- new DOMException (line 7113)
+- new ObjectEntry (line 7387)
+- new DomNodeState (line 7391)
+- new Variable (line 7398)
+- new ObjectEntry (line 7425)
+- new DomNodeState (line 7428)
+- new Variable (line 7436)
+- new Variable (line 7627)
+- new DOMException (line 7764)
+- new DOMException (line 7771)
+- new DOMException (line 7778)
+- new DOMException (line 7782)
+- new DOMException (line 7785)
+- new DOMException (line 7794)
+- new DOMException (line 7806)
+- new DOMException (line 8867)
+- new Variable (line 8926)
+- new Variable (line 8939)
+- new Variable (line 8977)
+- new DOMException (line 8988)
+- new Variable (line 8990)
+- new DOMException (line 9151)
+- new DOMException (line 9178)
+- new DOMException (line 9214)
+- new DOMException (line 9278)
+- new DOMException (line 9286)
+- new DOMException (line 9299)
+- new DOMException (line 9304)
+- new DOMException (line 9307)
+- new DOMException (line 9310)
+- new DOMException (line 9339)
+- new Error (line 10238)
+- new Error (line 10242)
+- 423 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -8490,19 +8504,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomLiving.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 80)
-- new ObjectEntry (line 98)
-- new DOMException (line 127)
-- new Variable (line 130)
-- new DOMException (line 170)
-- new DOMException (line 253)
-- new DOMException (line 258)
-- new DOMException (line 265)
-- new DOMException (line 296)
-- new DOMException (line 308)
-- new DOMException (line 421)
-- new Variable (line 427)
-- new Variable (line 461)
+- new ObjectEntry (line 86)
+- new ObjectEntry (line 104)
+- new DOMException (line 133)
+- new Variable (line 136)
+- new DOMException (line 176)
+- new DOMException (line 259)
+- new DOMException (line 264)
+- new DOMException (line 271)
+- new DOMException (line 302)
+- new DOMException (line 314)
+- new DOMException (line 427)
+- new Variable (line 433)
+- new Variable (line 467)
 - 36 class method(s)
 - 1 closure(s)
 
@@ -27282,7 +27296,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/date_format.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 - 1 closure(s)
 

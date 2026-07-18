@@ -122,6 +122,23 @@ final class DomLivingBuiltinClasses
             $ctx->classes[VmDomLiving::CLASS_TOKEN_LIST] = $tokenList;
         }
 
+        // Dom\HTMLCollection — live class/tag/$children collections (php-src html_collection.c; #20709).
+        $htmlCollection = new ClassEntry('Dom\\HTMLCollection');
+        $htmlCollection->isInternal = true;
+        $htmlCollection->interfaces[] = 'countable';
+        if (isset($ctx->classes['iterator'])) {
+            $htmlCollection->interfaces[] = 'iterator';
+        }
+        if (isset($ctx->classes['traversable'])) {
+            $htmlCollection->interfaces[] = 'traversable';
+        }
+        $htmlCollection->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
+        self::copyMethods($ctx->classes[VmDom::CLASS_NODE_LIST] ?? null, $htmlCollection);
+        $htmlCollection->methods['nameditem'] = new HtmlCollectionNamedItem();
+        $htmlCollection->methodVisibility['nameditem'] = $pub;
+        $htmlCollection->methodNames['nameditem'] = 'namedItem';
+        $ctx->classes[VmDomLiving::CLASS_HTML_COLLECTION] = $htmlCollection;
+
         $document = new ClassEntry('Dom\\Document');
         $document->isInternal = true;
         $document->parentLc = VmDomLiving::CLASS_NODE;

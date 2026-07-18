@@ -51,6 +51,10 @@ final class VmDomCollectionDimension
             if (VmDom::isNamedNodeMap($object)) {
                 return null !== VmDom::namedNodeMapGetNamedItem($object, $offset->resolveIndirect()->toString());
             }
+            // Dom\HTMLCollection string offset → namedItem (php-src html_collection.c; #20709).
+            if (VmDom::isHtmlCollection($object)) {
+                return null !== VmDom::htmlCollectionNamedItem($object, $offset->resolveIndirect()->toString());
+            }
 
             return false;
         }
@@ -73,6 +77,17 @@ final class VmDomCollectionDimension
         if (self::processOffsetAsNamed($offset, $lval)) {
             if (VmDom::isNamedNodeMap($object)) {
                 $node = VmDom::namedNodeMapGetNamedItem($object, $offset->resolveIndirect()->toString());
+                if (null === $node) {
+                    $out->null();
+
+                    return;
+                }
+                $out->object($node);
+
+                return;
+            }
+            if (VmDom::isHtmlCollection($object)) {
+                $node = VmDom::htmlCollectionNamedItem($object, $offset->resolveIndirect()->toString());
                 if (null === $node) {
                     $out->null();
 

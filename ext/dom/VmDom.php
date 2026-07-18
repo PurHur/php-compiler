@@ -7010,12 +7010,63 @@ final class VmDom
         return $var;
     }
 
+    /**
+     * Dom\HTMLCollection handle — same list state as DOMNodeList (php-src html_collection.c; #20709).
+     *
+     * @param list<int> $nodeIds
+     */
+    public static function createHtmlCollection(Context $ctx, array $nodeIds): Variable
+    {
+        $class = $ctx->classes[VmDomLiving::CLASS_HTML_COLLECTION] ?? null;
+        if (null === $class) {
+            return self::createNodeList($ctx, $nodeIds);
+        }
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_LENGTH)->int(\count($nodeIds));
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_NODELIST;
+        $state->nodeName = '#htmlcollection';
+        $state->listNodeIds = $nodeIds;
+        $state->listIterIndex = 0;
+        DomRegistry::attach($entry, $state);
+
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
+    /** Living Dom\* receivers use HTMLCollection; legacy DOM* keep DOMNodeList (#20709). */
+    public static function prefersHtmlCollection(ObjectEntry $root): bool
+    {
+        $lc = strtolower($root->class->name);
+
+        return VmDomLiving::isLivingDocument($root)
+            || VmDomLiving::isLivingElement($root)
+            || VmDomLiving::CLASS_DOCUMENT === $lc;
+    }
+
+    /**
+     * @param list<int> $nodeIds
+     */
+    public static function createLiveCollection(Context $ctx, ObjectEntry $root, array $nodeIds): Variable
+    {
+        if (self::prefersHtmlCollection($root)) {
+            return self::createHtmlCollection($ctx, $nodeIds);
+        }
+
+        return self::createNodeList($ctx, $nodeIds);
+    }
+
     public static function createLiveTagNameNodeList(
         Context $ctx,
         ObjectEntry $root,
         string $tagName
     ): Variable {
-        $var = self::createNodeList($ctx, self::collectElementsByTagName($root, $tagName));
+        $var = self::createLiveCollection($ctx, $root, self::collectElementsByTagName($root, $tagName));
         $state = DomRegistry::state($var->toObject());
         $state->listQueryRootId = $root->id;
         $state->listQueryTagName = $tagName;
@@ -7029,8 +7080,9 @@ final class VmDom
         string $namespaceUri,
         string $localName
     ): Variable {
-        $var = self::createNodeList(
+        $var = self::createLiveCollection(
             $ctx,
+            $root,
             self::collectElementsByTagNameNS($root, $namespaceUri, $localName)
         );
         $state = DomRegistry::state($var->toObject());
@@ -7069,7 +7121,7 @@ final class VmDom
         ObjectEntry $root,
         string $classNames
     ): Variable {
-        $var = self::createNodeList($ctx, self::collectElementsByClassName($root, $classNames));
+        $var = self::createLiveCollection($ctx, $root, self::collectElementsByClassName($root, $classNames));
         $state = DomRegistry::state($var->toObject());
         $state->listQueryRootId = $root->id;
         $state->listQueryClassNames = $classNames;
@@ -7131,9 +7183,66 @@ final class VmDom
 
     public static function isNodeList(ObjectEntry $entry): bool
     {
-        return self::CLASS_NODE_LIST === strtolower($entry->class->name)
+        $lc = strtolower($entry->class->name);
+        if (self::CLASS_NODE_LIST !== $lc && VmDomLiving::CLASS_HTML_COLLECTION !== $lc) {
+            return false;
+        }
+
+        return DomRegistry::has($entry)
+            && DomConstants::XML_NODELIST === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isHtmlCollection(ObjectEntry $entry): bool
+    {
+        return VmDomLiving::CLASS_HTML_COLLECTION === strtolower($entry->class->name)
             && DomRegistry::has($entry)
             && DomConstants::XML_NODELIST === DomRegistry::state($entry)->nodeType;
+    }
+
+    /**
+     * Dom\HTMLCollection::namedItem() — id or HTML name attr (php-src html_collection.c; #20709).
+     */
+    public static function htmlCollectionNamedItem(ObjectEntry $collection, string $key): ?ObjectEntry
+    {
+        if (!self::isHtmlCollection($collection)) {
+            throw new \LogicException('Dom\\HTMLCollection::namedItem() called on non-HTMLCollection in this compiler build');
+        }
+        if ('' === $key) {
+            return null;
+        }
+        self::refreshNodeListIfLive($collection);
+        foreach (DomRegistry::state($collection)->listNodeIds as $nodeId) {
+            $node = DomRegistry::entry($nodeId);
+            if (null === $node || !self::isElement($node)) {
+                continue;
+            }
+            if (self::getAttribute($node, 'id') === $key) {
+                return $node;
+            }
+            if (self::elementIsInHtmlNamespace($node) && self::getAttribute($node, 'name') === $key) {
+                return $node;
+            }
+        }
+
+        return null;
+    }
+
+    /** HTML ns or HTMLDocument tree with null ns (our loadHTML path; #20709). */
+    private static function elementIsInHtmlNamespace(ObjectEntry $element): bool
+    {
+        $ns = DomRegistry::state($element)->namespaceUri;
+        if (VmDomLiving::HTML_NS === $ns) {
+            return true;
+        }
+        if (null !== $ns && '' !== $ns) {
+            return false;
+        }
+        $owner = self::ownerDocumentEntry($element);
+        if (null === $owner) {
+            return false;
+        }
+
+        return DomRegistry::state($owner)->isHtmlDocument;
     }
 
     public static function namedNodeMapItem(ObjectEntry $namedNodeMap, int $index): ?ObjectEntry
@@ -9388,6 +9497,13 @@ final class VmDom
             }
             // Dom\TokenList shares DOMTokenList method handlers (#20512).
             if (self::CLASS_TOKEN_LIST === $classLc && self::isTokenList($object)) {
+                return $object;
+            }
+            // Dom\HTMLCollection shares DOMNodeList item/count/iterator handlers (#20709).
+            if (self::CLASS_NODE_LIST === $classLc && self::isNodeList($object)) {
+                return $object;
+            }
+            if (VmDomLiving::CLASS_HTML_COLLECTION === $classLc && self::isHtmlCollection($object)) {
                 return $object;
             }
             throw new \TypeError(sprintf('%s must be called on a %s instance', $label, self::classNameFromLc($classLc)));
