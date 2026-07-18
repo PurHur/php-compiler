@@ -227,6 +227,12 @@ final class VmPgsqlNative
         return (int) self::requireFfi()->PQsetnonblocking($conn, $arg);
     }
 
+    /** PQsetErrorVerbosity — previous verbosity (php-src pg_set_error_verbosity; #20660). */
+    public static function setErrorVerbosity(\FFI\CData $conn, int $verbosity): int
+    {
+        return (int) self::requireFfi()->PQsetErrorVerbosity($conn, $verbosity);
+    }
+
     public static function escapeIdentifier(\FFI\CData $conn, string $value): string
     {
         $ffi = self::requireFfi();
@@ -469,6 +475,7 @@ int PQconsumeInput(PGconn *conn);
 int PQflush(PGconn *conn);
 int PQisnonblocking(const PGconn *conn);
 int PQsetnonblocking(PGconn *conn, int arg);
+int PQsetErrorVerbosity(PGconn *conn, int verbosity);
 Oid PQftable(const PGresult *res, int field_num);
 Oid PQftype(const PGresult *res, int field_num);
 int PQfnumber(const PGresult *res, const char *field_name);
