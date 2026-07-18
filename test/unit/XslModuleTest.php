@@ -47,10 +47,15 @@ $result = $proc->transformToXML($dom);
 echo (int) str_contains($result, '<h1>Hi</h1>'), "\n";
 $docResult = $proc->transformToDoc($dom);
 echo $docResult->getElementsByTagName('h1')->item(0)->textContent, "\n";
+$uri = tempnam(sys_get_temp_dir(), 'xslt_uri_');
+$n = $proc->transformToUri($dom, $uri);
+echo (int) is_int($n), "\n";
+echo (int) str_contains((string) file_get_contents($uri), '<h1>Hi</h1>'), "\n";
+@unlink($uri);
 PHP;
         $block = $runtime->parseAndCompile($code, 'xsl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("1\nHi\n", ob_get_clean());
+        self::assertSame("1\nHi\n1\n1\n", ob_get_clean());
     }
 }

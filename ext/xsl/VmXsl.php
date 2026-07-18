@@ -43,6 +43,9 @@ final class VmXsl
         $entry->methods['transformtodoc'] = new XsltProcessorTransformToDoc();
         $entry->methodVisibility['transformtodoc'] = $pub;
         $entry->methodNames['transformtodoc'] = 'transformToDoc';
+        $entry->methods['transformtouri'] = new XsltProcessorTransformToUri();
+        $entry->methodVisibility['transformtouri'] = $pub;
+        $entry->methodNames['transformtouri'] = 'transformToUri';
         $entry->methods['setparameter'] = new XsltProcessorSetParameter();
         $entry->methodVisibility['setparameter'] = $pub;
         $entry->methodNames['setparameter'] = 'setParameter';
@@ -113,6 +116,14 @@ final class VmXsl
         }
 
         return VmXslDomBridge::hostDocumentToVm($ctx, $hostResult);
+    }
+
+    /** @return int|false */
+    public static function transformToUri(ObjectEntry $entry, ObjectEntry $document, string $uri)
+    {
+        $hostDoc = VmXslDomBridge::vmDocumentToHost($document);
+
+        return XsltHostBridge::transformToUri(XsltRegistry::processor($entry), $hostDoc, $uri);
     }
 
     public static function setParameter(ObjectEntry $entry, string $namespace, string $name, string $value): bool
