@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM\Builtin;
 
-use PHPCompiler\ext\standard\VmReflection;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\DateTimeSupport;
 
-/** DateTime::format(string $format) — VM (#3072). */
+/**
+ * DateTime::format(string $format) — VM (#3072).
+ *
+ * Z_PARAM_STR $format — null TypeError on 8.4 forward profile (#20693, ext/date/php_date.c).
+ */
 final class DateTimeFormat extends VmClassMethod
 {
     public function __construct()
@@ -22,7 +26,11 @@ final class DateTimeFormat extends VmClassMethod
             throw new \LogicException('DateTime::format() expects exactly 1 argument');
         }
         $receiver = DateTimeSupport::requireDateTimeLike($frame->calledArgs[0], 'DateTime::format()');
-        $format = VmReflection::stringArg($frame->calledArgs[1], 'DateTime::format() format', 1);
+        $formatFn = (false !== stripos($receiver->class->name, 'immutable'))
+            ? 'DateTimeImmutable::format'
+            : 'DateTime::format';
+        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 / strict_types (#20693).
+        $format = VmString::zparamStrBuiltinArgForFrame($frame, 1, $formatFn, 0, 'format');
         if (null === $frame->returnVar) {
             return;
         }
