@@ -639,3 +639,92 @@ final class pg_get_notify extends Internal
         throw new \LogicException('pg_get_notify() is not implemented for JIT (#20681)');
     }
 }
+
+/**
+ * pg_result_status (php-src ext/pgsql/pgsql.c; #20702).
+ */
+final class pg_result_status extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_result_status');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_result_status() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmPgsqlArg::requireResult($frame->calledArgs[0], 'pg_result_status', 1);
+        $mode = PgsqlConstants::PGSQL_STATUS_LONG;
+        if (2 === $argc) {
+            $modeVar = $frame->calledArgs[1]->resolveIndirect();
+            if (\PHPCompiler\VM\Variable::TYPE_INTEGER !== $modeVar->type
+                && \PHPCompiler\VM\Variable::TYPE_FLOAT !== $modeVar->type
+                && \PHPCompiler\VM\Variable::TYPE_BOOLEAN !== $modeVar->type
+                && \PHPCompiler\VM\Variable::TYPE_STRING !== $modeVar->type
+            ) {
+                throw new \TypeError(\sprintf(
+                    'pg_result_status(): Argument #2 ($mode) must be of type int, %s given',
+                    match ($modeVar->type) {
+                        \PHPCompiler\VM\Variable::TYPE_NULL => 'null',
+                        \PHPCompiler\VM\Variable::TYPE_ARRAY => 'array',
+                        \PHPCompiler\VM\Variable::TYPE_OBJECT => 'object',
+                        default => 'mixed',
+                    }
+                ));
+            }
+            $mode = (int) $modeVar->toInt();
+        }
+        $out = VmPgsqlCore::resultStatus($result, $mode);
+        if (\is_int($out)) {
+            $frame->returnVar->int($out);
+        } else {
+            $frame->returnVar->string($out);
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_result_status() is not implemented for JIT (#20702)');
+    }
+}
+
+/**
+ * pg_get_pid (php-src ext/pgsql/pgsql.c; #20702).
+ */
+final class pg_get_pid extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_get_pid');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_get_pid() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_get_pid', 1);
+        $frame->returnVar->int(VmPgsqlCore::getPid($conn));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_get_pid() is not implemented for JIT (#20702)');
+    }
+}

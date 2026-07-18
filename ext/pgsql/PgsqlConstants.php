@@ -91,6 +91,12 @@ final class PgsqlConstants
     /** libpq PQTRANS_UNKNOWN */
     public const PGSQL_TRANSACTION_UNKNOWN = 4;
 
+    /** php-src PGSQL_STATUS_LONG — return ExecStatusType as int */
+    public const PGSQL_STATUS_LONG = 1;
+
+    /** php-src PGSQL_STATUS_STRING — return PQcmdStatus string */
+    public const PGSQL_STATUS_STRING = 2;
+
     /**
      * @return array<string, int>
      */
@@ -128,6 +134,8 @@ final class PgsqlConstants
             'PGSQL_TRANSACTION_INTRANS' => self::PGSQL_TRANSACTION_INTRANS,
             'PGSQL_TRANSACTION_INERROR' => self::PGSQL_TRANSACTION_INERROR,
             'PGSQL_TRANSACTION_UNKNOWN' => self::PGSQL_TRANSACTION_UNKNOWN,
+            'PGSQL_STATUS_LONG' => self::PGSQL_STATUS_LONG,
+            'PGSQL_STATUS_STRING' => self::PGSQL_STATUS_STRING,
         ];
     }
 }

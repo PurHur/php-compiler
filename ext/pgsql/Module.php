@@ -115,6 +115,8 @@ class Module extends ModuleAbstract
             new pg_get_result(),
             new pg_cancel_query(),
             new pg_get_notify(),
+            new pg_result_status(),
+            new pg_get_pid(),
             new pg_set_error_verbosity(),
             new pg_set_error_context_visibility(),
             new pg_put_line(),

@@ -811,6 +811,31 @@ final class VmPgsqlCore
     }
 
     /**
+     * pg_result_status — int (ExecStatusType) or cmd status string (#20702).
+     *
+     * @return int|string
+     */
+    public static function resultStatus(ObjectEntry $resultObj, int $mode = PgsqlConstants::PGSQL_STATUS_LONG): int|string
+    {
+        $result = VmPgsqlResult::native($resultObj);
+        if (PgsqlConstants::PGSQL_STATUS_LONG === $mode) {
+            return VmPgsqlNative::resultStatus($result);
+        }
+        if (PgsqlConstants::PGSQL_STATUS_STRING === $mode) {
+            return VmPgsqlNative::cmdStatus($result);
+        }
+        throw new \ValueError(
+            'pg_result_status(): Argument #2 ($mode) must be either PGSQL_STATUS_LONG or PGSQL_STATUS_STRING'
+        );
+    }
+
+    /** pg_get_pid (#20702). */
+    public static function getPid(ObjectEntry $connection): int
+    {
+        return VmPgsqlNative::backendPid(VmPgsqlConnection::native($connection));
+    }
+
+    /**
      * pg_version assoc array (php-src php_pgsql_get_link_info PHP_PG_VERSION; #20680).
      */
     public static function version(ObjectEntry $connection): HashTable
