@@ -1015,6 +1015,206 @@ final class VmGd
         return true;
     }
 
+    /**
+     * imagefilltoborder() — flood fill until border color (php-src gdImageFillToBorder; #20439).
+     */
+    public static function fillToBorder(ObjectEntry $image, int $x, int $y, int $border, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        // libgd refuses non-solid border/color (special negative color ids).
+        if ($border < 0 || $color < 0) {
+            return true;
+        }
+        if (!$state->truecolor) {
+            $colorsTotal = \count($state->colors);
+            if ($color >= $colorsTotal || $border >= $colorsTotal) {
+                return true;
+            }
+        }
+
+        $restoreAlpha = $state->alphaBlending;
+        $state->alphaBlending = GdConstants::REGISTERED['IMG_EFFECT_REPLACE'];
+
+        $sx = $state->width;
+        $sy = $state->height;
+        if ($x >= $sx) {
+            $x = $sx - 1;
+        } elseif ($x < 0) {
+            $x = 0;
+        }
+        if ($y >= $sy) {
+            $y = $sy - 1;
+        } elseif ($y < 0) {
+            $y = 0;
+        }
+
+        // Iterative stack mirrors libgd recursion (avoids PHP call-stack limits).
+        $stack = [[$x, $y]];
+        while ([] !== $stack) {
+            [$cx, $cy] = array_pop($stack);
+            $leftLimit = -1;
+            for ($i = $cx; $i >= 0; --$i) {
+                if (self::rawPixel($state, $i, $cy) === $border) {
+                    break;
+                }
+                self::putPixel($state, $i, $cy, $color);
+                $leftLimit = $i;
+            }
+            if (-1 === $leftLimit) {
+                continue;
+            }
+            $rightLimit = $cx;
+            for ($i = $cx + 1; $i < $sx; ++$i) {
+                if (self::rawPixel($state, $i, $cy) === $border) {
+                    break;
+                }
+                self::putPixel($state, $i, $cy, $color);
+                $rightLimit = $i;
+            }
+            if ($cy > 0) {
+                $lastBorder = 1;
+                for ($i = $leftLimit; $i <= $rightLimit; ++$i) {
+                    $c = self::rawPixel($state, $i, $cy - 1);
+                    if ($lastBorder) {
+                        if ($c !== $border && $c !== $color) {
+                            $stack[] = [$i, $cy - 1];
+                            $lastBorder = 0;
+                        }
+                    } elseif ($c === $border || $c === $color) {
+                        $lastBorder = 1;
+                    }
+                }
+            }
+            if ($cy < $sy - 1) {
+                $lastBorder = 1;
+                for ($i = $leftLimit; $i <= $rightLimit; ++$i) {
+                    $c = self::rawPixel($state, $i, $cy + 1);
+                    if ($lastBorder) {
+                        if ($c !== $border && $c !== $color) {
+                            $stack[] = [$i, $cy + 1];
+                            $lastBorder = 0;
+                        }
+                    } elseif ($c === $border || $c === $color) {
+                        $lastBorder = 1;
+                    }
+                }
+            }
+        }
+
+        $state->alphaBlending = $restoreAlpha;
+
+        return true;
+    }
+
+    /**
+     * imagesetbrush() — brush GdImage for IMG_COLOR_BRUSHED (php-src gdImageSetBrush; #20439).
+     */
+    public static function setBrush(ObjectEntry $image, ObjectEntry $brush): bool
+    {
+        $state = GdRegistry::state($image);
+        $brushState = GdRegistry::state($brush);
+        if (null === $state || null === $brushState) {
+            return false;
+        }
+        $state->brush = $brush;
+        $state->brushColorMap = [];
+        if (!$state->truecolor && !$brushState->truecolor) {
+            foreach ($brushState->colors as $i => $packed) {
+                $state->brushColorMap[(int) $i] = self::colorResolveAlpha(
+                    $image,
+                    ($packed >> 16) & 0xFF,
+                    ($packed >> 8) & 0xFF,
+                    $packed & 0xFF,
+                    ($packed >> 24) & 0x7F
+                );
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * imagesetstyle() — style color list for IMG_COLOR_STYLED (php-src gdImageSetStyle; #20439).
+     *
+     * @param list<int> $style
+     */
+    public static function setStyle(ObjectEntry $image, array $style): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        $state->style = array_values($style);
+        $state->stylePos = 0;
+
+        return true;
+    }
+
+    /**
+     * Coerce imagesetstyle() $style array elements (zval_get_long; #20439).
+     *
+     * @return list<int>
+     */
+    public static function coerceStyleArray(Variable $arg, string $function, int $position): array
+    {
+        $arg = $arg->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($style) must be of type array, %s given',
+                $function,
+                $position,
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($style) must be of type array, %s given',
+                $function,
+                $position,
+                self::typeLabel($arg)
+            ));
+        }
+        $table = $arg->toArray();
+        if (0 === $table->getNumElements()) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($style) must not be empty',
+                $function,
+                $position
+            ));
+        }
+        $style = [];
+        foreach ($table->iterate(true) as $item) {
+            $style[] = self::coerceStyleColor($item);
+        }
+
+        return $style;
+    }
+
+    private static function coerceStyleColor(Variable $arg): int
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $arg->type) {
+            return $arg->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $arg->type) {
+            return (int) $arg->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $arg->type) {
+            return $arg->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_STRING === $arg->type) {
+            return (int) $arg->toString();
+        }
+        if (Variable::TYPE_NULL === $arg->type) {
+            return 0;
+        }
+
+        return 0;
+    }
+
     public static function destroy(ObjectEntry $image): bool
     {
         if (null === GdRegistry::state($image)) {
@@ -4087,6 +4287,24 @@ final class VmGd
                 2 => 'thickness',
                 default => 'arg',
             },
+            'imagefilltoborder' => match ($position) {
+                1 => 'image',
+                2 => 'x',
+                3 => 'y',
+                4 => 'border_color',
+                5 => 'color',
+                default => 'arg',
+            },
+            'imagesetbrush' => match ($position) {
+                1 => 'image',
+                2 => 'brush',
+                default => 'arg',
+            },
+            'imagesetstyle' => match ($position) {
+                1 => 'image',
+                2 => 'style',
+                default => 'arg',
+            },
             'imagecolorallocatealpha' => match ($position) {
                 1 => 'image',
                 2 => 'red',
@@ -4143,6 +4361,39 @@ final class VmGd
 
     private static function putPixel(GdImageState $state, int $x, int $y, int $color): void
     {
+        switch ($color) {
+            case GdConstants::COLOR_STYLED:
+                if (null === $state->style || [] === $state->style) {
+                    return;
+                }
+                $p = $state->style[$state->stylePos++];
+                $state->stylePos %= \count($state->style);
+                if (GdConstants::COLOR_TRANSPARENT !== $p) {
+                    self::putPixel($state, $x, $y, $p);
+                }
+
+                return;
+            case GdConstants::COLOR_STYLEDBRUSHED:
+                if (null === $state->style || [] === $state->style) {
+                    return;
+                }
+                $p = $state->style[$state->stylePos++];
+                $state->stylePos %= \count($state->style);
+                if (GdConstants::COLOR_TRANSPARENT !== $p && 0 !== $p) {
+                    self::putPixel($state, $x, $y, GdConstants::COLOR_BRUSHED);
+                }
+
+                return;
+            case GdConstants::COLOR_BRUSHED:
+                self::brushApply($state, $x, $y);
+
+                return;
+            case GdConstants::COLOR_TILED:
+                // imagesettile() not in #20439 — no-op without a tile (libgd same).
+                return;
+            default:
+                break;
+        }
         if ($x < 0 || $y < 0 || $x >= $state->width || $y >= $state->height) {
             return;
         }
@@ -4169,6 +4420,157 @@ final class VmGd
                 $state->pixels[$index] = $color;
                 break;
         }
+    }
+
+    private static function rawPixel(GdImageState $state, int $x, int $y): int
+    {
+        return $state->pixels[$y * $state->width + $x];
+    }
+
+    /**
+     * libgd gdImageBrushApply (php-src ext/gd/libgd/gd.c; #20439).
+     */
+    private static function brushApply(GdImageState $state, int $x, int $y): void
+    {
+        if (null === $state->brush) {
+            return;
+        }
+        $brushState = GdRegistry::state($state->brush);
+        if (null === $brushState || !$brushState->hasRaster()) {
+            return;
+        }
+        $hy = intdiv($brushState->height, 2);
+        $hx = intdiv($brushState->width, 2);
+        $y1 = $y - $hy;
+        $y2 = $y1 + $brushState->height;
+        $x1 = $x - $hx;
+        $x2 = $x1 + $brushState->width;
+        $srcy = 0;
+        $brushTransparent = $brushState->transparent;
+
+        if ($state->truecolor) {
+            for ($ly = $y1; $ly < $y2; ++$ly) {
+                $srcx = 0;
+                for ($lx = $x1; $lx < $x2; ++$lx) {
+                    if ($brushState->truecolor) {
+                        $p = self::rawPixel($brushState, $srcx, $srcy);
+                        if ($p !== $brushTransparent) {
+                            self::putPixel($state, $lx, $ly, $p);
+                        }
+                    } else {
+                        $p = self::rawPixel($brushState, $srcx, $srcy);
+                        if ($p !== $brushTransparent) {
+                            $tc = self::trueColorFromBrushPixel($brushState, $p);
+                            self::putPixel($state, $lx, $ly, $tc);
+                        }
+                    }
+                    ++$srcx;
+                }
+                ++$srcy;
+            }
+
+            return;
+        }
+
+        for ($ly = $y1; $ly < $y2; ++$ly) {
+            $srcx = 0;
+            for ($lx = $x1; $lx < $x2; ++$lx) {
+                $p = self::rawPixel($brushState, $srcx, $srcy);
+                if ($p !== $brushTransparent) {
+                    if ($brushState->truecolor) {
+                        self::putPixel(
+                            $state,
+                            $lx,
+                            $ly,
+                            self::resolveColorOnState(
+                                $state,
+                                ($p >> 16) & 0xFF,
+                                ($p >> 8) & 0xFF,
+                                $p & 0xFF,
+                                ($p >> 24) & 0x7F
+                            )
+                        );
+                    } else {
+                        self::putPixel($state, $lx, $ly, $state->brushColorMap[$p] ?? $p);
+                    }
+                }
+                ++$srcx;
+            }
+            ++$srcy;
+        }
+    }
+
+    /**
+     * Palette color resolve against a GdImageState (gdImageColorResolveAlpha; #20439).
+     */
+    private static function resolveColorOnState(
+        GdImageState $state,
+        int $red,
+        int $green,
+        int $blue,
+        int $alpha
+    ): int {
+        if ($state->truecolor) {
+            return (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+        }
+        foreach ($state->colors as $i => $packed) {
+            if ((int) $i === $state->transparent) {
+                continue;
+            }
+            if (
+                (($packed >> 16) & 0xFF) === ($red & 0xFF)
+                && (($packed >> 8) & 0xFF) === ($green & 0xFF)
+                && ($packed & 0xFF) === ($blue & 0xFF)
+                && (($packed >> 24) & 0x7F) === ($alpha & 0x7F)
+            ) {
+                return (int) $i;
+            }
+        }
+        if (\count($state->colors) < 256) {
+            $state->colors[] = (($alpha & 0x7F) << 24)
+                | (($red & 0xFF) << 16)
+                | (($green & 0xFF) << 8)
+                | ($blue & 0xFF);
+
+            return \count($state->colors) - 1;
+        }
+        $ct = -1;
+        $mindist = 4 * 255 * 255;
+        foreach ($state->colors as $i => $packed) {
+            if ((int) $i === $state->transparent) {
+                continue;
+            }
+            $rd = (($packed >> 16) & 0xFF) - $red;
+            $gd = (($packed >> 8) & 0xFF) - $green;
+            $bd = ($packed & 0xFF) - $blue;
+            $ad = (($packed >> 24) & 0x7F) - $alpha;
+            $dist = $rd * $rd + $gd * $gd + $bd * $bd + $ad * $ad;
+            if (0 === $dist) {
+                return (int) $i;
+            }
+            if ($dist < $mindist) {
+                $mindist = $dist;
+                $ct = (int) $i;
+            }
+        }
+
+        return $ct;
+    }
+
+    private static function trueColorFromBrushPixel(GdImageState $brushState, int $p): int
+    {
+        if ($brushState->truecolor) {
+            return $p;
+        }
+        if (!isset($brushState->colors[$p])) {
+            return 0;
+        }
+        $packed = $brushState->colors[$p];
+        if ($brushState->transparent === $p) {
+            return ($packed & 0xFFFFFF) | (127 << 24);
+        }
+
+        return $packed;
     }
 
     /**

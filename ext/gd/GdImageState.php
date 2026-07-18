@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\gd;
 
 use PHPCompiler\ext\standard\VmImage;
+use PHPCompiler\VM\ObjectEntry;
 
 /**
  * GdImage payload for {@see VmGd} (php-src ext/gd/gd.c; #6215, #3496, #20415).
@@ -71,6 +72,27 @@ final class GdImageState
      * libgd transparent color index / truecolor value (−1 = none; php-src; #20459).
      */
     public int $transparent;
+
+    /**
+     * libgd style[] / styleLength / stylePos for IMG_COLOR_STYLED (#20439).
+     *
+     * @var list<int>|null
+     */
+    public ?array $style = null;
+
+    public int $stylePos = 0;
+
+    /**
+     * libgd brush image for IMG_COLOR_BRUSHED (#20439).
+     */
+    public ?ObjectEntry $brush = null;
+
+    /**
+     * Palette brush → dest color map when both are palette (#20439).
+     *
+     * @var array<int, int>
+     */
+    public array $brushColorMap = [];
 
     /**
      * @param list<int> $pixels

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5623 |
-| Phase A inventory files (M2 ratio SSOT) | 5623 |
+| PHP files on vm.php path | 5626 |
+| Phase A inventory files (M2 ratio SSOT) | 5626 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16059 |
+| Source constructs flagged (warnings) | 16065 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -482,7 +482,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 5 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 75 |
+| `ext/gd/Module.php` | 0 | 78 |
 | `ext/gd/VmGd.php` | 0 | 15 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
 | `ext/gd/VmGdBmp.php` | 0 | 1 |
@@ -537,6 +537,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagefilledellipse.php` | 0 | 1 |
 | `ext/gd/imagefilledpolygon.php` | 0 | 1 |
 | `ext/gd/imagefilledrectangle.php` | 0 | 1 |
+| `ext/gd/imagefilltoborder.php` | 0 | 1 |
 | `ext/gd/imagefilter.php` | 0 | 1 |
 | `ext/gd/imageflip.php` | 0 | 1 |
 | `ext/gd/imagegetinterpolation.php` | 0 | 1 |
@@ -554,8 +555,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagerotate.php` | 0 | 1 |
 | `ext/gd/imagesavealpha.php` | 0 | 1 |
 | `ext/gd/imagescale.php` | 0 | 1 |
+| `ext/gd/imagesetbrush.php` | 0 | 1 |
 | `ext/gd/imagesetinterpolation.php` | 0 | 1 |
 | `ext/gd/imagesetpixel.php` | 0 | 1 |
+| `ext/gd/imagesetstyle.php` | 0 | 1 |
 | `ext/gd/imagesetthickness.php` | 0 | 1 |
 | `ext/gd/imagestring.php` | 0 | 1 |
 | `ext/gd/imagesx.php` | 0 | 1 |
@@ -8788,10 +8791,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gd/GdImageState.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 115)
-- new self (line 122)
-- new self (line 130)
-- new self (line 138)
+- new self (line 137)
+- new self (line 144)
+- new self (line 152)
+- new self (line 160)
 - 6 class method(s)
 
 ### `ext/gd/GdRegistry.php`
@@ -8823,59 +8826,62 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagesavealpha (line 75)
 - new imageantialias (line 76)
 - new imagesetthickness (line 77)
-- new imageistruecolor (line 78)
-- new imagetruecolortopalette (line 79)
-- new imagepalettetotruecolor (line 80)
-- new imagesetinterpolation (line 81)
-- new imagegetinterpolation (line 82)
-- new imagefill (line 83)
-- new imagedestroy (line 84)
-- new imagesx (line 85)
-- new imagesy (line 86)
-- new imagecolorat (line 87)
-- new imagecopy (line 88)
-- new imagecopymerge (line 89)
-- new imagecopyresampled (line 90)
-- new imagecopyresized (line 91)
-- new imagesetpixel (line 92)
-- new imageline (line 93)
-- new imagedashedline (line 94)
-- new imagerectangle (line 95)
-- new imageellipse (line 96)
-- new imagefilledellipse (line 97)
-- new imagearc (line 98)
-- new imagefilledarc (line 99)
-- new imagepolygon (line 100)
-- new imageopenpolygon (line 101)
-- new imagefilledpolygon (line 102)
-- new imagefilledrectangle (line 103)
-- new imagestring (line 104)
-- new imagechar (line 105)
-- new imagettftext (line 107)
-- new imagettfbbox (line 108)
-- new imagefilter (line 110)
-- new imageflip (line 111)
-- new imagecrop (line 112)
-- new imagecropauto (line 113)
-- new imagerotate (line 114)
-- new imagescale (line 115)
-- new imageaffine (line 116)
-- new imageaffinematrixget (line 117)
-- new imageaffinematrixconcat (line 118)
-- new imageconvolution (line 119)
-- new imagecreatefromstring (line 122)
-- new imagepng (line 123)
-- new imagejpeg (line 124)
-- new imagegif (line 125)
-- new imagewebp (line 126)
-- new imageavif (line 127)
-- new imagebmp (line 128)
-- new imagecreatefrompng (line 129)
-- new imagecreatefromjpeg (line 130)
-- new imagecreatefromgif (line 131)
-- new imagecreatefromwebp (line 132)
-- new imagecreatefromavif (line 133)
-- new imagecreatefrombmp (line 134)
+- new imagesetbrush (line 78)
+- new imagesetstyle (line 79)
+- new imageistruecolor (line 80)
+- new imagetruecolortopalette (line 81)
+- new imagepalettetotruecolor (line 82)
+- new imagesetinterpolation (line 83)
+- new imagegetinterpolation (line 84)
+- new imagefill (line 85)
+- new imagefilltoborder (line 86)
+- new imagedestroy (line 87)
+- new imagesx (line 88)
+- new imagesy (line 89)
+- new imagecolorat (line 90)
+- new imagecopy (line 91)
+- new imagecopymerge (line 92)
+- new imagecopyresampled (line 93)
+- new imagecopyresized (line 94)
+- new imagesetpixel (line 95)
+- new imageline (line 96)
+- new imagedashedline (line 97)
+- new imagerectangle (line 98)
+- new imageellipse (line 99)
+- new imagefilledellipse (line 100)
+- new imagearc (line 101)
+- new imagefilledarc (line 102)
+- new imagepolygon (line 103)
+- new imageopenpolygon (line 104)
+- new imagefilledpolygon (line 105)
+- new imagefilledrectangle (line 106)
+- new imagestring (line 107)
+- new imagechar (line 108)
+- new imagettftext (line 110)
+- new imagettfbbox (line 111)
+- new imagefilter (line 113)
+- new imageflip (line 114)
+- new imagecrop (line 115)
+- new imagecropauto (line 116)
+- new imagerotate (line 117)
+- new imagescale (line 118)
+- new imageaffine (line 119)
+- new imageaffinematrixget (line 120)
+- new imageaffinematrixconcat (line 121)
+- new imageconvolution (line 122)
+- new imagecreatefromstring (line 125)
+- new imagepng (line 126)
+- new imagejpeg (line 127)
+- new imagegif (line 128)
+- new imagewebp (line 129)
+- new imageavif (line 130)
+- new imagebmp (line 131)
+- new imagecreatefrompng (line 132)
+- new imagecreatefromjpeg (line 133)
+- new imagecreatefromgif (line 134)
+- new imagecreatefromwebp (line 135)
+- new imagecreatefromavif (line 136)
+- new imagecreatefrombmp (line 137)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -8886,16 +8892,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 103)
 - new HashTable (line 650)
 - new Variable (line 652)
-- new HashTable (line 1180)
-- new Variable (line 1182)
-- new HashTable (line 2742)
-- new Variable (line 2744)
-- new ObjectEntry (line 3194)
-- new ObjectEntry (line 3218)
-- new ObjectEntry (line 3242)
-- new ObjectEntry (line 3309)
-- new ObjectEntry (line 3620)
-- 144 class method(s)
+- new HashTable (line 1380)
+- new Variable (line 1382)
+- new HashTable (line 2942)
+- new Variable (line 2944)
+- new ObjectEntry (line 3394)
+- new ObjectEntry (line 3418)
+- new ObjectEntry (line 3442)
+- new ObjectEntry (line 3509)
+- new ObjectEntry (line 3820)
+- 153 class method(s)
 
 ### `ext/gd/VmGdAvif.php`
 
@@ -9162,6 +9168,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/gd/imagefilltoborder.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/gd/imagefilter.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9247,12 +9258,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/gd/imagesetbrush.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/gd/imagesetinterpolation.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `ext/gd/imagesetpixel.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagesetstyle.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)

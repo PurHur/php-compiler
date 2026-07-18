@@ -74,6 +74,12 @@ final class GdConstants
         'IMG_ARC_CHORD' => 1,
         'IMG_ARC_NOFILL' => 2,
         'IMG_ARC_EDGED' => 4,
+        // Special drawing colors (php-src ext/gd/libgd/gd.h; #20439)
+        'IMG_COLOR_STYLED' => -2,
+        'IMG_COLOR_BRUSHED' => -3,
+        'IMG_COLOR_STYLEDBRUSHED' => -4,
+        'IMG_COLOR_TILED' => -5,
+        'IMG_COLOR_TRANSPARENT' => -6,
     ];
 
     /** gdArc / IMG_ARC_PIE — rounded pie edge (php-src gd.h; #20437). */
@@ -87,6 +93,21 @@ final class GdConstants
 
     /** gdEdged / IMG_ARC_EDGED. */
     public const ARC_EDGED = 4;
+
+    /** gdStyled / IMG_COLOR_STYLED (#20439). */
+    public const COLOR_STYLED = -2;
+
+    /** gdBrushed / IMG_COLOR_BRUSHED (#20439). */
+    public const COLOR_BRUSHED = -3;
+
+    /** gdStyledBrushed / IMG_COLOR_STYLEDBRUSHED (#20439). */
+    public const COLOR_STYLEDBRUSHED = -4;
+
+    /** gdTiled / IMG_COLOR_TILED (#20439). */
+    public const COLOR_TILED = -5;
+
+    /** gdTransparent / IMG_COLOR_TRANSPARENT (#20439). */
+    public const COLOR_TRANSPARENT = -6;
 
     /** GD_METHOD_COUNT — exclusive upper bound for imagescale() $mode (#20405). */
     public const INTERPOLATION_METHOD_COUNT = 22;
