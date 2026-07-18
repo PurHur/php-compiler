@@ -9,6 +9,8 @@ $checks = [
     'imagecropauto',
     'imagerotate',
     'imagescale',
+    'imageconvolution',
+    'imagecopyresized',
 ];
 
 foreach ($checks as $fn) {

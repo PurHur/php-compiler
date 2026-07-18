@@ -727,6 +727,377 @@ final class VmGd
         return true;
     }
 
+    /**
+     * imagecopyresized() — nearest-neighbour scale blit (php-src gdImageCopyResized; #20405).
+     */
+    public static function copyResized(
+        ObjectEntry $dst,
+        ObjectEntry $src,
+        int $dstX,
+        int $dstY,
+        int $srcX,
+        int $srcY,
+        int $dstW,
+        int $dstH,
+        int $srcW,
+        int $srcH
+    ): bool {
+        $dstState = GdRegistry::state($dst);
+        $srcState = GdRegistry::state($src);
+        if (null === $dstState || null === $srcState
+            || !$dstState->hasRaster() || !$srcState->hasRaster()) {
+            return false;
+        }
+        if ($dstW <= 0 || $dstH <= 0 || $srcW <= 0 || $srcH <= 0) {
+            return false;
+        }
+
+        $dstPixels = $dstState->pixels;
+        $dstWidth = $dstState->width;
+        $srcWidth = $srcState->width;
+        $srcHeight = $srcState->height;
+        $srcPixels = $srcState->pixels;
+
+        for ($row = 0; $row < $dstH; ++$row) {
+            $dy = $dstY + $row;
+            if ($dy < 0 || $dy >= $dstState->height) {
+                continue;
+            }
+            $sy = $srcY + (int) (($row * $srcH) / $dstH);
+            if ($sy < 0 || $sy >= $srcHeight) {
+                continue;
+            }
+            for ($col = 0; $col < $dstW; ++$col) {
+                $dx = $dstX + $col;
+                if ($dx < 0 || $dx >= $dstWidth) {
+                    continue;
+                }
+                $sx = $srcX + (int) (($col * $srcW) / $dstW);
+                if ($sx < 0 || $sx >= $srcWidth) {
+                    continue;
+                }
+                $dstPixels[$dy * $dstWidth + $dx] = $srcPixels[$sy * $srcWidth + $sx];
+            }
+        }
+
+        $dstState->pixels = $dstPixels;
+
+        return true;
+    }
+
+    /**
+     * imagerotate() — counterclockwise degrees; 90° steps exact (php-src gdImageRotateInterpolated; #20405).
+     */
+    public static function rotate(Frame $frame, ObjectEntry $image, float $angle, int $bgColor): ObjectEntry|false
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+
+        $normalized = fmod($angle, 360.0);
+        if ($normalized < 0.0) {
+            $normalized += 360.0;
+        }
+        $quarter = (int) round($normalized / 90.0);
+        if (abs($normalized - (90.0 * $quarter)) < 0.0001) {
+            $quarter %= 4;
+            if (0 === $quarter) {
+                return self::createTruecolorFromPixels($frame, $state->width, $state->height, $state->pixels);
+            }
+            if (1 === $quarter) {
+                return self::rotate90CounterClockwise($frame, $state);
+            }
+            if (2 === $quarter) {
+                return self::rotate180($frame, $state);
+            }
+
+            return self::rotate270CounterClockwise($frame, $state);
+        }
+
+        return self::rotateArbitrary($frame, $state, $normalized, $bgColor);
+    }
+
+    /**
+     * imagescale() — new raster sized to $width×$height (php-src gdImageScale; #20405).
+     */
+    public static function scale(Frame $frame, ObjectEntry $image, int $width, int $height, int $mode): ObjectEntry|false
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if ($mode < GdConstants::REGISTERED['IMG_DEFAULT'] || $mode >= GdConstants::INTERPOLATION_METHOD_COUNT) {
+            throw new \ValueError('imagescale(): Argument #4 ($mode) must be one of the GD_* constants');
+        }
+        if ($height < 0 && $width < 0) {
+            throw new \ValueError('imagescale(): Argument #2 ($width) and argument #3 ($height) cannot be both negative');
+        }
+        $srcW = $state->width;
+        $srcH = $state->height;
+        if ($height < 0) {
+            if ($srcW <= 0) {
+                return false;
+            }
+            $height = (int) (($width * $srcH) / $srcW);
+        }
+        if ($width < 0) {
+            if ($srcH <= 0) {
+                return false;
+            }
+            $width = (int) (($height * $srcW) / $srcH);
+        }
+        if ($width <= 0 || $height <= 0) {
+            return false;
+        }
+
+        $dst = self::createTruecolorImage($frame, $width, $height);
+        if (false === $dst) {
+            return false;
+        }
+        $nearest = GdConstants::REGISTERED['IMG_NEAREST_NEIGHBOUR'] === $mode;
+        if ($nearest) {
+            self::copyResized($dst, $image, 0, 0, 0, 0, $width, $height, $srcW, $srcH);
+        } else {
+            self::copyResampled($dst, $image, 0, 0, 0, 0, $width, $height, $srcW, $srcH);
+        }
+
+        return $dst;
+    }
+
+    /**
+     * imageconvolution() — in-place 3×3 kernel (php-src gdImageConvolution; #20405).
+     *
+     * @param list<list<float>> $matrix
+     */
+    public static function convolve(ObjectEntry $image, array $matrix, float $divisor, float $offset): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if (!is_finite($divisor) || 0.0 === $divisor) {
+            throw new \ValueError('imageconvolution(): Argument #3 ($divisor) must be a non-zero finite number');
+        }
+        if (!is_finite($offset)) {
+            throw new \ValueError('imageconvolution(): Argument #4 ($offset) must be finite');
+        }
+
+        $width = $state->width;
+        $height = $state->height;
+        $src = $state->pixels;
+        $dst = $src;
+        for ($y = 0; $y < $height; ++$y) {
+            for ($x = 0; $x < $width; ++$x) {
+                $r = 0.0;
+                $g = 0.0;
+                $b = 0.0;
+                for ($ky = 0; $ky < 3; ++$ky) {
+                    $sy = $y + $ky - 1;
+                    if ($sy < 0 || $sy >= $height) {
+                        continue;
+                    }
+                    for ($kx = 0; $kx < 3; ++$kx) {
+                        $sx = $x + $kx - 1;
+                        if ($sx < 0 || $sx >= $width) {
+                            continue;
+                        }
+                        $weight = $matrix[$ky][$kx];
+                        [$pr, $pg, $pb] = self::unpackRgb($src[$sy * $width + $sx]);
+                        $r += $pr * $weight;
+                        $g += $pg * $weight;
+                        $b += $pb * $weight;
+                    }
+                }
+                $dst[$y * $width + $x] = self::packRgb(
+                    self::clampChannel((int) round($r / $divisor + $offset)),
+                    self::clampChannel((int) round($g / $divisor + $offset)),
+                    self::clampChannel((int) round($b / $divisor + $offset))
+                );
+            }
+        }
+        $state->pixels = $dst;
+
+        return true;
+    }
+
+    /**
+     * @return list<list<float>>
+     */
+    public static function coerceConvolutionMatrix(Variable $arg, string $function, int $position): array
+    {
+        $arg = $arg->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($matrix) must be of type array, %s given',
+                $function,
+                $position,
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($matrix) must be of type array, %s given',
+                $function,
+                $position,
+                self::typeLabel($arg)
+            ));
+        }
+
+        $outer = $arg->toArray();
+        $matrix = [];
+        for ($i = 0; $i < 3; ++$i) {
+            $rowVar = $outer->find((string) $i);
+            if (null === $rowVar) {
+                throw new \ValueError(\sprintf(
+                    '%s(): Argument #%d ($matrix) must be a 3x3 array',
+                    $function,
+                    $position
+                ));
+            }
+            $rowVar = $rowVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $rowVar->type) {
+                throw new \ValueError(\sprintf(
+                    '%s(): Argument #%d ($matrix) must be a 3x3 array',
+                    $function,
+                    $position
+                ));
+            }
+            $rowHt = $rowVar->toArray();
+            $row = [];
+            for ($j = 0; $j < 3; ++$j) {
+                $cellVar = $rowHt->find((string) $j);
+                if (null === $cellVar) {
+                    throw new \ValueError(\sprintf(
+                        '%s(): Argument #%d ($matrix) must be a 3x3 array, matrix[%d][%d] cannot be found (missing integer key)',
+                        $function,
+                        $position,
+                        $i,
+                        $j
+                    ));
+                }
+                $row[] = self::coerceFloatArg($cellVar, $function, $position, 'matrix');
+            }
+            $matrix[] = $row;
+        }
+
+        return $matrix;
+    }
+
+    private static function rotate90CounterClockwise(Frame $frame, GdImageState $state): ObjectEntry|false
+    {
+        $srcW = $state->width;
+        $srcH = $state->height;
+        $dstW = $srcH;
+        $dstH = $srcW;
+        $pixels = [];
+        for ($y = 0; $y < $dstH; ++$y) {
+            for ($x = 0; $x < $dstW; ++$x) {
+                // 90° CCW: dest(x,y) ← src(srcW-1-y, x)
+                $sx = $srcW - 1 - $y;
+                $sy = $x;
+                $pixels[] = $state->pixels[$sy * $srcW + $sx];
+            }
+        }
+
+        return self::createTruecolorFromPixels($frame, $dstW, $dstH, $pixels);
+    }
+
+    private static function rotate180(Frame $frame, GdImageState $state): ObjectEntry|false
+    {
+        $srcW = $state->width;
+        $srcH = $state->height;
+        $pixels = [];
+        for ($y = 0; $y < $srcH; ++$y) {
+            for ($x = 0; $x < $srcW; ++$x) {
+                $sx = $srcW - 1 - $x;
+                $sy = $srcH - 1 - $y;
+                $pixels[] = $state->pixels[$sy * $srcW + $sx];
+            }
+        }
+
+        return self::createTruecolorFromPixels($frame, $srcW, $srcH, $pixels);
+    }
+
+    private static function rotate270CounterClockwise(Frame $frame, GdImageState $state): ObjectEntry|false
+    {
+        $srcW = $state->width;
+        $srcH = $state->height;
+        $dstW = $srcH;
+        $dstH = $srcW;
+        $pixels = [];
+        for ($y = 0; $y < $dstH; ++$y) {
+            for ($x = 0; $x < $dstW; ++$x) {
+                // 270° CCW: dest(x,y) ← src(y, srcH-1-x)
+                $sx = $y;
+                $sy = $srcH - 1 - $x;
+                $pixels[] = $state->pixels[$sy * $srcW + $sx];
+            }
+        }
+
+        return self::createTruecolorFromPixels($frame, $dstW, $dstH, $pixels);
+    }
+
+    private static function rotateArbitrary(
+        Frame $frame,
+        GdImageState $state,
+        float $angleDegrees,
+        int $bgColor
+    ): ObjectEntry|false {
+        $srcW = $state->width;
+        $srcH = $state->height;
+        $rad = deg2rad($angleDegrees);
+        $cos = cos($rad);
+        $sin = sin($rad);
+        $cx = ($srcW - 1) / 2.0;
+        $cy = ($srcH - 1) / 2.0;
+        $corners = [
+            [0.0, 0.0],
+            [(float) ($srcW - 1), 0.0],
+            [(float) ($srcW - 1), (float) ($srcH - 1)],
+            [0.0, (float) ($srcH - 1)],
+        ];
+        $minX = INF;
+        $maxX = -INF;
+        $minY = INF;
+        $maxY = -INF;
+        foreach ($corners as [$px, $py]) {
+            $dx = $px - $cx;
+            $dy = $py - $cy;
+            $rx = $dx * $cos - $dy * $sin;
+            $ry = $dx * $sin + $dy * $cos;
+            $minX = min($minX, $rx);
+            $maxX = max($maxX, $rx);
+            $minY = min($minY, $ry);
+            $maxY = max($maxY, $ry);
+        }
+        $dstW = (int) floor($maxX - $minX) + 1;
+        $dstH = (int) floor($maxY - $minY) + 1;
+        if ($dstW <= 0 || $dstH <= 0) {
+            return false;
+        }
+        $dstCx = ($dstW - 1) / 2.0;
+        $dstCy = ($dstH - 1) / 2.0;
+        $invCos = cos(-$rad);
+        $invSin = sin(-$rad);
+        $pixels = [];
+        for ($y = 0; $y < $dstH; ++$y) {
+            for ($x = 0; $x < $dstW; ++$x) {
+                $dx = $x - $dstCx;
+                $dy = $y - $dstCy;
+                $sx = $dx * $invCos - $dy * $invSin + $cx;
+                $sy = $dx * $invSin + $dy * $invCos + $cy;
+                if ($sx < -0.5 || $sy < -0.5 || $sx >= $srcW - 0.5 || $sy >= $srcH - 0.5) {
+                    $pixels[] = $bgColor;
+                } else {
+                    $pixels[] = self::sampleBilinear($state->pixels, $srcW, $srcH, $sx, $sy);
+                }
+            }
+        }
+
+        return self::createTruecolorFromPixels($frame, $dstW, $dstH, $pixels);
+    }
+
     public static function coerceIntArg(Variable $arg, string $function, int $position, string $name): int
     {
         $arg = $arg->resolveIndirect();

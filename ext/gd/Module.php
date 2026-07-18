@@ -69,6 +69,7 @@ class Module extends ModuleAbstract
             $functions[] = new imagecopy();
             $functions[] = new imagecopymerge();
             $functions[] = new imagecopyresampled();
+            $functions[] = new imagecopyresized();
             $functions[] = new imagesetpixel();
             $functions[] = new imageline();
             $functions[] = new imagefilledrectangle();
@@ -82,6 +83,9 @@ class Module extends ModuleAbstract
             $functions[] = new imageflip();
             $functions[] = new imagecrop();
             $functions[] = new imagecropauto();
+            $functions[] = new imagerotate();
+            $functions[] = new imagescale();
+            $functions[] = new imageconvolution();
         }
         if (GdExtensionPolicy::advertisesDecodeFromString()) {
             $functions[] = new imagecreatefromstring();
