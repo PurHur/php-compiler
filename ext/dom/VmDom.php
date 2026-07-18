@@ -1697,6 +1697,59 @@ final class VmDom
         return self::serializeHtmlElement($element);
     }
 
+    /**
+     * Dom\Element::$innerHTML setter — replace children with parsed fragment
+     * (php-src ext/dom/inner_outer_html_mixin.c; #20532).
+     */
+    public static function setInnerHTML(Context $ctx, ObjectEntry $element, string $html): void
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $ownerDocument = self::ownerDocumentEntry($element);
+        if (null === $ownerDocument) {
+            throw new \DOMException('Hierarchy request error');
+        }
+        $fragment = self::parseHtmlIntoFragment($ctx, $html, $ownerDocument);
+        self::removeAllLiveStandardChildren($ctx, $element);
+        self::appendLiveStandardChild($ctx, $element, $fragment);
+        self::syncSubtree($ctx, $element);
+    }
+
+    /**
+     * Dom\Element::$outerHTML setter — replace element with parsed fragment
+     * (php-src ext/dom/inner_outer_html_mixin.c; #20532).
+     */
+    public static function setOuterHTML(Context $ctx, ObjectEntry $element, string $html): void
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $state = DomRegistry::state($element);
+        if (null === $state->parentId) {
+            // Spec: if parent is null, return (no-op).
+            return;
+        }
+        $parent = DomRegistry::entry($state->parentId);
+        if (null === $parent) {
+            return;
+        }
+        if (self::isDocument($parent) || VmDomLiving::isLivingDocument($parent)) {
+            throw new \DOMException(
+                'Invalid Modification Error',
+                DomExceptionConstants::INVALID_MODIFICATION_ERR
+            );
+        }
+        $ownerDocument = self::ownerDocumentEntry($element);
+        if (null === $ownerDocument) {
+            throw new \DOMException('Hierarchy request error');
+        }
+        $fragment = self::parseHtmlIntoFragment($ctx, $html, $ownerDocument);
+        self::insertBeforeSibling($ctx, $parent, $fragment, $element);
+        self::removeChild($ctx, $parent, $element);
+        self::syncSubtree($ctx, $parent);
+    }
+
     public static function setAttributeNS(
         Context $ctx,
         ObjectEntry $element,

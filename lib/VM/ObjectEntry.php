@@ -243,6 +243,11 @@ class ObjectEntry {
         if (null !== $domHtmlIsset) {
             return $domHtmlIsset;
         }
+        // Dom\Element::$id|/className|/innerHTML|/outerHTML (#20532).
+        $domHtmlElIsset = \PHPCompiler\ext\dom\DomHtmlElementPropertySupport::propertyIsSet($this, $name);
+        if (null !== $domHtmlElIsset) {
+            return $domHtmlElIsset;
+        }
         if (!isset($this->properties[$name])) {
             return false;
         }

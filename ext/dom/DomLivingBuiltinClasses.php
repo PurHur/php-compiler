@@ -40,6 +40,12 @@ final class DomLivingBuiltinClasses
         $element->isInternal = true;
         $element->parentLc = VmDomLiving::CLASS_NODE;
         $element->properties[] = new ClassProperty(VmDom::PROP_TEXT_CONTENT, $nullProto, new Variable(Variable::TYPE_STRING));
+        // Living Standard string props (php-src php_dom.stub.php Dom\Element; #20532).
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_ID, $nullProto, $strProto);
+        $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_CLASS_NAME, $nullProto, $strProto);
+        $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_INNER_HTML, $nullProto, $strProto);
+        $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_OUTER_HTML, $nullProto, $strProto);
         if (CompilerVersion::supportsDomTokenList()) {
             $element->properties[] = new ClassProperty(VmDom::PROP_CLASS_LIST, $nullProto, $objProto);
         }
