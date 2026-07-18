@@ -381,6 +381,70 @@ final class VmCurlEasy
         return VmCurlNative::easyPause($native, $flags);
     }
 
+    /**
+     * curl_copy_handle() — curl_easy_duphandle + PHP option clone
+     * (php-src ext/curl/interface.c; #20495).
+     */
+    public static function copyHandle(ObjectEntry $easy, Context $ctx): ?Variable
+    {
+        self::ensureLive($easy, 'curl_copy_handle');
+        if (!isset(self::$state[$easy->id])) {
+            return null;
+        }
+        $src = self::$state[$easy->id];
+        $native = $src['native'];
+        if (null === $native) {
+            return null;
+        }
+        $dup = VmCurlNative::easyDuphandle($native);
+        if (null === $dup) {
+            @\trigger_error('curl_copy_handle(): Cannot duplicate cURL handle', \E_WARNING);
+
+            return null;
+        }
+        self::registerClass($ctx);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        $object->constructed = true;
+        self::$state[$object->id] = [
+            'closed' => false,
+            'url' => $src['url'],
+            'share_id' => $src['share_id'],
+            'return_transfer' => $src['return_transfer'],
+            'nobody' => $src['nobody'],
+            'post' => $src['post'],
+            'headers' => $src['headers'],
+            'headers_on_handle' => false,
+            'errno' => 0,
+            'error' => '',
+            'http_code' => 0,
+            'effective_url' => '',
+            'last_body' => '',
+            'native' => $dup,
+            'multi_id' => null,
+            'write_tmp' => null,
+            'write_fp' => null,
+            'write_slist' => null,
+            'multi_harvested' => false,
+        ];
+        $var->object($object);
+
+        return $var;
+    }
+
+    /**
+     * SAVE_CURL_ERROR after multi info_read (php-src multi.c; #20495).
+     */
+    public static function saveTransferResult(ObjectEntry $easy, int $result): void
+    {
+        if (!isset(self::$state[$easy->id])) {
+            return;
+        }
+        $st = &self::$state[$easy->id];
+        $st['errno'] = $result;
+        $st['error'] = 0 === $result ? '' : VmCurlNative::easyStrerror($result);
+    }
+
     public static function isEasyObject(?ObjectEntry $object): bool
     {
         return null !== $object && self::CLASS_LC === strtolower($object->class->name);

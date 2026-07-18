@@ -196,6 +196,9 @@ final class BuiltinByRefParams
             case 'curl_multi_exec':
                 // php-src ext/curl/multi.c / curl.stub.php — &$still_running (#3721)
                 return [1];
+            case 'curl_multi_info_read':
+                // php-src ext/curl/multi.c / curl.stub.php — &$queued_messages (#20495)
+                return [1];
         }
 
         return [];
