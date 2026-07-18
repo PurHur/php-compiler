@@ -2234,42 +2234,20 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ hebrevc() (ext/standard/string.c, issue #17183, #17206).
+     * hebrevc() — removed in php-src 8.0 (ext/standard/string.c, #20354, re-#17206).
      *
-     * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
-     * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.3` / `8.4` forward profile.
+     * Only register on pre-8.0 language profiles (legacy). PHP 8.0+ keeps hebrev() only.
+     * php-src: UPGRADING / basic_functions.stub.php — hebrev remains; hebrevc gone since 8.0.
      */
     public static function supportsHebrevc(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.0.0', '<');
     }
 
-    /** hebrevc() visible to function_exists() — stable runtime or forward 8.3+ (#17206). */
+    /** hebrevc() visible to function_exists() — pre-8.0 profiles only (#20354). */
     public static function advertisesHebrevc(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '>=')) {
-            return true;
-        }
-
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if (!\is_string($raw) || '' === trim($raw)) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return self::supportsHebrevc();
     }
 
     /**

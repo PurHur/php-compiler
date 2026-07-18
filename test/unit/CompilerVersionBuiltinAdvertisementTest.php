@@ -683,6 +683,45 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
+    /** hebrevc() removed in php-src 8.0 — must not register on 8.2/8.4 (#20354). */
+    public function testHebrevcWithheldOnPhp84Profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertFalse(CompilerVersion::supportsHebrevc());
+            $this->assertFalse(CompilerVersion::advertisesHebrevc());
+            $runtime = new Runtime();
+            $this->assertFalse(isset($runtime->vmContext->functions['hebrevc']));
+            $this->assertTrue(isset($runtime->vmContext->functions['hebrev']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testHebrevcRegisteredOnPhp74LegacyProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=7.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsHebrevc());
+            $this->assertTrue(CompilerVersion::advertisesHebrevc());
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['hebrevc']));
+            $this->assertTrue(isset($runtime->vmContext->functions['hebrev']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testVmDoesNotRegisterZendThreadIdOnReferenceProfile(): void
     {
         $runtime = new Runtime();

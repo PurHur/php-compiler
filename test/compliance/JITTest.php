@@ -195,15 +195,8 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'crc32c_phantom')) {
                 continue;
             }
-            if (!CompilerVersion::supportsHebrevc()
-                && str_contains($name, 'hebrevc')
-                && !str_contains($name, 'hebrevc_phantom')) {
-                continue;
-            }
-            if (CompilerVersion::supportsHebrevc()
-                && str_contains($name, 'hebrevc_phantom')) {
-                continue;
-            }
+            // hebrevc removed in php-src 8.0 (#20354): functional cases use PROFILE=7.4 via --ENV--;
+            // phantom_* cases assert absence on 8.2/8.4 — always include (do not gate on supportsHebrevc()).
             if (!CompilerVersion::supportsMbStrPad()
                 && str_contains($name, 'mb_str_pad')
                 && !str_contains($name, 'mb_str_pad_phantom')) {

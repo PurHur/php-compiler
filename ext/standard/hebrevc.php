@@ -12,9 +12,10 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * hebrevc() — visual Hebrew with newline conversion (php-src string.c, #17183).
+ * hebrevc() — visual Hebrew with newline conversion (php-src string.c).
  *
- * VM: {@see VmHebrev::convertWithNewlines()}; JIT/AOT via {@see JitHebrevc} + {@see HebrevJitHelper}.
+ * Removed in php-src 8.0; registered only when {@see \PHPCompiler\CompilerVersion::supportsHebrevc()}
+ * (pre-8.0 language profile). VM: {@see VmHebrev::convertWithNewlines()}; JIT/AOT via {@see JitHebrevc}.
  */
 final class hebrevc extends Internal
 {
