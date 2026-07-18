@@ -5003,6 +5003,13 @@ final class VmDom
     {
         $parentState = DomRegistry::state($parent);
         $existingIds = $parentState->childIds;
+        // Unregister IDs while children are still connected (php-src textContent / replaceChildren).
+        foreach ($existingIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::unregisterSubtreeElementIdsIfConnected($child);
+            }
+        }
         $parentState->childIds = [];
         if (self::isDocument($parent)) {
             $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->null();
@@ -8586,11 +8593,16 @@ final class VmDom
 
             return;
         }
-        if (DomConstants::XML_ELEMENT_NODE !== $state->nodeType) {
+        if (DomConstants::XML_ELEMENT_NODE !== $state->nodeType
+            && DomConstants::XML_DOCUMENT_FRAG_NODE !== $state->nodeType
+        ) {
             return;
         }
+        // php-src dom_node_textContent_write / node_value_write — unlink all children before
+        // inserting replacement text (#20646). Clearing childIds alone left held element
+        // wrappers still parented (live-tree desync vs Zend).
+        self::removeAllLiveStandardChildren($ctx, $node);
         $ownerDoc = self::ownerDocumentEntry($node);
-        $state->childIds = [];
         if ('' !== $value) {
             $text = self::createTextNode($ctx, $value, $ownerDoc);
             $state->childIds[] = $text->id;
