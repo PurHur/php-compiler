@@ -5,12 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\curl;
 
 /**
- * ext/curl advertisement — php-src ext/curl/interface.c (#12117, #13588, #16659).
+ * ext/curl advertisement — php-src ext/curl/interface.c (#12117, #13588, #16659, #3325).
  *
- * Phase 2 introspection ({@see VmCurlCore}) keeps curl_* implementations in-tree without
- * libcurl HTTP I/O (#3325). Zend never splits CURLFile / CURLStringFile / CurlShareHandle
- * from the module — withhold class_exists / function_exists until {@see advertisesExtension()}
- * (#19671, #19728, same pattern as #19670).
+ * Zend never splits CURLFile / CURLStringFile / CurlShareHandle from the module —
+ * withhold class_exists / function_exists until {@see advertisesExtension()} when
+ * libcurl FFI is available (#19671, #19728, same pattern as #19670).
  */
 final class CurlExtensionPolicy
 {
@@ -20,11 +19,11 @@ final class CurlExtensionPolicy
     }
 
     /**
-     * extension_loaded('curl') / CREDITS_MODULES — false until curl_init() ships (#11627, #16748, #3325).
+     * extension_loaded('curl') / CREDITS_MODULES — true once libcurl easy I/O ships (#11627, #16748, #3325).
      */
     public static function advertisesExtension(): bool
     {
-        return false;
+        return VmCurlNative::available();
     }
 
     public static function advertisesHandleClasses(): bool

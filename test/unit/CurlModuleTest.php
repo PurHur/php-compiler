@@ -8,32 +8,36 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
 /**
- * curl extension module registration (issue #6999, #16659).
+ * curl extension module registration (issue #6999, #16659, #3325).
  *
  * @group curl_module_skeleton
  */
 final class CurlModuleTest extends TestCase
 {
-    public function test_curl_module_phase2_functions_constants_and_classes(): void
+    public function test_curl_module_libcurl_easy_functions_constants_and_classes(): void
     {
+        if (!\PHPCompiler\ext\curl\VmCurlNative::available()) {
+            $this->markTestSkipped('libcurl FFI unavailable');
+        }
+
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['curl_init', 'curl_setopt', 'curl_setopt_array', 'curl_close'] as $fn) {
-            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
+        foreach (['curl_init', 'curl_setopt', 'curl_setopt_array', 'curl_exec', 'curl_getinfo', 'curl_error', 'curl_errno', 'curl_close'] as $fn) {
+            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_share_init', 'curl_share_setopt', 'curl_share_close'] as $fn) {
-            // Share APIs stay with curl_init until extension_loaded('curl') (#19728).
-            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
+            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep', 'curl_file_create'] as $fn) {
-            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
+            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_escape', 'curl_unescape'] as $fn) {
-            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
+            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
-        self::assertFalse(VmReflection::classExists($ctx, 'CURLFile'));
-        self::assertFalse(VmReflection::classExists($ctx, 'CURLStringFile'));
+        self::assertTrue(VmReflection::classExists($ctx, 'CURLFile'));
+        self::assertTrue(VmReflection::classExists($ctx, 'CURLStringFile'));
+        self::assertTrue(VmReflection::classExists($ctx, 'CurlHandle'));
 
         $code = <<<'PHP'
 <?php
@@ -57,6 +61,6 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'curl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('00000000000011000210', ob_get_clean());
+        self::assertSame('11111111111111000211', ob_get_clean());
     }
 }

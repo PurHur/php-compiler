@@ -9,12 +9,10 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 
 /**
- * curl extension module entry (php-src ext/curl/interface.c; issue #6999, #16659, #19671).
+ * curl extension module entry (php-src ext/curl/interface.c; issue #6999, #16659, #19671, #3325).
  *
- * libcurl HTTP client parity tracked in #3325; curl_multi in #3721.
- * Phase 2 keeps introspection helpers in-tree via {@see VmCurlCore}; CURLFile /
- * CURLStringFile / curl_file_create / curl_share_* stay withheld until
- * {@see CurlExtensionPolicy::advertisesExtension()} (#19728).
+ * Easy-handle HTTP via libcurl FFI when {@see CurlExtensionPolicy::advertisesExtension()}.
+ * curl_multi tracked in #3721.
  */
 class Module extends ModuleAbstract
 {
@@ -77,6 +75,10 @@ class Module extends ModuleAbstract
             $functions[] = new curl_init();
             $functions[] = new curl_setopt();
             $functions[] = new curl_setopt_array();
+            $functions[] = new curl_exec();
+            $functions[] = new curl_getinfo();
+            $functions[] = new curl_error();
+            $functions[] = new curl_errno();
             $functions[] = new curl_close();
         }
 
