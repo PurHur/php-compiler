@@ -11452,16 +11452,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmNumberFormatter.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 69)
-- new Variable (line 73)
-- new NumberFormatterCreate (line 80)
-- new NumberFormatterFormat (line 83)
-- new Error (line 97)
-- new ObjectEntry (line 99)
-- new Error (line 140)
-- new ArgumentCountError (line 256)
-- new ArgumentCountError (line 286)
-- new Error (line 294)
+- new ClassEntry (line 96)
+- new Variable (line 100)
+- new NumberFormatterCreate (line 107)
+- new NumberFormatterFormat (line 110)
+- new Error (line 124)
+- new ObjectEntry (line 126)
+- new Error (line 167)
+- new ArgumentCountError (line 283)
+- new ArgumentCountError (line 313)
+- new Error (line 321)
 - 12 class method(s)
 
 ### `ext/intl/VmResourceBundle.php`
@@ -40160,7 +40160,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitNestedHelperCoerce.php`
 
 **Warnings** (review for bootstrap subset):
-- 19 class method(s)
+- 20 class method(s)
 
 ### `lib/JIT/JitNumericDivisionGuard.php`
 
