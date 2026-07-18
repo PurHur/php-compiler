@@ -111,6 +111,50 @@ final class VmPgsqlNative
         self::requireFfi()->PQclear($result);
     }
 
+    public static function resultMemorySize(\FFI\CData $result): int
+    {
+        return (int) self::requireFfi()->PQresultMemorySize($result);
+    }
+
+    public static function putCopyData(\FFI\CData $conn, string $buffer): int
+    {
+        return (int) self::requireFfi()->PQputCopyData($conn, $buffer, \strlen($buffer));
+    }
+
+    public static function putCopyEnd(\FFI\CData $conn, ?string $error): int
+    {
+        return (int) self::requireFfi()->PQputCopyEnd($conn, $error);
+    }
+
+    public static function socket(\FFI\CData $conn): int
+    {
+        return (int) self::requireFfi()->PQsocket($conn);
+    }
+
+    public static function escapeIdentifier(\FFI\CData $conn, string $value): string
+    {
+        $ffi = self::requireFfi();
+        $escaped = $ffi->PQescapeIdentifier($conn, $value, \strlen($value));
+        $out = self::ffiString($escaped);
+        if (null !== $escaped) {
+            $ffi->PQfreemem($escaped);
+        }
+
+        return $out;
+    }
+
+    public static function escapeLiteral(\FFI\CData $conn, string $value): string
+    {
+        $ffi = self::requireFfi();
+        $escaped = $ffi->PQescapeLiteral($conn, $value, \strlen($value));
+        $out = self::ffiString($escaped);
+        if (null !== $escaped) {
+            $ffi->PQfreemem($escaped);
+        }
+
+        return $out;
+    }
+
     /** @return \FFI */
     private static function requireFfi()
     {
@@ -167,6 +211,13 @@ char *PQfname(const PGresult *res, int field_num);
 char *PQgetvalue(const PGresult *res, int tup_num, int field_num);
 int PQgetisnull(const PGresult *res, int tup_num, int field_num);
 void PQclear(PGresult *res);
+size_t PQresultMemorySize(const PGresult *res);
+int PQputCopyData(PGconn *conn, const char *buffer, int nbytes);
+int PQputCopyEnd(PGconn *conn, const char *errormsg);
+int PQsocket(const PGconn *conn);
+char *PQescapeIdentifier(PGconn *conn, const char *str, size_t length);
+char *PQescapeLiteral(PGconn *conn, const char *str, size_t length);
+void PQfreemem(void *ptr);
 CDEF;
 
         foreach (['libpq.so.5', 'libpq.so'] as $lib) {
