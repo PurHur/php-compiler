@@ -12,10 +12,16 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * Invoke registered SAX handlers during xml_parse() (#18203, #19683, php-src ext/xml/xml.c).
+ * Invoke registered SAX handlers during xml_parse() (#18203, #19683, #20333, php-src ext/xml/xml.c).
  *
  * Namespace-aware parsers (xml_parser_create_ns) expand element/attribute names as
  * uri + separator + localname and strip xmlns declarations from attribute bags.
+ *
+ * Default handler (xml_set_default_handler / XML_SetDefaultHandler) receives:
+ * - Comment and (when no PI handler) processing-instruction markup as raw text
+ * - Start/end tag markup when the corresponding element handler is unset
+ * - Character data when the character-data handler is unset
+ * (php-src ext/xml/compat.c comment_handler / pi_handler / start_element_handler)
  */
 final class VmXmlSaxDispatcher
 {
@@ -47,12 +53,12 @@ final class VmXmlSaxDispatcher
         if ('' === $trimmed) {
             return;
         }
-        // Drop XML declaration / DOCTYPE / Misc so parse starts at the document element (#20323).
-        $trimmed = VmXml::stripDocumentMiscEnvelope($trimmed);
+        // Keep Comment/PI Misc for default/PI handlers; only drop xml decl + DOCTYPE (#20333).
+        $trimmed = VmXml::stripXmlDeclAndDoctypeKeepMisc($trimmed);
         if ('' === $trimmed) {
             return;
         }
-        $dispatcher->parseElementAt($trimmed, 0);
+        $dispatcher->parseDocument($trimmed);
     }
 
     private Context $ctx;
@@ -81,6 +87,45 @@ final class VmXmlSaxDispatcher
         $this->parserVar->object($parser);
     }
 
+    /**
+     * Document production: (Misc* element Misc*) — fire handlers for leading/trailing Misc (#20333).
+     */
+    private function parseDocument(string $data): void
+    {
+        $pos = 0;
+        $len = \strlen($data);
+        while ($pos < $len) {
+            $pos = self::skipWhitespace($data, $pos);
+            if ($pos >= $len) {
+                break;
+            }
+            if ('<' !== $data[$pos]) {
+                break;
+            }
+            $comment = VmXml::parseCommentAt($data, $pos);
+            if (null !== $comment) {
+                $raw = substr($data, $pos, $comment['end'] - $pos);
+                $this->invokeDefault($raw);
+                $pos = $comment['end'];
+
+                continue;
+            }
+            $pi = VmXml::parseProcessingInstructionAt($data, $pos);
+            if (null !== $pi) {
+                $raw = substr($data, $pos, $pi['end'] - $pos);
+                $this->invokeProcessingInstruction($raw, $pi['target'], $pi['data']);
+                $pos = $pi['end'];
+
+                continue;
+            }
+            $next = $this->parseElementAt($data, $pos);
+            if ($next === $pos) {
+                break;
+            }
+            $pos = $next;
+        }
+    }
+
     private function parseElementAt(string $data, int $pos): int
     {
         $pos = self::skipWhitespace($data, $pos);
@@ -100,12 +145,15 @@ final class VmXmlSaxDispatcher
         $this->applyNamespaceDeclarations($attrSpec);
         $attrs = $this->attributesForHandlers($attrSpec);
         $tag = $this->expandElementName($rawTag);
+        // Default-handler start markup reconstructs open form (self-close → start+end; compat.c).
+        $startMarkup = '<'.$rawTag.$attrSpec.'>';
+        $endMarkup = '</'.$rawTag.'>';
         $contentStart = $pos + \strlen($open[0]);
 
-        $this->invokeElementStart($tag, $attrs);
+        $this->invokeElementStart($tag, $attrs, $startMarkup);
 
         if ($selfClose) {
-            $this->invokeElementEnd($tag);
+            $this->invokeElementEnd($tag, $endMarkup);
             $this->nsBindings = $savedBindings;
 
             return $contentStart;
@@ -121,10 +169,7 @@ final class VmXmlSaxDispatcher
         $innerEnd = $end - \strlen('</'.$open[1].'>');
         $scan = $contentStart;
         while ($scan < $innerEnd) {
-            $scan = self::skipWhitespace($data, $scan);
-            if ($scan >= $innerEnd) {
-                break;
-            }
+            // Do not skip whitespace — it is character data for cdata/default handlers (#20333).
             if ('<' !== $data[$scan]) {
                 $textEnd = strpos($data, '<', $scan);
                 if (false === $textEnd || $textEnd > $innerEnd) {
@@ -147,55 +192,99 @@ final class VmXmlSaxDispatcher
             }
             $comment = VmXml::parseCommentAt($data, $scan);
             if (null !== $comment) {
+                $raw = substr($data, $scan, $comment['end'] - $scan);
+                $this->invokeDefault($raw);
                 $scan = $comment['end'];
+
+                continue;
+            }
+            $pi = VmXml::parseProcessingInstructionAt($data, $scan);
+            if (null !== $pi) {
+                $raw = substr($data, $scan, $pi['end'] - $scan);
+                $this->invokeProcessingInstruction($raw, $pi['target'], $pi['data']);
+                $scan = $pi['end'];
 
                 continue;
             }
             $scan = $this->parseElementAt($data, $scan);
         }
 
-        $this->invokeElementEnd($tag);
+        $this->invokeElementEnd($tag, $endMarkup);
         // libxml-backed php-src does not invoke end-NS handlers (php.net); match Zend (#20323).
         $this->nsBindings = $savedBindings;
 
         return $end;
     }
 
-    private function invokeElementStart(string $tag, HashTable $attrs): void
+    private function invokeElementStart(string $tag, HashTable $attrs, string $startMarkup): void
     {
         $handler = $this->state['handlers'][XmlParserHandlers::HANDLER_ELEMENT_START] ?? null;
         $callback = XmlParserHandlers::handlerCallback($this->parser, $handler);
-        if (null === $callback) {
+        if (null !== $callback) {
+            $nameVar = new Variable();
+            $nameVar->string($tag);
+            $attrsVar = new Variable();
+            $attrsVar->array($attrs);
+            VmCallable::invoke($this->ctx, $callback, $this->parserVar, $nameVar, $attrsVar);
+
             return;
         }
-        $nameVar = new Variable();
-        $nameVar->string($tag);
-        $attrsVar = new Variable();
-        $attrsVar->array($attrs);
-        VmCallable::invoke($this->ctx, $callback, $this->parserVar, $nameVar, $attrsVar);
+        $this->invokeDefault($startMarkup);
     }
 
-    private function invokeElementEnd(string $tag): void
+    private function invokeElementEnd(string $tag, string $endMarkup): void
     {
         $handler = $this->state['handlers'][XmlParserHandlers::HANDLER_ELEMENT_END] ?? null;
         $callback = XmlParserHandlers::handlerCallback($this->parser, $handler);
-        if (null === $callback) {
+        if (null !== $callback) {
+            $nameVar = new Variable();
+            $nameVar->string($tag);
+            VmCallable::invoke($this->ctx, $callback, $this->parserVar, $nameVar);
+
             return;
         }
-        $nameVar = new Variable();
-        $nameVar->string($tag);
-        VmCallable::invoke($this->ctx, $callback, $this->parserVar, $nameVar);
+        $this->invokeDefault($endMarkup);
     }
 
     private function invokeCharacterData(string $text): void
     {
         $handler = $this->state['handlers'][XmlParserHandlers::HANDLER_CHARACTER_DATA] ?? null;
         $callback = XmlParserHandlers::handlerCallback($this->parser, $handler);
+        if (null !== $callback) {
+            $dataVar = new Variable();
+            $dataVar->string($text);
+            VmCallable::invoke($this->ctx, $callback, $this->parserVar, $dataVar);
+
+            return;
+        }
+        $this->invokeDefault($text);
+    }
+
+    private function invokeProcessingInstruction(string $raw, string $target, string $data): void
+    {
+        $handler = $this->state['handlers'][XmlParserHandlers::HANDLER_PI] ?? null;
+        $callback = XmlParserHandlers::handlerCallback($this->parser, $handler);
+        if (null !== $callback) {
+            $targetVar = new Variable();
+            $targetVar->string($target);
+            $dataVar = new Variable();
+            $dataVar->string($data);
+            VmCallable::invoke($this->ctx, $callback, $this->parserVar, $targetVar, $dataVar);
+
+            return;
+        }
+        $this->invokeDefault($raw);
+    }
+
+    private function invokeDefault(string $data): void
+    {
+        $handler = $this->state['handlers'][XmlParserHandlers::HANDLER_DEFAULT] ?? null;
+        $callback = XmlParserHandlers::handlerCallback($this->parser, $handler);
         if (null === $callback) {
             return;
         }
         $dataVar = new Variable();
-        $dataVar->string($text);
+        $dataVar->string($data);
         VmCallable::invoke($this->ctx, $callback, $this->parserVar, $dataVar);
     }
 
