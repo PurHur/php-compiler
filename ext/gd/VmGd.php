@@ -2300,6 +2300,159 @@ final class VmGd
         return true;
     }
 
+    /**
+     * imagecharup() — 90° CCW built-in font glyph (php-src gdImageCharUp; #20460).
+     */
+    public static function charUp(ObjectEntry $image, int $font, int $x, int $y, string $char, int $color): bool
+    {
+        $ch = '' === $char ? 0 : \ord($char[0]);
+
+        return self::drawCharUp(GdRegistry::state($image), GdFonts::get($font), $x, $y, $ch, $color);
+    }
+
+    /**
+     * imagestringup() — vertical string via CharUp (php-src gdImageStringUp; #20460).
+     */
+    public static function stringUp(ObjectEntry $image, int $font, int $x, int $y, string $text, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $fontData = GdFonts::get($font);
+        $len = \strlen($text);
+        for ($i = 0; $i < $len; ++$i) {
+            self::drawCharUp($state, $fontData, $x, $y, \ord($text[$i]), $color);
+            $y -= $fontData['w'];
+        }
+
+        return true;
+    }
+
+    /**
+     * imagegammacorrect() — pow gamma remap (php-src ext/gd/gd.c; #20460).
+     */
+    public static function gammaCorrect(ObjectEntry $image, float $inputgamma, float $outputgamma): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if ($inputgamma <= 0.0 || !is_finite($inputgamma)) {
+            throw new \ValueError(\sprintf(
+                'imagegammacorrect(): Argument #2 ($inputgamma) must be %s',
+                $inputgamma <= 0.0 ? 'greater than 0' : 'finite'
+            ));
+        }
+        if ($outputgamma <= 0.0 || !is_finite($outputgamma)) {
+            throw new \ValueError(\sprintf(
+                'imagegammacorrect(): Argument #3 ($outputgamma) must be %s',
+                $outputgamma <= 0.0 ? 'greater than 0' : 'finite'
+            ));
+        }
+        $gamma = $inputgamma / $outputgamma;
+        if ($state->truecolor) {
+            $n = \count($state->pixels);
+            for ($i = 0; $i < $n; ++$i) {
+                $c = $state->pixels[$i];
+                $r = (int) ((pow((($c >> 16) & 0xFF) / 255.0, $gamma) * 255) + 0.5);
+                $g = (int) ((pow((($c >> 8) & 0xFF) / 255.0, $gamma) * 255) + 0.5);
+                $b = (int) ((pow(($c & 0xFF) / 255.0, $gamma) * 255) + 0.5);
+                $a = ($c >> 24) & 0x7F;
+                $state->pixels[$i] = (($a & 0x7F) << 24) | (($r & 0xFF) << 16) | (($g & 0xFF) << 8) | ($b & 0xFF);
+            }
+        } else {
+            foreach ($state->colors as $i => $packed) {
+                $r = (int) ((pow((($packed >> 16) & 0xFF) / 255.0, $gamma) * 255) + 0.5);
+                $g = (int) ((pow((($packed >> 8) & 0xFF) / 255.0, $gamma) * 255) + 0.5);
+                $b = (int) ((pow(($packed & 0xFF) / 255.0, $gamma) * 255) + 0.5);
+                $a = ($packed >> 24) & 0x7F;
+                $state->colors[$i] = (($a & 0x7F) << 24) | (($r & 0xFF) << 16) | (($g & 0xFF) << 8) | ($b & 0xFF);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * imageinterlace() get/set (php-src; returns current interlace bool; #20460).
+     */
+    public static function interlace(ObjectEntry $image, ?bool $enable): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        if (null !== $enable) {
+            $state->interlace = $enable;
+        }
+
+        return $state->interlace;
+    }
+
+    /**
+     * imagesetclip() — set inclusive clip rect (php-src gdImageSetClip; #20460).
+     */
+    public static function setClip(ObjectEntry $image, int $x1, int $y1, int $x2, int $y2): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $sx = $state->width;
+        $sy = $state->height;
+        if ($x1 < 0) {
+            $x1 = 0;
+        }
+        if ($x1 >= $sx) {
+            $x1 = $sx - 1;
+        }
+        if ($x2 < 0) {
+            $x2 = 0;
+        }
+        if ($x2 >= $sx) {
+            $x2 = $sx - 1;
+        }
+        if ($y1 < 0) {
+            $y1 = 0;
+        }
+        if ($y1 >= $sy) {
+            $y1 = $sy - 1;
+        }
+        if ($y2 < 0) {
+            $y2 = 0;
+        }
+        if ($y2 >= $sy) {
+            $y2 = $sy - 1;
+        }
+        $state->cx1 = $x1;
+        $state->cy1 = $y1;
+        $state->cx2 = $x2;
+        $state->cy2 = $y2;
+
+        return true;
+    }
+
+    /**
+     * imagegetclip() — [x1,y1,x2,y2] (php-src; #20460).
+     *
+     * @return list<int>
+     */
+    public static function getClip(ObjectEntry $image): array
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return [0, 0, 0, 0];
+        }
+
+        return [$state->cx1, $state->cy1, $state->cx2, $state->cy2];
+    }
+
+    public static function getClipToHashTable(ObjectEntry $image): HashTable
+    {
+        return self::brectToHashTable(self::getClip($image));
+    }
+
     public static function copy(
         ObjectEntry $dst,
         ObjectEntry $src,
@@ -4305,6 +4458,35 @@ final class VmGd
                 2 => 'style',
                 default => 'arg',
             },
+            'imagecharup', 'imagestringup' => match ($position) {
+                1 => 'image',
+                2 => 'font',
+                3 => 'x',
+                4 => 'y',
+                5 => 'imagecharup' === $function ? 'char' : 'string',
+                6 => 'color',
+                default => 'arg',
+            },
+            'imagegammacorrect' => match ($position) {
+                1 => 'image',
+                2 => 'inputgamma',
+                3 => 'outputgamma',
+                default => 'arg',
+            },
+            'imageinterlace' => match ($position) {
+                1 => 'image',
+                2 => 'enable',
+                default => 'arg',
+            },
+            'imagesetclip' => match ($position) {
+                1 => 'image',
+                2 => 'x1',
+                3 => 'y1',
+                4 => 'x2',
+                5 => 'y2',
+                default => 'arg',
+            },
+            'imagegetclip' => 'image',
             'imagecolorallocatealpha' => match ($position) {
                 1 => 'image',
                 2 => 'red',
@@ -4395,6 +4577,10 @@ final class VmGd
                 break;
         }
         if ($x < 0 || $y < 0 || $x >= $state->width || $y >= $state->height) {
+            return;
+        }
+        // libgd gdImageBoundsSafe — also honor clip rect (#20460).
+        if ($x < $state->cx1 || $x > $state->cx2 || $y < $state->cy1 || $y > $state->cy2) {
             return;
         }
         $index = $y * $state->width + $x;
@@ -4814,6 +5000,41 @@ final class VmGd
                 ++$cx;
             }
             ++$cy;
+        }
+
+        return true;
+    }
+
+    /**
+     * libgd gdImageCharUp — 90° CCW glyph blit (php-src; #20460).
+     *
+     * @param array{nchars:int,offset:int,w:int,h:int,data:string}|null $font
+     */
+    private static function drawCharUp(?GdImageState $state, ?array $font, int $x, int $y, int $c, int $color): bool
+    {
+        if (null === $state || !$state->hasRaster() || null === $font) {
+            return false;
+        }
+        if ($c < $font['offset'] || $c >= ($font['offset'] + $font['nchars'])) {
+            return true;
+        }
+        $fw = $font['w'];
+        $fh = $font['h'];
+        $fline = ($c - $font['offset']) * $fh * $fw;
+        $data = $font['data'];
+        $xupper = $x + $fh;
+        $ylower = $y - $fw;
+        $cx = 0;
+        $cy = 0;
+        for ($py = $y; $py > $ylower; --$py) {
+            for ($px = $x; $px < $xupper; ++$px) {
+                if ("\x01" === $data[$fline + $cy * $fw + $cx]) {
+                    self::putPixel($state, $px, $py, $color);
+                }
+                ++$cy;
+            }
+            $cy = 0;
+            ++$cx;
         }
 
         return true;
