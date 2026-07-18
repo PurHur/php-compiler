@@ -8646,10 +8646,20 @@ class JIT {
                     }
                     if ($this->context->inlineIncludeDepth > 0) {
                         $echoName = JIT\OperandName::resolve($echoOp);
-                        // Refresh inherited locals before echo of bound names after ?? (#866).
-                        // Skip refresh for post-include locals like $scriptBase — full-frame
-                        // restore was corrupting those string slots (MiniWebApp munmap, #20507).
-                        if (JIT\IncludeBindingEmitHelper::refreshFrameDeclaresName($this->context, $echoName)) {
+                        // Refresh before echo of inherited include-bindings after ?? (#866).
+                        // OperandName can be null on Temporary wrappers — also refresh when the
+                        // live variable still carries includeBinding. Skip post-include locals
+                        // like $scriptBase (name not in frame, includeBinding false) (#20507).
+                        $echoNeedsRefresh = JIT\IncludeBindingEmitHelper::refreshFrameDeclaresName(
+                            $this->context,
+                            $echoName
+                        );
+                        if (!$echoNeedsRefresh && $this->context->hasVariableOp($echoOp)) {
+                            $echoVar = $this->context->getVariableFromOp($echoOp);
+                            $echoNeedsRefresh = $echoVar->includeBinding
+                                && !$this->context->coalesceAssignTargets->contains($echoOp);
+                        }
+                        if ($echoNeedsRefresh) {
                             JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                         }
                     }
@@ -9064,6 +9074,9 @@ class JIT {
                             $builder->branch($mergeBb);
                         }
                         $builder->positionAtEnd($mergeBb);
+                        // Refresh inherited locals after ?? (#866). IncludeBindingEmitHelper skips
+                        // in-flight coalesceAssignTargets (e.g. $scriptBase) so MiniWebApp AOT
+                        // does not munmap (#20507).
                         if ($this->context->inlineIncludeDepth > 0) {
                             JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                         }
@@ -9128,6 +9141,7 @@ class JIT {
                             $builder->branch($mergeBb);
                         }
                         $builder->positionAtEnd($mergeBb);
+                        // Mirror ?? : refresh inherited locals; skip in-flight assign targets (#20507).
                         if ($this->context->inlineIncludeDepth > 0) {
                             JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                         }
