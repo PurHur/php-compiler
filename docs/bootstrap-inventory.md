@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5673 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16211 |
+| Source constructs flagged (warnings) | 16215 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1065,7 +1065,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/Module.php` | 0 | 2 |
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
-| `ext/pdo/VmPDO.php` | 0 | 44 |
+| `ext/pdo/VmPDO.php` | 0 | 48 |
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/phar/BuiltinClasses.php` | 0 | 10 |
@@ -13026,50 +13026,54 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pdo/VmPDO.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 40)
-- new Variable (line 44)
-- new Variable (line 47)
-- new PDOConstruct (line 55)
-- new PDOExec (line 60)
-- new PDOPrepare (line 61)
-- new PDOQuery (line 62)
-- new PDOSetAttribute (line 63)
-- new PDOGetAttribute (line 64)
-- new PDOGetAvailableDrivers (line 65)
-- new PDOLastInsertId (line 66)
-- new PDOQuote (line 67)
-- new PDOBeginTransaction (line 68)
-- new PDOCommit (line 69)
-- new PDORollBack (line 70)
-- new PDOInTransaction (line 71)
-- new PDOErrorCode (line 72)
-- new PDOErrorInfo (line 73)
-- new PDOSqliteCreateFunction (line 74)
-- new PDOSqliteCreateAggregate (line 75)
-- new HashTable (line 102)
-- new Variable (line 104)
-- new PDOException (line 124)
-- new PDOException (line 130)
-- new PdoState (line 132)
-- new PDOException (line 154)
-- new PDOException (line 163)
-- new PDOException (line 190)
-- new HashTable (line 238)
-- new Variable (line 240)
-- new ArgumentCountError (line 301)
-- new ArgumentCountError (line 328)
-- new ArgumentCountError (line 365)
-- new ArgumentCountError (line 402)
-- new ArgumentCountError (line 454)
-- new ArgumentCountError (line 483)
-- new ArgumentCountError (line 547)
-- new HashTable (line 696)
-- new Variable (line 697)
-- new Variable (line 700)
-- new Variable (line 707)
-- new ArgumentCountError (line 730)
-- new ArgumentCountError (line 783)
-- 31 class method(s)
+- new ClassEntry (line 46)
+- new Variable (line 50)
+- new Variable (line 53)
+- new PDOConstruct (line 61)
+- new PDOExec (line 66)
+- new PDOPrepare (line 67)
+- new PDOQuery (line 68)
+- new PDOSetAttribute (line 69)
+- new PDOGetAttribute (line 70)
+- new PDOGetAvailableDrivers (line 71)
+- new PDOConnect (line 72)
+- new PDOLastInsertId (line 73)
+- new PDOQuote (line 74)
+- new PDOBeginTransaction (line 75)
+- new PDOCommit (line 76)
+- new PDORollBack (line 77)
+- new PDOInTransaction (line 78)
+- new PDOErrorCode (line 79)
+- new PDOErrorInfo (line 80)
+- new PDOSqliteCreateFunction (line 81)
+- new PDOSqliteCreateAggregate (line 82)
+- new ClassEntry (line 120)
+- new ObjectEntry (line 146)
+- new HashTable (line 157)
+- new Variable (line 159)
+- new PDOException (line 179)
+- new PDOException (line 185)
+- new PdoState (line 187)
+- new PDOException (line 209)
+- new PDOException (line 218)
+- new PDOException (line 245)
+- new HashTable (line 293)
+- new Variable (line 295)
+- new ArgumentCountError (line 356)
+- new ArgumentCountError (line 395)
+- new ArgumentCountError (line 423)
+- new ArgumentCountError (line 460)
+- new ArgumentCountError (line 497)
+- new ArgumentCountError (line 549)
+- new ArgumentCountError (line 578)
+- new ArgumentCountError (line 642)
+- new HashTable (line 791)
+- new Variable (line 792)
+- new Variable (line 795)
+- new Variable (line 802)
+- new ArgumentCountError (line 825)
+- new ArgumentCountError (line 878)
+- 35 class method(s)
 
 ### `ext/pdo/VmPDOStatement.php`
 
