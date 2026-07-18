@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5709 |
-| Phase A inventory files (M2 ratio SSOT) | 5709 |
+| PHP files on vm.php path | 5711 |
+| Phase A inventory files (M2 ratio SSOT) | 5711 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16381 |
+| Source constructs flagged (warnings) | 16392 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1495,6 +1495,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/SQLite3Changes.php` | 0 | 1 |
 | `ext/sqlite3/SQLite3Close.php` | 0 | 1 |
 | `ext/sqlite3/SQLite3Construct.php` | 0 | 2 |
+| `ext/sqlite3/SQLite3CreateAggregate.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3CreateCollation.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3CreateFunction.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3EnableExceptions.php` | 0 | 1 |
@@ -1503,6 +1504,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/SQLite3LastErrorCode.php` | 0 | 1 |
 | `ext/sqlite3/SQLite3LastErrorMsg.php` | 0 | 1 |
 | `ext/sqlite3/SQLite3LastInsertRowID.php` | 0 | 1 |
+| `ext/sqlite3/SQLite3LoadExtension.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3Open.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3Prepare.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3Query.php` | 0 | 2 |
@@ -1510,11 +1512,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/SQLite3Version.php` | 0 | 4 |
 | `ext/sqlite3/Sqlite3ClassMethod.php` | 0 | 1 |
 | `ext/sqlite3/Sqlite3ExtensionPolicy.php` | 0 | 1 |
-| `ext/sqlite3/VmSQLite3.php` | 0 | 24 |
+| `ext/sqlite3/VmSQLite3.php` | 0 | 26 |
 | `ext/sqlite3/VmSQLite3Result.php` | 0 | 12 |
 | `ext/sqlite3/VmSQLite3Stmt.php` | 0 | 15 |
-| `ext/sqlite3/VmSqlite3Native.php` | 0 | 9 |
-| `ext/sqlite3/VmSqlite3Udf.php` | 0 | 3 |
+| `ext/sqlite3/VmSqlite3Native.php` | 0 | 10 |
+| `ext/sqlite3/VmSqlite3Udf.php` | 0 | 7 |
 | `ext/standard/AbsJitHelper.php` | 0 | 1 |
 | `ext/standard/AcosJitHelper.php` | 0 | 1 |
 | `ext/standard/AcoshJitHelper.php` | 0 | 1 |
@@ -16796,6 +16798,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 20)
 - 1 class method(s)
 
+### `ext/sqlite3/SQLite3CreateAggregate.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 1 class method(s)
+
 ### `ext/sqlite3/SQLite3CreateCollation.php`
 
 **Warnings** (review for bootstrap subset):
@@ -16838,6 +16846,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sqlite3/SQLite3LastInsertRowID.php`
 
 **Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sqlite3/SQLite3LoadExtension.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 1 class method(s)
 
 ### `ext/sqlite3/SQLite3Open.php`
@@ -16902,12 +16916,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SQLite3BusyTimeout (line 61)
 - new SQLite3EnableExceptions (line 62)
 - new SQLite3CreateFunction (line 63)
-- new SQLite3CreateCollation (line 64)
-- new SQLite3Backup (line 65)
-- new SQLite3Version (line 66)
-- new Sqlite3State (line 85)
-- new Exception (line 104)
-- new Variable (line 268)
+- new SQLite3CreateAggregate (line 64)
+- new SQLite3CreateCollation (line 65)
+- new SQLite3LoadExtension (line 66)
+- new SQLite3Backup (line 67)
+- new SQLite3Version (line 68)
+- new Sqlite3State (line 87)
+- new Exception (line 106)
+- new Variable (line 271)
 - 18 class method(s)
 
 ### `ext/sqlite3/VmSQLite3Result.php`
@@ -16953,17 +16969,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SQLite3Exception (line 92)
 - new SQLite3Exception (line 139)
 - new SQLite3Exception (line 183)
-- new SQLite3Exception (line 262)
-- new SQLite3Exception (line 265)
-- new SQLite3Exception (line 268)
-- 36 class method(s)
+- new SQLite3Exception (line 238)
+- new SQLite3Exception (line 350)
+- new SQLite3Exception (line 353)
+- new SQLite3Exception (line 356)
+- 38 class method(s)
 
 ### `ext/sqlite3/VmSqlite3Udf.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 100)
-- 10 class method(s)
-- 1 closure(s)
+- new Variable (line 119)
+- new Variable (line 124)
+- new Variable (line 129)
+- new Variable (line 136)
+- new Variable (line 210)
+- 13 class method(s)
+- 2 closure(s)
 
 ### `ext/standard/AbsJitHelper.php`
 

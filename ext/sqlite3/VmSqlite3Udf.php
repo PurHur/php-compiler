@@ -10,11 +10,11 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmCallable;
 
 /**
- * SQLite3::createFunction scalar UDF support (#19862).
+ * SQLite3::createFunction scalar UDF + createAggregate support (#19862 / #20585).
  *
  * On PHP ≥ 8.3, registers via sqlite3_create_function_v2 + FFI::callback.
  * On PHP 8.2 (pinned CI), expands registered scalar calls with literal/nested-UDF
- * args in SQL before prepare/exec (issue repro + common app patterns).
+ * args in SQL before prepare/exec; aggregates rewrite SELECT agg(…) FROM ….
  */
 final class VmSqlite3Udf
 {
@@ -43,6 +43,116 @@ final class VmSqlite3Udf
         }
 
         return $sql;
+    }
+
+    /**
+     * Evaluate `SELECT agg(args) FROM …` by stepping rows through PHP callbacks (#20585).
+     *
+     * @param array<string, array{
+     *     step: Variable,
+     *     stepClosure: ?ClosureState,
+     *     final: Variable,
+     *     finalClosure: ?ClosureState,
+     *     argc: int,
+     *     ctx: Context
+     * }> $aggregates
+     */
+    public static function expandAggregates(\FFI\CData $db, string $sql, array $aggregates): string
+    {
+        if ([] === $aggregates) {
+            return $sql;
+        }
+        $names = array_keys($aggregates);
+        usort($names, static fn (string $a, string $b): int => \strlen($b) <=> \strlen($a));
+        foreach ($names as $name) {
+            $rewritten = self::tryExpandAggregateSelect($db, $sql, $name, $aggregates[$name]);
+            if (null !== $rewritten) {
+                return $rewritten;
+            }
+        }
+
+        return $sql;
+    }
+
+    /**
+     * @param array{
+     *     step: Variable,
+     *     stepClosure: ?ClosureState,
+     *     final: Variable,
+     *     finalClosure: ?ClosureState,
+     *     argc: int,
+     *     ctx: Context
+     * } $entry
+     */
+    private static function tryExpandAggregateSelect(
+        \FFI\CData $db,
+        string $sql,
+        string $name,
+        array $entry
+    ): ?string {
+        $pattern = '/^\s*SELECT\s+'.preg_quote($name, '/').'\s*\((.*)\)\s+FROM\s+(.+?)\s*;?\s*$/is';
+        if (1 !== preg_match($pattern, $sql, $m)) {
+            return null;
+        }
+        $argsRaw = trim($m[1]);
+        $fromRest = trim($m[2]);
+        $argExprs = self::parseArgList($argsRaw);
+        if (null === $argExprs) {
+            return null;
+        }
+        if (-1 !== $entry['argc'] && \count($argExprs) !== $entry['argc']) {
+            return null;
+        }
+        if ([] === $argExprs) {
+            $innerSql = 'SELECT 1 FROM '.$fromRest;
+        } else {
+            $innerSql = 'SELECT '.implode(', ', $argExprs).' FROM '.$fromRest;
+        }
+        try {
+            $rows = VmSqlite3Native::fetchAllRows($db, $innerSql);
+        } catch (\Throwable) {
+            return null;
+        }
+        self::attachClosure($entry['step'], $entry['stepClosure']);
+        self::attachClosure($entry['final'], $entry['finalClosure']);
+
+        $context = new Variable();
+        $context->null();
+        $rowCount = 0;
+        foreach ($rows as $row) {
+            ++$rowCount;
+            $rowNum = new Variable(Variable::TYPE_INTEGER);
+            $rowNum->int($rowCount);
+            $phpArgs = [$context, $rowNum];
+            if ([] !== $argExprs) {
+                foreach ($row as $cell) {
+                    $slot = new Variable();
+                    self::assignPhpValue($slot, $cell);
+                    $phpArgs[] = $slot;
+                }
+            }
+            $context = VmCallable::invoke($entry['ctx'], $entry['step'], ...$phpArgs);
+        }
+        $finalRow = new Variable(Variable::TYPE_INTEGER);
+        $finalRow->int(0); // php-src resets row_count before final callback
+        $result = VmCallable::invoke($entry['ctx'], $entry['final'], $context, $finalRow);
+
+        return 'SELECT '.self::sqlLiteralFromVariable($result);
+    }
+
+    private static function attachClosure(Variable $callback, ?ClosureState $closure): void
+    {
+        if (null === $closure) {
+            return;
+        }
+        $resolved = $callback->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return;
+        }
+        $obj = $resolved->toObject();
+        if (null === $obj->closureState) {
+            $obj->closureState = $closure;
+        }
     }
 
     /**
