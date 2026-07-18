@@ -26,18 +26,33 @@ final class DomLivingBuiltinClasses
         $objProto = new Variable(Variable::TYPE_OBJECT);
         $nullProto = new Variable(Variable::TYPE_NULL);
         $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
+        $pub = CfgFunc::FLAG_PUBLIC;
 
         $node = new ClassEntry('Dom\\Node');
         $node->isInternal = true;
         if (CompilerVersion::supportsDomNodeIsConnected()) {
             $node->properties[] = new ClassProperty(VmDom::PROP_IS_CONNECTED, null, new Variable(Variable::TYPE_BOOLEAN));
         }
+        self::copyMethods($ctx->classes[VmDom::CLASS_NODE] ?? null, $node);
         $ctx->classes[VmDomLiving::CLASS_NODE] = $node;
 
         $element = new ClassEntry('Dom\\Element');
         $element->isInternal = true;
         $element->parentLc = VmDomLiving::CLASS_NODE;
         $element->properties[] = new ClassProperty(VmDom::PROP_TEXT_CONTENT, $nullProto, new Variable(Variable::TYPE_STRING));
+        self::copyMethods($ctx->classes[VmDom::CLASS_ELEMENT] ?? null, $element);
+        $element->methods['closest'] = new ElementClosest();
+        $element->methodVisibility['closest'] = $pub;
+        $element->methodNames['closest'] = 'closest';
+        $element->methods['matches'] = new ElementMatches();
+        $element->methodVisibility['matches'] = $pub;
+        $element->methodNames['matches'] = 'matches';
+        $element->methods['queryselector'] = new ElementQuerySelector();
+        $element->methodVisibility['queryselector'] = $pub;
+        $element->methodNames['queryselector'] = 'querySelector';
+        $element->methods['queryselectorall'] = new ElementQuerySelectorAll();
+        $element->methodVisibility['queryselectorall'] = $pub;
+        $element->methodNames['queryselectorall'] = 'querySelectorAll';
         $ctx->classes[VmDomLiving::CLASS_ELEMENT] = $element;
 
         $htmlElement = new ClassEntry('Dom\\HTMLElement');
@@ -90,5 +105,25 @@ final class DomLivingBuiltinClasses
         $xmlDocument->methodVisibility['createempty'] = $pubStatic;
         $xmlDocument->methodNames['createempty'] = 'createEmpty';
         $ctx->classes[VmDomLiving::CLASS_XML_DOCUMENT] = $xmlDocument;
+    }
+
+    /** Share classic DOM* method handlers with living Dom\* types (#20418). */
+    private static function copyMethods(?ClassEntry $from, ClassEntry $to): void
+    {
+        if (null === $from) {
+            return;
+        }
+        foreach ($from->methods as $lc => $method) {
+            if (isset($to->methods[$lc])) {
+                continue;
+            }
+            $to->methods[$lc] = $method;
+            if (isset($from->methodVisibility[$lc])) {
+                $to->methodVisibility[$lc] = $from->methodVisibility[$lc];
+            }
+            if (isset($from->methodNames[$lc])) {
+                $to->methodNames[$lc] = $from->methodNames[$lc];
+            }
+        }
     }
 }

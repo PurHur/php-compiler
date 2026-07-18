@@ -98,6 +98,8 @@ final class VmDomInstanceInvoke
             'c14n' => VmDomJitDispatch::c14n($ctx, $self, $extra),
             'queryselector' => VmDomJitDispatch::querySelector($self, $extra),
             'queryselectorall' => VmDomJitDispatch::querySelectorAll($ctx, $self, $extra),
+            'closest' => VmDomJitDispatch::closest($self, $extra),
+            'matches' => VmDomJitDispatch::matches($self, $extra),
             'savehtml' => VmDomJitDispatch::saveHtml($self, $extra),
             default => throw new \Error('Call to undefined method '.$self->class->name.'::'.$methodLc.'()'),
         };
