@@ -1355,6 +1355,220 @@ final class VmGd
     }
 
     /**
+     * imagerectangle() — outline rect (php-src ext/gd/libgd/gd.c gdImageRectangle; #20457).
+     */
+    public static function rectangle(ObjectEntry $image, int $x1, int $y1, int $x2, int $y2, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $thick = $state->thick;
+        if ($x1 === $x2 && $y1 === $y2 && 1 === $thick) {
+            self::putPixel($state, $x1, $y1, $color);
+
+            return true;
+        }
+        if ($y2 < $y1) {
+            $t = $y1;
+            $y1 = $y2;
+            $y2 = $t;
+        }
+        if ($x2 < $x1) {
+            $t = $x1;
+            $x1 = $x2;
+            $x2 = $t;
+        }
+        if ($thick > 1) {
+            $half = $thick >> 1;
+            $x1ul = $x1 - $half;
+            $y1ul = $y1 - $half;
+            $x2lr = $x2 + $half;
+            $y2lr = $y2 + $half;
+            $cy = $y1ul + $thick;
+            while ($cy-- > $y1ul) {
+                $cx = $x1ul - 1;
+                while ($cx++ < $x2lr) {
+                    self::putPixel($state, $cx, $cy, $color);
+                }
+            }
+            $cy = $y2lr - $thick;
+            while ($cy++ < $y2lr) {
+                $cx = $x1ul - 1;
+                while ($cx++ < $x2lr) {
+                    self::putPixel($state, $cx, $cy, $color);
+                }
+            }
+            $cy = $y1ul + $thick - 1;
+            while ($cy++ < $y2lr - $thick) {
+                $cx = $x1ul - 1;
+                while ($cx++ < $x1ul + $thick) {
+                    self::putPixel($state, $cx, $cy, $color);
+                }
+            }
+            $cy = $y1ul + $thick - 1;
+            while ($cy++ < $y2lr - $thick) {
+                $cx = $x2lr - $thick - 1;
+                while ($cx++ < $x2lr) {
+                    self::putPixel($state, $cx, $cy, $color);
+                }
+            }
+
+            return true;
+        }
+        if ($x1 === $x2 || $y1 === $y2) {
+            self::line($image, $x1, $y1, $x2, $y2, $color);
+        } else {
+            self::line($image, $x1, $y1, $x2, $y1, $color);
+            self::line($image, $x1, $y2, $x2, $y2, $color);
+            self::line($image, $x1, $y1 + 1, $x1, $y2 - 1, $color);
+            self::line($image, $x2, $y1 + 1, $x2, $y2 - 1, $color);
+        }
+
+        return true;
+    }
+
+    /**
+     * imagedashedline() — Bresenham dashed stroke (php-src gdImageDashedLine; #20457).
+     *
+     * Dash period is libgd gdDashSize (4). Thickness wid uses sin(atan2) for both
+     * branches (libgd quirk; matches php-src ext/gd/libgd/gd.c).
+     */
+    public static function dashedLine(ObjectEntry $image, int $x1, int $y1, int $x2, int $y2, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $dashStep = 0;
+        $on = true;
+        $thick = $state->thick;
+        $dx = \abs($x2 - $x1);
+        $dy = \abs($y2 - $y1);
+        if ($dy <= $dx) {
+            $as = \sin(\atan2($dy, $dx));
+            $wid = (0.0 !== $as) ? (int) ($thick / $as) : 1;
+            $vert = true;
+            $d = 2 * $dy - $dx;
+            $incr1 = 2 * $dy;
+            $incr2 = 2 * ($dy - $dx);
+            if ($x1 > $x2) {
+                $x = $x2;
+                $y = $y2;
+                $ydirflag = -1;
+                $xend = $x1;
+            } else {
+                $x = $x1;
+                $y = $y1;
+                $ydirflag = 1;
+                $xend = $x2;
+            }
+            self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+            if ((($y2 - $y1) * $ydirflag) > 0) {
+                while ($x < $xend) {
+                    ++$x;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        ++$y;
+                        $d += $incr2;
+                    }
+                    self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+                }
+            } else {
+                while ($x < $xend) {
+                    ++$x;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        --$y;
+                        $d += $incr2;
+                    }
+                    self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+                }
+            }
+        } else {
+            $as = \sin(\atan2($dy, $dx));
+            $wid = (0.0 !== $as) ? (int) ($thick / $as) : 1;
+            $vert = false;
+            $d = 2 * $dx - $dy;
+            $incr1 = 2 * $dx;
+            $incr2 = 2 * ($dx - $dy);
+            if ($y1 > $y2) {
+                $y = $y2;
+                $x = $x2;
+                $yend = $y1;
+                $xdirflag = -1;
+            } else {
+                $y = $y1;
+                $x = $x1;
+                $yend = $y2;
+                $xdirflag = 1;
+            }
+            self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+            if ((($x2 - $x1) * $xdirflag) > 0) {
+                while ($y < $yend) {
+                    ++$y;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        ++$x;
+                        $d += $incr2;
+                    }
+                    self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+                }
+            } else {
+                while ($y < $yend) {
+                    ++$y;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        --$x;
+                        $d += $incr2;
+                    }
+                    self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * libgd dashedSet helper — gdDashSize=4 (php-src ext/gd/libgd/gd.h; #20457).
+     */
+    private static function dashedSet(
+        GdImageState $state,
+        int $x,
+        int $y,
+        int $color,
+        bool &$on,
+        int &$dashStep,
+        int $wid,
+        bool $vert
+    ): void {
+        ++$dashStep;
+        if (4 === $dashStep) {
+            $dashStep = 0;
+            $on = !$on;
+        }
+        if (!$on) {
+            return;
+        }
+        if ($vert) {
+            $wstart = $y - intdiv($wid, 2);
+            for ($w = $wstart; $w < $wstart + $wid; ++$w) {
+                self::putPixel($state, $x, $w, $color);
+            }
+        } else {
+            $wstart = $x - intdiv($wid, 2);
+            for ($w = $wstart; $w < $wstart + $wid; ++$w) {
+                self::putPixel($state, $w, $y, $color);
+            }
+        }
+    }
+
+    /**
      * imagefilledrectangle() — clipped fill (php-src _gdImageFilledVRectangle; #6534).
      */
     public static function filledRectangle(ObjectEntry $image, int $x1, int $y1, int $x2, int $y2, int $color): bool
