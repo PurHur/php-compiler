@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5545 |
-| Phase A inventory files (M2 ratio SSOT) | 5545 |
+| PHP files on vm.php path | 5546 |
+| Phase A inventory files (M2 ratio SSOT) | 5546 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15835 |
+| Source constructs flagged (warnings) | 15839 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3708,7 +3708,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/xmlwriter_write_raw.php` | 0 | 2 |
 | `ext/xsl/BuiltinClasses.php` | 0 | 1 |
 | `ext/xsl/Module.php` | 0 | 2 |
-| `ext/xsl/VmXsl.php` | 0 | 10 |
+| `ext/xsl/VmXsl.php` | 0 | 11 |
 | `ext/xsl/VmXslDomBridge.php` | 0 | 3 |
 | `ext/xsl/XslExtensionPolicy.php` | 0 | 1 |
 | `ext/xsl/XsltClassMethod.php` | 0 | 1 |
@@ -3720,6 +3720,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/XsltProcessorRemoveParameter.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorSetParameter.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorTransformToDoc.php` | 0 | 3 |
+| `ext/xsl/XsltProcessorTransformToUri.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorTransformToXml.php` | 0 | 3 |
 | `ext/xsl/XsltRegistry.php` | 0 | 1 |
 | `ext/yaml/Module.php` | 0 | 5 |
@@ -30745,11 +30746,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new XsltProcessorImportStylesheet (line 37)
 - new XsltProcessorTransformToXml (line 40)
 - new XsltProcessorTransformToDoc (line 43)
-- new XsltProcessorSetParameter (line 46)
-- new XsltProcessorGetParameter (line 49)
-- new XsltProcessorRemoveParameter (line 52)
-- new XsltProcessorRegisterPhpFunctions (line 55)
-- 13 class method(s)
+- new XsltProcessorTransformToUri (line 46)
+- new XsltProcessorSetParameter (line 49)
+- new XsltProcessorGetParameter (line 52)
+- new XsltProcessorRemoveParameter (line 55)
+- new XsltProcessorRegisterPhpFunctions (line 58)
+- 14 class method(s)
 
 ### `ext/xsl/VmXslDomBridge.php`
 
@@ -30772,7 +30774,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new XSLTProcessor (line 26)
-- 9 class method(s)
+- 10 class method(s)
 
 ### `ext/xsl/XsltProcessorConstruct.php`
 
@@ -30815,6 +30817,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xsl/XsltProcessorTransformToUri.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
 - 1 class method(s)
 - 1 closure(s)
 

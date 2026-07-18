@@ -50,6 +50,12 @@ final class XsltHostBridge
         return $result;
     }
 
+    /** @return int|false */
+    public static function transformToUri(\XSLTProcessor $proc, \DOMDocument $doc, string $uri)
+    {
+        return $proc->transformToUri($doc, $uri);
+    }
+
     public static function setParameter(\XSLTProcessor $proc, string $namespace, string $name, string $value): bool
     {
         return $proc->setParameter($namespace, $name, $value);
