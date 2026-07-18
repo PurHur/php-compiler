@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmActiveContextLlvm;
 use PHPCompiler\JIT\VmActiveContextInitLlvm;
 use PHPCompiler\JIT\VmActiveContextLlvm;
-use PHPCompiler\ext\standard\JitVarExportKernel;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_var_export via VarExportJitHelper PHP (#9189, #13349, #19430, #20077).
+ * JIT/AOT link for __compiler_var_export via VarExportJitHelper PHP (#9189, #13349, #19430, #20589).
  *
- * Embed / non-thin: compile {@see VarExportJitHelper}; thin LLVM bridges forward the ABI.
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20065 shape): {@see JitVarExportKernel}.
+ * Embed + thin standalone AOT: {@see VarExportJitHelper} via {@see JitVmHelperLink}
+ * (Htmlspecialchars #20487 / HashEquals #20469 shape — no thin kernel fork).
+ * SSOT: {@see \PHPCompiler\ext\standard\VmVarExport::formatVariable()}.
  * php-src: ext/standard/var.c — php_var_export_ex
  */
 final class StringVarExport
@@ -25,6 +25,8 @@ final class StringVarExport
     private const HELPER_PATH = '/ext/standard/VarExportJitHelper.php';
 
     private const FORMAT_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\VarExportJitHelper::formatValue';
+
+    private const BRIDGE_ENTRY = 'var_export_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -48,64 +50,42 @@ final class StringVarExport
 
     public static function implement(Context $context): void
     {
-        if ($context->isThinStandaloneAotMain()) {
-            JitVarExportKernel::implement($context);
-
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
+        // Thin + embed: publish sg_vm_context before NestedJIT of VarExportJitHelper (#17391).
         VmActiveContextInitLlvm::requestThinStandaloneInit($context);
         VmActiveContextLlvm::ensureAbi($context);
         NestedVmActiveContextLlvm::ensureMethod($context);
         DomInstanceMethodRuntime::ensureActiveContextProxy($context);
 
-        $savedInsert = null;
-        try {
-            $savedInsert = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
         $probe = $context->module->getNamedFunction('__compiler_var_export');
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
-        self::ensureJitHelperCompiled($context);
-        self::implementBridge($context);
-        self::registerLinkedRuntime($context);
-        if (null !== $savedInsert) {
-            $context->builder->positionAtEnd($savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function implementBridge(Context $context): void
-    {
-        $abiName = '__compiler_var_export';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
-        $ft = $context->context->functionType($strPtr, false, $valuePtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('var_export_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, self::FORMAT_VALUE_HELPER),
-            $fn->getParam(0)
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_var_export',
+            self::BRIDGE_ENTRY,
+            [$valuePtr],
+            $strPtr,
+            self::FORMAT_VALUE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20589'
         );
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
+        self::registerLinkedRuntime($context);
     }
 
     public static function ensureJitHelperCompiled(Context $context): void
@@ -114,7 +94,7 @@ final class StringVarExport
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#9189'
+            '#20589'
         );
     }
 
@@ -124,7 +104,7 @@ final class StringVarExport
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after VarExportJitHelper compile (#9189)');
+            throw new \LogicException($logical.' missing after VarExportJitHelper compile (#20589)');
         }
 
         return $fn;
@@ -135,7 +115,7 @@ final class StringVarExport
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringVarExport bridge (#9189)');
+                throw new \LogicException($name.' missing after StringVarExport bridge (#20589)');
             }
             $context->registerFunction($name, $fn);
         }
