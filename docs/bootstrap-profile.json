@@ -505,6 +505,7 @@
         "ext/gd/VmGdGif.php",
         "ext/gd/VmGdJpeg.php",
         "ext/gd/VmGdPng.php",
+        "ext/gd/VmGdTga.php",
         "ext/gd/VmGdWbmp.php",
         "ext/gd/VmGdWebp.php",
         "ext/gd/VmGdXbm.php",
@@ -548,6 +549,7 @@
         "ext/gd/imagecreatefromjpeg.php",
         "ext/gd/imagecreatefrompng.php",
         "ext/gd/imagecreatefromstring.php",
+        "ext/gd/imagecreatefromtga.php",
         "ext/gd/imagecreatefromwbmp.php",
         "ext/gd/imagecreatefromwebp.php",
         "ext/gd/imagecreatefromxbm.php",
@@ -5894,9 +5896,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5660,
+        "inventory_files": 5662,
         "excluded": 0,
-        "eligible": 5660,
+        "eligible": 5662,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

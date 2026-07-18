@@ -14,16 +14,18 @@ echo 'webp=', (int) (0 !== ($mask & IMG_WEBP)), "\n";
 echo 'bmp=', (int) (0 !== ($mask & IMG_BMP)), "\n";
 echo 'avif=', (int) (0 !== ($mask & IMG_AVIF)), "\n";
 echo 'wbmp=', (int) (0 !== ($mask & IMG_WBMP)), "\n";
+echo 'tga=', (int) (0 !== ($mask & IMG_TGA)), "\n";
 $info = gd_info();
 echo 'version=', (int) isset($info['GD Version']), "\n";
 echo 'png_support=', (int) (!empty($info['PNG Support'])), "\n";
 echo 'wbmp_support=', (int) (!empty($info['WBMP Support'])), "\n";
+echo 'tga_support=', (int) (!empty($info['TGA Read Support'])), "\n";
 echo 'ok', "\n";
 ?>
 --EXPECT--
 gd_info=1
 imagetypes=1
-mask=367
+mask=495
 png=1
 jpeg=1
 gif=1
@@ -31,7 +33,9 @@ webp=1
 bmp=1
 avif=1
 wbmp=1
+tga=1
 version=1
 png_support=1
 wbmp_support=1
+tga_support=1
 ok

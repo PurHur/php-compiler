@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5660 |
-| Phase A inventory files (M2 ratio SSOT) | 5660 |
+| PHP files on vm.php path | 5662 |
+| Phase A inventory files (M2 ratio SSOT) | 5662 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16153 |
+| Source constructs flagged (warnings) | 16156 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -491,7 +491,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 6 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 98 |
+| `ext/gd/Module.php` | 0 | 99 |
 | `ext/gd/VmGd.php` | 0 | 19 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
 | `ext/gd/VmGdBmp.php` | 0 | 1 |
@@ -500,6 +500,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/VmGdGif.php` | 0 | 1 |
 | `ext/gd/VmGdJpeg.php` | 0 | 1 |
 | `ext/gd/VmGdPng.php` | 0 | 1 |
+| `ext/gd/VmGdTga.php` | 0 | 1 |
 | `ext/gd/VmGdWbmp.php` | 0 | 1 |
 | `ext/gd/VmGdWebp.php` | 0 | 1 |
 | `ext/gd/VmGdXbm.php` | 0 | 1 |
@@ -543,6 +544,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagecreatefromjpeg.php` | 0 | 1 |
 | `ext/gd/imagecreatefrompng.php` | 0 | 1 |
 | `ext/gd/imagecreatefromstring.php` | 0 | 1 |
+| `ext/gd/imagecreatefromtga.php` | 0 | 1 |
 | `ext/gd/imagecreatefromwbmp.php` | 0 | 1 |
 | `ext/gd/imagecreatefromwebp.php` | 0 | 1 |
 | `ext/gd/imagecreatefromxbm.php` | 0 | 1 |
@@ -9000,30 +9002,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagecreatefromgd (line 155)
 - new imagecreatefromgd2 (line 156)
 - new imagecreatefromgd2part (line 157)
+- new imagecreatefromtga (line 158)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 101)
-- new Variable (line 103)
-- new ObjectEntry (line 140)
-- new ObjectEntry (line 163)
-- new ObjectEntry (line 189)
-- new ObjectEntry (line 361)
-- new HashTable (line 891)
-- new Variable (line 893)
-- new HashTable (line 1621)
-- new Variable (line 1623)
-- new HashTable (line 3342)
-- new Variable (line 3344)
-- new ObjectEntry (line 3794)
-- new ObjectEntry (line 3818)
-- new ObjectEntry (line 3842)
-- new ObjectEntry (line 3909)
-- new ObjectEntry (line 4182)
-- new ObjectEntry (line 4474)
-- 182 class method(s)
+- new HashTable (line 102)
+- new Variable (line 104)
+- new ObjectEntry (line 141)
+- new ObjectEntry (line 164)
+- new ObjectEntry (line 190)
+- new ObjectEntry (line 362)
+- new HashTable (line 892)
+- new Variable (line 894)
+- new HashTable (line 1622)
+- new Variable (line 1624)
+- new HashTable (line 3343)
+- new Variable (line 3345)
+- new ObjectEntry (line 3795)
+- new ObjectEntry (line 3819)
+- new ObjectEntry (line 3843)
+- new ObjectEntry (line 3910)
+- new ObjectEntry (line 4204)
+- new ObjectEntry (line 4496)
+- 183 class method(s)
 
 ### `ext/gd/VmGdAvif.php`
 
@@ -9059,6 +9062,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `ext/gd/VmGdTga.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `ext/gd/VmGdWbmp.php`
 
@@ -9271,6 +9279,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imagecreatefromstring.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecreatefromtga.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
