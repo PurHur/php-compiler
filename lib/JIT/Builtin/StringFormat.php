@@ -12,10 +12,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_sprintf/printf/number_format via SprintfJitHelper PHP (#9131).
+ * JIT/AOT link for __compiler_sprintf/printf/number_format via SprintfJitHelper PHP (#9131, #20395).
  *
- * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\SprintfJitHelper}; thin LLVM bridges forward the ABI.
- * php-src: ext/standard/sprintf.c, ext/standard/number_format.c
+ * Embed / non-thin: NestedJIT {@see \PHPCompiler\ext\standard\SprintfJitHelper} (#9131).
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20380 / #20371 shape): thin stubs without nested JIT (#13137, #13245).
+ * php-src: ext/standard/formatted_print.c — sprintf / printf / number_format
  */
 final class StringFormat
 {
@@ -101,10 +102,10 @@ final class StringFormat
         self::implement($context);
     }
 
-    /** Inventory argv emit: link sprintf ABI without nested VmString JIT during defineBuiltins (#13137). */
+    /** Thin standalone AOT: linkable sprintf ABI without nested SprintfJitHelper (#13137, #20395). */
     public static function ensureDeferredStubsForInventoryEmit(Context $context): void
     {
-        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if (!$context->isThinStandaloneAotMain()) {
             return;
         }
         StringFormatInventoryStubs::implement($context);
@@ -112,9 +113,19 @@ final class StringFormat
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_sprintf');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        if ($context->isThinStandaloneAotMain()) {
+            StringFormatInventoryStubs::implement($context);
 
             return;
         }

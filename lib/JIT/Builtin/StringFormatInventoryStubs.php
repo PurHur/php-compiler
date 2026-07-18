@@ -7,9 +7,10 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * M4 inventory argv deferred sprintf/printf/number_format ABI stubs (#13137, #14811).
+ * Thin standalone AOT sprintf/printf/number_format ABI stubs (#13137, #14811, #20395).
  *
  * Quarantined from {@see StringFormat} so the runtime bridge stays under shrink-test LOC.
+ * Gate: {@see Context::isThinStandaloneAotMain()} (peer #20380 / #20371 — no StreamIo defer bag).
  */
 final class StringFormatInventoryStubs
 {

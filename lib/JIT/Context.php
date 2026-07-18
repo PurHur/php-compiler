@@ -1097,6 +1097,7 @@ class Context {
                 Builtin\StringStrtr::ensureStandaloneBodies($this);
                 Builtin\StringParseStr::ensureStandaloneBodies($this);
             }
+            Builtin\StringFormat::ensureStandaloneBodies($this);
             Builtin\StringJsonEncode::ensureStandaloneBodies($this);
             Builtin\StringJsonDecode::ensureStandaloneBodies($this);
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
