@@ -6,7 +6,9 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** serialize() JIT routes through SerializeJitHelper PHP not StringSerializeJit LLVM (#9180, #13311). */
+/**
+ * serialize() JIT: embed via SerializeJitHelper; thin AOT via isThinStandaloneAotMain (#9180, #13311, #20336).
+ */
 final class SerializeRuntimeShrinkTest extends TestCase
 {
     public function testStringSerializeUsesJitHelperNotLlvmMonolith(): void
@@ -31,7 +33,9 @@ final class SerializeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringSerialize.php');
         $this->assertStringContainsString('ensureStandaloneBodies', $source);
-        $this->assertStringContainsString('shouldDeferHeavyStreamIoEmitters', $source);
-        $this->assertStringContainsString('implementDeferredInventoryStubs', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('implementThinStandaloneStubs', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringNotContainsString('implementDeferredInventoryStubs', $source);
     }
 }
