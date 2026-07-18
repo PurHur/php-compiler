@@ -52,6 +52,45 @@ final class PgsqlConstants
     /** libpq PQSHOW_CONTEXT_ALWAYS */
     public const PGSQL_SHOW_CONTEXT_ALWAYS = 2;
 
+    /** libpq CONNECTION_OK */
+    public const PGSQL_CONNECTION_OK = 0;
+
+    /** libpq CONNECTION_BAD */
+    public const PGSQL_CONNECTION_BAD = 1;
+
+    /** libpq CONNECTION_STARTED */
+    public const PGSQL_CONNECTION_STARTED = 2;
+
+    /** libpq CONNECTION_MADE */
+    public const PGSQL_CONNECTION_MADE = 3;
+
+    /** libpq CONNECTION_AWAITING_RESPONSE */
+    public const PGSQL_CONNECTION_AWAITING_RESPONSE = 4;
+
+    /** libpq CONNECTION_AUTH_OK */
+    public const PGSQL_CONNECTION_AUTH_OK = 5;
+
+    /** libpq CONNECTION_SETENV */
+    public const PGSQL_CONNECTION_SETENV = 6;
+
+    /** libpq CONNECTION_SSL_STARTUP */
+    public const PGSQL_CONNECTION_SSL_STARTUP = 7;
+
+    /** libpq PQTRANS_IDLE */
+    public const PGSQL_TRANSACTION_IDLE = 0;
+
+    /** libpq PQTRANS_ACTIVE */
+    public const PGSQL_TRANSACTION_ACTIVE = 1;
+
+    /** libpq PQTRANS_INTRANS */
+    public const PGSQL_TRANSACTION_INTRANS = 2;
+
+    /** libpq PQTRANS_INERROR */
+    public const PGSQL_TRANSACTION_INERROR = 3;
+
+    /** libpq PQTRANS_UNKNOWN */
+    public const PGSQL_TRANSACTION_UNKNOWN = 4;
+
     /**
      * @return array<string, int>
      */
@@ -76,6 +115,19 @@ final class PgsqlConstants
             'PGSQL_SHOW_CONTEXT_NEVER' => self::PGSQL_SHOW_CONTEXT_NEVER,
             'PGSQL_SHOW_CONTEXT_ERRORS' => self::PGSQL_SHOW_CONTEXT_ERRORS,
             'PGSQL_SHOW_CONTEXT_ALWAYS' => self::PGSQL_SHOW_CONTEXT_ALWAYS,
+            'PGSQL_CONNECTION_OK' => self::PGSQL_CONNECTION_OK,
+            'PGSQL_CONNECTION_BAD' => self::PGSQL_CONNECTION_BAD,
+            'PGSQL_CONNECTION_STARTED' => self::PGSQL_CONNECTION_STARTED,
+            'PGSQL_CONNECTION_MADE' => self::PGSQL_CONNECTION_MADE,
+            'PGSQL_CONNECTION_AWAITING_RESPONSE' => self::PGSQL_CONNECTION_AWAITING_RESPONSE,
+            'PGSQL_CONNECTION_AUTH_OK' => self::PGSQL_CONNECTION_AUTH_OK,
+            'PGSQL_CONNECTION_SETENV' => self::PGSQL_CONNECTION_SETENV,
+            'PGSQL_CONNECTION_SSL_STARTUP' => self::PGSQL_CONNECTION_SSL_STARTUP,
+            'PGSQL_TRANSACTION_IDLE' => self::PGSQL_TRANSACTION_IDLE,
+            'PGSQL_TRANSACTION_ACTIVE' => self::PGSQL_TRANSACTION_ACTIVE,
+            'PGSQL_TRANSACTION_INTRANS' => self::PGSQL_TRANSACTION_INTRANS,
+            'PGSQL_TRANSACTION_INERROR' => self::PGSQL_TRANSACTION_INERROR,
+            'PGSQL_TRANSACTION_UNKNOWN' => self::PGSQL_TRANSACTION_UNKNOWN,
         ];
     }
 }

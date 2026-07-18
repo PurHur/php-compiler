@@ -540,6 +540,91 @@ final class VmPgsqlCore
         };
     }
 
+    /**
+     * pg_version assoc array (php-src php_pgsql_get_link_info PHP_PG_VERSION; #20680).
+     */
+    public static function version(ObjectEntry $connection): HashTable
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        $ht = new HashTable();
+        self::htAddString($ht, 'client', VmPgsqlNative::libpqVersionString());
+        self::htAddLong($ht, 'protocol', VmPgsqlNative::protocolVersion($conn));
+        $server = VmPgsqlNative::parameterStatus($conn, 'server_version');
+        if (null === $server) {
+            $slot = new Variable();
+            $slot->null();
+            $ht->add('server', $slot);
+        } else {
+            self::htAddString($ht, 'server', $server);
+        }
+        foreach ([
+            'server_encoding',
+            'client_encoding',
+            'is_superuser',
+            'session_authorization',
+            'DateStyle',
+            'IntervalStyle',
+            'TimeZone',
+            'integer_datetimes',
+            'standard_conforming_strings',
+            'application_name',
+        ] as $param) {
+            $tmp = VmPgsqlNative::parameterStatus($conn, $param);
+            if (null === $tmp) {
+                $slot = new Variable();
+                $slot->null();
+                $ht->add($param, $slot);
+            } else {
+                self::htAddString($ht, $param, $tmp);
+            }
+        }
+
+        return $ht;
+    }
+
+    /** pg_ping (php-src; #20680). */
+    public static function ping(ObjectEntry $connection): bool
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        $res = VmPgsqlNative::exec($conn, 'SELECT 1;');
+        if (null !== $res) {
+            VmPgsqlNative::clear($res);
+        }
+        if (VmPgsqlNative::CONNECTION_OK === VmPgsqlNative::status($conn)) {
+            return true;
+        }
+        VmPgsqlNative::reset($conn);
+
+        return VmPgsqlNative::CONNECTION_OK === VmPgsqlNative::status($conn);
+    }
+
+    /** pg_connection_reset (php-src; #20680). */
+    public static function connectionReset(ObjectEntry $connection): bool
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        VmPgsqlNative::reset($conn);
+
+        return PgsqlConstants::PGSQL_CONNECTION_BAD !== VmPgsqlNative::status($conn);
+    }
+
+    /** pg_connection_busy (php-src php_pgsql_do_async IS_BUSY; #20680). */
+    public static function connectionBusy(ObjectEntry $connection): bool
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        if (0 !== VmPgsqlNative::setNonBlocking($conn, 1)) {
+            @\trigger_error('pg_connection_busy(): Cannot set connection to nonblocking mode', \E_USER_NOTICE);
+
+            return false;
+        }
+        VmPgsqlNative::consumeInput($conn);
+        $busy = VmPgsqlNative::isBusy($conn);
+        if (0 !== VmPgsqlNative::setNonBlocking($conn, 0)) {
+            @\trigger_error('pg_connection_busy(): Cannot set connection to blocking mode', \E_USER_NOTICE);
+        }
+
+        return $busy;
+    }
+
     public static function quoteTableName(\FFI\CData $conn, string $table): string|false
     {
         $dot = \strpos($table, '.');

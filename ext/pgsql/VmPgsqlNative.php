@@ -246,6 +246,82 @@ final class VmPgsqlNative
         return (int) self::requireFfi()->PQsetnonblocking($conn, $arg);
     }
 
+    public static function isBusy(\FFI\CData $conn): bool
+    {
+        return 1 === (int) self::requireFfi()->PQisBusy($conn);
+    }
+
+    public static function reset(\FFI\CData $conn): void
+    {
+        self::requireFfi()->PQreset($conn);
+    }
+
+    public static function host(\FFI\CData $conn): string
+    {
+        return self::ffiString(self::requireFfi()->PQhost($conn));
+    }
+
+    public static function port(\FFI\CData $conn): string
+    {
+        return self::ffiString(self::requireFfi()->PQport($conn));
+    }
+
+    public static function db(\FFI\CData $conn): string
+    {
+        return self::ffiString(self::requireFfi()->PQdb($conn));
+    }
+
+    public static function options(\FFI\CData $conn): string
+    {
+        return self::ffiString(self::requireFfi()->PQoptions($conn));
+    }
+
+    public static function tty(\FFI\CData $conn): string
+    {
+        return self::ffiString(self::requireFfi()->PQtty($conn));
+    }
+
+    public static function parameterStatus(\FFI\CData $conn, string $name): ?string
+    {
+        $raw = self::requireFfi()->PQparameterStatus($conn, $name);
+        if (null === $raw) {
+            return null;
+        }
+
+        return self::ffiString($raw);
+    }
+
+    public static function protocolVersion(\FFI\CData $conn): int
+    {
+        return (int) self::requireFfi()->PQprotocolVersion($conn);
+    }
+
+    public static function transactionStatus(\FFI\CData $conn): int
+    {
+        return (int) self::requireFfi()->PQtransactionStatus($conn);
+    }
+
+    public static function setClientEncoding(\FFI\CData $conn, string $encoding): int
+    {
+        return (int) self::requireFfi()->PQsetClientEncoding($conn, $encoding);
+    }
+
+    /** Formatted libpq client version string (php-src php_libpq_version). */
+    public static function libpqVersionString(): string
+    {
+        $version = (int) self::requireFfi()->PQlibVersion();
+        $major = intdiv($version, 10000);
+        if ($major >= 10) {
+            $minor = $version % 10000;
+
+            return $major.'.'.$minor;
+        }
+        $minor = intdiv($version, 100) % 100;
+        $revision = $version % 100;
+
+        return $major.'.'.$minor.'.'.$revision;
+    }
+
     /** PQsetErrorVerbosity — previous verbosity (php-src pg_set_error_verbosity; #20660). */
     public static function setErrorVerbosity(\FFI\CData $conn, int $verbosity): int
     {
@@ -662,6 +738,18 @@ int PQconsumeInput(PGconn *conn);
 int PQflush(PGconn *conn);
 int PQisnonblocking(const PGconn *conn);
 int PQsetnonblocking(PGconn *conn, int arg);
+int PQisBusy(PGconn *conn);
+void PQreset(PGconn *conn);
+char *PQhost(const PGconn *conn);
+char *PQport(const PGconn *conn);
+char *PQdb(const PGconn *conn);
+char *PQoptions(const PGconn *conn);
+char *PQtty(const PGconn *conn);
+char *PQparameterStatus(const PGconn *conn, const char *paramName);
+int PQprotocolVersion(const PGconn *conn);
+int PQtransactionStatus(const PGconn *conn);
+int PQsetClientEncoding(PGconn *conn, const char *encoding);
+int PQlibVersion(void);
 int PQsetErrorVerbosity(PGconn *conn, int verbosity);
 int PQsetErrorContextVisibility(PGconn *conn, int visibility);
 Oid PQftable(const PGresult *res, int field_num);

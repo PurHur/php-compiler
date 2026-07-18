@@ -74,6 +74,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/pg_async_builtins.php';
         require_once __DIR__.'/pg_dml_builtins.php';
         require_once __DIR__.'/pg_params_escape_builtins.php';
+        require_once __DIR__.'/pg_connection_info_builtins.php';
 
         return [
             new pg_connect(),
@@ -111,6 +112,20 @@ class Module extends ModuleAbstract
             new pg_set_error_context_visibility(),
             new pg_put_line(),
             new pg_end_copy(),
+            new pg_version(),
+            new pg_parameter_status(),
+            new pg_host(),
+            new pg_port(),
+            new pg_dbname(),
+            new pg_options(),
+            new pg_tty(),
+            new pg_client_encoding(),
+            new pg_set_client_encoding(),
+            new pg_ping(),
+            new pg_connection_reset(),
+            new pg_connection_busy(),
+            new pg_connection_status(),
+            new pg_transaction_status(),
             new pg_insert(),
             new pg_update(),
             new pg_delete(),
