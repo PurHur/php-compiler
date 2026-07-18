@@ -351,7 +351,7 @@ final class VmXml
      * Strip leading/trailing Misc (Comment | PI | S) and an optional XML declaration / DOCTYPE
      * so the remaining string is the document element (php-src libxml document production; #19361).
      */
-    private static function stripDocumentMiscEnvelope(string $xml): string
+    public static function stripDocumentMiscEnvelope(string $xml): string
     {
         $pos = 0;
         $len = \strlen($xml);
