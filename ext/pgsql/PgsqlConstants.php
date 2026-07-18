@@ -43,6 +43,15 @@ final class PgsqlConstants
     /** libpq PQERRORS_SQLSTATE (PHP 8.3+) */
     public const PGSQL_ERRORS_SQLSTATE = 3;
 
+    /** libpq PQSHOW_CONTEXT_NEVER */
+    public const PGSQL_SHOW_CONTEXT_NEVER = 0;
+
+    /** libpq PQSHOW_CONTEXT_ERRORS */
+    public const PGSQL_SHOW_CONTEXT_ERRORS = 1;
+
+    /** libpq PQSHOW_CONTEXT_ALWAYS */
+    public const PGSQL_SHOW_CONTEXT_ALWAYS = 2;
+
     /**
      * @return array<string, int>
      */
@@ -64,6 +73,9 @@ final class PgsqlConstants
             'PGSQL_ERRORS_DEFAULT' => self::PGSQL_ERRORS_DEFAULT,
             'PGSQL_ERRORS_VERBOSE' => self::PGSQL_ERRORS_VERBOSE,
             'PGSQL_ERRORS_SQLSTATE' => self::PGSQL_ERRORS_SQLSTATE,
+            'PGSQL_SHOW_CONTEXT_NEVER' => self::PGSQL_SHOW_CONTEXT_NEVER,
+            'PGSQL_SHOW_CONTEXT_ERRORS' => self::PGSQL_SHOW_CONTEXT_ERRORS,
+            'PGSQL_SHOW_CONTEXT_ALWAYS' => self::PGSQL_SHOW_CONTEXT_ALWAYS,
         ];
     }
 }

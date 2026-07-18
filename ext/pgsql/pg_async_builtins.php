@@ -280,3 +280,61 @@ final class pg_end_copy extends Internal
         throw new \LogicException('pg_end_copy() is not implemented for JIT (#20673)');
     }
 }
+
+/**
+ * pg_set_error_context_visibility (php-src ext/pgsql/pgsql.c; #20674).
+ */
+final class pg_set_error_context_visibility extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_set_error_context_visibility');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_set_error_context_visibility() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_set_error_context_visibility', 1);
+        $visibilityVar = $frame->calledArgs[1]->resolveIndirect();
+        if (\PHPCompiler\VM\Variable::TYPE_INTEGER !== $visibilityVar->type
+            && \PHPCompiler\VM\Variable::TYPE_FLOAT !== $visibilityVar->type
+            && \PHPCompiler\VM\Variable::TYPE_BOOLEAN !== $visibilityVar->type
+            && \PHPCompiler\VM\Variable::TYPE_STRING !== $visibilityVar->type
+        ) {
+            throw new \TypeError(\sprintf(
+                'pg_set_error_context_visibility(): Argument #2 ($visibility) must be of type int, %s given',
+                match ($visibilityVar->type) {
+                    \PHPCompiler\VM\Variable::TYPE_NULL => 'null',
+                    \PHPCompiler\VM\Variable::TYPE_ARRAY => 'array',
+                    \PHPCompiler\VM\Variable::TYPE_OBJECT => 'object',
+                    default => 'mixed',
+                }
+            ));
+        }
+        $visibility = (int) $visibilityVar->toInt();
+        // php-src: visibility == NEVER || visibility & (ERRORS|ALWAYS)
+        if (PgsqlConstants::PGSQL_SHOW_CONTEXT_NEVER !== $visibility
+            && 0 === ($visibility & (PgsqlConstants::PGSQL_SHOW_CONTEXT_ERRORS | PgsqlConstants::PGSQL_SHOW_CONTEXT_ALWAYS))
+        ) {
+            throw new \ValueError(
+                'pg_set_error_context_visibility(): Argument #2 ($visibility) must be one of PGSQL_SHOW_CONTEXT_NEVER, PGSQL_SHOW_CONTEXT_ERRORS or PGSQL_SHOW_CONTEXT_ALWAYS'
+            );
+        }
+        $prev = VmPgsqlNative::setErrorContextVisibility(VmPgsqlConnection::native($conn), $visibility);
+        $frame->returnVar->int($prev);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_set_error_context_visibility() is not implemented for JIT (#20674)');
+    }
+}
