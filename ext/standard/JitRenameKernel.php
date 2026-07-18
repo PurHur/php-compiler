@@ -9,16 +9,17 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for phpc_rename_kernel() — thin libc rename(2) (#19215, #20028).
+ * LLVM lowering for phpc_rename_kernel() — thin libc rename(2) (#19215, #20028, #20603).
  *
- * Nested leaf inside RenameJitHelper / VmFsPathPure, and thin standalone AOT
- * ABI body via {@see \PHPCompiler\JIT\Builtin\StringRename} (FilePutContents shape).
+ * Nested leaf inside RenameJitHelper only (user-script AOT always goes through
+ * {@see RenameJitHelper} via {@see \PHPCompiler\JIT\Builtin\StringRename}).
  */
 final class JitRenameKernel
 {
     /** @return Value i1 — true when rename(2) returns 0 */
     public static function invoke(Context $context, Value $fromStr, Value $toStr): Value
     {
+        \PHPCompiler\JIT\LibcExtern::register($context);
         $map = $context->structFieldMap['__string__'];
         $fromPtr = $context->builder->structGep($fromStr, $map['value']);
         $toPtr = $context->builder->structGep($toStr, $map['value']);
