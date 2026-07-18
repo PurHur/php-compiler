@@ -336,3 +336,188 @@ final class pg_field_is_null extends Internal
         throw new \LogicException('pg_field_is_null() is not implemented for JIT (#20629)');
     }
 }
+
+/**
+ * pg_field_name (php-src ext/pgsql/pgsql.c; #20703).
+ */
+final class pg_field_name extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_field_name');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_field_name() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmPgsqlArg::requireResult($frame->calledArgs[0], 'pg_field_name', 1);
+        $field = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $frame->returnVar->string(VmPgsqlCore::fieldName($result, $field));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_field_name() is not implemented for JIT (#20703)');
+    }
+}
+
+/**
+ * pg_field_size (php-src ext/pgsql/pgsql.c; #20703).
+ */
+final class pg_field_size extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_field_size');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_field_size() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmPgsqlArg::requireResult($frame->calledArgs[0], 'pg_field_size', 1);
+        $field = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $frame->returnVar->int(VmPgsqlCore::fieldSize($result, $field));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_field_size() is not implemented for JIT (#20703)');
+    }
+}
+
+/**
+ * pg_field_type (php-src ext/pgsql/pgsql.c; #20703).
+ */
+final class pg_field_type extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_field_type');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_field_type() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmPgsqlArg::requireResult($frame->calledArgs[0], 'pg_field_type', 1);
+        $field = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $frame->returnVar->string(VmPgsqlCore::fieldType($result, $field));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_field_type() is not implemented for JIT (#20703)');
+    }
+}
+
+/**
+ * pg_field_num (php-src ext/pgsql/pgsql.c; #20703).
+ */
+final class pg_field_num extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_field_num');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_field_num() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmPgsqlArg::requireResult($frame->calledArgs[0], 'pg_field_num', 1);
+        $field = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_field_num', 1, 'field');
+        $frame->returnVar->int(VmPgsqlCore::fieldNum($result, $field));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_field_num() is not implemented for JIT (#20703)');
+    }
+}
+
+/**
+ * pg_field_prtlen (php-src ext/pgsql/pgsql.c; #20703).
+ */
+final class pg_field_prtlen extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_field_prtlen');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_field_prtlen() expects between 2 and 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmPgsqlArg::requireResult($frame->calledArgs[0], 'pg_field_prtlen', 1);
+        if (2 === $argc) {
+            @\trigger_error(
+                'Calling pg_field_prtlen() with 2 arguments is deprecated, use the 3-parameter signature with a null $row parameter instead',
+                \E_USER_DEPRECATED
+            );
+            $row = null;
+            $fieldArg = $frame->calledArgs[1]->resolveIndirect();
+        } else {
+            $rowArg = $frame->calledArgs[1]->resolveIndirect();
+            $row = Variable::TYPE_NULL === $rowArg->type ? null : $rowArg->toInt();
+            $fieldArg = $frame->calledArgs[2]->resolveIndirect();
+        }
+        $field = Variable::TYPE_STRING === $fieldArg->type
+            ? $fieldArg->toString()
+            : $fieldArg->toInt();
+        $out = VmPgsqlCore::fieldPrtlen($result, $row, $field);
+        if (false === $out) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($out);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_field_prtlen() is not implemented for JIT (#20703)');
+    }
+}

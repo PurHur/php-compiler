@@ -282,6 +282,16 @@ final class VmPgsqlNative
         return (int) self::requireFfi()->PQftype($result, $fieldNum);
     }
 
+    public static function fsize(\FFI\CData $result, int $fieldNum): int
+    {
+        return (int) self::requireFfi()->PQfsize($result, $fieldNum);
+    }
+
+    public static function getlength(\FFI\CData $result, int $tupNum, int $fieldNum): int
+    {
+        return (int) self::requireFfi()->PQgetlength($result, $tupNum, $fieldNum);
+    }
+
     public static function fnumber(\FFI\CData $result, string $fieldName): int
     {
         return (int) self::requireFfi()->PQfnumber($result, $fieldName);
@@ -885,6 +895,8 @@ int PQsetErrorVerbosity(PGconn *conn, int verbosity);
 int PQsetErrorContextVisibility(PGconn *conn, int visibility);
 Oid PQftable(const PGresult *res, int field_num);
 Oid PQftype(const PGresult *res, int field_num);
+int PQfsize(const PGresult *res, int field_num);
+int PQgetlength(const PGresult *res, int tup_num, int field_num);
 int PQfnumber(const PGresult *res, const char *field_name);
 size_t PQescapeStringConn(PGconn *conn, char *to, const char *from, size_t length, int *error);
 size_t PQescapeString(char *to, const char *from, size_t length);
