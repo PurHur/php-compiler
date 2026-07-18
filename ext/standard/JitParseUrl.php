@@ -52,8 +52,21 @@ final class JitParseUrl
     public static function parseUrl(Context $context, JITVariable $url, ?JITVariable $component = null): Value
     {
         ParseUrlRuntime::ensureLinked($context);
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20110, ext/standard/url.c)
+        if (
+            (JITVariable::TYPE_NULL === $url->type || ($url->isNullConstant ?? false))
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            return JitStringBuiltinArg::lowerZparamStr($context, $url, 'parse_url', 0, 'url');
+        }
         if (null === $component) {
             $urlLiteral = $url->compileTimeString ?? null;
+            if (
+                null === $urlLiteral
+                && (JITVariable::TYPE_NULL === $url->type || ($url->isNullConstant ?? false))
+            ) {
+                $urlLiteral = '';
+            }
             if (null !== $urlLiteral) {
                 $result = VmString::parseUrl($urlLiteral, -1);
                 if (!\is_array($result)) {
@@ -63,7 +76,7 @@ final class JitParseUrl
                 return self::materializeVmArray($context, $result);
             }
 
-            $urlStr = JitStringBuiltinArg::lower($context, $url, 'parse_url', 0, 'url');
+            $urlStr = self::jitUrlArg($context, $url);
             $slot = JitValueBox::alloc($context);
             $ptr = JitValueBox::pointer($context, $slot);
             $context->builder->call(
@@ -81,6 +94,12 @@ final class JitParseUrl
         }
         $comp = VmParseUrl::normalizeRawComponentInt($comp);
         $urlLiteral = $url->compileTimeString ?? null;
+        if (
+            null === $urlLiteral
+            && (JITVariable::TYPE_NULL === $url->type || ($url->isNullConstant ?? false))
+        ) {
+            $urlLiteral = '';
+        }
         if (null !== $urlLiteral) {
             $result = VmString::parseUrl($urlLiteral, $comp);
             if (\is_array($result)) {
@@ -90,7 +109,7 @@ final class JitParseUrl
             return self::materializeVmResult($context, $result);
         }
 
-        $urlStr = JitStringBuiltinArg::lower($context, $url, 'parse_url', 0, 'url');
+        $urlStr = self::jitUrlArg($context, $url);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         if (-1 === $comp) {
@@ -117,6 +136,28 @@ final class JitParseUrl
         }
 
         return $ptr;
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#20110, ext/standard/url.c). */
+    private static function jitUrlArg(Context $context, JITVariable $url): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $url,
+                'parse_url',
+                0,
+                'url'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $url,
+            'parse_url',
+            0,
+            'url'
+        );
     }
 
     /**
