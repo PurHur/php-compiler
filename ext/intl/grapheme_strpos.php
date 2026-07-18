@@ -19,6 +19,7 @@ use PHPLLVM\Value;
  * grapheme_strpos() — grapheme index search (php-src ext/intl/grapheme; #3352).
  *
  * VM: {@see VmGrapheme}; JIT/AOT: compile-time fold via {@see JitGrapheme}.
+ * Z_PARAM_STR null TypeError on 8.4 forward profile (#20694).
  */
 final class grapheme_strpos extends Internal
 {
@@ -35,21 +36,12 @@ final class grapheme_strpos extends Internal
                 'grapheme_strpos() expects at least 2 arguments, '.$argc.' given'
             );
         }
-        $haystack = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'grapheme_strpos',
-            0,
-            'haystack'
-        );
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20694, grapheme_string.c).
+        $haystack = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'grapheme_strpos', 0, 'haystack');
         if (null === $frame->returnVar) {
             return;
         }
-        $needle = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
-            'grapheme_strpos',
-            1,
-            'needle'
-        );
+        $needle = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'grapheme_strpos', 1, 'needle');
         $offset = 0;
         if (3 === $argc) {
             $offset = VmMath::parseIntBuiltinArg(
@@ -81,8 +73,25 @@ final class grapheme_strpos extends Internal
         if (null !== $folded) {
             return $folded;
         }
-        JitStringBuiltinArg::lower($context, $args[0], 'grapheme_strpos', 0, 'haystack');
-        JitStringBuiltinArg::lower($context, $args[1], 'grapheme_strpos', 1, 'needle');
+        $zparamStrict = $context->callerStrictTypes
+            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile();
+        // Z_PARAM_STR — null TypeError on 8.4 forward (constants + boxed VALUE) (#20694).
+        JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'grapheme_strpos', 0, 'haystack');
+        $nullHaystack = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
+        if ($nullHaystack && $zparamStrict) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'grapheme_strpos', 1, 'needle');
+        $nullNeedle = JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false);
+        if ($nullNeedle && $zparamStrict) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (
+            (JITVariable::TYPE_VALUE === $args[0]->type || JITVariable::TYPE_VALUE === $args[1]->type)
+            && $zparamStrict
+        ) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
 
         throw new \LogicException(
             'grapheme_strpos() JIT runtime lowering is deferred; use VM or compile-time literals (#3352)'
