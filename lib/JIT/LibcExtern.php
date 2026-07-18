@@ -92,6 +92,8 @@ final class LibcExtern
             'flock' => [$i32, false, [$i32, $i32]],
             'pow' => [$dbl, false, [$dbl, $dbl]],
             'nextafter' => [$dbl, false, [$dbl, $dbl]],
+            'hypot' => [$dbl, false, [$dbl, $dbl]],
+            'sqrt' => [$dbl, false, [$dbl]],
         ];
 
         foreach ($specs as $name => [$ret, $vararg, $params]) {

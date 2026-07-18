@@ -5,15 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * hypot() for compiled JIT/AOT modules (#15074, php-in-PHP).
+ * hypot() for compiled JIT/AOT modules (#15074, #20664, php-in-PHP).
  *
- * SSOT: {@see VmMath::hypot()}
+ * Kernel path: {@see phpc_hypot_kernel}; VM SSOT remains VmMath::hypot.
  * php-src: ext/standard/math.c — PHP_FUNCTION(hypot)
  */
 final class HypotJitHelper
 {
     public static function hypotArgv(float $x, float $y): float
     {
-        return VmMath::hypot($x, $y);
+        return \phpc_hypot_kernel($x, $y);
     }
 }

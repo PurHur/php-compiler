@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\NextafterJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** nextafter() JIT: PHP helper for embed; thin libc via isThinStandaloneAotMain (#15062, #20034). */
+/** nextafter() JIT: always NextafterJitHelper via JitVmHelperLink — no thin libc fork (#15062, #20664). */
 final class NextafterRuntimeShrinkTest extends TestCase
 {
     public function testNextafterUsesJitHelperNotLibcLookup(): void
@@ -18,15 +18,17 @@ final class NextafterRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('invokeLibc', $builtin);
     }
 
-    public function testMathNextafterThinKernelAndEmbedHelper(): void
+    public function testMathNextafterAlwaysUsesHelperBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathNextafter.php');
         $this->assertStringContainsString('JitNextafterKernel', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('implementKernelBody', $source);
+        $this->assertStringNotContainsString('nextafter_kernel_entry', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('NextafterJitHelper', $source);
-        $this->assertStringContainsString('nextafter_kernel_entry', $source);
         $this->assertStringNotContainsString('invokeLibcNextafter', $source);
         $this->assertStringNotContainsString("lookupFunction('nextafter')", $source);
         $this->assertStringNotContainsString("addFunction('nextafter'", $source);

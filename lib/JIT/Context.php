@@ -748,7 +748,13 @@ class Context {
     {
         return match ($lc) {
             'phpc_file_put_contents_kernel',
-            'phpc_readfile_kernel' => true,
+            'phpc_readfile_kernel',
+            // Float math always-helper NestedJIT leaves (#20664) — peer rename/fpc (#20290).
+            'phpc_fpow_kernel',
+            'phpc_nextafter_kernel',
+            'phpc_hypot_kernel',
+            'phpc_sqrt_kernel',
+            'phpc_rename_kernel' => true,
             default => false,
         };
     }

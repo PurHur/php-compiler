@@ -103,8 +103,11 @@ final class JitNestedHelperCoerce
             return $raw;
         }
         if ('__value__' === $haveStr) {
+            // Peer {@see JitValueBox::alloc}: re-open insert after entryAlloca — otherwise
+            // store/GEP land as orphan instructions under NestedJIT user-script AOT (#20664).
             BasicBlockHelper::ensureOpenInsertBlock($context, 'nested_helper_vbox_materialize');
             $slot = BasicBlockHelper::entryAlloca($context, $have);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'nested_helper_vbox_store');
             $context->builder->store($raw, $slot);
 
             return $context->builder->pointerCast($slot, $valuePtrTy);
@@ -115,6 +118,7 @@ final class JitNestedHelperCoerce
 
   private static function isValueBoxNullOrFalse(Context $context, Value $valuePtr): Value
     {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'nested_helper_vbox_nullish');
         $map = $context->structFieldMap['__value__'];
         $i8 = $context->getTypeFromString('int8');
         $i1 = $context->getTypeFromString('int1');
@@ -180,6 +184,25 @@ final class JitNestedHelperCoerce
                 $context->lookupFunction('__value__writeHashtable'),
                 JitValueBox::pointer($context, $slot),
                 $arg
+            );
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        if (('double' === $wantStr || 'float' === $wantStr) && self::isValueBoxType($context, $haveTy)) {
+            $extracted = self::extractDoubleFromHelperResult($context, $arg);
+            if ('float' === $wantStr && $extracted->typeOf() !== $wantTy) {
+                return $context->builder->fpTrunc($extracted, $wantTy);
+            }
+
+            return $extracted;
+        }
+        if (self::isValueBoxType($context, $wantTy) && ('double' === $haveStr || 'float' === $haveStr)) {
+            $slot = JitValueBox::alloc($context);
+            $asDouble = 'float' === $haveStr ? $context->builder->fpExt($arg, $context->getTypeFromString('double')) : $arg;
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                JitValueBox::pointer($context, $slot),
+                $asDouble
             );
 
             return JitValueBox::pointer($context, $slot);
@@ -250,6 +273,13 @@ final class JitNestedHelperCoerce
                 self::valueBoxPtrFromHelperResult($context, $raw)
             );
         }
+        // NestedJIT under user-script AOT may lower HashTable returns as i64 (#20664 / #20652).
+        if ('int64' === $haveStr || 'long long' === $haveStr) {
+            return self::i64ToTypedPtr($context, $raw, $htPtr);
+        }
+        if (Type::KIND_POINTER === $have->getKind()) {
+            return $context->builder->bitcast($raw, $htPtr);
+        }
 
         return $context->builder->bitcast($raw, $htPtr);
     }
@@ -318,6 +348,36 @@ final class JitNestedHelperCoerce
         return self::coerceHelperScalarResult($context, $raw, $toType);
     }
 
+    /**
+     * NestedJIT *JitHelper methods returning float may box as {@see __value__}; ABI bridges want bare double (#20664).
+     *
+     * Peer {@see extractLongFromHelperResult} — keep readDouble scoped (not in {@see coerceHelperScalarResult}).
+     */
+    public static function extractDoubleFromHelperResult(Context $context, Value $raw): Value
+    {
+        $double = $context->getTypeFromString('double');
+        $have = $raw->typeOf();
+        if ($have === $double) {
+            return $raw;
+        }
+        if (self::isValueBox($context, $raw)) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readDouble'),
+                self::valueBoxPtrFromHelperResult($context, $raw)
+            );
+        }
+        $haveStr = $context->getStringFromType($have);
+        // Truncated integer returns (NestedJIT mis-typed float as long) — widen via SIToFP.
+        if ('int64' === $haveStr || 'long long' === $haveStr || 'int32' === $haveStr) {
+            return $context->builder->siToFp($raw, $double);
+        }
+        if ('float' === $haveStr) {
+            return $context->builder->fpExt($raw, $double);
+        }
+
+        return $raw;
+    }
+
     public static function coerceBridgeResult(Context $context, Value $raw, Type $wantTy): Value
     {
         $haveTy = $raw->typeOf();
@@ -331,7 +391,20 @@ final class JitNestedHelperCoerce
         if ('__string__*' === $wantStr) {
             return self::extractStringPtrFromHelperResult($context, $raw);
         }
+        if ('double' === $wantStr || 'float' === $wantStr) {
+            $extracted = self::extractDoubleFromHelperResult($context, $raw);
+            if ('float' === $wantStr && $extracted->typeOf() !== $wantTy) {
+                return $context->builder->fpTrunc($extracted, $wantTy);
+            }
+
+            return $extracted;
+        }
         if (Type::KIND_INTEGER === $wantTy->getKind()) {
+            // Prefer scoped long extract when helper boxed the int (#20266 / rename #20603).
+            if (self::isValueBox($context, $raw)) {
+                return self::extractLongFromHelperResult($context, $raw, $wantTy);
+            }
+
             return self::coerceHelperScalarResult($context, $raw, $wantTy);
         }
         if (Type::KIND_POINTER === $wantTy->getKind() && Type::KIND_POINTER === $haveTy->getKind()) {
