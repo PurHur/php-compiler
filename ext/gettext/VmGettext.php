@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\gettext;
 
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
+use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -13,14 +14,40 @@ use PHPCompiler\VM\Variable;
  */
 final class VmGettext
 {
+    /**
+     * Z_PARAM_STR $message / $msgid* — null TypeError on PROFILE=8.4 (#20209, gettext.stub.php).
+     */
     public static function coerceMsgidArg(Variable $var, string $function, int $argIndex, string $param): string
     {
-        return VmString::coerceStringBuiltinArg($var, $function, $argIndex, $param);
+        return VmString::coerceZparamStrBuiltinArg($var, $function, $argIndex, $param);
     }
 
+    /**
+     * Z_PARAM_STR $domain — null TypeError on PROFILE=8.4 (#20209, gettext.stub.php).
+     */
     public static function coerceDomainArg(Variable $var, string $function, int $argIndex, string $param): string
     {
-        return VmString::coerceStringBuiltinArg($var, $function, $argIndex, $param);
+        return VmString::coerceZparamStrBuiltinArg($var, $function, $argIndex, $param);
+    }
+
+    public static function msgidArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $param
+    ): string {
+        return VmString::zparamStrBuiltinArgForFrame($frame, $argIndex, $function, $userArgIndex, $param);
+    }
+
+    public static function domainArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $param
+    ): string {
+        return VmString::zparamStrBuiltinArgForFrame($frame, $argIndex, $function, $userArgIndex, $param);
     }
 
     public static function coerceNullableDirectoryArg(

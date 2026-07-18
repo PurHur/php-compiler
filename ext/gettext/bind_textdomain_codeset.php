@@ -23,7 +23,7 @@ final class bind_textdomain_codeset extends GettextFunction
                 $argc
             ));
         }
-        $domain = VmGettext::coerceDomainArg($frame->calledArgs[0], 'bind_textdomain_codeset', 0, 'domain');
+        $domain = VmGettext::domainArgForFrame($frame, 0, 'bind_textdomain_codeset', 0, 'domain');
         $codeset = 2 === $argc
             ? VmGettext::coerceNullableDirectoryArg($frame->calledArgs[1], 'bind_textdomain_codeset', 1, 'codeset')
             : null;

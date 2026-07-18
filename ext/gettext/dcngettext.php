@@ -23,9 +23,9 @@ final class dcngettext extends GettextFunction
                 $argc
             ));
         }
-        $domain = VmGettext::coerceDomainArg($frame->calledArgs[0], 'dcngettext', 0, 'domain');
-        $msgid1 = VmGettext::coerceMsgidArg($frame->calledArgs[1], 'dcngettext', 1, 'msgid1');
-        $msgid2 = VmGettext::coerceMsgidArg($frame->calledArgs[2], 'dcngettext', 2, 'msgid2');
+        $domain = VmGettext::domainArgForFrame($frame, 0, 'dcngettext', 0, 'domain');
+        $msgid1 = VmGettext::msgidArgForFrame($frame, 1, 'dcngettext', 1, 'msgid1');
+        $msgid2 = VmGettext::msgidArgForFrame($frame, 2, 'dcngettext', 2, 'msgid2');
         $n = VmGettext::coerceCountArg($frame->calledArgs[3], 'dcngettext', 3, 'count');
         $category = 5 === $argc
             ? VmGettext::coerceCategoryArg($frame->calledArgs[4], 'dcngettext', 4, 'category')

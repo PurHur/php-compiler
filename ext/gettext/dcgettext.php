@@ -23,8 +23,8 @@ final class dcgettext extends GettextFunction
                 $argc
             ));
         }
-        $domain = VmGettext::coerceDomainArg($frame->calledArgs[0], 'dcgettext', 0, 'domain');
-        $msgid = VmGettext::coerceMsgidArg($frame->calledArgs[1], 'dcgettext', 1, 'message');
+        $domain = VmGettext::domainArgForFrame($frame, 0, 'dcgettext', 0, 'domain');
+        $msgid = VmGettext::msgidArgForFrame($frame, 1, 'dcgettext', 1, 'message');
         $category = 3 === $argc
             ? VmGettext::coerceCategoryArg($frame->calledArgs[2], 'dcgettext', 2, 'category')
             : VmGettextNative::defaultCategory();

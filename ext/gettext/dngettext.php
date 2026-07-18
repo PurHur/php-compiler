@@ -17,9 +17,9 @@ final class dngettext extends GettextFunction
     public function execute(Frame $frame): void
     {
         $this->requireArgCount($frame, 4);
-        $domain = VmGettext::coerceDomainArg($frame->calledArgs[0], 'dngettext', 0, 'domain');
-        $msgid1 = VmGettext::coerceMsgidArg($frame->calledArgs[1], 'dngettext', 1, 'msgid1');
-        $msgid2 = VmGettext::coerceMsgidArg($frame->calledArgs[2], 'dngettext', 2, 'msgid2');
+        $domain = VmGettext::domainArgForFrame($frame, 0, 'dngettext', 0, 'domain');
+        $msgid1 = VmGettext::msgidArgForFrame($frame, 1, 'dngettext', 1, 'msgid1');
+        $msgid2 = VmGettext::msgidArgForFrame($frame, 2, 'dngettext', 2, 'msgid2');
         $n = VmGettext::coerceCountArg($frame->calledArgs[3], 'dngettext', 3, 'count');
         if (null === $frame->returnVar) {
             return;

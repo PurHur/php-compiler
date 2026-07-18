@@ -23,7 +23,7 @@ final class bindtextdomain extends GettextFunction
                 $argc
             ));
         }
-        $domain = VmGettext::coerceDomainArg($frame->calledArgs[0], 'bindtextdomain', 0, 'domain');
+        $domain = VmGettext::domainArgForFrame($frame, 0, 'bindtextdomain', 0, 'domain');
         $directory = 2 === $argc
             ? VmGettext::coerceNullableDirectoryArg($frame->calledArgs[1], 'bindtextdomain', 1, 'directory')
             : null;

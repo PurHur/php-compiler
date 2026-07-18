@@ -9094,7 +9094,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gettext/GettextFunction.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 39)
+- new ArgumentCountError (line 40)
 - 2 class method(s)
 
 ### `ext/gettext/GettextJitHelper.php`
@@ -9105,16 +9105,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gettext/JitGettext.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- new ArgumentCountError (line 39)
-- new ArgumentCountError (line 59)
-- new ArgumentCountError (line 84)
-- new ArgumentCountError (line 104)
-- new ArgumentCountError (line 125)
-- new ArgumentCountError (line 148)
-- new ArgumentCountError (line 167)
-- new ArgumentCountError (line 185)
-- 12 class method(s)
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 50)
+- new ArgumentCountError (line 70)
+- new ArgumentCountError (line 95)
+- new ArgumentCountError (line 115)
+- new ArgumentCountError (line 136)
+- new ArgumentCountError (line 159)
+- new ArgumentCountError (line 178)
+- new ArgumentCountError (line 196)
+- 14 class method(s)
 
 ### `ext/gettext/Module.php`
 
@@ -9134,7 +9134,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gettext/VmGettext.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 9 class method(s)
 
 ### `ext/gettext/VmGettextNative.php`
 
