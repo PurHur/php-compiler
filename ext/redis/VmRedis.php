@@ -24,7 +24,7 @@ final class VmRedis
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['lpush'])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['publish'])) {
             return;
         }
 
@@ -44,6 +44,7 @@ final class VmRedis
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
 
+        require_once __DIR__.'/RedisDepth20682.php';
         $methods = [
             'connect' => new RedisConnect(),
             'set' => new RedisSet(),
@@ -81,6 +82,27 @@ final class VmRedis
             'keys' => new RedisKeys(),
             'mget' => new RedisMGet(),
             'mset' => new RedisMSet(),
+            // #20682 — pub/sub, SCAN family, streams, companions
+            'publish' => new RedisPublish(),
+            'subscribe' => new RedisSubscribe(),
+            'psubscribe' => new RedisPSubscribe(),
+            'scan' => new RedisScan(),
+            'hscan' => new RedisHScan(),
+            'sscan' => new RedisSScan(),
+            'zscan' => new RedisZScan(),
+            'xadd' => new RedisXAdd(),
+            'xread' => new RedisXRead(),
+            'xgroup' => new RedisXGroup(),
+            'pconnect' => new RedisPConnect(),
+            'rawcommand' => new RedisRawCommand(),
+            'setex' => new RedisSetEx(),
+            'setnx' => new RedisSetNx(),
+            'blpop' => new RedisBlPop(),
+            'brpop' => new RedisBrPop(),
+            'info' => new RedisInfo(),
+            'flushall' => new RedisFlushAll(),
+            'watch' => new RedisWatch(),
+            'unwatch' => new RedisUnwatch(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -102,6 +124,20 @@ final class VmRedis
                 'zadd' => 'zAdd',
                 'zrange' => 'zRange',
                 'zrem' => 'zRem',
+                'psubscribe' => 'psubscribe',
+                'hscan' => 'hScan',
+                'sscan' => 'sScan',
+                'zscan' => 'zScan',
+                'xadd' => 'xAdd',
+                'xread' => 'xRead',
+                'xgroup' => 'xGroup',
+                'pconnect' => 'pconnect',
+                'rawcommand' => 'rawCommand',
+                'setex' => 'setEx',
+                'setnx' => 'setNx',
+                'blpop' => 'blPop',
+                'brpop' => 'brPop',
+                'flushall' => 'flushAll',
                 default => $name,
             };
         }

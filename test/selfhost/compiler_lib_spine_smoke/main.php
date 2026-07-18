@@ -1274,6 +1274,7 @@ require_once __DIR__.'/../../../ext/redis/RedisClose.php';
 require_once __DIR__.'/../../../ext/redis/RedisConnect.php';
 require_once __DIR__.'/../../../ext/redis/RedisConstants.php';
 require_once __DIR__.'/../../../ext/redis/RedisConstruct.php';
+require_once __DIR__.'/../../../ext/redis/RedisDepth20682.php';
 require_once __DIR__.'/../../../ext/redis/RedisDepthMethods.php';
 require_once __DIR__.'/../../../ext/redis/RedisExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/redis/RedisGet.php';

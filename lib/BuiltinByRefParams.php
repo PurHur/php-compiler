@@ -156,6 +156,14 @@ final class BuiltinByRefParams
             case 'collator::asort':
                 // $this + &$array (+ optional flags) — php-src collator.stub.php (#5747)
                 return [1];
+            case 'redis::scan':
+                // $this + &$iterator (+ optional pattern/count) — phpredis redis.stub.php (#20682)
+                return [1];
+            case 'redis::hscan':
+            case 'redis::sscan':
+            case 'redis::zscan':
+                // $this + $key + &$iterator (+ optional pattern/count) (#20682)
+                return [2];
             case 'ziparchive::getexternalattributesname':
             case 'ziparchive::getexternalattributesindex':
                 // $this + $name|$index + &$opsys + &$attr (+ optional flags) — php-src php_zip.stub.php (#20363)

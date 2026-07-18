@@ -18,6 +18,33 @@ final class VmRedisNative
      */
     public static function connect(string $host, int $port, float $timeout)
     {
+        return self::connectWithFlags($host, $port, $timeout, \STREAM_CLIENT_CONNECT);
+    }
+
+    /**
+     * Persistent TCP connect (phpredis pconnect; STREAM_CLIENT_PERSISTENT).
+     *
+     * @return resource
+     *
+     * @throws \RedisException
+     */
+    public static function pconnect(string $host, int $port, float $timeout)
+    {
+        return self::connectWithFlags(
+            $host,
+            $port,
+            $timeout,
+            \STREAM_CLIENT_CONNECT | \STREAM_CLIENT_PERSISTENT
+        );
+    }
+
+    /**
+     * @return resource
+     *
+     * @throws \RedisException
+     */
+    private static function connectWithFlags(string $host, int $port, float $timeout, int $flags)
+    {
         $remote = \sprintf('tcp://%s:%d', $host, $port);
         $errno = 0;
         $errstr = '';
@@ -26,7 +53,7 @@ final class VmRedisNative
             $errno,
             $errstr,
             $timeout > 0.0 ? $timeout : 60.0,
-            \STREAM_CLIENT_CONNECT
+            $flags
         );
         if (false === $socket) {
             $message = '' !== $errstr ? $errstr : 'Connection failed';
@@ -676,7 +703,7 @@ final class VmRedisNative
      *
      * @throws \RedisException
      */
-    private static function readReply($socket)
+    public static function readReply($socket)
     {
         $line = self::readLine($socket);
         if ('' === $line) {
