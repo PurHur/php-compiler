@@ -29,7 +29,7 @@ final class mkdir_ extends Internal
         if (!isset($frame->calledArgs[0])) {
             throw new \ArgumentCountError('mkdir(): Argument #1 ($directory) not passed');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'mkdir', 0, 'directory', $frame, true);
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'mkdir', 0, 'directory', $frame);
         $mode = 0777;
         if (isset($frame->calledArgs[1])) {
             $mode = VmFilestatArg::parseFileModeArgForFrame($frame, 1, 'mkdir', 'permissions');
@@ -62,7 +62,7 @@ final class mkdir_ extends Internal
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('mkdir() requires one to three arguments in this compiler build');
         }
-        $path = JitFilestatArg::lowerFilename($context, $args[0], 'mkdir', 0, 'directory', true);
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'mkdir', 0, 'directory');
         $i64 = $context->getTypeFromString('int64');
         $mode = $i64->constInt(0777, false);
         if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {

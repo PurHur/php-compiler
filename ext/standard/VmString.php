@@ -438,14 +438,18 @@ final class VmString
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
-            // Z_PARAM_PATH: null coerces with deprecation on forward profile (re-#18850, #19997; php-src filestat.c).
-            if (!self::requiresForwardProfileStrictStringNull()) {
-                VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+            // Z_PARAM_PATH: TypeError on 8.4 forward profile (#18817, #20474; php-src filestat.c).
+            // $softNullPath keeps basename/dirname/pathinfo soft-coerce (#19997) until #20099.
+            if (!$softNullPath && self::requiresZparamStrStrictNullOnForwardProfile()) {
+                throw new \TypeError(
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null', 'string')
+                );
             }
+            VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
 
             return '';
         }
-        $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
+        $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName, 'string', false);
         if (str_contains($str, "\0")) {
             throw new \ValueError(
                 sprintf(
