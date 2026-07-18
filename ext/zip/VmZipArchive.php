@@ -116,6 +116,14 @@ final class VmZipArchive
             'getcommentindex' => new ZipArchiveGetCommentIndex(),
             'setarchivecomment' => new ZipArchiveSetArchiveComment(),
             'getarchivecomment' => new ZipArchiveGetArchiveComment(),
+            // unchange / replace / bulk-add — php-src php_zip.c (#20387)
+            'unchangeall' => new ZipArchiveUnchangeAll(),
+            'unchangearchive' => new ZipArchiveUnchangeArchive(),
+            'unchangeindex' => new ZipArchiveUnchangeIndex(),
+            'unchangename' => new ZipArchiveUnchangeName(),
+            'replacefile' => new ZipArchiveReplaceFile(),
+            'addglob' => new ZipArchiveAddGlob(),
+            'addpattern' => new ZipArchiveAddPattern(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -262,6 +270,13 @@ final class VmZipArchive
             $state->archiveComment = $read['comment'];
         }
 
+        // Tag entries with orig_index so unchange* can restore by open-time slot (#20387).
+        foreach ($state->entries as $i => $zipEntry) {
+            $state->entries[$i]['orig_index'] = $i;
+        }
+        $state->openSnapshot = self::cloneEntries($state->entries);
+        $state->openSnapshotComment = $state->archiveComment;
+
         $state->filename = $filename;
         $state->open = true;
         $state->dirty = false;
@@ -293,6 +308,8 @@ final class VmZipArchive
         $state->open = false;
         $state->dirty = false;
         $state->archiveComment = '';
+        $state->openSnapshot = [];
+        $state->openSnapshotComment = '';
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
         if (null !== $ctx) {
             self::fireProgress($entry, $ctx, 1.0);
@@ -328,6 +345,7 @@ final class VmZipArchive
         $row = self::makeEntry($entryname, $data, $crc, $size);
         foreach ($state->entries as $idx => $existing) {
             if ($existing['name'] === $entryname) {
+                $row['orig_index'] = $existing['orig_index'] ?? null;
                 $state->entries[$idx] = $row;
                 $state->dirty = true;
                 self::syncProperties($entry, $state);
@@ -336,6 +354,7 @@ final class VmZipArchive
                 return true;
             }
         }
+        $row['orig_index'] = null;
         $state->entries[] = $row;
         $state->dirty = true;
         self::syncProperties($entry, $state);
@@ -357,6 +376,7 @@ final class VmZipArchive
         $row = self::makeEntry($name, $content, $crc, $size);
         foreach ($state->entries as $idx => $existing) {
             if ($existing['name'] === $name) {
+                $row['orig_index'] = $existing['orig_index'] ?? null;
                 $state->entries[$idx] = $row;
                 $state->dirty = true;
                 self::syncProperties($entry, $state);
@@ -365,6 +385,7 @@ final class VmZipArchive
                 return true;
             }
         }
+        $row['orig_index'] = null;
         $state->entries[] = $row;
         $state->dirty = true;
         self::syncProperties($entry, $state);
@@ -589,6 +610,7 @@ final class VmZipArchive
             }
         }
         $state->entries[] = self::makeEntry($dirname, '', self::crc32Unsigned(''), 0);
+        $state->entries[\count($state->entries) - 1]['orig_index'] = null;
         $state->dirty = true;
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
 
@@ -994,6 +1016,312 @@ final class VmZipArchive
         }
 
         return $state->archiveComment;
+    }
+
+    /**
+     * ZipArchive::unchangeAll — restore open-time entries + archive comment (#20387).
+     */
+    public static function unchangeAll(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry);
+        $state->entries = self::cloneEntries($state->openSnapshot);
+        $state->archiveComment = $state->openSnapshotComment;
+        $state->dirty = false;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::unchangeArchive — revert archive comment only (#20387 / zip_unchange_archive).
+     */
+    public static function unchangeArchive(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry);
+        $state->archiveComment = $state->openSnapshotComment;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::unchangeIndex — revert entry at index (#20387 / zip_unchange).
+     *
+     * Honest subset: restore from open snapshot via orig_index; newly added entries are removed.
+     */
+    public static function unchangeIndex(ObjectEntry $entry, int $index): bool
+    {
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            return false;
+        }
+        $orig = $state->entries[$index]['orig_index'] ?? null;
+        if (null === $orig) {
+            \array_splice($state->entries, $index, 1);
+            $state->dirty = self::entriesDifferFromSnapshot($state);
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+            return true;
+        }
+        if (!isset($state->openSnapshot[$orig])) {
+            return false;
+        }
+        $restored = $state->openSnapshot[$orig];
+        $restored['orig_index'] = $orig;
+        $state->entries[$index] = $restored;
+        $state->dirty = self::entriesDifferFromSnapshot($state);
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::unchangeName — revert entry by current name (#20387).
+     */
+    public static function unchangeName(ObjectEntry $entry, string $name): bool
+    {
+        $state = self::requireOpen($entry);
+        if ('' === $name) {
+            return false;
+        }
+        foreach ($state->entries as $index => $zipEntry) {
+            if ($zipEntry['name'] !== $name) {
+                continue;
+            }
+
+            return self::unchangeIndex($entry, $index);
+        }
+
+        return false;
+    }
+
+    /**
+     * ZipArchive::replaceFile — replace entry at index with file bytes (#20387 / php_zip_add_file replace).
+     *
+     * @param int $length 0 / LENGTH_TO_END = remaining bytes from $start
+     */
+    public static function replaceFile(
+        ObjectEntry $entry,
+        string $filepath,
+        int $index,
+        int $start = 0,
+        int $length = 0,
+        int $flags = 0
+    ): bool {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ('' === $filepath) {
+            throw new \ValueError('ZipArchive::replaceFile(): Argument #1 ($filepath) must not be empty');
+        }
+        if ($index < 0) {
+            throw new \ValueError('ZipArchive::replaceFile(): Argument #2 ($index) must be greater than or equal to 0');
+        }
+        if ($index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        if (!is_file($filepath) || !is_readable($filepath)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+            return false;
+        }
+        $data = VmFsReadNative::read($filepath);
+        if (false === $data) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_READ);
+
+            return false;
+        }
+        if ($start < 0) {
+            $start = 0;
+        }
+        if ($start > \strlen($data)) {
+            $data = '';
+        } elseif ($length <= 0) {
+            $data = \substr($data, $start);
+        } else {
+            $data = \substr($data, $start, $length);
+        }
+        $name = $state->entries[$index]['name'];
+        $orig = $state->entries[$index]['orig_index'] ?? null;
+        $row = self::makeEntry($name, $data, self::crc32Unsigned($data), \strlen($data));
+        $row['orig_index'] = $orig;
+        $state->entries[$index] = $row;
+        $state->dirty = true;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::addGlob — glob pattern → addFile each match (#20387 / php_zip_add_from_pattern type=1).
+     *
+     * Honest subset: options remove_all_path / remove_path / add_path supported; FL_* deferred.
+     *
+     * @param array<string, mixed> $options
+     * @return list<string>|false
+     */
+    public static function addGlob(ObjectEntry $entry, string $pattern, int $flags = 0, array $options = []): array|false
+    {
+        $state = self::requireOpen($entry);
+        if ('' === $pattern) {
+            throw new \ValueError('ZipArchive::addGlob(): Argument #1 ($pattern) must not be empty');
+        }
+        $found = \glob($pattern, $flags);
+        if (false === $found) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        if ([] === $found) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+            return [];
+        }
+
+        return self::addFilesFromPaths($entry, $found, $options);
+    }
+
+    /**
+     * ZipArchive::addPattern — PCRE filter under $path → addFile (#20387 / php_zip_add_from_pattern type=2).
+     *
+     * @param array<string, mixed> $options
+     * @return list<string>|false
+     */
+    public static function addPattern(
+        ObjectEntry $entry,
+        string $pattern,
+        string $path = '.',
+        array $options = []
+    ): array|false {
+        $state = self::requireOpen($entry);
+        if ('' === $pattern) {
+            throw new \ValueError('ZipArchive::addPattern(): Argument #1 ($pattern) must not be empty');
+        }
+        if (!is_dir($path)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+            return false;
+        }
+        $found = [];
+        $dh = @opendir($path);
+        if (false === $dh) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_READ);
+
+            return false;
+        }
+        while (false !== ($file = readdir($dh))) {
+            if ('.' === $file || '..' === $file) {
+                continue;
+            }
+            $full = rtrim($path, "/\\") . DIRECTORY_SEPARATOR . $file;
+            if (!is_file($full)) {
+                continue;
+            }
+            $match = @preg_match($pattern, $file);
+            if (1 === $match) {
+                $found[] = $full;
+            } elseif (false === $match) {
+                closedir($dh);
+                self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+                return false;
+            }
+        }
+        closedir($dh);
+        if ([] === $found) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+            return [];
+        }
+
+        return self::addFilesFromPaths($entry, $found, $options);
+    }
+
+    /**
+     * @param list<string> $paths
+     * @param array<string, mixed> $options
+     * @return list<string>|false
+     */
+    private static function addFilesFromPaths(ObjectEntry $entry, array $paths, array $options): array|false
+    {
+        $added = [];
+        foreach ($paths as $filepath) {
+            if (!is_file($filepath)) {
+                continue;
+            }
+            $entryName = self::entryNameFromOptions($filepath, $options);
+            if (!self::addFile($entry, $filepath, $entryName)) {
+                return false;
+            }
+            $added[] = $filepath;
+        }
+        self::setStatus($entry, self::state($entry), ZipArchiveConstants::ER_OK);
+
+        return $added;
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     */
+    private static function entryNameFromOptions(string $filepath, array $options): string
+    {
+        $removeAll = !empty($options['remove_all_path']);
+        $removePath = isset($options['remove_path']) ? (string) $options['remove_path'] : '';
+        $addPath = isset($options['add_path']) ? (string) $options['add_path'] : '';
+
+        if ($removeAll) {
+            $stripped = basename($filepath);
+        } elseif ('' !== $removePath && str_starts_with($filepath, $removePath)) {
+            $rest = substr($filepath, strlen($removePath));
+            if (isset($rest[0]) && ('/' === $rest[0] || '\\' === $rest[0])) {
+                $rest = substr($rest, 1);
+            }
+            $stripped = $rest;
+        } else {
+            $stripped = $filepath;
+        }
+
+        return $addPath . $stripped;
+    }
+
+    /**
+     * @param list<array<string, mixed>> $entries
+     * @return list<array<string, mixed>>
+     */
+    private static function cloneEntries(array $entries): array
+    {
+        $out = [];
+        foreach ($entries as $row) {
+            $out[] = $row;
+        }
+
+        return $out;
+    }
+
+    private static function entriesDifferFromSnapshot(ZipArchiveState $state): bool
+    {
+        if ($state->archiveComment !== $state->openSnapshotComment) {
+            return true;
+        }
+        if (\count($state->entries) !== \count($state->openSnapshot)) {
+            return true;
+        }
+        foreach ($state->entries as $i => $row) {
+            $snap = $state->openSnapshot[$i] ?? null;
+            if (null === $snap) {
+                return true;
+            }
+            if (($row['name'] ?? '') !== ($snap['name'] ?? '')
+                || ($row['data'] ?? '') !== ($snap['data'] ?? '')
+                || ($row['crc'] ?? 0) !== ($snap['crc'] ?? 0)
+                || ($row['comment'] ?? '') !== ($snap['comment'] ?? '')
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -1448,6 +1776,13 @@ final class VmZipArchive
             'getcommentindex' => 'getCommentIndex',
             'setarchivecomment' => 'setArchiveComment',
             'getarchivecomment' => 'getArchiveComment',
+            'unchangeall' => 'unchangeAll',
+            'unchangearchive' => 'unchangeArchive',
+            'unchangeindex' => 'unchangeIndex',
+            'unchangename' => 'unchangeName',
+            'replacefile' => 'replaceFile',
+            'addglob' => 'addGlob',
+            'addpattern' => 'addPattern',
             default => $lc,
         };
     }

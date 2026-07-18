@@ -73,11 +73,21 @@ final class ZipArchiveTest extends TestCase
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getcommentindex'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setarchivecomment'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getarchivecomment'));
+        // unchange / replace / bulk-add (#20387)
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'unchangeall'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'unchangearchive'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'unchangeindex'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'unchangename'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'replacefile'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'addglob'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'addpattern'));
 
         $entry = $ctx->classes['ziparchive'];
         self::assertContains('countable', $entry->interfaces);
         self::assertArrayHasKey('create', $entry->constants);
         self::assertSame(ZipArchiveConstants::CREATE, $entry->constants['create']->toInt());
+        self::assertArrayHasKey('length_to_end', $entry->constants);
+        self::assertSame(ZipArchiveConstants::LENGTH_TO_END, $entry->constants['length_to_end']->toInt());
         self::assertSame('CREATE', $entry->constNames['create']);
         self::assertSame('ER_OK', $entry->constNames['er_ok']);
         self::assertSame(ZipArchiveConstants::CM_STORE, $entry->constants['cm_store']->toInt());

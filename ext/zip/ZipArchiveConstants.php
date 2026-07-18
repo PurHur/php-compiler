@@ -17,6 +17,12 @@ final class ZipArchiveConstants
 
     public const OVERWRITE = 8;
 
+    /**
+     * replaceFile / addFile length sentinel — use remaining bytes from $start (php-src ZipArchive::LENGTH_TO_END).
+     * Value 0 matches php_zip.c zip_source_file(len=0) "to end" semantics.
+     */
+    public const LENGTH_TO_END = 0;
+
     public const ER_OK = 0;
 
     public const ER_MULTIDISK = 1;
@@ -170,6 +176,7 @@ final class ZipArchiveConstants
         'excl' => self::EXCL,
         'checkcons' => self::CHECKCONS,
         'overwrite' => self::OVERWRITE,
+        'length_to_end' => self::LENGTH_TO_END,
         'em_none' => self::EM_NONE,
         'em_trad_pkware' => self::EM_TRAD_PKWARE,
         'em_aes_128' => self::EM_AES_128,
@@ -250,6 +257,7 @@ final class ZipArchiveConstants
         'excl' => 'EXCL',
         'checkcons' => 'CHECKCONS',
         'overwrite' => 'OVERWRITE',
+        'length_to_end' => 'LENGTH_TO_END',
         'em_none' => 'EM_NONE',
         'em_trad_pkware' => 'EM_TRAD_PKWARE',
         'em_aes_128' => 'EM_AES_128',

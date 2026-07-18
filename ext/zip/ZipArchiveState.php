@@ -48,8 +48,32 @@ final class ZipArchiveState
      *     external_attr?: int,
      *     encryption_method?: int,
      *     encryption_password?: string,
-     *     comment?: string
+     *     comment?: string,
+     *     orig_index?: int|null
      * }>
      */
     public array $entries = [];
+
+    /**
+     * Pristine entry snapshot taken on open for unchange* (#20387).
+     *
+     * @var list<array{
+     *     name: string,
+     *     data: string,
+     *     crc: int,
+     *     size: int,
+     *     mtime?: int,
+     *     comp_method?: int,
+     *     opsys?: int,
+     *     external_attr?: int,
+     *     encryption_method?: int,
+     *     encryption_password?: string,
+     *     comment?: string,
+     *     orig_index?: int|null
+     * }>
+     */
+    public array $openSnapshot = [];
+
+    /** Archive comment at open — restored by unchangeArchive / unchangeAll (#20387). */
+    public string $openSnapshotComment = '';
 }
