@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5784 |
-| Phase A inventory files (M2 ratio SSOT) | 5784 |
+| PHP files on vm.php path | 5786 |
+| Phase A inventory files (M2 ratio SSOT) | 5786 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16944 |
+| Source constructs flagged (warnings) | 16951 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1573,12 +1573,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/SQLite3Prepare.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3Query.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3QuerySingle.php` | 0 | 2 |
+| `ext/sqlite3/SQLite3SetAuthorizer.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3Version.php` | 0 | 4 |
 | `ext/sqlite3/Sqlite3ClassMethod.php` | 0 | 1 |
 | `ext/sqlite3/Sqlite3ExtensionPolicy.php` | 0 | 1 |
-| `ext/sqlite3/VmSQLite3.php` | 0 | 27 |
+| `ext/sqlite3/VmSQLite3.php` | 0 | 29 |
 | `ext/sqlite3/VmSQLite3Result.php` | 0 | 13 |
 | `ext/sqlite3/VmSQLite3Stmt.php` | 0 | 20 |
+| `ext/sqlite3/VmSqlite3Authorizer.php` | 0 | 3 |
 | `ext/sqlite3/VmSqlite3BlobStream.php` | 0 | 2 |
 | `ext/sqlite3/VmSqlite3Native.php` | 0 | 13 |
 | `ext/sqlite3/VmSqlite3Udf.php` | 0 | 7 |
@@ -17701,6 +17703,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/sqlite3/SQLite3SetAuthorizer.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 1 class method(s)
+
 ### `ext/sqlite3/SQLite3Version.php`
 
 **Warnings** (review for bootstrap subset):
@@ -17723,31 +17731,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 35)
-- new Variable (line 38)
-- new SQLite3Construct (line 45)
-- new SQLite3Close (line 50)
-- new SQLite3Open (line 51)
-- new SQLite3Exec (line 52)
-- new SQLite3QuerySingle (line 53)
-- new SQLite3Query (line 54)
-- new SQLite3Prepare (line 55)
-- new SQLite3Changes (line 56)
-- new SQLite3LastInsertRowID (line 57)
-- new SQLite3LastErrorCode (line 58)
-- new SQLite3LastErrorMsg (line 59)
-- new SQLite3EscapeString (line 60)
-- new SQLite3BusyTimeout (line 61)
-- new SQLite3EnableExceptions (line 62)
-- new SQLite3CreateFunction (line 63)
-- new SQLite3CreateAggregate (line 64)
-- new SQLite3CreateCollation (line 65)
-- new SQLite3LoadExtension (line 66)
-- new SQLite3Backup (line 67)
-- new SQLite3OpenBlob (line 68)
-- new SQLite3Version (line 69)
-- new Sqlite3State (line 88)
-- new Exception (line 107)
-- new Variable (line 272)
+- new Variable (line 39)
+- new SQLite3Construct (line 46)
+- new SQLite3Close (line 51)
+- new SQLite3Open (line 52)
+- new SQLite3Exec (line 53)
+- new SQLite3QuerySingle (line 54)
+- new SQLite3Query (line 55)
+- new SQLite3Prepare (line 56)
+- new SQLite3Changes (line 57)
+- new SQLite3LastInsertRowID (line 58)
+- new SQLite3LastErrorCode (line 59)
+- new SQLite3LastErrorMsg (line 60)
+- new SQLite3EscapeString (line 61)
+- new SQLite3BusyTimeout (line 62)
+- new SQLite3EnableExceptions (line 63)
+- new SQLite3CreateFunction (line 64)
+- new SQLite3CreateAggregate (line 65)
+- new SQLite3CreateCollation (line 66)
+- new SQLite3SetAuthorizer (line 67)
+- new SQLite3LoadExtension (line 68)
+- new SQLite3Backup (line 69)
+- new SQLite3OpenBlob (line 70)
+- new SQLite3Version (line 71)
+- new Sqlite3State (line 90)
+- new Exception (line 109)
+- new Variable (line 274)
+- new SQLite3Exception (line 307)
 - 18 class method(s)
 
 ### `ext/sqlite3/VmSQLite3Result.php`
@@ -17790,6 +17800,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 276)
 - new ArgumentCountError (line 547)
 - 20 class method(s)
+
+### `ext/sqlite3/VmSqlite3Authorizer.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 31)
+- new Variable (line 35)
+- 2 class method(s)
 
 ### `ext/sqlite3/VmSqlite3BlobStream.php`
 

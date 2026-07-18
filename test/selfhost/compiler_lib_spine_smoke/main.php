@@ -1619,6 +1619,8 @@ require_once __DIR__.'/../../../ext/sqlite3/SQLite3Close.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3Construct.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3CreateAggregate.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3CreateCollation.php';
+require_once __DIR__.'/../../../ext/sqlite3/SQLite3SetAuthorizer.php';
+require_once __DIR__.'/../../../ext/sqlite3/VmSqlite3Authorizer.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3CreateFunction.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3EnableExceptions.php';
 require_once __DIR__.'/../../../ext/sqlite3/SQLite3EscapeString.php';
