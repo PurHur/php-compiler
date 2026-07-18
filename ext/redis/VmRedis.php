@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\redis;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmString;
@@ -23,7 +24,7 @@ final class VmRedis
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['del'])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['lpush'])) {
             return;
         }
 
@@ -57,6 +58,29 @@ final class VmRedis
             'hset' => new RedisHSet(),
             'hget' => new RedisHGet(),
             'hgetall' => new RedisHGetAll(),
+            'lpush' => new RedisLPush(),
+            'lpop' => new RedisLPop(),
+            'rpush' => new RedisRPush(),
+            'rpop' => new RedisRPop(),
+            'lrange' => new RedisLRange(),
+            'sadd' => new RedisSAdd(),
+            'srem' => new RedisSRem(),
+            'smembers' => new RedisSMembers(),
+            'sismember' => new RedisSIsMember(),
+            'zadd' => new RedisZAdd(),
+            'zrange' => new RedisZRange(),
+            'zrem' => new RedisZRem(),
+            'multi' => new RedisMulti(),
+            'pipeline' => new RedisPipeline(),
+            'exec' => new RedisExec(),
+            'eval' => new RedisEval(),
+            'expire' => new RedisExpire(),
+            'ttl' => new RedisTtl(),
+            'incr' => new RedisIncr(),
+            'decr' => new RedisDecr(),
+            'keys' => new RedisKeys(),
+            'mget' => new RedisMGet(),
+            'mset' => new RedisMSet(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -66,11 +90,146 @@ final class VmRedis
                 'hset' => 'hSet',
                 'hget' => 'hGet',
                 'hgetall' => 'hGetAll',
+                'lpush' => 'lPush',
+                'lpop' => 'lPop',
+                'rpush' => 'rPush',
+                'rpop' => 'rPop',
+                'lrange' => 'lRange',
+                'sadd' => 'sAdd',
+                'srem' => 'sRem',
+                'smembers' => 'sMembers',
+                'sismember' => 'sIsMember',
+                'zadd' => 'zAdd',
+                'zrange' => 'zRange',
+                'zrem' => 'zRem',
                 default => $name,
             };
         }
 
         $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    /** Build a packed PHP list HashTable from string values (#20612). */
+    public static function stringListToHashTable(array $values): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($values as $v) {
+            $slot = new Variable();
+            $slot->string((string) $v);
+            $ht->append($slot);
+        }
+
+        return $ht;
+    }
+
+    /** Build a map HashTable from string=>string (#20612). */
+    public static function stringMapToHashTable(array $map): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($map as $k => $v) {
+            $slot = new Variable();
+            $slot->string((string) $v);
+            $ht->add((string) $k, $slot);
+        }
+
+        return $ht;
+    }
+
+    /** Convert a RESP reply into a VM Variable (MULTI/EXEC / EVAL) (#20612). */
+    public static function replyToVariable(mixed $reply): Variable
+    {
+        $slot = new Variable();
+        if (null === $reply) {
+            $slot->null();
+
+            return $slot;
+        }
+        if (\is_int($reply)) {
+            $slot->int($reply);
+
+            return $slot;
+        }
+        if (\is_bool($reply)) {
+            $slot->bool($reply);
+
+            return $slot;
+        }
+        if (\is_string($reply)) {
+            $slot->string($reply);
+
+            return $slot;
+        }
+        if (\is_array($reply)) {
+            $ht = new HashTable();
+            $isList = \array_keys($reply) === \range(0, \count($reply) - 1);
+            if ($isList || [] === $reply) {
+                foreach ($reply as $item) {
+                    $ht->append(self::replyToVariable($item));
+                }
+            } else {
+                foreach ($reply as $k => $item) {
+                    $ht->add((string) $k, self::replyToVariable($item));
+                }
+            }
+            $slot->array($ht);
+
+            return $slot;
+        }
+        $slot->string((string) $reply);
+
+        return $slot;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function coerceStringListArg(Variable $var, string $label, int $index, string $paramName): array
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $resolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type array, %s given',
+                $label,
+                $index + 1,
+                $paramName,
+                self::typeLabel($var)
+            ));
+        }
+        $out = [];
+        foreach ($resolved->toArray()->iterateKeyed(true) as [, $valueVar]) {
+            $out[] = self::coerceValueToString($valueVar, $label, $index, $paramName);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public static function coerceStringMapArg(Variable $var, string $label, int $index, string $paramName): array
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $resolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type array, %s given',
+                $label,
+                $index + 1,
+                $paramName,
+                self::typeLabel($var)
+            ));
+        }
+        $out = [];
+        foreach ($resolved->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $keyResolved = $keyVar->resolveIndirect();
+            $key = match ($keyResolved->type) {
+                Variable::TYPE_STRING => $keyResolved->toString(),
+                Variable::TYPE_INTEGER => (string) $keyResolved->toInt(),
+                default => self::coerceValueToString($keyVar, $label, $index, $paramName),
+            };
+            $out[$key] = self::coerceValueToString($valueVar, $label, $index, $paramName);
+        }
+
+        return $out;
     }
 
     public static function initObject(ObjectEntry $entry): void

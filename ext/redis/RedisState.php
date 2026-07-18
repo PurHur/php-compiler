@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\redis;
 
-/** Per-instance Redis connection state (PECL phpredis; #6098). */
+/** Per-instance Redis connection state (PECL phpredis; #6098 / #20612). */
 final class RedisState
 {
     /** @var resource|null */
@@ -15,4 +15,10 @@ final class RedisState
     public string $host = '';
 
     public int $port = 6379;
+
+    /** 0 = atomic, Redis::MULTI, or Redis::PIPELINE (#20612). */
+    public int $mode = 0;
+
+    /** Commands written but not yet read while in PIPELINE mode. */
+    public int $pipelinePending = 0;
 }

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\redis;
 
 /**
- * Redis class constants subset (PECL phpredis redis.c / redis.stub.php; #6098).
+ * Redis class constants subset (PECL phpredis redis.c / redis.stub.php; #6098 / #20612).
+ *
+ * Storage keys are lowercase (VmReflection::findClassConstantDecl / ClassName::CONST).
+ * Display names stay Zend casing via CLASS_CONSTANT_NAMES.
  */
 final class RedisConstants
 {
@@ -15,24 +18,32 @@ final class RedisConstants
     public const OPT_TCP_KEEPALIVE = 6;
     public const SERIALIZER_NONE = 0;
     public const SERIALIZER_PHP = 1;
+    /** @see phpredis php_redis.h MULTI */
+    public const MULTI = 1;
+    /** @see phpredis php_redis.h PIPELINE */
+    public const PIPELINE = 2;
 
-    /** @var array<string, int> */
+    /** @var array<string, int> lowercase storage key => value */
     public const CLASS_CONSTANTS = [
-        'OPT_SERIALIZER' => self::OPT_SERIALIZER,
-        'OPT_PREFIX' => self::OPT_PREFIX,
-        'OPT_READ_TIMEOUT' => self::OPT_READ_TIMEOUT,
-        'OPT_TCP_KEEPALIVE' => self::OPT_TCP_KEEPALIVE,
-        'SERIALIZER_NONE' => self::SERIALIZER_NONE,
-        'SERIALIZER_PHP' => self::SERIALIZER_PHP,
+        'opt_serializer' => self::OPT_SERIALIZER,
+        'opt_prefix' => self::OPT_PREFIX,
+        'opt_read_timeout' => self::OPT_READ_TIMEOUT,
+        'opt_tcp_keepalive' => self::OPT_TCP_KEEPALIVE,
+        'serializer_none' => self::SERIALIZER_NONE,
+        'serializer_php' => self::SERIALIZER_PHP,
+        'multi' => self::MULTI,
+        'pipeline' => self::PIPELINE,
     ];
 
-    /** @var array<string, string> */
+    /** @var array<string, string> lowercase storage key => display name */
     public const CLASS_CONSTANT_NAMES = [
-        'OPT_SERIALIZER' => 'OPT_SERIALIZER',
-        'OPT_PREFIX' => 'OPT_PREFIX',
-        'OPT_READ_TIMEOUT' => 'OPT_READ_TIMEOUT',
-        'OPT_TCP_KEEPALIVE' => 'OPT_TCP_KEEPALIVE',
-        'SERIALIZER_NONE' => 'SERIALIZER_NONE',
-        'SERIALIZER_PHP' => 'SERIALIZER_PHP',
+        'opt_serializer' => 'OPT_SERIALIZER',
+        'opt_prefix' => 'OPT_PREFIX',
+        'opt_read_timeout' => 'OPT_READ_TIMEOUT',
+        'opt_tcp_keepalive' => 'OPT_TCP_KEEPALIVE',
+        'serializer_none' => 'SERIALIZER_NONE',
+        'serializer_php' => 'SERIALIZER_PHP',
+        'multi' => 'MULTI',
+        'pipeline' => 'PIPELINE',
     ];
 }

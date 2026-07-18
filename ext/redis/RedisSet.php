@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\redis;
 
 use PHPCompiler\Frame;
 
-/** Redis::set(string $key, mixed $value) — VM (#6098). */
+/** Redis::set(string $key, mixed $value) — VM (#6098 / #20612 multi-aware). */
 final class RedisSet extends RedisClassMethod
 {
     public function __construct()
@@ -24,10 +24,16 @@ final class RedisSet extends RedisClassMethod
         }
         $key = $this->stringArg($frame->calledArgs[1], 'Redis::set', 0, 'key');
         $value = VmRedis::coerceValueToString($frame->calledArgs[2], 'Redis::set', 1, 'value');
-        $socket = VmRedis::requireSocket($receiver, 'Redis::set');
-        $ok = VmRedisNative::set($socket, $key, $value);
+        [$handled, $reply] = $this->commandOrQueue($frame, $receiver, 'Redis::set', ['SET', $key, $value]);
+        if ($handled) {
+            return;
+        }
+        $ok = (\is_string($reply) && 'OK' === $reply) || true === $reply;
+        if (!$ok) {
+            throw new \RedisException('SET failed');
+        }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool($ok);
+            $frame->returnVar->bool(true);
         }
     }
 }

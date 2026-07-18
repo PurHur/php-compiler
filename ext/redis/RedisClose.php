@@ -23,6 +23,8 @@ final class RedisClose extends RedisClassMethod
             $state->socket = null;
         }
         $state->connected = false;
+        $state->mode = 0;
+        $state->pipelinePending = 0;
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }

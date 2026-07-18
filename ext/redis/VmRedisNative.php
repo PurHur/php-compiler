@@ -87,19 +87,47 @@ final class VmRedisNative
      * @param resource     $socket
      * @param list<string> $args
      *
-     * @return mixed
-     *
      * @throws \RedisException
      */
-    public static function command($socket, array $args)
+    public static function writeCommand($socket, array $args): void
     {
         $payload = self::encode($args);
         $written = @\fwrite($socket, $payload);
         if (false === $written || $written < \strlen($payload)) {
             throw new \RedisException('Failed writing to Redis connection');
         }
+    }
+
+    /**
+     * @param resource     $socket
+     * @param list<string> $args
+     *
+     * @return mixed
+     *
+     * @throws \RedisException
+     */
+    public static function command($socket, array $args)
+    {
+        self::writeCommand($socket, $args);
 
         return self::readReply($socket);
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @return list<mixed>
+     *
+     * @throws \RedisException
+     */
+    public static function readReplies($socket, int $count): array
+    {
+        $out = [];
+        for ($i = 0; $i < $count; ++$i) {
+            $out[] = self::readReply($socket);
+        }
+
+        return $out;
     }
 
     /**
@@ -255,6 +283,379 @@ final class VmRedisNative
         }
 
         return $out;
+    }
+
+    /**
+     * @param resource     $socket
+     * @param list<string> $values
+     *
+     * @throws \RedisException
+     */
+    public static function listPush($socket, string $op, string $key, array $values): int
+    {
+        if ([] === $values) {
+            return 0;
+        }
+        $reply = self::command($socket, \array_merge([$op, $key], $values));
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, $op.' failed'));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @return string|false
+     *
+     * @throws \RedisException
+     */
+    public static function listPop($socket, string $op, string $key)
+    {
+        $reply = self::command($socket, [$op, $key]);
+        if (null === $reply) {
+            return false;
+        }
+        if (\is_string($reply)) {
+            return $reply;
+        }
+
+        throw new \RedisException(self::errorMessage($reply, $op.' failed'));
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @return list<string>
+     *
+     * @throws \RedisException
+     */
+    public static function lRange($socket, string $key, int $start, int $end): array
+    {
+        $reply = self::command($socket, ['LRANGE', $key, (string) $start, (string) $end]);
+        if (null === $reply) {
+            return [];
+        }
+        if (!\is_array($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'LRANGE failed'));
+        }
+        $out = [];
+        foreach ($reply as $item) {
+            $out[] = null === $item ? '' : (string) $item;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param resource     $socket
+     * @param list<string> $members
+     *
+     * @throws \RedisException
+     */
+    public static function sAdd($socket, string $key, array $members): int
+    {
+        if ([] === $members) {
+            return 0;
+        }
+        $reply = self::command($socket, \array_merge(['SADD', $key], $members));
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'SADD failed'));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * @param resource     $socket
+     * @param list<string> $members
+     *
+     * @throws \RedisException
+     */
+    public static function sRem($socket, string $key, array $members): int
+    {
+        if ([] === $members) {
+            return 0;
+        }
+        $reply = self::command($socket, \array_merge(['SREM', $key], $members));
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'SREM failed'));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @return list<string>
+     *
+     * @throws \RedisException
+     */
+    public static function sMembers($socket, string $key): array
+    {
+        $reply = self::command($socket, ['SMEMBERS', $key]);
+        if (null === $reply) {
+            return [];
+        }
+        if (!\is_array($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'SMEMBERS failed'));
+        }
+        $out = [];
+        foreach ($reply as $item) {
+            $out[] = null === $item ? '' : (string) $item;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @throws \RedisException
+     */
+    public static function sIsMember($socket, string $key, string $member): bool
+    {
+        $reply = self::command($socket, ['SISMEMBER', $key, $member]);
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'SISMEMBER failed'));
+        }
+
+        return $reply > 0;
+    }
+
+    /**
+     * @param resource          $socket
+     * @param list<float|string> $scoreMembers alternating score, member
+     *
+     * @throws \RedisException
+     */
+    public static function zAdd($socket, string $key, array $scoreMembers): int
+    {
+        if ([] === $scoreMembers) {
+            return 0;
+        }
+        $args = ['ZADD', $key];
+        foreach ($scoreMembers as $part) {
+            $args[] = (string) $part;
+        }
+        $reply = self::command($socket, $args);
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'ZADD failed'));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @return list<string>|array<string, string>
+     *
+     * @throws \RedisException
+     */
+    public static function zRange($socket, string $key, int $start, int $end, bool $withScores = false): array
+    {
+        $args = ['ZRANGE', $key, (string) $start, (string) $end];
+        if ($withScores) {
+            $args[] = 'WITHSCORES';
+        }
+        $reply = self::command($socket, $args);
+        if (null === $reply) {
+            return [];
+        }
+        if (!\is_array($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'ZRANGE failed'));
+        }
+        if (!$withScores) {
+            $out = [];
+            foreach ($reply as $item) {
+                $out[] = null === $item ? '' : (string) $item;
+            }
+
+            return $out;
+        }
+        $map = [];
+        $n = \count($reply);
+        for ($i = 0; $i + 1 < $n; $i += 2) {
+            $map[(string) $reply[$i]] = (string) $reply[$i + 1];
+        }
+
+        return $map;
+    }
+
+    /**
+     * @param resource     $socket
+     * @param list<string> $members
+     *
+     * @throws \RedisException
+     */
+    public static function zRem($socket, string $key, array $members): int
+    {
+        if ([] === $members) {
+            return 0;
+        }
+        $reply = self::command($socket, \array_merge(['ZREM', $key], $members));
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'ZREM failed'));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @throws \RedisException
+     */
+    public static function expire($socket, string $key, int $ttl): bool
+    {
+        $reply = self::command($socket, ['EXPIRE', $key, (string) $ttl]);
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'EXPIRE failed'));
+        }
+
+        return $reply > 0;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @throws \RedisException
+     */
+    public static function ttl($socket, string $key): int
+    {
+        $reply = self::command($socket, ['TTL', $key]);
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'TTL failed'));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @throws \RedisException
+     */
+    public static function incrBy($socket, string $key, int $by): int
+    {
+        $args = 1 === $by ? ['INCR', $key] : ['INCRBY', $key, (string) $by];
+        $reply = self::command($socket, $args);
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'INCR failed'));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @throws \RedisException
+     */
+    public static function decrBy($socket, string $key, int $by): int
+    {
+        $args = 1 === $by ? ['DECR', $key] : ['DECRBY', $key, (string) $by];
+        $reply = self::command($socket, $args);
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'DECR failed'));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @return list<string>
+     *
+     * @throws \RedisException
+     */
+    public static function keys($socket, string $pattern): array
+    {
+        $reply = self::command($socket, ['KEYS', $pattern]);
+        if (null === $reply) {
+            return [];
+        }
+        if (!\is_array($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'KEYS failed'));
+        }
+        $out = [];
+        foreach ($reply as $item) {
+            $out[] = null === $item ? '' : (string) $item;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param resource     $socket
+     * @param list<string> $keys
+     *
+     * @return list<string|null>
+     *
+     * @throws \RedisException
+     */
+    public static function mget($socket, array $keys): array
+    {
+        if ([] === $keys) {
+            return [];
+        }
+        $reply = self::command($socket, \array_merge(['MGET'], $keys));
+        if (null === $reply) {
+            return \array_fill(0, \count($keys), null);
+        }
+        if (!\is_array($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'MGET failed'));
+        }
+        $out = [];
+        foreach ($reply as $item) {
+            $out[] = null === $item ? null : (string) $item;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param resource            $socket
+     * @param array<string,string> $pairs
+     *
+     * @throws \RedisException
+     */
+    public static function mset($socket, array $pairs): bool
+    {
+        if ([] === $pairs) {
+            return true;
+        }
+        $args = ['MSET'];
+        foreach ($pairs as $k => $v) {
+            $args[] = (string) $k;
+            $args[] = (string) $v;
+        }
+        $reply = self::command($socket, $args);
+        if (\is_string($reply) && 'OK' === $reply) {
+            return true;
+        }
+        if (true === $reply) {
+            return true;
+        }
+
+        throw new \RedisException(self::errorMessage($reply, 'MSET failed'));
+    }
+
+    /**
+     * @param resource     $socket
+     * @param list<string> $keysAndArgs
+     *
+     * @return mixed
+     *
+     * @throws \RedisException
+     */
+    public static function eval($socket, string $script, int $numKeys, array $keysAndArgs)
+    {
+        return self::command($socket, \array_merge(['EVAL', $script, (string) $numKeys], $keysAndArgs));
     }
 
     /** @param list<string> $args */

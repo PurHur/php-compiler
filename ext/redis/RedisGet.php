@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\redis;
 
 use PHPCompiler\Frame;
 
-/** Redis::get(string $key) — VM (#6098). */
+/** Redis::get(string $key) — VM (#6098 / #20612 multi-aware). */
 final class RedisGet extends RedisClassMethod
 {
     public function __construct()
@@ -21,16 +21,21 @@ final class RedisGet extends RedisClassMethod
             throw new \ArgumentCountError('Redis::get() expects at least 1 argument, 0 given');
         }
         $key = $this->stringArg($frame->calledArgs[1], 'Redis::get', 0, 'key');
-        $socket = VmRedis::requireSocket($receiver, 'Redis::get');
-        $value = VmRedisNative::get($socket, $key);
+        [$handled, $reply] = $this->commandOrQueue($frame, $receiver, 'Redis::get', ['GET', $key]);
+        if ($handled) {
+            return;
+        }
         if (null === $frame->returnVar) {
             return;
         }
-        if (false === $value) {
+        if (null === $reply) {
             $frame->returnVar->bool(false);
 
             return;
         }
-        $frame->returnVar->string($value);
+        if (!\is_string($reply)) {
+            throw new \RedisException('GET failed');
+        }
+        $frame->returnVar->string($reply);
     }
 }
