@@ -30,6 +30,9 @@ final class BuiltinClasses
         if (CurlExtensionPolicy::advertisesShareHandles()) {
             VmCurlShare::registerClass($ctx);
         }
+        if (CurlExtensionPolicy::advertisesSharePersistentHandles()) {
+            VmCurlShare::registerPersistentClass($ctx);
+        }
         if (CurlExtensionPolicy::advertisesMultiHandles()) {
             VmCurlMulti::registerClass($ctx);
         }

@@ -77,6 +77,7 @@ final class CurlExtensionPolicy
         }
 
         return str_contains($testFileName, 'curl_share_phantom')
+            || str_contains($testFileName, 'curl_share_persistent_phantom')
             || str_contains($testFileName, 'class_exists_curlhandle_no_curl');
     }
 
@@ -97,6 +98,28 @@ final class CurlExtensionPolicy
     {
         return self::advertisesMultiHandles()
             && CompilerVersion::advertisesCurlMultiGetHandles();
+    }
+
+    /**
+     * curl_share_init_persistent() + CurlSharePersistentHandle — PHP 8.5+ (php-src share.c; #20530).
+     *
+     * Withheld on 8.4 profiles so function_exists/class_exists match Zend 8.4.
+     */
+    public static function advertisesSharePersistentHandles(): bool
+    {
+        return self::advertisesShareHandles()
+            && CompilerVersion::advertisesCurlShareInitPersistent();
+    }
+
+    /** Run persistent-share compliance when advertised or a phantom/profile guard matches (#20530). */
+    public static function runsCurlSharePersistentCompliance(string $testFileName): bool
+    {
+        if (self::advertisesSharePersistentHandles()) {
+            return true;
+        }
+
+        return str_contains($testFileName, 'curl_share_persistent_phantom')
+            || str_contains($testFileName, 'curl_share_init_persistent');
     }
 
     /** Run curl_multi_* compliance when multi is advertised or a phantom guard matches (#3721). */

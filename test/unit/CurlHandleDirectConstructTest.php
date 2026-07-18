@@ -22,6 +22,7 @@ final class CurlHandleDirectConstructTest extends TestCase
         // Force-register handle classes (withheld by policy until extension_loaded; #19728).
         VmCurlEasy::registerClass($runtime->vmContext);
         VmCurlShare::registerClass($runtime->vmContext);
+        VmCurlShare::registerPersistentClass($runtime->vmContext);
         if (!isset($runtime->vmContext->classes['curlmultihandle'])) {
             $runtime->vmContext->classes['curlmultihandle'] = new \PHPCompiler\VM\ClassEntry('CurlMultiHandle');
         }
@@ -32,6 +33,7 @@ foreach ([
     'CurlHandle' => 'curl_init()',
     'CurlMultiHandle' => 'curl_multi_init()',
     'CurlShareHandle' => 'curl_share_init()',
+    'CurlSharePersistentHandle' => 'curl_share_init_persistent()',
 ] as $class => $hint) {
     try {
         new $class();
@@ -46,7 +48,8 @@ PHP;
         self::assertSame(
             "CurlHandle:Cannot directly construct CurlHandle, use curl_init() instead\n"
             ."CurlMultiHandle:Cannot directly construct CurlMultiHandle, use curl_multi_init() instead\n"
-            ."CurlShareHandle:Cannot directly construct CurlShareHandle, use curl_share_init() instead\n",
+            ."CurlShareHandle:Cannot directly construct CurlShareHandle, use curl_share_init() instead\n"
+            ."CurlSharePersistentHandle:Cannot directly construct CurlSharePersistentHandle, use curl_share_init_persistent() instead\n",
             ob_get_clean()
         );
     }

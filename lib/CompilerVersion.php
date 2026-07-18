@@ -962,6 +962,21 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ curl_share_init_persistent() / CurlSharePersistentHandle (php-src ext/curl/share.c; #20530).
+     *
+     * Withheld on 8.4.0-dev / PROFILE=8.4 so function_exists matches Zend 8.4. Enable via
+     * stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5` forward profile.
+     */
+    public static function advertisesCurlShareInitPersistent(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.5+ compile-time rejection of {@code #[\AllowDynamicProperties]} on enums (php-src GH-15731, #17402).
      *
      * Withheld on reference profile (matches Zend 8.2 acceptance). Enable via stable 8.5.0+ or explicit

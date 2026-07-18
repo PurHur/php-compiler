@@ -44,6 +44,41 @@ final class VmCurlArg
         return $object;
     }
 
+    /**
+     * CURLOPT_SHARE value — CurlShareHandle or CurlSharePersistentHandle (php-src share.c; #20530).
+     */
+    public static function requireShareableObject(Variable $var, string $functionName, int $argNum): ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($value) must be of type CurlShareHandle|CurlSharePersistentHandle, %s given',
+                $functionName,
+                $argNum,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($value) must be of type CurlShareHandle|CurlSharePersistentHandle, %s given',
+                $functionName,
+                $argNum,
+                VmStreamArg::debugTypeName($var)
+            ));
+        }
+        $object = $var->toObject();
+        if (!VmCurlShare::isShareableObject($object)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($value) must be of type CurlShareHandle|CurlSharePersistentHandle, %s given',
+                $functionName,
+                $argNum,
+                self::objectTypeName($object)
+            ));
+        }
+
+        return $object;
+    }
+
     public static function requireEasyObject(Variable $var, string $functionName, int $argNum): ObjectEntry
     {
         $var = $var->resolveIndirect();
@@ -110,6 +145,7 @@ final class VmCurlArg
 
     private static function objectTypeName(ObjectEntry $object): string
     {
-        return 'object('.$object->class->name.')';
+        // Zend TypeError for object-of-class params uses the class name (php-src zend_types.h).
+        return $object->class->name;
     }
 }
