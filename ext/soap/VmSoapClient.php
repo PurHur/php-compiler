@@ -124,6 +124,16 @@ final class VmSoapClient
         if (isset($options['proxy_password'])) {
             $state->proxyPassword = (string) $options['proxy_password'];
         }
+        // php-src SoapClient ctor: user_agent / connection_timeout (#20341).
+        if (isset($options['user_agent']) && \is_string($options['user_agent'])) {
+            $state->userAgent = $options['user_agent'];
+        }
+        if (isset($options['connection_timeout'])) {
+            $timeout = (int) $options['connection_timeout'];
+            if ($timeout > 0) {
+                $state->connectionTimeout = $timeout;
+            }
+        }
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
@@ -274,7 +284,8 @@ final class VmSoapClient
             $acceptEncoding,
             $contentEncoding,
             $proxyAuthHeader,
-            $useProxy
+            $useProxy,
+            $state->userAgent
         );
         if ($state->trace) {
             $state->lastRequestHeaders = $requestHeaders;
@@ -340,7 +351,7 @@ final class VmSoapClient
             'header' => $headers,
             'content' => $bodyOut,
             'ignore_errors' => true,
-            'timeout' => 30,
+            'timeout' => null !== $state->connectionTimeout ? $state->connectionTimeout : 30,
         ];
         if ($useProxy && null !== $state->proxyHost && null !== $state->proxyPort) {
             // php-src http_connect via proxy — PHP stream proxy URI (#20339).
@@ -684,7 +695,8 @@ final class VmSoapClient
         string $acceptEncoding = '',
         string $contentEncoding = '',
         string $proxyAuthHeader = '',
-        bool $useProxy = false
+        bool $useProxy = false,
+        ?string $userAgent = null
     ): string {
         $path = '/';
         $host = 'localhost';
@@ -701,8 +713,15 @@ final class VmSoapClient
 
         $hdr = 'POST '.$path." HTTP/1.1\r\n".
             'Host: '.$host."\r\n".
-            "Connection: Keep-Alive\r\n".
-            'User-Agent: PHP-SOAP/'.\PHP_VERSION."\r\n";
+            "Connection: Keep-Alive\r\n";
+        // php-src: custom user_agent, else PHP-SOAP/VERSION (#20341).
+        if (null !== $userAgent) {
+            if ('' !== $userAgent) {
+                $hdr .= 'User-Agent: '.$userAgent."\r\n";
+            }
+        } else {
+            $hdr .= 'User-Agent: PHP-SOAP/'.\PHP_VERSION."\r\n";
+        }
         if ('' !== $acceptEncoding) {
             $hdr .= 'Accept-Encoding: '.$acceptEncoding."\r\n";
         }
@@ -1169,6 +1188,12 @@ final class SoapClientState
     public ?string $proxyLogin = null;
 
     public ?string $proxyPassword = null;
+
+    /** php-src _user_agent — null means default PHP-SOAP/VERSION (#20341). */
+    public ?string $userAgent = null;
+
+    /** php-src _connection_timeout seconds — null means stream default (#20341). */
+    public ?int $connectionTimeout = null;
 
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
