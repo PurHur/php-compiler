@@ -52,6 +52,8 @@ class Module extends ModuleAbstract
             new sodium_add(),
             new sodium_bin2hex(),
             new sodium_hex2bin(),
+            new sodium_bin2base64(),
+            new sodium_base642bin(),
             new sodium_memzero(),
             new sodium_crypto_stream(),
             new sodium_crypto_stream_xor(),
