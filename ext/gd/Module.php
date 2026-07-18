@@ -55,6 +55,8 @@ class Module extends ModuleAbstract
         $functions = [
             new imagecreate(),
             new imagecreatetruecolor(),
+            new gd_info(),
+            new imagetypes(),
         ];
         if (GdExtensionPolicy::advertisesDrawing()) {
             $functions[] = new imagecolorallocate();

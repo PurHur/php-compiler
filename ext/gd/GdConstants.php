@@ -80,6 +80,17 @@ final class GdConstants
         'IMG_COLOR_STYLEDBRUSHED' => -4,
         'IMG_COLOR_TILED' => -5,
         'IMG_COLOR_TRANSPARENT' => -6,
+        // Image type bitflags for imagetypes() (php-src ext/gd/php_gd.h; #20471)
+        'IMG_GIF' => 1,
+        'IMG_JPG' => 2,
+        'IMG_JPEG' => 2,
+        'IMG_PNG' => 4,
+        'IMG_WBMP' => 8,
+        'IMG_XPM' => 16,
+        'IMG_WEBP' => 32,
+        'IMG_BMP' => 64,
+        'IMG_TGA' => 128,
+        'IMG_AVIF' => 256,
     ];
 
     /** gdArc / IMG_ARC_PIE — rounded pie edge (php-src gd.h; #20437). */

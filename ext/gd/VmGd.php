@@ -26,6 +26,89 @@ final class VmGd
 {
     public const CLASS_GDIMAGE = 'gdimage';
 
+    /** IMG_GIF — imagetypes() bit (php-src php_gd.h; #20471). */
+    public const IMG_GIF = 1;
+
+    public const IMG_JPG = 2;
+
+    public const IMG_PNG = 4;
+
+    public const IMG_WBMP = 8;
+
+    public const IMG_XPM = 16;
+
+    public const IMG_WEBP = 32;
+
+    public const IMG_BMP = 64;
+
+    public const IMG_TGA = 128;
+
+    public const IMG_AVIF = 256;
+
+    /**
+     * imagetypes() — honest format bitmask for this build (php-src; #20471).
+     *
+     * Advertises GIF/JPG/PNG/WEBP/BMP/AVIF (encoders present). Omits WBMP/XPM/TGA
+     * until those codecs land (#20472).
+     */
+    public static function imageTypesMask(): int
+    {
+        return self::IMG_GIF
+            | self::IMG_JPG
+            | self::IMG_PNG
+            | self::IMG_WEBP
+            | self::IMG_BMP
+            | self::IMG_AVIF;
+    }
+
+    /**
+     * gd_info() — php-src-shaped assoc array (php-src ext/gd/gd.c; #20471).
+     */
+    public static function gdInfoToHashTable(): HashTable
+    {
+        $ft = VmGdFreeType::available();
+        $info = [
+            'GD Version' => 'bundled (2.1.0 compatible)',
+            'FreeType Support' => $ft,
+            'GIF Read Support' => true,
+            'GIF Create Support' => true,
+            'JPEG Support' => true,
+            'PNG Support' => true,
+            'WBMP Support' => false,
+            'XPM Support' => false,
+            'XBM Support' => false,
+            'WebP Support' => true,
+            'BMP Support' => true,
+            'AVIF Support' => true,
+            'TGA Read Support' => false,
+            'JIS-mapped Japanese Font Support' => false,
+        ];
+        if ($ft) {
+            // Insert FreeType Linkage after FreeType Support like php-src.
+            $ordered = [];
+            foreach ($info as $key => $value) {
+                $ordered[$key] = $value;
+                if ('FreeType Support' === $key) {
+                    $ordered['FreeType Linkage'] = 'with freetype';
+                }
+            }
+            $info = $ordered;
+        }
+
+        $ht = new HashTable();
+        foreach ($info as $key => $value) {
+            $slot = new Variable();
+            if (\is_bool($value)) {
+                $slot->bool($value);
+            } else {
+                $slot->string((string) $value);
+            }
+            $ht->add((string) $key, $slot);
+        }
+
+        return $ht;
+    }
+
     public static function createFromString(Frame $frame, string $data): ObjectEntry|false
     {
         $parsed = VmImage::getImageSizeFromBytes($data);
