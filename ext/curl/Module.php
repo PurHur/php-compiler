@@ -9,10 +9,9 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 
 /**
- * curl extension module entry (php-src ext/curl/interface.c; issue #6999, #16659, #19671, #3325).
+ * curl extension module entry (php-src ext/curl/interface.c; issue #6999, #16659, #19671, #3325, #3721).
  *
- * Easy-handle HTTP via libcurl FFI when {@see CurlExtensionPolicy::advertisesExtension()}.
- * curl_multi tracked in #3721.
+ * Easy + multi HTTP via libcurl FFI when {@see CurlExtensionPolicy::advertisesExtension()}.
  */
 class Module extends ModuleAbstract
 {
@@ -80,6 +79,15 @@ class Module extends ModuleAbstract
             $functions[] = new curl_error();
             $functions[] = new curl_errno();
             $functions[] = new curl_close();
+        }
+        if (CurlExtensionPolicy::advertisesMultiHandles()) {
+            $functions[] = new curl_multi_init();
+            $functions[] = new curl_multi_add_handle();
+            $functions[] = new curl_multi_exec();
+            $functions[] = new curl_multi_select();
+            $functions[] = new curl_multi_getcontent();
+            $functions[] = new curl_multi_remove_handle();
+            $functions[] = new curl_multi_close();
         }
 
         return $functions;

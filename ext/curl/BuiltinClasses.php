@@ -30,21 +30,11 @@ final class BuiltinClasses
         if (CurlExtensionPolicy::advertisesShareHandles()) {
             VmCurlShare::registerClass($ctx);
         }
-        if (CurlExtensionPolicy::advertisesHandleClasses()) {
-            self::registerCurlMultiHandle($ctx);
+        if (CurlExtensionPolicy::advertisesMultiHandles()) {
+            VmCurlMulti::registerClass($ctx);
         }
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
-    }
-
-    /** php-src ext/curl/curl.stub.php — final class CurlMultiHandle (#7266). */
-    private static function registerCurlMultiHandle(Context $ctx): void
-    {
-        if (isset($ctx->classes['curlmultihandle'])) {
-            return;
-        }
-
-        $ctx->classes['curlmultihandle'] = new ClassEntry('CurlMultiHandle');
     }
 }

@@ -193,6 +193,9 @@ final class BuiltinByRefParams
             case 'exif_thumbnail':
                 // php-src ext/exif/exif.stub.php — &$width, &$height, &$image_type (#20027)
                 return [1, 2, 3];
+            case 'curl_multi_exec':
+                // php-src ext/curl/multi.c / curl.stub.php — &$still_running (#3721)
+                return [1];
         }
 
         return [];

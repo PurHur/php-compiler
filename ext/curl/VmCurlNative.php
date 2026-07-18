@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\curl;
 
 /**
- * Thin libcurl FFI bridge for easy-handle HTTP I/O (php-src ext/curl/interface.c; #3325).
+ * Thin libcurl FFI bridge for easy + multi HTTP I/O
+ * (php-src ext/curl/interface.c, multi.c; #3325, #3721).
  *
- * Semantics live in {@see VmCurlEasy}; this class only loads libcurl/libc and exposes
- * curl_easy_* / FILE* helpers — no new runtime/ C.
+ * Semantics live in {@see VmCurlEasy} / {@see VmCurlMulti}; this class only loads
+ * libcurl/libc and exposes curl_easy_* / curl_multi_* / FILE* helpers — no new runtime/ C.
  */
 final class VmCurlNative
 {
@@ -121,6 +122,86 @@ final class VmCurlNative
     public static function easyStrerror(int $code): string
     {
         $msg = self::requireCurl()->curl_easy_strerror($code);
+
+        return null === $msg ? '' : (string) \FFI::string($msg);
+    }
+
+    /**
+     * @return \FFI\CData CURLM*
+     */
+    public static function multiInit(): \FFI\CData
+    {
+        $ffi = self::requireCurl();
+        $mh = $ffi->curl_multi_init();
+        if (null === $mh) {
+            throw new \Error('curl_multi_init(): Could not initialize a new cURL multi handle');
+        }
+
+        return $mh;
+    }
+
+    /**
+     * @param \FFI\CData $mh CURLM*
+     */
+    public static function multiCleanup(\FFI\CData $mh): void
+    {
+        self::requireCurl()->curl_multi_cleanup($mh);
+    }
+
+    /**
+     * @param \FFI\CData $mh CURLM*
+     * @param \FFI\CData $ch CURL*
+     */
+    public static function multiAddHandle(\FFI\CData $mh, \FFI\CData $ch): int
+    {
+        return (int) self::requireCurl()->curl_multi_add_handle($mh, $ch);
+    }
+
+    /**
+     * @param \FFI\CData $mh CURLM*
+     * @param \FFI\CData $ch CURL*
+     */
+    public static function multiRemoveHandle(\FFI\CData $mh, \FFI\CData $ch): int
+    {
+        return (int) self::requireCurl()->curl_multi_remove_handle($mh, $ch);
+    }
+
+    /**
+     * @param \FFI\CData $mh CURLM*
+     *
+     * @return array{0: int, 1: int} CURLMcode, still_running
+     */
+    public static function multiPerform(\FFI\CData $mh, int $stillRunning): array
+    {
+        $ffi = self::requireCurl();
+        $running = $ffi->new('int');
+        $running->cdata = $stillRunning;
+        $rc = (int) $ffi->curl_multi_perform($mh, \FFI::addr($running));
+
+        return [$rc, (int) $running->cdata];
+    }
+
+    /**
+     * @param \FFI\CData $mh CURLM*
+     *
+     * @return array{0: int, 1: int} CURLMcode, numfds (-1 on error path for PHP select)
+     */
+    public static function multiWait(\FFI\CData $mh, int $timeoutMs): array
+    {
+        $ffi = self::requireCurl();
+        $numfds = $ffi->new('int');
+        $numfds->cdata = 0;
+        $rc = (int) $ffi->curl_multi_wait($mh, null, 0, $timeoutMs, \FFI::addr($numfds));
+        if (0 !== $rc) {
+            return [$rc, -1];
+        }
+
+        return [$rc, (int) $numfds->cdata];
+    }
+
+    public static function multiStrerror(int $code): string
+    {
+        $msg = self::requireCurl()->curl_multi_strerror($code);
 
         return null === $msg ? '' : (string) \FFI::string($msg);
     }
@@ -241,6 +322,7 @@ final class VmCurlNative
 
         $cdef = <<<'CDEF'
 typedef void CURL;
+typedef void CURLM;
 struct curl_slist {
     char *data;
     struct curl_slist *next;
@@ -254,6 +336,13 @@ int curl_easy_getinfo(CURL *curl, int info, ...);
 const char *curl_easy_strerror(int code);
 curl_slist *curl_slist_append(curl_slist *list, const char *data);
 void curl_slist_free_all(curl_slist *list);
+CURLM *curl_multi_init(void);
+int curl_multi_cleanup(CURLM *multi_handle);
+int curl_multi_add_handle(CURLM *multi_handle, CURL *curl_handle);
+int curl_multi_remove_handle(CURLM *multi_handle, CURL *curl_handle);
+int curl_multi_perform(CURLM *multi_handle, int *running_handles);
+int curl_multi_wait(CURLM *multi_handle, void *extra_fds, unsigned int extra_nfds, int timeout_ms, int *numfds);
+const char *curl_multi_strerror(int code);
 CDEF;
 
         foreach (['libcurl.so.4', 'libcurl.so'] as $lib) {

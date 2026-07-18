@@ -35,7 +35,12 @@ final class VmCurlEasy
      *   http_code: int,
      *   effective_url: string,
      *   last_body: string,
-     *   native: ?\FFI\CData
+     *   native: ?\FFI\CData,
+     *   multi_id: ?int,
+     *   write_tmp: ?string,
+     *   write_fp: ?\FFI\CData,
+     *   write_slist: ?\FFI\CData,
+     *   multi_harvested: bool
      * }>
      */
     private static array $state = [];
@@ -76,6 +81,11 @@ final class VmCurlEasy
             'effective_url' => '',
             'last_body' => '',
             'native' => $native,
+            'multi_id' => null,
+            'write_tmp' => null,
+            'write_fp' => null,
+            'write_slist' => null,
+            'multi_harvested' => false,
         ];
         if (null !== $url && '' !== $url) {
             VmCurlNative::easySetoptString($native, CurlConstants::CURLOPT_URL, $url);
@@ -312,6 +322,7 @@ final class VmCurlEasy
         if (!isset(self::$state[$easy->id])) {
             return;
         }
+        self::cleanupMultiWriteBuffers($easy);
         $native = self::$state[$easy->id]['native'];
         if (null !== $native) {
             VmCurlNative::easyCleanup($native);
@@ -331,9 +342,145 @@ final class VmCurlEasy
         return self::isEasyObject($object) && isset(self::$state[$object->id]) && !self::$state[$object->id]['closed'];
     }
 
+    /** Public wrapper for multi API type checks (php-src Z_PARAM_OBJECT_OF_CLASS). */
+    public static function ensureLivePublic(ObjectEntry $easy, string $function): void
+    {
+        self::ensureLive($easy, $function);
+    }
+
     public static function shareIdForEasy(ObjectEntry $easy): ?int
     {
         return self::$state[$easy->id]['share_id'] ?? null;
+    }
+
+    /**
+     * @return \FFI\CData|null CURL*
+     */
+    public static function nativeHandle(ObjectEntry $easy): ?\FFI\CData
+    {
+        self::ensureLive($easy, 'curl_multi');
+
+        return self::$state[$easy->id]['native'] ?? null;
+    }
+
+    public static function multiIdForEasy(ObjectEntry $easy): ?int
+    {
+        return self::$state[$easy->id]['multi_id'] ?? null;
+    }
+
+    public static function setMultiId(ObjectEntry $easy, ?int $multiId): void
+    {
+        if (!isset(self::$state[$easy->id])) {
+            return;
+        }
+        self::$state[$easy->id]['multi_id'] = $multiId;
+    }
+
+    public static function isReturnTransfer(ObjectEntry $easy): bool
+    {
+        return (bool) (self::$state[$easy->id]['return_transfer'] ?? false);
+    }
+
+    public static function lastBody(ObjectEntry $easy): string
+    {
+        return (string) (self::$state[$easy->id]['last_body'] ?? '');
+    }
+
+    /**
+     * Attach write buffer / headers for a multi transfer (php-src write handler setup).
+     */
+    public static function prepareMultiTransfer(ObjectEntry $easy): void
+    {
+        self::ensureLive($easy, 'curl_multi_add_handle');
+        $st = &self::$state[$easy->id];
+        $native = $st['native'];
+        if (null === $native) {
+            throw new \LogicException('curl_multi_add_handle(): easy handle has no libcurl handle');
+        }
+        self::cleanupMultiWriteBuffers($easy);
+        $st['multi_harvested'] = false;
+        $st['last_body'] = '';
+        $st['errno'] = 0;
+        $st['error'] = '';
+        $st['http_code'] = 0;
+        $st['effective_url'] = '';
+
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_curlm_');
+        if (false === $tmp) {
+            throw new \RuntimeException('Out of memory');
+        }
+        $fp = VmCurlNative::fopen($tmp, 'w+b');
+        VmCurlNative::easySetoptPtr($native, CurlConstants::CURLOPT_WRITEDATA, $fp);
+        $st['write_tmp'] = $tmp;
+        $st['write_fp'] = $fp;
+
+        $slist = null;
+        if ([] !== $st['headers']) {
+            foreach ($st['headers'] as $header) {
+                $slist = VmCurlNative::slistAppend($slist, $header);
+            }
+            VmCurlNative::easySetoptPtr($native, CurlConstants::CURLOPT_HTTPHEADER, $slist);
+            $st['headers_on_handle'] = true;
+        } elseif ($st['headers_on_handle']) {
+            VmCurlNative::easySetoptNull($native, CurlConstants::CURLOPT_HTTPHEADER);
+            $st['headers_on_handle'] = false;
+        }
+        $st['write_slist'] = $slist;
+    }
+
+    /**
+     * Refresh getinfo / body after multi perform (or remove/close).
+     */
+    public static function harvestMultiTransfer(ObjectEntry $easy, bool $forceBody = false): void
+    {
+        if (!isset(self::$state[$easy->id])) {
+            return;
+        }
+        $st = &self::$state[$easy->id];
+        $native = $st['native'];
+        if (null === $native) {
+            return;
+        }
+        $st['http_code'] = VmCurlNative::easyGetinfoLong($native, CurlConstants::CURLINFO_HTTP_CODE);
+        $st['effective_url'] = VmCurlNative::easyGetinfoString($native, CurlConstants::CURLINFO_EFFECTIVE_URL);
+        if (!$forceBody && $st['multi_harvested']) {
+            return;
+        }
+        if (null !== $st['write_fp']) {
+            VmCurlNative::rewind($st['write_fp']);
+            $st['last_body'] = VmCurlNative::freadAll($st['write_fp']);
+        }
+        $st['multi_harvested'] = true;
+    }
+
+    public static function setEasyResult(ObjectEntry $easy, int $errno): void
+    {
+        if (!isset(self::$state[$easy->id])) {
+            return;
+        }
+        $st = &self::$state[$easy->id];
+        $st['errno'] = $errno;
+        $st['error'] = 0 === $errno ? '' : VmCurlNative::easyStrerror($errno);
+    }
+
+    public static function cleanupMultiWriteBuffers(ObjectEntry $easy): void
+    {
+        if (!isset(self::$state[$easy->id])) {
+            return;
+        }
+        $st = &self::$state[$easy->id];
+        if (null !== $st['write_slist']) {
+            VmCurlNative::slistFreeAll($st['write_slist']);
+            $st['write_slist'] = null;
+        }
+        if (null !== $st['write_fp']) {
+            VmCurlNative::fclose($st['write_fp']);
+            $st['write_fp'] = null;
+        }
+        if (null !== $st['write_tmp']) {
+            @unlink($st['write_tmp']);
+            $st['write_tmp'] = null;
+        }
     }
 
     private static function ensureLive(ObjectEntry $easy, string $function): void

@@ -550,6 +550,16 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'curl_easy_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::runsCurlMultiCompliance($name)
+                && str_contains($name, 'curl_multi')
+                && !str_contains($name, 'curl_multi_strerror')
+                && !str_contains($name, 'curl_multi_phantom')) {
+                continue;
+            }
+            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesMultiHandles()
+                && str_contains($name, 'curl_multi_phantom')) {
+                continue;
+            }
             if (!\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
                 && str_contains($name, 'ldap_escape')
                 && !str_contains($name, 'ldap_escape_phantom')) {
