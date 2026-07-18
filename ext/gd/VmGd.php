@@ -3167,6 +3167,128 @@ final class VmGd
         return $entry;
     }
 
+    public static function createFromPngBytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdPng::decodeRgb($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefrompng');
+
+            return false;
+        }
+        [$width, $height, $pixels] = $decoded;
+
+        return self::attachRasterImage($frame, $width, $height, $pixels, VmImage::IMAGETYPE_PNG, 'imagecreatefrompng');
+    }
+
+    public static function createFromJpegBytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdJpeg::decodeRgb($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefromjpeg');
+
+            return false;
+        }
+        [$width, $height, $pixels] = $decoded;
+
+        return self::attachRasterImage($frame, $width, $height, $pixels, VmImage::IMAGETYPE_JPEG, 'imagecreatefromjpeg');
+    }
+
+    public static function createFromGifBytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdGif::decodeRgb($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefromgif');
+
+            return false;
+        }
+        [$width, $height, $pixels] = $decoded;
+
+        return self::attachRasterImage($frame, $width, $height, $pixels, VmImage::IMAGETYPE_GIF, 'imagecreatefromgif');
+    }
+
+    /**
+     * @param list<int> $pixels
+     */
+    private static function attachRasterImage(
+        Frame $frame,
+        int $width,
+        int $height,
+        array $pixels,
+        int $imageType,
+        string $function
+    ): ObjectEntry {
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException($function.'() requires VM context');
+        }
+        $class = $ctx->classes[self::CLASS_GDIMAGE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('GdImage is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $state = GdImageState::fromRaster($width, $height, $pixels);
+        $state->imageType = $imageType;
+        GdRegistry::attach($entry, $state);
+
+        return $entry;
+    }
+
+    public static function encodedJpegBytes(ObjectEntry $image, int $quality = 75): string
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            throw new \TypeError('imagejpeg(): Argument #1 ($image) must be of type GdImage');
+        }
+        if ($state->hasRaster()) {
+            return VmGdJpeg::encodeRgb(
+                $state->width,
+                $state->height,
+                self::truecolorPixelsForEncode($state),
+                $quality
+            );
+        }
+        if ($state->hasEncoded() && VmImage::IMAGETYPE_JPEG === $state->imageType) {
+            return $state->encoded;
+        }
+
+        throw new \TypeError('imagejpeg(): Argument #1 ($image) must be of type GdImage');
+    }
+
+    public static function writeJpegToOutput(Frame $frame, ObjectEntry $image, int $quality = 75): bool
+    {
+        OutputBuffer::append(self::encodedJpegBytes($image, $quality), $frame->scriptPath ?: null);
+
+        return true;
+    }
+
+    public static function encodedGifBytes(ObjectEntry $image): string
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            throw new \TypeError('imagegif(): Argument #1 ($image) must be of type GdImage');
+        }
+        if ($state->hasRaster()) {
+            return VmGdGif::encodeRgb(
+                $state->width,
+                $state->height,
+                self::truecolorPixelsForEncode($state)
+            );
+        }
+        if ($state->hasEncoded() && VmImage::IMAGETYPE_GIF === $state->imageType) {
+            return $state->encoded;
+        }
+
+        throw new \TypeError('imagegif(): Argument #1 ($image) must be of type GdImage');
+    }
+
+    public static function writeGifToOutput(Frame $frame, ObjectEntry $image): bool
+    {
+        OutputBuffer::append(self::encodedGifBytes($image), $frame->scriptPath ?: null);
+
+        return true;
+    }
+
     public static function encodedBmpBytes(ObjectEntry $image, bool $compressed = true): string
     {
         $state = GdRegistry::state($image);
@@ -3824,9 +3946,10 @@ final class VmGd
     private static function parameterName(string $function, int $position): string
     {
         return match ($function) {
-            'imagepng', 'imagewebp', 'imageavif' => 1 === $position ? 'image' : 'arg',
+            'imagepng', 'imagewebp', 'imageavif', 'imagejpeg', 'imagegif' => 1 === $position ? 'image' : 'arg',
             'imagecreatefromstring' => 'image',
-            'imagecreatefromwebp', 'imagecreatefromavif' => 'filename',
+            'imagecreatefromwebp', 'imagecreatefromavif', 'imagecreatefrombmp',
+            'imagecreatefrompng', 'imagecreatefromjpeg', 'imagecreatefromgif' => 'filename',
             'imagesx', 'imagesy', 'imageistruecolor', 'imagepalettetotruecolor', 'imagedestroy', 'imagegetinterpolation' => 'image',
             'imageaffine' => match ($position) {
                 1 => 'image',
