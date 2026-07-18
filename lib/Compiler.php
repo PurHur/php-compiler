@@ -7772,7 +7772,8 @@ class Compiler {
         AttributeTargetValidator::assertPromotedParameterTargets($declare->attributeEntries, $this->attributeClassRegistry);
         AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
         AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property');
-        AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'property');
+        // Promoted ctor params keep parameter attribute targets (zend_compile.c / #20351).
+        AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'parameter');
         $result->addOpCode($declare);
     }
 

@@ -154,4 +154,14 @@ final class AttributeNamesDuplicateTest extends TestCase
         AttributeNames::assertSensitiveParameterParamTargetOnly(['\\SensitiveParameter'], 'parameter');
         $this->addToAssertionCount(1);
     }
+
+    public function testRejectsSensitiveParameterOnProperty(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Attribute "SensitiveParameter" cannot target property (allowed targets: parameter)'
+        );
+
+        AttributeNames::assertSensitiveParameterParamTargetOnly(['\\SensitiveParameter'], 'property');
+    }
 }
