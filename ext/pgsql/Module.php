@@ -75,6 +75,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/pg_dml_builtins.php';
         require_once __DIR__.'/pg_params_escape_builtins.php';
         require_once __DIR__.'/pg_connection_info_builtins.php';
+        require_once __DIR__.'/pg_fetch_extra_builtins.php';
 
         return [
             new pg_connect(),
@@ -82,6 +83,11 @@ class Module extends ModuleAbstract
             new pg_query(),
             new pg_fetch_assoc(),
             new pg_fetch_row(),
+            new pg_fetch_array(),
+            new pg_fetch_object(),
+            new pg_fetch_result(),
+            new pg_free_result(),
+            new pg_result_seek(),
             new pg_num_rows(),
             new pg_last_error(),
             new pg_trace(),

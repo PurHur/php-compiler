@@ -1378,58 +1378,204 @@ final class VmPgsqlCore
     }
 
     /**
+     * php_pgsql_fetch_hash (php-src ext/pgsql/pgsql.c; #20704).
+     *
      * @return HashTable|false
      */
-    public static function fetchAssoc(ObjectEntry $resultObj): HashTable|false
-    {
+    public static function fetchHash(
+        ObjectEntry $resultObj,
+        ?int $row,
+        int $mode,
+        string $fn = 'pg_fetch_array'
+    ): HashTable|false {
+        if (null !== $row && $row < 0) {
+            throw new \ValueError($fn.'(): Argument #2 ($row) must be greater than or equal to 0');
+        }
+        if (0 === ($mode & PgsqlConstants::PGSQL_BOTH)) {
+            throw new \ValueError(
+                $fn.'(): Argument #3 ($mode) must be one of PGSQL_ASSOC, PGSQL_NUM, or PGSQL_BOTH'
+            );
+        }
         $result = VmPgsqlResult::native($resultObj);
-        $row = VmPgsqlResult::currentRow($resultObj);
         $ntuples = VmPgsqlNative::ntuples($result);
-        if ($row >= $ntuples) {
-            return false;
+        if (null !== $row) {
+            if ($row >= $ntuples) {
+                @\trigger_error(
+                    \sprintf('%s(): Unable to jump to row %d on PostgreSQL result', $fn, $row),
+                    \E_USER_WARNING
+                );
+
+                return false;
+            }
+            $pgsqlRow = $row;
+            VmPgsqlResult::setCurrentRow($resultObj, $pgsqlRow);
+        } else {
+            $pgsqlRow = VmPgsqlResult::currentRow($resultObj);
+            if ($pgsqlRow < 0 || $pgsqlRow >= $ntuples) {
+                return false;
+            }
+            VmPgsqlResult::advanceRow($resultObj);
         }
         $ht = new HashTable();
         $nfields = VmPgsqlNative::nfields($result);
         for ($i = 0; $i < $nfields; ++$i) {
-            $name = VmPgsqlNative::fname($result, $i);
-            $slot = new Variable();
-            if (VmPgsqlNative::getisnull($result, $row, $i)) {
-                $slot->null();
-            } else {
-                $slot->string(VmPgsqlNative::getvalue($result, $row, $i));
+            $isNull = VmPgsqlNative::getisnull($result, $pgsqlRow, $i);
+            if ($mode & PgsqlConstants::PGSQL_NUM) {
+                $slot = new Variable();
+                if ($isNull) {
+                    $slot->null();
+                } else {
+                    $slot->string(VmPgsqlNative::getvalue($result, $pgsqlRow, $i));
+                }
+                $ht->add((string) $i, $slot);
             }
-            $ht->add($name, $slot);
+            if ($mode & PgsqlConstants::PGSQL_ASSOC) {
+                $slot = new Variable();
+                if ($isNull) {
+                    $slot->null();
+                } else {
+                    $slot->string(VmPgsqlNative::getvalue($result, $pgsqlRow, $i));
+                }
+                $ht->add(VmPgsqlNative::fname($result, $i), $slot);
+            }
         }
-        VmPgsqlResult::advanceRow($resultObj);
 
         return $ht;
     }
 
     /**
+     * @return HashTable|false
+     */
+    public static function fetchAssoc(ObjectEntry $resultObj, ?int $row = null): HashTable|false
+    {
+        return self::fetchHash($resultObj, $row, PgsqlConstants::PGSQL_ASSOC, 'pg_fetch_assoc');
+    }
+
+    /**
      * @return HashTable|false numeric keys
      */
-    public static function fetchRow(ObjectEntry $resultObj): HashTable|false
+    public static function fetchRow(ObjectEntry $resultObj, ?int $row = null): HashTable|false
     {
-        $result = VmPgsqlResult::native($resultObj);
-        $row = VmPgsqlResult::currentRow($resultObj);
-        $ntuples = VmPgsqlNative::ntuples($result);
-        if ($row >= $ntuples) {
+        return self::fetchHash($resultObj, $row, PgsqlConstants::PGSQL_NUM, 'pg_fetch_row');
+    }
+
+    /**
+     * @return HashTable|false
+     */
+    public static function fetchArray(
+        ObjectEntry $resultObj,
+        ?int $row = null,
+        int $mode = PgsqlConstants::PGSQL_BOTH
+    ): HashTable|false {
+        return self::fetchHash($resultObj, $row, $mode, 'pg_fetch_array');
+    }
+
+    /**
+     * pg_fetch_object — assoc row as stdClass (custom class subset; #20704).
+     *
+     * @return ObjectEntry|false
+     */
+    public static function fetchObject(
+        ObjectEntry $resultObj,
+        Context $ctx,
+        ?int $row = null,
+        string $className = 'stdClass'
+    ): ObjectEntry|false {
+        $ht = self::fetchHash($resultObj, $row, PgsqlConstants::PGSQL_ASSOC, 'pg_fetch_object');
+        if (false === $ht) {
             return false;
         }
-        $ht = new HashTable();
-        $nfields = VmPgsqlNative::nfields($result);
-        for ($i = 0; $i < $nfields; ++$i) {
-            $slot = new Variable();
-            if (VmPgsqlNative::getisnull($result, $row, $i)) {
-                $slot->null();
-            } else {
-                $slot->string(VmPgsqlNative::getvalue($result, $row, $i));
-            }
-            $ht->add((string) $i, $slot);
+        $lc = \strtolower($className);
+        if (!isset($ctx->classes[$lc])) {
+            throw new \TypeError(\sprintf('Class "%s" not found', $className));
         }
-        VmPgsqlResult::advanceRow($resultObj);
+        $object = new ObjectEntry($ctx->classes[$lc]);
+        $object->constructed = true;
+        foreach ($ht->iterateKeyed(true) as [$keyVar, $valVar]) {
+            $slot = $object->allocateProperty($keyVar->toString());
+            $slot->copyFrom($valVar);
+        }
 
-        return $ht;
+        return $object;
+    }
+
+    /**
+     * pg_fetch_result — single field value (#20704).
+     *
+     * @return string|null|false
+     */
+    public static function fetchResult(ObjectEntry $resultObj, ?int $row, string|int $field, int $fieldArgNum): string|null|false
+    {
+        $result = VmPgsqlResult::native($resultObj);
+        if (null === $row) {
+            $pgsqlRow = VmPgsqlResult::currentRow($resultObj);
+            if ($pgsqlRow < 0) {
+                VmPgsqlResult::setCurrentRow($resultObj, 0);
+                $pgsqlRow = 0;
+            }
+            if ($pgsqlRow >= VmPgsqlNative::ntuples($result)) {
+                return false;
+            }
+            VmPgsqlResult::advanceRow($resultObj);
+        } else {
+            if ($row < 0) {
+                throw new \ValueError('pg_fetch_result(): Argument #2 ($row) must be greater than or equal to 0');
+            }
+            if ($row >= VmPgsqlNative::ntuples($result)) {
+                @\trigger_error(
+                    \sprintf('pg_fetch_result(): Unable to jump to row %d on PostgreSQL result', $row),
+                    \E_USER_WARNING
+                );
+
+                return false;
+            }
+            $pgsqlRow = $row;
+        }
+        if (\is_string($field)) {
+            $offset = VmPgsqlNative::fnumber($result, $field);
+            if ($offset < 0) {
+                throw new \ValueError(\sprintf(
+                    'Argument #%d must be a field name from this result set',
+                    $fieldArgNum
+                ));
+            }
+        } else {
+            $offset = $field;
+            if ($offset < 0) {
+                throw new \ValueError(\sprintf('Argument #%d must be greater than or equal to 0', $fieldArgNum));
+            }
+            if ($offset >= VmPgsqlNative::nfields($result)) {
+                throw new \ValueError(\sprintf(
+                    'Argument #%d must be less than the number of fields for this result set',
+                    $fieldArgNum
+                ));
+            }
+        }
+        if (VmPgsqlNative::getisnull($result, $pgsqlRow, $offset)) {
+            return null;
+        }
+
+        return VmPgsqlNative::getvalue($result, $pgsqlRow, $offset);
+    }
+
+    /** pg_result_seek (#20704). */
+    public static function resultSeek(ObjectEntry $resultObj, int $row): bool
+    {
+        $result = VmPgsqlResult::native($resultObj);
+        if ($row < 0 || $row >= VmPgsqlNative::ntuples($result)) {
+            return false;
+        }
+        VmPgsqlResult::setCurrentRow($resultObj, $row);
+
+        return true;
+    }
+
+    /** pg_free_result (#20704). */
+    public static function freeResult(ObjectEntry $resultObj): bool
+    {
+        VmPgsqlResult::clear($resultObj);
+
+        return true;
     }
 
     private static function convertValueToSql(\FFI\CData $conn, Variable $val): string
