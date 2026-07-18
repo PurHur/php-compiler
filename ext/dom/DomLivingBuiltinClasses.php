@@ -14,6 +14,45 @@ use PHPCompiler\VM\Variable;
 /** Register PHP 8.4 Dom\ living-standard classes (php-src ext/dom/php_dom.stub.php; #6506). */
 final class DomLivingBuiltinClasses
 {
+    /**
+     * Dom\Document methods aliased from DOMDocument handlers (php-src php_dom.stub.php; #20556).
+     *
+     * @var list<string>
+     */
+    private const DOCUMENT_SHARED_METHODS = [
+        'createelement',
+        'createelementns',
+        'createattribute',
+        'createattributens',
+        'createdocumentfragment',
+        'createtextnode',
+        'createcomment',
+        'createcdatasection',
+        'createprocessinginstruction',
+        'getelementsbytagname',
+        'getelementsbytagnamens',
+        'getelementbyid',
+        'importnode',
+        'adoptnode',
+        'registernodeclass',
+        'schemavalidate',
+        'schemavalidatesource',
+        'relaxngvalidate',
+        'relaxngvalidatesource',
+        'savexml',
+    ];
+
+    /**
+     * Dom\XMLDocument-only methods (php-src XMLDocument stub; #20556).
+     *
+     * @var list<string>
+     */
+    private const XML_DOCUMENT_EXTRA_METHODS = [
+        'createentityreference',
+        'validate',
+        'xinclude',
+    ];
+
     public static function register(Context $ctx): void
     {
         if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
@@ -62,6 +101,9 @@ final class DomLivingBuiltinClasses
         $element->methods['queryselectorall'] = new ElementQuerySelectorAll();
         $element->methodVisibility['queryselectorall'] = $pub;
         $element->methodNames['queryselectorall'] = 'querySelectorAll';
+        $element->methods['getelementsbyclassname'] = new ElementGetElementsByClassName();
+        $element->methodVisibility['getelementsbyclassname'] = $pub;
+        $element->methodNames['getelementsbyclassname'] = 'getElementsByClassName';
         $ctx->classes[VmDomLiving::CLASS_ELEMENT] = $element;
 
         $htmlElement = new ClassEntry('Dom\\HTMLElement');
@@ -82,7 +124,18 @@ final class DomLivingBuiltinClasses
 
         $document = new ClassEntry('Dom\\Document');
         $document->isInternal = true;
+        $document->parentLc = VmDomLiving::CLASS_NODE;
         $document->properties[] = new ClassProperty(VmDomLiving::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
+        self::copySelectedMethods(
+            $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null,
+            $document,
+            self::DOCUMENT_SHARED_METHODS
+        );
+        // Living Dom casing (php-src HTMLDocument/XMLDocument::saveXml; #20556).
+        $document->methodNames['savexml'] = 'saveXml';
+        $document->methods['getelementsbyclassname'] = new DocumentGetElementsByClassName();
+        $document->methodVisibility['getelementsbyclassname'] = $pub;
+        $document->methodNames['getelementsbyclassname'] = 'getElementsByClassName';
         $ctx->classes[VmDomLiving::CLASS_DOCUMENT] = $document;
 
         $htmlDocument = new ClassEntry('Dom\\HTMLDocument');
@@ -112,6 +165,18 @@ final class DomLivingBuiltinClasses
         $htmlDocument->methods['savehtml'] = new HtmlDocumentSaveHtml();
         $htmlDocument->methodVisibility['savehtml'] = CfgFunc::FLAG_PUBLIC;
         $htmlDocument->methodNames['savehtml'] = 'saveHtml';
+        self::copySelectedMethods(
+            $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null,
+            $htmlDocument,
+            ['savehtmlfile']
+        );
+        $htmlDocument->methodNames['savehtmlfile'] = 'saveHtmlFile';
+        $legacyDoc = $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null;
+        if (null !== $legacyDoc && isset($legacyDoc->methods['save'])) {
+            $htmlDocument->methods['savexmlfile'] = $legacyDoc->methods['save'];
+            $htmlDocument->methodVisibility['savexmlfile'] = $pub;
+            $htmlDocument->methodNames['savexmlfile'] = 'saveXmlFile';
+        }
         $ctx->classes[VmDomLiving::CLASS_HTML_DOCUMENT] = $htmlDocument;
 
         $xmlDocument = new ClassEntry('Dom\\XMLDocument');
@@ -124,6 +189,16 @@ final class DomLivingBuiltinClasses
         $xmlDocument->methods['createempty'] = new XmlDocumentCreateEmpty();
         $xmlDocument->methodVisibility['createempty'] = $pubStatic;
         $xmlDocument->methodNames['createempty'] = 'createEmpty';
+        self::copySelectedMethods(
+            $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null,
+            $xmlDocument,
+            self::XML_DOCUMENT_EXTRA_METHODS
+        );
+        if (null !== $legacyDoc && isset($legacyDoc->methods['save'])) {
+            $xmlDocument->methods['savexmlfile'] = $legacyDoc->methods['save'];
+            $xmlDocument->methodVisibility['savexmlfile'] = $pub;
+            $xmlDocument->methodNames['savexmlfile'] = 'saveXmlFile';
+        }
         $ctx->classes[VmDomLiving::CLASS_XML_DOCUMENT] = $xmlDocument;
     }
 
@@ -138,6 +213,28 @@ final class DomLivingBuiltinClasses
                 continue;
             }
             $to->methods[$lc] = $method;
+            if (isset($from->methodVisibility[$lc])) {
+                $to->methodVisibility[$lc] = $from->methodVisibility[$lc];
+            }
+            if (isset($from->methodNames[$lc])) {
+                $to->methodNames[$lc] = $from->methodNames[$lc];
+            }
+        }
+    }
+
+    /**
+     * @param list<string> $methodLcs
+     */
+    private static function copySelectedMethods(?ClassEntry $from, ClassEntry $to, array $methodLcs): void
+    {
+        if (null === $from) {
+            return;
+        }
+        foreach ($methodLcs as $lc) {
+            if (!isset($from->methods[$lc]) || isset($to->methods[$lc])) {
+                continue;
+            }
+            $to->methods[$lc] = $from->methods[$lc];
             if (isset($from->methodVisibility[$lc])) {
                 $to->methodVisibility[$lc] = $from->methodVisibility[$lc];
             }
