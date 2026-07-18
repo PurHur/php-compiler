@@ -12,7 +12,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\BuiltinExceptionSupport;
+use PHPCompiler\ext\standard\VmHttpBuildQuery;
 use PHPCompiler\ext\standard\VmJson;
+use PHPCompiler\ext\standard\VmStreamContext;
 
 /**
  * SoapClient VM class — v1 local WSDL + file/HTTP transport (php-src ext/soap/soap.c; #20037, #20183, #20293).
@@ -138,6 +140,12 @@ final class VmSoapClient
         if (\array_key_exists('keep_alive', $options)) {
             $ka = $options['keep_alive'];
             $state->keepAlive = !(false === $ka || 0 === $ka || '0' === $ka);
+        }
+        // php-src SoapClient ctor: stream_context resource → HTTP/SSL options (#20365).
+        if (isset($options['__phpc_stream_context_options']) && \is_array($options['__phpc_stream_context_options'])) {
+            $state->streamContextOptions = $options['__phpc_stream_context_options'];
+            unset($options['__phpc_stream_context_options']);
+            $state->options = $options;
         }
 
         if (null !== $wsdl && '' !== $wsdl) {
@@ -291,7 +299,8 @@ final class VmSoapClient
             $proxyAuthHeader,
             $useProxy,
             $state->userAgent,
-            $state->keepAlive
+            $state->keepAlive,
+            $state->streamContextOptions
         );
         if ($state->trace) {
             $state->lastRequestHeaders = $requestHeaders;
@@ -354,6 +363,15 @@ final class VmSoapClient
         if ($useProxy && '' !== $proxyAuthHeader) {
             $headers .= $proxyAuthHeader."\r\n";
         }
+        $contextHeaderExtra = self::streamContextHttpHeaderBlock(
+            $state->streamContextOptions,
+            '' !== $authHeader,
+            $useProxy && '' !== $proxyAuthHeader,
+            '' !== $cookieHeader
+        );
+        if ('' !== $contextHeaderExtra) {
+            $headers .= $contextHeaderExtra;
+        }
         $httpOpts = [
             'method' => 'POST',
             'header' => $headers,
@@ -361,14 +379,18 @@ final class VmSoapClient
             'ignore_errors' => true,
             'timeout' => null !== $state->connectionTimeout ? $state->connectionTimeout : 30,
         ];
+        // Merge user stream_context http/ssl options (php-src http_connect) (#20365).
+        $httpOpts = self::mergeStreamContextHttpOptions($httpOpts, $state->streamContextOptions);
         if ($useProxy && null !== $state->proxyHost && null !== $state->proxyPort) {
             // php-src http_connect via proxy — PHP stream proxy URI (#20339).
             $httpOpts['proxy'] = 'tcp://'.$state->proxyHost.':'.$state->proxyPort;
             $httpOpts['request_fulluri'] = true;
         }
-        $ctx = \stream_context_create([
-            'http' => $httpOpts,
-        ]);
+        $ctxOpts = ['http' => $httpOpts];
+        if (isset($state->streamContextOptions['ssl']) && \is_array($state->streamContextOptions['ssl'])) {
+            $ctxOpts['ssl'] = $state->streamContextOptions['ssl'];
+        }
+        $ctx = \stream_context_create($ctxOpts);
         $body = @\file_get_contents($location, false, $ctx);
         if (false === $body) {
             throw new \SoapFault('HTTP', 'Could not connect to host');
@@ -694,6 +716,9 @@ final class VmSoapClient
     /**
      * Build Zend-shaped HTTP request header block for trace (php-src soap_client).
      */
+    /**
+     * @param array<string, mixed>|null $streamContextOptions
+     */
     private static function buildHttpRequestHeaders(
         string $location,
         string $action,
@@ -705,7 +730,8 @@ final class VmSoapClient
         string $proxyAuthHeader = '',
         bool $useProxy = false,
         ?string $userAgent = null,
-        bool $keepAlive = true
+        bool $keepAlive = true,
+        ?array $streamContextOptions = null
     ): string {
         $path = '/';
         $host = 'localhost';
@@ -752,8 +778,93 @@ final class VmSoapClient
         if ($useProxy && '' !== $proxyAuthHeader) {
             $hdr .= $proxyAuthHeader."\r\n";
         }
+        // php-src http_context_headers — merge stream_context http.header (#20365).
+        $hdr .= self::streamContextHttpHeaderBlock(
+            $streamContextOptions,
+            '' !== $authHeader,
+            $useProxy && '' !== $proxyAuthHeader,
+            '' !== $cookieHeader
+        );
 
         return $hdr;
+    }
+
+    /**
+     * php-src http_context_headers / http_context_add_header (#20365).
+     *
+     * @param array<string, mixed>|null $streamContextOptions
+     */
+    private static function streamContextHttpHeaderBlock(
+        ?array $streamContextOptions,
+        bool $hasAuthorization,
+        bool $hasProxyAuthorization,
+        bool $hasCookies
+    ): string {
+        if (null === $streamContextOptions) {
+            return '';
+        }
+        $http = $streamContextOptions['http'] ?? null;
+        if (!\is_array($http) || !isset($http['header'])) {
+            return '';
+        }
+        $raw = $http['header'];
+        $lines = [];
+        if (\is_array($raw)) {
+            foreach ($raw as $item) {
+                if (\is_string($item) && '' !== $item) {
+                    $lines[] = $item;
+                }
+            }
+        } elseif (\is_string($raw) && '' !== $raw) {
+            $lines[] = $raw;
+        }
+        $out = '';
+        foreach ($lines as $block) {
+            foreach (\preg_split('/\r\n|\n|\r/', $block) ?: [] as $line) {
+                $line = \trim($line);
+                if ('' === $line) {
+                    continue;
+                }
+                $lower = \strtolower($line);
+                if ($hasAuthorization && \str_starts_with($lower, 'authorization:')) {
+                    continue;
+                }
+                if ($hasProxyAuthorization && \str_starts_with($lower, 'proxy-authorization:')) {
+                    continue;
+                }
+                if ($hasCookies && \str_starts_with($lower, 'cookie:')) {
+                    continue;
+                }
+                $out .= $line."\r\n";
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Merge user stream_context http options under SOAP-owned keys (#20365).
+     *
+     * @param array<string, mixed>      $httpOpts
+     * @param array<string, mixed>|null $streamContextOptions
+     *
+     * @return array<string, mixed>
+     */
+    private static function mergeStreamContextHttpOptions(array $httpOpts, ?array $streamContextOptions): array
+    {
+        if (null === $streamContextOptions || !isset($streamContextOptions['http']) || !\is_array($streamContextOptions['http'])) {
+            return $httpOpts;
+        }
+        foreach ($streamContextOptions['http'] as $key => $value) {
+            if ('header' === $key || 'method' === $key || 'content' === $key) {
+                continue;
+            }
+            if (!\array_key_exists($key, $httpOpts)) {
+                $httpOpts[$key] = $value;
+            }
+        }
+
+        return $httpOpts;
     }
 
     private static function synthesizeFixtureResponseHeaders(int $contentLength): string
@@ -1209,6 +1320,13 @@ final class SoapClientState
     /** php-src _keep_alive — default true; false → Connection: close (#20364). */
     public bool $keepAlive = true;
 
+    /**
+     * php-src stream_context wrapper options (http/ssl bags) (#20365).
+     *
+     * @var array<string, mixed>|null
+     */
+    public ?array $streamContextOptions = null;
+
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
     public int $style = SoapConstants::SOAP_RPC;
@@ -1269,9 +1387,44 @@ final class SoapClientConstruct extends SoapClassMethod
                     'SoapClient::__construct(): Argument #2 ($options) must be of type array'
                 );
             }
-            $exported = VmJson::export($optVar, $frame->vmContext, null, $frame);
+            // Peel stream_context before JSON export — resource-like arrays are not JSON-safe (#20365).
+            $streamContextOptions = null;
+            $sourceHt = $optVar->toArray();
+            $scSlot = $sourceHt->find('stream_context');
+            if (null !== $scSlot) {
+                $scVar = $scSlot->resolveIndirect();
+                if (VmStreamContext::isRepresentation($scVar)) {
+                    $optsHt = VmStreamContext::getOptionsHashTable($scVar);
+                    $optsVar = new Variable();
+                    $optsVar->array($optsHt);
+                    $exportedCtx = VmHttpBuildQuery::export($optsVar, $frame);
+                    if (\is_array($exportedCtx)) {
+                        $streamContextOptions = $exportedCtx;
+                    }
+                }
+            }
+            $filtered = new HashTable();
+            foreach ($sourceHt->iterateKeyed(true) as [$key, $value]) {
+                $k = $key->resolveIndirect();
+                if (Variable::TYPE_STRING === $k->type && 'stream_context' === $k->toString()) {
+                    continue;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                if (Variable::TYPE_STRING === $k->type) {
+                    $filtered->add($k->toString(), $copy);
+                } elseif (Variable::TYPE_INTEGER === $k->type) {
+                    $filtered->addIndex($k->toInt(), $copy);
+                }
+            }
+            $exportVar = new Variable();
+            $exportVar->array($filtered);
+            $exported = VmJson::export($exportVar, $frame->vmContext, null, $frame);
             if (\is_array($exported)) {
                 $options = $exported;
+            }
+            if (null !== $streamContextOptions) {
+                $options['__phpc_stream_context_options'] = $streamContextOptions;
             }
         }
         VmSoapClient::initObject($receiver, $wsdl, $options, $frame->vmContext);
