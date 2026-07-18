@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\apcu;
+
+use PHPCompiler\ModuleAbstract;
+
+/**
+ * apcu extension module entry (PECL apcu / php-src ext/apcu; #6574).
+ *
+ * PHP-in-PHP in-process user cache — no runtime/*.c growth.
+ */
+class Module extends ModuleAbstract
+{
+    /** PECL APCU_VERSION-style */
+    private const APCU_VERSION = '5.1.24';
+
+    public function getExtensionVersion(): string
+    {
+        return self::APCU_VERSION;
+    }
+
+    public function getFunctions(): array
+    {
+        return [
+            new apcu_store(),
+            new apcu_fetch(),
+            new apcu_delete(),
+            new apcu_clear_cache(),
+            new apcu_exists(),
+            new apcu_cache_info(),
+        ];
+    }
+}
