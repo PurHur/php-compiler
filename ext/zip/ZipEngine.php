@@ -21,7 +21,7 @@ final class ZipEngine
     private const SIG_EOCD = 0x06054b50;
 
     /**
-     * @return array{ok: true, entries: list<array{name: string, data: string, crc: int, size: int, comment?: string}>, comment: string}|array{ok: false, code: int}
+     * @return array{ok: true, entries: list<array{name: string, data: string, crc: int, size: int, comp_size: int, comp_method: int, comment?: string}>, comment: string}|array{ok: false, code: int}
      */
     public static function readArchive(string $path): array
     {
@@ -71,6 +71,7 @@ final class ZipEngine
                 'data' => $fileData,
                 'crc' => (int) $header['crc'],
                 'size' => (int) $header['size'],
+                'comp_size' => (int) $header['compSize'],
                 'mtime' => self::unixFromDos((int) $header['mtime'], (int) $header['mdate']),
                 'comp_method' => $method,
                 'opsys' => ((int) $header['version'] >> 8) & 0xff,
