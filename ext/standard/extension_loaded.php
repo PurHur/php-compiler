@@ -10,7 +10,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** extension_loaded() — registered extension probe (ext/standard/info.c parity, #3204). */
+/**
+ * extension_loaded() — registered extension probe (ext/standard/info.c parity, #3204).
+ *
+ * Z_PARAM_STR $extension — null TypeError on PHP_COMPILER_PROFILE=8.4 (#20254).
+ */
 final class extension_loaded extends Internal
 {
     public function __construct()
@@ -26,7 +30,8 @@ final class extension_loaded extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $name = VmString::stringBuiltinArgForFrame($frame, 0, 'extension_loaded', 0, 'extension');
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20254, ext/standard/info.c).
+        $name = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'extension_loaded', 0, 'extension');
         $frame->returnVar->bool(VmInfo::extension_loaded($name));
     }
 

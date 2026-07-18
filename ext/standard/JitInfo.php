@@ -149,10 +149,34 @@ final class JitInfo
         }
 
         StringVersionCompare::ensureLinked($context);
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20254, ext/standard/versioning.c).
+        // Compile-time null must not continue into __compiler_version_compare after catchable abort.
+        $rejectNull = $context->callerStrictTypes
+            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile();
+        if (
+            $rejectNull
+            && (JITVariable::TYPE_NULL === $ver1->type || ($ver1->isNullConstant ?? false))
+        ) {
+            JitStringBuiltinArg::lowerZparamStr($context, $ver1, 'version_compare', 0, 'version1');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        $ver1Str = JitStringBuiltinArg::lowerZparamStr($context, $ver1, 'version_compare', 0, 'version1');
+        if (
+            $rejectNull
+            && (JITVariable::TYPE_NULL === $ver2->type || ($ver2->isNullConstant ?? false))
+        ) {
+            JitStringBuiltinArg::lowerZparamStr($context, $ver2, 'version_compare', 1, 'version2');
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        $ver2Str = JitStringBuiltinArg::lowerZparamStr($context, $ver2, 'version_compare', 1, 'version2');
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_version_compare'),
-            JitStringBuiltinArg::lower($context, $ver1, 'version_compare', 0, 'version1'),
-            JitStringBuiltinArg::lower($context, $ver2, 'version_compare', 1, 'version2')
+            $ver1Str,
+            $ver2Str
         );
         if (null === $operator) {
             $slot = JitValueBox::alloc($context);
@@ -180,12 +204,27 @@ final class JitInfo
     public static function extension_loaded(Context $context, JITVariable $extension): Value
     {
         StringInfo::ensureLinked($context);
-        $loaded = $context->builder->call(
-            $context->lookupFunction('__compiler_extension_loaded'),
-            JitStringBuiltinArg::lower($context, $extension, 'extension_loaded', 0, 'extension')
-        );
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20254, ext/standard/info.c).
+        $nullExt = JITVariable::TYPE_NULL === $extension->type || ($extension->isNullConstant ?? false);
+        $extStr = JitStringBuiltinArg::lowerZparamStr($context, $extension, 'extension_loaded', 0, 'extension');
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
+        if (
+            $nullExt
+            && (
+                $context->callerStrictTypes
+                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+            )
+        ) {
+            // lowerZparamStr already emitted TypeError+abort; skip runtime call (#20254).
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return $ptr;
+        }
+        $loaded = $context->builder->call(
+            $context->lookupFunction('__compiler_extension_loaded'),
+            $extStr
+        );
         $i32 = $context->getTypeFromString('int32');
         $truthy = $context->builder->icmp(
             Builder::INT_NE,
@@ -227,15 +266,30 @@ final class JitInfo
     public static function get_extension_funcs(Context $context, JITVariable $extension): Value
     {
         StringInfo::ensureLinked($context);
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20254, ext/standard/info.c).
+        $nullExt = JITVariable::TYPE_NULL === $extension->type || ($extension->isNullConstant ?? false);
+        $extStr = JitStringBuiltinArg::lowerZparamStr($context, $extension, 'get_extension_funcs', 0, 'extension_name');
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        if (
+            $nullExt
+            && (
+                $context->callerStrictTypes
+                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+            )
+        ) {
+            // lowerZparamStr already emitted TypeError+abort; skip runtime call (#20254).
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return $ptr;
+        }
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_get_extension_funcs'),
-            JitStringBuiltinArg::lower($context, $extension, 'get_extension_funcs', 0, 'extension_name')
+            $extStr
         );
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $failed = $context->builder->icmp(Builder::INT_EQ, $raw, $htPtr->constNull());
 
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
         $failBlock = BasicBlockHelper::append($context, 'get_extension_funcs_fail');
         $okBlock = BasicBlockHelper::append($context, 'get_extension_funcs_ok');
         $doneBlock = BasicBlockHelper::append($context, 'get_extension_funcs_done');
