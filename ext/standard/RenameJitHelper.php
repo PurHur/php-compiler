@@ -8,15 +8,18 @@ namespace PHPCompiler\ext\standard;
  * rename() for compiled JIT/AOT modules (#15533, php-in-PHP).
  *
  * Kernel path: {@see phpc_rename_kernel}; VM SSOT remains VmFs rename.
+ * Returns int 0/1 (not bool) so NestedJIT return lowering uses __value__readLong
+ * (bool boxes have no readLong arm and always yield 0; see #20603 / HashEquals i32 ABI).
+ * Null-byte checks must not use a PHP NUL-needle string search under NestedJIT
+ * (it constant-folds the true branch and skips phpc_rename_kernel).
  * php-src: ext/standard/filestat.c — php_rename
  */
 final class RenameJitHelper
 {
-    public static function invokeArgv(string $from, string $to): bool
+    /** @return int 1 on success, 0 on failure */
+    public static function invokeArgv(string $from, string $to): int
     {
-        if (str_contains($from, "\0") || str_contains($to, "\0")) {
-            $ok = false;
-        } elseif (null !== VmFsPhpWrapper::renameWarningMessage($from, $to)) {
+        if (null !== VmFsPhpWrapper::renameWarningMessage($from, $to)) {
             $ok = false;
         } else {
             $ok = \phpc_rename_kernel($from, $to);
@@ -34,6 +37,6 @@ final class RenameJitHelper
             );
         }
 
-        return $ok;
+        return $ok ? 1 : 0;
     }
 }

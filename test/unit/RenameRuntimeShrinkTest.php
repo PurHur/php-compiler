@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\RenameJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** rename() JIT: no UserScriptAotDeferNestedJit; thin AOT via JitRenameKernel (#15533, #20028). */
+/** rename() JIT: always RenameJitHelper via JitVmHelperLink — no thin libc fork (#15533, #20603). */
 final class RenameRuntimeShrinkTest extends TestCase
 {
     public function testJitRenameUsesPhpBridgeNotLibc(): void
@@ -19,18 +19,21 @@ final class RenameRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
     }
 
-    public function testStringRenameHasNoUserScriptDeferGate(): void
+    public function testStringRenameAlwaysUsesHelperBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringRename.php');
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('RenameJitHelper', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('JitRenameKernel::invoke', $source);
-        $this->assertStringContainsString('implementLibcBody', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('implementLibcBody', $source);
+        $this->assertStringNotContainsString('VmActiveContextInitLlvm', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('implementUserScriptKernel', $source);
         $this->assertStringNotContainsString("lookupFunction('rename')", $source);
         $this->assertStringNotContainsString('StatCacheRuntime', $source);
+        $this->assertStringNotContainsString('LibcExtern', $source);
     }
 
     public function testStringRenameBridgeUsesRenameJitHelper(): void
@@ -50,14 +53,23 @@ final class RenameRuntimeShrinkTest extends TestCase
         $from = $dir.'/from.txt';
         $to = $dir.'/to.txt';
         $this->assertNotFalse(file_put_contents($from, 'x'));
-        $this->assertTrue(RenameJitHelper::invokeArgv($from, $to));
+        $this->assertSame(1, RenameJitHelper::invokeArgv($from, $to));
         $this->assertFileDoesNotExist($from);
         $this->assertFileExists($to);
-        $this->assertFalse(RenameJitHelper::invokeArgv($from, $to));
-        $this->assertTrue(RenameJitHelper::invokeArgv($to, $from));
+        $this->assertSame(0, RenameJitHelper::invokeArgv($from, $to));
+        $this->assertSame(1, RenameJitHelper::invokeArgv($to, $from));
         $this->assertFileExists($from);
         unlink($from);
         rmdir($dir);
+    }
+
+    public function testRenameJitHelperReturnsIntNotBool(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/RenameJitHelper.php');
+        $this->assertStringContainsString('public static function invokeArgv(string $from, string $to): int', $source);
+        $this->assertStringContainsString('return $ok ? 1 : 0', $source);
+        $this->assertStringContainsString('phpc_rename_kernel', $source);
+        $this->assertStringNotContainsString('str_contains', $source);
     }
 
     public function testSpineBundleIncludesRenameJitHelper(): void

@@ -6,17 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
-use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\ext\standard\JitRenameKernel;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for rename() (#15533, #19215, #20028).
+ * JIT/AOT link for rename() (#15533, #19215, #20028, #20603).
  *
- * Embed / non-thin: {@see RenameJitHelper} via {@see JitVmHelperLink}.
- * Thin standalone AOT main: {@see JitRenameKernel} libc body (#19966 FilePutContents shape).
+ * Embed + thin standalone AOT: {@see RenameJitHelper} via {@see JitVmHelperLink}
+ * (Unlink #19186 / HashEquals #20469 shape — no thin libc ABI fork).
+ * Helper returns int 0/1 (coerced to i1); Nested helper compile uses {@see JitRenameKernel}.
  * php-src: ext/standard/filestat.c — php_rename
  */
 final class StringRename
@@ -34,8 +33,6 @@ final class StringRename
 
     private const BRIDGE_ENTRY = 'rename_bridge_entry';
 
-    private const LIBC_ENTRY = 'rename_libc_entry';
-
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -48,6 +45,11 @@ final class StringRename
 
     public static function invoke(Context $context, Value $from, Value $to): Value
     {
+        // Nested helper compile: libc leaf without re-entering RenameJitHelper (#17279 / MathFpow).
+        if (NestedJitCompileScope::isActive()) {
+            return JitRenameKernel::invoke($context, $from, $to);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call($context->lookupFunction(self::ABI), $from, $to);
@@ -60,20 +62,15 @@ final class StringRename
         }
 
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
-            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::LIBC_ENTRY)) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI, $probe);
 
             return;
         }
 
-        if ($context->isThinStandaloneAotMain()) {
-            self::implementLibcBody($context, $probe);
-
-            return;
-        }
-
         $strPtr = $context->getTypeFromString('__string__*');
+        // ABI stays i1 for rename() callers; helper returns int 0/1 so NestedJIT
+        // uses readLong (bool boxes have no readLong arm — always 0; #20603).
         $i1 = $context->getTypeFromString('int1');
         JitVmHelperLink::ensureBridge(
             $context,
@@ -84,39 +81,7 @@ final class StringRename
             self::INVOKE_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#20028'
+            '#20603'
         );
-    }
-
-    private static function implementLibcBody(Context $context, ?LlvmFunction $probe): void
-    {
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        LibcExtern::register($context);
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i1 = $context->getTypeFromString('int1');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($i1, false, $strPtr, $strPtr)
-            );
-
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::LIBC_ENTRY);
-        $context->builder->positionAtEnd($entry);
-        $ok = JitRenameKernel::invoke($context, $fn->getParam(0), $fn->getParam(1));
-        $context->builder->returnValue($ok);
-        $context->registerFunction(self::ABI, $fn);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 }
