@@ -15,6 +15,7 @@ use PHPCompiler\ext\standard\VmStreamArg;
  * Phase 1–3: arithmetic + bit ops.
  * Phase 4: seedable random + import/export — no runtime/*.c growth.
  * Phase 5: prime / bit-index / number-theory (#20394, re-#19540) — no runtime/*.c growth.
+ * Phase 5b: gmp_binomial (#20519) — no runtime/*.c growth.
  * PROFILE=8.4: null init/operand TypeError (stub int|string; #20210).
  */
 final class VmGmp
@@ -417,6 +418,78 @@ final class VmGmp
         }
 
         return $result;
+    }
+
+    /**
+     * Binomial coefficient C(n, k) — php-src gmp.c mpz_bin_ui / mpz_bin_uiui (#20519).
+     *
+     * Multiplicative product stays exact for integer n and k >= 0 (including negative n).
+     */
+    public static function binomial(string $n, int $k): string
+    {
+        if ($k < 0) {
+            throw new \ValueError('gmp_binomial(): Argument #2 ($k) must be greater than or equal to 0');
+        }
+        if (0 === $k) {
+            return '1';
+        }
+        $nNorm = self::normalizeSignedDecimal($n);
+        if (self::cmp($nNorm, '0') >= 0) {
+            if (self::cmp($nNorm, (string) $k) < 0) {
+                return '0';
+            }
+            // C(n,k) == C(n, n-k); shrink loop when k is large.
+            $nMinusK = self::sub($nNorm, (string) $k);
+            if (self::cmp((string) $k, $nMinusK) > 0) {
+                if (self::cmp($nMinusK, (string) \PHP_INT_MAX) > 0) {
+                    throw new \ValueError('gmp_binomial(): Argument #2 ($k) is too large in this compiler build');
+                }
+                $k = (int) $nMinusK;
+                if (0 === $k) {
+                    return '1';
+                }
+            }
+        }
+
+        $result = '1';
+        for ($i = 1; $i <= $k; ++$i) {
+            $term = self::sub($nNorm, (string) ($k - $i));
+            $result = self::divQ(self::mul($result, $term), (string) $i);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Z_PARAM_LONG $k for gmp_binomial (php-src "zl"; same coercion shape as gmp_pow $exponent).
+     *
+     * @throws \TypeError
+     */
+    public static function coerceBinomialK(Variable $var): int
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $resolved->type) {
+            return $resolved->toInt();
+        }
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return 0;
+        }
+        if (Variable::TYPE_STRING === $resolved->type) {
+            $raw = trim($resolved->toString());
+            if ('' === $raw || !preg_match('/^[+-]?[0-9]+$/', $raw)) {
+                throw new \TypeError('gmp_binomial(): Argument #2 ($k) must be of type int, string given');
+            }
+            if (self::cmp($raw, (string) \PHP_INT_MAX) > 0 || self::cmp($raw, (string) \PHP_INT_MIN) < 0) {
+                throw new \TypeError('gmp_binomial(): Argument #2 ($k) must be of type int, string given');
+            }
+
+            return (int) $raw;
+        }
+
+        throw new \TypeError(\sprintf(
+            'gmp_binomial(): Argument #2 ($k) must be of type int, %s given',
+            VmStreamArg::debugTypeName($resolved)
+        ));
     }
 
     public static function gcd(string $left, string $right): string
