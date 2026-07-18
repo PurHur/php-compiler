@@ -1074,3 +1074,178 @@ final class ZipArchiveSetEncryptionIndex extends ZipClassMethod
         return $var->toString();
     }
 }
+
+/**
+ * ZipArchive::setCommentName(string $name, string $comment) — (#20386).
+ */
+final class ZipArchiveSetCommentName extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setCommentName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setCommentName()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::setCommentName() expects exactly 2 arguments, %d given',
+                \count($frame->calledArgs) - 1
+            ));
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::setCommentName', 1, 'name');
+        $comment = $this->stringArg($frame->calledArgs[2], 'ZipArchive::setCommentName', 2, 'comment');
+        $ok = VmZipArchive::setCommentName($receiver, $name, $comment);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::setCommentIndex(int $index, string $comment) — (#20386).
+ */
+final class ZipArchiveSetCommentIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setCommentIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setCommentIndex()');
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::setCommentIndex() expects exactly 2 arguments, %d given',
+                \count($frame->calledArgs) - 1
+            ));
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::setCommentIndex', 1, 'index');
+        $comment = $this->stringArg($frame->calledArgs[2], 'ZipArchive::setCommentIndex', 2, 'comment');
+        $ok = VmZipArchive::setCommentIndex($receiver, $index, $comment);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::getCommentName(string $name, int $flags = 0) — (#20386).
+ */
+final class ZipArchiveGetCommentName extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getCommentName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::getCommentName()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::getCommentName() expects at least 1 argument, 0 given');
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::getCommentName', 1, 'name');
+        $flags = \count($frame->calledArgs) >= 3
+            ? $this->intArg($frame->calledArgs[2], 'ZipArchive::getCommentName', 2, 'flags')
+            : 0;
+        $result = VmZipArchive::getCommentName($receiver, $name, $flags);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+}
+
+/**
+ * ZipArchive::getCommentIndex(int $index, int $flags = 0) — (#20386).
+ */
+final class ZipArchiveGetCommentIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getCommentIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::getCommentIndex()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::getCommentIndex() expects at least 1 argument, 0 given');
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::getCommentIndex', 1, 'index');
+        $flags = \count($frame->calledArgs) >= 3
+            ? $this->intArg($frame->calledArgs[2], 'ZipArchive::getCommentIndex', 2, 'flags')
+            : 0;
+        $result = VmZipArchive::getCommentIndex($receiver, $index, $flags);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+}
+
+/**
+ * ZipArchive::setArchiveComment(string $comment) — (#20386).
+ */
+final class ZipArchiveSetArchiveComment extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setArchiveComment');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setArchiveComment()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::setArchiveComment() expects exactly 1 argument, 0 given');
+        }
+        $comment = $this->stringArg($frame->calledArgs[1], 'ZipArchive::setArchiveComment', 1, 'comment');
+        $ok = VmZipArchive::setArchiveComment($receiver, $comment);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::getArchiveComment(int $flags = 0) — (#20386).
+ */
+final class ZipArchiveGetArchiveComment extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getArchiveComment');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::getArchiveComment()');
+        $flags = \count($frame->calledArgs) >= 2
+            ? $this->intArg($frame->calledArgs[1], 'ZipArchive::getArchiveComment', 1, 'flags')
+            : 0;
+        $result = VmZipArchive::getArchiveComment($receiver, $flags);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+}

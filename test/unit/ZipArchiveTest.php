@@ -66,6 +66,13 @@ final class ZipArchiveTest extends TestCase
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getstreamname'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'clearerror'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setencryptionindex'));
+        // entry / archive comments (#20386)
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setcommentname'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setcommentindex'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getcommentname'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getcommentindex'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setarchivecomment'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getarchivecomment'));
 
         $entry = $ctx->classes['ziparchive'];
         self::assertContains('countable', $entry->interfaces);

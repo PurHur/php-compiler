@@ -21,7 +21,7 @@ final class ZipEngine
     private const SIG_EOCD = 0x06054b50;
 
     /**
-     * @return array{ok: true, entries: list<array{name: string, data: string, crc: int, size: int}>}|array{ok: false, code: int}
+     * @return array{ok: true, entries: list<array{name: string, data: string, crc: int, size: int, comment?: string}>, comment: string}|array{ok: false, code: int}
      */
     public static function readArchive(string $path): array
     {
@@ -33,7 +33,7 @@ final class ZipEngine
             return ['ok' => false, 'code' => ZipArchiveConstants::ER_READ];
         }
         if ('' === $data) {
-            return ['ok' => true, 'entries' => []];
+            return ['ok' => true, 'entries' => [], 'comment' => ''];
         }
 
         $eocd = self::findEocd($data);
@@ -56,6 +56,7 @@ final class ZipEngine
             $extraLen = (int) $header['extraLen'];
             $commentLen = (int) $header['commentLen'];
             $name = substr($data, $offset + 46, $nameLen);
+            $fileComment = substr($data, $offset + 46 + $nameLen + $extraLen, $commentLen);
             $method = (int) $header['method'];
             if (0 !== $method) {
                 return ['ok' => false, 'code' => ZipArchiveConstants::ER_COMPNOTSUPP];
@@ -65,7 +66,7 @@ final class ZipEngine
             if (null === $fileData) {
                 return ['ok' => false, 'code' => ZipArchiveConstants::ER_INCONS];
             }
-            $entries[] = [
+            $row = [
                 'name' => $name,
                 'data' => $fileData,
                 'crc' => (int) $header['crc'],
@@ -75,10 +76,14 @@ final class ZipEngine
                 'opsys' => ((int) $header['version'] >> 8) & 0xff,
                 'external_attr' => (int) $header['extAttr'],
             ];
+            if ('' !== $fileComment) {
+                $row['comment'] = $fileComment;
+            }
+            $entries[] = $row;
             $offset += 46 + $nameLen + $extraLen + $commentLen;
         }
 
-        return ['ok' => true, 'entries' => $entries];
+        return ['ok' => true, 'entries' => $entries, 'comment' => $eocd['comment']];
     }
 
     /**
@@ -89,12 +94,13 @@ final class ZipEngine
      *     size: int,
      *     mtime?: int,
      *     opsys?: int,
-     *     external_attr?: int
+     *     external_attr?: int,
+     *     comment?: string
      * }> $entries
      */
-    public static function writeArchive(string $path, array $entries): bool
+    public static function writeArchive(string $path, array $entries, string $archiveComment = ''): bool
     {
-        $binary = self::buildArchive($entries);
+        $binary = self::buildArchive($entries, $archiveComment);
 
         return false !== VmFsWriteNative::write($path, $binary);
     }
@@ -107,17 +113,25 @@ final class ZipEngine
      *     size: int,
      *     mtime?: int,
      *     opsys?: int,
-     *     external_attr?: int
+     *     external_attr?: int,
+     *     comment?: string
      * }> $entries
      */
-    public static function buildArchive(array $entries): string
+    public static function buildArchive(array $entries, string $archiveComment = ''): string
     {
+        if (strlen($archiveComment) > 0xffff) {
+            $archiveComment = substr($archiveComment, 0, 0xffff);
+        }
         $local = '';
         $central = '';
         $offset = 0;
         foreach ($entries as $entry) {
             $name = $entry['name'];
             $data = $entry['data'];
+            $comment = (string) ($entry['comment'] ?? '');
+            if (strlen($comment) > 0xffff) {
+                $comment = substr($comment, 0, 0xffff);
+            }
             $size = strlen($data);
             $crc = self::crc32Unsigned($data);
             $mtime = (int) ($entry['mtime'] ?? time());
@@ -156,13 +170,13 @@ final class ZipEngine
                 $size,
                 strlen($name),
                 0,
-                0,
+                strlen($comment),
                 0,
                 0,
                 $extAttr,
                 $offset
             );
-            $central .= $centralHeader . $name;
+            $central .= $centralHeader . $name . $comment;
             $offset += strlen($chunk);
         }
 
@@ -176,14 +190,14 @@ final class ZipEngine
             count($entries),
             $cdSize,
             strlen($local),
-            0
+            strlen($archiveComment)
         );
 
-        return $local . $central . $eocd;
+        return $local . $central . $eocd . $archiveComment;
     }
 
     /**
-     * @return array{cdCount: int, cdOffset: int}|null
+     * @return array{cdCount: int, cdOffset: int, comment: string}|null
      */
     private static function findEocd(string $data): ?array
     {
@@ -197,10 +211,15 @@ final class ZipEngine
                 if (!is_array($fields)) {
                     return null;
                 }
+                $commentLen = (int) $fields['commentLen'];
+                if ($pos + 22 + $commentLen > $len) {
+                    return null;
+                }
 
                 return [
                     'cdCount' => (int) $fields['cdCount'],
                     'cdOffset' => (int) $fields['cdOffset'],
+                    'comment' => substr($data, $pos + 22, $commentLen),
                 ];
             }
         }
