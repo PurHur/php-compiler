@@ -1,7 +1,7 @@
 --TEST--
-stdlib hebrevc() — removed in php-src 8.0; phantom on 8.2 reference (#20354, #17206)
+stdlib hebrevc() — not registered under PROFILE=8.4 (removed php-src 8.0, #20354)
 --ENV--
-PHP_COMPILER_PROFILE=8.2
+PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
 echo function_exists('hebrevc') ? "fail\n" : "ok\n";
