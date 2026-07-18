@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -33,7 +34,8 @@ final class method_exists_ extends Internal
             ));
         }
         $ctx = VmReflection::requireContext($frame);
-        $method = VmReflection::stringArg($frame->calledArgs[1], 'method_exists() method name', 1);
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20360, zend_builtin_functions.c).
+        $method = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'method_exists', 1, 'method');
         $exists = VmReflection::methodExists($ctx, $frame->calledArgs[0], $method);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);
@@ -49,6 +51,8 @@ final class method_exists_ extends Internal
                 $argc
             ));
         }
+        // Z_PARAM_STR method — null TypeError on 8.4 forward profile (#20360).
+        self::jitMethodNameArg($context, $args[1]);
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             self::emitJitTypeErrorAndAbort($context, \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'null'));
             $i1 = $context->getTypeFromString('int1');
@@ -70,11 +74,29 @@ final class method_exists_ extends Internal
         if (JITVariable::TYPE_STRING === $args[0]->type) {
             $this->jitString($context, $args[0], 'method_exists() class name');
         }
-        if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
-            $this->jitString($context, $args[1], 'method_exists() method name');
-        }
 
         return JitMethodExists::invoke($context, $args[0], $args[1]);
+    }
+
+    private static function jitMethodNameArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'method_exists',
+                1,
+                'method'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'method_exists',
+            1,
+            'method'
+        );
     }
 
     private static function emitJitTypeErrorAndAbort(Context $context, string $message): void

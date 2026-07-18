@@ -12,12 +12,14 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for function_exists() (issue #1216, #16424). */
+/** LLVM lowering for function_exists() (issue #1216, #16424, #20360). */
 final class JitFunctionExists
 {
     public static function invoke(Context $context, JITVariable $nameArg): Value
     {
         $i1 = $context->getTypeFromString('int1');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20360, zend_builtin_functions.c).
+        $nameStr = self::jitNameArg($context, $nameArg);
         $literal = JitStringArg::compileTimeLiteral($nameArg);
         if (null !== $literal) {
             $literal = VmReflection::normalizeGlobalIntrospectionName($literal);
@@ -32,9 +34,29 @@ final class JitFunctionExists
             );
         }
 
-        $nameStr = JitStringBuiltinArg::lower($context, $nameArg, 'function_exists', 0, 'function');
         $nameStr = GlobalIntrospectionNameRuntime::normalizeString($context, $nameStr);
 
         return StringFunctionExists::invoke($context, $nameStr);
+    }
+
+    private static function jitNameArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'function_exists',
+                0,
+                'function'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'function_exists',
+            0,
+            'function'
+        );
     }
 }
