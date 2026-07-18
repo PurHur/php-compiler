@@ -9,13 +9,12 @@ use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\ext\standard\JitNextafterKernel;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for nextafter() via NextafterJitHelper PHP (#15062, #19259, #20034).
+ * JIT/AOT link for nextafter() via NextafterJitHelper PHP (#15062, #19259, #20034, #20664).
  *
- * Embed / non-thin: {@see NextafterJitHelper} via {@see JitVmHelperLink}.
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20011): {@see JitNextafterKernel} libc.
+ * Embed + thin standalone AOT: {@see NextafterJitHelper} via {@see JitVmHelperLink}
+ * (Rename #20603 shape — no thin libc ABI fork; double results via {@see JitNestedHelperCoerce::extractDoubleFromHelperResult}).
  * Nested helper compile: libc leaf without re-entering NextafterJitHelper.
  * php-src: ext/standard/math.c — PHP_FUNCTION(nextafter)
  */
@@ -33,8 +32,6 @@ final class MathNextafter
     ];
 
     private const BRIDGE_ENTRY = 'nextafter_bridge_entry';
-
-    private const KERNEL_ENTRY = 'nextafter_kernel_entry';
 
     public static function ensureLinked(Context $context): void
     {
@@ -68,15 +65,8 @@ final class MathNextafter
         }
 
         $probe = $context->module->getNamedFunction(self::ABI_NEXTAFTER);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
-            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             $context->registerFunction(self::ABI_NEXTAFTER, $probe);
-
-            return;
-        }
-
-        if ($context->isThinStandaloneAotMain()) {
-            self::implementKernelBody($context, $probe);
 
             return;
         }
@@ -91,36 +81,7 @@ final class MathNextafter
             self::NEXTAFTER_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#20034'
+            '#20664'
         );
-    }
-
-    private static function implementKernelBody(Context $context, ?LlvmFunction $probe): void
-    {
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        $double = $context->getTypeFromString('double');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI_NEXTAFTER,
-                $context->context->functionType($double, false, $double, $double)
-            );
-
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::KERNEL_ENTRY);
-        $context->builder->positionAtEnd($entry);
-        $result = JitNextafterKernel::invoke($context, $fn->getParam(0), $fn->getParam(1));
-        $context->builder->returnValue($result);
-        $context->registerFunction(self::ABI_NEXTAFTER, $fn);
-
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 }

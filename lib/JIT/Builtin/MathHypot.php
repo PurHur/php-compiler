@@ -6,13 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\ext\standard\JitHypotKernel;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for hypot() via HypotJitHelper PHP (#15074).
+ * JIT/AOT link for hypot() via HypotJitHelper PHP (#15074, #20664).
  *
- * Replaces libc `hypot` LLVM lookup in ext/standard/hypot.php.
- * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * Embed + thin standalone AOT: {@see HypotJitHelper} via {@see JitVmHelperLink}
+ * (Rename #20603 shape — double via {@see JitNestedHelperCoerce::extractDoubleFromHelperResult}).
+ * Nested helper compile: libc leaf without re-entering HypotJitHelper.
  * php-src: ext/standard/math.c — PHP_FUNCTION(hypot)
  */
 final class MathHypot
@@ -28,6 +31,8 @@ final class MathHypot
         self::HYPOT_HELPER,
     ];
 
+    private const BRIDGE_ENTRY = 'hypot_bridge_entry';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -40,6 +45,10 @@ final class MathHypot
 
     public static function invoke(Context $context, Value $x, Value $y): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return JitHypotKernel::invoke($context, $x, $y);
+        }
+
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -51,17 +60,28 @@ final class MathHypot
 
     private static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        $probe = $context->module->getNamedFunction(self::ABI_HYPOT);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
+            $context->registerFunction(self::ABI_HYPOT, $probe);
+
+            return;
+        }
+
         $double = $context->getTypeFromString('double');
         JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_HYPOT,
-            'hypot_bridge_entry',
+            self::BRIDGE_ENTRY,
             [$double, $double],
             $double,
             self::HYPOT_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#15074'
+            '#20664'
         );
     }
 }

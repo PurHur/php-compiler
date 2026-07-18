@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\FpowJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** fpow()/pow float JIT: PHP helper for embed; thin libc via isThinStandaloneAotMain (#15189, #20034). */
+/** fpow()/pow float JIT: always FpowJitHelper via JitVmHelperLink — no thin libc fork (#15189, #20664). */
 final class FpowRuntimeShrinkTest extends TestCase
 {
     public function testFpowUsesJitHelperNotLibcPow(): void
@@ -22,19 +22,32 @@ final class FpowRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('invokeLibc', $jitPow);
     }
 
-    public function testMathFpowThinKernelAndEmbedHelper(): void
+    public function testMathFpowAlwaysUsesHelperBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathFpow.php');
         $this->assertStringContainsString('JitFpowKernel', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('implementKernelBody', $source);
+        $this->assertStringNotContainsString('fpow_kernel_entry', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('FpowJitHelper', $source);
-        $this->assertStringContainsString('fpow_kernel_entry', $source);
         $this->assertStringNotContainsString('invokeLibcPow', $source);
         $this->assertStringNotContainsString("lookupFunction('pow')", $source);
         $this->assertStringNotContainsString("addFunction('pow'", $source);
         $this->assertStringNotContainsString('addFunction($abiName', $source);
+    }
+
+    public function testNestedHelperCoerceExtractsDoubleFromHelperResult(): void
+    {
+        $coerce = (string) file_get_contents(__DIR__.'/../../lib/JIT/JitNestedHelperCoerce.php');
+        $this->assertStringContainsString('extractDoubleFromHelperResult', $coerce);
+        $this->assertStringContainsString('__value__readDouble', $coerce);
+        $this->assertMatchesRegularExpression(
+            '/function coerceBridgeResult\(.*?extractDoubleFromHelperResult/s',
+            $coerce
+        );
     }
 
     public function testFpowJitHelperDelegatesToKernel(): void
