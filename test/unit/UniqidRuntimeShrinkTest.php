@@ -20,6 +20,8 @@ final class UniqidRuntimeShrinkTest extends TestCase
         $uniqid = (string) file_get_contents(__DIR__.'/../../ext/standard/uniqid.php');
         $this->assertStringContainsString('StringUniqid::ensureLinked', $uniqid);
         $this->assertStringContainsString('__compiler_uniqid', $uniqid);
+        $this->assertStringContainsString('coerceZparamStrBuiltinArg', $uniqid);
+        $this->assertStringContainsString('lowerZparamStr', $uniqid);
         $this->assertStringNotContainsString('JitUniqid', $uniqid);
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUniqid.php');
