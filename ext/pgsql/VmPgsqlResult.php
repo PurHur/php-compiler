@@ -62,6 +62,16 @@ final class VmPgsqlResult
         return self::$state[$object->id]['native'];
     }
 
+    /** Native handle or null when already freed (php-src pg_result_error*; #20720). */
+    public static function nativeOrNull(ObjectEntry $object): ?\FFI\CData
+    {
+        if (!isset(self::$state[$object->id]) || self::$state[$object->id]['closed']) {
+            return null;
+        }
+
+        return self::$state[$object->id]['native'];
+    }
+
     public static function connection(ObjectEntry $object): ?ObjectEntry
     {
         return self::$state[$object->id]['conn'] ?? null;

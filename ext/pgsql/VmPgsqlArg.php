@@ -45,6 +45,22 @@ final class VmPgsqlArg
 
     public static function requireResult(Variable $var, string $functionName, int $argNum): ObjectEntry
     {
+        $object = self::requireResultObject($var, $functionName, $argNum);
+        if (!VmPgsqlResult::isLive($object)) {
+            throw new \TypeError(\sprintf(
+                '%s(): supplied resource is not a valid PostgreSQL result resource',
+                $functionName
+            ));
+        }
+
+        return $object;
+    }
+
+    /**
+     * PgSql\Result object without live-handle check (php-src pg_result_error*; #20720).
+     */
+    public static function requireResultObject(Variable $var, string $functionName, int $argNum): ObjectEntry
+    {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
             throw new \TypeError(\sprintf(
@@ -62,12 +78,6 @@ final class VmPgsqlArg
                 $functionName,
                 $argNum,
                 $object->class->name
-            ));
-        }
-        if (!VmPgsqlResult::isLive($object)) {
-            throw new \TypeError(\sprintf(
-                '%s(): supplied resource is not a valid PostgreSQL result resource',
-                $functionName
             ));
         }
 

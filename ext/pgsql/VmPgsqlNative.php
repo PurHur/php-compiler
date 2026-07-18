@@ -574,6 +574,33 @@ final class VmPgsqlNative
         return (int) $raw;
     }
 
+    /** PQresultErrorMessage (php-src pg_result_error; #20720). */
+    public static function resultErrorMessage(\FFI\CData $result): string
+    {
+        return self::ffiString(self::requireFfi()->PQresultErrorMessage($result));
+    }
+
+    /**
+     * PQresultErrorField — null when field absent (#20720).
+     *
+     * @return string|null
+     */
+    public static function resultErrorField(\FFI\CData $result, int $fieldcode): ?string
+    {
+        $ptr = self::requireFfi()->PQresultErrorField($result, $fieldcode);
+        if (null === $ptr) {
+            return null;
+        }
+
+        return self::ffiString($ptr);
+    }
+
+    /** PQoidValue — InvalidOid (0) when none (#20720). */
+    public static function oidValue(\FFI\CData $result): int
+    {
+        return (int) self::requireFfi()->PQoidValue($result);
+    }
+
     /**
      * Shared PQexecParams / PQexecPrepared param marshalling (#20661).
      *
@@ -909,6 +936,9 @@ PGresult *PQexecParams(PGconn *conn, const char *command, int nParams, const Oid
 PGresult *PQprepare(PGconn *conn, const char *stmtName, const char *query, int nParams, const Oid *paramTypes);
 PGresult *PQexecPrepared(PGconn *conn, const char *stmtName, int nParams, const char **paramValues, const int *paramLengths, const int *paramFormats, int resultFormat);
 char *PQcmdTuples(const PGresult *res);
+char *PQresultErrorMessage(const PGresult *res);
+char *PQresultErrorField(const PGresult *res, int fieldcode);
+Oid PQoidValue(const PGresult *res);
 void PQfreemem(void *ptr);
 void PQtrace(PGconn *conn, FILE *stream);
 void PQuntrace(PGconn *conn);
