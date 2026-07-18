@@ -26,12 +26,18 @@ final class VmPDO
 {
     public const CLASS_LC = 'pdo';
 
+    public const SQLITE_CLASS_LC = 'pdo\\sqlite';
+
+    public const SQLITE_CLASS_NAME = 'Pdo\\Sqlite';
+
     /** @var array<int, PdoState> */
     private static array $store = [];
 
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['exec'])) {
+            self::registerSqliteSubclass($ctx);
+
             return;
         }
 
@@ -63,6 +69,7 @@ final class VmPDO
             'setattribute' => new PDOSetAttribute(),
             'getattribute' => new PDOGetAttribute(),
             'getavailabledrivers' => new PDOGetAvailableDrivers(),
+            'connect' => new PDOConnect(),
             'lastinsertid' => new PDOLastInsertId(),
             'quote' => new PDOQuote(),
             'begintransaction' => new PDOBeginTransaction(),
@@ -90,8 +97,56 @@ final class VmPDO
         $entry->methodNames['sqlitecreatefunction'] = 'sqliteCreateFunction';
         $entry->methodNames['sqlitecreateaggregate'] = 'sqliteCreateAggregate';
         $entry->methodVisibility['getavailabledrivers'] = CfgFunc::FLAG_STATIC | $pub;
+        $entry->methodVisibility['connect'] = CfgFunc::FLAG_STATIC | $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
+        self::registerSqliteSubclass($ctx);
+    }
+
+    /**
+     * PHP 8.4 driver-specific subclass (php-src ext/pdo_sqlite/pdo_sqlite.stub.php; #20529).
+     */
+    public static function registerSqliteSubclass(Context $ctx): void
+    {
+        if (!PdoExtensionPolicy::advertisesSqliteDriver()) {
+            return;
+        }
+        if (isset($ctx->classes[self::SQLITE_CLASS_LC])) {
+            return;
+        }
+        if (!isset($ctx->classes[self::CLASS_LC])) {
+            return;
+        }
+        $sqlite = new ClassEntry(self::SQLITE_CLASS_NAME);
+        $sqlite->isInternal = true;
+        $sqlite->parentLc = self::CLASS_LC;
+        $ctx->classes[self::SQLITE_CLASS_LC] = $sqlite;
+    }
+
+    public static function isPdoFamily(ClassEntry $class): bool
+    {
+        $lc = \strtolower($class->name);
+        if (self::CLASS_LC === $lc || self::SQLITE_CLASS_LC === $lc) {
+            return true;
+        }
+
+        return self::CLASS_LC === ($class->parentLc ?? '');
+    }
+
+    /**
+     * Allocate and open a PDO (or Pdo\Sqlite) handle from a DSN (#20529).
+     */
+    public static function connect(Context $ctx, string $dsn): ObjectEntry
+    {
+        $filename = self::parseSqliteDsn($dsn);
+        $class = $ctx->classes[self::SQLITE_CLASS_LC] ?? $ctx->classes[self::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('PDO is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        self::initObject($entry, $filename);
+
+        return $entry;
     }
 
     /**
@@ -301,7 +356,7 @@ final class PDOConstruct extends PdoClassMethod
             throw new \ArgumentCountError('PDO::__construct() expects at least 1 argument, 0 given');
         }
         $receiver = $this->receiver($frame, 'PDO::__construct()');
-        if (VmPDO::CLASS_LC !== strtolower($receiver->class->name)) {
+        if (!VmPDO::isPdoFamily($receiver->class)) {
             throw new \TypeError('PDO::__construct() must be called on PDO');
         }
         if ($receiver->constructed) {
@@ -311,6 +366,46 @@ final class PDOConstruct extends PdoClassMethod
         // username/password/options ignored for sqlite subset.
         $filename = VmPDO::parseSqliteDsn($dsn);
         VmPDO::initObject($receiver, $filename);
+    }
+}
+
+/** PDO::connect() — PHP 8.4 driver-specific factory (php-src ext/pdo/pdo_dbh.c; #20529). */
+final class PDOConnect extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('connect');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        // Static call: user args only (no $this). Guard if an instance somehow prepends self.
+        $argOffset = 0;
+        if ($argc >= 1) {
+            $maybeThis = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $maybeThis->type
+                && VmPDO::isPdoFamily($maybeThis->toObject()->class)
+            ) {
+                $argOffset = 1;
+            }
+        }
+        $userArgc = $argc - $argOffset;
+        if ($userArgc < 1) {
+            throw new \ArgumentCountError(
+                'PDO::connect() expects at least 1 argument, '.$userArgc.' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('PDO::connect() requires a VM context');
+        }
+        $dsn = $this->stringArg($frame->calledArgs[$argOffset], 'PDO::connect', 0, 'dsn');
+        // username/password/options ignored for sqlite subset (same as __construct).
+        $frame->returnVar->object(VmPDO::connect($ctx, $dsn));
     }
 }
 
