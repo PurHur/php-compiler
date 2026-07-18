@@ -472,6 +472,99 @@ final class VmGd
     }
 
     /**
+     * Fill polygon via gdImageFilledPolygon scanline (php-src ext/gd/libgd/gd.c; #20448).
+     *
+     * @param list<array{0: int, 1: int}> $points
+     */
+    public static function filledPolygon(ObjectEntry $image, array $points, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $n = \count($points);
+        if ($n <= 0) {
+            return true;
+        }
+
+        $miny = $points[0][1];
+        $maxy = $points[0][1];
+        for ($i = 1; $i < $n; ++$i) {
+            $py = $points[$i][1];
+            if ($py < $miny) {
+                $miny = $py;
+            }
+            if ($py > $maxy) {
+                $maxy = $py;
+            }
+        }
+
+        // Horizontal line special case (libgd gdImageFilledPolygon).
+        if ($n > 1 && $miny === $maxy) {
+            $x1 = $points[0][0];
+            $x2 = $points[0][0];
+            for ($i = 1; $i < $n; ++$i) {
+                $px = $points[$i][0];
+                if ($px < $x1) {
+                    $x1 = $px;
+                } elseif ($px > $x2) {
+                    $x2 = $px;
+                }
+            }
+            self::line($image, $x1, $miny, $x2, $miny, $color);
+
+            return true;
+        }
+
+        $pmaxy = $maxy;
+        if ($miny < 0) {
+            $miny = 0;
+        }
+        if ($maxy >= $state->height) {
+            $maxy = $state->height - 1;
+        }
+
+        for ($y = $miny; $y <= $maxy; ++$y) {
+            $ints = [];
+            for ($i = 0; $i < $n; ++$i) {
+                if (0 === $i) {
+                    $ind1 = $n - 1;
+                    $ind2 = 0;
+                } else {
+                    $ind1 = $i - 1;
+                    $ind2 = $i;
+                }
+                $y1 = $points[$ind1][1];
+                $y2 = $points[$ind2][1];
+                if ($y1 < $y2) {
+                    $x1 = $points[$ind1][0];
+                    $x2 = $points[$ind2][0];
+                } elseif ($y1 > $y2) {
+                    $y2 = $points[$ind1][1];
+                    $y1 = $points[$ind2][1];
+                    $x2 = $points[$ind1][0];
+                    $x1 = $points[$ind2][0];
+                } else {
+                    continue;
+                }
+                // Float intermediate + 0.5 so stroke/fill share footprint (libgd comment).
+                if ($y >= $y1 && $y < $y2) {
+                    $ints[] = (int) (((float) (($y - $y1) * ($x2 - $x1))) / (float) ($y2 - $y1) + 0.5 + $x1);
+                } elseif ($y === $pmaxy && $y === $y2) {
+                    $ints[] = $x2;
+                }
+            }
+            \sort($ints, \SORT_NUMERIC);
+            $count = \count($ints);
+            for ($i = 0; $i < $count - 1; $i += 2) {
+                self::line($image, $ints[$i], $y, $ints[$i + 1], $y, $color);
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Parse image*polygon() args (php-src ext/gd/gd.c php_imagepolygon; #20431).
      *
      * @return array{0: list<array{0: int, 1: int}>, 1: int}
@@ -3282,7 +3375,7 @@ final class VmGd
                 3 => 'resolution_y',
                 default => 'arg',
             },
-            'imagepolygon', 'imageopenpolygon' => match ($position) {
+            'imagepolygon', 'imageopenpolygon', 'imagefilledpolygon' => match ($position) {
                 1 => 'image',
                 2 => 'points',
                 3 => 'num_points_or_color',
