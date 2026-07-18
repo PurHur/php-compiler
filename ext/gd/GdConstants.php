@@ -33,5 +33,31 @@ final class GdConstants
         'IMG_CROP_WHITE' => 3,
         'IMG_CROP_SIDES' => 4,
         'IMG_CROP_THRESHOLD' => 5,
+        // gdInterpolationMethod (php-src ext/gd/libgd/gd.h; #20405)
+        'IMG_DEFAULT' => 0,
+        'IMG_BELL' => 1,
+        'IMG_BESSEL' => 2,
+        'IMG_BILINEAR_FIXED' => 3,
+        'IMG_BICUBIC' => 4,
+        'IMG_BICUBIC_FIXED' => 5,
+        'IMG_BLACKMAN' => 6,
+        'IMG_BOX' => 7,
+        'IMG_BSPLINE' => 8,
+        'IMG_CATMULLROM' => 9,
+        'IMG_GAUSSIAN' => 10,
+        'IMG_GENERALIZED_CUBIC' => 11,
+        'IMG_HERMITE' => 12,
+        'IMG_HAMMING' => 13,
+        'IMG_HANNING' => 14,
+        'IMG_MITCHELL' => 15,
+        'IMG_NEAREST_NEIGHBOUR' => 16,
+        'IMG_POWER' => 17,
+        'IMG_QUADRATIC' => 18,
+        'IMG_SINC' => 19,
+        'IMG_TRIANGLE' => 20,
+        'IMG_WEIGHTED4' => 21,
     ];
+
+    /** GD_METHOD_COUNT — exclusive upper bound for imagescale() $mode (#20405). */
+    public const INTERPOLATION_METHOD_COUNT = 22;
 }
