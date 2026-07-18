@@ -14,15 +14,30 @@ use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 
 /**
- * Minimal CurlHandle stubs for CURLOPT_SHARE attachment (php-src ext/curl/interface.c; #6322).
- *
- * HTTP I/O remains #3325; this tracks share association only.
+ * CurlHandle easy API — libcurl FFI via {@see VmCurlNative} (php-src ext/curl/interface.c; #3325).
  */
 final class VmCurlEasy
 {
     public const CLASS_LC = 'curlhandle';
 
-    /** @var array<int, array{closed: bool, url: ?string, share_id: ?int}> */
+    /**
+     * @var array<int, array{
+     *   closed: bool,
+     *   url: ?string,
+     *   share_id: ?int,
+     *   return_transfer: bool,
+     *   nobody: bool,
+     *   post: bool,
+     *   headers: list<string>,
+     *   headers_on_handle: bool,
+     *   errno: int,
+     *   error: string,
+     *   http_code: int,
+     *   effective_url: string,
+     *   last_body: string,
+     *   native: ?\FFI\CData
+     * }>
+     */
     private static array $state = [];
 
     public static function registerClass(Context $ctx): void
@@ -39,10 +54,32 @@ final class VmCurlEasy
     public static function init(?string $url, Context $ctx): Variable
     {
         self::registerClass($ctx);
+        if (!VmCurlNative::available()) {
+            throw new \LogicException('curl_init() requires libcurl FFI (issue #3325)');
+        }
+        $native = VmCurlNative::easyInit();
         $var = new Variable(Variable::TYPE_OBJECT);
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
-        self::$state[$object->id] = ['closed' => false, 'url' => $url, 'share_id' => null];
+        self::$state[$object->id] = [
+            'closed' => false,
+            'url' => $url,
+            'share_id' => null,
+            'return_transfer' => false,
+            'nobody' => false,
+            'post' => false,
+            'headers' => [],
+            'headers_on_handle' => false,
+            'errno' => 0,
+            'error' => '',
+            'http_code' => 0,
+            'effective_url' => '',
+            'last_body' => '',
+            'native' => $native,
+        ];
+        if (null !== $url && '' !== $url) {
+            VmCurlNative::easySetoptString($native, CurlConstants::CURLOPT_URL, $url);
+        }
         $var->object($object);
 
         return $var;
@@ -51,20 +88,47 @@ final class VmCurlEasy
     public static function setopt(ObjectEntry $easy, int $option, Variable $value, Frame $frame): bool
     {
         self::ensureLive($easy, 'curl_setopt');
+        $st = &self::$state[$easy->id];
+        $native = $st['native'];
+        if (null === $native) {
+            return false;
+        }
+
         if (CurlConstants::CURLOPT_SHARE === $option) {
             $share = VmCurlArg::requireShareObject($value, 'curl_setopt', 3);
             VmCurlShare::attachToEasy($share);
-            self::$state[$easy->id]['share_id'] = $share->id;
+            $st['share_id'] = $share->id;
 
             return true;
         }
         if (CurlConstants::CURLOPT_URL === $option) {
-            self::$state[$easy->id]['url'] = VmString::coerceStringBuiltinArg(
-                $value,
-                'curl_setopt',
-                2,
-                'value'
-            );
+            $url = VmString::coerceStringBuiltinArg($value, 'curl_setopt', 2, 'value');
+            $st['url'] = $url;
+            VmCurlNative::easySetoptString($native, CurlConstants::CURLOPT_URL, $url);
+
+            return true;
+        }
+        if (CurlConstants::CURLOPT_RETURNTRANSFER === $option) {
+            // PHP-level option — not a real libcurl CURLOPT (php-src ext/curl/interface.c).
+            $st['return_transfer'] = self::toBoolOption($value, 'curl_setopt');
+
+            return true;
+        }
+        if (CurlConstants::CURLOPT_NOBODY === $option) {
+            $st['nobody'] = self::toBoolOption($value, 'curl_setopt');
+            VmCurlNative::easySetoptLong($native, CurlConstants::CURLOPT_NOBODY, $st['nobody'] ? 1 : 0);
+
+            return true;
+        }
+        if (CurlConstants::CURLOPT_POST === $option) {
+            $st['post'] = self::toBoolOption($value, 'curl_setopt');
+            VmCurlNative::easySetoptLong($native, CurlConstants::CURLOPT_POST, $st['post'] ? 1 : 0);
+
+            return true;
+        }
+        if (CurlConstants::CURLOPT_HTTPHEADER === $option) {
+            $headers = self::coerceHeaderList($value, 'curl_setopt');
+            $st['headers'] = $headers;
 
             return true;
         }
@@ -101,12 +165,159 @@ final class VmCurlEasy
         return true;
     }
 
+    /**
+     * @return string|bool
+     */
+    public static function exec(ObjectEntry $easy)
+    {
+        self::ensureLive($easy, 'curl_exec');
+        $st = &self::$state[$easy->id];
+        $native = $st['native'];
+        if (null === $native) {
+            return false;
+        }
+        if (null === $st['url'] || '' === $st['url']) {
+            $st['errno'] = 3; // CURLE_URL_MALFORMAT
+            $st['error'] = VmCurlNative::easyStrerror(3);
+            $st['http_code'] = 0;
+            $st['last_body'] = '';
+
+            return false;
+        }
+
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_curl_');
+        if (false === $tmp) {
+            $st['errno'] = 27;
+            $st['error'] = 'Out of memory';
+
+            return false;
+        }
+        $fp = null;
+        $slist = null;
+        try {
+            $fp = VmCurlNative::fopen($tmp, 'w+b');
+            VmCurlNative::easySetoptPtr($native, CurlConstants::CURLOPT_WRITEDATA, $fp);
+
+            if ([] !== $st['headers']) {
+                foreach ($st['headers'] as $header) {
+                    $slist = VmCurlNative::slistAppend($slist, $header);
+                }
+                VmCurlNative::easySetoptPtr($native, CurlConstants::CURLOPT_HTTPHEADER, $slist);
+                $st['headers_on_handle'] = true;
+            } elseif ($st['headers_on_handle']) {
+                VmCurlNative::easySetoptNull($native, CurlConstants::CURLOPT_HTTPHEADER);
+                $st['headers_on_handle'] = false;
+            }
+
+            $rc = VmCurlNative::easyPerform($native);
+            $st['errno'] = $rc;
+            $st['error'] = 0 === $rc ? '' : VmCurlNative::easyStrerror($rc);
+            $st['http_code'] = VmCurlNative::easyGetinfoLong($native, CurlConstants::CURLINFO_HTTP_CODE);
+            $st['effective_url'] = VmCurlNative::easyGetinfoString($native, CurlConstants::CURLINFO_EFFECTIVE_URL);
+
+            VmCurlNative::rewind($fp);
+            $body = VmCurlNative::freadAll($fp);
+            $st['last_body'] = $body;
+
+            if (0 !== $rc) {
+                return false;
+            }
+            if ($st['return_transfer']) {
+                return $body;
+            }
+            echo $body;
+
+            return true;
+        } finally {
+            if (null !== $slist) {
+                VmCurlNative::slistFreeAll($slist);
+            }
+            if (null !== $fp) {
+                VmCurlNative::fclose($fp);
+            }
+            @unlink($tmp);
+        }
+    }
+
+    public static function getinfo(ObjectEntry $easy, ?int $option = null): mixed
+    {
+        self::ensureLive($easy, 'curl_getinfo');
+        $st = self::$state[$easy->id];
+        if (null === $option) {
+            return [
+                'url' => $st['effective_url'] !== '' ? $st['effective_url'] : (string) ($st['url'] ?? ''),
+                'http_code' => $st['http_code'],
+                'header_size' => 0,
+                'request_size' => 0,
+                'filetime' => -1,
+                'ssl_verify_result' => 0,
+                'redirect_count' => 0,
+                'total_time' => 0.0,
+                'namelookup_time' => 0.0,
+                'connect_time' => 0.0,
+                'pretransfer_time' => 0.0,
+                'size_upload' => 0.0,
+                'size_download' => 0.0,
+                'speed_download' => 0.0,
+                'speed_upload' => 0.0,
+                'download_content_length' => -1.0,
+                'upload_content_length' => -1.0,
+                'starttransfer_time' => 0.0,
+                'redirect_time' => 0.0,
+                'redirect_url' => '',
+                'primary_ip' => '',
+                'certinfo' => [],
+                'primary_port' => 0,
+                'local_ip' => '',
+                'local_port' => 0,
+                'http_version' => 0,
+                'protocol' => 0,
+                'ssl_verifyresult' => 0,
+                'scheme' => '',
+                'appconnect_time_us' => 0,
+                'connect_time_us' => 0,
+                'namelookup_time_us' => 0,
+                'pretransfer_time_us' => 0,
+                'redirect_time_us' => 0,
+                'starttransfer_time_us' => 0,
+                'total_time_us' => 0,
+            ];
+        }
+        if (CurlConstants::CURLINFO_HTTP_CODE === $option) {
+            return $st['http_code'];
+        }
+        if (CurlConstants::CURLINFO_EFFECTIVE_URL === $option) {
+            return $st['effective_url'] !== '' ? $st['effective_url'] : (string) ($st['url'] ?? '');
+        }
+
+        return false;
+    }
+
+    public static function error(ObjectEntry $easy): string
+    {
+        self::ensureLive($easy, 'curl_error');
+
+        return self::$state[$easy->id]['error'];
+    }
+
+    public static function errno(ObjectEntry $easy): int
+    {
+        self::ensureLive($easy, 'curl_errno');
+
+        return self::$state[$easy->id]['errno'];
+    }
+
     public static function close(ObjectEntry $easy): void
     {
         if (!isset(self::$state[$easy->id])) {
             return;
         }
+        $native = self::$state[$easy->id]['native'];
+        if (null !== $native) {
+            VmCurlNative::easyCleanup($native);
+        }
         self::$state[$easy->id]['closed'] = true;
+        self::$state[$easy->id]['native'] = null;
         unset(self::$state[$easy->id]);
     }
 
@@ -133,6 +344,47 @@ final class VmCurlEasy
         if (!isset(self::$state[$easy->id])) {
             return;
         }
+    }
+
+    private static function toBoolOption(Variable $value, string $function): bool
+    {
+        $value = $value->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($value)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #3 ($value) must not be an enum case',
+                $function
+            ));
+        }
+        if (Variable::TYPE_BOOLEAN === $value->type) {
+            return $value->toBool();
+        }
+        if (Variable::TYPE_INTEGER === $value->type) {
+            return 0 !== $value->toInt();
+        }
+        if (Variable::TYPE_NULL === $value->type) {
+            return false;
+        }
+
+        return (bool) $value->toBool();
+    }
+
+    /** @return list<string> */
+    private static function coerceHeaderList(Variable $value, string $function): array
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $value->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #3 ($value) must be of type array, %s given',
+                $function,
+                EnumCaseSupport::typeNameForVariable($value)
+            ));
+        }
+        $headers = [];
+        foreach ($value->toArray()->iterateKeyed(true) as [, $headerVar]) {
+            $headers[] = VmString::coerceStringBuiltinArg($headerVar, $function, 2, 'value');
+        }
+
+        return $headers;
     }
 
     private static function parseOptionKey(Variable $keyVar): int

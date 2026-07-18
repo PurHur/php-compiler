@@ -15,10 +15,10 @@ echo "\n";
 var_export(curl_multi_strerror(CURLM_OK));
 echo "\n";
 --EXPECT--
-version_missing
-strerror_missing
-multi_strerror_missing
-ext_missing
+version_fn
+strerror_fn
+multi_strerror_fn
+ext_loaded
 8.7.0
 'No error'
 'No error'
