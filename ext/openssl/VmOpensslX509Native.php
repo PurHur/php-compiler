@@ -291,6 +291,202 @@ final class VmOpensslX509Native
     }
 
     /**
+     * openssl_x509_checkpurpose() — X509_STORE_CTX + X509_verify_cert (php-src check_cert; #20286).
+     *
+     * @param list<string> $caInfo file/dir paths for the trusted store
+     *
+     * @return int 1 ok, 0 fail, -1 error (or other X509_verify_cert codes)
+     */
+    public static function checkPurposeCertificatePem(
+        string $certPem,
+        int $purpose,
+        array $caInfo,
+        ?string $untrustedFile,
+        ?\PHPCompiler\Frame $frame = null,
+    ): int {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+
+        $store = null;
+        $csc = null;
+        $certBio = null;
+        $x509 = null;
+        $untrusted = null;
+        /** @var list<\FFI\CData> */
+        $ownedUntrusted = [];
+
+        try {
+            if (null !== $untrustedFile && '' !== $untrustedFile) {
+                $loaded = self::loadAllCertsFromFile($ffi, $untrustedFile);
+                if (null === $loaded) {
+                    return -1;
+                }
+                [$untrusted, $ownedUntrusted] = $loaded;
+            }
+
+            $store = self::setupVerifyStore($ffi, $caInfo, $frame);
+            if (null === $store) {
+                return -1;
+            }
+
+            $certBio = $ffi->BIO_new_mem_buf($certPem, \strlen($certPem));
+            if (null === $certBio) {
+                return -1;
+            }
+            $x509 = $ffi->PEM_read_bio_X509($certBio, null, null, null);
+            if (null === $x509) {
+                return -1;
+            }
+
+            $csc = $ffi->X509_STORE_CTX_new();
+            if (null === $csc) {
+                return -1;
+            }
+            if (!$ffi->X509_STORE_CTX_init($csc, $store, $x509, $untrusted)) {
+                VmOpenssl::userWarningForFrame(
+                    'openssl_x509_checkpurpose(): Certificate store initialization failed',
+                    $frame
+                );
+
+                return 0;
+            }
+            if ($purpose >= 0 && !$ffi->X509_STORE_CTX_set_purpose($csc, $purpose)) {
+                // php-src stores OpenSSL errors but continues verification
+            }
+
+            return (int) $ffi->X509_verify_cert($csc);
+        } finally {
+            if (null !== $csc) {
+                $ffi->X509_STORE_CTX_free($csc);
+            }
+            if (null !== $x509) {
+                $ffi->X509_free($x509);
+            }
+            if (null !== $certBio) {
+                $ffi->BIO_free($certBio);
+            }
+            if (null !== $store) {
+                $ffi->X509_STORE_free($store);
+            }
+            foreach ($ownedUntrusted as $owned) {
+                $ffi->X509_free($owned);
+            }
+            if (null !== $untrusted) {
+                $ffi->OPENSSL_sk_free($untrusted);
+            }
+        }
+    }
+
+    /**
+     * php_openssl_setup_verify — build X509_STORE from ca_info paths + defaults.
+     *
+     * @param list<string> $caInfo
+     *
+     * @return \FFI\CData|null
+     */
+    private static function setupVerifyStore(\FFI $ffi, array $caInfo, ?\PHPCompiler\Frame $frame)
+    {
+        $store = $ffi->X509_STORE_new();
+        if (null === $store) {
+            return null;
+        }
+
+        $nfiles = 0;
+        $ndirs = 0;
+
+        foreach ($caInfo as $path) {
+            if ('' === $path) {
+                continue;
+            }
+            if (!@is_file($path) && !@is_dir($path)) {
+                VmOpenssl::userWarningForFrame(
+                    'openssl_x509_checkpurpose(): Unable to stat '.$path,
+                    $frame
+                );
+                continue;
+            }
+            if (@is_file($path)) {
+                if (1 !== (int) $ffi->X509_STORE_load_file($store, $path)) {
+                    VmOpenssl::userWarningForFrame(
+                        'openssl_x509_checkpurpose(): Error loading file '.$path,
+                        $frame
+                    );
+                } else {
+                    ++$nfiles;
+                }
+            } else {
+                if (1 !== (int) $ffi->X509_STORE_load_path($store, $path)) {
+                    VmOpenssl::userWarningForFrame(
+                        'openssl_x509_checkpurpose(): Error loading directory '.$path,
+                        $frame
+                    );
+                } else {
+                    ++$ndirs;
+                }
+            }
+        }
+
+        // Match php_openssl_setup_verify: when no explicit CA files/dirs were loaded,
+        // fall back to OpenSSL default CA locations (X509_FILETYPE_DEFAULT).
+        if (0 === $nfiles || 0 === $ndirs) {
+            $ffi->X509_STORE_set_default_paths($store);
+        }
+
+        return $store;
+    }
+
+    /**
+     * php_openssl_load_all_certs_from_file — PEM cert stack for untrusted chain.
+     *
+     * @return array{0:\FFI\CData,1:list<\FFI\CData>}|null
+     */
+    private static function loadAllCertsFromFile(\FFI $ffi, string $path): ?array
+    {
+        $bio = $ffi->BIO_new_file($path, 'r');
+        if (null === $bio) {
+            return null;
+        }
+        $stack = $ffi->OPENSSL_sk_new_null();
+        if (null === $stack) {
+            $ffi->BIO_free($bio);
+
+            return null;
+        }
+        $owned = [];
+        $ok = false;
+        try {
+            while (true) {
+                $cert = $ffi->PEM_read_bio_X509($bio, null, null, null);
+                if (null === $cert) {
+                    break;
+                }
+                if (1 !== (int) $ffi->OPENSSL_sk_push($stack, $cert)) {
+                    $ffi->X509_free($cert);
+
+                    return null;
+                }
+                $owned[] = $cert;
+            }
+            if (0 === \count($owned)) {
+                return null;
+            }
+            $ok = true;
+
+            return [$stack, $owned];
+        } finally {
+            $ffi->BIO_free($bio);
+            if (!$ok) {
+                foreach ($owned as $ownedCert) {
+                    $ffi->X509_free($ownedCert);
+                }
+                $ffi->OPENSSL_sk_free($stack);
+            }
+        }
+    }
+
+    /**
      * Parse PEM and return normalized certificate PEM, or false when invalid/unavailable.
      */
     public static function normalizeCertificatePem(string $pem): string|false
@@ -391,9 +587,13 @@ typedef struct asn1_object_st ASN1_OBJECT;
 typedef struct asn1_string_st ASN1_STRING;
 typedef struct asn1_integer_st ASN1_INTEGER;
 typedef struct asn1_time_st ASN1_TIME;
+typedef struct x509_store_st X509_STORE;
+typedef struct x509_store_ctx_st X509_STORE_CTX;
+typedef struct openssl_stack_st OPENSSL_STACK;
 
 BIO *BIO_new_mem_buf(const void *buf, int len);
 BIO *BIO_new(const BIO_METHOD *type);
+BIO *BIO_new_file(const char *filename, const char *mode);
 const BIO_METHOD *BIO_s_mem(void);
 void BIO_free(BIO *a);
 X509 *PEM_read_bio_X509(BIO *bp, X509 **x, void *cb, void *u);
@@ -432,6 +632,20 @@ void EVP_PKEY_free(EVP_PKEY *pkey);
 EVP_PKEY *PEM_read_bio_PUBKEY(BIO *bp, EVP_PKEY **x, void *cb, void *u);
 EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, void *cb, void *u);
 int PEM_write_bio_PUBKEY(BIO *bp, EVP_PKEY *x);
+
+X509_STORE *X509_STORE_new(void);
+void X509_STORE_free(X509_STORE *v);
+int X509_STORE_load_file(X509_STORE *ctx, const char *file);
+int X509_STORE_load_path(X509_STORE *ctx, const char *path);
+int X509_STORE_set_default_paths(X509_STORE *ctx);
+X509_STORE_CTX *X509_STORE_CTX_new(void);
+void X509_STORE_CTX_free(X509_STORE_CTX *ctx);
+int X509_STORE_CTX_init(X509_STORE_CTX *ctx, X509_STORE *store, X509 *x509, OPENSSL_STACK *chain);
+int X509_STORE_CTX_set_purpose(X509_STORE_CTX *ctx, int purpose);
+int X509_verify_cert(X509_STORE_CTX *ctx);
+OPENSSL_STACK *OPENSSL_sk_new_null(void);
+int OPENSSL_sk_push(OPENSSL_STACK *sk, void *data);
+void OPENSSL_sk_free(OPENSSL_STACK *sk);
 CDEF;
 
         foreach (['libcrypto.so.3', 'libcrypto.so'] as $lib) {
