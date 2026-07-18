@@ -50,8 +50,8 @@ final class VmGd
     /**
      * imagetypes() — honest format bitmask for this build (php-src; #20471).
      *
-     * Advertises GIF/JPG/PNG/WEBP/BMP/AVIF (encoders present). Omits WBMP/XPM/TGA
-     * until those codecs land (#20472).
+     * Advertises GIF/JPG/PNG/WEBP/BMP/AVIF/WBMP (encoders present). Omits XPM/TGA
+     * (XPM soft-fails — no libXpm; #20472).
      */
     public static function imageTypesMask(): int
     {
@@ -60,7 +60,8 @@ final class VmGd
             | self::IMG_PNG
             | self::IMG_WEBP
             | self::IMG_BMP
-            | self::IMG_AVIF;
+            | self::IMG_AVIF
+            | self::IMG_WBMP;
     }
 
     /**
@@ -76,9 +77,9 @@ final class VmGd
             'GIF Create Support' => true,
             'JPEG Support' => true,
             'PNG Support' => true,
-            'WBMP Support' => false,
+            'WBMP Support' => true,
             'XPM Support' => false,
-            'XBM Support' => false,
+            'XBM Support' => true,
             'WebP Support' => true,
             'BMP Support' => true,
             'AVIF Support' => true,
@@ -3995,6 +3996,134 @@ final class VmGd
         OutputBuffer::append(self::encodedBmpBytes($image, $compressed), $frame->scriptPath ?: null);
 
         return true;
+    }
+
+    /**
+     * Default WBMP/XBM foreground RGB — first black palette entry, else 0 (php-src gd.c; #20472).
+     *
+     * @return int RGB to treat as black; -1 means no match (all white)
+     */
+    public static function resolveMonoForegroundRgb(ObjectEntry $image, ?int $foreground): int
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            throw new \TypeError('GdImage required for mono foreground resolve');
+        }
+        if (null !== $foreground) {
+            if ($state->truecolor) {
+                return $foreground & 0xFFFFFF;
+            }
+
+            return isset($state->colors[$foreground])
+                ? ($state->colors[$foreground] & 0xFFFFFF)
+                : -1;
+        }
+        if ($state->truecolor) {
+            return 0;
+        }
+        foreach ($state->colors as $rgb) {
+            if (0 === ($rgb & 0xFFFFFF)) {
+                return $rgb & 0xFFFFFF;
+            }
+        }
+
+        // php-src leaves i == colorsTotal — no pixel matches.
+        return -1;
+    }
+
+    public static function encodedWbmpBytes(ObjectEntry $image, ?int $foreground = null): string
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            throw new \TypeError('imagewbmp(): Argument #1 ($image) must be of type GdImage');
+        }
+        if (!$state->hasRaster()) {
+            throw new \TypeError('imagewbmp(): Argument #1 ($image) must be of type GdImage');
+        }
+        $fg = self::resolveMonoForegroundRgb($image, $foreground);
+
+        return VmGdWbmp::encodeRgb(
+            $state->width,
+            $state->height,
+            self::truecolorPixelsForEncode($state),
+            $fg
+        );
+    }
+
+    public static function writeWbmpToOutput(Frame $frame, ObjectEntry $image, ?int $foreground = null): bool
+    {
+        OutputBuffer::append(self::encodedWbmpBytes($image, $foreground), $frame->scriptPath ?: null);
+
+        return true;
+    }
+
+    public static function createFromWbmpBytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdWbmp::decodeRgb($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefromwbmp');
+
+            return false;
+        }
+        [$width, $height, $pixels] = $decoded;
+
+        return self::attachRasterImage($frame, $width, $height, $pixels, VmImage::IMAGETYPE_WBMP, 'imagecreatefromwbmp');
+    }
+
+    public static function encodedXbmBytes(ObjectEntry $image, ?int $foreground = null, string $name = 'image'): string
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            throw new \TypeError('imagexbm(): Argument #1 ($image) must be of type GdImage');
+        }
+        if (!$state->hasRaster()) {
+            throw new \TypeError('imagexbm(): Argument #1 ($image) must be of type GdImage');
+        }
+        $fg = self::resolveMonoForegroundRgb($image, $foreground);
+
+        return VmGdXbm::encodeRgb(
+            $state->width,
+            $state->height,
+            self::truecolorPixelsForEncode($state),
+            $fg,
+            $name
+        );
+    }
+
+    public static function writeXbmToOutput(Frame $frame, ObjectEntry $image, ?int $foreground = null, string $name = 'image'): bool
+    {
+        OutputBuffer::append(self::encodedXbmBytes($image, $foreground, $name), $frame->scriptPath ?: null);
+
+        return true;
+    }
+
+    public static function createFromXbmBytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdXbm::decodeRgb($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefromxbm');
+
+            return false;
+        }
+        [$width, $height, $pixels] = $decoded;
+
+        return self::attachRasterImage($frame, $width, $height, $pixels, VmImage::IMAGETYPE_XBM, 'imagecreatefromxbm');
+    }
+
+    /** imagecreatefromxpm — no libXpm in this build; warn + false (php-src HAVE_GD_XPM off shape; #20472). */
+    public static function createFromXpmUnsupported(Frame $frame): false
+    {
+        if (null !== $frame->vmContext) {
+            $frame->vmContext->errors->triggerError(
+                'imagecreatefromxpm(): XPM support is not available in this PHP build',
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+        }
+
+        return false;
     }
 
     public static function applyFilter(

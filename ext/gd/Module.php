@@ -139,12 +139,17 @@ class Module extends ModuleAbstract
             $functions[] = new imagewebp();
             $functions[] = new imageavif();
             $functions[] = new imagebmp();
+            $functions[] = new imagewbmp();
+            $functions[] = new imagexbm();
             $functions[] = new imagecreatefrompng();
             $functions[] = new imagecreatefromjpeg();
             $functions[] = new imagecreatefromgif();
             $functions[] = new imagecreatefromwebp();
             $functions[] = new imagecreatefromavif();
             $functions[] = new imagecreatefrombmp();
+            $functions[] = new imagecreatefromwbmp();
+            $functions[] = new imagecreatefromxbm();
+            $functions[] = new imagecreatefromxpm();
         }
 
         return $functions;
