@@ -1,5 +1,7 @@
 --TEST--
-stdlib password_get_info(null) — unknown algo like Zend, array operand TypeError (#18656, ext/standard/password.c)
+stdlib password_get_info(null) — coerce+unknown on 8.2 profile; array TypeError (#18656, #20672, ext/standard/password.c)
+--ENV--
+PHP_COMPILER_PROFILE=8.2
 --FILE--
 <?php
 $info = password_get_info(null);
