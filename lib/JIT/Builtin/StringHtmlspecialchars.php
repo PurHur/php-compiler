@@ -8,15 +8,12 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\ext\standard\JitHtmlspecialcharsKernel;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __string__htmlspecialchars via HtmlspecialcharsJitHelper PHP (#9445, #18967, #20141).
+ * JIT/AOT link for __string__htmlspecialchars via HtmlspecialcharsJitHelper PHP (#9445, #18967, #20487).
  *
- * Embed / non-thin: {@see HtmlspecialcharsJitHelper} via {@see JitVmHelperLink}.
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20011 shape): {@see JitHtmlspecialcharsKernel}
- * escape loop — nested helper TUs are ExternalMethod-stubbed under user-script AOT (#16075).
+ * Embed + thin standalone AOT: {@see HtmlspecialcharsJitHelper} via {@see JitVmHelperLink}
+ * (Bin2hex #20452 / HashEquals #20469 shape — no hand-written escape kernel).
  * SSOT: {@see \PHPCompiler\ext\standard\VmString::htmlspecialchars()}.
  * php-src: ext/standard/html.c — PHP_FUNCTION(htmlspecialchars)
  */
@@ -29,8 +26,6 @@ final class StringHtmlspecialchars
     private const HTMLSPECIALCHARS_HELPER = 'PHPCompiler\\ext\\standard\\HtmlspecialcharsJitHelper::htmlspecialchars';
 
     private const BRIDGE_ENTRY = 'htmlspecialchars_bridge_entry';
-
-    private const KERNEL_ENTRY = 'htmlspecialchars_kernel_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -54,15 +49,8 @@ final class StringHtmlspecialchars
         }
 
         $probe = $context->module->getNamedFunction(self::ABI);
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
-            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::KERNEL_ENTRY)) {
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction(self::ABI, $probe);
-
-            return;
-        }
-
-        if ($context->isThinStandaloneAotMain()) {
-            self::implementKernelBody($context, $probe);
 
             return;
         }
@@ -89,32 +77,7 @@ final class StringHtmlspecialchars
             self::HTMLSPECIALCHARS_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#20141'
+            '#20487'
         );
-    }
-
-    private static function implementKernelBody(Context $context, ?LlvmFunction $probe): void
-    {
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                self::ABI,
-                $context->context->functionType($strPtr, false, $strPtr, $i64)
-            );
-
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::KERNEL_ENTRY);
-        $context->builder->positionAtEnd($entry);
-        JitHtmlspecialcharsKernel::emitBody($context, $fn);
-        $context->registerFunction(self::ABI, $fn);
-
-        if (null !== $savedInsert) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
     }
 }

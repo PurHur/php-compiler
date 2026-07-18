@@ -192,6 +192,8 @@ if (null !== $unitPath) {
         '/ext/standard/Bin2hexJitHelper.php' => true,
         // Peer always-helper (#20469); keep off HELPER_RUNTIME_O until unit.o green.
         '/ext/standard/HashEqualsJitHelper.php' => true,
+        // Peer always-helper (#20487); keep off HELPER_RUNTIME_O until unit.o green.
+        '/ext/standard/HtmlspecialcharsJitHelper.php' => true,
     ];
     file_put_contents($dir.'/manifest.json', json_encode([
         'fingerprint' => HelperRuntimeCache::unitFingerprint($sourceAbs),
