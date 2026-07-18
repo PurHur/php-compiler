@@ -12,6 +12,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\BuiltinExceptionSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\ext\standard\VmHttpBuildQuery;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmStreamContext;
@@ -146,6 +147,10 @@ final class VmSoapClient
             $state->streamContextOptions = $options['__phpc_stream_context_options'];
             unset($options['__phpc_stream_context_options']);
             $state->options = $options;
+        }
+        // php-src SoapClient ctor: ssl_method long (#20366).
+        if (isset($options['ssl_method']) && (\is_int($options['ssl_method']) || \is_float($options['ssl_method']))) {
+            $state->sslMethod = (int) $options['ssl_method'];
         }
 
         if (null !== $wsdl && '' !== $wsdl) {
@@ -389,6 +394,18 @@ final class VmSoapClient
         $ctxOpts = ['http' => $httpOpts];
         if (isset($state->streamContextOptions['ssl']) && \is_array($state->streamContextOptions['ssl'])) {
             $ctxOpts['ssl'] = $state->streamContextOptions['ssl'];
+        }
+        // php-src php_http.c: ssl_method → STREAM_CRYPTO_METHOD_*_CLIENT (#20366).
+        if (null !== $state->sslMethod && \preg_match('#^https://#i', $location)) {
+            $crypto = self::sslMethodToCryptoMethod($state->sslMethod);
+            if (null !== $crypto) {
+                if (!isset($ctxOpts['ssl']) || !\is_array($ctxOpts['ssl'])) {
+                    $ctxOpts['ssl'] = [];
+                }
+                if (!\array_key_exists('crypto_method', $ctxOpts['ssl'])) {
+                    $ctxOpts['ssl']['crypto_method'] = $crypto;
+                }
+            }
         }
         $ctx = \stream_context_create($ctxOpts);
         $body = @\file_get_contents($location, false, $ctx);
@@ -867,6 +884,25 @@ final class VmSoapClient
         return $httpOpts;
     }
 
+    /**
+     * php-src php_http.c ssl_method → STREAM_CRYPTO_METHOD_*_CLIENT (#20366).
+     */
+    private static function sslMethodToCryptoMethod(int $sslMethod): ?int
+    {
+        return match ($sslMethod) {
+            SoapConstants::SOAP_SSL_METHOD_TLS => \defined('STREAM_CRYPTO_METHOD_TLS_CLIENT')
+                ? (int) \constant('STREAM_CRYPTO_METHOD_TLS_CLIENT') : null,
+            SoapConstants::SOAP_SSL_METHOD_SSLv2 => \defined('STREAM_CRYPTO_METHOD_SSLv2_CLIENT')
+                ? (int) \constant('STREAM_CRYPTO_METHOD_SSLv2_CLIENT') : null,
+            SoapConstants::SOAP_SSL_METHOD_SSLv3 => \defined('STREAM_CRYPTO_METHOD_SSLv3_CLIENT')
+                ? (int) \constant('STREAM_CRYPTO_METHOD_SSLv3_CLIENT') : null,
+            SoapConstants::SOAP_SSL_METHOD_SSLv23 => \defined('STREAM_CRYPTO_METHOD_SSLv23_CLIENT')
+                ? (int) \constant('STREAM_CRYPTO_METHOD_SSLv23_CLIENT') : null,
+            default => \defined('STREAM_CRYPTO_METHOD_TLS_CLIENT')
+                ? (int) \constant('STREAM_CRYPTO_METHOD_TLS_CLIENT') : null,
+        };
+    }
+
     private static function synthesizeFixtureResponseHeaders(int $contentLength): string
     {
         return "HTTP/1.1 200 OK\r\n".
@@ -1327,6 +1363,9 @@ final class SoapClientState
      */
     public ?array $streamContextOptions = null;
 
+    /** php-src _ssl_method — null when unset (#20366). */
+    public ?int $sslMethod = null;
+
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
     public int $style = SoapConstants::SOAP_RPC;
@@ -1425,6 +1464,16 @@ final class SoapClientConstruct extends SoapClassMethod
             }
             if (null !== $streamContextOptions) {
                 $options['__phpc_stream_context_options'] = $streamContextOptions;
+            }
+            // php-src soap.c: ssl_method option is deprecated (#20366).
+            if (isset($options['ssl_method']) && (\is_int($options['ssl_method']) || \is_float($options['ssl_method']))) {
+                $frame->vmContext->errors->triggerError(
+                    'The "ssl_method" option is deprecated. Use "ssl" stream context options instead',
+                    ErrorReporter::E_DEPRECATED,
+                    '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                    $frame->vmContext,
+                    $frame
+                );
             }
         }
         VmSoapClient::initObject($receiver, $wsdl, $options, $frame->vmContext);
