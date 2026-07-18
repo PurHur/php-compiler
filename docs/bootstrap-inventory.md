@@ -20301,7 +20301,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamIoKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 39 class method(s)
+- 29 class method(s)
 
 ### `ext/standard/JitStreamIsLocal.php`
 

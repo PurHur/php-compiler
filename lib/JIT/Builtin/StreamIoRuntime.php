@@ -562,15 +562,13 @@ final class StreamIoRuntime
     }
 
     /**
-     * M3 inventory / bootstrap-aot-link / standalone Context init — defer NestedJIT stream emitters.
-     * Thin user-script AOT uses {@see Context::isThinStandaloneAotMain()} at call sites (#20229, #20553).
+     * M3 inventory / bootstrap-aot-link — defer NestedJIT stream emitters (#20576).
+     * Context standalone init uses {@see isStandaloneInitPhase()} at call sites (not this bag).
+     * Thin user-script AOT uses {@see Context::isThinStandaloneAotMain()} (#20229, #20553).
      */
     public static function shouldDeferHeavyStreamIoEmitters(Context $context): bool
     {
         unset($context);
-        if (self::$standaloneInitPhase) {
-            return true;
-        }
         foreach (
             [
                 'PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER',
