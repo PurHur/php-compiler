@@ -43,9 +43,11 @@ final class StreamIoRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('ensureRuntimeAbiDeclared', $source);
+        $this->assertStringContainsString('isStandaloneInitPhase', $source);
         // Thin AOT upgrades via libc kernel — nested VmFs helpers skip __init__ (#16075, #19462, #19530, #20229).
         $this->assertStringContainsString('JitStreamIoKernel', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('UserScriptAotEnv', $source);
         $this->assertStringNotContainsString('NestedJitCompileScope', $source);
         $this->assertStringNotContainsString('StreamIoStandaloneLlvm', $source);
     }

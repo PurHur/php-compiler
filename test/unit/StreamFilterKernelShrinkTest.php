@@ -29,6 +29,9 @@ final class StreamFilterKernelShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_stream_filter_append', $source);
         $this->assertStringContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('isStandaloneInitPhase', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
     }
 
     public function testSpineBundleIncludesKernelNotBuiltinJit(): void

@@ -31,6 +31,9 @@ final class StreamBucketKernelShrinkTest extends TestCase
         $this->assertStringContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
         $this->assertStringContainsString('StreamBucketJitHelper', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('isStandaloneInitPhase', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('GLOBAL_BUCKET_ACTIVE', $source);
         $this->assertStringNotContainsString('emitBucketRegister', $source);
         $this->assertLessThan(400, \substr_count($source, "\n") + 1);
