@@ -68,6 +68,11 @@ final class GdImageState
     public int $resY;
 
     /**
+     * libgd transparent color index / truecolor value (−1 = none; php-src; #20459).
+     */
+    public int $transparent;
+
+    /**
      * @param list<int> $pixels
      * @param list<int> $colors
      */
@@ -85,7 +90,8 @@ final class GdImageState
         bool $antiAlias = false,
         int $interpolationId = 3,
         int $resX = 96,
-        int $resY = 96
+        int $resY = 96,
+        int $transparent = -1
     ) {
         $this->encoded = $encoded;
         $this->imageType = $imageType;
@@ -101,6 +107,7 @@ final class GdImageState
         $this->interpolationId = $interpolationId;
         $this->resX = $resX;
         $this->resY = $resY;
+        $this->transparent = $transparent;
     }
 
     public static function fromEncoded(string $encoded, int $imageType): self

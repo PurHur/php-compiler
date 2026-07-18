@@ -325,6 +325,277 @@ final class VmGd
     }
 
     /**
+     * imagecolorclosest() — gdImageColorClosest (php-src ext/gd/libgd/gd.c; #20440).
+     */
+    public static function colorClosest(ObjectEntry $image, int $red, int $green, int $blue): int
+    {
+        return self::colorClosestAlpha($image, $red, $green, $blue, 0);
+    }
+
+    /**
+     * gdImageColorClosestAlpha — truecolor packs ARGB; palette uses Euclidean distance (#20440).
+     */
+    public static function colorClosestAlpha(
+        ObjectEntry $image,
+        int $red,
+        int $green,
+        int $blue,
+        int $alpha
+    ): int {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return -1;
+        }
+        if ($state->truecolor) {
+            return (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+        }
+        $ct = -1;
+        $first = true;
+        $mindist = 0;
+        foreach ($state->colors as $i => $packed) {
+            $rd = (($packed >> 16) & 0xFF) - $red;
+            $gd = (($packed >> 8) & 0xFF) - $green;
+            $bd = ($packed & 0xFF) - $blue;
+            $ad = (($packed >> 24) & 0x7F) - $alpha;
+            $dist = $rd * $rd + $gd * $gd + $bd * $bd + $ad * $ad;
+            if ($first || $dist < $mindist) {
+                $mindist = $dist;
+                $ct = (int) $i;
+                $first = false;
+            }
+        }
+
+        return $ct;
+    }
+
+    /**
+     * imagecolorexact() — opaque exact match (php-src gdImageColorExact; #20459).
+     */
+    public static function colorExact(ObjectEntry $image, int $red, int $green, int $blue): int
+    {
+        return self::colorExactAlpha($image, $red, $green, $blue, 0);
+    }
+
+    /**
+     * gdImageColorExactAlpha — truecolor packs ARGB; palette exact RGBA (#20459).
+     */
+    public static function colorExactAlpha(
+        ObjectEntry $image,
+        int $red,
+        int $green,
+        int $blue,
+        int $alpha
+    ): int {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return -1;
+        }
+        if ($state->truecolor) {
+            return (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+        }
+        $want = (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+        foreach ($state->colors as $i => $packed) {
+            if ($packed === $want) {
+                return (int) $i;
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * imagecolorresolve() — exact or allocate or closest (php-src gdImageColorResolve; #20459).
+     */
+    public static function colorResolve(ObjectEntry $image, int $red, int $green, int $blue): int
+    {
+        return self::colorResolveAlpha($image, $red, $green, $blue, 0);
+    }
+
+    /**
+     * gdImageColorResolveAlpha without open-slot reuse (dense palette; #20459).
+     */
+    public static function colorResolveAlpha(
+        ObjectEntry $image,
+        int $red,
+        int $green,
+        int $blue,
+        int $alpha
+    ): int {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return -1;
+        }
+        if ($state->truecolor) {
+            return (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+        }
+        $exact = self::colorExactAlpha($image, $red, $green, $blue, $alpha);
+        if (-1 !== $exact && $exact !== $state->transparent) {
+            return $exact;
+        }
+        // Prefer allocate when room (skip transparent index as resolve target).
+        if (\count($state->colors) < 256) {
+            $state->colors[] = (($alpha & 0x7F) << 24)
+                | (($red & 0xFF) << 16)
+                | (($green & 0xFF) << 8)
+                | ($blue & 0xFF);
+
+            return \count($state->colors) - 1;
+        }
+        $ct = -1;
+        $mindist = 4 * 255 * 255;
+        foreach ($state->colors as $i => $packed) {
+            if ((int) $i === $state->transparent) {
+                continue;
+            }
+            $rd = (($packed >> 16) & 0xFF) - $red;
+            $gd = (($packed >> 8) & 0xFF) - $green;
+            $bd = ($packed & 0xFF) - $blue;
+            $ad = (($packed >> 24) & 0x7F) - $alpha;
+            $dist = $rd * $rd + $gd * $gd + $bd * $bd + $ad * $ad;
+            if (0 === $dist) {
+                return (int) $i;
+            }
+            if ($dist < $mindist) {
+                $mindist = $dist;
+                $ct = (int) $i;
+            }
+        }
+
+        return $ct;
+    }
+
+    /**
+     * imagecolortransparent() get/set (php-src gdImageColorTransparent; #20459).
+     */
+    public static function colorTransparent(ObjectEntry $image, ?int $color): int
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return -1;
+        }
+        if (null !== $color) {
+            if (-1 === $color) {
+                if (!$state->truecolor && $state->transparent >= 0 && isset($state->colors[$state->transparent])) {
+                    $state->colors[$state->transparent] = $state->colors[$state->transparent] & 0xFFFFFF;
+                }
+                $state->transparent = -1;
+            } elseif ($color >= -1) {
+                if ($state->truecolor) {
+                    $state->transparent = $color;
+                } elseif ($color < 256) {
+                    if ($state->transparent !== -1 && isset($state->colors[$state->transparent])) {
+                        $state->colors[$state->transparent] = $state->colors[$state->transparent] & 0xFFFFFF;
+                    }
+                    if (isset($state->colors[$color])) {
+                        $state->colors[$color] = ($state->colors[$color] & 0xFFFFFF) | (127 << 24);
+                    }
+                    $state->transparent = $color;
+                }
+            }
+        }
+
+        return $state->transparent;
+    }
+
+    /**
+     * imagecolorset() — mutate palette slot (php-src; success null / failure false; #20440).
+     *
+     * @return null|false
+     */
+    public static function colorSet(
+        ObjectEntry $image,
+        int $color,
+        int $red,
+        int $green,
+        int $blue,
+        int $alpha = 0
+    ): mixed {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster() || $state->truecolor) {
+            return false;
+        }
+        if ($color < 0 || $color >= \count($state->colors)) {
+            return false;
+        }
+        $state->colors[$color] = (($alpha & 0x7F) << 24)
+            | (($red & 0xFF) << 16)
+            | (($green & 0xFF) << 8)
+            | ($blue & 0xFF);
+
+        return null;
+    }
+
+    /**
+     * imagecolorsforindex() — red/green/blue/alpha assoc (php-src; #20440).
+     *
+     * @return array{red: int, green: int, blue: int, alpha: int}
+     */
+    public static function colorsForIndex(ObjectEntry $image, int $index): array
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            throw new \ValueError('imagecolorsforindex(): Argument #2 ($color) is out of range');
+        }
+        if ($state->truecolor) {
+            if ($index < 0) {
+                throw new \ValueError('imagecolorsforindex(): Argument #2 ($color) is out of range');
+            }
+
+            return [
+                'red' => ($index >> 16) & 0xFF,
+                'green' => ($index >> 8) & 0xFF,
+                'blue' => $index & 0xFF,
+                'alpha' => ($index >> 24) & 0x7F,
+            ];
+        }
+        if ($index < 0 || $index >= \count($state->colors)) {
+            throw new \ValueError('imagecolorsforindex(): Argument #2 ($color) is out of range');
+        }
+        $packed = $state->colors[$index];
+
+        return [
+            'red' => ($packed >> 16) & 0xFF,
+            'green' => ($packed >> 8) & 0xFF,
+            'blue' => $packed & 0xFF,
+            'alpha' => ($packed >> 24) & 0x7F,
+        ];
+    }
+
+    /**
+     * @param array{red: int, green: int, blue: int, alpha: int} $components
+     */
+    public static function colorsForIndexToHashTable(array $components): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($components as $key => $value) {
+            $var = new Variable();
+            $var->int($value);
+            $ht->update($key, $var);
+        }
+
+        return $ht;
+    }
+
+    /** php-src CHECK_RGBA_RANGE for Red/Green/Blue (0..255) or Alpha (0..127). */
+    public static function requireRgbaComponent(
+        int $value,
+        string $function,
+        int $position,
+        string $paramName,
+        int $max
+    ): void {
+        if ($value < 0 || $value > $max) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($%s) must be between 0 and %d (inclusive)',
+                $function,
+                $position,
+                $paramName,
+                $max
+            ));
+        }
+    }
+
+    /**
      * imagecolorallocatealpha() — GD truecolor ARGB (alpha 0 opaque .. 127 transparent; #6535).
      */
     public static function colorAllocateAlpha(
@@ -1265,7 +1536,9 @@ final class VmGd
     }
 
     /**
-     * libgd gdImageFilledPolygon scanline fill (php-src ext/gd/libgd/gd.c; #20437).
+     * libgd gdImageFilledPolygon scanline fill (php-src ext/gd/libgd/gd.c; #20437, #20448).
+     *
+     * Shared by imagefilledpolygon() and filled-arc pie wedges.
      *
      * @param list<array{0: int, 1: int}> $points
      */
@@ -1350,6 +1623,322 @@ final class VmGd
         }
 
         return true;
+    }
+
+    /**
+     * imageellipse() — mid-point stroke ellipse (php-src gdImageEllipse; #20438).
+     */
+    public static function ellipse(ObjectEntry $image, int $mx, int $my, int $w, int $h, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $a = $w >> 1;
+        $b = $h >> 1;
+        // Skip overflowMul3 — PHP int is wide enough for canvas sizes we support.
+        self::putPixel($state, $mx + $a, $my, $color);
+        self::putPixel($state, $mx - $a, $my, $color);
+        $mx1 = $mx - $a;
+        $my1 = $my;
+        $mx2 = $mx + $a;
+        $my2 = $my;
+        $aq = $a * $a;
+        $bq = $b * $b;
+        $dx = $aq << 1;
+        $dy = $bq << 1;
+        $r = $a * $bq;
+        $rx = $r << 1;
+        $ry = 0;
+        $x = $a;
+        while ($x > 0) {
+            if ($r > 0) {
+                ++$my1;
+                --$my2;
+                $ry += $dx;
+                $r -= $ry;
+            }
+            if ($r <= 0) {
+                --$x;
+                ++$mx1;
+                --$mx2;
+                $rx -= $dy;
+                $r += $rx;
+            }
+            self::putPixel($state, $mx1, $my1, $color);
+            self::putPixel($state, $mx1, $my2, $color);
+            self::putPixel($state, $mx2, $my1, $color);
+            self::putPixel($state, $mx2, $my2, $color);
+        }
+
+        return true;
+    }
+
+    /**
+     * imagefilledellipse() — mid-point filled ellipse (php-src gdImageFilledEllipse; #20438).
+     */
+    public static function filledEllipse(ObjectEntry $image, int $mx, int $my, int $w, int $h, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $a = $w >> 1;
+        $b = $h >> 1;
+        for ($x = $mx - $a; $x <= $mx + $a; ++$x) {
+            self::putPixel($state, $x, $my, $color);
+        }
+        $mx1 = $mx - $a;
+        $my1 = $my;
+        $mx2 = $mx + $a;
+        $my2 = $my;
+        $aq = $a * $a;
+        $bq = $b * $b;
+        $dx = $aq << 1;
+        $dy = $bq << 1;
+        $r = $a * $bq;
+        $rx = $r << 1;
+        $ry = 0;
+        $x = $a;
+        $oldY2 = -2;
+        while ($x > 0) {
+            if ($r > 0) {
+                ++$my1;
+                --$my2;
+                $ry += $dx;
+                $r -= $ry;
+            }
+            if ($r <= 0) {
+                --$x;
+                ++$mx1;
+                --$mx2;
+                $rx -= $dy;
+                $r += $rx;
+            }
+            if ($oldY2 !== $my2) {
+                for ($i = $mx1; $i <= $mx2; ++$i) {
+                    self::putPixel($state, $i, $my2, $color);
+                    self::putPixel($state, $i, $my1, $color);
+                }
+            }
+            $oldY2 = $my2;
+        }
+
+        return true;
+    }
+
+    /**
+     * imagerectangle() — outline rect (php-src ext/gd/libgd/gd.c gdImageRectangle; #20457).
+     */
+    public static function rectangle(ObjectEntry $image, int $x1, int $y1, int $x2, int $y2, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $thick = $state->thick;
+        if ($x1 === $x2 && $y1 === $y2 && 1 === $thick) {
+            self::putPixel($state, $x1, $y1, $color);
+
+            return true;
+        }
+        if ($y2 < $y1) {
+            $t = $y1;
+            $y1 = $y2;
+            $y2 = $t;
+        }
+        if ($x2 < $x1) {
+            $t = $x1;
+            $x1 = $x2;
+            $x2 = $t;
+        }
+        if ($thick > 1) {
+            $half = $thick >> 1;
+            $x1ul = $x1 - $half;
+            $y1ul = $y1 - $half;
+            $x2lr = $x2 + $half;
+            $y2lr = $y2 + $half;
+            $cy = $y1ul + $thick;
+            while ($cy-- > $y1ul) {
+                $cx = $x1ul - 1;
+                while ($cx++ < $x2lr) {
+                    self::putPixel($state, $cx, $cy, $color);
+                }
+            }
+            $cy = $y2lr - $thick;
+            while ($cy++ < $y2lr) {
+                $cx = $x1ul - 1;
+                while ($cx++ < $x2lr) {
+                    self::putPixel($state, $cx, $cy, $color);
+                }
+            }
+            $cy = $y1ul + $thick - 1;
+            while ($cy++ < $y2lr - $thick) {
+                $cx = $x1ul - 1;
+                while ($cx++ < $x1ul + $thick) {
+                    self::putPixel($state, $cx, $cy, $color);
+                }
+            }
+            $cy = $y1ul + $thick - 1;
+            while ($cy++ < $y2lr - $thick) {
+                $cx = $x2lr - $thick - 1;
+                while ($cx++ < $x2lr) {
+                    self::putPixel($state, $cx, $cy, $color);
+                }
+            }
+
+            return true;
+        }
+        if ($x1 === $x2 || $y1 === $y2) {
+            self::line($image, $x1, $y1, $x2, $y2, $color);
+        } else {
+            self::line($image, $x1, $y1, $x2, $y1, $color);
+            self::line($image, $x1, $y2, $x2, $y2, $color);
+            self::line($image, $x1, $y1 + 1, $x1, $y2 - 1, $color);
+            self::line($image, $x2, $y1 + 1, $x2, $y2 - 1, $color);
+        }
+
+        return true;
+    }
+
+    /**
+     * imagedashedline() — Bresenham dashed stroke (php-src gdImageDashedLine; #20457).
+     *
+     * Dash period is libgd gdDashSize (4). Thickness wid uses sin(atan2) for both
+     * branches (libgd quirk; matches php-src ext/gd/libgd/gd.c).
+     */
+    public static function dashedLine(ObjectEntry $image, int $x1, int $y1, int $x2, int $y2, int $color): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $dashStep = 0;
+        $on = true;
+        $thick = $state->thick;
+        $dx = \abs($x2 - $x1);
+        $dy = \abs($y2 - $y1);
+        if ($dy <= $dx) {
+            $as = \sin(\atan2($dy, $dx));
+            $wid = (0.0 !== $as) ? (int) ($thick / $as) : 1;
+            $vert = true;
+            $d = 2 * $dy - $dx;
+            $incr1 = 2 * $dy;
+            $incr2 = 2 * ($dy - $dx);
+            if ($x1 > $x2) {
+                $x = $x2;
+                $y = $y2;
+                $ydirflag = -1;
+                $xend = $x1;
+            } else {
+                $x = $x1;
+                $y = $y1;
+                $ydirflag = 1;
+                $xend = $x2;
+            }
+            self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+            if ((($y2 - $y1) * $ydirflag) > 0) {
+                while ($x < $xend) {
+                    ++$x;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        ++$y;
+                        $d += $incr2;
+                    }
+                    self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+                }
+            } else {
+                while ($x < $xend) {
+                    ++$x;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        --$y;
+                        $d += $incr2;
+                    }
+                    self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+                }
+            }
+        } else {
+            $as = \sin(\atan2($dy, $dx));
+            $wid = (0.0 !== $as) ? (int) ($thick / $as) : 1;
+            $vert = false;
+            $d = 2 * $dx - $dy;
+            $incr1 = 2 * $dx;
+            $incr2 = 2 * ($dx - $dy);
+            if ($y1 > $y2) {
+                $y = $y2;
+                $x = $x2;
+                $yend = $y1;
+                $xdirflag = -1;
+            } else {
+                $y = $y1;
+                $x = $x1;
+                $yend = $y2;
+                $xdirflag = 1;
+            }
+            self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+            if ((($x2 - $x1) * $xdirflag) > 0) {
+                while ($y < $yend) {
+                    ++$y;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        ++$x;
+                        $d += $incr2;
+                    }
+                    self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+                }
+            } else {
+                while ($y < $yend) {
+                    ++$y;
+                    if ($d < 0) {
+                        $d += $incr1;
+                    } else {
+                        --$x;
+                        $d += $incr2;
+                    }
+                    self::dashedSet($state, $x, $y, $color, $on, $dashStep, $wid, $vert);
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * libgd dashedSet helper — gdDashSize=4 (php-src ext/gd/libgd/gd.h; #20457).
+     */
+    private static function dashedSet(
+        GdImageState $state,
+        int $x,
+        int $y,
+        int $color,
+        bool &$on,
+        int &$dashStep,
+        int $wid,
+        bool $vert
+    ): void {
+        ++$dashStep;
+        if (4 === $dashStep) {
+            $dashStep = 0;
+            $on = !$on;
+        }
+        if (!$on) {
+            return;
+        }
+        if ($vert) {
+            $wstart = $y - intdiv($wid, 2);
+            for ($w = $wstart; $w < $wstart + $wid; ++$w) {
+                self::putPixel($state, $x, $w, $color);
+            }
+        } else {
+            $wstart = $x - intdiv($wid, 2);
+            for ($w = $wstart; $w < $wstart + $wid; ++$w) {
+                self::putPixel($state, $w, $y, $color);
+            }
+        }
     }
 
     /**
@@ -3282,7 +3871,7 @@ final class VmGd
                 3 => 'resolution_y',
                 default => 'arg',
             },
-            'imagepolygon', 'imageopenpolygon' => match ($position) {
+            'imagepolygon', 'imageopenpolygon', 'imagefilledpolygon' => match ($position) {
                 1 => 'image',
                 2 => 'points',
                 3 => 'num_points_or_color',

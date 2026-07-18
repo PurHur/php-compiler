@@ -59,6 +59,15 @@ class Module extends ModuleAbstract
         if (GdExtensionPolicy::advertisesDrawing()) {
             $functions[] = new imagecolorallocate();
             $functions[] = new imagecolorallocatealpha();
+            $functions[] = new imagecolorsforindex();
+            $functions[] = new imagecolorclosest();
+            $functions[] = new imagecolorclosestalpha();
+            $functions[] = new imagecolorexact();
+            $functions[] = new imagecolorexactalpha();
+            $functions[] = new imagecolorresolve();
+            $functions[] = new imagecolorresolvealpha();
+            $functions[] = new imagecolorset();
+            $functions[] = new imagecolortransparent();
             $functions[] = new imagealphablending();
             $functions[] = new imagelayereffect();
             $functions[] = new imageresolution();
@@ -81,10 +90,15 @@ class Module extends ModuleAbstract
             $functions[] = new imagecopyresized();
             $functions[] = new imagesetpixel();
             $functions[] = new imageline();
+            $functions[] = new imagedashedline();
+            $functions[] = new imagerectangle();
+            $functions[] = new imageellipse();
+            $functions[] = new imagefilledellipse();
             $functions[] = new imagearc();
             $functions[] = new imagefilledarc();
             $functions[] = new imagepolygon();
             $functions[] = new imageopenpolygon();
+            $functions[] = new imagefilledpolygon();
             $functions[] = new imagefilledrectangle();
             $functions[] = new imagestring();
             $functions[] = new imagechar();
