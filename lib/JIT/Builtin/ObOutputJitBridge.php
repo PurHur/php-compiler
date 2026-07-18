@@ -19,10 +19,12 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed + standalone link for ob_* stack via ObOutputJitHelper PHP (#9268, #12951, #19422).
+ * JIT/AOT embed + standalone link for ob_* stack via ObOutputJitHelper PHP (#9268, #12951, #19422, #20443).
  *
- * Replaces ~1k-line LLVM buffer stack. SSOT: {@see \PHPCompiler\ext\standard\ObOutputJitHelper}.
- * User-script / bootstrap-aot: {@see JitObOutputKernel} (ext/standard).
+ * Embed / non-thin: honest NestedJIT bridges via compiled {@see \PHPCompiler\ext\standard\ObOutputJitHelper}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20420 / #20401 shape): {@see implementDeferredInventoryStubs}
+ * without nested JIT (#13301 / #13571). User-script / bootstrap-aot: {@see JitObOutputKernel} (ext/standard).
+ * SSOT: {@see \PHPCompiler\ext\standard\ObOutputJitHelper}.
  * php-src: ext/standard/output.c
  */
 final class ObOutputJitBridge
@@ -116,7 +118,7 @@ final class ObOutputJitBridge
             return;
         }
 
-        if (!$forceFull && StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if (!$forceFull && $context->isThinStandaloneAotMain()) {
             self::ensureExtraGlobals($context);
             self::implementDeferredInventoryStubs($context);
             self::restoreInsertBlock($context, $restore);
