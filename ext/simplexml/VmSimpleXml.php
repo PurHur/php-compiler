@@ -14,6 +14,7 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -44,6 +45,8 @@ final class VmSimpleXml
         $entry->methodVisibility['__construct'] = $pub;
         $entry->methods['__get'] = new SimpleXmlElementGet();
         $entry->methodVisibility['__get'] = $pub;
+        $entry->methods['__set'] = new SimpleXmlElementSet();
+        $entry->methodVisibility['__set'] = $pub;
         $entry->methods['__isset'] = new SimpleXmlElementIsset();
         $entry->methodVisibility['__isset'] = $pub;
         $entry->methods['__unset'] = new SimpleXmlElementUnset();
@@ -255,6 +258,120 @@ final class VmSimpleXml
             $state->children,
             static fn (SimpleXmlNodeState $child): bool => $child->name !== $name
         ));
+    }
+
+    /**
+     * $sxe->child = $value — element text / new child (php-src sxe_prop_dim_write; #20539).
+     *
+     * On an attributes() view, updates an existing attribute by name (new names are ignored —
+     * matches observed Zend ATTRLIST property-write behaviour when the parent node is an attr).
+     */
+    public static function setChildProperty(
+        Context $ctx,
+        ObjectEntry $entry,
+        string $name,
+        Variable $value,
+        ?Frame $frame = null
+    ): void {
+        if ('' === $name) {
+            throw new \ValueError('Cannot create element with an empty name');
+        }
+
+        $value = $value->resolveIndirect();
+        $stringValue = self::coercePropertyWriteValue($value, false, $frame);
+
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            $state = SimpleXmlRegistry::state($entry);
+            if (!\array_key_exists($name, self::attributesMap($entry))) {
+                return;
+            }
+            $state->attributes[$name] = $stringValue;
+            VmDomSimpleXmlBridge::syncDomAttributeFromSimpleXml($ctx, $state, $name, $stringValue);
+
+            return;
+        }
+
+        $matches = self::matchingElements($entry, $name);
+        $count = \count($matches);
+        if (1 === $count) {
+            $node = $matches[0];
+            $node->children = [];
+            $node->text = $stringValue;
+            VmDomSimpleXmlBridge::syncDomTextFromSimpleXml($ctx, $node, $stringValue);
+
+            return;
+        }
+        if ($count > 1) {
+            // php-src php_error_docref(NULL, E_WARNING, …) — no method prefix (#20539).
+            self::warn(
+                $ctx,
+                'Cannot assign to an array of nodes (duplicate subnodes or attr detected)',
+                $frame
+            );
+
+            return;
+        }
+
+        // No match — create a new child under the property-access parent (php-src xmlNewTextChild).
+        $parent = self::propertyAccessParent($entry);
+        if ('' === $parent->name && !SimpleXmlRegistry::isView($entry) && !SimpleXmlRegistry::isAttributesView($entry)) {
+            // Detached / empty placeholder — nowhere to attach.
+            return;
+        }
+        $child = new SimpleXmlNodeState($name);
+        $child->text = $stringValue;
+        $parent->children[] = $child;
+    }
+
+    /**
+     * Coerce RHS for sxe_prop_dim_write — scalars + SimpleXMLElement cast; reject complex types.
+     *
+     * @throws \TypeError
+     */
+    private static function coercePropertyWriteValue(
+        Variable $value,
+        bool $attribs,
+        ?Frame $frame
+    ): string {
+        $value = $value->resolveIndirect();
+        $vm = $frame?->vmContext?->vm ?? null;
+
+        if ($value->isVmResource()) {
+            throw new \TypeError(self::complexPropertyWriteTypeError($attribs, 'resource'));
+        }
+
+        switch ($value->type) {
+            case Variable::TYPE_NULL:
+            case Variable::TYPE_UNDEFINED:
+            case Variable::TYPE_INTEGER:
+            case Variable::TYPE_FLOAT:
+            case Variable::TYPE_BOOLEAN:
+            case Variable::TYPE_STRING:
+                return $value->toString($vm, $frame);
+            case Variable::TYPE_OBJECT:
+                $object = $value->toObject();
+                if (ResourceSupport::isResourceObject($object)) {
+                    throw new \TypeError(self::complexPropertyWriteTypeError($attribs, 'resource'));
+                }
+                if (self::CLASS_LC === strtolower($object->class->name)) {
+                    return $value->toString($vm, $frame);
+                }
+
+                throw new \TypeError(self::complexPropertyWriteTypeError($attribs, $object->class->name));
+            case Variable::TYPE_ARRAY:
+                throw new \TypeError(self::complexPropertyWriteTypeError($attribs, 'array'));
+            default:
+                throw new \TypeError(self::complexPropertyWriteTypeError($attribs, 'mixed'));
+        }
+    }
+
+    private static function complexPropertyWriteTypeError(bool $attribs, string $given): string
+    {
+        return sprintf(
+            "It's not possible to assign a complex type to %s, %s given",
+            $attribs ? 'attributes' : 'properties',
+            $given
+        );
     }
 
     /**
