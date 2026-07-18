@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\ObOutputJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** ObOutputRuntime routes standalone + embed through ObOutputJitHelper PHP; thin AOT via isThinStandaloneAotMain + JitObOutputKernel (#9268, #12951, #19422, #20169). */
+/** ObOutputRuntime routes standalone + embed through ObOutputJitHelper PHP; thin AOT via isThinStandaloneAotMain + JitObOutputKernel (#9268, #12951, #19422, #20169, #20443). */
 final class ObOutputRuntimeShrinkTest extends TestCase
 {
     public function testObOutputRuntimeUsesHelperNotLlvmStack(): void
@@ -29,6 +29,9 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $bridge);
         $this->assertStringContainsString('JitObOutputKernel::shouldUse', $bridge);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $bridge);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $bridge);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
         $this->assertStringNotContainsString('ObOutputUserScriptLlvm', $bridge);
         $this->assertStringNotContainsString('ObStorageGlobals::ensureGlobals', $bridge);
         $this->assertStringNotContainsString('GLOBAL_STORAGE', $bridge);
