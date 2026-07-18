@@ -841,6 +841,11 @@ class VM {
         if (null !== $domHtmlIsset) {
             return $domHtmlIsset;
         }
+        // Dom\Element::$id|/className|/innerHTML|/outerHTML (#20532).
+        $domHtmlElIsset = ext\dom\DomHtmlElementPropertySupport::propertyIsSet($object, $propName);
+        if (null !== $domHtmlElIsset) {
+            return $domHtmlElIsset;
+        }
         $props = $object->getRawProperties();
         if (isset($props[$propName])) {
             return VmIsset::storedPropertyIsSet($props[$propName]);
@@ -1217,6 +1222,13 @@ class VM {
         $domHtmlEmpty = ext\dom\DomHtmlDocumentPropertySupport::propertyIsEmpty($object, $propName);
         if (null !== $domHtmlEmpty) {
             $dst->bool($domHtmlEmpty);
+
+            return null;
+        }
+        // Dom\Element::$id|/className|/innerHTML|/outerHTML (#20532).
+        $domHtmlElEmpty = ext\dom\DomHtmlElementPropertySupport::propertyIsEmpty($object, $propName);
+        if (null !== $domHtmlElEmpty) {
+            $dst->bool($domHtmlElEmpty);
 
             return null;
         }
