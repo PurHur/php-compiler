@@ -100,8 +100,10 @@ class Module extends ModuleAbstract
             $functions[] = new imagepng();
             $functions[] = new imagewebp();
             $functions[] = new imageavif();
+            $functions[] = new imagebmp();
             $functions[] = new imagecreatefromwebp();
             $functions[] = new imagecreatefromavif();
+            $functions[] = new imagecreatefrombmp();
         }
 
         return $functions;

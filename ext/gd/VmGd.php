@@ -1984,6 +1984,60 @@ final class VmGd
         return $entry;
     }
 
+    public static function createFromBmpBytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdBmp::decodeRgb($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefrombmp');
+
+            return false;
+        }
+        [$width, $height, $pixels] = $decoded;
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('imagecreatefrombmp() requires VM context');
+        }
+        $class = $ctx->classes[self::CLASS_GDIMAGE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('GdImage is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $state = GdImageState::fromRaster($width, $height, $pixels);
+        $state->imageType = VmImage::IMAGETYPE_BMP;
+        GdRegistry::attach($entry, $state);
+
+        return $entry;
+    }
+
+    public static function encodedBmpBytes(ObjectEntry $image, bool $compressed = true): string
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            throw new \TypeError('imagebmp(): Argument #1 ($image) must be of type GdImage');
+        }
+        if ($state->hasRaster()) {
+            return VmGdBmp::encodeRgb(
+                $state->width,
+                $state->height,
+                self::truecolorPixelsForEncode($state),
+                $compressed
+            );
+        }
+        if ($state->hasEncoded() && VmImage::IMAGETYPE_BMP === $state->imageType) {
+            return $state->encoded;
+        }
+
+        throw new \TypeError('imagebmp(): Argument #1 ($image) must be of type GdImage');
+    }
+
+    public static function writeBmpToOutput(Frame $frame, ObjectEntry $image, bool $compressed = true): bool
+    {
+        OutputBuffer::append(self::encodedBmpBytes($image, $compressed), $frame->scriptPath ?: null);
+
+        return true;
+    }
+
     public static function applyFilter(
         Frame $frame,
         ObjectEntry $image,
