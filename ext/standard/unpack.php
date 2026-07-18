@@ -13,15 +13,20 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** unpack() — binary decode (VM via UnpackEngine; JIT/AOT via __compiler_unpack, #3188/#5442). */
+/**
+ * unpack() — binary decode (VM via UnpackEngine; JIT/AOT via __compiler_unpack, #3188/#5442).
+ *
+ * Z_PARAM_STR $format / $data: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20241, pack.c).
+ */
 final class unpack extends Internal
 {
     public function execute(Frame $frame): void
     {
         $this->requireArgCountRange($frame, 'unpack', 2, 3);
         $argc = \count($frame->calledArgs);
-        $fmt = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'unpack', 0, 'format');
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'unpack', 1, 'string');
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20241, ext/standard/pack.c).
+        $fmt = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'unpack', 0, 'format');
+        $data = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'unpack', 1, 'string');
         $offset = 0;
         if (3 === $argc) {
             $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'unpack', 3, 'offset');

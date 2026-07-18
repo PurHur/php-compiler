@@ -12,7 +12,11 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM JIT/AOT helper for pack() via __compiler_pack (issue #5231). */
+/**
+ * LLVM JIT/AOT helper for pack() via __compiler_pack (issue #5231).
+ *
+ * Z_PARAM_STR $format: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20241).
+ */
 final class JitPack
 {
     public static function pack(Context $context, JITVariable ...$args): Value
@@ -25,7 +29,21 @@ final class JitPack
                 $argc
             ));
         }
-        $fmt = JitStringBuiltinArg::lower($context, $args[0], 'pack', 0, 'format');
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20241, pack.c).
+        $nullFormat = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
+        $fmt = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'pack', 0, 'format')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'pack', 0, 'format');
+        if (
+            $nullFormat
+            && (
+                $context->callerStrictTypes
+                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+            )
+        ) {
+            // lower* already emitted TypeError+abort; do not lower __compiler_pack after terminator.
+            return $context->constantFromString('');
+        }
         $numArgs = $argc - 1;
         for ($i = 1; $i < $argc; ++$i) {
             self::rejectNullValueArg($context, $args[$i], $i + 1);
