@@ -1,0 +1,48 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\enchant;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\ext\standard\VmString;
+use PHPLLVM\Value;
+
+/**
+ * enchant_broker_dict_exists() (php-src ext/enchant/enchant.c; #6230).
+ */
+final class enchant_broker_dict_exists extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('enchant_broker_dict_exists');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'enchant_broker_dict_exists() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $broker = VmEnchantArg::requireBroker($frame->calledArgs[0], 'enchant_broker_dict_exists', 1);
+        $tag = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'enchant_broker_dict_exists', 1, 'tag');
+        if ('' === $tag) {
+            throw new \ValueError('enchant_broker_dict_exists(): Argument #2 ($tag) must not be empty');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmEnchantCore::dictExists($broker, $tag));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('enchant_broker_dict_exists() is not implemented for JIT in this compiler build (issue #6230)');
+    }
+}

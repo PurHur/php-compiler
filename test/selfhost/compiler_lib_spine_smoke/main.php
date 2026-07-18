@@ -5812,4 +5812,19 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/enchant/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/enchant/EnchantExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/enchant/Module.php';
+require_once __DIR__.'/../../../ext/enchant/VmEnchantArg.php';
+require_once __DIR__.'/../../../ext/enchant/VmEnchantBroker.php';
+require_once __DIR__.'/../../../ext/enchant/VmEnchantCore.php';
+require_once __DIR__.'/../../../ext/enchant/VmEnchantDictionary.php';
+require_once __DIR__.'/../../../ext/enchant/VmEnchantNative.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_dict_exists.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_free.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_free_dict.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_init.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_request_dict.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_check.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_suggest.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
