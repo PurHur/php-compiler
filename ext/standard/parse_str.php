@@ -49,7 +49,14 @@ final class parse_str extends Internal
                 $argc
             ));
         }
-        $encodedStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'parse_str', 0, 'string');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20113, ext/standard/string.c).
+        $encodedStr = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
+            'parse_str',
+            0,
+            'string'
+        );
 
         $resultArg = $frame->calledArgs[1];
         $resolved = $resultArg->resolveIndirect();
@@ -66,7 +73,13 @@ final class parse_str extends Internal
 
         $delimiter = '&';
         if ($supportsSeparator && 3 === $argc) {
-            $delimiter = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'parse_str', 2, 'separator');
+            $delimiter = VmString::zparamStrBuiltinArgForFrame(
+                $frame,
+                2,
+                'parse_str',
+                2,
+                'separator'
+            );
         }
 
         $params = ParseStrEngine::parse($encodedStr, $delimiter);
