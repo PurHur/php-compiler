@@ -164,12 +164,19 @@ final class ZipArchiveConstants
 
     public const OPSYS_DEFAULT = self::OPSYS_UNIX;
 
+    /**
+     * replaceFile / addFile length sentinel — libzip ZIP_LENGTH_TO_END (#20387).
+     * When undefined in older libzip, php-src defines it as 0.
+     */
+    public const LENGTH_TO_END = 0;
+
     /** @var array<string, int> */
     public const CLASS_CONSTANTS = [
         'create' => self::CREATE,
         'excl' => self::EXCL,
         'checkcons' => self::CHECKCONS,
         'overwrite' => self::OVERWRITE,
+        'length_to_end' => self::LENGTH_TO_END,
         'em_none' => self::EM_NONE,
         'em_trad_pkware' => self::EM_TRAD_PKWARE,
         'em_aes_128' => self::EM_AES_128,
@@ -250,6 +257,7 @@ final class ZipArchiveConstants
         'excl' => 'EXCL',
         'checkcons' => 'CHECKCONS',
         'overwrite' => 'OVERWRITE',
+        'length_to_end' => 'LENGTH_TO_END',
         'em_none' => 'EM_NONE',
         'em_trad_pkware' => 'EM_TRAD_PKWARE',
         'em_aes_128' => 'EM_AES_128',

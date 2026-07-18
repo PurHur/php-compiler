@@ -11,8 +11,10 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\ext\standard\VmCallable;
+use PHPCompiler\ext\standard\VmDir;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsDirNative;
+use PHPCompiler\ext\standard\VmFsGlob;
 use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPCompiler\ext\standard\VmFsWriteNative;
 use PHPCompiler\ext\standard\VmPhpMemoryStream;
@@ -116,6 +118,14 @@ final class VmZipArchive
             'getcommentindex' => new ZipArchiveGetCommentIndex(),
             'setarchivecomment' => new ZipArchiveSetArchiveComment(),
             'getarchivecomment' => new ZipArchiveGetArchiveComment(),
+            // unchange / replace / glob — php-src php_zip.c (#20387)
+            'unchangearchive' => new ZipArchiveUnchangeArchive(),
+            'unchangeall' => new ZipArchiveUnchangeAll(),
+            'unchangename' => new ZipArchiveUnchangeName(),
+            'unchangeindex' => new ZipArchiveUnchangeIndex(),
+            'replacefile' => new ZipArchiveReplaceFile(),
+            'addglob' => new ZipArchiveAddGlob(),
+            'addpattern' => new ZipArchiveAddPattern(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -265,6 +275,8 @@ final class VmZipArchive
         $state->filename = $filename;
         $state->open = true;
         $state->dirty = false;
+        self::stampOrigIndexes($state);
+        self::captureSnapshot($state);
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
 
         return true;
@@ -293,6 +305,8 @@ final class VmZipArchive
         $state->open = false;
         $state->dirty = false;
         $state->archiveComment = '';
+        $state->snapshotEntries = [];
+        $state->snapshotArchiveComment = '';
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
         if (null !== $ctx) {
             self::fireProgress($entry, $ctx, 1.0);
@@ -328,6 +342,7 @@ final class VmZipArchive
         $row = self::makeEntry($entryname, $data, $crc, $size);
         foreach ($state->entries as $idx => $existing) {
             if ($existing['name'] === $entryname) {
+                $row['orig_index'] = (int) ($existing['orig_index'] ?? -1);
                 $state->entries[$idx] = $row;
                 $state->dirty = true;
                 self::syncProperties($entry, $state);
@@ -357,6 +372,7 @@ final class VmZipArchive
         $row = self::makeEntry($name, $content, $crc, $size);
         foreach ($state->entries as $idx => $existing) {
             if ($existing['name'] === $name) {
+                $row['orig_index'] = (int) ($existing['orig_index'] ?? -1);
                 $state->entries[$idx] = $row;
                 $state->dirty = true;
                 self::syncProperties($entry, $state);
@@ -997,6 +1013,259 @@ final class VmZipArchive
     }
 
     /**
+     * ZipArchive::unchangeArchive — revert archive comment only (php-src zip_unchange_archive; #20387).
+     */
+    public static function unchangeArchive(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry);
+        $state->archiveComment = $state->snapshotArchiveComment;
+        $state->dirty = self::entriesDifferFromSnapshot($state);
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::unchangeAll — revert all entry + archive changes (php-src zip_unchange_all; #20387).
+     */
+    public static function unchangeAll(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry);
+        $state->entries = [];
+        foreach ($state->snapshotEntries as $zipEntry) {
+            $state->entries[] = self::cloneEntry($zipEntry);
+        }
+        $state->archiveComment = $state->snapshotArchiveComment;
+        $state->dirty = false;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::unchangeName — revert changes to named entry (php-src zip_unchange; #20387).
+     */
+    public static function unchangeName(ObjectEntry $entry, string $name): bool
+    {
+        $state = self::requireOpen($entry);
+        if ('' === $name) {
+            return false;
+        }
+        $index = self::locateEntryIndex($state, $name);
+        if (null === $index) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+            return false;
+        }
+
+        return self::unchangeIndex($entry, $index);
+    }
+
+    /**
+     * ZipArchive::unchangeIndex — revert changes to entry at index (php-src zip_unchange; #20387).
+     */
+    public static function unchangeIndex(ObjectEntry $entry, int $index): bool
+    {
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            return false;
+        }
+        $origIndex = (int) ($state->entries[$index]['orig_index'] ?? -1);
+        if ($origIndex < 0) {
+            // Newly added since open — zip_unchange removes the entry.
+            \array_splice($state->entries, $index, 1);
+        } elseif (!isset($state->snapshotEntries[$origIndex])) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        } else {
+            $state->entries[$index] = self::cloneEntry($state->snapshotEntries[$origIndex]);
+        }
+        $state->dirty = self::entriesDifferFromSnapshot($state)
+            || $state->archiveComment !== $state->snapshotArchiveComment;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::replaceFile — replace entry at index with file bytes (php-src zim_ZipArchive_replaceFile; #20387).
+     *
+     * Honest subset: $flags ignored (no FL_* libzip flags yet).
+     */
+    public static function replaceFile(
+        ObjectEntry $entry,
+        string $filepath,
+        int $index,
+        int $start = 0,
+        int $length = ZipArchiveConstants::LENGTH_TO_END,
+        int $flags = 0
+    ): bool {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ('' === $filepath) {
+            throw new \ValueError('ZipArchive::replaceFile(): Argument #1 ($filepath) must not be empty');
+        }
+        if ($index < 0) {
+            throw new \ValueError('ZipArchive::replaceFile(): Argument #2 ($index) must be greater than or equal to 0');
+        }
+        if ($index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        if (!is_file($filepath) || !is_readable($filepath)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+            return false;
+        }
+        $data = VmFsReadNative::read($filepath);
+        if (false === $data) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_READ);
+
+            return false;
+        }
+        if ($start < 0) {
+            $start = 0;
+        }
+        if ($start > \strlen($data)) {
+            $data = '';
+        } elseif ($length === ZipArchiveConstants::LENGTH_TO_END || $length < 0) {
+            $data = \substr($data, $start);
+        } else {
+            $data = \substr($data, $start, $length);
+        }
+        $size = \strlen($data);
+        $crc = self::crc32Unsigned($data);
+        $name = $state->entries[$index]['name'];
+        $origIndex = (int) ($state->entries[$index]['orig_index'] ?? -1);
+        $row = self::makeEntry($name, $data, $crc, $size);
+        $row['orig_index'] = $origIndex;
+        $state->entries[$index] = $row;
+        $state->dirty = true;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::addGlob — add files matching glob(3) pattern (php-src php_zip_add_from_pattern type=1; #20387).
+     *
+     * Honest subset: $flags / $options FL_* and remove_path/add_path deferred; basename used as entry name.
+     *
+     * @param array<string, mixed> $options
+     * @return list<string>|false
+     */
+    public static function addGlob(ObjectEntry $entry, string $pattern, int $flags = 0, array $options = []): array|false
+    {
+        unset($flags, $options);
+        $state = self::requireOpen($entry);
+        if ('' === $pattern) {
+            throw new \ValueError('ZipArchive::addGlob(): Argument #1 ($pattern) must not be empty');
+        }
+        $matches = VmFsGlob::glob($pattern);
+        if (false === $matches) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        $added = [];
+        foreach ($matches as $path) {
+            if (!\is_string($path) || !VmStatPath::isFile($path)) {
+                continue;
+            }
+            $entryname = basename($path);
+            if (!self::addFile($entry, $path, $entryname)) {
+                return false;
+            }
+            $added[] = $entryname;
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return $added;
+    }
+
+    /**
+     * ZipArchive::addPattern — add files under $path matching PCRE (php-src type=2; #20387).
+     *
+     * Honest subset: non-recursive directory scan; $options deferred.
+     *
+     * @param array<string, mixed> $options
+     * @return list<string>|false
+     */
+    public static function addPattern(
+        ObjectEntry $entry,
+        string $pattern,
+        string $path = '.',
+        array $options = []
+    ): array|false {
+        unset($options);
+        $state = self::requireOpen($entry);
+        if ('' === $pattern) {
+            throw new \ValueError('ZipArchive::addPattern(): Argument #1 ($pattern) must not be empty');
+        }
+        if (!VmStatPath::isDir($path)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+            return false;
+        }
+        $names = VmDir::scandir($path, \SCANDIR_SORT_NONE);
+        if (false === $names) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_READ);
+
+            return false;
+        }
+        $added = [];
+        foreach ($names as $name) {
+            if (!\is_string($name) || '.' === $name || '..' === $name) {
+                continue;
+            }
+            $full = \rtrim($path, "/\\") . DIRECTORY_SEPARATOR . $name;
+            if (!VmStatPath::isFile($full)) {
+                continue;
+            }
+            $matched = @\preg_match($pattern, $name);
+            if (false === $matched) {
+                self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+                return false;
+            }
+            if (1 !== $matched) {
+                continue;
+            }
+            if (!self::addFile($entry, $full, $name)) {
+                return false;
+            }
+            $added[] = $name;
+        }
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return $added;
+    }
+
+    private static function entriesDifferFromSnapshot(ZipArchiveState $state): bool
+    {
+        if (\count($state->entries) !== \count($state->snapshotEntries)) {
+            return true;
+        }
+        foreach ($state->entries as $index => $zipEntry) {
+            $snap = $state->snapshotEntries[$index] ?? null;
+            if (null === $snap) {
+                return true;
+            }
+            if (($zipEntry['name'] ?? '') !== ($snap['name'] ?? '')
+                || ($zipEntry['data'] ?? '') !== ($snap['data'] ?? '')
+                || (int) ($zipEntry['crc'] ?? 0) !== (int) ($snap['crc'] ?? 0)
+                || (string) ($zipEntry['comment'] ?? '') !== (string) ($snap['comment'] ?? '')
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * ZipArchive::setMtimeName — php-src zim_ZipArchive_setMtimeName (#20363).
      */
     public static function setMtimeName(ObjectEntry $entry, string $name, int $timestamp, int $flags = 0): bool
@@ -1342,7 +1611,35 @@ final class VmZipArchive
             'opsys' => ZipArchiveConstants::OPSYS_DEFAULT,
             'external_attr' => 0,
             'encryption_method' => ZipArchiveConstants::EM_NONE,
+            'orig_index' => -1,
         ];
+    }
+
+    /** Mark open-time entries with stable orig_index for zip_unchange* (#20387). */
+    private static function stampOrigIndexes(ZipArchiveState $state): void
+    {
+        foreach ($state->entries as $index => $zipEntry) {
+            $state->entries[$index]['orig_index'] = $index;
+        }
+    }
+
+    /** Deep-copy open-time entries/comment for unchange* (#20387). */
+    private static function captureSnapshot(ZipArchiveState $state): void
+    {
+        $state->snapshotEntries = [];
+        foreach ($state->entries as $zipEntry) {
+            $state->snapshotEntries[] = $zipEntry;
+        }
+        $state->snapshotArchiveComment = $state->archiveComment;
+    }
+
+    /**
+     * @param array<string, mixed> $zipEntry
+     * @return array<string, mixed>
+     */
+    private static function cloneEntry(array $zipEntry): array
+    {
+        return $zipEntry;
     }
 
     /** @return int|null */
@@ -1448,6 +1745,13 @@ final class VmZipArchive
             'getcommentindex' => 'getCommentIndex',
             'setarchivecomment' => 'setArchiveComment',
             'getarchivecomment' => 'getArchiveComment',
+            'unchangearchive' => 'unchangeArchive',
+            'unchangeall' => 'unchangeAll',
+            'unchangename' => 'unchangeName',
+            'unchangeindex' => 'unchangeIndex',
+            'replacefile' => 'replaceFile',
+            'addglob' => 'addGlob',
+            'addpattern' => 'addPattern',
             default => $lc,
         };
     }

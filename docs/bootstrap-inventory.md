@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5545 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15835 |
+| Source constructs flagged (warnings) | 15851 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3732,7 +3732,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/yaml/yaml_parse_file.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/Module.php` | 0 | 9 |
-| `ext/zip/VmZipArchive.php` | 0 | 56 |
+| `ext/zip/VmZipArchive.php` | 0 | 63 |
 | `ext/zip/VmZipProcedural.php` | 0 | 1 |
 | `ext/zip/VmZipResourceArg.php` | 0 | 1 |
 | `ext/zip/ZipArchiveAddFile.php` | 0 | 2 |
@@ -3742,7 +3742,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipArchiveConstruct.php` | 0 | 1 |
 | `ext/zip/ZipArchiveExtractTo.php` | 0 | 2 |
 | `ext/zip/ZipArchiveGetFromName.php` | 0 | 2 |
-| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 38 |
+| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 47 |
 | `ext/zip/ZipArchiveOpen.php` | 0 | 2 |
 | `ext/zip/ZipClassMethod.php` | 0 | 1 |
 | `ext/zip/ZipEngine.php` | 0 | 1 |
@@ -30917,62 +30917,69 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/VmZipArchive.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 45)
-- new Variable (line 46)
-- new ClassEntry (line 50)
-- new ClassProperty (line 52)
-- new ClassProperty (line 53)
+- new Variable (line 47)
+- new Variable (line 48)
+- new ClassEntry (line 52)
 - new ClassProperty (line 54)
-- new Variable (line 61)
-- new ZipArchiveConstruct (line 67)
-- new ZipArchiveOpen (line 72)
-- new ZipArchiveClose (line 73)
-- new ZipArchiveAddFile (line 74)
-- new ZipArchiveAddFromString (line 75)
-- new ZipArchiveGetFromName (line 76)
-- new ZipArchiveExtractTo (line 77)
-- new ZipArchiveGetStatusString (line 78)
-- new ZipArchiveCount (line 79)
-- new ZipArchiveStatName (line 80)
-- new ZipArchiveSetPassword (line 81)
-- new ZipArchiveSetEncryptionName (line 82)
-- new ZipArchiveStatIndex (line 84)
-- new ZipArchiveLocateName (line 85)
-- new ZipArchiveGetFromIndex (line 86)
-- new ZipArchiveGetNameIndex (line 87)
-- new ZipArchiveDeleteName (line 88)
-- new ZipArchiveDeleteIndex (line 89)
-- new ZipArchiveAddEmptyDir (line 90)
-- new ZipArchiveRenameName (line 91)
-- new ZipArchiveRenameIndex (line 92)
-- new ZipArchiveGetStream (line 93)
-- new ZipArchiveSetMtimeName (line 95)
-- new ZipArchiveSetMtimeIndex (line 96)
-- new ZipArchiveSetExternalAttributesName (line 97)
-- new ZipArchiveSetExternalAttributesIndex (line 98)
-- new ZipArchiveGetExternalAttributesName (line 99)
-- new ZipArchiveGetExternalAttributesIndex (line 100)
-- new ZipArchiveSetCompressionName (line 101)
-- new ZipArchiveSetCompressionIndex (line 102)
-- new ZipArchiveIsCompressionMethodSupported (line 103)
-- new ZipArchiveIsEncryptionMethodSupported (line 105)
-- new ZipArchiveRegisterProgressCallback (line 106)
-- new ZipArchiveRegisterCancelCallback (line 107)
-- new ZipArchiveGetStreamIndex (line 108)
-- new ZipArchiveGetStreamName (line 109)
-- new ZipArchiveClearError (line 110)
-- new ZipArchiveSetEncryptionIndex (line 111)
-- new ZipArchiveSetCommentName (line 113)
-- new ZipArchiveSetCommentIndex (line 114)
-- new ZipArchiveGetCommentName (line 115)
-- new ZipArchiveGetCommentIndex (line 116)
-- new ZipArchiveSetArchiveComment (line 117)
-- new ZipArchiveGetArchiveComment (line 118)
-- new ZipArchiveState (line 134)
-- new Variable (line 822)
-- new Variable (line 837)
-- new Variable (line 852)
-- 63 class method(s)
+- new ClassProperty (line 55)
+- new ClassProperty (line 56)
+- new Variable (line 63)
+- new ZipArchiveConstruct (line 69)
+- new ZipArchiveOpen (line 74)
+- new ZipArchiveClose (line 75)
+- new ZipArchiveAddFile (line 76)
+- new ZipArchiveAddFromString (line 77)
+- new ZipArchiveGetFromName (line 78)
+- new ZipArchiveExtractTo (line 79)
+- new ZipArchiveGetStatusString (line 80)
+- new ZipArchiveCount (line 81)
+- new ZipArchiveStatName (line 82)
+- new ZipArchiveSetPassword (line 83)
+- new ZipArchiveSetEncryptionName (line 84)
+- new ZipArchiveStatIndex (line 86)
+- new ZipArchiveLocateName (line 87)
+- new ZipArchiveGetFromIndex (line 88)
+- new ZipArchiveGetNameIndex (line 89)
+- new ZipArchiveDeleteName (line 90)
+- new ZipArchiveDeleteIndex (line 91)
+- new ZipArchiveAddEmptyDir (line 92)
+- new ZipArchiveRenameName (line 93)
+- new ZipArchiveRenameIndex (line 94)
+- new ZipArchiveGetStream (line 95)
+- new ZipArchiveSetMtimeName (line 97)
+- new ZipArchiveSetMtimeIndex (line 98)
+- new ZipArchiveSetExternalAttributesName (line 99)
+- new ZipArchiveSetExternalAttributesIndex (line 100)
+- new ZipArchiveGetExternalAttributesName (line 101)
+- new ZipArchiveGetExternalAttributesIndex (line 102)
+- new ZipArchiveSetCompressionName (line 103)
+- new ZipArchiveSetCompressionIndex (line 104)
+- new ZipArchiveIsCompressionMethodSupported (line 105)
+- new ZipArchiveIsEncryptionMethodSupported (line 107)
+- new ZipArchiveRegisterProgressCallback (line 108)
+- new ZipArchiveRegisterCancelCallback (line 109)
+- new ZipArchiveGetStreamIndex (line 110)
+- new ZipArchiveGetStreamName (line 111)
+- new ZipArchiveClearError (line 112)
+- new ZipArchiveSetEncryptionIndex (line 113)
+- new ZipArchiveSetCommentName (line 115)
+- new ZipArchiveSetCommentIndex (line 116)
+- new ZipArchiveGetCommentName (line 117)
+- new ZipArchiveGetCommentIndex (line 118)
+- new ZipArchiveSetArchiveComment (line 119)
+- new ZipArchiveGetArchiveComment (line 120)
+- new ZipArchiveUnchangeArchive (line 122)
+- new ZipArchiveUnchangeAll (line 123)
+- new ZipArchiveUnchangeName (line 124)
+- new ZipArchiveUnchangeIndex (line 125)
+- new ZipArchiveReplaceFile (line 126)
+- new ZipArchiveAddGlob (line 127)
+- new ZipArchiveAddPattern (line 128)
+- new ZipArchiveState (line 144)
+- new Variable (line 838)
+- new Variable (line 853)
+- new Variable (line 868)
+- 74 class method(s)
 
 ### `ext/zip/VmZipProcedural.php`
 
@@ -31063,7 +31070,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 1148)
 - new ArgumentCountError (line 1181)
 - new ArgumentCountError (line 1214)
-- 40 class method(s)
+- new ArgumentCountError (line 1267)
+- new ArgumentCountError (line 1293)
+- new ArgumentCountError (line 1319)
+- new ArgumentCountError (line 1343)
+- new ArgumentCountError (line 1368)
+- new ArgumentCountError (line 1405)
+- new HashTable (line 1440)
+- new Variable (line 1442)
+- new ArgumentCountError (line 1464)
+- 48 class method(s)
 
 ### `ext/zip/ZipArchiveOpen.php`
 
@@ -33096,7 +33112,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/CliArgvRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 487)
+- new JIT (line 490)
 - 19 class method(s)
 - 1 closure(s)
 

@@ -1249,3 +1249,236 @@ final class ZipArchiveGetArchiveComment extends ZipClassMethod
         $frame->returnVar->string($result);
     }
 }
+
+/**
+ * ZipArchive::unchangeArchive() — (#20387).
+ */
+final class ZipArchiveUnchangeArchive extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('unchangeArchive');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::unchangeArchive()');
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::unchangeArchive() expects exactly 0 arguments, %d given',
+                \count($frame->calledArgs) - 1
+            ));
+        }
+        $ok = VmZipArchive::unchangeArchive($receiver);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::unchangeAll() — (#20387).
+ */
+final class ZipArchiveUnchangeAll extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('unchangeAll');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::unchangeAll()');
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::unchangeAll() expects exactly 0 arguments, %d given',
+                \count($frame->calledArgs) - 1
+            ));
+        }
+        $ok = VmZipArchive::unchangeAll($receiver);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::unchangeName(string $name) — (#20387).
+ */
+final class ZipArchiveUnchangeName extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('unchangeName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::unchangeName()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::unchangeName() expects exactly 1 argument, 0 given');
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::unchangeName', 1, 'name');
+        $ok = VmZipArchive::unchangeName($receiver, $name);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::unchangeIndex(int $index) — (#20387).
+ */
+final class ZipArchiveUnchangeIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('unchangeIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::unchangeIndex()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::unchangeIndex() expects exactly 1 argument, 0 given');
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::unchangeIndex', 1, 'index');
+        $ok = VmZipArchive::unchangeIndex($receiver, $index);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::replaceFile(string $filepath, int $index, int $start = 0, int $length = LENGTH_TO_END, int $flags = 0) — (#20387).
+ */
+final class ZipArchiveReplaceFile extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('replaceFile');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::replaceFile()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::replaceFile() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $filepath = $this->stringArg($frame->calledArgs[1], 'ZipArchive::replaceFile', 1, 'filepath');
+        $index = $this->intArg($frame->calledArgs[2], 'ZipArchive::replaceFile', 2, 'index');
+        $start = $argc >= 3
+            ? $this->intArg($frame->calledArgs[3], 'ZipArchive::replaceFile', 3, 'start')
+            : 0;
+        $length = $argc >= 4
+            ? $this->intArg($frame->calledArgs[4], 'ZipArchive::replaceFile', 4, 'length')
+            : ZipArchiveConstants::LENGTH_TO_END;
+        $flags = $argc >= 5
+            ? $this->intArg($frame->calledArgs[5], 'ZipArchive::replaceFile', 5, 'flags')
+            : 0;
+        $ok = VmZipArchive::replaceFile($receiver, $filepath, $index, $start, $length, $flags);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::addGlob(string $pattern, int $flags = 0, array $options = []) — (#20387).
+ */
+final class ZipArchiveAddGlob extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('addGlob');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::addGlob()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::addGlob() expects at least 1 argument, 0 given');
+        }
+        $pattern = $this->stringArg($frame->calledArgs[1], 'ZipArchive::addGlob', 1, 'pattern');
+        $flags = \count($frame->calledArgs) >= 3
+            ? $this->intArg($frame->calledArgs[2], 'ZipArchive::addGlob', 2, 'flags')
+            : 0;
+        $options = [];
+        if (\count($frame->calledArgs) >= 4) {
+            $optVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $optVar->type) {
+                throw new \TypeError(\sprintf(
+                    'ZipArchive::addGlob(): Argument #3 ($options) must be of type array, %s given',
+                    EnumCaseSupport::typeNameForVariable($optVar)
+                ));
+            }
+            // Honest subset: options ignored (#20387).
+            $options = [];
+        }
+        $result = VmZipArchive::addGlob($receiver, $pattern, $flags, $options);
+        self::assignStringListOrFalse($frame->returnVar, $result);
+    }
+
+    /**
+     * @param list<string>|false $result
+     */
+    public static function assignStringListOrFalse(?Variable $returnVar, array|false $result): void
+    {
+        if (null === $returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($result as $i => $name) {
+            $slot = new Variable();
+            $slot->string($name);
+            $ht->add((string) $i, $slot);
+        }
+        $returnVar->array($ht);
+    }
+}
+
+/**
+ * ZipArchive::addPattern(string $pattern, string $path = ".", array $options = []) — (#20387).
+ */
+final class ZipArchiveAddPattern extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('addPattern');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::addPattern()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::addPattern() expects at least 1 argument, 0 given');
+        }
+        $pattern = $this->stringArg($frame->calledArgs[1], 'ZipArchive::addPattern', 1, 'pattern');
+        $path = \count($frame->calledArgs) >= 3
+            ? $this->stringArg($frame->calledArgs[2], 'ZipArchive::addPattern', 2, 'path')
+            : '.';
+        $options = [];
+        if (\count($frame->calledArgs) >= 4) {
+            $optVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $optVar->type) {
+                throw new \TypeError(\sprintf(
+                    'ZipArchive::addPattern(): Argument #3 ($options) must be of type array, %s given',
+                    EnumCaseSupport::typeNameForVariable($optVar)
+                ));
+            }
+            $options = [];
+        }
+        $result = VmZipArchive::addPattern($receiver, $pattern, $path, $options);
+        ZipArchiveAddGlob::assignStringListOrFalse($frame->returnVar, $result);
+    }
+}

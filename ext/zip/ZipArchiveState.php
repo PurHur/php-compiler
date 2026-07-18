@@ -26,6 +26,29 @@ final class ZipArchiveState
     public string $archiveComment = '';
 
     /**
+     * Pristine entry snapshot taken on open — zip_unchange* (#20387).
+     *
+     * @var list<array{
+     *     name: string,
+     *     data: string,
+     *     crc: int,
+     *     size: int,
+     *     mtime?: int,
+     *     comp_method?: int,
+     *     opsys?: int,
+     *     external_attr?: int,
+     *     encryption_method?: int,
+     *     encryption_password?: string,
+     *     comment?: string,
+     *     orig_index?: int
+     * }>
+     */
+    public array $snapshotEntries = [];
+
+    /** Archive comment at open — zip_unchange_archive (#20387). */
+    public string $snapshotArchiveComment = '';
+
+    /**
      * Progress callback for registerProgressCallback (#20378).
      * Honest subset: invoked at end of mutating ops with state=1.0 (no libzip progress ticks).
      */
@@ -48,7 +71,8 @@ final class ZipArchiveState
      *     external_attr?: int,
      *     encryption_method?: int,
      *     encryption_password?: string,
-     *     comment?: string
+     *     comment?: string,
+     *     orig_index?: int
      * }>
      */
     public array $entries = [];
