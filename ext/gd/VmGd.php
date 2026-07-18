@@ -50,7 +50,7 @@ final class VmGd
     /**
      * imagetypes() — honest format bitmask for this build (php-src; #20471).
      *
-     * Advertises GIF/JPG/PNG/WEBP/BMP/AVIF/WBMP (encoders present). Omits XPM/TGA
+     * Advertises GIF/JPG/PNG/WEBP/BMP/AVIF/WBMP/TGA (encoders/readers present). Omits XPM
      * (XPM soft-fails — no libXpm; #20472).
      */
     public static function imageTypesMask(): int
@@ -61,7 +61,8 @@ final class VmGd
             | self::IMG_WEBP
             | self::IMG_BMP
             | self::IMG_AVIF
-            | self::IMG_WBMP;
+            | self::IMG_WBMP
+            | self::IMG_TGA;
     }
 
     /**
@@ -83,7 +84,7 @@ final class VmGd
             'WebP Support' => true,
             'BMP Support' => true,
             'AVIF Support' => true,
-            'TGA Read Support' => false,
+            'TGA Read Support' => true,
             'JIS-mapped Japanese Font Support' => false,
         ];
         if ($ft) {
@@ -4157,6 +4158,27 @@ final class VmGd
         }
 
         return self::attachGdDecoded($frame, $decoded, 'imagecreatefromgd2part');
+    }
+
+    public static function createFromTgaBytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdTga::decodeRgb($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefromtga');
+
+            return false;
+        }
+        [$width, $height, $pixels, $hasAlpha] = $decoded;
+        $entry = self::attachRasterImage($frame, $width, $height, $pixels, VmImage::IMAGETYPE_PNG, 'imagecreatefromtga');
+        if ($hasAlpha) {
+            $state = GdRegistry::state($entry);
+            if (null !== $state) {
+                $state->alphaBlending = 0;
+                $state->saveAlpha = true;
+            }
+        }
+
+        return $entry;
     }
 
     /**

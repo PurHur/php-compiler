@@ -155,6 +155,7 @@ class Module extends ModuleAbstract
             $functions[] = new imagecreatefromgd();
             $functions[] = new imagecreatefromgd2();
             $functions[] = new imagecreatefromgd2part();
+            $functions[] = new imagecreatefromtga();
         }
 
         return $functions;
