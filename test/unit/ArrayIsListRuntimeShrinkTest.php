@@ -28,6 +28,21 @@ final class ArrayIsListRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('JitArrayIsList::invoke', $builtin);
     }
 
+    public function testNestedHelperCoerceExtractsBoolFromHelperResult(): void
+    {
+        $coerce = (string) file_get_contents(__DIR__.'/../../lib/JIT/JitNestedHelperCoerce.php');
+        $this->assertStringContainsString('extractBoolFromHelperResult', $coerce);
+        $this->assertMatchesRegularExpression(
+            '/function coerceBridgeResult\(.*?extractBoolFromHelperResult/s',
+            $coerce
+        );
+        // Must not route bool boxes through readLong (#8555 / #20652).
+        $this->assertMatchesRegularExpression(
+            '/function extractBoolFromHelperResult\(.*?int1.*?isValueBox/s',
+            $coerce
+        );
+    }
+
     public function testArrayIsListJitHelperMatchesVmIsListSemantics(): void
     {
         $this->assertTrue(ArrayIsListJitHelper::isList(new HashTable()));
