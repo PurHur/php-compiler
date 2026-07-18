@@ -655,6 +655,7 @@ class Module extends ModuleAbstract
             new phpc_native_ht_set_string_key_long(),
             new phpc_native_environ_mirror_into_ht(),
             new phpc_rename_kernel(),
+            new phpc_getenv_kernel(),
             new phpc_readfile_kernel(),
             new phpc_file_put_contents_kernel(),
             new phpc_stat_mode_kernel(),

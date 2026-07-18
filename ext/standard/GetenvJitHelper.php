@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Lowered into JIT/AOT modules for getenv()/putenv() overlay (#9092, #8992 php-in-PHP).
+ * Lowered into JIT/AOT modules for getenv()/putenv() overlay (#9092, #8992, #20644 php-in-PHP).
  *
- * Overlay mutations and inherited environ lookup — no libc getenv/putenv in VM/JIT overlay path.
+ * Overlay mutations in PHP; inherited environ via {@see GetenvLookupJitHelper} /
+ * {@see phpc_getenv_kernel} under thin AOT NestedJIT.
  * php-src: ext/standard/basic_functions.c — zif_getenv, zif_putenv
  */
 final class GetenvJitHelper
@@ -36,13 +37,11 @@ final class GetenvJitHelper
         if (\array_key_exists($name, self::$local)) {
             return self::$local[$name];
         }
-
-        $environ = VmEnvEnvironNative::enumerate();
-        if (!\array_key_exists($name, $environ)) {
+        if (0 !== $localOnly) {
             return false;
         }
 
-        return $environ[$name];
+        return GetenvLookupJitHelper::fromEnviron($name, 0) ?? false;
     }
 
     /** @return array<string, string> */

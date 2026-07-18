@@ -754,7 +754,8 @@ class Context {
             'phpc_nextafter_kernel',
             'phpc_hypot_kernel',
             'phpc_sqrt_kernel',
-            'phpc_rename_kernel' => true,
+            'phpc_rename_kernel',
+            'phpc_getenv_kernel' => true,
             default => false,
         };
     }
