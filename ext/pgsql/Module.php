@@ -64,6 +64,7 @@ class Module extends ModuleAbstract
 
         require_once __DIR__.'/pg_lo_builtins.php';
         require_once __DIR__.'/pg_copy_meta_builtins.php';
+        require_once __DIR__.'/pg_async_builtins.php';
 
         return [
             new pg_connect(),
@@ -94,6 +95,9 @@ class Module extends ModuleAbstract
             new pg_field_table(),
             new pg_field_type_oid(),
             new pg_field_is_null(),
+            new pg_socket(),
+            new pg_consume_input(),
+            new pg_flush(),
             ...self::php84Functions(),
         ];
     }
