@@ -253,7 +253,8 @@ final class VmSoapClient
         string $location,
         string $action,
         int $version,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        bool $digestRetry = false
     ): string {
         $state = self::state($object);
         $state->lastRequest = $request;
@@ -261,7 +262,7 @@ final class VmSoapClient
         [$bodyOut, $contentEncoding, $acceptEncoding] = self::applyRequestCompression($state, $request);
 
         $cookieHeader = self::formatCookieHeader($state->cookies);
-        $authHeader = self::formatAuthorizationHeader($state);
+        $authHeader = self::formatAuthorizationHeader($state, $location);
         $proxyAuthHeader = self::formatProxyAuthorizationHeader($state);
         $useProxy = self::usesHttpProxy($state, $location);
         $requestHeaders = self::buildHttpRequestHeaders(
@@ -281,6 +282,26 @@ final class VmSoapClient
 
         $path = self::localPathFromLocation($location);
         if (null !== $path) {
+            // Fixture Digest challenge sidecar (php-src 401 WWW-Authenticate path) (#20340).
+            // Only when SOAP_AUTHENTICATION_DIGEST — Basic login fixtures share the same
+            // response file and must keep Authorization: Basic (#20312).
+            $challengePath = $path.'.digest-challenge';
+            if (
+                !$digestRetry
+                && SoapConstants::SOAP_AUTHENTICATION_DIGEST === $state->authentication
+                && null === $state->digest
+                && null !== $state->login
+                && null !== $state->password
+                && \is_file($challengePath)
+            ) {
+                $challengeLine = \trim((string) \file_get_contents($challengePath));
+                if ('' !== $challengeLine && self::ingestDigestChallenge($state, $challengeLine)) {
+                    $state->lastResponseHeaders = "HTTP/1.1 401 Unauthorized\r\n".
+                        'WWW-Authenticate: '.$challengeLine."\r\n";
+
+                    return self::doRequest($object, $request, $location, $action, $version, $frame, true);
+                }
+            }
             $body = @\file_get_contents($path);
             if (false === $body) {
                 throw new \SoapFault('HTTP', 'Could not read SOAP response fixture: '.$path);
@@ -336,6 +357,19 @@ final class VmSoapClient
         $responseHeaders = '';
         if (isset($http_response_header) && \is_array($http_response_header) && $http_response_header !== []) {
             $responseHeaders = \implode("\r\n", $http_response_header)."\r\n";
+        }
+        // php-src: HTTP 401 + WWW-Authenticate Digest → store challenge and retry (#20340).
+        if (
+            !$digestRetry
+            && null === $state->digest
+            && null !== $state->login
+            && null !== $state->password
+            && self::responseIsUnauthorized($responseHeaders)
+            && self::ingestDigestChallengeFromHeaders($state, $responseHeaders)
+        ) {
+            $state->lastResponseHeaders = $responseHeaders;
+
+            return self::doRequest($object, $request, $location, $action, $version, $frame, true);
         }
         $body = self::maybeDecompressResponse($body, $responseHeaders);
         $state->lastResponse = $body;
@@ -430,23 +464,180 @@ final class VmSoapClient
     }
 
     /**
-     * HTTP Authorization header line (no trailing CRLF) — php-src php_http.c (#20312).
+     * HTTP Authorization header line (no trailing CRLF) — php-src php_http.c (#20312, #20340).
      *
-     * Digest is not implemented in this child; only Basic when login is set.
+     * Digest when challenge params are stored; Basic when login set and not DIGEST-only mode
+     * without a challenge yet (SOAP_AUTHENTICATION_DIGEST suppresses Basic until challenge).
      */
-    private static function formatAuthorizationHeader(SoapClientState $state): string
+    private static function formatAuthorizationHeader(SoapClientState $state, string $location = ''): string
     {
         if (null === $state->login) {
             return '';
         }
+        if (null !== $state->digest) {
+            return self::formatDigestAuthorizationHeader($state, $location);
+        }
         if (SoapConstants::SOAP_AUTHENTICATION_DIGEST === $state->authentication) {
-            // Digest requires a challenge/response exchange; leave for a follow-up child.
+            // php-src basic_authentication: skip Basic when _use_digest (#20340).
             return '';
         }
         $user = $state->login;
         $pass = null !== $state->password ? $state->password : '';
 
         return 'Authorization: Basic '.\base64_encode($user.':'.$pass);
+    }
+
+    /**
+     * Authorization: Digest … — php-src php_http.c digest branch (#20340).
+     *
+     * @param array<string, string|int> $digest
+     */
+    private static function formatDigestAuthorizationHeader(SoapClientState $state, string $location): string
+    {
+        $digest = $state->digest;
+        if (null === $digest || null === $state->login) {
+            return '';
+        }
+        $user = $state->login;
+        $pass = null !== $state->password ? $state->password : '';
+        $realm = isset($digest['realm']) ? (string) $digest['realm'] : '';
+        $nonce = isset($digest['nonce']) ? (string) $digest['nonce'] : '';
+        $qop = isset($digest['qop']) ? (string) $digest['qop'] : '';
+        $opaque = isset($digest['opaque']) ? (string) $digest['opaque'] : '';
+        $algorithm = isset($digest['algorithm']) ? (string) $digest['algorithm'] : '';
+
+        $ncInt = isset($digest['nc']) ? (int) $digest['nc'] + 1 : 1;
+        $digest['nc'] = $ncInt;
+        $state->digest = $digest;
+        $nc = \sprintf('%08d', $ncInt);
+
+        // php-src: 16 random bytes → hex, but only first 8 hex chars used in header/HA1-sess.
+        try {
+            $cnonceFull = \bin2hex(\random_bytes(16));
+        } catch (\Throwable $e) {
+            $cnonceFull = \bin2hex(\pack('d*', \microtime(true), \mt_rand()));
+        }
+        $cnonce = \substr($cnonceFull, 0, 8);
+
+        $ha1 = \md5($user.':'.$realm.':'.$pass);
+        if (0 === \strcasecmp($algorithm, 'md5-sess')) {
+            $ha1 = \md5($ha1.':'.$nonce.':'.$cnonce);
+        }
+
+        $uriPath = self::digestUriPath($location);
+        $ha2 = \md5('POST:'.$uriPath);
+
+        if ('' !== $qop) {
+            $response = \md5($ha1.':'.$nonce.':'.$nc.':'.$cnonce.':auth:'.$ha2);
+        } else {
+            $response = \md5($ha1.':'.$nonce.':'.$ha2);
+        }
+
+        $hdr = 'Authorization: Digest username="'.$user.'"';
+        if ('' !== $realm) {
+            $hdr .= ', realm="'.$realm.'"';
+        }
+        if ('' !== $nonce) {
+            $hdr .= ', nonce="'.$nonce.'"';
+        }
+        $hdr .= ', uri="'.$uriPath.'"';
+        if ('' !== $qop) {
+            $hdr .= ', qop=auth, nc='.$nc.', cnonce="'.$cnonce.'"';
+        }
+        $hdr .= ', response="'.$response.'"';
+        if ('' !== $opaque) {
+            $hdr .= ', opaque="'.$opaque.'"';
+        }
+        if ('' !== $algorithm) {
+            $hdr .= ', algorithm="'.$algorithm.'"';
+        }
+
+        return $hdr;
+    }
+
+    private static function digestUriPath(string $location): string
+    {
+        if (\preg_match('#^https?://[^/]+(/.*)?$#i', $location, $m)) {
+            return isset($m[1]) && '' !== $m[1] ? $m[1] : '/';
+        }
+
+        return '/' !== $location && '' !== $location ? $location : '/';
+    }
+
+    private static function responseIsUnauthorized(string $responseHeaders): bool
+    {
+        return 1 === \preg_match('/^HTTP\/\d(?:\.\d)?\s+401\b/im', $responseHeaders);
+    }
+
+    private static function ingestDigestChallengeFromHeaders(SoapClientState $state, string $responseHeaders): bool
+    {
+        if (!\preg_match('/^WWW-Authenticate:\s*(.+)$/im', $responseHeaders, $m)) {
+            return false;
+        }
+
+        return self::ingestDigestChallenge($state, \trim($m[1]));
+    }
+
+    /**
+     * Parse "Digest realm=…, nonce=…" into SoapClientState::$digest (php-src 401 handler).
+     */
+    private static function ingestDigestChallenge(SoapClientState $state, string $authLine): bool
+    {
+        if (!\str_starts_with($authLine, 'Digest')) {
+            return false;
+        }
+        $s = \substr($authLine, \strlen('Digest'));
+        $digest = [];
+        $len = \strlen($s);
+        $i = 0;
+        while ($i < $len) {
+            while ($i < $len && ' ' === $s[$i]) {
+                ++$i;
+            }
+            if ($i >= $len) {
+                break;
+            }
+            $nameStart = $i;
+            while ($i < $len && '=' !== $s[$i]) {
+                ++$i;
+            }
+            if ($i >= $len || '=' !== $s[$i]) {
+                break;
+            }
+            $name = \substr($s, $nameStart, $i - $nameStart);
+            ++$i;
+            if ($i < $len && '"' === $s[$i]) {
+                ++$i;
+                $valStart = $i;
+                while ($i < $len && '"' !== $s[$i]) {
+                    ++$i;
+                }
+                $val = \substr($s, $valStart, $i - $valStart);
+                if ($i < $len) {
+                    ++$i;
+                }
+            } else {
+                $valStart = $i;
+                while ($i < $len && ' ' !== $s[$i] && ',' !== $s[$i]) {
+                    ++$i;
+                }
+                $val = \substr($s, $valStart, $i - $valStart);
+            }
+            while ($i < $len && ',' !== $s[$i] && ' ' !== $s[$i]) {
+                ++$i;
+            }
+            while ($i < $len && (',' === $s[$i] || ' ' === $s[$i])) {
+                ++$i;
+            }
+            $digest[$name] = $val;
+        }
+        if ($digest === []) {
+            return false;
+        }
+        $state->digest = $digest;
+        $state->authentication = SoapConstants::SOAP_AUTHENTICATION_DIGEST;
+
+        return true;
     }
 
     /**
@@ -959,6 +1150,13 @@ final class SoapClientState
     public ?string $password = null;
 
     public int $authentication = SoapConstants::SOAP_AUTHENTICATION_BASIC;
+
+    /**
+     * Parsed WWW-Authenticate Digest params (php-src _digest) (#20340).
+     *
+     * @var array<string, string|int>|null
+     */
+    public ?array $digest = null;
 
     /** php-src Z_CLIENT_COMPRESSION — null when unset (#20313). */
     public ?int $compression = null;
