@@ -63,6 +63,9 @@ class Module extends ModuleAbstract
             $functions[] = new imagesavealpha();
             $functions[] = new imageantialias();
             $functions[] = new imagesetthickness();
+            $functions[] = new imageistruecolor();
+            $functions[] = new imagetruecolortopalette();
+            $functions[] = new imagepalettetotruecolor();
             $functions[] = new imagefill();
             $functions[] = new imagedestroy();
             $functions[] = new imagesx();

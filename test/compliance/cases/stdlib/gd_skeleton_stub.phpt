@@ -1,17 +1,17 @@
 --TEST--
-stdlib gd imagecreate skeleton stub (issue #7407)
+stdlib gd imagecreate palette canvas (issue #7407, #20415)
 --FILE--
 <?php
 echo 'function_exists=', var_export(function_exists('imagecreate'), true), "\n";
 echo 'extension_loaded=', var_export(extension_loaded('gd'), true), "\n";
-try {
-    imagecreate(1, 1);
-    echo "no_throw\n";
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+$im = imagecreate(4, 4);
+echo 'is_gdimage=', var_export($im instanceof GdImage, true), "\n";
+echo 'istruecolor=', var_export(imageistruecolor($im), true), "\n";
+echo 'sx=', imagesx($im), ' sy=', imagesy($im), "\n";
 ?>
 --EXPECT--
 function_exists=true
 extension_loaded=true
-Error: imagecreate() is not implemented in this compiler build (issue #3496)
+is_gdimage=true
+istruecolor=false
+sx=4 sy=4

@@ -7,9 +7,10 @@ namespace PHPCompiler\ext\gd;
 use PHPCompiler\ext\standard\VmImage;
 
 /**
- * GdImage payload for {@see VmGd} (php-src ext/gd/gd.c; #6215, #3496).
+ * GdImage payload for {@see VmGd} (php-src ext/gd/gd.c; #6215, #3496, #20415).
  *
- * Decode path stores pre-encoded PNG bytes; drawing path stores a truecolor raster.
+ * Decode path stores pre-encoded PNG bytes; drawing path stores a raster
+ * (truecolor ARGB ints, or palette indices + {@see $colors}).
  */
 final class GdImageState
 {
@@ -21,10 +22,17 @@ final class GdImageState
 
     public int $height;
 
-    /** @var list<int> */
+    /** @var list<int> truecolor ARGB or palette indices */
     public array $pixels;
 
     public bool $truecolor;
+
+    /**
+     * Palette RGB entries (opaque ARGB with alpha 0) when !$truecolor.
+     *
+     * @var list<int>
+     */
+    public array $colors;
 
     /**
      * libgd alphaBlendingFlag — default on for truecolor (php-src ext/gd/libgd/gd.c; #6535).
@@ -47,7 +55,13 @@ final class GdImageState
     public bool $antiAlias;
 
     /**
+     * gdInterpolationMethod — default GD_BILINEAR_FIXED (php-src ext/gd/libgd/gd.c; #20416).
+     */
+    public int $interpolationId;
+
+    /**
      * @param list<int> $pixels
+     * @param list<int> $colors
      */
     private function __construct(
         string $encoded,
@@ -56,10 +70,12 @@ final class GdImageState
         int $height,
         array $pixels,
         bool $truecolor,
+        array $colors = [],
         bool $alphaBlending = true,
         bool $saveAlpha = false,
         int $thick = 1,
-        bool $antiAlias = false
+        bool $antiAlias = false,
+        int $interpolationId = 3
     ) {
         $this->encoded = $encoded;
         $this->imageType = $imageType;
@@ -67,22 +83,32 @@ final class GdImageState
         $this->height = $height;
         $this->pixels = $pixels;
         $this->truecolor = $truecolor;
+        $this->colors = $colors;
         $this->alphaBlending = $alphaBlending;
         $this->saveAlpha = $saveAlpha;
         $this->thick = $thick;
         $this->antiAlias = $antiAlias;
+        $this->interpolationId = $interpolationId;
     }
 
     public static function fromEncoded(string $encoded, int $imageType): self
     {
-        return new self($encoded, $imageType, 0, 0, [], false, true, false);
+        return new self($encoded, $imageType, 0, 0, [], false, [], true, false);
     }
 
     public static function createTruecolor(int $width, int $height): self
     {
         $pixels = array_fill(0, $width * $height, 0);
 
-        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true, true, false);
+        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true, [], true, false);
+    }
+
+    public static function createPalette(int $width, int $height): self
+    {
+        $pixels = array_fill(0, $width * $height, 0);
+
+        // Palette canvases start with alpha blending off (php-src gdImageCreate).
+        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, false, [], false, false);
     }
 
     /**
@@ -90,12 +116,12 @@ final class GdImageState
      */
     public static function fromRaster(int $width, int $height, array $pixels): self
     {
-        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true, true, false);
+        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true, [], true, false);
     }
 
     public function hasRaster(): bool
     {
-        return $this->truecolor && $this->width > 0 && $this->height > 0;
+        return $this->width > 0 && $this->height > 0;
     }
 
     public function hasEncoded(): bool

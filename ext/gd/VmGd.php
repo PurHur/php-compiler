@@ -81,17 +81,209 @@ final class VmGd
         return $entry;
     }
 
+    /**
+     * imagecreate() — palette canvas (php-src gdImageCreate; #20415).
+     */
+    public static function createPaletteImage(Frame $frame, int $width, int $height): ObjectEntry|false
+    {
+        if ($width <= 0 || $height <= 0) {
+            self::warnInvalidDimensions($frame, 'imagecreate');
+
+            return false;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('imagecreate() requires VM context');
+        }
+        $class = $ctx->classes[self::CLASS_GDIMAGE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('GdImage is not registered in this compiler build');
+        }
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        GdRegistry::attach($entry, GdImageState::createPalette($width, $height));
+
+        return $entry;
+    }
+
+    /**
+     * imageistruecolor() — im->trueColor (php-src ext/gd/gd.c; #20415).
+     */
+    public static function isTruecolor(ObjectEntry $image): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+
+        return $state->truecolor;
+    }
+
+    /**
+     * imagetruecolortopalette() — gdImageTrueColorToPalette (php-src ext/gd/gd.c; #20415).
+     *
+     * Honest PHP quantization: exact map when unique colors fit; otherwise popularity
+     * sampling + nearest-color remap with optional Floyd–Steinberg dither.
+     */
+    public static function trueColorToPalette(
+        Frame $frame,
+        ObjectEntry $image,
+        bool $dither,
+        int $numColors
+    ): bool {
+        if ($numColors <= 0 || $numColors >= 2147483647) {
+            throw new \ValueError(
+                'imagetruecolortopalette(): Argument #3 ($num_colors) must be greater than 0 and less than 2147483647'
+            );
+        }
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if (!$state->truecolor) {
+            return true;
+        }
+        $wanted = $numColors > 256 ? 256 : $numColors;
+        if ($wanted < 1) {
+            self::warnCouldNotConvertToPalette($frame);
+
+            return false;
+        }
+
+        $pixels = $state->pixels;
+        $n = $state->width * $state->height;
+        $counts = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $rgb = $pixels[$i] & 0xFFFFFF;
+            $counts[$rgb] = ($counts[$rgb] ?? 0) + 1;
+        }
+        arsort($counts, SORT_NUMERIC);
+        $paletteKeys = array_keys($counts);
+        if (\count($paletteKeys) > $wanted) {
+            $paletteKeys = array_slice($paletteKeys, 0, $wanted);
+        }
+        $palette = [];
+        foreach ($paletteKeys as $rgb) {
+            $palette[] = $rgb & 0xFFFFFF;
+        }
+        if ([] === $palette) {
+            $palette[] = 0;
+        }
+
+        $indexOf = [];
+        foreach ($palette as $idx => $rgb) {
+            $indexOf[$rgb] = $idx;
+        }
+
+        $mapped = [];
+        if ($dither) {
+            $width = $state->width;
+            $height = $state->height;
+            $work = [];
+            for ($i = 0; $i < $n; ++$i) {
+                $c = $pixels[$i];
+                $work[$i] = [
+                    (float) (($c >> 16) & 0xFF),
+                    (float) (($c >> 8) & 0xFF),
+                    (float) ($c & 0xFF),
+                ];
+            }
+            for ($y = 0; $y < $height; ++$y) {
+                for ($x = 0; $x < $width; ++$x) {
+                    $pos = $y * $width + $x;
+                    $r = (int) max(0, min(255, (int) round($work[$pos][0])));
+                    $g = (int) max(0, min(255, (int) round($work[$pos][1])));
+                    $b = (int) max(0, min(255, (int) round($work[$pos][2])));
+                    $idx = self::nearestPaletteIndex($palette, $r, $g, $b);
+                    $mapped[$pos] = $idx;
+                    $pr = ($palette[$idx] >> 16) & 0xFF;
+                    $pg = ($palette[$idx] >> 8) & 0xFF;
+                    $pb = $palette[$idx] & 0xFF;
+                    $er = $work[$pos][0] - $pr;
+                    $eg = $work[$pos][1] - $pg;
+                    $eb = $work[$pos][2] - $pb;
+                    self::ditherDiffuse($work, $width, $height, $x, $y, $er, $eg, $eb);
+                }
+            }
+        } else {
+            for ($i = 0; $i < $n; ++$i) {
+                $rgb = $pixels[$i] & 0xFFFFFF;
+                if (isset($indexOf[$rgb])) {
+                    $mapped[$i] = $indexOf[$rgb];
+                } else {
+                    $mapped[$i] = self::nearestPaletteIndex(
+                        $palette,
+                        ($rgb >> 16) & 0xFF,
+                        ($rgb >> 8) & 0xFF,
+                        $rgb & 0xFF
+                    );
+                }
+            }
+        }
+
+        $state->pixels = $mapped;
+        $state->colors = $palette;
+        $state->truecolor = false;
+        $state->alphaBlending = false;
+        $state->encoded = '';
+
+        return true;
+    }
+
+    /**
+     * imagepalettetotruecolor() — gdImagePaletteToTrueColor (php-src ext/gd/gd.c; #20415).
+     */
+    public static function paletteToTrueColor(ObjectEntry $image): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if ($state->truecolor) {
+            return true;
+        }
+        $colors = $state->colors;
+        $n = $state->width * $state->height;
+        $pixels = $state->pixels;
+        $expanded = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $idx = $pixels[$i];
+            $expanded[$i] = isset($colors[$idx]) ? ($colors[$idx] & 0xFFFFFF) : 0;
+        }
+        $state->pixels = $expanded;
+        $state->colors = [];
+        $state->truecolor = true;
+        $state->alphaBlending = true;
+        $state->encoded = '';
+
+        return true;
+    }
+
     public static function colorAllocate(ObjectEntry $image, int $red, int $green, int $blue): int|false
     {
         $state = GdRegistry::state($image);
-        if (null === $state || !$state->hasRaster() || !$state->truecolor) {
+        if (null === $state || !$state->hasRaster()) {
             return false;
         }
         if ($red < 0 || $red > 255 || $green < 0 || $green > 255 || $blue < 0 || $blue > 255) {
             return false;
         }
+        $rgb = ($red << 16) | ($green << 8) | $blue;
+        if ($state->truecolor) {
+            return $rgb;
+        }
+        foreach ($state->colors as $idx => $existing) {
+            if (($existing & 0xFFFFFF) === $rgb) {
+                return $idx;
+            }
+        }
+        if (\count($state->colors) >= 256) {
+            return false;
+        }
+        $state->colors[] = $rgb;
 
-        return ($red << 16) | ($green << 8) | $blue;
+        return \count($state->colors) - 1;
     }
 
     /**
@@ -1337,11 +1529,12 @@ final class VmGd
             return $state->encoded;
         }
         if ($state->hasRaster()) {
+            $pixels = self::truecolorPixelsForEncode($state);
             if ($state->saveAlpha) {
-                return VmGdPng::encodeRgba($state->width, $state->height, $state->pixels);
+                return VmGdPng::encodeRgba($state->width, $state->height, $pixels);
             }
 
-            return VmGdPng::encodeRgb($state->width, $state->height, $state->pixels);
+            return VmGdPng::encodeRgb($state->width, $state->height, $pixels);
         }
 
         throw new \TypeError('imagepng(): Argument #1 ($image) must be of type GdImage');
@@ -1361,7 +1554,7 @@ final class VmGd
             throw new \TypeError('imagewebp(): Argument #1 ($image) must be of type GdImage');
         }
         if ($state->hasRaster()) {
-            return VmGdWebp::encodeRgb($state->width, $state->height, $state->pixels);
+            return VmGdWebp::encodeRgb($state->width, $state->height, self::truecolorPixelsForEncode($state));
         }
         if ($state->hasEncoded() && VmImage::IMAGETYPE_WEBP === $state->imageType) {
             return $state->encoded;
@@ -1384,7 +1577,7 @@ final class VmGd
             throw new \TypeError('imageavif(): Argument #1 ($image) must be of type GdImage');
         }
         if ($state->hasRaster()) {
-            return VmGdAvif::encodeRgb($state->width, $state->height, $state->pixels);
+            return VmGdAvif::encodeRgb($state->width, $state->height, self::truecolorPixelsForEncode($state));
         }
         if ($state->hasEncoded() && VmImage::IMAGETYPE_AVIF === $state->imageType) {
             return $state->encoded;
@@ -1458,7 +1651,7 @@ final class VmGd
         int $arg4
     ): bool {
         $state = GdRegistry::state($image);
-        if (null === $state || !$state->hasRaster()) {
+        if (null === $state || !$state->hasRaster() || !$state->truecolor) {
             return false;
         }
 
@@ -1911,6 +2104,100 @@ final class VmGd
         );
     }
 
+    private static function warnCouldNotConvertToPalette(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            'imagetruecolortopalette(): Couldn\'t convert to palette',
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    /**
+     * Expand palette indices to truecolor RGB for encoders (#20415).
+     *
+     * @return list<int>
+     */
+    private static function truecolorPixelsForEncode(GdImageState $state): array
+    {
+        if ($state->truecolor) {
+            return $state->pixels;
+        }
+        $colors = $state->colors;
+        $n = $state->width * $state->height;
+        $out = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $idx = $state->pixels[$i];
+            $out[$i] = isset($colors[$idx]) ? ($colors[$idx] & 0xFFFFFF) : 0;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $palette
+     */
+    private static function nearestPaletteIndex(array $palette, int $r, int $g, int $b): int
+    {
+        $best = 0;
+        $bestDist = PHP_INT_MAX;
+        foreach ($palette as $idx => $rgb) {
+            $pr = ($rgb >> 16) & 0xFF;
+            $pg = ($rgb >> 8) & 0xFF;
+            $pb = $rgb & 0xFF;
+            $dr = $pr - $r;
+            $dg = $pg - $g;
+            $db = $pb - $b;
+            $dist = $dr * $dr + $dg * $dg + $db * $db;
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $best = $idx;
+                if (0 === $dist) {
+                    break;
+                }
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Floyd–Steinberg error diffusion for truecolor→palette (#20415).
+     *
+     * @param list<array{0: float, 1: float, 2: float}> $work
+     */
+    private static function ditherDiffuse(
+        array &$work,
+        int $width,
+        int $height,
+        int $x,
+        int $y,
+        float $er,
+        float $eg,
+        float $eb
+    ): void {
+        $neighbors = [
+            [$x + 1, $y, 7 / 16],
+            [$x - 1, $y + 1, 3 / 16],
+            [$x, $y + 1, 5 / 16],
+            [$x + 1, $y + 1, 1 / 16],
+        ];
+        foreach ($neighbors as [$nx, $ny, $w]) {
+            if ($nx < 0 || $ny < 0 || $nx >= $width || $ny >= $height) {
+                continue;
+            }
+            $pos = $ny * $width + $nx;
+            $work[$pos][0] += $er * $w;
+            $work[$pos][1] += $eg * $w;
+            $work[$pos][2] += $eb * $w;
+        }
+    }
+
     private static function typeLabel(Variable $var): string
     {
         $var = $var->resolveIndirect();
@@ -1986,7 +2273,13 @@ final class VmGd
             'imagepng', 'imagewebp', 'imageavif' => 1 === $position ? 'image' : 'arg',
             'imagecreatefromstring' => 'image',
             'imagecreatefromwebp', 'imagecreatefromavif' => 'filename',
-            'imagesx', 'imagesy' => 'image',
+            'imagesx', 'imagesy', 'imageistruecolor', 'imagepalettetotruecolor', 'imagedestroy' => 'image',
+            'imagetruecolortopalette' => match ($position) {
+                1 => 'image',
+                2 => 'dither',
+                3 => 'num_colors',
+                default => 'arg',
+            },
             'imagealphablending', 'imagesavealpha', 'imageantialias' => match ($position) {
                 1 => 'image',
                 2 => 'enable',
