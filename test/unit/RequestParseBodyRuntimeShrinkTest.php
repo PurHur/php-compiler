@@ -6,7 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** request_parse_body user-script AOT kernel quarantined in ext/standard (#19466, #5965). */
+/**
+ * request_parse_body user-script AOT kernel quarantined in ext/standard (#19466, #5965, #20521).
+ * Thin path gates on isThinStandaloneAotMain (no StreamIo defer bag).
+ */
 final class RequestParseBodyRuntimeShrinkTest extends TestCase
 {
     public function testUserScriptLlvmMovedToExtKernel(): void
@@ -16,10 +19,16 @@ final class RequestParseBodyRuntimeShrinkTest extends TestCase
 
         $builtin = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/RequestParseBodyRuntime.php');
         $this->assertStringNotContainsString('RequestParseBodyUserScriptLlvm', $builtin);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $builtin);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $builtin);
+        $this->assertStringNotContainsString('StreamIoRuntime', $builtin);
 
         $callsite = (string) file_get_contents(__DIR__.'/../../ext/standard/request_parse_body.php');
         $this->assertStringContainsString('JitRequestParseBodyKernel::ensureLinked', $callsite);
         $this->assertStringContainsString('JitRequestParseBodyKernel::BRIDGE_NAME', $callsite);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $callsite);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $callsite);
+        $this->assertStringNotContainsString('StreamIoRuntime', $callsite);
         $this->assertStringNotContainsString('RequestParseBodyUserScriptLlvm', $callsite);
 
         $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitRequestParseBodyKernel.php');
