@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5742 |
-| Phase A inventory files (M2 ratio SSOT) | 5742 |
+| PHP files on vm.php path | 5756 |
+| Phase A inventory files (M2 ratio SSOT) | 5756 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16589 |
+| Source constructs flagged (warnings) | 16642 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -415,18 +415,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/dom_import_simplexml.php` | 0 | 2 |
 | `ext/enchant/BuiltinClasses.php` | 0 | 1 |
 | `ext/enchant/EnchantExtensionPolicy.php` | 0 | 1 |
-| `ext/enchant/Module.php` | 0 | 8 |
+| `ext/enchant/Module.php` | 0 | 22 |
 | `ext/enchant/VmEnchantArg.php` | 0 | 1 |
 | `ext/enchant/VmEnchantBroker.php` | 0 | 5 |
-| `ext/enchant/VmEnchantCore.php` | 0 | 3 |
+| `ext/enchant/VmEnchantCore.php` | 0 | 13 |
 | `ext/enchant/VmEnchantDictionary.php` | 0 | 4 |
-| `ext/enchant/VmEnchantNative.php` | 0 | 1 |
+| `ext/enchant/VmEnchantNative.php` | 0 | 2 |
+| `ext/enchant/enchant_broker_describe.php` | 0 | 2 |
 | `ext/enchant/enchant_broker_dict_exists.php` | 0 | 2 |
 | `ext/enchant/enchant_broker_free.php` | 0 | 2 |
 | `ext/enchant/enchant_broker_free_dict.php` | 0 | 2 |
+| `ext/enchant/enchant_broker_get_error.php` | 0 | 2 |
 | `ext/enchant/enchant_broker_init.php` | 0 | 2 |
+| `ext/enchant/enchant_broker_list_dicts.php` | 0 | 2 |
 | `ext/enchant/enchant_broker_request_dict.php` | 0 | 2 |
+| `ext/enchant/enchant_broker_request_pwl_dict.php` | 0 | 2 |
+| `ext/enchant/enchant_broker_set_ordering.php` | 0 | 2 |
+| `ext/enchant/enchant_dict_add.php` | 0 | 2 |
+| `ext/enchant/enchant_dict_add_to_session.php` | 0 | 2 |
 | `ext/enchant/enchant_dict_check.php` | 0 | 2 |
+| `ext/enchant/enchant_dict_describe.php` | 0 | 2 |
+| `ext/enchant/enchant_dict_get_error.php` | 0 | 2 |
+| `ext/enchant/enchant_dict_is_added.php` | 0 | 2 |
+| `ext/enchant/enchant_dict_quick_check.php` | 0 | 2 |
+| `ext/enchant/enchant_dict_remove.php` | 0 | 2 |
+| `ext/enchant/enchant_dict_remove_from_session.php` | 0 | 2 |
+| `ext/enchant/enchant_dict_store_replacement.php` | 0 | 2 |
 | `ext/enchant/enchant_dict_suggest.php` | 0 | 2 |
 | `ext/exif/ExifImagetypeJitHelper.php` | 0 | 1 |
 | `ext/exif/JitExifImagetype.php` | 0 | 2 |
@@ -8239,48 +8253,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 5483)
 - new DOMException (line 5525)
 - new DOMException (line 5552)
-- new DOMException (line 6408)
-- new Variable (line 6436)
-- new DOMException (line 6706)
-- new DOMException (line 6824)
-- new DOMException (line 6869)
-- new ObjectEntry (line 6954)
-- new DomNodeState (line 6958)
-- new Variable (line 6965)
-- new DOMException (line 7019)
-- new ObjectEntry (line 7236)
-- new DomNodeState (line 7240)
-- new Variable (line 7247)
-- new ObjectEntry (line 7274)
-- new DomNodeState (line 7277)
-- new Variable (line 7285)
-- new Variable (line 7476)
-- new DOMException (line 7613)
-- new DOMException (line 7620)
-- new DOMException (line 7627)
-- new DOMException (line 7631)
-- new DOMException (line 7634)
-- new DOMException (line 7643)
+- new DOMException (line 6441)
+- new Variable (line 6471)
+- new DOMException (line 6741)
+- new DOMException (line 6859)
+- new DOMException (line 6904)
+- new ObjectEntry (line 6989)
+- new DomNodeState (line 6993)
+- new Variable (line 7000)
+- new DOMException (line 7054)
+- new ObjectEntry (line 7271)
+- new DomNodeState (line 7275)
+- new Variable (line 7282)
+- new ObjectEntry (line 7309)
+- new DomNodeState (line 7312)
+- new Variable (line 7320)
+- new Variable (line 7511)
+- new DOMException (line 7648)
 - new DOMException (line 7655)
-- new DOMException (line 8711)
-- new Variable (line 8770)
-- new Variable (line 8783)
-- new Variable (line 8821)
-- new DOMException (line 8832)
-- new Variable (line 8834)
-- new DOMException (line 8995)
-- new DOMException (line 9022)
-- new DOMException (line 9058)
-- new DOMException (line 9122)
-- new DOMException (line 9130)
-- new DOMException (line 9143)
-- new DOMException (line 9148)
-- new DOMException (line 9151)
-- new DOMException (line 9154)
+- new DOMException (line 7662)
+- new DOMException (line 7666)
+- new DOMException (line 7669)
+- new DOMException (line 7678)
+- new DOMException (line 7690)
+- new DOMException (line 8746)
+- new Variable (line 8805)
+- new Variable (line 8818)
+- new Variable (line 8856)
+- new DOMException (line 8867)
+- new Variable (line 8869)
+- new DOMException (line 9030)
+- new DOMException (line 9057)
+- new DOMException (line 9093)
+- new DOMException (line 9157)
+- new DOMException (line 9165)
+- new DOMException (line 9178)
 - new DOMException (line 9183)
-- new Error (line 10075)
-- new Error (line 10079)
-- 415 class method(s)
+- new DOMException (line 9186)
+- new DOMException (line 9189)
+- new DOMException (line 9218)
+- new Error (line 10110)
+- new Error (line 10114)
+- 417 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -8492,11 +8506,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new enchant_broker_init (line 38)
 - new enchant_broker_free (line 39)
-- new enchant_broker_request_dict (line 40)
-- new enchant_broker_free_dict (line 41)
-- new enchant_broker_dict_exists (line 42)
-- new enchant_dict_check (line 43)
-- new enchant_dict_suggest (line 44)
+- new enchant_broker_get_error (line 40)
+- new enchant_broker_list_dicts (line 41)
+- new enchant_broker_request_dict (line 42)
+- new enchant_broker_request_pwl_dict (line 43)
+- new enchant_broker_free_dict (line 44)
+- new enchant_broker_dict_exists (line 45)
+- new enchant_broker_set_ordering (line 46)
+- new enchant_broker_describe (line 47)
+- new enchant_dict_quick_check (line 48)
+- new enchant_dict_check (line 49)
+- new enchant_dict_suggest (line 50)
+- new enchant_dict_add (line 51)
+- new enchant_dict_remove (line 52)
+- new enchant_dict_add_to_session (line 53)
+- new enchant_dict_remove_from_session (line 54)
+- new enchant_dict_is_added (line 55)
+- new enchant_dict_store_replacement (line 56)
+- new enchant_dict_get_error (line 57)
+- new enchant_dict_describe (line 58)
 - 3 class method(s)
 
 ### `ext/enchant/VmEnchantArg.php`
@@ -8516,9 +8544,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/enchant/VmEnchantCore.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 59)
-- new Variable (line 61)
-- 5 class method(s)
+- new HashTable (line 104)
+- new Variable (line 106)
+- new HashTable (line 116)
+- new Variable (line 118)
+- new HashTable (line 134)
+- new Variable (line 136)
+- new HashTable (line 152)
+- new HashTable (line 160)
+- new Variable (line 162)
+- new HashTable (line 212)
+- new HashTable (line 223)
+- new Variable (line 225)
+- 20 class method(s)
 
 ### `ext/enchant/VmEnchantDictionary.php`
 
@@ -8531,7 +8569,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/enchant/VmEnchantNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 24 class method(s)
+- 3 closure(s)
+
+### `ext/enchant/enchant_broker_describe.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
 
 ### `ext/enchant/enchant_broker_dict_exists.php`
 
@@ -8551,10 +8596,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 27)
 - 2 class method(s)
 
+### `ext/enchant/enchant_broker_get_error.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
 ### `ext/enchant/enchant_broker_init.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/enchant/enchant_broker_list_dicts.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
 - 2 class method(s)
 
 ### `ext/enchant/enchant_broker_request_dict.php`
@@ -8563,7 +8620,73 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 28)
 - 2 class method(s)
 
+### `ext/enchant/enchant_broker_request_pwl_dict.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_broker_set_ordering.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_dict_add.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_dict_add_to_session.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
 ### `ext/enchant/enchant_dict_check.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_dict_describe.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_dict_get_error.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_dict_is_added.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_dict_quick_check.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_dict_remove.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_dict_remove_from_session.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_dict_store_replacement.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
