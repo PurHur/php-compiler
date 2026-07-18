@@ -40,6 +40,9 @@ final class DomLivingBuiltinClasses
         $element->isInternal = true;
         $element->parentLc = VmDomLiving::CLASS_NODE;
         $element->properties[] = new ClassProperty(VmDom::PROP_TEXT_CONTENT, $nullProto, new Variable(Variable::TYPE_STRING));
+        if (CompilerVersion::supportsDomTokenList()) {
+            $element->properties[] = new ClassProperty(VmDom::PROP_CLASS_LIST, $nullProto, $objProto);
+        }
         self::copyMethods($ctx->classes[VmDom::CLASS_ELEMENT] ?? null, $element);
         $element->methods['closest'] = new ElementClosest();
         $element->methodVisibility['closest'] = $pub;
@@ -59,6 +62,17 @@ final class DomLivingBuiltinClasses
         $htmlElement->isInternal = true;
         $htmlElement->parentLc = VmDomLiving::CLASS_ELEMENT;
         $ctx->classes[VmDomLiving::CLASS_HTML_ELEMENT] = $htmlElement;
+
+        if (CompilerVersion::supportsDomTokenList()) {
+            // Dom\TokenList is parallel to legacy DOMTokenList (php-src php_dom.stub.php; #20512).
+            $tokenList = new ClassEntry('Dom\\TokenList');
+            $tokenList->isInternal = true;
+            $tokenList->interfaces[] = 'countable';
+            $tokenList->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
+            $tokenList->properties[] = new ClassProperty(VmDom::PROP_VALUE, null, new Variable(Variable::TYPE_STRING));
+            self::copyMethods($ctx->classes[VmDom::CLASS_TOKEN_LIST] ?? null, $tokenList);
+            $ctx->classes[VmDomLiving::CLASS_TOKEN_LIST] = $tokenList;
+        }
 
         $document = new ClassEntry('Dom\\Document');
         $document->isInternal = true;

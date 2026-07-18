@@ -7072,7 +7072,14 @@ final class VmDom
 
     public static function createTokenList(Context $ctx, ObjectEntry $element): Variable
     {
-        $class = $ctx->classes[self::CLASS_TOKEN_LIST] ?? null;
+        // Dom\HTMLElement::$classList → Dom\TokenList; legacy DOMElement → DOMTokenList (#20512).
+        $classLc = VmDomLiving::isLivingElement($element)
+            ? VmDomLiving::CLASS_TOKEN_LIST
+            : self::CLASS_TOKEN_LIST;
+        $class = $ctx->classes[$classLc] ?? null;
+        if (null === $class && VmDomLiving::CLASS_TOKEN_LIST === $classLc) {
+            $class = $ctx->classes[self::CLASS_TOKEN_LIST] ?? null;
+        }
         if (null === $class) {
             throw new \LogicException('DOMTokenList is not registered in this compiler build');
         }
@@ -7096,8 +7103,12 @@ final class VmDom
 
     public static function isTokenList(ObjectEntry $entry): bool
     {
-        return self::CLASS_TOKEN_LIST === strtolower($entry->class->name)
-            && DomRegistry::has($entry)
+        $lc = strtolower($entry->class->name);
+        if (self::CLASS_TOKEN_LIST !== $lc && VmDomLiving::CLASS_TOKEN_LIST !== $lc) {
+            return false;
+        }
+
+        return DomRegistry::has($entry)
             && DomConstants::XML_TOKENLIST === DomRegistry::state($entry)->nodeType;
     }
 
@@ -9030,6 +9041,10 @@ final class VmDom
                 return $object;
             }
             if (self::CLASS_NODE === $classLc && self::isDomNode($object)) {
+                return $object;
+            }
+            // Dom\TokenList shares DOMTokenList method handlers (#20512).
+            if (self::CLASS_TOKEN_LIST === $classLc && self::isTokenList($object)) {
                 return $object;
             }
             throw new \TypeError(sprintf('%s must be called on a %s instance', $label, self::classNameFromLc($classLc)));

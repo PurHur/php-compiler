@@ -471,7 +471,7 @@ final class VmDomJitDispatch
     public static function dispatchItem(VmContext $ctx, ObjectEntry $receiver, array $extra): Variable
     {
         return match (strtolower($receiver->class->name)) {
-            'domtokenlist' => self::tokenListItem($receiver, $extra),
+            'domtokenlist', 'dom\\tokenlist' => self::tokenListItem($receiver, $extra),
             'domnodelist' => self::nodeListItem($ctx, $receiver, $extra),
             default => throw new \Error('Call to undefined method '.$receiver->class->name.'::item()'),
         };
@@ -546,7 +546,7 @@ final class VmDomJitDispatch
     public static function dispatchContains(ObjectEntry $receiver, array $extra): Variable
     {
         return match (strtolower($receiver->class->name)) {
-            'domtokenlist' => self::tokenListContains($receiver, $extra),
+            'domtokenlist', 'dom\\tokenlist' => self::tokenListContains($receiver, $extra),
             default => self::nodeContains($receiver, $extra),
         };
     }

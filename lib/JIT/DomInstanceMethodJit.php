@@ -404,6 +404,7 @@ final class DomInstanceMethodJit
         'domnode' => ['appendchild'],
         'domelement' => ['setattribute', 'removeattribute'],
         'domtokenlist' => ['add', 'contains', 'item', 'toggle', 'remove'],
+        'dom\\tokenlist' => ['add', 'contains', 'item', 'toggle', 'remove'],
         'domxpath' => ['query', 'evaluate', 'registernamespace', 'registerphpfunctions', 'registerphpfunctionns'],
         'domnodelist' => ['item'],
     ];
