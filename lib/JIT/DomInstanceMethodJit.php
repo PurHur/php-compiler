@@ -68,6 +68,11 @@ final class DomInstanceMethodJit
         'domelement::removechild' => true,
         'domnode::replacechild' => true,
         'domelement::replacechild' => true,
+        'domnode::normalize' => true,
+        'domelement::normalize' => true,
+        'domdocument::normalize' => true,
+        'domdocumentfragment::normalize' => true,
+        'domdocument::normalizedocument' => true,
         'domdocument::createdocumentfragment' => true,
         'domdocument::importnode' => true,
         'domdocument::adoptnode' => true,
@@ -275,6 +280,20 @@ final class DomInstanceMethodJit
 
                 return;
             }
+            if ('domnode::normalize' === $lc
+                || 'domelement::normalize' === $lc
+                || 'domdocument::normalize' === $lc
+                || 'domdocumentfragment::normalize' === $lc
+            ) {
+                $context->functionProxies[$lc] = new Call\DomNodeNormalize();
+
+                return;
+            }
+            if ('domdocument::normalizedocument' === $lc) {
+                $context->functionProxies[$lc] = new Call\DomDocumentNormalizeDocument();
+
+                return;
+            }
             if ('domdocument::createdocumentfragment' === $lc) {
                 $context->functionProxies[$lc] = new Call\DomDocumentCreateDocumentFragment();
 
@@ -365,6 +384,11 @@ final class DomInstanceMethodJit
             self::ensureProxy($context, 'domelement::removechild');
             self::ensureProxy($context, 'domnode::replacechild');
             self::ensureProxy($context, 'domelement::replacechild');
+            self::ensureProxy($context, 'domnode::normalize');
+            self::ensureProxy($context, 'domelement::normalize');
+            self::ensureProxy($context, 'domdocument::normalize');
+            self::ensureProxy($context, 'domdocumentfragment::normalize');
+            self::ensureProxy($context, 'domdocument::normalizedocument');
             self::ensureProxy($context, 'domdocument::createdocumentfragment');
             self::ensureProxy($context, 'domxpath::query');
             self::ensureProxy($context, 'domxpath::evaluate');

@@ -24,6 +24,7 @@ use PHPCompiler\JIT\Builtin\DomNodeIsConnectedRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeListItemRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeLiveMutationRuntime;
 use PHPCompiler\JIT\Builtin\DomNodeTreeMutationRuntime;
+use PHPCompiler\JIT\Builtin\DomNormalizeRuntime;
 use PHPCompiler\JIT\Builtin\DomSaveHTMLFileRuntime;
 use PHPCompiler\JIT\Builtin\DomSaveHTMLRuntime;
 use PHPCompiler\JIT\Builtin\DomSaveXMLRuntime;
@@ -397,6 +398,34 @@ final class JitDomDocumentMethodKernel
             $context->getTypeFromString('__object__*'),
             'PHPCompiler\\ext\\dom\\DomCreateElementJitHelper::createElementArgv',
             '/ext/dom/DomCreateElementJitHelper.php'
+        );
+    }
+
+    public static function ensureNormalizeBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        self::ensureBridge(
+            $context,
+            DomNormalizeRuntime::ABI_NORMALIZE,
+            'dom_normalize_user_script',
+            [$objPtr],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomNormalizeJitHelper::normalizeArgv',
+            '/ext/dom/DomNormalizeJitHelper.php'
+        );
+    }
+
+    public static function ensureNormalizeDocumentBridge(Context $context): void
+    {
+        $objPtr = $context->getTypeFromString('__object__*');
+        self::ensureBridge(
+            $context,
+            DomNormalizeRuntime::ABI_NORMALIZE_DOCUMENT,
+            'dom_normalize_document_user_script',
+            [$objPtr],
+            $context->context->voidType(),
+            'PHPCompiler\\ext\\dom\\DomNormalizeJitHelper::normalizeDocumentArgv',
+            '/ext/dom/DomNormalizeJitHelper.php'
         );
     }
 
