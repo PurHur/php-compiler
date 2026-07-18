@@ -61,6 +61,13 @@ final class GdImageState
     public int $interpolationId;
 
     /**
+     * libgd res_x / res_y DPI (GD_RESOLUTION=96 default; php-src ext/gd/libgd/gd.h; #20430).
+     */
+    public int $resX;
+
+    public int $resY;
+
+    /**
      * @param list<int> $pixels
      * @param list<int> $colors
      */
@@ -76,7 +83,9 @@ final class GdImageState
         bool $saveAlpha = false,
         int $thick = 1,
         bool $antiAlias = false,
-        int $interpolationId = 3
+        int $interpolationId = 3,
+        int $resX = 96,
+        int $resY = 96
     ) {
         $this->encoded = $encoded;
         $this->imageType = $imageType;
@@ -90,6 +99,8 @@ final class GdImageState
         $this->thick = $thick;
         $this->antiAlias = $antiAlias;
         $this->interpolationId = $interpolationId;
+        $this->resX = $resX;
+        $this->resY = $resY;
     }
 
     public static function fromEncoded(string $encoded, int $imageType): self

@@ -567,6 +567,7 @@ require_once __DIR__.'/../../../ext/gd/imagelayereffect.php';
 require_once __DIR__.'/../../../ext/gd/imageline.php';
 require_once __DIR__.'/../../../ext/gd/imagepalettetotruecolor.php';
 require_once __DIR__.'/../../../ext/gd/imagepng.php';
+require_once __DIR__.'/../../../ext/gd/imageresolution.php';
 require_once __DIR__.'/../../../ext/gd/imagerotate.php';
 require_once __DIR__.'/../../../ext/gd/imagesavealpha.php';
 require_once __DIR__.'/../../../ext/gd/imagescale.php';
