@@ -53,6 +53,20 @@ final class VmDomLiving
         return self::CLASS_HTML_DOCUMENT === $lc || self::CLASS_XML_DOCUMENT === $lc;
     }
 
+    public static function isLivingElement(ObjectEntry $entry): bool
+    {
+        $lc = strtolower($entry->class->name);
+
+        return self::CLASS_ELEMENT === $lc || self::CLASS_HTML_ELEMENT === $lc;
+    }
+
+    public static function isLivingElementClass(string $classLc): bool
+    {
+        $lc = strtolower($classLc);
+
+        return self::CLASS_ELEMENT === $lc || self::CLASS_HTML_ELEMENT === $lc;
+    }
+
     public static function allocateHtmlDocument(Context $ctx): ObjectEntry
     {
         $class = $ctx->classes[self::CLASS_HTML_DOCUMENT] ?? null;
@@ -284,6 +298,46 @@ final class VmDomLiving
     public static function querySelectorAll(Context $ctx, ObjectEntry $root, string $selectors): Variable
     {
         return VmDom::createNodeList($ctx, self::querySelectorAllIds($root, $selectors));
+    }
+
+    /**
+     * Element.matches() — php-src ext/dom/php_dom.c / ParentNode (#20418).
+     */
+    public static function matches(ObjectEntry $element, string $selectors): bool
+    {
+        if (!VmDom::isElement($element)) {
+            return false;
+        }
+        $root = VmDom::ownerDocumentEntry($element) ?? $element;
+        $ids = self::querySelectorAllIds($root, $selectors);
+
+        return \in_array($element->id, $ids, true);
+    }
+
+    /**
+     * Element.closest() — walk ancestors including self (php-src ext/dom/php_dom.c; #20418).
+     */
+    public static function closest(ObjectEntry $element, string $selectors): ?ObjectEntry
+    {
+        // Validate selector syntax even when no ancestor matches.
+        self::querySelectorAllIds($element, $selectors);
+
+        $current = $element;
+        while (null !== $current) {
+            if (VmDom::isElement($current) && self::matches($current, $selectors)) {
+                return $current;
+            }
+            if (!DomRegistry::has($current)) {
+                return null;
+            }
+            $parentId = DomRegistry::state($current)->parentId;
+            if (null === $parentId) {
+                return null;
+            }
+            $current = DomRegistry::entry($parentId);
+        }
+
+        return null;
     }
 
     /** Dom\HTMLDocument::saveHtml() — php-src html_document.c (#19580). */

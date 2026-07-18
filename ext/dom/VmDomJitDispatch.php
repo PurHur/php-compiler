@@ -89,6 +89,39 @@ final class VmDomJitDispatch
     }
 
     /**
+     * Dom\Element::closest() — php-src php_dom.c (#20418).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function closest(ObjectEntry $element, array $extra): Variable
+    {
+        $selectors = self::stringArg($extra[0] ?? self::missingArg('closest', 0), 'closest', 0);
+        $found = VmDomLiving::closest($element, $selectors);
+        $var = new Variable();
+        if (null === $found) {
+            $var->null();
+        } else {
+            $var->object($found);
+        }
+
+        return $var;
+    }
+
+    /**
+     * Dom\Element::matches() — php-src php_dom.c (#20418).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function matches(ObjectEntry $element, array $extra): Variable
+    {
+        $selectors = self::stringArg($extra[0] ?? self::missingArg('matches', 0), 'matches', 0);
+        $var = new Variable();
+        $var->bool(VmDomLiving::matches($element, $selectors));
+
+        return $var;
+    }
+
+    /**
      * Dom\HTMLDocument::saveHtml() — php-src html_document.c (#19580).
      *
      * @param list<Variable> $extra

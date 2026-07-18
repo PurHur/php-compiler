@@ -1066,10 +1066,7 @@ final class VmDom
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
-        $entry->getProperty(self::PROP_NODE_NAME)->string($name);
-        if ($entry->hasProperty(self::PROP_TAG_NAME)) {
-            $entry->getProperty(self::PROP_TAG_NAME)->string($name);
-        }
+        self::writeElementNameSlots($entry, $name);
         self::initElementPropertySlots($entry);
 
         $state = new DomNodeState();
@@ -1108,10 +1105,7 @@ final class VmDom
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
-        $entry->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
-        if ($entry->hasProperty(self::PROP_TAG_NAME)) {
-            $entry->getProperty(self::PROP_TAG_NAME)->string($qualifiedName);
-        }
+        self::writeElementNameSlots($entry, $qualifiedName);
         self::initElementPropertySlots($entry);
 
         $state = new DomNodeState();
@@ -5728,7 +5722,8 @@ final class VmDom
         ?\PHPCompiler\Frame $frame = null,
     ): ObjectEntry {
         $localName = strtolower($tagName);
-        $entry = self::createElement($ctx, $localName)->toObject();
+        // Pass owner so living Dom\HTMLDocument nodeClassMap → Dom\HTMLElement (#20418).
+        $entry = self::createElement($ctx, $localName, $ownerDocument)->toObject();
         $state = DomRegistry::state($entry);
         $state->attributes = self::decodeHtmlAttributeMap(self::parseAttributes($attrPart));
         self::applyQualifiedElementNames($state, $localName);
@@ -7064,6 +7059,24 @@ final class VmDom
         self::initNodePropertySlots($entry);
     }
 
+    /**
+     * Initialize nodeName/tagName slots before DomRegistry attach.
+     * Living Dom\Element classes omit classic DOMElement ClassProperty declarations (#20418).
+     */
+    private static function writeElementNameSlots(ObjectEntry $entry, string $name): void
+    {
+        if (!$entry->hasProperty(self::PROP_NODE_NAME)) {
+            $entry->allocateProperty(self::PROP_NODE_NAME)->string($name);
+        } else {
+            $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        }
+        if ($entry->hasProperty(self::PROP_TAG_NAME)) {
+            $entry->getProperty(self::PROP_TAG_NAME)->string($name);
+        } else {
+            $entry->allocateProperty(self::PROP_TAG_NAME)->string($name);
+        }
+    }
+
     private static function initNodePropertySlots(ObjectEntry $entry): void
     {
         if (!$entry->hasProperty(self::PROP_FIRST_CHILD)) {
@@ -7806,7 +7819,9 @@ final class VmDom
     {
         $class = $entry->class;
         for ($guard = 0; null !== $class && $guard < 64; ++$guard) {
-            if (self::CLASS_NODE === strtolower($class->name)) {
+            $lc = strtolower($class->name);
+            // Classic DOMNode or living Dom\Node (#20418).
+            if (self::CLASS_NODE === $lc || VmDomLiving::CLASS_NODE === $lc) {
                 return true;
             }
             if (null === $class->parentLc || !isset($ctx->classes[$class->parentLc])) {
@@ -8864,6 +8879,13 @@ final class VmDom
             return $object;
         }
         if ($classLc !== strtolower($object->class->name)) {
+            // Living Dom\* nodes are parallel to classic DOM* (php-src 8.4); accept by nodeType (#20418).
+            if (self::CLASS_ELEMENT === $classLc && self::isElement($object)) {
+                return $object;
+            }
+            if (self::CLASS_NODE === $classLc && self::isDomNode($object)) {
+                return $object;
+            }
             throw new \TypeError(sprintf('%s must be called on a %s instance', $label, self::classNameFromLc($classLc)));
         }
 

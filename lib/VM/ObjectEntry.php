@@ -187,6 +187,9 @@ class ObjectEntry {
         if (\PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::isManagedProperty($this, $name)) {
             return true;
         }
+        if (\PHPCompiler\ext\dom\DomHtmlElementPropertySupport::isManagedProperty($this, $name)) {
+            return true;
+        }
         if (\PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::isManagedProperty($this, $name)) {
             return true;
         }
@@ -219,6 +222,9 @@ class ObjectEntry {
         }
         if (\PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::isManagedProperty($this, $name)) {
             return \PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::getProperty($this, $name);
+        }
+        if (\PHPCompiler\ext\dom\DomHtmlElementPropertySupport::isManagedProperty($this, $name)) {
+            return \PHPCompiler\ext\dom\DomHtmlElementPropertySupport::getProperty($this, $name);
         }
         if (\PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::isManagedProperty($this, $name)) {
             return \PHPCompiler\ext\xmlreader\XmlReaderPropertySupport::getProperty($this, $name);
