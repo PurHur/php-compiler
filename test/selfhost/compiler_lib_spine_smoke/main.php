@@ -1174,6 +1174,7 @@ require_once __DIR__.'/../../../ext/pgsql/pg_trace.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_untrace.php';
 require_once __DIR__.'/../../../ext/pgsql/VmPgsqlLob.php';
 require_once __DIR__.'/../../../ext/pgsql/pg_lo_builtins.php';
+require_once __DIR__.'/../../../ext/pgsql/pg_copy_meta_builtins.php';
 require_once __DIR__.'/../../../ext/phar/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/phar/Module.php';
 require_once __DIR__.'/../../../ext/phar/PharDataBuiltin.php';

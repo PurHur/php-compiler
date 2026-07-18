@@ -63,6 +63,7 @@ class Module extends ModuleAbstract
         }
 
         require_once __DIR__.'/pg_lo_builtins.php';
+        require_once __DIR__.'/pg_copy_meta_builtins.php';
 
         return [
             new pg_connect(),
@@ -86,6 +87,13 @@ class Module extends ModuleAbstract
             new pg_lo_truncate(),
             new pg_lo_import(),
             new pg_lo_export(),
+            new pg_copy_to(),
+            new pg_copy_from(),
+            new pg_meta_data(),
+            new pg_convert(),
+            new pg_field_table(),
+            new pg_field_type_oid(),
+            new pg_field_is_null(),
             ...self::php84Functions(),
         ];
     }
