@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5546 |
-| Phase A inventory files (M2 ratio SSOT) | 5546 |
+| PHP files on vm.php path | 5562 |
+| Phase A inventory files (M2 ratio SSOT) | 5562 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15839 |
+| Source constructs flagged (warnings) | 15889 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -527,12 +527,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gettext/textdomain.php` | 0 | 2 |
 | `ext/gmp/GmpFunction.php` | 0 | 1 |
 | `ext/gmp/GmpToString.php` | 0 | 1 |
-| `ext/gmp/Module.php` | 0 | 32 |
-| `ext/gmp/VmGmp.php` | 0 | 5 |
+| `ext/gmp/Module.php` | 0 | 49 |
+| `ext/gmp/VmGmp.php` | 0 | 6 |
 | `ext/gmp/VmGmpObject.php` | 0 | 7 |
 | `ext/gmp/gmp_abs.php` | 0 | 2 |
 | `ext/gmp/gmp_add.php` | 0 | 2 |
 | `ext/gmp/gmp_and.php` | 0 | 2 |
+| `ext/gmp/gmp_clrbit.php` | 0 | 2 |
 | `ext/gmp/gmp_cmp.php` | 0 | 2 |
 | `ext/gmp/gmp_com.php` | 0 | 2 |
 | `ext/gmp/gmp_div_q.php` | 0 | 2 |
@@ -541,24 +542,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gmp/gmp_export.php` | 0 | 2 |
 | `ext/gmp/gmp_fact.php` | 0 | 2 |
 | `ext/gmp/gmp_gcd.php` | 0 | 2 |
+| `ext/gmp/gmp_gcdext.php` | 0 | 3 |
+| `ext/gmp/gmp_hamdist.php` | 0 | 2 |
 | `ext/gmp/gmp_import.php` | 0 | 2 |
 | `ext/gmp/gmp_init.php` | 0 | 2 |
 | `ext/gmp/gmp_intval.php` | 0 | 2 |
+| `ext/gmp/gmp_invert.php` | 0 | 2 |
+| `ext/gmp/gmp_jacobi.php` | 0 | 2 |
 | `ext/gmp/gmp_lcm.php` | 0 | 2 |
+| `ext/gmp/gmp_legendre.php` | 0 | 2 |
 | `ext/gmp/gmp_mod.php` | 0 | 2 |
 | `ext/gmp/gmp_mul.php` | 0 | 2 |
 | `ext/gmp/gmp_neg.php` | 0 | 2 |
+| `ext/gmp/gmp_nextprime.php` | 0 | 2 |
 | `ext/gmp/gmp_or.php` | 0 | 2 |
+| `ext/gmp/gmp_perfect_power.php` | 0 | 2 |
 | `ext/gmp/gmp_perfect_square.php` | 0 | 2 |
+| `ext/gmp/gmp_popcount.php` | 0 | 2 |
 | `ext/gmp/gmp_pow.php` | 0 | 2 |
 | `ext/gmp/gmp_powm.php` | 0 | 2 |
+| `ext/gmp/gmp_prob_prime.php` | 0 | 2 |
 | `ext/gmp/gmp_random_bits.php` | 0 | 2 |
 | `ext/gmp/gmp_random_range.php` | 0 | 2 |
 | `ext/gmp/gmp_random_seed.php` | 0 | 2 |
+| `ext/gmp/gmp_root.php` | 0 | 2 |
+| `ext/gmp/gmp_rootrem.php` | 0 | 3 |
+| `ext/gmp/gmp_scan0.php` | 0 | 2 |
+| `ext/gmp/gmp_scan1.php` | 0 | 2 |
+| `ext/gmp/gmp_setbit.php` | 0 | 2 |
+| `ext/gmp/gmp_sign.php` | 0 | 2 |
 | `ext/gmp/gmp_sqrt.php` | 0 | 2 |
 | `ext/gmp/gmp_sqrtrem.php` | 0 | 2 |
 | `ext/gmp/gmp_strval.php` | 0 | 2 |
 | `ext/gmp/gmp_sub.php` | 0 | 2 |
+| `ext/gmp/gmp_testbit.php` | 0 | 2 |
 | `ext/gmp/gmp_xor.php` | 0 | 2 |
 | `ext/hash/BuiltinClasses.php` | 0 | 1 |
 | `ext/hash/HashAlgosJitHelper.php` | 0 | 1 |
@@ -3708,7 +3725,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/xmlwriter_write_raw.php` | 0 | 2 |
 | `ext/xsl/BuiltinClasses.php` | 0 | 1 |
 | `ext/xsl/Module.php` | 0 | 2 |
-| `ext/xsl/VmXsl.php` | 0 | 11 |
+| `ext/xsl/VmXsl.php` | 0 | 10 |
 | `ext/xsl/VmXslDomBridge.php` | 0 | 3 |
 | `ext/xsl/XslExtensionPolicy.php` | 0 | 1 |
 | `ext/xsl/XsltClassMethod.php` | 0 | 1 |
@@ -3720,7 +3737,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xsl/XsltProcessorRemoveParameter.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorSetParameter.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorTransformToDoc.php` | 0 | 3 |
-| `ext/xsl/XsltProcessorTransformToUri.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorTransformToXml.php` | 0 | 3 |
 | `ext/xsl/XsltRegistry.php` | 0 | 1 |
 | `ext/yaml/Module.php` | 0 | 5 |
@@ -7646,191 +7662,191 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DocumentRegisterNodeClass (line 634)
 - new DocumentNormalizeDocument (line 637)
 - new DocumentXInclude (line 640)
-- new DocumentSchemaValidate (line 643)
-- new DocumentRelaxNGValidate (line 646)
-- new DocumentSchemaValidateSource (line 649)
-- new DocumentRelaxNGValidateSource (line 652)
-- new DocumentValidate (line 655)
-- new ClassEntry (line 659)
+- new DocumentSchemaValidate (line 642)
+- new DocumentRelaxNGValidate (line 645)
+- new DocumentSchemaValidateSource (line 648)
+- new DocumentRelaxNGValidateSource (line 651)
+- new DocumentValidate (line 654)
+- new ClassEntry (line 658)
+- new ClassProperty (line 661)
 - new ClassProperty (line 662)
 - new ClassProperty (line 663)
-- new ClassProperty (line 664)
+- new ClassProperty (line 665)
 - new ClassProperty (line 666)
 - new ClassProperty (line 667)
 - new ClassProperty (line 668)
 - new ClassProperty (line 669)
-- new ClassProperty (line 670)
-- new ElementAppendChild (line 671)
-- new ElementGetAttribute (line 673)
-- new ElementGetAttributeNode (line 675)
-- new ElementGetAttributeNodeNS (line 677)
-- new ElementGetAttributeNS (line 680)
-- new ElementHasAttribute (line 682)
-- new ElementHasAttributeNS (line 684)
-- new ElementRemoveAttribute (line 686)
-- new ElementRemoveAttributeNode (line 688)
-- new ElementSetAttribute (line 690)
-- new ElementSetAttributeNode (line 692)
-- new ElementSetAttributeNodeNS (line 694)
-- new ElementSetAttributeNS (line 697)
-- new ElementRemoveAttributeNS (line 699)
-- new ElementSetIdAttribute (line 701)
-- new ElementSetIdAttributeNS (line 704)
-- new ElementSetIdAttributeNode (line 707)
-- new ElementGetElementsByTagName (line 710)
-- new ElementGetElementsByTagNameNS (line 712)
-- new ElementGetAttributeNames (line 716)
-- new ElementInsertAdjacentHTML (line 721)
-- new ElementInsertAdjacentElement (line 726)
-- new ElementInsertAdjacentText (line 731)
-- new ElementToggleAttribute (line 736)
-- new ElementGetInnerHTML (line 741)
-- new ElementGetOuterHTML (line 744)
-- new ClassProperty (line 749)
-- new ClassEntry (line 753)
-- new FragmentConstruct (line 756)
-- new ClassProperty (line 760)
+- new ElementAppendChild (line 670)
+- new ElementGetAttribute (line 672)
+- new ElementGetAttributeNode (line 674)
+- new ElementGetAttributeNodeNS (line 676)
+- new ElementGetAttributeNS (line 679)
+- new ElementHasAttribute (line 681)
+- new ElementHasAttributeNS (line 683)
+- new ElementRemoveAttribute (line 685)
+- new ElementRemoveAttributeNode (line 687)
+- new ElementSetAttribute (line 689)
+- new ElementSetAttributeNode (line 691)
+- new ElementSetAttributeNodeNS (line 693)
+- new ElementSetAttributeNS (line 696)
+- new ElementRemoveAttributeNS (line 698)
+- new ElementSetIdAttribute (line 700)
+- new ElementSetIdAttributeNS (line 703)
+- new ElementSetIdAttributeNode (line 706)
+- new ElementGetElementsByTagName (line 709)
+- new ElementGetElementsByTagNameNS (line 711)
+- new ElementGetAttributeNames (line 715)
+- new ElementInsertAdjacentHTML (line 720)
+- new ElementInsertAdjacentElement (line 725)
+- new ElementInsertAdjacentText (line 730)
+- new ElementToggleAttribute (line 735)
+- new ElementGetInnerHTML (line 740)
+- new ElementGetOuterHTML (line 743)
+- new ClassProperty (line 748)
+- new ClassEntry (line 752)
+- new FragmentConstruct (line 755)
+- new ClassProperty (line 759)
+- new ClassProperty (line 761)
 - new ClassProperty (line 762)
 - new ClassProperty (line 763)
-- new ClassProperty (line 764)
-- new FragmentAppendChild (line 765)
-- new FragmentAppendXML (line 767)
-- new ObjectEntry (line 781)
-- new DomNodeState (line 783)
-- new Variable (line 797)
-- new ObjectEntry (line 820)
-- new DomNodeState (line 825)
-- new Variable (line 851)
-- new ObjectEntry (line 879)
-- new DomNodeState (line 900)
-- new Variable (line 940)
-- new HashTable (line 951)
-- new Variable (line 952)
-- new HashTable (line 964)
-- new Variable (line 971)
-- new DomNodeState (line 994)
-- new DomNodeState (line 1043)
-- new ObjectEntry (line 1067)
-- new DomNodeState (line 1075)
-- new Variable (line 1093)
-- new ObjectEntry (line 1109)
-- new DomNodeState (line 1117)
-- new Variable (line 1140)
-- new Variable (line 1161)
-- new ObjectEntry (line 1179)
-- new DomNodeState (line 1188)
-- new Variable (line 1200)
-- new ObjectEntry (line 1234)
-- new DomNodeState (line 1250)
-- new DOMException (line 1297)
-- new Variable (line 1301)
-- new Variable (line 1307)
-- new DOMException (line 1316)
-- new Variable (line 1353)
-- new DOMException (line 1373)
-- new Variable (line 1376)
-- new DOMException (line 1395)
-- new Variable (line 1427)
-- new DOMException (line 1439)
-- new DOMException (line 1452)
-- new Variable (line 1460)
-- new DOMException (line 1564)
-- new DOMException (line 1616)
-- new DOMException (line 1629)
-- new DOMException (line 1652)
-- new DOMException (line 1666)
-- new DOMException (line 1729)
-- new DOMException (line 1782)
-- new DOMException (line 1838)
-- new DOMException (line 1842)
-- new DOMException (line 1855)
-- new DOMException (line 1859)
-- new DOMException (line 1871)
-- new DOMException (line 1884)
-- new DOMException (line 1894)
-- new DOMException (line 2647)
-- new DOMException (line 2663)
-- new ObjectEntry (line 2750)
-- new DomNodeState (line 2755)
-- new ObjectEntry (line 2771)
-- new DomNodeState (line 2776)
-- new ObjectEntry (line 2792)
-- new DomNodeState (line 2797)
-- new DOMException (line 2836)
-- new DOMException (line 2846)
-- new DOMException (line 2859)
-- new DOMException (line 2878)
-- new ObjectEntry (line 2966)
-- new DomNodeState (line 2971)
-- new Variable (line 2980)
-- new ObjectEntry (line 2990)
-- new DomNodeState (line 2995)
-- new Variable (line 3005)
-- new ObjectEntry (line 3739)
-- new DomNodeState (line 3741)
-- new ObjectEntry (line 3937)
-- new DomNodeState (line 3939)
-- new ObjectEntry (line 3967)
-- new DomNodeState (line 3969)
-- new ObjectEntry (line 4157)
-- new DomNodeState (line 4162)
-- new DOMException (line 4561)
-- new DOMException (line 4577)
-- new Variable (line 4595)
-- new DOMException (line 4609)
-- new DOMException (line 4612)
-- new DOMException (line 4622)
-- new Error (line 4652)
-- new DOMException (line 4658)
-- new DOMException (line 4672)
-- new DOMException (line 4870)
-- new DOMException (line 5067)
-- new DOMException (line 5071)
-- new DOMException (line 5160)
-- new DOMException (line 5164)
-- new DOMException (line 5222)
-- new DOMException (line 5239)
-- new DOMException (line 5271)
-- new DOMException (line 5313)
-- new DOMException (line 5340)
-- new DOMException (line 6188)
-- new Variable (line 6216)
-- new DOMException (line 6477)
-- new DOMException (line 6595)
-- new DOMException (line 6640)
-- new ObjectEntry (line 6725)
-- new DomNodeState (line 6729)
-- new Variable (line 6736)
-- new ObjectEntry (line 6948)
-- new DomNodeState (line 6952)
-- new Variable (line 6959)
-- new ObjectEntry (line 6979)
-- new DomNodeState (line 6982)
-- new Variable (line 6990)
-- new Variable (line 7159)
-- new DOMException (line 7266)
-- new DOMException (line 7273)
-- new DOMException (line 7280)
-- new DOMException (line 7284)
+- new FragmentAppendChild (line 764)
+- new FragmentAppendXML (line 766)
+- new ObjectEntry (line 780)
+- new DomNodeState (line 782)
+- new Variable (line 796)
+- new ObjectEntry (line 819)
+- new DomNodeState (line 824)
+- new Variable (line 850)
+- new ObjectEntry (line 878)
+- new DomNodeState (line 899)
+- new Variable (line 939)
+- new HashTable (line 950)
+- new Variable (line 951)
+- new HashTable (line 963)
+- new Variable (line 970)
+- new DomNodeState (line 993)
+- new DomNodeState (line 1042)
+- new ObjectEntry (line 1066)
+- new DomNodeState (line 1074)
+- new Variable (line 1092)
+- new ObjectEntry (line 1108)
+- new DomNodeState (line 1116)
+- new Variable (line 1139)
+- new Variable (line 1160)
+- new ObjectEntry (line 1178)
+- new DomNodeState (line 1187)
+- new Variable (line 1199)
+- new ObjectEntry (line 1233)
+- new DomNodeState (line 1249)
+- new DOMException (line 1296)
+- new Variable (line 1300)
+- new Variable (line 1306)
+- new DOMException (line 1315)
+- new Variable (line 1352)
+- new DOMException (line 1372)
+- new Variable (line 1375)
+- new DOMException (line 1394)
+- new Variable (line 1426)
+- new DOMException (line 1438)
+- new DOMException (line 1451)
+- new Variable (line 1459)
+- new DOMException (line 1563)
+- new DOMException (line 1615)
+- new DOMException (line 1628)
+- new DOMException (line 1651)
+- new DOMException (line 1665)
+- new DOMException (line 1728)
+- new DOMException (line 1781)
+- new DOMException (line 1837)
+- new DOMException (line 1841)
+- new DOMException (line 1854)
+- new DOMException (line 1858)
+- new DOMException (line 1870)
+- new DOMException (line 1883)
+- new DOMException (line 1893)
+- new DOMException (line 2646)
+- new DOMException (line 2662)
+- new ObjectEntry (line 2749)
+- new DomNodeState (line 2754)
+- new ObjectEntry (line 2770)
+- new DomNodeState (line 2775)
+- new ObjectEntry (line 2791)
+- new DomNodeState (line 2796)
+- new DOMException (line 2835)
+- new DOMException (line 2845)
+- new DOMException (line 2858)
+- new DOMException (line 2877)
+- new ObjectEntry (line 2965)
+- new DomNodeState (line 2970)
+- new Variable (line 2979)
+- new ObjectEntry (line 2989)
+- new DomNodeState (line 2994)
+- new Variable (line 3004)
+- new ObjectEntry (line 3730)
+- new DomNodeState (line 3732)
+- new ObjectEntry (line 3928)
+- new DomNodeState (line 3930)
+- new ObjectEntry (line 3958)
+- new DomNodeState (line 3960)
+- new ObjectEntry (line 4148)
+- new DomNodeState (line 4153)
+- new DOMException (line 4552)
+- new DOMException (line 4568)
+- new Variable (line 4586)
+- new DOMException (line 4600)
+- new DOMException (line 4603)
+- new DOMException (line 4613)
+- new Error (line 4643)
+- new DOMException (line 4649)
+- new DOMException (line 4663)
+- new DOMException (line 4861)
+- new DOMException (line 5058)
+- new DOMException (line 5062)
+- new DOMException (line 5151)
+- new DOMException (line 5155)
+- new DOMException (line 5213)
+- new DOMException (line 5230)
+- new DOMException (line 5262)
+- new DOMException (line 5304)
+- new DOMException (line 5331)
+- new DOMException (line 6179)
+- new Variable (line 6207)
+- new DOMException (line 6468)
+- new DOMException (line 6586)
+- new DOMException (line 6631)
+- new ObjectEntry (line 6716)
+- new DomNodeState (line 6720)
+- new Variable (line 6727)
+- new ObjectEntry (line 6939)
+- new DomNodeState (line 6943)
+- new Variable (line 6950)
+- new ObjectEntry (line 6970)
+- new DomNodeState (line 6973)
+- new Variable (line 6981)
+- new Variable (line 7150)
+- new DOMException (line 7257)
+- new DOMException (line 7264)
+- new DOMException (line 7271)
+- new DOMException (line 7275)
+- new DOMException (line 7278)
 - new DOMException (line 7287)
-- new DOMException (line 7296)
-- new DOMException (line 7308)
-- new DOMException (line 8301)
-- new Variable (line 8360)
-- new Variable (line 8373)
-- new Variable (line 8411)
-- new DOMException (line 8422)
-- new Variable (line 8424)
-- new DOMException (line 8580)
-- new DOMException (line 8607)
-- new DOMException (line 8638)
-- new DOMException (line 8702)
+- new DOMException (line 7299)
+- new DOMException (line 8292)
+- new Variable (line 8351)
+- new Variable (line 8364)
+- new Variable (line 8402)
+- new DOMException (line 8413)
+- new Variable (line 8415)
+- new DOMException (line 8571)
+- new DOMException (line 8598)
+- new DOMException (line 8629)
+- new DOMException (line 8693)
+- new DOMException (line 8701)
 - new DOMException (line 8710)
-- new DOMException (line 8719)
-- new Error (line 9596)
-- new Error (line 9600)
-- 398 class method(s)
-- 2 closure(s)
+- new Error (line 9338)
+- new Error (line 9342)
+- 390 class method(s)
+- 1 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
 
@@ -9020,16 +9036,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new gmp_random_range (line 67)
 - new gmp_import (line 68)
 - new gmp_export (line 69)
+- new gmp_sign (line 70)
+- new gmp_prob_prime (line 71)
+- new gmp_nextprime (line 72)
+- new gmp_invert (line 73)
+- new gmp_jacobi (line 74)
+- new gmp_legendre (line 75)
+- new gmp_gcdext (line 76)
+- new gmp_root (line 77)
+- new gmp_rootrem (line 78)
+- new gmp_perfect_power (line 79)
+- new gmp_testbit (line 80)
+- new gmp_setbit (line 81)
+- new gmp_clrbit (line 82)
+- new gmp_scan0 (line 83)
+- new gmp_scan1 (line 84)
+- new gmp_popcount (line 85)
+- new gmp_hamdist (line 86)
 - 3 class method(s)
 
 ### `ext/gmp/VmGmp.php`
 
 **Warnings** (review for bootstrap subset):
-- new DivisionByZeroError (line 273)
-- new DivisionByZeroError (line 301)
-- new DivisionByZeroError (line 379)
-- new DivisionByZeroError (line 897)
-- 61 class method(s)
+- new DivisionByZeroError (line 274)
+- new DivisionByZeroError (line 302)
+- new DivisionByZeroError (line 380)
+- new DivisionByZeroError (line 654)
+- new DivisionByZeroError (line 1362)
+- 83 class method(s)
 
 ### `ext/gmp/VmGmpObject.php`
 
@@ -9055,6 +9089,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/gmp/gmp_and.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_clrbit.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -9109,6 +9149,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/gmp/gmp_gcdext.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- new HashTable (line 32)
+- 1 class method(s)
+
+### `ext/gmp/gmp_hamdist.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_import.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9127,7 +9180,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/gmp/gmp_invert.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_jacobi.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_lcm.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_legendre.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -9151,13 +9222,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/gmp/gmp_nextprime.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_or.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/gmp/gmp_perfect_power.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_perfect_square.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_popcount.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -9173,6 +9262,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_prob_prime.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
 - 1 class method(s)
 
 ### `ext/gmp/gmp_random_bits.php`
@@ -9191,6 +9286,43 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/gmp/gmp_root.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_rootrem.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- new HashTable (line 32)
+- 1 class method(s)
+
+### `ext/gmp/gmp_scan0.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_scan1.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_setbit.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/gmp/gmp_sign.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
 - 1 class method(s)
 
 ### `ext/gmp/gmp_sqrt.php`
@@ -9212,6 +9344,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/gmp/gmp_sub.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_testbit.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -30746,12 +30884,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new XsltProcessorImportStylesheet (line 37)
 - new XsltProcessorTransformToXml (line 40)
 - new XsltProcessorTransformToDoc (line 43)
-- new XsltProcessorTransformToUri (line 46)
-- new XsltProcessorSetParameter (line 49)
-- new XsltProcessorGetParameter (line 52)
-- new XsltProcessorRemoveParameter (line 55)
-- new XsltProcessorRegisterPhpFunctions (line 58)
-- 14 class method(s)
+- new XsltProcessorSetParameter (line 46)
+- new XsltProcessorGetParameter (line 49)
+- new XsltProcessorRemoveParameter (line 52)
+- new XsltProcessorRegisterPhpFunctions (line 55)
+- 13 class method(s)
 
 ### `ext/xsl/VmXslDomBridge.php`
 
@@ -30774,7 +30911,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new XSLTProcessor (line 26)
-- 10 class method(s)
+- 9 class method(s)
 
 ### `ext/xsl/XsltProcessorConstruct.php`
 
@@ -30817,13 +30954,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 23)
-- 1 class method(s)
-- 1 closure(s)
-
-### `ext/xsl/XsltProcessorTransformToUri.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
 - 1 class method(s)
 - 1 closure(s)
 
