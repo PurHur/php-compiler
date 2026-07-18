@@ -173,6 +173,9 @@ final class VmDom
 
     public const PROP_OWNER_ELEMENT = 'ownerElement';
 
+    /** DOMAttr::$specified — always true (php-src ext/dom/attr.c dom_attr_specified_read; #20605). */
+    public const PROP_SPECIFIED = 'specified';
+
     public const PROP_PUBLIC_ID = 'publicId';
 
     public const PROP_SYSTEM_ID = 'systemId';
@@ -385,6 +388,10 @@ final class VmDom
         $attr->properties[] = new ClassProperty(self::PROP_NAME, null, $strProto);
         $attr->properties[] = new ClassProperty(self::PROP_VALUE, null, $strProto);
         $attr->properties[] = new ClassProperty(self::PROP_OWNER_ELEMENT, $nullProto, $objProto);
+        // php-src: "useless; always returns true" (#20605, ext/dom/attr.c).
+        $specifiedDefault = new Variable(Variable::TYPE_BOOLEAN);
+        $specifiedDefault->bool(true);
+        $attr->properties[] = new ClassProperty(self::PROP_SPECIFIED, $specifiedDefault, $boolProto);
         $attr->methods['isid'] = new AttrIsId();
         $attr->methodVisibility['isid'] = $pub;
         $attr->methodNames['isid'] = 'isId';

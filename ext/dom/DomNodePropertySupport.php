@@ -15,6 +15,21 @@ use PHPCompiler\VM\Variable;
  */
 final class DomNodePropertySupport
 {
+    /**
+     * php-src ext/dom/php_dom.c — DOMAttr::$specified is read-only (#20605).
+     */
+    public static function rejectReadOnlyPropertyWrite(ObjectEntry $owner, string $name): void
+    {
+        if (!VmDom::isAttr($owner)) {
+            return;
+        }
+        if (strtolower(VmDom::PROP_SPECIFIED) === strtolower($name)) {
+            throw new \Error(
+                'Cannot write read-only property DOMAttr::$specified'
+            );
+        }
+    }
+
     public static function isManagedProperty(ObjectEntry $object, string $name): bool
     {
         if (!DomRegistry::has($object)) {
@@ -36,6 +51,7 @@ final class DomNodePropertySupport
             || (VmDom::isAttr($object) && strtolower(VmDom::PROP_NAME) === $lc)
             || (VmDom::isAttr($object) && strtolower(VmDom::PROP_VALUE) === $lc)
             || (VmDom::isAttr($object) && strtolower(VmDom::PROP_OWNER_ELEMENT) === $lc)
+            || (VmDom::isAttr($object) && strtolower(VmDom::PROP_SPECIFIED) === $lc)
             || (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_DATA) === $lc)
             || (VmDom::isCharacterData($object) && strtolower(VmDom::PROP_LENGTH) === $lc)
             || (VmDom::isTextOrCdataNode($object) && strtolower(VmDom::PROP_WHOLE_TEXT) === $lc)
@@ -148,6 +164,12 @@ final class DomNodePropertySupport
                     $var->object($owner);
                 }
             }
+
+            return $var;
+        }
+        // php-src ext/dom/attr.c dom_attr_specified_read — always true (#20605).
+        if (VmDom::isAttr($object) && strtolower(VmDom::PROP_SPECIFIED) === $lc) {
+            $var->bool(true);
 
             return $var;
         }
