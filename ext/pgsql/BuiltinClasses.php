@@ -18,5 +18,6 @@ final class BuiltinClasses
         }
         VmPgsqlConnection::registerClass($ctx);
         VmPgsqlResult::registerClass($ctx);
+        VmPgsqlLob::registerClass($ctx);
     }
 }

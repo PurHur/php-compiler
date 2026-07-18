@@ -87,6 +87,37 @@ final class VmPgsqlArg
         return self::requireConnection($var, $functionName, $argNum);
     }
 
+    public static function requireLob(Variable $var, string $functionName, int $argNum): ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($lob) must be of type PgSql\\Lob, %s given',
+                $functionName,
+                $argNum,
+                self::typeLabel($var)
+            ));
+        }
+        $object = $var->toObject();
+        $lc = strtolower($object->class->name);
+        if (VmPgsqlLob::CLASS_LC !== $lc) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($lob) must be of type PgSql\\Lob, %s given',
+                $functionName,
+                $argNum,
+                $object->class->name
+            ));
+        }
+        if (!VmPgsqlLob::isLive($object)) {
+            throw new \TypeError(\sprintf(
+                '%s(): supplied resource is not a valid PostgreSQL large object',
+                $functionName
+            ));
+        }
+
+        return $object;
+    }
+
     private static function typeLabel(Variable $var): string
     {
         return match ($var->type) {
