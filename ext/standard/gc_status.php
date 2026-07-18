@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * gc_status() — cyclic GC statistics (ext/standard/php_gc.c parity, #3280).
  *
- * @see https://github.com/php/php-src/blob/master/ext/standard/php_gc.c PHP_FUNCTION(gc_status)
+ * @see https://github.com/php/php-src/blob/master/Zend/zend_builtin_functions.c ZEND_FUNCTION(gc_status)
  */
 final class gc_status extends Internal
 {

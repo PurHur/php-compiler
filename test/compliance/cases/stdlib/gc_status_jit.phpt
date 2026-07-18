@@ -7,7 +7,7 @@ foreach (['gc_status', 'gc_mem_caches'] as $fn) {
 }
 $st = gc_status();
 gc_mem_caches();
-if (array_key_exists('runs', $st)) {
+if (!array_key_exists('running', $st)) {
     echo "skip — legacy gc_status schema on reference profile\n";
     exit(0);
 }

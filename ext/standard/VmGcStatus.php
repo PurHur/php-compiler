@@ -10,7 +10,7 @@ use PHPCompiler\VM\CycleCollector;
 use PHPCompiler\VM\HashTable;
 
 /**
- * gc_status() / gc_mem_caches() VM helpers (ext/standard/php_gc.c parity, #3280).
+ * gc_status() / gc_mem_caches() VM helpers (ext/standard / Zend gc_status parity, #3280, #20627).
  */
 final class VmGcStatus
 {
@@ -23,7 +23,15 @@ final class VmGcStatus
                 $s['running'],
                 $s['protected'],
                 $s['full'],
-                $s['buffer_size']
+                $s['runs'],
+                $s['collected'],
+                $s['threshold'],
+                $s['buffer_size'],
+                $s['roots'],
+                $s['application_time'],
+                $s['collector_time'],
+                $s['destructor_time'],
+                $s['free_time']
             );
         }
 

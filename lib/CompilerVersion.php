@@ -1524,11 +1524,12 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ gc_status() schema (running/protected/full/buffer_size; ext/standard/php_gc.c, #12780, #13673, #14431).
-     *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile keeps legacy
-     * runs/collected/threshold/roots (#12993, #13293, #14612, #15784); enable via `PHP_COMPILER_PROFILE=8.4`.
-     */
+ * PHP 8.4+ gc_status() schema (php-src 8.3+ 12-key table; Zend/zend_builtin_functions.c, #12780, #20627).
+ *
+ * Forward profile returns running/protected/full/buffer_size **and** legacy counters plus timing floats.
+ * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile keeps the
+ * four-key pre-8.3 table (#12993, #13293, #14612, #15784); enable via `PHP_COMPILER_PROFILE=8.4`.
+ */
     public static function supportsGcStatusPhp84Schema(): bool
     {
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
