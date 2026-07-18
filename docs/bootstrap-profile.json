@@ -1136,6 +1136,7 @@
         "ext/pgsql/pg_change_password.php",
         "ext/pgsql/pg_close.php",
         "ext/pgsql/pg_connect.php",
+        "ext/pgsql/pg_copy_meta_builtins.php",
         "ext/pgsql/pg_fetch_assoc.php",
         "ext/pgsql/pg_fetch_row.php",
         "ext/pgsql/pg_jit.php",
@@ -5998,9 +5999,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5764,
+        "inventory_files": 5765,
         "excluded": 0,
-        "eligible": 5764,
+        "eligible": 5765,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1

@@ -18,7 +18,7 @@ final class VmPgsqlResult
 
     public const CLASS_NAME = 'PgSql\\Result';
 
-    /** @var array<int, array{native: \FFI\CData, closed: bool, row: int}> */
+    /** @var array<int, array{native: \FFI\CData, closed: bool, row: int, conn: ?ObjectEntry}> */
     private static array $state = [];
 
     public static function registerClass(Context $ctx): void
@@ -31,7 +31,7 @@ final class VmPgsqlResult
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
-    public static function wrap(\FFI\CData $native, Context $ctx): Variable
+    public static function wrap(\FFI\CData $native, Context $ctx, ?ObjectEntry $connection = null): Variable
     {
         self::registerClass($ctx);
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
@@ -40,6 +40,7 @@ final class VmPgsqlResult
             'native' => $native,
             'closed' => false,
             'row' => 0,
+            'conn' => $connection,
         ];
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($object);
@@ -61,9 +62,21 @@ final class VmPgsqlResult
         return self::$state[$object->id]['native'];
     }
 
+    public static function connection(ObjectEntry $object): ?ObjectEntry
+    {
+        return self::$state[$object->id]['conn'] ?? null;
+    }
+
     public static function currentRow(ObjectEntry $object): int
     {
         return self::$state[$object->id]['row'] ?? 0;
+    }
+
+    public static function setCurrentRow(ObjectEntry $object, int $row): void
+    {
+        if (isset(self::$state[$object->id])) {
+            self::$state[$object->id]['row'] = $row;
+        }
     }
 
     public static function advanceRow(ObjectEntry $object): void

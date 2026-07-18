@@ -17,6 +17,10 @@ final class VmPgsqlNative
 
     public const PGRES_TUPLES_OK = 2;
 
+    public const PGRES_COPY_OUT = 3;
+
+    public const PGRES_COPY_IN = 4;
+
     public const PGRES_FATAL_ERROR = 7;
 
     /** @var \FFI|null */
@@ -126,9 +130,91 @@ final class VmPgsqlNative
         return (int) self::requireFfi()->PQputCopyEnd($conn, $error);
     }
 
+    /**
+     * Drain pending results (php-src pg_copy_* pre/post loops).
+     */
+    public static function drainResults(\FFI\CData $conn): void
+    {
+        $ffi = self::requireFfi();
+        while (null !== ($res = $ffi->PQgetResult($conn))) {
+            $ffi->PQclear($res);
+        }
+    }
+
+    /**
+     * @return \FFI\CData|null PGresult*
+     */
+    public static function getResult(\FFI\CData $conn): ?\FFI\CData
+    {
+        return self::requireFfi()->PQgetResult($conn);
+    }
+
+    /**
+     * PQgetCopyData — returns [status, rowString]. status: >0 bytes, -1 done, -2 error, 0 would-block.
+     *
+     * @return array{0: int, 1: string}
+     */
+    public static function getCopyData(\FFI\CData $conn): array
+    {
+        $ffi = self::requireFfi();
+        $bufPtr = $ffi->new('char*');
+        $ret = (int) $ffi->PQgetCopyData($conn, \FFI::addr($bufPtr), 0);
+        if ($ret > 0) {
+            $row = \FFI::string($bufPtr, $ret);
+            $ffi->PQfreemem($bufPtr);
+
+            return [$ret, $row];
+        }
+
+        return [$ret, ''];
+    }
+
+    public static function ftable(\FFI\CData $result, int $fieldNum): int
+    {
+        return (int) self::requireFfi()->PQftable($result, $fieldNum);
+    }
+
+    public static function ftype(\FFI\CData $result, int $fieldNum): int
+    {
+        return (int) self::requireFfi()->PQftype($result, $fieldNum);
+    }
+
+    public static function fnumber(\FFI\CData $result, string $fieldName): int
+    {
+        return (int) self::requireFfi()->PQfnumber($result, $fieldName);
+    }
+
+    /**
+     * PQescapeStringConn — returns escaped text (no surrounding quotes).
+     */
+    public static function escapeStringConn(\FFI\CData $conn, string $value): string|false
+    {
+        $ffi = self::requireFfi();
+        $len = \strlen($value);
+        $buf = $ffi->new('char['.(($len * 2) + 1).']');
+        $err = $ffi->new('int');
+        $err->cdata = 0;
+        $newLen = (int) $ffi->PQescapeStringConn($conn, $buf, $value, $len, \FFI::addr($err));
+        if (0 !== (int) $err->cdata) {
+            return false;
+        }
+
+        return $newLen > 0 ? \FFI::string($buf, $newLen) : '';
+    }
+
     public static function socket(\FFI\CData $conn): int
     {
         return (int) self::requireFfi()->PQsocket($conn);
+    }
+
+    public static function consumeInput(\FFI\CData $conn): bool
+    {
+        return 1 === (int) self::requireFfi()->PQconsumeInput($conn);
+    }
+
+    public static function flush(\FFI\CData $conn): int
+    {
+        return (int) self::requireFfi()->PQflush($conn);
     }
 
     public static function escapeIdentifier(\FFI\CData $conn, string $value): string
@@ -350,6 +436,7 @@ CDEF;
 typedef struct pg_conn PGconn;
 typedef struct pg_result PGresult;
 typedef struct _IO_FILE FILE;
+typedef unsigned int Oid;
 PGconn *PQconnectdb(const char *conninfo);
 int PQstatus(const PGconn *conn);
 char *PQerrorMessage(const PGconn *conn);
@@ -365,13 +452,20 @@ void PQclear(PGresult *res);
 size_t PQresultMemorySize(const PGresult *res);
 int PQputCopyData(PGconn *conn, const char *buffer, int nbytes);
 int PQputCopyEnd(PGconn *conn, const char *errormsg);
+int PQgetCopyData(PGconn *conn, char **buffer, int async);
+PGresult *PQgetResult(PGconn *conn);
 int PQsocket(const PGconn *conn);
+int PQconsumeInput(PGconn *conn);
+int PQflush(PGconn *conn);
+Oid PQftable(const PGresult *res, int field_num);
+Oid PQftype(const PGresult *res, int field_num);
+int PQfnumber(const PGresult *res, const char *field_name);
+size_t PQescapeStringConn(PGconn *conn, char *to, const char *from, size_t length, int *error);
 char *PQescapeIdentifier(PGconn *conn, const char *str, size_t length);
 char *PQescapeLiteral(PGconn *conn, const char *str, size_t length);
 void PQfreemem(void *ptr);
 void PQtrace(PGconn *conn, FILE *stream);
 void PQuntrace(PGconn *conn);
-typedef unsigned int Oid;
 Oid lo_creat(PGconn *conn, int mode);
 Oid lo_create(PGconn *conn, Oid lobjId);
 int lo_open(PGconn *conn, Oid lobjId, int mode);
