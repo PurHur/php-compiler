@@ -75,4 +75,34 @@ final class GethostbynamelBuiltinTest extends TestCase
         $resolved = $frame->returnVar->resolveIndirect();
         $this->assertTrue($resolved->toBool() === false);
     }
+
+    /** @see https://github.com/PurHur/php-compiler/issues/20555 */
+    public function testNullHostnameTypeErrorOnForward84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            $runtime = new Runtime();
+            $fn = new gethostbynamel();
+            $frame = $fn->getFrame($runtime->vmContext);
+            $hostVar = new VMVariable();
+            $hostVar->null();
+            $frame->calledArgs = [$hostVar];
+            $frame->returnVar = new VMVariable();
+            $this->expectException(\TypeError::class);
+            $this->expectExceptionMessage(
+                'gethostbynamel(): Argument #1 ($hostname) must be of type string, null given'
+            );
+            $fn->execute($frame);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
 }

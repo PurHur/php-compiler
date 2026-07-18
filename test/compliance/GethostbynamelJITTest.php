@@ -22,6 +22,10 @@ final class GethostbynamelJITTest extends BaseTest
             __DIR__.'/cases/stdlib/gethostbynamel_localhost_jit.phpt',
             'gethostbynamel_localhost_jit.phpt'
         );
+        yield 'gethostbynamel_null_forward84_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/gethostbynamel_null_forward84_jit.phpt',
+            'gethostbynamel_null_forward84_jit.phpt'
+        );
     }
 
     public function setUp(): void

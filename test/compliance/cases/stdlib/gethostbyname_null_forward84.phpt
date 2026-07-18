@@ -1,10 +1,15 @@
 --TEST--
-stdlib gethostbyname(null) — null coerces to empty string on 8.4 forward profile (#19098, ext/standard/dns.c)
+stdlib gethostbyname(null) — TypeError on 8.4 forward profile (#20555, re-#19098, ext/standard/dns.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-echo var_export(@gethostbyname(null), true), "\n";
+try {
+    gethostbyname(null);
+    echo "uncaught\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
 ?>
 --EXPECT--
-''
+gethostbyname(): Argument #1 ($hostname) must be of type string, null given
