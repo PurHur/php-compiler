@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5544 |
-| Phase A inventory files (M2 ratio SSOT) | 5544 |
+| PHP files on vm.php path | 5545 |
+| Phase A inventory files (M2 ratio SSOT) | 5545 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15831 |
+| Source constructs flagged (warnings) | 15835 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -832,7 +832,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 64 |
+| `ext/openssl/Module.php` | 0 | 65 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
@@ -844,7 +844,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/VmOpensslConfigNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslCsrNative.php` | 0 | 1 |
 | `ext/openssl/VmOpensslErrorNative.php` | 0 | 1 |
-| `ext/openssl/VmOpensslObjects.php` | 0 | 22 |
+| `ext/openssl/VmOpensslObjects.php` | 0 | 23 |
 | `ext/openssl/VmOpensslPkcs12Native.php` | 0 | 1 |
 | `ext/openssl/VmOpensslPkcs7Native.php` | 0 | 1 |
 | `ext/openssl/VmOpensslPkeyDeriveNative.php` | 0 | 1 |
@@ -908,6 +908,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_spki_verify.php` | 0 | 2 |
 | `ext/openssl/openssl_verify.php` | 0 | 3 |
 | `ext/openssl/openssl_x509_check_private_key.php` | 0 | 2 |
+| `ext/openssl/openssl_x509_checkpurpose.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_export.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_export_to_file.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_fingerprint.php` | 0 | 2 |
@@ -11311,22 +11312,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_cms_read (line 79)
 - new openssl_x509_verify (line 80)
 - new openssl_x509_check_private_key (line 81)
-- new openssl_x509_free (line 82)
-- new openssl_csr_new (line 83)
-- new openssl_csr_export (line 84)
-- new openssl_csr_export_to_file (line 85)
-- new openssl_csr_sign (line 86)
-- new openssl_csr_get_subject (line 87)
-- new openssl_csr_get_public_key (line 88)
-- new openssl_free_key (line 89)
-- new openssl_pkey_free (line 90)
-- new openssl_spki_new (line 91)
-- new openssl_spki_verify (line 92)
-- new openssl_spki_export (line 93)
-- new openssl_spki_export_challenge (line 94)
-- new openssl_seal (line 95)
-- new openssl_open (line 96)
-- new openssl_error_string (line 97)
+- new openssl_x509_checkpurpose (line 82)
+- new openssl_x509_free (line 83)
+- new openssl_csr_new (line 84)
+- new openssl_csr_export (line 85)
+- new openssl_csr_export_to_file (line 86)
+- new openssl_csr_sign (line 87)
+- new openssl_csr_get_subject (line 88)
+- new openssl_csr_get_public_key (line 89)
+- new openssl_free_key (line 90)
+- new openssl_pkey_free (line 91)
+- new openssl_spki_new (line 92)
+- new openssl_spki_verify (line 93)
+- new openssl_spki_export (line 94)
+- new openssl_spki_export_challenge (line 95)
+- new openssl_seal (line 96)
+- new openssl_open (line 97)
+- new openssl_error_string (line 98)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -11337,7 +11339,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/OpensslConstants.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `ext/openssl/OpensslExtensionPolicy.php`
 
@@ -11405,16 +11407,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 265)
 - new Variable (line 272)
 - new Variable (line 297)
-- new Variable (line 340)
-- new Variable (line 352)
-- new Variable (line 360)
-- new Variable (line 367)
-- new Variable (line 386)
-- new Variable (line 393)
-- new Variable (line 417)
-- new HashTable (line 419)
-- new ClassEntry (line 660)
-- 26 class method(s)
+- new Variable (line 338)
+- new Variable (line 385)
+- new Variable (line 397)
+- new Variable (line 405)
+- new Variable (line 412)
+- new Variable (line 431)
+- new Variable (line 438)
+- new Variable (line 462)
+- new HashTable (line 464)
+- new ClassEntry (line 705)
+- 27 class method(s)
 
 ### `ext/openssl/VmOpensslPkcs12Native.php`
 
@@ -11454,7 +11457,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/VmOpensslX509Native.php`
 
 **Warnings** (review for bootstrap subset):
-- 19 class method(s)
+- 22 class method(s)
 
 ### `ext/openssl/openssl_cipher_iv_length.php`
 
@@ -11798,6 +11801,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
 - 2 class method(s)
+
+### `ext/openssl/openssl_x509_checkpurpose.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 5 class method(s)
 
 ### `ext/openssl/openssl_x509_export.php`
 
@@ -22544,7 +22553,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmHttpResponse.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 90)
+- new Variable (line 91)
 - 8 class method(s)
 
 ### `ext/standard/VmHttpTlsNative.php`
@@ -35086,7 +35095,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFormat.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 334)
+- new JIT (line 345)
 - 12 class method(s)
 - 2 closure(s)
 
@@ -37181,19 +37190,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 945)
 - new Call\DateTimeFormat (line 948)
 - new Call\DateTimeFormat (line 949)
-- new Result (line 1283)
-- new Result (line 1304)
-- new Variable (line 1905)
-- new Variable (line 2042)
-- new Variable (line 2268)
-- new Variable (line 2326)
-- new VMVariable (line 2464)
-- new VMVariable (line 2480)
-- new VMVariable (line 2486)
-- new VMVariable (line 2492)
-- new VMVariable (line 2503)
-- new Variable (line 2533)
-- new Variable (line 2573)
+- new Result (line 1284)
+- new Result (line 1305)
+- new Variable (line 1906)
+- new Variable (line 2043)
+- new Variable (line 2269)
+- new Variable (line 2327)
+- new VMVariable (line 2465)
+- new VMVariable (line 2481)
+- new VMVariable (line 2487)
+- new VMVariable (line 2493)
+- new VMVariable (line 2504)
+- new Variable (line 2534)
+- new Variable (line 2574)
 - 102 class method(s)
 - 28 closure(s)
 

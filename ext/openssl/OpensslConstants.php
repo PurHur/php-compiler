@@ -67,6 +67,17 @@ final class OpensslConstants
     public const OPENSSL_ENCODING_SMIME = 1;
     public const OPENSSL_ENCODING_PEM = 2;
 
+    /** php-src X509_PURPOSE_* (openssl/x509v3.h; openssl.stub.php; #20286). */
+    public const X509_PURPOSE_SSL_CLIENT = 1;
+    public const X509_PURPOSE_SSL_SERVER = 2;
+    public const X509_PURPOSE_NS_SSL_SERVER = 3;
+    public const X509_PURPOSE_SMIME_SIGN = 4;
+    public const X509_PURPOSE_SMIME_ENCRYPT = 5;
+    public const X509_PURPOSE_CRL_SIGN = 6;
+    public const X509_PURPOSE_ANY = 7;
+    public const X509_PURPOSE_OCSP_HELPER = 8;
+    public const X509_PURPOSE_TIMESTAMP_SIGN = 9;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
@@ -76,7 +87,23 @@ final class OpensslConstants
             'OPENSSL_PKCS1_PADDING' => self::OPENSSL_PKCS1_PADDING,
             'OPENSSL_NO_PADDING' => self::OPENSSL_NO_PADDING,
             'OPENSSL_PKCS1_OAEP_PADDING' => self::OPENSSL_PKCS1_OAEP_PADDING,
-        ] + self::algorithmConstants() + self::pkcs7Constants() + self::cmsConstants() + self::cipherConstants();
+        ] + self::algorithmConstants() + self::pkcs7Constants() + self::cmsConstants() + self::cipherConstants() + self::x509PurposeConstants();
+    }
+
+    /** @return array<string, int> */
+    public static function x509PurposeConstants(): array
+    {
+        return [
+            'X509_PURPOSE_SSL_CLIENT' => self::X509_PURPOSE_SSL_CLIENT,
+            'X509_PURPOSE_SSL_SERVER' => self::X509_PURPOSE_SSL_SERVER,
+            'X509_PURPOSE_NS_SSL_SERVER' => self::X509_PURPOSE_NS_SSL_SERVER,
+            'X509_PURPOSE_SMIME_SIGN' => self::X509_PURPOSE_SMIME_SIGN,
+            'X509_PURPOSE_SMIME_ENCRYPT' => self::X509_PURPOSE_SMIME_ENCRYPT,
+            'X509_PURPOSE_CRL_SIGN' => self::X509_PURPOSE_CRL_SIGN,
+            'X509_PURPOSE_ANY' => self::X509_PURPOSE_ANY,
+            'X509_PURPOSE_OCSP_HELPER' => self::X509_PURPOSE_OCSP_HELPER,
+            'X509_PURPOSE_TIMESTAMP_SIGN' => self::X509_PURPOSE_TIMESTAMP_SIGN,
+        ];
     }
 
     public static function algorithmConstants(): array

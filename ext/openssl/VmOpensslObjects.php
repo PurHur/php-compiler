@@ -321,6 +321,51 @@ final class VmOpensslObjects
     }
 
     /**
+     * openssl_x509_checkpurpose() — X509_verify_cert with purpose (ext/openssl/openssl.c; #20286).
+     *
+     * php-src returns -1 (int) on setup/parse failure; bool for 0/1 verify results; other ints unchanged.
+     *
+     * @param list<string> $caInfo
+     */
+    public static function checkPurpose(
+        Context $ctx,
+        Variable $certArg,
+        int $purpose,
+        array $caInfo,
+        ?string $untrustedFile,
+        ?Frame $frame = null,
+    ): Variable {
+        $result = new Variable();
+        if (!VmOpensslX509Native::available()) {
+            $result->int(-1);
+
+            return $result;
+        }
+
+        $certPem = self::resolveCertificatePem($ctx, $certArg, 'openssl_x509_checkpurpose');
+        if (null === $certPem || false === VmOpensslX509Native::normalizeCertificatePem($certPem)) {
+            $result->int(-1);
+
+            return $result;
+        }
+
+        $ret = VmOpensslX509Native::checkPurposeCertificatePem(
+            $certPem,
+            $purpose,
+            $caInfo,
+            $untrustedFile,
+            $frame
+        );
+        if (0 !== $ret && 1 !== $ret) {
+            $result->int($ret);
+        } else {
+            $result->bool(1 === $ret);
+        }
+
+        return $result;
+    }
+
+    /**
      * openssl_x509_verify() — X509_verify against supplied public key (ext/openssl/x509.c; #6595).
      */
     public static function verifyCertificate(
