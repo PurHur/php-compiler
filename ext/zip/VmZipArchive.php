@@ -124,6 +124,9 @@ final class VmZipArchive
             'replacefile' => new ZipArchiveReplaceFile(),
             'addglob' => new ZipArchiveAddGlob(),
             'addpattern' => new ZipArchiveAddPattern(),
+            // read-only archive flag — php-src php_zip.c (#20412)
+            'iswritable' => new ZipArchiveIsWritable(),
+            'setreadonly' => new ZipArchiveSetReadOnly(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -280,6 +283,7 @@ final class VmZipArchive
         $state->filename = $filename;
         $state->open = true;
         $state->dirty = false;
+        $state->readOnly = false;
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
 
         return true;
@@ -298,7 +302,8 @@ final class VmZipArchive
 
             return false;
         }
-        if ($state->dirty || $state->open) {
+        // setReadOnly / AFL_RDONLY — refuse persisting mutations (#20412).
+        if (!$state->readOnly && ($state->dirty || $state->open)) {
             if (!ZipEngine::writeArchive($state->filename, $state->entries, $state->archiveComment)) {
                 self::setStatus($entry, $state, ZipArchiveConstants::ER_WRITE);
 
@@ -307,6 +312,7 @@ final class VmZipArchive
         }
         $state->open = false;
         $state->dirty = false;
+        $state->readOnly = false;
         $state->archiveComment = '';
         $state->openSnapshot = [];
         $state->openSnapshotComment = '';
@@ -324,6 +330,9 @@ final class VmZipArchive
         if (!$state->open) {
             self::setStatus($entry, $state, ZipArchiveConstants::ER_ZIPCLOSED);
 
+            return false;
+        }
+        if (!self::requireWritable($entry, $state)) {
             return false;
         }
         if ('' === $entryname) {
@@ -369,6 +378,9 @@ final class VmZipArchive
         if (!$state->open) {
             self::setStatus($entry, $state, ZipArchiveConstants::ER_ZIPCLOSED);
 
+            return false;
+        }
+        if (!self::requireWritable($entry, $state)) {
             return false;
         }
         $size = strlen($content);
@@ -1606,6 +1618,41 @@ final class VmZipArchive
         return $state;
     }
 
+    /** Fail mutating ops when setReadOnly(true) (php-src ZIP_ER_RDONLY; #20412). */
+    private static function requireWritable(ObjectEntry $entry, ZipArchiveState $state): bool
+    {
+        if ($state->readOnly) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_RDONLY);
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::isWritable — true when archive is open and not read-only (#20412).
+     */
+    public static function isWritable(ObjectEntry $entry): bool
+    {
+        $state = self::requireOpen($entry);
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return !$state->readOnly;
+    }
+
+    /**
+     * ZipArchive::setReadOnly — toggle AFL_RDONLY-style session flag (#20412).
+     */
+    public static function setReadOnly(ObjectEntry $entry, bool $readonly): bool
+    {
+        $state = self::requireOpen($entry);
+        $state->readOnly = $readonly;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
     /**
      * @param array{
      *     name: string,
@@ -1783,6 +1830,8 @@ final class VmZipArchive
             'replacefile' => 'replaceFile',
             'addglob' => 'addGlob',
             'addpattern' => 'addPattern',
+            'iswritable' => 'isWritable',
+            'setreadonly' => 'setReadOnly',
             default => $lc,
         };
     }

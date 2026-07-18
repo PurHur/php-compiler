@@ -1518,3 +1518,53 @@ final class ZipArchiveAddPattern extends ZipClassMethod
         ZipArchiveAddGlob::assignPathListOrFalse($frame->returnVar, $result);
     }
 }
+
+/**
+ * ZipArchive::isWritable() — (#20412).
+ */
+final class ZipArchiveIsWritable extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isWritable');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::isWritable()');
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::isWritable() expects exactly 0 arguments, %d given',
+                \count($frame->calledArgs) - 1
+            ));
+        }
+        $ok = VmZipArchive::isWritable($receiver);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::setReadOnly(bool $readonly) — (#20412).
+ */
+final class ZipArchiveSetReadOnly extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setReadOnly');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setReadOnly()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::setReadOnly() expects exactly 1 argument, 0 given');
+        }
+        $readonly = $this->boolArg($frame->calledArgs[1], 'ZipArchive::setReadOnly', 1, 'readonly');
+        $ok = VmZipArchive::setReadOnly($receiver, $readonly);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}

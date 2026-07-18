@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5563 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15910 |
+| Source constructs flagged (warnings) | 15914 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3750,7 +3750,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/yaml/yaml_parse_file.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/Module.php` | 0 | 9 |
-| `ext/zip/VmZipArchive.php` | 0 | 63 |
+| `ext/zip/VmZipArchive.php` | 0 | 65 |
 | `ext/zip/VmZipProcedural.php` | 0 | 1 |
 | `ext/zip/VmZipResourceArg.php` | 0 | 1 |
 | `ext/zip/ZipArchiveAddFile.php` | 0 | 2 |
@@ -3760,7 +3760,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipArchiveConstruct.php` | 0 | 1 |
 | `ext/zip/ZipArchiveExtractTo.php` | 0 | 2 |
 | `ext/zip/ZipArchiveGetFromName.php` | 0 | 2 |
-| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 47 |
+| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 49 |
 | `ext/zip/ZipArchiveOpen.php` | 0 | 2 |
 | `ext/zip/ZipClassMethod.php` | 0 | 1 |
 | `ext/zip/ZipEngine.php` | 0 | 1 |
@@ -31124,11 +31124,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ZipArchiveReplaceFile (line 124)
 - new ZipArchiveAddGlob (line 125)
 - new ZipArchiveAddPattern (line 126)
-- new ZipArchiveState (line 142)
-- new Variable (line 844)
-- new Variable (line 859)
-- new Variable (line 874)
-- 74 class method(s)
+- new ZipArchiveIsWritable (line 128)
+- new ZipArchiveSetReadOnly (line 129)
+- new ZipArchiveState (line 145)
+- new Variable (line 856)
+- new Variable (line 871)
+- new Variable (line 886)
+- 77 class method(s)
 
 ### `ext/zip/VmZipProcedural.php`
 
@@ -31228,7 +31230,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 1483)
 - new Variable (line 1485)
 - new ArgumentCountError (line 1508)
-- 49 class method(s)
+- new ArgumentCountError (line 1536)
+- new ArgumentCountError (line 1562)
+- 51 class method(s)
 
 ### `ext/zip/ZipArchiveOpen.php`
 
