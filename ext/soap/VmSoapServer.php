@@ -274,6 +274,14 @@ final class VmSoapServer
             $state->lastResponse = $response;
             OutputBuffer::append($response);
         } finally {
+            // php-src: SESSION persistence object must remain in $_SESSION for
+            // session_encode / next-request decode (#20315, #20342).
+            if (
+                SoapConstants::SOAP_PERSISTENCE_SESSION === $state->persistence
+                && null !== $state->classInstance
+            ) {
+                self::storeSessionClassInstance($ctx, $state->classInstance);
+            }
             --self::$handleDepth;
             $state->pendingFault = null;
         }
