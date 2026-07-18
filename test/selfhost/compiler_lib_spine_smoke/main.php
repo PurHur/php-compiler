@@ -563,6 +563,7 @@ require_once __DIR__.'/../../../ext/gd/imagefilter.php';
 require_once __DIR__.'/../../../ext/gd/imageflip.php';
 require_once __DIR__.'/../../../ext/gd/imagegetinterpolation.php';
 require_once __DIR__.'/../../../ext/gd/imageistruecolor.php';
+require_once __DIR__.'/../../../ext/gd/imagelayereffect.php';
 require_once __DIR__.'/../../../ext/gd/imageline.php';
 require_once __DIR__.'/../../../ext/gd/imagepalettetotruecolor.php';
 require_once __DIR__.'/../../../ext/gd/imagepng.php';

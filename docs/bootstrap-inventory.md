@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5590 |
-| Phase A inventory files (M2 ratio SSOT) | 5590 |
+| PHP files on vm.php path | 5591 |
+| Phase A inventory files (M2 ratio SSOT) | 5591 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15982 |
+| Source constructs flagged (warnings) | 15984 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -477,7 +477,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 5 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 47 |
+| `ext/gd/Module.php` | 0 | 48 |
 | `ext/gd/VmGd.php` | 0 | 10 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
 | `ext/gd/VmGdBmp.php` | 0 | 1 |
@@ -513,6 +513,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imageflip.php` | 0 | 1 |
 | `ext/gd/imagegetinterpolation.php` | 0 | 1 |
 | `ext/gd/imageistruecolor.php` | 0 | 1 |
+| `ext/gd/imagelayereffect.php` | 0 | 1 |
 | `ext/gd/imageline.php` | 0 | 1 |
 | `ext/gd/imagepalettetotruecolor.php` | 0 | 1 |
 | `ext/gd/imagepng.php` | 0 | 1 |
@@ -8719,10 +8720,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gd/GdImageState.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 96)
-- new self (line 103)
-- new self (line 111)
-- new self (line 119)
+- new self (line 97)
+- new self (line 104)
+- new self (line 112)
+- new self (line 120)
 - 6 class method(s)
 
 ### `ext/gd/GdRegistry.php`
@@ -8739,46 +8740,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagecolorallocate (line 60)
 - new imagecolorallocatealpha (line 61)
 - new imagealphablending (line 62)
-- new imagesavealpha (line 63)
-- new imageantialias (line 64)
-- new imagesetthickness (line 65)
-- new imageistruecolor (line 66)
-- new imagetruecolortopalette (line 67)
-- new imagepalettetotruecolor (line 68)
-- new imagesetinterpolation (line 69)
-- new imagegetinterpolation (line 70)
-- new imagefill (line 71)
-- new imagedestroy (line 72)
-- new imagesx (line 73)
-- new imagesy (line 74)
-- new imagecolorat (line 75)
-- new imagecopy (line 76)
-- new imagecopymerge (line 77)
-- new imagecopyresampled (line 78)
-- new imagecopyresized (line 79)
-- new imagesetpixel (line 80)
-- new imageline (line 81)
-- new imagefilledrectangle (line 82)
-- new imagestring (line 83)
-- new imagechar (line 84)
-- new imagettftext (line 86)
-- new imagettfbbox (line 87)
-- new imagefilter (line 89)
-- new imageflip (line 90)
-- new imagecrop (line 91)
-- new imagecropauto (line 92)
-- new imagerotate (line 93)
-- new imagescale (line 94)
-- new imageaffine (line 95)
-- new imageconvolution (line 96)
-- new imagecreatefromstring (line 99)
-- new imagepng (line 100)
-- new imagewebp (line 101)
-- new imageavif (line 102)
-- new imagebmp (line 103)
-- new imagecreatefromwebp (line 104)
-- new imagecreatefromavif (line 105)
-- new imagecreatefrombmp (line 106)
+- new imagelayereffect (line 63)
+- new imagesavealpha (line 64)
+- new imageantialias (line 65)
+- new imagesetthickness (line 66)
+- new imageistruecolor (line 67)
+- new imagetruecolortopalette (line 68)
+- new imagepalettetotruecolor (line 69)
+- new imagesetinterpolation (line 70)
+- new imagegetinterpolation (line 71)
+- new imagefill (line 72)
+- new imagedestroy (line 73)
+- new imagesx (line 74)
+- new imagesy (line 75)
+- new imagecolorat (line 76)
+- new imagecopy (line 77)
+- new imagecopymerge (line 78)
+- new imagecopyresampled (line 79)
+- new imagecopyresized (line 80)
+- new imagesetpixel (line 81)
+- new imageline (line 82)
+- new imagefilledrectangle (line 83)
+- new imagestring (line 84)
+- new imagechar (line 85)
+- new imagettftext (line 87)
+- new imagettfbbox (line 88)
+- new imagefilter (line 90)
+- new imageflip (line 91)
+- new imagecrop (line 92)
+- new imagecropauto (line 93)
+- new imagerotate (line 94)
+- new imagescale (line 95)
+- new imageaffine (line 96)
+- new imageconvolution (line 97)
+- new imagecreatefromstring (line 100)
+- new imagepng (line 101)
+- new imagewebp (line 102)
+- new imageavif (line 103)
+- new imagebmp (line 104)
+- new imagecreatefromwebp (line 105)
+- new imagecreatefromavif (line 106)
+- new imagecreatefrombmp (line 107)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -8787,13 +8789,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 54)
 - new ObjectEntry (line 77)
 - new ObjectEntry (line 103)
-- new HashTable (line 616)
-- new Variable (line 618)
-- new ObjectEntry (line 1956)
-- new ObjectEntry (line 1980)
-- new ObjectEntry (line 2004)
-- new ObjectEntry (line 2260)
-- 100 class method(s)
+- new HashTable (line 632)
+- new Variable (line 634)
+- new ObjectEntry (line 1972)
+- new ObjectEntry (line 1996)
+- new ObjectEntry (line 2020)
+- new ObjectEntry (line 2276)
+- 104 class method(s)
 
 ### `ext/gd/VmGdAvif.php`
 
@@ -8961,6 +8963,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imageistruecolor.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagelayereffect.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)

@@ -56,6 +56,12 @@ final class GdConstants
         'IMG_SINC' => 19,
         'IMG_TRIANGLE' => 20,
         'IMG_WEIGHTED4' => 21,
+        // gdEffect* layer modes (php-src ext/gd/libgd/gd.h; #20429)
+        'IMG_EFFECT_REPLACE' => 0,
+        'IMG_EFFECT_ALPHABLEND' => 1,
+        'IMG_EFFECT_NORMAL' => 2,
+        'IMG_EFFECT_OVERLAY' => 3,
+        'IMG_EFFECT_MULTIPLY' => 4,
     ];
 
     /** GD_METHOD_COUNT — exclusive upper bound for imagescale() $mode (#20405). */
