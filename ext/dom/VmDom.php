@@ -1062,6 +1062,8 @@ final class VmDom
         ?ObjectEntry $ownerDocument = null,
         string $value = ''
     ): Variable {
+        // php-src document.c / xmlValidateName — Invalid Character Error (#20594).
+        self::assertValidXmlName($name);
         $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ELEMENT);
 
         $entry = new ObjectEntry($class);
@@ -1100,6 +1102,8 @@ final class VmDom
         ?ObjectEntry $ownerDocument = null,
         string $value = ''
     ): Variable {
+        // php-src document.c — QName + xml/xmlns namespace URI rules (#20594).
+        self::assertValidElementNSName($namespace, $qualifiedName);
         [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
         $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ELEMENT);
 
@@ -1165,11 +1169,20 @@ final class VmDom
         Context $ctx,
         ?string $namespace,
         string $qualifiedName,
-        ?ObjectEntry $ownerDocument = null
+        ?ObjectEntry $ownerDocument = null,
+        bool $validateAsQName = true
     ): Variable {
+        // createAttribute() uses Name rules; createAttributeNS() uses QName/NS rules (#20594).
+        if ($validateAsQName) {
+            self::assertValidElementNSName($namespace, $qualifiedName);
+            [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
+        } else {
+            // Non-NS Attr keeps the full XML Name (php-src attr->name), including leading ':'.
+            $prefix = '';
+            $localName = $qualifiedName;
+        }
         $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ATTR);
 
-        [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
@@ -1202,7 +1215,10 @@ final class VmDom
         string $name,
         ?ObjectEntry $ownerDocument = null
     ): Variable {
-        return self::createAttributeNS($ctx, null, $name, $ownerDocument);
+        // php-src xmlValidateName — Invalid Character Error (not Namespace Error) (#20594).
+        self::assertValidXmlName($name);
+
+        return self::createAttributeNS($ctx, null, $name, $ownerDocument, false);
     }
 
     /**
@@ -9070,6 +9086,50 @@ final class VmDom
         if ('' === $name || !preg_match('/^[A-Za-z_:][\w.:-]*$/', $name)) {
             throw new \DOMException('Invalid Character Error', DomExceptionConstants::INVALID_CHARACTER_ERR);
         }
+    }
+
+    /**
+     * QName + namespace URI constraints for createElementNS / createAttributeNS
+     * (php-src ext/dom/document.c; libxml xmlValidateQName; #20594).
+     *
+     * @throws \DOMException Namespace Error (14)
+     */
+    private static function assertValidElementNSName(?string $namespace, string $qualifiedName): void
+    {
+        if (!self::isValidXmlQName($qualifiedName)) {
+            throw new \DOMException('Namespace Error', DomExceptionConstants::NAMESPACE_ERR);
+        }
+        [$prefix] = self::splitQualifiedName($qualifiedName);
+        $ns = $namespace ?? '';
+        if ('' !== $prefix && '' === $ns) {
+            throw new \DOMException('Namespace Error', DomExceptionConstants::NAMESPACE_ERR);
+        }
+        if ('xml' === $prefix && 'http://www.w3.org/XML/1998/namespace' !== $ns) {
+            throw new \DOMException('Namespace Error', DomExceptionConstants::NAMESPACE_ERR);
+        }
+        if ('xmlns' === $prefix && 'http://www.w3.org/2000/xmlns/' !== $ns) {
+            throw new \DOMException('Namespace Error', DomExceptionConstants::NAMESPACE_ERR);
+        }
+    }
+
+    /** libxml xmlValidateQName — NCName or NCName:NCName (no empty parts, one colon). */
+    private static function isValidXmlQName(string $name): bool
+    {
+        if ('' === $name) {
+            return false;
+        }
+        $pos = strpos($name, ':');
+        if (false === $pos) {
+            return 1 === preg_match('/^[A-Za-z_][\w.-]*$/', $name);
+        }
+        $prefix = substr($name, 0, $pos);
+        $local = substr($name, $pos + 1);
+        if ('' === $prefix || '' === $local || false !== strpos($local, ':')) {
+            return false;
+        }
+
+        return 1 === preg_match('/^[A-Za-z_][\w.-]*$/', $prefix)
+            && 1 === preg_match('/^[A-Za-z_][\w.-]*$/', $local);
     }
 
     /** @throws \DOMException when $target is not a valid PI target (php-src dom_document_create_processing_instruction). */
