@@ -50,6 +50,8 @@ final class CurlConstants
     public const CURL_LOCK_DATA_DNS = 3;
     public const CURL_LOCK_DATA_SSL_SESSION = 4;
     public const CURL_LOCK_DATA_CONNECT = 5;
+    /** libcurl curl_lock_data CURL_LOCK_DATA_PSL (curl.h; php-src curl.stub.php; #20530). */
+    public const CURL_LOCK_DATA_PSL = 6;
     /** curl_easy_pause bitmasks (curl/curl.h; php-src curl.stub.php; #20494). */
     public const CURLPAUSE_RECV = 1;
     public const CURLPAUSE_RECV_CONT = 0;
@@ -115,6 +117,7 @@ final class CurlConstants
             'CURL_LOCK_DATA_DNS' => self::CURL_LOCK_DATA_DNS,
             'CURL_LOCK_DATA_SSL_SESSION' => self::CURL_LOCK_DATA_SSL_SESSION,
             'CURL_LOCK_DATA_CONNECT' => self::CURL_LOCK_DATA_CONNECT,
+            'CURL_LOCK_DATA_PSL' => self::CURL_LOCK_DATA_PSL,
         ];
         if (CurlExtensionPolicy::advertisesExtension()) {
             $constants['CURLINFO_HTTP_CODE'] = self::CURLINFO_HTTP_CODE;

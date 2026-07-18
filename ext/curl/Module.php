@@ -70,6 +70,10 @@ class Module extends ModuleAbstract
             // curl_share_errno / curl_share_strerror — share error surface (php-src share.c; #20531)
             $functions[] = new curl_share_errno();
             $functions[] = new curl_share_strerror();
+            // curl_share_init_persistent — PHP 8.5+ (php-src share.c; #20530)
+            if (CurlExtensionPolicy::advertisesSharePersistentHandles()) {
+                $functions[] = new curl_share_init_persistent();
+            }
         }
         if (CurlExtensionPolicy::advertisesEasyHandleStubs()) {
             // curl_escape/unescape require CurlHandle (php-src curl.stub.php; #20493)

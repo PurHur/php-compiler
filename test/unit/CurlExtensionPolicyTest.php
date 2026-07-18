@@ -143,4 +143,28 @@ PHP;
             }
         }
     }
+
+    public function testCurlShareInitPersistentRegisteredOnProfile85(): void
+    {
+        if (!VmCurlNative::available()) {
+            $this->markTestSkipped('libcurl FFI unavailable');
+        }
+
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(\PHPCompiler\CompilerVersion::advertisesCurlShareInitPersistent());
+            $this->assertTrue(CurlExtensionPolicy::advertisesSharePersistentHandles());
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            self::assertTrue(VmReflection::functionExists($ctx, 'curl_share_init_persistent'));
+            self::assertTrue(VmReflection::classExists($ctx, 'CurlSharePersistentHandle'));
+        } finally {
+            if (false === $prev || null === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

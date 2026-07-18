@@ -105,7 +105,7 @@ final class VmCurlEasy
         }
 
         if (CurlConstants::CURLOPT_SHARE === $option) {
-            $share = VmCurlArg::requireShareObject($value, 'curl_setopt', 3);
+            $share = VmCurlArg::requireShareableObject($value, 'curl_setopt', 3);
             VmCurlShare::attachToEasy($share);
             $st['share_id'] = $share->id;
 
