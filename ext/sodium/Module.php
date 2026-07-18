@@ -110,6 +110,7 @@ class Module extends ModuleAbstract
             new sodium_crypto_aead_aes256gcm_is_available(),
             new sodium_crypto_aead_aes256gcm_encrypt(),
             new sodium_crypto_aead_aes256gcm_decrypt(),
+            ...self::aegisFunctions(),
             new sodium_crypto_sign_keypair(),
             new sodium_crypto_sign_publickey(),
             new sodium_crypto_sign_secretkey(),
@@ -135,5 +136,27 @@ class Module extends ModuleAbstract
             new sodium_crypto_pwhash_str_verify(),
             new sodium_crypto_pwhash_str_needs_rehash(),
         ];
+    }
+
+    /**
+     * AEGIS AEAD entrypoints — php-src #ifdef crypto_aead_aegis{128l,256}_KEYBYTES (#20518).
+     *
+     * @return list<\PHPCompiler\Internal>
+     */
+    private static function aegisFunctions(): array
+    {
+        $out = [];
+        if (SodiumExtensionPolicy::advertisesAegis128l()) {
+            $out[] = new sodium_crypto_aead_aegis128l_encrypt();
+            $out[] = new sodium_crypto_aead_aegis128l_decrypt();
+            $out[] = new sodium_crypto_aead_aegis128l_keygen();
+        }
+        if (SodiumExtensionPolicy::advertisesAegis256()) {
+            $out[] = new sodium_crypto_aead_aegis256_encrypt();
+            $out[] = new sodium_crypto_aead_aegis256_decrypt();
+            $out[] = new sodium_crypto_aead_aegis256_keygen();
+        }
+
+        return $out;
     }
 }

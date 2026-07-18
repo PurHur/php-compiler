@@ -119,6 +119,24 @@ final class VmSodium
 
     public const CRYPTO_AEAD_AES256GCM_ABYTES = 16;
 
+    /** AEGIS-128L (libsodium ≥ 1.0.19; php-src PHP 8.4 #ifdef crypto_aead_aegis128l_KEYBYTES; #20518). */
+    public const CRYPTO_AEAD_AEGIS128L_KEYBYTES = 16;
+
+    public const CRYPTO_AEAD_AEGIS128L_NPUBBYTES = 16;
+
+    public const CRYPTO_AEAD_AEGIS128L_NSECRETBYTES = 0;
+
+    public const CRYPTO_AEAD_AEGIS128L_ABYTES = 32;
+
+    /** AEGIS-256 (libsodium ≥ 1.0.19; php-src PHP 8.4 #ifdef crypto_aead_aegis256_KEYBYTES; #20518). */
+    public const CRYPTO_AEAD_AEGIS256_KEYBYTES = 32;
+
+    public const CRYPTO_AEAD_AEGIS256_NPUBBYTES = 32;
+
+    public const CRYPTO_AEAD_AEGIS256_NSECRETBYTES = 0;
+
+    public const CRYPTO_AEAD_AEGIS256_ABYTES = 32;
+
     public const CRYPTO_SIGN_PUBLICKEYBYTES = 32;
 
     public const CRYPTO_SIGN_SECRETKEYBYTES = 64;
@@ -193,6 +211,15 @@ final class VmSodium
 
     private static bool $ffiUnavailable = false;
 
+    /** Separate FFI for AEGIS — must not share the core cdef (missing symbols would break load; #20518). */
+    private static ?\FFI $ffiAegis = null;
+
+    private static bool $ffiAegisUnavailable = false;
+
+    private static ?bool $aegis128lAvailable = null;
+
+    private static ?bool $aegis256Available = null;
+
     public static function available(): bool
     {
         return \function_exists('sodium_crypto_secretbox')
@@ -212,6 +239,36 @@ final class VmSodium
             || \function_exists('sodium_crypto_kdf_derive_from_key')
             || \function_exists('sodium_crypto_pwhash')
             || null !== self::ffi();
+    }
+
+    /**
+     * AEGIS-128L available — host PHP wrappers or libsodium FFI (php-src #ifdef crypto_aead_aegis128l_KEYBYTES; #20518).
+     */
+    public static function aeadAegis128lAvailable(): bool
+    {
+        if (null !== self::$aegis128lAvailable) {
+            return self::$aegis128lAvailable;
+        }
+        if (\function_exists('sodium_crypto_aead_aegis128l_encrypt')) {
+            return self::$aegis128lAvailable = true;
+        }
+
+        return self::$aegis128lAvailable = null !== self::ffiAegis();
+    }
+
+    /**
+     * AEGIS-256 available — host PHP wrappers or libsodium FFI (php-src #ifdef crypto_aead_aegis256_KEYBYTES; #20518).
+     */
+    public static function aeadAegis256Available(): bool
+    {
+        if (null !== self::$aegis256Available) {
+            return self::$aegis256Available;
+        }
+        if (\function_exists('sodium_crypto_aead_aegis256_encrypt')) {
+            return self::$aegis256Available = true;
+        }
+
+        return self::$aegis256Available = null !== self::ffiAegis();
     }
 
     public static function aeadAes256gcmIsAvailable(): bool
@@ -990,6 +1047,114 @@ final class VmSodium
         }
 
         return self::ffiAeadAes256gcmDecrypt($ciphertext, $additionalData, $nonce, $key);
+    }
+
+    /**
+     * sodium_crypto_aead_aegis128l_keygen() — random AEGIS-128L key (php-src #20518).
+     */
+    public static function aeadAegis128lKeygen(): string
+    {
+        if (!self::aeadAegis128lAvailable()) {
+            self::throwSodium('AEGIS-128L is not available');
+        }
+        if (\function_exists('sodium_crypto_aead_aegis128l_keygen')) {
+            return \sodium_crypto_aead_aegis128l_keygen();
+        }
+
+        return self::randomKeyBytes(self::CRYPTO_AEAD_AEGIS128L_KEYBYTES);
+    }
+
+    public static function aeadAegis128lEncrypt(
+        string $message,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string {
+        if (!self::aeadAegis128lAvailable()) {
+            self::throwSodium('AEGIS-128L is not available');
+        }
+        if (\function_exists('sodium_crypto_aead_aegis128l_encrypt')) {
+            self::validateAeadAegis128lKeyNonce($key, $nonce, 'sodium_crypto_aead_aegis128l_encrypt', 3, 4);
+
+            return \sodium_crypto_aead_aegis128l_encrypt($message, $additionalData, $nonce, $key);
+        }
+
+        return self::ffiAeadAegis128lEncrypt($message, $additionalData, $nonce, $key);
+    }
+
+    /**
+     * @return string|false
+     */
+    public static function aeadAegis128lDecrypt(
+        string $ciphertext,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string|false {
+        if (!self::aeadAegis128lAvailable()) {
+            self::throwSodium('AEGIS-128L is not available');
+        }
+        if (\function_exists('sodium_crypto_aead_aegis128l_decrypt')) {
+            self::validateAeadAegis128lKeyNonce($key, $nonce, 'sodium_crypto_aead_aegis128l_decrypt', 3, 4);
+
+            return \sodium_crypto_aead_aegis128l_decrypt($ciphertext, $additionalData, $nonce, $key);
+        }
+
+        return self::ffiAeadAegis128lDecrypt($ciphertext, $additionalData, $nonce, $key);
+    }
+
+    /**
+     * sodium_crypto_aead_aegis256_keygen() — random AEGIS-256 key (php-src #20518).
+     */
+    public static function aeadAegis256Keygen(): string
+    {
+        if (!self::aeadAegis256Available()) {
+            self::throwSodium('AEGIS-256 is not available');
+        }
+        if (\function_exists('sodium_crypto_aead_aegis256_keygen')) {
+            return \sodium_crypto_aead_aegis256_keygen();
+        }
+
+        return self::randomKeyBytes(self::CRYPTO_AEAD_AEGIS256_KEYBYTES);
+    }
+
+    public static function aeadAegis256Encrypt(
+        string $message,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string {
+        if (!self::aeadAegis256Available()) {
+            self::throwSodium('AEGIS-256 is not available');
+        }
+        if (\function_exists('sodium_crypto_aead_aegis256_encrypt')) {
+            self::validateAeadAegis256KeyNonce($key, $nonce, 'sodium_crypto_aead_aegis256_encrypt', 3, 4);
+
+            return \sodium_crypto_aead_aegis256_encrypt($message, $additionalData, $nonce, $key);
+        }
+
+        return self::ffiAeadAegis256Encrypt($message, $additionalData, $nonce, $key);
+    }
+
+    /**
+     * @return string|false
+     */
+    public static function aeadAegis256Decrypt(
+        string $ciphertext,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string|false {
+        if (!self::aeadAegis256Available()) {
+            self::throwSodium('AEGIS-256 is not available');
+        }
+        if (\function_exists('sodium_crypto_aead_aegis256_decrypt')) {
+            self::validateAeadAegis256KeyNonce($key, $nonce, 'sodium_crypto_aead_aegis256_decrypt', 3, 4);
+
+            return \sodium_crypto_aead_aegis256_decrypt($ciphertext, $additionalData, $nonce, $key);
+        }
+
+        return self::ffiAeadAegis256Decrypt($ciphertext, $additionalData, $nonce, $key);
     }
 
     public static function signKeypair(): string
@@ -2834,6 +2999,158 @@ final class VmSodium
         return self::unsignedCharArrayToString($mBuf, $mlen);
     }
 
+    private static function ffiAeadAegis128lEncrypt(
+        string $message,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string {
+        $ffi = self::requireFfiAegis();
+        self::validateAeadAegis128lKeyNonce($key, $nonce, 'sodium_crypto_aead_aegis128l_encrypt', 3, 4);
+        $mlen = \strlen($message);
+        $adlen = \strlen($additionalData);
+        $clen = $mlen + self::CRYPTO_AEAD_AEGIS128L_ABYTES;
+        $cBuf = $ffi->new('unsigned char['.$clen.']');
+        $clenOut = $ffi->new('unsigned long long');
+        $mBuf = $mlen > 0 ? self::stringToUnsignedCharArray($ffi, $message) : null;
+        $adBuf = $adlen > 0 ? self::stringToUnsignedCharArray($ffi, $additionalData) : null;
+        $npubBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_aead_aegis128l_encrypt(
+            $cBuf,
+            \FFI::addr($clenOut),
+            $mBuf,
+            $mlen,
+            $adBuf,
+            $adlen,
+            null,
+            $npubBuf,
+            $kBuf
+        );
+        if (0 !== $rc) {
+            throw new \Exception('sodium_crypto_aead_aegis128l_encrypt(): internal error');
+        }
+
+        return self::unsignedCharArrayToString($cBuf, $clen);
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function ffiAeadAegis128lDecrypt(
+        string $ciphertext,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string|false {
+        $ffi = self::requireFfiAegis();
+        self::validateAeadAegis128lKeyNonce($key, $nonce, 'sodium_crypto_aead_aegis128l_decrypt', 3, 4);
+        $clen = \strlen($ciphertext);
+        if ($clen < self::CRYPTO_AEAD_AEGIS128L_ABYTES) {
+            return false;
+        }
+        $mlen = $clen - self::CRYPTO_AEAD_AEGIS128L_ABYTES;
+        $mBuf = $mlen > 0 ? $ffi->new('unsigned char['.$mlen.']') : null;
+        $mlenOut = $ffi->new('unsigned long long');
+        $cBuf = self::stringToUnsignedCharArray($ffi, $ciphertext);
+        $adlen = \strlen($additionalData);
+        $adBuf = $adlen > 0 ? self::stringToUnsignedCharArray($ffi, $additionalData) : null;
+        $npubBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_aead_aegis128l_decrypt(
+            $mBuf,
+            \FFI::addr($mlenOut),
+            null,
+            $cBuf,
+            $clen,
+            $adBuf,
+            $adlen,
+            $npubBuf,
+            $kBuf
+        );
+        if (0 !== $rc) {
+            return false;
+        }
+
+        return $mlen > 0 ? self::unsignedCharArrayToString($mBuf, $mlen) : '';
+    }
+
+    private static function ffiAeadAegis256Encrypt(
+        string $message,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string {
+        $ffi = self::requireFfiAegis();
+        self::validateAeadAegis256KeyNonce($key, $nonce, 'sodium_crypto_aead_aegis256_encrypt', 3, 4);
+        $mlen = \strlen($message);
+        $adlen = \strlen($additionalData);
+        $clen = $mlen + self::CRYPTO_AEAD_AEGIS256_ABYTES;
+        $cBuf = $ffi->new('unsigned char['.$clen.']');
+        $clenOut = $ffi->new('unsigned long long');
+        $mBuf = $mlen > 0 ? self::stringToUnsignedCharArray($ffi, $message) : null;
+        $adBuf = $adlen > 0 ? self::stringToUnsignedCharArray($ffi, $additionalData) : null;
+        $npubBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_aead_aegis256_encrypt(
+            $cBuf,
+            \FFI::addr($clenOut),
+            $mBuf,
+            $mlen,
+            $adBuf,
+            $adlen,
+            null,
+            $npubBuf,
+            $kBuf
+        );
+        if (0 !== $rc) {
+            throw new \Exception('sodium_crypto_aead_aegis256_encrypt(): internal error');
+        }
+
+        return self::unsignedCharArrayToString($cBuf, $clen);
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function ffiAeadAegis256Decrypt(
+        string $ciphertext,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string|false {
+        $ffi = self::requireFfiAegis();
+        self::validateAeadAegis256KeyNonce($key, $nonce, 'sodium_crypto_aead_aegis256_decrypt', 3, 4);
+        $clen = \strlen($ciphertext);
+        if ($clen < self::CRYPTO_AEAD_AEGIS256_ABYTES) {
+            return false;
+        }
+        $mlen = $clen - self::CRYPTO_AEAD_AEGIS256_ABYTES;
+        $mBuf = $mlen > 0 ? $ffi->new('unsigned char['.$mlen.']') : null;
+        $mlenOut = $ffi->new('unsigned long long');
+        $cBuf = self::stringToUnsignedCharArray($ffi, $ciphertext);
+        $adlen = \strlen($additionalData);
+        $adBuf = $adlen > 0 ? self::stringToUnsignedCharArray($ffi, $additionalData) : null;
+        $npubBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_aead_aegis256_decrypt(
+            $mBuf,
+            \FFI::addr($mlenOut),
+            null,
+            $cBuf,
+            $clen,
+            $adBuf,
+            $adlen,
+            $npubBuf,
+            $kBuf
+        );
+        if (0 !== $rc) {
+            return false;
+        }
+
+        return $mlen > 0 ? self::unsignedCharArrayToString($mBuf, $mlen) : '';
+    }
+
     private static function ffiSignKeypair(): string
     {
         $ffi = self::requireFfi();
@@ -3229,6 +3546,52 @@ final class VmSodium
         }
     }
 
+    private static function validateAeadAegis128lKeyNonce(
+        string $key,
+        string $nonce,
+        string $fn,
+        int $nonceArg,
+        int $keyArg
+    ): void {
+        if (\strlen($nonce) !== self::CRYPTO_AEAD_AEGIS128L_NPUBBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($nonce) must be SODIUM_CRYPTO_AEAD_AEGIS128L_NPUBBYTES bytes long',
+                $fn,
+                $nonceArg
+            ));
+        }
+        if (\strlen($key) !== self::CRYPTO_AEAD_AEGIS128L_KEYBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($key) must be SODIUM_CRYPTO_AEAD_AEGIS128L_KEYBYTES bytes long',
+                $fn,
+                $keyArg
+            ));
+        }
+    }
+
+    private static function validateAeadAegis256KeyNonce(
+        string $key,
+        string $nonce,
+        string $fn,
+        int $nonceArg,
+        int $keyArg
+    ): void {
+        if (\strlen($nonce) !== self::CRYPTO_AEAD_AEGIS256_NPUBBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($nonce) must be SODIUM_CRYPTO_AEAD_AEGIS256_NPUBBYTES bytes long',
+                $fn,
+                $nonceArg
+            ));
+        }
+        if (\strlen($key) !== self::CRYPTO_AEAD_AEGIS256_KEYBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($key) must be SODIUM_CRYPTO_AEAD_AEGIS256_KEYBYTES bytes long',
+                $fn,
+                $keyArg
+            ));
+        }
+    }
+
     private static function validateSignKeypair(string $keypair, string $fn, int $argNum = 1): void
     {
         if (\strlen($keypair) !== self::CRYPTO_SIGN_KEYPAIRBYTES) {
@@ -3537,6 +3900,61 @@ final class VmSodium
             }
         }
         self::$ffiUnavailable = true;
+
+        return null;
+    }
+
+    private static function requireFfiAegis(): \FFI
+    {
+        $ffi = self::ffiAegis();
+        if (null === $ffi) {
+            throw new \LogicException('libsodium AEGIS is not available in this compiler build');
+        }
+
+        return $ffi;
+    }
+
+    /**
+     * AEGIS-only FFI — separate from {@see ffi()} so missing AEGIS symbols do not break the core load (#20518).
+     *
+     * Optional override: PHP_COMPILER_LIBSODIUM_SO=/path/to/libsodium.so (libsodium ≥ 1.0.19).
+     */
+    private static function ffiAegis(): ?\FFI
+    {
+        if (self::$ffiAegisUnavailable) {
+            return null;
+        }
+        if (null !== self::$ffiAegis) {
+            return self::$ffiAegis;
+        }
+        if (!\extension_loaded('ffi')) {
+            self::$ffiAegisUnavailable = true;
+
+            return null;
+        }
+        $libs = [];
+        $env = \getenv('PHP_COMPILER_LIBSODIUM_SO');
+        if (\is_string($env) && '' !== $env) {
+            $libs[] = $env;
+        }
+        $libs = \array_merge($libs, ['libsodium.so.26', 'libsodium.so.23', 'libsodium.so']);
+        $cdef = 'int sodium_init(void);
+            int crypto_aead_aegis128l_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k);
+            int crypto_aead_aegis128l_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);
+            int crypto_aead_aegis256_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k);
+            int crypto_aead_aegis256_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);';
+        foreach ($libs as $lib) {
+            try {
+                $ffi = \FFI::cdef($cdef, $lib);
+                $ffi->sodium_init();
+                self::$ffiAegis = $ffi;
+
+                return self::$ffiAegis;
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+        self::$ffiAegisUnavailable = true;
 
         return null;
     }

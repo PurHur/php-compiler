@@ -63,6 +63,7 @@ final class SodiumConstants
             'SODIUM_CRYPTO_AEAD_AES256GCM_NPUBBYTES' => VmSodium::CRYPTO_AEAD_AES256GCM_NPUBBYTES,
             'SODIUM_CRYPTO_AEAD_AES256GCM_NSECBYTES' => VmSodium::CRYPTO_AEAD_AES256GCM_NSECRETBYTES,
             'SODIUM_CRYPTO_AEAD_AES256GCM_ABYTES' => VmSodium::CRYPTO_AEAD_AES256GCM_ABYTES,
+            ...self::aegisConstants(),
             'SODIUM_CRYPTO_SIGN_BYTES' => VmSodium::CRYPTO_SIGN_BYTES,
             'SODIUM_CRYPTO_SIGN_SEEDBYTES' => VmSodium::CRYPTO_SIGN_SEEDBYTES,
             'SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES' => VmSodium::CRYPTO_SIGN_PUBLICKEYBYTES,
@@ -93,5 +94,29 @@ final class SodiumConstants
             'SODIUM_CRYPTO_PWHASH_OPSLIMIT_SENSITIVE' => VmSodium::CRYPTO_PWHASH_OPSLIMIT_SENSITIVE,
             'SODIUM_CRYPTO_PWHASH_MEMLIMIT_SENSITIVE' => VmSodium::CRYPTO_PWHASH_MEMLIMIT_SENSITIVE,
         ];
+    }
+
+    /**
+     * AEGIS size constants — only when libsodium provides the primitives (php-src #ifdef; #20518).
+     *
+     * @return array<string, int>
+     */
+    private static function aegisConstants(): array
+    {
+        $out = [];
+        if (SodiumExtensionPolicy::advertisesAegis128l()) {
+            $out['SODIUM_CRYPTO_AEAD_AEGIS128L_KEYBYTES'] = VmSodium::CRYPTO_AEAD_AEGIS128L_KEYBYTES;
+            $out['SODIUM_CRYPTO_AEAD_AEGIS128L_NPUBBYTES'] = VmSodium::CRYPTO_AEAD_AEGIS128L_NPUBBYTES;
+            $out['SODIUM_CRYPTO_AEAD_AEGIS128L_NSECBYTES'] = VmSodium::CRYPTO_AEAD_AEGIS128L_NSECRETBYTES;
+            $out['SODIUM_CRYPTO_AEAD_AEGIS128L_ABYTES'] = VmSodium::CRYPTO_AEAD_AEGIS128L_ABYTES;
+        }
+        if (SodiumExtensionPolicy::advertisesAegis256()) {
+            $out['SODIUM_CRYPTO_AEAD_AEGIS256_KEYBYTES'] = VmSodium::CRYPTO_AEAD_AEGIS256_KEYBYTES;
+            $out['SODIUM_CRYPTO_AEAD_AEGIS256_NPUBBYTES'] = VmSodium::CRYPTO_AEAD_AEGIS256_NPUBBYTES;
+            $out['SODIUM_CRYPTO_AEAD_AEGIS256_NSECBYTES'] = VmSodium::CRYPTO_AEAD_AEGIS256_NSECRETBYTES;
+            $out['SODIUM_CRYPTO_AEAD_AEGIS256_ABYTES'] = VmSodium::CRYPTO_AEAD_AEGIS256_ABYTES;
+        }
+
+        return $out;
     }
 }
