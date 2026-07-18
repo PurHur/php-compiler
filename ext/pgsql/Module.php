@@ -70,6 +70,27 @@ class Module extends ModuleAbstract
             new pg_fetch_row(),
             new pg_num_rows(),
             new pg_last_error(),
+            ...self::php84Functions(),
+        ];
+    }
+
+    /**
+     * @return list<\PHPCompiler\Func\Internal>
+     */
+    private function php84Functions(): array
+    {
+        if (!PgsqlExtensionPolicy::advertisesPhp84Helpers()) {
+            return [];
+        }
+
+        return [
+            new pg_change_password(),
+            new pg_jit(),
+            new pg_put_copy_data(),
+            new pg_put_copy_end(),
+            new pg_result_memory_size(),
+            new pg_set_chunked_rows_size(),
+            new pg_socket_poll(),
         ];
     }
 }

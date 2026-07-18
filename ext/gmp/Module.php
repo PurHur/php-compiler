@@ -74,6 +74,8 @@ class Module extends ModuleAbstract
             new gmp_invert(),
             new gmp_jacobi(),
             new gmp_legendre(),
+            new gmp_kronecker(),
+            new gmp_divexact(),
             new gmp_gcdext(),
             new gmp_root(),
             new gmp_rootrem(),

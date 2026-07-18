@@ -224,6 +224,94 @@ final class VmSqlite3Native
         return (int) self::requireFfi()->sqlite3_errcode($db);
     }
 
+    /**
+     * Fetch all result rows (numeric columns) for aggregate expansion (#20585).
+     *
+     * @return list<list<string|int|float|null>>
+     */
+    public static function fetchAllRows(\FFI\CData $db, string $sql): array
+    {
+        $ffi = self::requireFfi();
+        $stmtPtr = $ffi->new('sqlite3_stmt*');
+        $rc = (int) $ffi->sqlite3_prepare_v2($db, $sql, -1, \FFI::addr($stmtPtr), null);
+        if (self::SQLITE_OK !== $rc) {
+            throw new \SQLite3Exception(self::errmsg($db));
+        }
+        $rows = [];
+        try {
+            while (true) {
+                $step = (int) $ffi->sqlite3_step($stmtPtr);
+                if (self::SQLITE_ROW !== $step) {
+                    break;
+                }
+                $columnCount = (int) $ffi->sqlite3_column_count($stmtPtr);
+                $row = [];
+                for ($i = 0; $i < $columnCount; ++$i) {
+                    $row[] = self::columnValue($ffi, $stmtPtr, $i);
+                }
+                $rows[] = $row;
+            }
+        } finally {
+            $ffi->sqlite3_finalize($stmtPtr);
+        }
+
+        return $rows;
+    }
+
+    /**
+     * SQLite3::loadExtension — php-src zim_sqlite3_loadExtension (#20585).
+     *
+     * Returns false when sqlite3.extension_dir is unset/empty (extensions disabled),
+     * path cannot be resolved, or sqlite3_load_extension fails / is omitted from the build.
+     */
+    public static function loadExtension(\FFI\CData $db, string $name): bool
+    {
+        $extDir = \ini_get('sqlite3.extension_dir');
+        if (false === $extDir || '' === $extDir) {
+            return false;
+        }
+        $dir = rtrim((string) $extDir, "/\\");
+        $libPath = $dir.DIRECTORY_SEPARATOR.$name;
+        $real = realpath($libPath);
+        if (false === $real) {
+            return false;
+        }
+        // Separate cdef so missing SQLITE_OMIT_LOAD_EXTENSION builds do not break core FFI.
+        $loadCdef = <<<'CDEF'
+typedef struct sqlite3 sqlite3;
+int sqlite3_enable_load_extension(sqlite3 *db, int onoff);
+int sqlite3_load_extension(sqlite3 *db, const char *zFile, const char *zProc, char **pzErrMsg);
+void sqlite3_free(void *p);
+CDEF;
+        $loadFfi = null;
+        foreach (['libsqlite3.so.0', 'libsqlite3.so'] as $lib) {
+            try {
+                $loadFfi = \FFI::cdef($loadCdef, $lib);
+                break;
+            } catch (\Throwable) {
+            }
+        }
+        if (null === $loadFfi) {
+            return false;
+        }
+        try {
+            $enable = $loadFfi->sqlite3_enable_load_extension($db, 1);
+            if (self::SQLITE_OK !== (int) $enable) {
+                return false;
+            }
+            $errMsgPtr = $loadFfi->new('char*');
+            $rc = (int) $loadFfi->sqlite3_load_extension($db, $real, null, \FFI::addr($errMsgPtr));
+            $loadFfi->sqlite3_enable_load_extension($db, 0);
+            if (null !== $errMsgPtr && '' !== self::ffiString($errMsgPtr)) {
+                $loadFfi->sqlite3_free($errMsgPtr);
+            }
+
+            return self::SQLITE_OK === $rc;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     /** @return array{versionString: string, versionNumber: int} */
     public static function version(): array
     {

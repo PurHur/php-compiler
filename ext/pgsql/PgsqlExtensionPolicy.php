@@ -25,4 +25,15 @@ final class PgsqlExtensionPolicy
     {
         return self::advertisesExtension();
     }
+
+    /**
+     * PHP 8.4 libpq helpers (pg_jit, pg_put_copy_*, …) — #7083.
+     *
+     * Gated on compiler VERSION_ID ≥ 80400 (ships with 8.4.0-dev) + libpq FFI.
+     */
+    public static function advertisesPhp84Helpers(): bool
+    {
+        return self::advertisesBuiltins()
+            && \PHPCompiler\CompilerVersion::VERSION_ID >= 80400;
+    }
 }

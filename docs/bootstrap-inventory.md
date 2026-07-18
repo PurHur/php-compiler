@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5704 |
-| Phase A inventory files (M2 ratio SSOT) | 5704 |
+| PHP files on vm.php path | 5715 |
+| Phase A inventory files (M2 ratio SSOT) | 5715 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16358 |
+| Source constructs flagged (warnings) | 16402 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -628,7 +628,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gettext/textdomain.php` | 0 | 2 |
 | `ext/gmp/GmpFunction.php` | 0 | 1 |
 | `ext/gmp/GmpToString.php` | 0 | 1 |
-| `ext/gmp/Module.php` | 0 | 50 |
+| `ext/gmp/Module.php` | 0 | 52 |
 | `ext/gmp/VmGmp.php` | 0 | 6 |
 | `ext/gmp/VmGmpObject.php` | 0 | 7 |
 | `ext/gmp/gmp_abs.php` | 0 | 2 |
@@ -641,6 +641,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gmp/gmp_div_q.php` | 0 | 2 |
 | `ext/gmp/gmp_div_qr.php` | 0 | 3 |
 | `ext/gmp/gmp_div_r.php` | 0 | 2 |
+| `ext/gmp/gmp_divexact.php` | 0 | 2 |
 | `ext/gmp/gmp_export.php` | 0 | 2 |
 | `ext/gmp/gmp_fact.php` | 0 | 2 |
 | `ext/gmp/gmp_gcd.php` | 0 | 2 |
@@ -651,6 +652,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gmp/gmp_intval.php` | 0 | 2 |
 | `ext/gmp/gmp_invert.php` | 0 | 2 |
 | `ext/gmp/gmp_jacobi.php` | 0 | 2 |
+| `ext/gmp/gmp_kronecker.php` | 0 | 2 |
 | `ext/gmp/gmp_lcm.php` | 0 | 2 |
 | `ext/gmp/gmp_legendre.php` | 0 | 2 |
 | `ext/gmp/gmp_mod.php` | 0 | 2 |
@@ -1074,20 +1076,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
-| `ext/pgsql/Module.php` | 0 | 8 |
+| `ext/pgsql/Module.php` | 0 | 15 |
 | `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlArg.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlConnection.php` | 0 | 4 |
 | `ext/pgsql/VmPgsqlCore.php` | 0 | 5 |
 | `ext/pgsql/VmPgsqlNative.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlResult.php` | 0 | 4 |
+| `ext/pgsql/pg_change_password.php` | 0 | 2 |
 | `ext/pgsql/pg_close.php` | 0 | 2 |
 | `ext/pgsql/pg_connect.php` | 0 | 2 |
 | `ext/pgsql/pg_fetch_assoc.php` | 0 | 2 |
 | `ext/pgsql/pg_fetch_row.php` | 0 | 2 |
+| `ext/pgsql/pg_jit.php` | 0 | 5 |
 | `ext/pgsql/pg_last_error.php` | 0 | 2 |
 | `ext/pgsql/pg_num_rows.php` | 0 | 2 |
+| `ext/pgsql/pg_put_copy_data.php` | 0 | 2 |
+| `ext/pgsql/pg_put_copy_end.php` | 0 | 2 |
 | `ext/pgsql/pg_query.php` | 0 | 2 |
+| `ext/pgsql/pg_result_memory_size.php` | 0 | 2 |
+| `ext/pgsql/pg_set_chunked_rows_size.php` | 0 | 2 |
+| `ext/pgsql/pg_socket_poll.php` | 0 | 2 |
 | `ext/phar/BuiltinClasses.php` | 0 | 10 |
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 15 |
@@ -1490,6 +1499,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/SQLite3Changes.php` | 0 | 1 |
 | `ext/sqlite3/SQLite3Close.php` | 0 | 1 |
 | `ext/sqlite3/SQLite3Construct.php` | 0 | 2 |
+| `ext/sqlite3/SQLite3CreateAggregate.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3CreateCollation.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3CreateFunction.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3EnableExceptions.php` | 0 | 1 |
@@ -1498,6 +1508,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/SQLite3LastErrorCode.php` | 0 | 1 |
 | `ext/sqlite3/SQLite3LastErrorMsg.php` | 0 | 1 |
 | `ext/sqlite3/SQLite3LastInsertRowID.php` | 0 | 1 |
+| `ext/sqlite3/SQLite3LoadExtension.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3Open.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3Prepare.php` | 0 | 2 |
 | `ext/sqlite3/SQLite3Query.php` | 0 | 2 |
@@ -1505,11 +1516,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sqlite3/SQLite3Version.php` | 0 | 4 |
 | `ext/sqlite3/Sqlite3ClassMethod.php` | 0 | 1 |
 | `ext/sqlite3/Sqlite3ExtensionPolicy.php` | 0 | 1 |
-| `ext/sqlite3/VmSQLite3.php` | 0 | 24 |
+| `ext/sqlite3/VmSQLite3.php` | 0 | 26 |
 | `ext/sqlite3/VmSQLite3Result.php` | 0 | 12 |
 | `ext/sqlite3/VmSQLite3Stmt.php` | 0 | 15 |
-| `ext/sqlite3/VmSqlite3Native.php` | 0 | 9 |
-| `ext/sqlite3/VmSqlite3Udf.php` | 0 | 3 |
+| `ext/sqlite3/VmSqlite3Native.php` | 0 | 10 |
+| `ext/sqlite3/VmSqlite3Udf.php` | 0 | 7 |
 | `ext/standard/AbsJitHelper.php` | 0 | 1 |
 | `ext/standard/AcosJitHelper.php` | 0 | 1 |
 | `ext/standard/AcoshJitHelper.php` | 0 | 1 |
@@ -3885,7 +3896,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/yaml/yaml_parse_file.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/Module.php` | 0 | 11 |
-| `ext/zip/VmZipArchive.php` | 0 | 65 |
+| `ext/zip/VmZipArchive.php` | 0 | 68 |
 | `ext/zip/VmZipProcedural.php` | 0 | 1 |
 | `ext/zip/VmZipResourceArg.php` | 0 | 1 |
 | `ext/zip/ZipArchiveAddFile.php` | 0 | 2 |
@@ -9845,17 +9856,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new gmp_invert (line 74)
 - new gmp_jacobi (line 75)
 - new gmp_legendre (line 76)
-- new gmp_gcdext (line 77)
-- new gmp_root (line 78)
-- new gmp_rootrem (line 79)
-- new gmp_perfect_power (line 80)
-- new gmp_testbit (line 81)
-- new gmp_setbit (line 82)
-- new gmp_clrbit (line 83)
-- new gmp_scan0 (line 84)
-- new gmp_scan1 (line 85)
-- new gmp_popcount (line 86)
-- new gmp_hamdist (line 87)
+- new gmp_kronecker (line 77)
+- new gmp_divexact (line 78)
+- new gmp_gcdext (line 79)
+- new gmp_root (line 80)
+- new gmp_rootrem (line 81)
+- new gmp_perfect_power (line 82)
+- new gmp_testbit (line 83)
+- new gmp_setbit (line 84)
+- new gmp_clrbit (line 85)
+- new gmp_scan0 (line 86)
+- new gmp_scan1 (line 87)
+- new gmp_popcount (line 88)
+- new gmp_hamdist (line 89)
 - 3 class method(s)
 
 ### `ext/gmp/VmGmp.php`
@@ -9865,8 +9878,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DivisionByZeroError (line 303)
 - new DivisionByZeroError (line 381)
 - new DivisionByZeroError (line 727)
-- new DivisionByZeroError (line 1435)
-- 85 class method(s)
+- new DivisionByZeroError (line 1455)
+- 87 class method(s)
 
 ### `ext/gmp/VmGmpObject.php`
 
@@ -9940,6 +9953,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 22)
 - 1 class method(s)
 
+### `ext/gmp/gmp_divexact.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_export.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9996,6 +10015,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/gmp/gmp_jacobi.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_kronecker.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -13248,12 +13273,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new pg_fetch_row (line 70)
 - new pg_num_rows (line 71)
 - new pg_last_error (line 72)
-- 6 class method(s)
+- new pg_change_password (line 87)
+- new pg_jit (line 88)
+- new pg_put_copy_data (line 89)
+- new pg_put_copy_end (line 90)
+- new pg_result_memory_size (line 91)
+- new pg_set_chunked_rows_size (line 92)
+- new pg_socket_poll (line 93)
+- 7 class method(s)
 
 ### `ext/pgsql/PgsqlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/pgsql/VmPgsqlArg.php`
 
@@ -13280,7 +13312,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/VmPgsqlNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 23 class method(s)
 
 ### `ext/pgsql/VmPgsqlResult.php`
 
@@ -13289,6 +13321,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 37)
 - new Variable (line 44)
 - 7 class method(s)
+
+### `ext/pgsql/pg_change_password.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
 
 ### `ext/pgsql/pg_close.php`
 
@@ -13314,6 +13352,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 27)
 - 2 class method(s)
 
+### `ext/pgsql/pg_jit.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 38)
+- new HashTable (line 42)
+- new Variable (line 45)
+- 2 class method(s)
+
 ### `ext/pgsql/pg_last_error.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13326,10 +13373,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 27)
 - 2 class method(s)
 
+### `ext/pgsql/pg_put_copy_data.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/pgsql/pg_put_copy_end.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+
 ### `ext/pgsql/pg_query.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/pgsql/pg_result_memory_size.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/pgsql/pg_set_chunked_rows_size.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- 2 class method(s)
+
+### `ext/pgsql/pg_socket_poll.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 
 ### `ext/phar/BuiltinClasses.php`
@@ -16751,6 +16828,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 20)
 - 1 class method(s)
 
+### `ext/sqlite3/SQLite3CreateAggregate.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 1 class method(s)
+
 ### `ext/sqlite3/SQLite3CreateCollation.php`
 
 **Warnings** (review for bootstrap subset):
@@ -16793,6 +16876,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sqlite3/SQLite3LastInsertRowID.php`
 
 **Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sqlite3/SQLite3LoadExtension.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 1 class method(s)
 
 ### `ext/sqlite3/SQLite3Open.php`
@@ -16857,12 +16946,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SQLite3BusyTimeout (line 61)
 - new SQLite3EnableExceptions (line 62)
 - new SQLite3CreateFunction (line 63)
-- new SQLite3CreateCollation (line 64)
-- new SQLite3Backup (line 65)
-- new SQLite3Version (line 66)
-- new Sqlite3State (line 85)
-- new Exception (line 104)
-- new Variable (line 268)
+- new SQLite3CreateAggregate (line 64)
+- new SQLite3CreateCollation (line 65)
+- new SQLite3LoadExtension (line 66)
+- new SQLite3Backup (line 67)
+- new SQLite3Version (line 68)
+- new Sqlite3State (line 87)
+- new Exception (line 106)
+- new Variable (line 271)
 - 18 class method(s)
 
 ### `ext/sqlite3/VmSQLite3Result.php`
@@ -16908,17 +16999,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SQLite3Exception (line 92)
 - new SQLite3Exception (line 139)
 - new SQLite3Exception (line 183)
-- new SQLite3Exception (line 262)
-- new SQLite3Exception (line 265)
-- new SQLite3Exception (line 268)
-- 36 class method(s)
+- new SQLite3Exception (line 238)
+- new SQLite3Exception (line 350)
+- new SQLite3Exception (line 353)
+- new SQLite3Exception (line 356)
+- 38 class method(s)
 
 ### `ext/sqlite3/VmSqlite3Udf.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 100)
-- 10 class method(s)
-- 1 closure(s)
+- new Variable (line 119)
+- new Variable (line 124)
+- new Variable (line 129)
+- new Variable (line 136)
+- new Variable (line 210)
+- 13 class method(s)
+- 2 closure(s)
 
 ### `ext/standard/AbsJitHelper.php`
 
@@ -20315,7 +20411,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamIoKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 39 class method(s)
+- 29 class method(s)
 
 ### `ext/standard/JitStreamIsLocal.php`
 
@@ -32182,71 +32278,74 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/VmZipArchive.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 45)
-- new Variable (line 46)
-- new ClassEntry (line 50)
-- new ClassProperty (line 52)
-- new ClassProperty (line 53)
-- new ClassProperty (line 54)
-- new Variable (line 61)
-- new ZipArchiveConstruct (line 67)
-- new ZipArchiveOpen (line 72)
-- new ZipArchiveClose (line 73)
-- new ZipArchiveAddFile (line 74)
-- new ZipArchiveAddFromString (line 75)
-- new ZipArchiveGetFromName (line 76)
-- new ZipArchiveExtractTo (line 77)
-- new ZipArchiveGetStatusString (line 78)
-- new ZipArchiveCount (line 79)
-- new ZipArchiveStatName (line 80)
-- new ZipArchiveSetPassword (line 81)
-- new ZipArchiveSetEncryptionName (line 82)
-- new ZipArchiveStatIndex (line 84)
-- new ZipArchiveLocateName (line 85)
-- new ZipArchiveGetFromIndex (line 86)
-- new ZipArchiveGetNameIndex (line 87)
-- new ZipArchiveDeleteName (line 88)
-- new ZipArchiveDeleteIndex (line 89)
-- new ZipArchiveAddEmptyDir (line 90)
-- new ZipArchiveRenameName (line 91)
-- new ZipArchiveRenameIndex (line 92)
-- new ZipArchiveGetStream (line 93)
-- new ZipArchiveSetMtimeName (line 95)
-- new ZipArchiveSetMtimeIndex (line 96)
-- new ZipArchiveSetExternalAttributesName (line 97)
-- new ZipArchiveSetExternalAttributesIndex (line 98)
-- new ZipArchiveGetExternalAttributesName (line 99)
-- new ZipArchiveGetExternalAttributesIndex (line 100)
-- new ZipArchiveSetCompressionName (line 101)
-- new ZipArchiveSetCompressionIndex (line 102)
-- new ZipArchiveIsCompressionMethodSupported (line 103)
-- new ZipArchiveIsEncryptionMethodSupported (line 105)
-- new ZipArchiveRegisterProgressCallback (line 106)
-- new ZipArchiveRegisterCancelCallback (line 107)
-- new ZipArchiveGetStreamIndex (line 108)
-- new ZipArchiveGetStreamName (line 109)
-- new ZipArchiveClearError (line 110)
-- new ZipArchiveSetEncryptionIndex (line 111)
-- new ZipArchiveSetCommentName (line 113)
-- new ZipArchiveSetCommentIndex (line 114)
-- new ZipArchiveGetCommentName (line 115)
-- new ZipArchiveGetCommentIndex (line 116)
-- new ZipArchiveSetArchiveComment (line 117)
-- new ZipArchiveGetArchiveComment (line 118)
-- new ZipArchiveUnchangeAll (line 120)
-- new ZipArchiveUnchangeArchive (line 121)
-- new ZipArchiveUnchangeIndex (line 122)
-- new ZipArchiveUnchangeName (line 123)
-- new ZipArchiveReplaceFile (line 124)
-- new ZipArchiveAddGlob (line 125)
-- new ZipArchiveAddPattern (line 126)
-- new ZipArchiveIsWritable (line 128)
-- new ZipArchiveSetReadOnly (line 129)
-- new ZipArchiveState (line 145)
-- new Variable (line 856)
+- new Variable (line 52)
+- new Variable (line 53)
+- new ClassEntry (line 57)
+- new ClassProperty (line 59)
+- new ClassProperty (line 60)
+- new ClassProperty (line 61)
+- new ClassProperty (line 62)
+- new ClassProperty (line 63)
+- new ClassProperty (line 64)
+- new Variable (line 71)
+- new ZipArchiveConstruct (line 77)
+- new ZipArchiveOpen (line 82)
+- new ZipArchiveClose (line 83)
+- new ZipArchiveAddFile (line 84)
+- new ZipArchiveAddFromString (line 85)
+- new ZipArchiveGetFromName (line 86)
+- new ZipArchiveExtractTo (line 87)
+- new ZipArchiveGetStatusString (line 88)
+- new ZipArchiveCount (line 89)
+- new ZipArchiveStatName (line 90)
+- new ZipArchiveSetPassword (line 91)
+- new ZipArchiveSetEncryptionName (line 92)
+- new ZipArchiveStatIndex (line 94)
+- new ZipArchiveLocateName (line 95)
+- new ZipArchiveGetFromIndex (line 96)
+- new ZipArchiveGetNameIndex (line 97)
+- new ZipArchiveDeleteName (line 98)
+- new ZipArchiveDeleteIndex (line 99)
+- new ZipArchiveAddEmptyDir (line 100)
+- new ZipArchiveRenameName (line 101)
+- new ZipArchiveRenameIndex (line 102)
+- new ZipArchiveGetStream (line 103)
+- new ZipArchiveSetMtimeName (line 105)
+- new ZipArchiveSetMtimeIndex (line 106)
+- new ZipArchiveSetExternalAttributesName (line 107)
+- new ZipArchiveSetExternalAttributesIndex (line 108)
+- new ZipArchiveGetExternalAttributesName (line 109)
+- new ZipArchiveGetExternalAttributesIndex (line 110)
+- new ZipArchiveSetCompressionName (line 111)
+- new ZipArchiveSetCompressionIndex (line 112)
+- new ZipArchiveIsCompressionMethodSupported (line 113)
+- new ZipArchiveIsEncryptionMethodSupported (line 115)
+- new ZipArchiveRegisterProgressCallback (line 116)
+- new ZipArchiveRegisterCancelCallback (line 117)
+- new ZipArchiveGetStreamIndex (line 118)
+- new ZipArchiveGetStreamName (line 119)
+- new ZipArchiveClearError (line 120)
+- new ZipArchiveSetEncryptionIndex (line 121)
+- new ZipArchiveSetCommentName (line 123)
+- new ZipArchiveSetCommentIndex (line 124)
+- new ZipArchiveGetCommentName (line 125)
+- new ZipArchiveGetCommentIndex (line 126)
+- new ZipArchiveSetArchiveComment (line 127)
+- new ZipArchiveGetArchiveComment (line 128)
+- new ZipArchiveUnchangeAll (line 130)
+- new ZipArchiveUnchangeArchive (line 131)
+- new ZipArchiveUnchangeIndex (line 132)
+- new ZipArchiveUnchangeName (line 133)
+- new ZipArchiveReplaceFile (line 134)
+- new ZipArchiveAddGlob (line 135)
+- new ZipArchiveAddPattern (line 136)
+- new ZipArchiveIsWritable (line 138)
+- new ZipArchiveSetReadOnly (line 139)
+- new ZipArchiveState (line 155)
 - new Variable (line 871)
 - new Variable (line 886)
-- 77 class method(s)
+- new Variable (line 901)
+- 78 class method(s)
 
 ### `ext/zip/VmZipProcedural.php`
 

@@ -13,6 +13,18 @@ final class ZipArchiveState
 {
     public int $status = ZipArchiveConstants::ER_OK;
 
+    /**
+     * System errno companion to $status (libzip zip_error_code_system).
+     * Pure-PHP ZipEngine has no OS errno → stays 0 unless a mapped failure sets it (#20584).
+     */
+    public int $statusSys = 0;
+
+    /**
+     * Index of last successfully added entry (file or directory); -1 before any add (#20584).
+     * php-src ze_zip_object::last_id.
+     */
+    public int $lastId = -1;
+
     public string $filename = '';
 
     public bool $open = false;

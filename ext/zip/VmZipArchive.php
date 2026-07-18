@@ -29,9 +29,16 @@ final class VmZipArchive
 
     public const PROP_STATUS = 'status';
 
+    public const PROP_STATUS_SYS = 'statusSys';
+
+    public const PROP_LAST_ID = 'lastId';
+
     public const PROP_FILENAME = 'filename';
 
     public const PROP_NUM_FILES = 'numFiles';
+
+    /** Archive EOCD comment — mirrors getArchiveComment() when set; '' when unset (#20584). */
+    public const PROP_COMMENT = 'comment';
 
     /** @var array<int, ZipArchiveState> */
     private static array $store = [];
@@ -50,8 +57,11 @@ final class VmZipArchive
         $entry = new ClassEntry('ZipArchive');
         $entry->isInternal = true;
         $entry->properties[] = new ClassProperty(self::PROP_STATUS, null, $intProto, false, $pub, self::CLASS_LC);
+        $entry->properties[] = new ClassProperty(self::PROP_STATUS_SYS, null, $intProto, false, $pub, self::CLASS_LC);
+        $entry->properties[] = new ClassProperty(self::PROP_LAST_ID, null, $intProto, false, $pub, self::CLASS_LC);
         $entry->properties[] = new ClassProperty(self::PROP_FILENAME, null, $strProto, false, $pub, self::CLASS_LC);
         $entry->properties[] = new ClassProperty(self::PROP_NUM_FILES, null, $intProto, false, $pub, self::CLASS_LC);
+        $entry->properties[] = new ClassProperty(self::PROP_COMMENT, null, $strProto, false, $pub, self::CLASS_LC);
         // php-src ext/zip/php_zip.c — ZipArchive implements Countable (#19492)
         if (isset($ctx->classes['countable'])) {
             $entry->interfaces[] = 'countable';
@@ -357,6 +367,7 @@ final class VmZipArchive
                 $row['orig_index'] = $existing['orig_index'] ?? null;
                 $state->entries[$idx] = $row;
                 $state->dirty = true;
+                self::noteLastId($state, $idx);
                 self::syncProperties($entry, $state);
                 self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
 
@@ -366,6 +377,7 @@ final class VmZipArchive
         $row['orig_index'] = null;
         $state->entries[] = $row;
         $state->dirty = true;
+        self::noteLastId($state, \count($state->entries) - 1);
         self::syncProperties($entry, $state);
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
 
@@ -391,6 +403,7 @@ final class VmZipArchive
                 $row['orig_index'] = $existing['orig_index'] ?? null;
                 $state->entries[$idx] = $row;
                 $state->dirty = true;
+                self::noteLastId($state, $idx);
                 self::syncProperties($entry, $state);
                 self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
 
@@ -400,6 +413,7 @@ final class VmZipArchive
         $row['orig_index'] = null;
         $state->entries[] = $row;
         $state->dirty = true;
+        self::noteLastId($state, \count($state->entries) - 1);
         self::syncProperties($entry, $state);
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
 
@@ -624,6 +638,7 @@ final class VmZipArchive
         $state->entries[] = self::makeEntry($dirname, '', self::crc32Unsigned(''), 0);
         $state->entries[\count($state->entries) - 1]['orig_index'] = null;
         $state->dirty = true;
+        self::noteLastId($state, \count($state->entries) - 1);
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
 
         return true;
@@ -1735,14 +1750,28 @@ final class VmZipArchive
     private static function setStatus(ObjectEntry $entry, ZipArchiveState $state, int $code): void
     {
         $state->status = $code;
+        // Pure-PHP engine: no libzip system errno; keep 0 on OK, leave prior on soft failures.
+        if (ZipArchiveConstants::ER_OK === $code) {
+            $state->statusSys = 0;
+        }
         self::syncProperties($entry, $state);
     }
 
     private static function syncProperties(ObjectEntry $entry, ZipArchiveState $state): void
     {
         $entry->getProperty(self::PROP_STATUS)->int($state->status);
+        $entry->getProperty(self::PROP_STATUS_SYS)->int($state->statusSys);
+        $entry->getProperty(self::PROP_LAST_ID)->int($state->lastId);
         $entry->getProperty(self::PROP_FILENAME)->string($state->filename);
         $entry->getProperty(self::PROP_NUM_FILES)->int(count($state->entries));
+        // php-src property reader: NULL comment → empty string (unlike getArchiveComment → false).
+        $entry->getProperty(self::PROP_COMMENT)->string($state->archiveComment);
+    }
+
+    /** Record last successfully added/replaced entry index (php-src last_id). */
+    private static function noteLastId(ZipArchiveState $state, int $index): void
+    {
+        $state->lastId = $index;
     }
 
     /** @return list<string>|null */
