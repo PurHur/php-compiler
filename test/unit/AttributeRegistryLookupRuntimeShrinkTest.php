@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\AttributeRegistryJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** AttributeRegistry lookup JIT routes through AttributeRegistryJitHelper PHP (#10086). */
+/** AttributeRegistry lookup: embed via JitHelper; thin AOT via isThinStandaloneAotMain (#10086, #20327). */
 final class AttributeRegistryLookupRuntimeShrinkTest extends TestCase
 {
     public function testAttributeRegistryLoweringUsesLookupRuntimeNotLlvmChains(): void
@@ -25,11 +25,15 @@ final class AttributeRegistryLookupRuntimeShrinkTest extends TestCase
         $this->assertGreaterThan(250, 439 - $lineCount);
     }
 
-    public function testAttributeRegistryLookupRuntimeUsesJitHelper(): void
+    public function testAttributeRegistryLookupRuntimeUsesJitHelperAndThinGate(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/AttributeRegistryLookupRuntime.php');
         $this->assertStringContainsString('AttributeRegistryJitHelper', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('implementThinStandaloneStubs', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringNotContainsString('implementDeferredUserScriptStubs', $source);
         $this->assertStringNotContainsString('emitCstrEqualsLiteral', $source);
     }
 

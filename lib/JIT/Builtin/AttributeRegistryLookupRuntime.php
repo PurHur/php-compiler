@@ -13,8 +13,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_attr_* lookup via AttributeRegistryJitHelper PHP (#10086).
+ * JIT/AOT link for __compiler_attr_* lookup via AttributeRegistryJitHelper PHP (#10086, #20327).
  *
+ * Embed / non-thin: NestedJIT {@see AttributeRegistryJitHelper} / {@see AttributeRegistryArgsJitHelper}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20308 / #20229 shape): thin stubs without nested JIT (#15417).
  * Args hashtable: {@see AttributeRegistryArgsJitHelper} when ctor args exist; null stub otherwise.
  */
 final class AttributeRegistryLookupRuntime
@@ -57,8 +59,8 @@ final class AttributeRegistryLookupRuntime
             return;
         }
 
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::implementDeferredUserScriptStubs($context);
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementThinStandaloneStubs($context);
 
             return;
         }
@@ -72,8 +74,8 @@ final class AttributeRegistryLookupRuntime
         $context->builder->clearInsertionPosition();
     }
 
-    /** User-script AOT: linkable attr ABI without nested AttributeRegistryJitHelper JIT (#15417). */
-    private static function implementDeferredUserScriptStubs(Context $context): void
+    /** Thin standalone AOT: linkable attr ABI without nested AttributeRegistryJitHelper (#15417, #20327). */
+    private static function implementThinStandaloneStubs(Context $context): void
     {
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
