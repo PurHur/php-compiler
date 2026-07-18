@@ -20,7 +20,8 @@ echo '    <a href="', htmlspecialchars($scriptBase), '/contact">Contact</a>', "\
 echo '</nav>', "\n";
 echo '<main>', "\n";
 // Thank-you is rendered via Router::renderContactThankYou → thankyou.php directly.
-// Nesting thankyou.php in this elseif pollutes the layout CFG (MiniWebApp AOT #20507).
+// Do not nest thankyou.php here: compiling that dead elseif (unbound $name) into the
+// layout CFG corrupts sibling arms and intermittently aborts MiniWebApp AOT (#20507).
 if ('Home' === $title) {
     include __DIR__ . '/home.php';
 } elseif ('Hello' === $title) {
