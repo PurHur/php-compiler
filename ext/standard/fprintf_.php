@@ -14,6 +14,8 @@ use PHPLLVM\Value;
 
 /**
  * fprintf() — formatted write to stream (php-src ext/standard/formatted_print.c; #3301).
+ *
+ * Z_PARAM_STR $format: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20197).
  */
 final class fprintf_ extends Internal
 {
@@ -33,7 +35,8 @@ final class fprintf_ extends Internal
             'fprintf',
             1
         );
-        $format = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'fprintf', 2, 'format');
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20197, formatted_print.c).
+        $format = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'fprintf', 1, 'format');
         $argsHt = new HashTable();
         for ($i = 2; $i < $argc; ++$i) {
             $argsHt->append($frame->calledArgs[$i]->resolveIndirect());

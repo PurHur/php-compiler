@@ -11,6 +11,8 @@ use PHPLLVM\Value;
 
 /**
  * LLVM JIT/AOT helper for printf() (%s, %d, %f, %%).
+ *
+ * Z_PARAM_STR $format: null TypeError on PHP_COMPILER_PROFILE=8.4 (#20197).
  */
 final class JitPrintf
 {
@@ -23,7 +25,21 @@ final class JitPrintf
                 $argc
             ));
         }
-        $fmt = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'printf', 0, 'format');
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20197, formatted_print.c).
+        $nullFormat = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
+        $fmt = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'printf', 0, 'format')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'printf', 0, 'format');
+        if (
+            $nullFormat
+            && (
+                $context->callerStrictTypes
+                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+            )
+        ) {
+            // lower* already emitted TypeError+abort; do not lower __compiler_printf after terminator.
+            return $context->constantFromInteger(0, 'int64');
+        }
         $numArgs = $argc - 1;
         if (0 === $numArgs) {
             $nullArgv = $context->builder->pointerCast(
