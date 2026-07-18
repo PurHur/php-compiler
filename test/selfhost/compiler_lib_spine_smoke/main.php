@@ -1728,7 +1728,6 @@ require_once __DIR__.'/../../../ext/standard/JitArrayPush.php';
 require_once __DIR__.'/../../../ext/standard/JitAssert.php';
 require_once __DIR__.'/../../../ext/standard/JitAssertOptions.php';
 require_once __DIR__.'/../../../ext/standard/JitAttributeExists.php';
-require_once __DIR__.'/../../../ext/standard/JitBin2hexKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitBuiltinWarning.php';
 require_once __DIR__.'/../../../ext/standard/JitCallUserFunc.php';
 require_once __DIR__.'/../../../ext/standard/JitChdir.php';
