@@ -26,6 +26,11 @@ final class VmSqlite3Native
 
     private static bool $ffiUnavailable = false;
 
+    /** @var \FFI|null Separate cdef for SQLite ≥ 3.43 explain APIs (may be absent on host). */
+    private static $explainFfi = null;
+
+    private static bool $explainFfiProbed = false;
+
     public static function available(): bool
     {
         return null !== self::ffi();
@@ -435,6 +440,43 @@ CDEF;
         return 0 !== (int) self::requireFfi()->sqlite3_stmt_readonly($stmt);
     }
 
+    /** php-src SQLite3Stmt::busy — sqlite3_stmt_busy (#20600). */
+    public static function stmtBusy(\FFI\CData $stmt): bool
+    {
+        return 0 !== (int) self::requireFfi()->sqlite3_stmt_busy($stmt);
+    }
+
+    /**
+     * SQLite ≥ 3.43 explain-mode APIs (php-src #if SQLITE_VERSION_NUMBER >= 3043000).
+     * Host images may ship older libsqlite3; probe before calling.
+     */
+    public static function supportsExplain(): bool
+    {
+        return null !== self::explainFfi();
+    }
+
+    /** php-src SQLite3Stmt::explain — sqlite3_stmt_isexplain (#20600). */
+    public static function stmtIsExplain(\FFI\CData $stmt): int
+    {
+        $ffi = self::explainFfi();
+        if (null === $ffi) {
+            throw new \Error('explain statement unsupported');
+        }
+
+        return (int) $ffi->sqlite3_stmt_isexplain($stmt);
+    }
+
+    /** php-src SQLite3Stmt::setExplain — sqlite3_stmt_explain (#20600). */
+    public static function stmtExplain(\FFI\CData $stmt, int $mode): bool
+    {
+        $ffi = self::explainFfi();
+        if (null === $ffi) {
+            throw new \Error('explain statement unsupported');
+        }
+
+        return self::SQLITE_OK === (int) $ffi->sqlite3_stmt_explain($stmt, $mode);
+    }
+
     /** Columns in the current row; 0 before first step / after reset (php-src columnType). */
     public static function dataCount(\FFI\CData $stmt): int
     {
@@ -574,6 +616,7 @@ int sqlite3_bind_parameter_index(sqlite3_stmt *pStmt, const char *zName);
 const char *sqlite3_sql(sqlite3_stmt *pStmt);
 char *sqlite3_expanded_sql(sqlite3_stmt *pStmt);
 int sqlite3_stmt_readonly(sqlite3_stmt *pStmt);
+int sqlite3_stmt_busy(sqlite3_stmt *pStmt);
 int sqlite3_data_count(sqlite3_stmt *pStmt);
 const char *sqlite3_column_decltype(sqlite3_stmt *pStmt, int N);
 int sqlite3_busy_timeout(sqlite3 *db, int ms);
@@ -601,5 +644,43 @@ CDEF;
         }
 
         return true;
+    }
+
+    /**
+     * Optional FFI for sqlite3_stmt_isexplain / sqlite3_stmt_explain (SQLite ≥ 3.43).
+     *
+     * @return \FFI|null
+     */
+    private static function explainFfi()
+    {
+        if (self::$explainFfiProbed) {
+            return self::$explainFfi;
+        }
+        self::$explainFfiProbed = true;
+        if (!self::ffiEnabled() || !\extension_loaded('ffi')) {
+            return null;
+        }
+        $core = self::ffi();
+        if (null === $core) {
+            return null;
+        }
+        if ((int) $core->sqlite3_libversion_number() < 3043000) {
+            return null;
+        }
+        $cdef = <<<'CDEF'
+typedef struct sqlite3_stmt sqlite3_stmt;
+int sqlite3_stmt_isexplain(sqlite3_stmt *pStmt);
+int sqlite3_stmt_explain(sqlite3_stmt *pStmt, int eMode);
+CDEF;
+        foreach (['libsqlite3.so.0', 'libsqlite3.so'] as $lib) {
+            try {
+                self::$explainFfi = \FFI::cdef($cdef, $lib);
+
+                return self::$explainFfi;
+            } catch (\Throwable) {
+            }
+        }
+
+        return null;
     }
 }
