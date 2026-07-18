@@ -83,6 +83,8 @@ class Module extends ModuleAbstract
             $functions[] = new imageline();
             $functions[] = new imagedashedline();
             $functions[] = new imagerectangle();
+            $functions[] = new imageellipse();
+            $functions[] = new imagefilledellipse();
             $functions[] = new imagearc();
             $functions[] = new imagefilledarc();
             $functions[] = new imagepolygon();
