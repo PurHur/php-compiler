@@ -120,6 +120,85 @@ final class JitDomAttributeNodeNS
         return self::boxObjectResult($context, $attr);
     }
 
+    /**
+     * DOMDocument::createAttribute() — non-NS Attr (php-src document.c; #20676).
+     * Reuses the empty-namespace Attr cache key shared with setAttribute/getAttributeNode.
+     */
+    public static function invokeCreateAttribute(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2) {
+            throw new \LogicException('DOMDocument::createAttribute() expects receiver and name');
+        }
+
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_createattr_cont');
+
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            return self::invokeCreateAttributeUserScript($context, ...$args);
+        }
+
+        DomImportNodeRuntime::ensureCreateAttributeLinked($context);
+
+        $document = self::loadObjectArg($context, $args[0], 'DOMDocument::createAttribute() receiver');
+        $name = self::loadStringArg($context, $args[1]);
+        $attr = $context->builder->call(
+            $context->lookupFunction(DomImportNodeRuntime::ABI_CREATE_ATTRIBUTE),
+            $document,
+            $name
+        );
+
+        return self::boxObjectResult($context, $attr);
+    }
+
+    /**
+     * DOMElement::setAttributeNode() — non-NS (php-src element.c; #20676).
+     * User-script path shares Attr cache with setAttributeNodeNS via rememberCreate('', name).
+     */
+    public static function invokeSetAttributeNode(Context $context, JITVariable ...$args): Value
+    {
+        if (\count($args) < 2) {
+            throw new \LogicException('DOMElement::setAttributeNode() expects receiver and attr');
+        }
+
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_setattrnode_cont');
+
+        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+            return self::invokeSetUserScript($context, ...$args);
+        }
+
+        DomImportNodeRuntime::ensureSetAttributeNodeLinked($context);
+
+        $element = self::loadObjectArg($context, $args[0], 'DOMElement::setAttributeNode() receiver');
+        $attr = self::loadObjectArg($context, $args[1], 'DOMElement::setAttributeNode() attr');
+        $replaced = $context->builder->call(
+            $context->lookupFunction(DomImportNodeRuntime::ABI_SET_ATTRIBUTE_NODE),
+            $element,
+            $attr
+        );
+
+        return self::boxNullableObjectResult($context, $replaced);
+    }
+
+    private static function invokeCreateAttributeUserScript(Context $context, JITVariable ...$args): Value
+    {
+        $nameLit = self::compileTimeStringArg($args[1]);
+        if (null !== $nameLit) {
+            DomUserScriptAttributeCacheLlvm::rememberCreate('', $nameLit);
+
+            return self::boxObjectResult(
+                $context,
+                self::materializeAttrFromLiterals($context, '', $nameLit, '')
+            );
+        }
+
+        $name = self::loadStringArg($context, $args[1]);
+        $emptyNs = $context->builder->load($context->constantStringFromString(''));
+
+        return self::boxObjectResult(
+            $context,
+            self::materializeAttrFromRuntime($context, $emptyNs, $name, null)
+        );
+    }
+
     private static function invokeCreateUserScript(Context $context, JITVariable ...$args): Value
     {
         $nsLit = self::compileTimeStringArg($args[1]);

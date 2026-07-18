@@ -4839,6 +4839,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodCreateFromISO8601String.p
 require_once __DIR__.'/../../../lib/JIT/Call/DatePeriodIteratorMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DateTimeFormat.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentAppendChild.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateAttributeNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateComment.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomDocumentCreateDocumentFragment.php';
@@ -4860,6 +4861,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/DomElementGetAttributeNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementGetAttributeNodeNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementRemoveAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetAttribute.php';
+require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetAttributeNode.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementSetAttributeNodeNS.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomElementToggleAttribute.php';
 require_once __DIR__.'/../../../lib/JIT/Call/DomImplementationCreateDocumentType.php';
