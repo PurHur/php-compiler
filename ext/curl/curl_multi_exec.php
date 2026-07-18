@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\ext\standard\VmMath;
 use PHPLLVM\Value;
 
 /**
@@ -32,9 +31,9 @@ final class curl_multi_exec extends Internal
             ));
         }
         $multi = VmCurlArg::requireMultiObject($frame->calledArgs[0], 'curl_multi_exec', 1);
+        // php-src Z_PARAM_ZVAL + ZEND_TRY_ASSIGN_REF_LONG — input value ignored (null/string ok).
         $stillVar = $frame->calledArgs[1];
-        $stillRunning = VmMath::parseIntBuiltinArg($stillVar, 'curl_multi_exec', 1, 'still_running');
-        [$rc, $running] = VmCurlMulti::exec($multi, $stillRunning);
+        [$rc, $running] = VmCurlMulti::exec($multi, 0);
         $stillVar->resolveIndirect()->int($running);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($rc);

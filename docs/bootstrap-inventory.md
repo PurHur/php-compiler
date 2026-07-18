@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5640 |
-| Phase A inventory files (M2 ratio SSOT) | 5640 |
+| PHP files on vm.php path | 5641 |
+| Phase A inventory files (M2 ratio SSOT) | 5641 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16102 |
+| Source constructs flagged (warnings) | 16107 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -490,8 +490,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 5 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 84 |
-| `ext/gd/VmGd.php` | 0 | 15 |
+| `ext/gd/Module.php` | 0 | 86 |
+| `ext/gd/VmGd.php` | 0 | 17 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
 | `ext/gd/VmGdBmp.php` | 0 | 1 |
 | `ext/gd/VmGdFreeType.php` | 0 | 1 |
@@ -499,6 +499,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/VmGdJpeg.php` | 0 | 1 |
 | `ext/gd/VmGdPng.php` | 0 | 1 |
 | `ext/gd/VmGdWebp.php` | 0 | 1 |
+| `ext/gd/gd_info.php` | 0 | 1 |
 | `ext/gd/imageaffine.php` | 0 | 1 |
 | `ext/gd/imageaffinematrixconcat.php` | 0 | 1 |
 | `ext/gd/imageaffinematrixget.php` | 0 | 1 |
@@ -580,6 +581,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagetruecolortopalette.php` | 0 | 1 |
 | `ext/gd/imagettfbbox.php` | 0 | 2 |
 | `ext/gd/imagettftext.php` | 0 | 2 |
+| `ext/gd/imagetypes.php` | 0 | 1 |
 | `ext/gd/imagewebp.php` | 0 | 1 |
 | `ext/gettext/GettextFunction.php` | 0 | 2 |
 | `ext/gettext/GettextJitHelper.php` | 0 | 1 |
@@ -1857,7 +1859,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitHtmlentities.php` | 0 | 1 |
 | `ext/standard/JitHtmlspecialchars.php` | 0 | 1 |
 | `ext/standard/JitHtmlspecialcharsDecode.php` | 0 | 1 |
-| `ext/standard/JitHtmlspecialcharsKernel.php` | 0 | 1 |
 | `ext/standard/JitHttpBuildQuery.php` | 0 | 1 |
 | `ext/standard/JitHttpLastResponseHeaders.php` | 0 | 1 |
 | `ext/standard/JitHttpResponseCode.php` | 0 | 1 |
@@ -7293,10 +7294,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/JitDomLoadXMLUserScript.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 90)
-- new JITVariable (line 152)
-- new JITVariable (line 169)
-- 10 class method(s)
+- new JITVariable (line 96)
+- new JITVariable (line 158)
+- new JITVariable (line 175)
+- 11 class method(s)
 
 ### `ext/dom/JitDomNodeChildProperty.php`
 
@@ -7992,70 +7993,70 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 2984)
 - new DomNodeState (line 2989)
 - new Variable (line 2999)
-- new ObjectEntry (line 3733)
-- new DomNodeState (line 3735)
-- new ObjectEntry (line 3931)
-- new DomNodeState (line 3933)
-- new ObjectEntry (line 3961)
-- new DomNodeState (line 3963)
-- new ObjectEntry (line 4151)
-- new DomNodeState (line 4156)
-- new DOMException (line 4555)
-- new DOMException (line 4571)
-- new Variable (line 4589)
-- new DOMException (line 4603)
-- new DOMException (line 4606)
-- new DOMException (line 4616)
-- new Error (line 4646)
+- new ObjectEntry (line 3782)
+- new DomNodeState (line 3784)
+- new ObjectEntry (line 3980)
+- new DomNodeState (line 3982)
+- new ObjectEntry (line 4010)
+- new DomNodeState (line 4012)
+- new ObjectEntry (line 4200)
+- new DomNodeState (line 4205)
+- new DOMException (line 4604)
+- new DOMException (line 4620)
+- new Variable (line 4638)
 - new DOMException (line 4652)
-- new DOMException (line 4666)
-- new DOMException (line 4864)
-- new DOMException (line 5061)
-- new DOMException (line 5065)
-- new DOMException (line 5154)
-- new DOMException (line 5158)
-- new DOMException (line 5216)
-- new DOMException (line 5233)
+- new DOMException (line 4655)
+- new DOMException (line 4665)
+- new Error (line 4695)
+- new DOMException (line 4701)
+- new DOMException (line 4715)
+- new DOMException (line 4913)
+- new DOMException (line 5110)
+- new DOMException (line 5114)
+- new DOMException (line 5203)
+- new DOMException (line 5207)
 - new DOMException (line 5265)
-- new DOMException (line 5307)
-- new DOMException (line 5334)
-- new DOMException (line 6183)
-- new Variable (line 6211)
-- new DOMException (line 6472)
-- new DOMException (line 6590)
-- new DOMException (line 6635)
-- new ObjectEntry (line 6720)
-- new DomNodeState (line 6724)
-- new Variable (line 6731)
-- new ObjectEntry (line 6943)
-- new DomNodeState (line 6947)
-- new Variable (line 6954)
-- new ObjectEntry (line 6974)
-- new DomNodeState (line 6977)
-- new Variable (line 6985)
-- new Variable (line 7172)
-- new DOMException (line 7279)
-- new DOMException (line 7286)
-- new DOMException (line 7293)
-- new DOMException (line 7297)
-- new DOMException (line 7300)
-- new DOMException (line 7309)
-- new DOMException (line 7321)
-- new DOMException (line 8316)
-- new Variable (line 8375)
-- new Variable (line 8388)
-- new Variable (line 8426)
-- new DOMException (line 8437)
-- new Variable (line 8439)
-- new DOMException (line 8595)
-- new DOMException (line 8622)
-- new DOMException (line 8653)
-- new DOMException (line 8717)
-- new DOMException (line 8725)
-- new DOMException (line 8734)
-- new Error (line 9618)
-- new Error (line 9622)
-- 399 class method(s)
+- new DOMException (line 5282)
+- new DOMException (line 5314)
+- new DOMException (line 5356)
+- new DOMException (line 5383)
+- new DOMException (line 6232)
+- new Variable (line 6260)
+- new DOMException (line 6521)
+- new DOMException (line 6639)
+- new DOMException (line 6684)
+- new ObjectEntry (line 6769)
+- new DomNodeState (line 6773)
+- new Variable (line 6780)
+- new ObjectEntry (line 6992)
+- new DomNodeState (line 6996)
+- new Variable (line 7003)
+- new ObjectEntry (line 7023)
+- new DomNodeState (line 7026)
+- new Variable (line 7034)
+- new Variable (line 7221)
+- new DOMException (line 7328)
+- new DOMException (line 7335)
+- new DOMException (line 7342)
+- new DOMException (line 7346)
+- new DOMException (line 7349)
+- new DOMException (line 7358)
+- new DOMException (line 7370)
+- new DOMException (line 8365)
+- new Variable (line 8424)
+- new Variable (line 8437)
+- new Variable (line 8475)
+- new DOMException (line 8486)
+- new Variable (line 8488)
+- new DOMException (line 8644)
+- new DOMException (line 8671)
+- new DOMException (line 8702)
+- new DOMException (line 8766)
+- new DOMException (line 8774)
+- new DOMException (line 8783)
+- new Error (line 9667)
+- new Error (line 9671)
+- 402 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -8879,106 +8880,110 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VM\Variable (line 42)
 - new imagecreate (line 56)
 - new imagecreatetruecolor (line 57)
-- new imagecolorallocate (line 60)
-- new imagecolorallocatealpha (line 61)
-- new imagecolorsforindex (line 62)
-- new imagecolorclosest (line 63)
-- new imagecolorclosestalpha (line 64)
-- new imagecolorclosesthwb (line 65)
-- new imagecolorexact (line 66)
-- new imagecolorexactalpha (line 67)
-- new imagecolorresolve (line 68)
-- new imagecolorresolvealpha (line 69)
-- new imagecolorset (line 70)
-- new imagecolortransparent (line 71)
-- new imagealphablending (line 72)
-- new imagelayereffect (line 73)
-- new imageresolution (line 74)
-- new imagesavealpha (line 75)
-- new imageantialias (line 76)
-- new imagesetthickness (line 77)
-- new imagesetbrush (line 78)
-- new imagesetstyle (line 79)
-- new imageistruecolor (line 80)
-- new imagetruecolortopalette (line 81)
-- new imagepalettetotruecolor (line 82)
-- new imagesetinterpolation (line 83)
-- new imagegetinterpolation (line 84)
-- new imagefill (line 85)
-- new imagefilltoborder (line 86)
-- new imagedestroy (line 87)
-- new imagesx (line 88)
-- new imagesy (line 89)
-- new imagecolorat (line 90)
-- new imagecopy (line 91)
-- new imagecopymerge (line 92)
-- new imagecopyresampled (line 93)
-- new imagecopyresized (line 94)
-- new imagesetpixel (line 95)
-- new imageline (line 96)
-- new imagedashedline (line 97)
-- new imagerectangle (line 98)
-- new imageellipse (line 99)
-- new imagefilledellipse (line 100)
-- new imagearc (line 101)
-- new imagefilledarc (line 102)
-- new imagepolygon (line 103)
-- new imageopenpolygon (line 104)
-- new imagefilledpolygon (line 105)
-- new imagefilledrectangle (line 106)
-- new imagestring (line 107)
-- new imagestringup (line 108)
-- new imagechar (line 109)
-- new imagecharup (line 110)
-- new imagegammacorrect (line 111)
-- new imageinterlace (line 112)
-- new imagesetclip (line 113)
-- new imagegetclip (line 114)
-- new imagettftext (line 116)
-- new imagettfbbox (line 117)
-- new imagefilter (line 119)
-- new imageflip (line 120)
-- new imagecrop (line 121)
-- new imagecropauto (line 122)
-- new imagerotate (line 123)
-- new imagescale (line 124)
-- new imageaffine (line 125)
-- new imageaffinematrixget (line 126)
-- new imageaffinematrixconcat (line 127)
-- new imageconvolution (line 128)
-- new imagecreatefromstring (line 131)
-- new imagepng (line 132)
-- new imagejpeg (line 133)
-- new imagegif (line 134)
-- new imagewebp (line 135)
-- new imageavif (line 136)
-- new imagebmp (line 137)
-- new imagecreatefrompng (line 138)
-- new imagecreatefromjpeg (line 139)
-- new imagecreatefromgif (line 140)
-- new imagecreatefromwebp (line 141)
-- new imagecreatefromavif (line 142)
-- new imagecreatefrombmp (line 143)
+- new gd_info (line 58)
+- new imagetypes (line 59)
+- new imagecolorallocate (line 62)
+- new imagecolorallocatealpha (line 63)
+- new imagecolorsforindex (line 64)
+- new imagecolorclosest (line 65)
+- new imagecolorclosestalpha (line 66)
+- new imagecolorclosesthwb (line 67)
+- new imagecolorexact (line 68)
+- new imagecolorexactalpha (line 69)
+- new imagecolorresolve (line 70)
+- new imagecolorresolvealpha (line 71)
+- new imagecolorset (line 72)
+- new imagecolortransparent (line 73)
+- new imagealphablending (line 74)
+- new imagelayereffect (line 75)
+- new imageresolution (line 76)
+- new imagesavealpha (line 77)
+- new imageantialias (line 78)
+- new imagesetthickness (line 79)
+- new imagesetbrush (line 80)
+- new imagesetstyle (line 81)
+- new imageistruecolor (line 82)
+- new imagetruecolortopalette (line 83)
+- new imagepalettetotruecolor (line 84)
+- new imagesetinterpolation (line 85)
+- new imagegetinterpolation (line 86)
+- new imagefill (line 87)
+- new imagefilltoborder (line 88)
+- new imagedestroy (line 89)
+- new imagesx (line 90)
+- new imagesy (line 91)
+- new imagecolorat (line 92)
+- new imagecopy (line 93)
+- new imagecopymerge (line 94)
+- new imagecopyresampled (line 95)
+- new imagecopyresized (line 96)
+- new imagesetpixel (line 97)
+- new imageline (line 98)
+- new imagedashedline (line 99)
+- new imagerectangle (line 100)
+- new imageellipse (line 101)
+- new imagefilledellipse (line 102)
+- new imagearc (line 103)
+- new imagefilledarc (line 104)
+- new imagepolygon (line 105)
+- new imageopenpolygon (line 106)
+- new imagefilledpolygon (line 107)
+- new imagefilledrectangle (line 108)
+- new imagestring (line 109)
+- new imagestringup (line 110)
+- new imagechar (line 111)
+- new imagecharup (line 112)
+- new imagegammacorrect (line 113)
+- new imageinterlace (line 114)
+- new imagesetclip (line 115)
+- new imagegetclip (line 116)
+- new imagettftext (line 118)
+- new imagettfbbox (line 119)
+- new imagefilter (line 121)
+- new imageflip (line 122)
+- new imagecrop (line 123)
+- new imagecropauto (line 124)
+- new imagerotate (line 125)
+- new imagescale (line 126)
+- new imageaffine (line 127)
+- new imageaffinematrixget (line 128)
+- new imageaffinematrixconcat (line 129)
+- new imageconvolution (line 130)
+- new imagecreatefromstring (line 133)
+- new imagepng (line 134)
+- new imagejpeg (line 135)
+- new imagegif (line 136)
+- new imagewebp (line 137)
+- new imageavif (line 138)
+- new imagebmp (line 139)
+- new imagecreatefrompng (line 140)
+- new imagecreatefromjpeg (line 141)
+- new imagecreatefromgif (line 142)
+- new imagecreatefromwebp (line 143)
+- new imagecreatefromavif (line 144)
+- new imagecreatefrombmp (line 145)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 54)
-- new ObjectEntry (line 77)
-- new ObjectEntry (line 103)
-- new HashTable (line 650)
-- new Variable (line 652)
-- new HashTable (line 1380)
-- new Variable (line 1382)
-- new HashTable (line 3095)
-- new Variable (line 3097)
-- new ObjectEntry (line 3547)
-- new ObjectEntry (line 3571)
-- new ObjectEntry (line 3595)
-- new ObjectEntry (line 3662)
-- new ObjectEntry (line 3973)
-- 161 class method(s)
+- new HashTable (line 98)
+- new Variable (line 100)
+- new ObjectEntry (line 137)
+- new ObjectEntry (line 160)
+- new ObjectEntry (line 186)
+- new HashTable (line 733)
+- new Variable (line 735)
+- new HashTable (line 1463)
+- new Variable (line 1465)
+- new HashTable (line 3178)
+- new Variable (line 3180)
+- new ObjectEntry (line 3630)
+- new ObjectEntry (line 3654)
+- new ObjectEntry (line 3678)
+- new ObjectEntry (line 3745)
+- new ObjectEntry (line 4056)
+- 163 class method(s)
 
 ### `ext/gd/VmGdAvif.php`
 
@@ -9011,6 +9016,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 8 class method(s)
 
 ### `ext/gd/VmGdWebp.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/gd_info.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -9420,6 +9430,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/gd/imagetypes.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `ext/gd/imagewebp.php`
@@ -17426,7 +17441,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/HtmlspecialcharsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/HttpBuildQueryJitHelper.php`
 
@@ -18634,11 +18649,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
-
-### `ext/standard/JitHtmlspecialcharsKernel.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
 
 ### `ext/standard/JitHttpBuildQuery.php`
 
@@ -36001,7 +36011,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHtmlspecialchars.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php`
 

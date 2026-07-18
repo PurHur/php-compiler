@@ -21,7 +21,7 @@ curl_setopt($ch2, CURLOPT_RETURNTRANSFER, true);
 echo 'add1=', curl_multi_add_handle($mh, $ch1), "\n";
 echo 'add2=', curl_multi_add_handle($mh, $ch2), "\n";
 
-$running = 0;
+$running = null;
 do {
     $status = curl_multi_exec($mh, $running);
 } while ($running > 0 && $status === CURLM_OK);
