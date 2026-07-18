@@ -238,6 +238,59 @@ final class VmOpensslX509Native
     }
 
     /**
+     * X509_check_private_key — whether private key matches certificate (php-src openssl_x509_check_private_key; #20285).
+     */
+    public static function checkPrivateKeyPem(string $certPem, string $privateKeyPem): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $certBio = null;
+        $keyBio = null;
+        $x509 = null;
+        $pkey = null;
+
+        try {
+            $certBio = $ffi->BIO_new_mem_buf($certPem, \strlen($certPem));
+            if (null === $certBio) {
+                return false;
+            }
+
+            $x509 = $ffi->PEM_read_bio_X509($certBio, null, null, null);
+            if (null === $x509) {
+                return false;
+            }
+
+            $keyBio = $ffi->BIO_new_mem_buf($privateKeyPem, \strlen($privateKeyPem));
+            if (null === $keyBio) {
+                return false;
+            }
+
+            $pkey = $ffi->PEM_read_bio_PrivateKey($keyBio, null, null, null);
+            if (null === $pkey) {
+                return false;
+            }
+
+            return 1 === (int) $ffi->X509_check_private_key($x509, $pkey);
+        } finally {
+            if (null !== $pkey) {
+                $ffi->EVP_PKEY_free($pkey);
+            }
+            if (null !== $x509) {
+                $ffi->X509_free($x509);
+            }
+            if (null !== $keyBio) {
+                $ffi->BIO_free($keyBio);
+            }
+            if (null !== $certBio) {
+                $ffi->BIO_free($certBio);
+            }
+        }
+    }
+
+    /**
      * Parse PEM and return normalized certificate PEM, or false when invalid/unavailable.
      */
     public static function normalizeCertificatePem(string $pem): string|false
@@ -374,6 +427,7 @@ int X509_digest(const X509 *data, const EVP_MD *type, unsigned char *md, unsigne
 typedef struct evp_pkey_st EVP_PKEY;
 EVP_PKEY *X509_get_pubkey(X509 *x);
 int X509_verify(X509 *a, EVP_PKEY *r);
+int X509_check_private_key(X509 *x, EVP_PKEY *k);
 void EVP_PKEY_free(EVP_PKEY *pkey);
 EVP_PKEY *PEM_read_bio_PUBKEY(BIO *bp, EVP_PKEY **x, void *cb, void *u);
 EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, void *cb, void *u);

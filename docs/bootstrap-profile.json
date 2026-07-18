@@ -917,6 +917,7 @@
         "ext/openssl/openssl_spki_new.php",
         "ext/openssl/openssl_spki_verify.php",
         "ext/openssl/openssl_verify.php",
+        "ext/openssl/openssl_x509_check_private_key.php",
         "ext/openssl/openssl_x509_export.php",
         "ext/openssl/openssl_x509_export_to_file.php",
         "ext/openssl/openssl_x509_fingerprint.php",

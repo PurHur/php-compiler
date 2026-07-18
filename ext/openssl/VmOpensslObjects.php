@@ -282,6 +282,45 @@ final class VmOpensslObjects
     }
 
     /**
+     * openssl_x509_check_private_key() — X509_check_private_key (ext/openssl/openssl.c; #20285).
+     *
+     * php-src returns false silently when the certificate or private key cannot be loaded (no warning).
+     */
+    public static function checkPrivateKey(
+        Context $ctx,
+        Variable $certArg,
+        Variable $privateKeyArg,
+        ?Frame $frame = null,
+    ): Variable {
+        unset($frame);
+
+        $result = new Variable();
+        if (!VmOpensslX509Native::available()) {
+            $result->bool(false);
+
+            return $result;
+        }
+
+        $certPem = self::resolveCertificatePem($ctx, $certArg, 'openssl_x509_check_private_key');
+        if (null === $certPem || false === VmOpensslX509Native::normalizeCertificatePem($certPem)) {
+            $result->bool(false);
+
+            return $result;
+        }
+
+        $keyPem = self::resolveCheckPrivateKeyPem($privateKeyArg);
+        if (null === $keyPem) {
+            $result->bool(false);
+
+            return $result;
+        }
+
+        $result->bool(VmOpensslX509Native::checkPrivateKeyPem($certPem, $keyPem));
+
+        return $result;
+    }
+
+    /**
      * openssl_x509_verify() — X509_verify against supplied public key (ext/openssl/x509.c; #6595).
      */
     public static function verifyCertificate(
@@ -411,10 +450,99 @@ final class VmOpensslObjects
     }
 
     /**
+     * Resolve private key material for openssl_x509_check_private_key (stub: OpenSSLAsymmetricKey|OpenSSLCertificate|array|string).
+     *
+     * @return string|null PEM private key, or null when caller should return false
+     */
+    private static function resolveCheckPrivateKeyPem(Variable $arg): ?string
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $object = $arg->toObject();
+            $lc = strtolower($object->class->name);
+            if (self::KEY_LC === $lc) {
+                $pem = self::keyPem($object);
+                if ('' === $pem) {
+                    return null;
+                }
+                $normalized = VmOpensslPkeyNative::normalizePrivateKeyPem($pem);
+                if (false === $normalized) {
+                    return null;
+                }
+
+                return $normalized;
+            }
+            if (self::CERT_LC === $lc) {
+                // Certificates do not carry a private key; php-src returns false.
+                return null;
+            }
+
+            throw new \TypeError(\sprintf(
+                'openssl_x509_check_private_key(): Argument #2 ($private_key) must be of type OpenSSLAsymmetricKey|OpenSSLCertificate|array|string, %s given',
+                $object->class->name
+            ));
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                'openssl_x509_check_private_key(): Argument #2 ($private_key) must be of type OpenSSLAsymmetricKey|OpenSSLCertificate|array|string, %s given',
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_ARRAY === $arg->type) {
+            $ht = $arg->toArray();
+            $keyVar = $ht->find('0');
+            if (null === $keyVar) {
+                throw new \ValueError('Key array must be of the form array(0 => key, 1 => phrase)');
+            }
+            $keyVar = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $keyVar->type && Variable::TYPE_OBJECT !== $keyVar->type) {
+                throw new \ValueError('Key array must be of the form array(0 => key, 1 => phrase)');
+            }
+            $passphrase = null;
+            $phraseVar = $ht->find('1');
+            if (null !== $phraseVar) {
+                $phraseVar = $phraseVar->resolveIndirect();
+                if (Variable::TYPE_STRING === $phraseVar->type) {
+                    $passphrase = $phraseVar->toString();
+                }
+            }
+            if (Variable::TYPE_OBJECT === $keyVar->type) {
+                if (self::KEY_LC !== strtolower($keyVar->toObject()->class->name)) {
+                    return null;
+                }
+                $pem = self::keyPem($keyVar->toObject());
+            } else {
+                $pem = $keyVar->toString();
+            }
+            $normalized = VmOpensslPkeyNative::normalizePrivateKeyPem($pem, $passphrase);
+            if (false === $normalized) {
+                return null;
+            }
+
+            return $normalized;
+        }
+        if (Variable::TYPE_STRING !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                'openssl_x509_check_private_key(): Argument #2 ($private_key) must be of type OpenSSLAsymmetricKey|OpenSSLCertificate|array|string, %s given',
+                self::typeLabel($arg)
+            ));
+        }
+
+        $material = $arg->toString();
+        $normalized = VmOpensslPkeyNative::normalizePrivateKeyPem($material);
+        if (false === $normalized) {
+            return null;
+        }
+
+        return $normalized;
+    }
+
+    /**
      * @return string|null PEM material, or null when caller should return false
      */
     private static function resolveCertificatePem(Context $ctx, Variable $arg, string $function): ?string
     {
+        unset($ctx);
         $arg = $arg->resolveIndirect();
         if (Variable::TYPE_OBJECT === $arg->type) {
             $object = $arg->toObject();
@@ -540,11 +668,10 @@ final class VmOpensslObjects
             Variable::TYPE_NULL => 'null',
             Variable::TYPE_BOOLEAN => 'bool',
             Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_FLOAT => 'float',
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_ARRAY => 'array',
             Variable::TYPE_OBJECT => $var->toObject()->class->name,
-            Variable::TYPE_RESOURCE => 'resource',
             default => 'mixed',
         };
     }
