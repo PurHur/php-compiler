@@ -8,9 +8,10 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 
 /**
- * M4 inventory argv deferred json_encode ABI stubs (#13245, #14817).
+ * Thin standalone AOT json_encode ABI stubs (#13245, #14817, #20371).
  *
  * Quarantined from {@see StringJsonEncode} so the runtime bridge stays under shrink-test LOC.
+ * Gate: {@see Context::isThinStandaloneAotMain()} (peer #20355 / #20336 — no StreamIo defer bag).
  */
 final class StringJsonEncodeInventoryStubs
 {

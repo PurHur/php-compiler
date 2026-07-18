@@ -6,7 +6,9 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** json_encode() JIT routes through JsonEncodeJitHelper PHP not StringJsonEncodeJit LLVM (#9267, #13239). */
+/**
+ * json_encode() JIT: embed via JsonEncodeJitHelper; thin AOT via isThinStandaloneAotMain (#9267, #13239, #20371).
+ */
 final class JsonEncodeRuntimeShrinkTest extends TestCase
 {
     public function testStringJsonEncodeUsesJitHelperNotLlvmWalker(): void
@@ -33,6 +35,9 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringJsonEncode.php');
         $this->assertStringContainsString('ensureStandaloneBodies', $source);
         $this->assertStringContainsString('self::implement($context)', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('StringJsonEncodeInventoryStubs', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
     }

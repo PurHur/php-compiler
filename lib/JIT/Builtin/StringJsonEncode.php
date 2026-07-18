@@ -14,9 +14,10 @@ use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_json_encode_* via JsonEncodeJitHelper PHP (#9267, #13239).
+ * JIT/AOT link for __compiler_json_encode_* via JsonEncodeJitHelper PHP (#9267, #13239, #20371).
  *
- * Embed and standalone AOT compile the same PHP bridge; no json_encode LLVM monolith.
+ * Embed / non-thin: NestedJIT {@see JsonEncodeJitHelper} (#13239).
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20355 / #20336 shape): thin stubs without nested JIT (#13245).
  * php-src: ext/json/php_json.c — php_json_encode
  */
 final class StringJsonEncode
@@ -43,18 +44,13 @@ final class StringJsonEncode
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::ensureDeferredStubsForInventoryEmit($context);
-
-            return;
-        }
         self::implement($context);
     }
 
-    /** Inventory argv emit: link json_encode ABI without nested JsonEncodeJitHelper JIT (#13245). */
+    /** Thin standalone AOT: linkable json_encode ABI without nested JsonEncodeJitHelper (#13245, #20371). */
     public static function ensureDeferredStubsForInventoryEmit(Context $context): void
     {
-        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if (!$context->isThinStandaloneAotMain()) {
             return;
         }
         StringJsonEncodeInventoryStubs::implement($context);
@@ -73,7 +69,7 @@ final class StringJsonEncode
             return;
         }
 
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             StringJsonEncodeInventoryStubs::implement($context);
 
             return;
