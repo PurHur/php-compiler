@@ -3,13 +3,16 @@
 declare(strict_types=1);
 
 /**
- * JIT/AOT helpers for getenv() and putenv() via GetenvJitHelper PHP (#9092, #8992).
+ * JIT/AOT helpers for getenv() and putenv() via GetenvJitHelper PHP (#9092, #8992, #20499).
+ *
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20443 / #20156 shape): libc setenv only —
+ * Nested GetenvJitHelper::putenv aborts on concat/slot temps (#17316). Embed / non-thin:
+ * helper overlay + libc mirror.
  */
 
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Builtin\StringGetenv;
 use PHPCompiler\JIT\Builtin\StringGetenvAll;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -59,12 +62,11 @@ final class JitEnv
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'putenv_emit_cont');
 
-        // Deferred user-script AOT: libc setenv only. Nested GetenvJitHelper::putenv
-        // aborts on concat/slot temps (#17316). putenv_.php materializes via
-        // __string__separate so the setenv mirror strdup sees a NUL-terminated buffer.
+        // Thin standalone AOT: libc setenv only (#17316 / #20499). putenv_.php materializes
+        // via __string__separate so the setenv mirror sees a NUL-terminated buffer.
         // Skip syntax guard here: first-byte/length GEPs on some concat temps still
         // misfire under thin AOT even after separate (seen as SIGABRT in guard abort).
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             self::emitLibcPutenvMirror($context, $assignmentStr);
             $i8 = $context->getTypeFromString('int8');
 
@@ -90,8 +92,9 @@ final class JitEnv
      * putenv from a compile-time "NAME=value" literal — avoid __string__ GEPs (#5965).
      *
      * Uses the same malloc+NUL+setenv path as {@see emitLibcPutenvMirror} so long values
-     * with CR/LF (multipart REQUEST_BODY) round-trip under deferred user-script AOT.
+     * with CR/LF (multipart REQUEST_BODY) round-trip under thin user-script AOT.
      * Direct setenv(nameConst, valueConst) left REQUEST_BODY empty after getenv (#5965).
+     * Non-thin: also NestedJIT {@see GetenvJitHelper::putenv} overlay (#20499).
      */
     public static function putenvFromCStringLiteral(Context $context, string $assignment): Value
     {
@@ -143,7 +146,7 @@ final class JitEnv
         $context->builder->positionAtEnd($skip);
         $context->builder->call($context->lookupFunction('free'), $cStr);
 
-        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if (!$context->isThinStandaloneAotMain()) {
             $str = $context->builder->load($context->constantStringFromString($assignment));
             StringGetenv::ensurePutenvLinked($context);
             JitNestedHelperCoerce::callHelper(
