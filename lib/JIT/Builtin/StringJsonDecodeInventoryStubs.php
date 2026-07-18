@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * M4 inventory argv deferred json_decode/json_validate ABI stubs (#13245, #14812).
+ * Thin standalone AOT json_decode/json_validate ABI stubs (#13245, #14812, #20380).
  *
  * Quarantined from {@see StringJsonDecode} so the runtime bridge stays under shrink-test LOC.
  */

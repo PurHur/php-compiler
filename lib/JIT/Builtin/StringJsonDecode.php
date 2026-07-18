@@ -13,9 +13,10 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_json_decode via JsonDecodeJitHelper PHP (#9359).
+ * JIT/AOT link for __compiler_json_decode via JsonDecodeJitHelper PHP (#9359, #13228, #20380).
  *
- * JIT/normal modules use compiled {@see JsonDecodeJitHelper}; standalone AOT uses the same PHP bridge (#13228).
+ * Embed / non-thin: NestedJIT {@see JsonDecodeJitHelper} (#13228).
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20371 / #20355 shape): thin stubs without nested JIT (#13245).
  * php-src: ext/json/php_json.c — php_json_decode_ex
  */
 final class StringJsonDecode
@@ -54,18 +55,13 @@ final class StringJsonDecode
     /** Standalone AOT: JSON POST helper for superglobals_refresh.c (#7389). */
     public static function ensureStandaloneBodies(Context $context): void
     {
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::ensureDeferredStubsForInventoryEmit($context);
-
-            return;
-        }
         self::implement($context);
     }
 
-    /** Inventory argv emit: link json_decode ABI without nested JsonDecodeJitHelper JIT (#13245). */
+    /** Thin standalone AOT: linkable json_decode ABI without nested JsonDecodeJitHelper (#13245, #20380). */
     public static function ensureDeferredStubsForInventoryEmit(Context $context): void
     {
-        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if (!$context->isThinStandaloneAotMain()) {
             return;
         }
         StringJsonDecodeInventoryStubs::implement($context);
@@ -84,7 +80,7 @@ final class StringJsonDecode
             return;
         }
 
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             StringJsonDecodeInventoryStubs::implement($context);
 
             return;
@@ -95,7 +91,7 @@ final class StringJsonDecode
         self::implementBridges($context);
         self::registerLinkedRuntime($context);
         if (null !== $savedInsert) {
-            $context->builder->positionAtEnd($savedInsert);
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }
