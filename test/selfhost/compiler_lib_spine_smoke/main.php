@@ -534,6 +534,7 @@ require_once __DIR__.'/../../../ext/gd/VmGdFreeType.php';
 require_once __DIR__.'/../../../ext/gd/VmGdPng.php';
 require_once __DIR__.'/../../../ext/gd/VmGdWebp.php';
 require_once __DIR__.'/../../../ext/gd/imagealphablending.php';
+require_once __DIR__.'/../../../ext/gd/imageaffine.php';
 require_once __DIR__.'/../../../ext/gd/imageantialias.php';
 require_once __DIR__.'/../../../ext/gd/imageavif.php';
 require_once __DIR__.'/../../../ext/gd/imagechar.php';

@@ -92,6 +92,7 @@ class Module extends ModuleAbstract
             $functions[] = new imagecropauto();
             $functions[] = new imagerotate();
             $functions[] = new imagescale();
+            $functions[] = new imageaffine();
             $functions[] = new imageconvolution();
         }
         if (GdExtensionPolicy::advertisesDecodeFromString()) {

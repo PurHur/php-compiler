@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5579 |
-| Phase A inventory files (M2 ratio SSOT) | 5579 |
+| PHP files on vm.php path | 5580 |
+| Phase A inventory files (M2 ratio SSOT) | 5580 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15959 |
+| Source constructs flagged (warnings) | 15961 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -477,12 +477,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 5 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 44 |
+| `ext/gd/Module.php` | 0 | 45 |
 | `ext/gd/VmGd.php` | 0 | 9 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
 | `ext/gd/VmGdFreeType.php` | 0 | 1 |
 | `ext/gd/VmGdPng.php` | 0 | 1 |
 | `ext/gd/VmGdWebp.php` | 0 | 1 |
+| `ext/gd/imageaffine.php` | 0 | 1 |
 | `ext/gd/imagealphablending.php` | 0 | 1 |
 | `ext/gd/imageantialias.php` | 0 | 1 |
 | `ext/gd/imageavif.php` | 0 | 1 |
@@ -8758,13 +8759,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagecropauto (line 92)
 - new imagerotate (line 93)
 - new imagescale (line 94)
-- new imageconvolution (line 95)
-- new imagecreatefromstring (line 98)
-- new imagepng (line 99)
-- new imagewebp (line 100)
-- new imageavif (line 101)
-- new imagecreatefromwebp (line 102)
-- new imagecreatefromavif (line 103)
+- new imageaffine (line 95)
+- new imageconvolution (line 96)
+- new imagecreatefromstring (line 99)
+- new imagepng (line 100)
+- new imagewebp (line 101)
+- new imageavif (line 102)
+- new imagecreatefromwebp (line 103)
+- new imagecreatefromavif (line 104)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -8775,10 +8777,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 103)
 - new HashTable (line 616)
 - new Variable (line 618)
-- new ObjectEntry (line 1651)
-- new ObjectEntry (line 1675)
-- new ObjectEntry (line 1901)
-- 91 class method(s)
+- new ObjectEntry (line 1956)
+- new ObjectEntry (line 1980)
+- new ObjectEntry (line 2206)
+- 97 class method(s)
 
 ### `ext/gd/VmGdAvif.php`
 
@@ -8796,6 +8798,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 5 class method(s)
 
 ### `ext/gd/VmGdWebp.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imageaffine.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
