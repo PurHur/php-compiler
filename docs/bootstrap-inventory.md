@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5774 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16865 |
+| Source constructs flagged (warnings) | 16867 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1114,7 +1114,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
-| `ext/pgsql/Module.php` | 0 | 43 |
+| `ext/pgsql/Module.php` | 0 | 44 |
 | `ext/pgsql/PgsqlConstants.php` | 0 | 1 |
 | `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlArg.php` | 0 | 1 |
@@ -1123,7 +1123,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/VmPgsqlLob.php` | 0 | 4 |
 | `ext/pgsql/VmPgsqlNative.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlResult.php` | 0 | 4 |
-| `ext/pgsql/pg_async_builtins.php` | 0 | 4 |
+| `ext/pgsql/pg_async_builtins.php` | 0 | 5 |
 | `ext/pgsql/pg_change_password.php` | 0 | 2 |
 | `ext/pgsql/pg_close.php` | 0 | 2 |
 | `ext/pgsql/pg_connect.php` | 0 | 2 |
@@ -13651,17 +13651,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new pg_socket (line 106)
 - new pg_consume_input (line 107)
 - new pg_flush (line 108)
-- new pg_insert (line 109)
-- new pg_update (line 110)
-- new pg_delete (line 111)
-- new pg_select (line 112)
-- new pg_change_password (line 127)
-- new pg_jit (line 128)
-- new pg_put_copy_data (line 129)
-- new pg_put_copy_end (line 130)
-- new pg_result_memory_size (line 131)
-- new pg_set_chunked_rows_size (line 132)
-- new pg_socket_poll (line 133)
+- new pg_set_error_verbosity (line 109)
+- new pg_insert (line 110)
+- new pg_update (line 111)
+- new pg_delete (line 112)
+- new pg_select (line 113)
+- new pg_change_password (line 128)
+- new pg_jit (line 129)
+- new pg_put_copy_data (line 130)
+- new pg_put_copy_end (line 131)
+- new pg_result_memory_size (line 132)
+- new pg_set_chunked_rows_size (line 133)
+- new pg_socket_poll (line 134)
 - 7 class method(s)
 
 ### `ext/pgsql/PgsqlConstants.php`
@@ -13723,7 +13724,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/VmPgsqlNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 51 class method(s)
+- 52 class method(s)
 
 ### `ext/pgsql/VmPgsqlResult.php`
 
@@ -13739,7 +13740,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 29)
 - new ArgumentCountError (line 68)
 - new ArgumentCountError (line 97)
-- 6 class method(s)
+- new ArgumentCountError (line 140)
+- 8 class method(s)
 
 ### `ext/pgsql/pg_change_password.php`
 

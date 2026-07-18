@@ -106,6 +106,7 @@ class Module extends ModuleAbstract
             new pg_socket(),
             new pg_consume_input(),
             new pg_flush(),
+            new pg_set_error_verbosity(),
             new pg_insert(),
             new pg_update(),
             new pg_delete(),

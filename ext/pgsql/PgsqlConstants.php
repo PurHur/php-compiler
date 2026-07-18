@@ -31,6 +31,18 @@ final class PgsqlConstants
 
     public const PGSQL_DML_ESCAPE = 1 << 12;
 
+    /** libpq PQERRORS_TERSE */
+    public const PGSQL_ERRORS_TERSE = 0;
+
+    /** libpq PQERRORS_DEFAULT */
+    public const PGSQL_ERRORS_DEFAULT = 1;
+
+    /** libpq PQERRORS_VERBOSE */
+    public const PGSQL_ERRORS_VERBOSE = 2;
+
+    /** libpq PQERRORS_SQLSTATE (PHP 8.3+) */
+    public const PGSQL_ERRORS_SQLSTATE = 3;
+
     /**
      * @return array<string, int>
      */
@@ -48,6 +60,10 @@ final class PgsqlConstants
             'PGSQL_DML_ASYNC' => self::PGSQL_DML_ASYNC,
             'PGSQL_DML_STRING' => self::PGSQL_DML_STRING,
             'PGSQL_DML_ESCAPE' => self::PGSQL_DML_ESCAPE,
+            'PGSQL_ERRORS_TERSE' => self::PGSQL_ERRORS_TERSE,
+            'PGSQL_ERRORS_DEFAULT' => self::PGSQL_ERRORS_DEFAULT,
+            'PGSQL_ERRORS_VERBOSE' => self::PGSQL_ERRORS_VERBOSE,
+            'PGSQL_ERRORS_SQLSTATE' => self::PGSQL_ERRORS_SQLSTATE,
         ];
     }
 }
