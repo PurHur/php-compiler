@@ -28,6 +28,14 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([0], BuiltinByRefParams::forFunction('asort'));
     }
 
+    public function testRedisScanIteratorByRef(): void
+    {
+        $this->assertSame([1], BuiltinByRefParams::forFunction('Redis::scan'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('Redis::hScan'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('Redis::sScan'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('Redis::zScan'));
+    }
+
     public function testArrayWalkFirstArgument(): void
     {
         $this->assertSame([0], BuiltinByRefParams::forFunction('array_walk'));
