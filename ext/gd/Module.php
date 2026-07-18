@@ -117,6 +117,8 @@ class Module extends ModuleAbstract
             $functions[] = new imagesetclip();
             $functions[] = new imagegetclip();
             if (VmGdFreeType::available()) {
+                $functions[] = new imagefttext();
+                $functions[] = new imageftbbox();
                 $functions[] = new imagettftext();
                 $functions[] = new imagettfbbox();
             }

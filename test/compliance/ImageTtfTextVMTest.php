@@ -23,6 +23,10 @@ final class ImageTtfTextVMTest extends BaseTest
             __DIR__.'/cases/stdlib/imagettftext.phpt',
             'imagettftext.phpt'
         );
+        yield 'gd_imageft_20496.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/gd_imageft_20496.phpt',
+            'gd_imageft_20496.phpt'
+        );
     }
 
     public function setUp(): void
