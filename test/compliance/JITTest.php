@@ -18,6 +18,11 @@ class JITTest extends BaseTest {
     public static function providePHPTests(): \Generator
     {
         foreach (parent::providePHPTests() as $name => $case) {
+            // FreeType FFI optional (#6532/#20496); skip when libfreetype is not on the host image.
+            if ((str_contains($name, 'imagettftext') || str_contains($name, 'gd_imageft_20496'))
+                && !\PHPCompiler\ext\gd\VmGdFreeType::available()) {
+                continue;
+            }
             // VM-first (#6212/#6248/#6064): JIT hangs/OOM on create_listen / datagram accept scripts; defer JIT PHPT.
             if (str_contains($name, 'socket_create_listen')
                 || str_contains($name, 'socket_datagram')

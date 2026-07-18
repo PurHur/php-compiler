@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5662 |
-| Phase A inventory files (M2 ratio SSOT) | 5662 |
+| PHP files on vm.php path | 5664 |
+| Phase A inventory files (M2 ratio SSOT) | 5664 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16156 |
+| Source constructs flagged (warnings) | 16162 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -491,7 +491,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 6 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 99 |
+| `ext/gd/Module.php` | 0 | 101 |
 | `ext/gd/VmGd.php` | 0 | 19 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
 | `ext/gd/VmGdBmp.php` | 0 | 1 |
@@ -563,6 +563,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagefilltoborder.php` | 0 | 1 |
 | `ext/gd/imagefilter.php` | 0 | 1 |
 | `ext/gd/imageflip.php` | 0 | 1 |
+| `ext/gd/imageftbbox.php` | 0 | 2 |
+| `ext/gd/imagefttext.php` | 0 | 2 |
 | `ext/gd/imagegammacorrect.php` | 0 | 1 |
 | `ext/gd/imagegd.php` | 0 | 1 |
 | `ext/gd/imagegd2.php` | 0 | 1 |
@@ -8014,69 +8016,69 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 3032)
 - new DomNodeState (line 3037)
 - new Variable (line 3047)
-- new ObjectEntry (line 3830)
-- new DomNodeState (line 3832)
-- new ObjectEntry (line 4028)
-- new DomNodeState (line 4030)
-- new ObjectEntry (line 4058)
-- new DomNodeState (line 4060)
-- new ObjectEntry (line 4248)
-- new DomNodeState (line 4253)
-- new DOMException (line 4652)
-- new DOMException (line 4668)
-- new Variable (line 4686)
-- new DOMException (line 4700)
-- new DOMException (line 4703)
-- new DOMException (line 4713)
-- new Error (line 4743)
-- new DOMException (line 4749)
-- new DOMException (line 4763)
-- new DOMException (line 4961)
-- new DOMException (line 5158)
-- new DOMException (line 5162)
-- new DOMException (line 5251)
-- new DOMException (line 5255)
-- new DOMException (line 5313)
-- new DOMException (line 5330)
-- new DOMException (line 5362)
-- new DOMException (line 5404)
-- new DOMException (line 5431)
-- new DOMException (line 6280)
-- new Variable (line 6308)
-- new DOMException (line 6569)
-- new DOMException (line 6687)
-- new DOMException (line 6732)
-- new ObjectEntry (line 6817)
-- new DomNodeState (line 6821)
-- new Variable (line 6828)
-- new ObjectEntry (line 7040)
-- new DomNodeState (line 7044)
-- new Variable (line 7051)
-- new ObjectEntry (line 7071)
-- new DomNodeState (line 7074)
-- new Variable (line 7082)
-- new Variable (line 7269)
-- new DOMException (line 7406)
-- new DOMException (line 7413)
-- new DOMException (line 7420)
-- new DOMException (line 7424)
-- new DOMException (line 7427)
+- new ObjectEntry (line 3839)
+- new DomNodeState (line 3841)
+- new ObjectEntry (line 4037)
+- new DomNodeState (line 4039)
+- new ObjectEntry (line 4067)
+- new DomNodeState (line 4069)
+- new ObjectEntry (line 4257)
+- new DomNodeState (line 4262)
+- new DOMException (line 4661)
+- new DOMException (line 4677)
+- new Variable (line 4695)
+- new DOMException (line 4709)
+- new DOMException (line 4712)
+- new DOMException (line 4722)
+- new Error (line 4752)
+- new DOMException (line 4758)
+- new DOMException (line 4772)
+- new DOMException (line 4970)
+- new DOMException (line 5167)
+- new DOMException (line 5171)
+- new DOMException (line 5260)
+- new DOMException (line 5264)
+- new DOMException (line 5322)
+- new DOMException (line 5339)
+- new DOMException (line 5371)
+- new DOMException (line 5413)
+- new DOMException (line 5440)
+- new DOMException (line 6289)
+- new Variable (line 6317)
+- new DOMException (line 6578)
+- new DOMException (line 6696)
+- new DOMException (line 6741)
+- new ObjectEntry (line 6826)
+- new DomNodeState (line 6830)
+- new Variable (line 6837)
+- new ObjectEntry (line 7049)
+- new DomNodeState (line 7053)
+- new Variable (line 7060)
+- new ObjectEntry (line 7080)
+- new DomNodeState (line 7083)
+- new Variable (line 7091)
+- new Variable (line 7278)
+- new DOMException (line 7415)
+- new DOMException (line 7422)
+- new DOMException (line 7429)
+- new DOMException (line 7433)
 - new DOMException (line 7436)
-- new DOMException (line 7448)
-- new DOMException (line 8443)
-- new Variable (line 8502)
-- new Variable (line 8515)
-- new Variable (line 8553)
-- new DOMException (line 8564)
-- new Variable (line 8566)
-- new DOMException (line 8727)
-- new DOMException (line 8754)
-- new DOMException (line 8790)
-- new DOMException (line 8854)
-- new DOMException (line 8862)
+- new DOMException (line 7445)
+- new DOMException (line 7457)
+- new DOMException (line 8452)
+- new Variable (line 8511)
+- new Variable (line 8524)
+- new Variable (line 8562)
+- new DOMException (line 8573)
+- new Variable (line 8575)
+- new DOMException (line 8736)
+- new DOMException (line 8763)
+- new DOMException (line 8799)
+- new DOMException (line 8863)
 - new DOMException (line 8871)
-- new Error (line 9755)
-- new Error (line 9759)
+- new DOMException (line 8880)
+- new Error (line 9764)
+- new Error (line 9768)
 - 404 class method(s)
 - 2 closure(s)
 
@@ -8967,42 +8969,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imageinterlace (line 116)
 - new imagesetclip (line 117)
 - new imagegetclip (line 118)
-- new imagettftext (line 120)
-- new imagettfbbox (line 121)
-- new imagefilter (line 123)
-- new imageflip (line 124)
-- new imagecrop (line 125)
-- new imagecropauto (line 126)
-- new imagerotate (line 127)
-- new imagescale (line 128)
-- new imageaffine (line 129)
-- new imageaffinematrixget (line 130)
-- new imageaffinematrixconcat (line 131)
-- new imageconvolution (line 132)
-- new imagecreatefromstring (line 135)
-- new imagepng (line 136)
-- new imagejpeg (line 137)
-- new imagegif (line 138)
-- new imagewebp (line 139)
-- new imageavif (line 140)
-- new imagebmp (line 141)
-- new imagewbmp (line 142)
-- new imagexbm (line 143)
-- new imagegd (line 144)
-- new imagegd2 (line 145)
-- new imagecreatefrompng (line 146)
-- new imagecreatefromjpeg (line 147)
-- new imagecreatefromgif (line 148)
-- new imagecreatefromwebp (line 149)
-- new imagecreatefromavif (line 150)
-- new imagecreatefrombmp (line 151)
-- new imagecreatefromwbmp (line 152)
-- new imagecreatefromxbm (line 153)
-- new imagecreatefromxpm (line 154)
-- new imagecreatefromgd (line 155)
-- new imagecreatefromgd2 (line 156)
-- new imagecreatefromgd2part (line 157)
-- new imagecreatefromtga (line 158)
+- new imagefttext (line 120)
+- new imageftbbox (line 121)
+- new imagettftext (line 122)
+- new imagettfbbox (line 123)
+- new imagefilter (line 125)
+- new imageflip (line 126)
+- new imagecrop (line 127)
+- new imagecropauto (line 128)
+- new imagerotate (line 129)
+- new imagescale (line 130)
+- new imageaffine (line 131)
+- new imageaffinematrixget (line 132)
+- new imageaffinematrixconcat (line 133)
+- new imageconvolution (line 134)
+- new imagecreatefromstring (line 137)
+- new imagepng (line 138)
+- new imagejpeg (line 139)
+- new imagegif (line 140)
+- new imagewebp (line 141)
+- new imageavif (line 142)
+- new imagebmp (line 143)
+- new imagewbmp (line 144)
+- new imagexbm (line 145)
+- new imagegd (line 146)
+- new imagegd2 (line 147)
+- new imagecreatefrompng (line 148)
+- new imagecreatefromjpeg (line 149)
+- new imagecreatefromgif (line 150)
+- new imagecreatefromwebp (line 151)
+- new imagecreatefromavif (line 152)
+- new imagecreatefrombmp (line 153)
+- new imagecreatefromwbmp (line 154)
+- new imagecreatefromxbm (line 155)
+- new imagecreatefromxpm (line 156)
+- new imagecreatefromgd (line 157)
+- new imagecreatefromgd2 (line 158)
+- new imagecreatefromgd2part (line 159)
+- new imagecreatefromtga (line 160)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -9376,6 +9380,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gd/imageflip.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imageftbbox.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+
+### `ext/gd/imagefttext.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/gd/imagegammacorrect.php`
@@ -28410,14 +28426,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/request_parse_body.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 38)
-- new HashTable (line 56)
+- new ArgumentCountError (line 39)
 - new HashTable (line 57)
-- new HashTable (line 64)
-- new Variable (line 65)
-- new Variable (line 67)
-- new JITVariable (line 119)
+- new HashTable (line 58)
+- new HashTable (line 65)
+- new Variable (line 66)
+- new Variable (line 68)
 - new JITVariable (line 120)
+- new JITVariable (line 121)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -35302,11 +35318,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/RequestParseBodyRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 260)
-- new phpc_native_ht_set_string_key (line 261)
-- new phpc_native_ht_set_string_key_ht (line 262)
-- new phpc_native_ht_set_string_at (line 263)
-- new phpc_native_ht_set_hashtable_at (line 264)
+- new phpc_native_ht_alloc (line 259)
+- new phpc_native_ht_set_string_key (line 260)
+- new phpc_native_ht_set_string_key_ht (line 261)
+- new phpc_native_ht_set_string_at (line 262)
+- new phpc_native_ht_set_hashtable_at (line 263)
 - 12 class method(s)
 - 1 closure(s)
 

@@ -650,6 +650,8 @@ require_once __DIR__.'/../../../ext/gd/imagetruecolortopalette.php';
 require_once __DIR__.'/../../../ext/gd/imagetypes.php';
 require_once __DIR__.'/../../../ext/gd/imagettfbbox.php';
 require_once __DIR__.'/../../../ext/gd/imagettftext.php';
+require_once __DIR__.'/../../../ext/gd/imageftbbox.php';
+require_once __DIR__.'/../../../ext/gd/imagefttext.php';
 require_once __DIR__.'/../../../ext/gd/imagewebp.php';
 require_once __DIR__.'/../../../ext/gettext/GettextFunction.php';
 require_once __DIR__.'/../../../ext/gettext/GettextJitHelper.php';
