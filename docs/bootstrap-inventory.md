@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5670 |
-| Phase A inventory files (M2 ratio SSOT) | 5670 |
+| PHP files on vm.php path | 5673 |
+| Phase A inventory files (M2 ratio SSOT) | 5673 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16194 |
+| Source constructs flagged (warnings) | 16211 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1029,18 +1029,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_x509_parse.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
 | `ext/openssl/openssl_x509_verify.php` | 0 | 2 |
-| `ext/pcntl/Module.php` | 0 | 25 |
+| `ext/pcntl/Module.php` | 0 | 28 |
 | `ext/pcntl/PcntlConstants.php` | 0 | 1 |
 | `ext/pcntl/PcntlHostBridge.php` | 0 | 2 |
 | `ext/pcntl/PcntlLibcThinAbi.php` | 0 | 2 |
-| `ext/pcntl/VmPcntl.php` | 0 | 22 |
+| `ext/pcntl/VmPcntl.php` | 0 | 25 |
 | `ext/pcntl/VmPcntlArg.php` | 0 | 3 |
 | `ext/pcntl/pcntl_alarm.php` | 0 | 3 |
 | `ext/pcntl/pcntl_async_signals.php` | 0 | 3 |
 | `ext/pcntl/pcntl_exec.php` | 0 | 3 |
 | `ext/pcntl/pcntl_fork.php` | 0 | 4 |
 | `ext/pcntl/pcntl_get_last_error.php` | 0 | 3 |
+| `ext/pcntl/pcntl_getcpu.php` | 0 | 3 |
+| `ext/pcntl/pcntl_getcpuaffinity.php` | 0 | 5 |
 | `ext/pcntl/pcntl_getpriority.php` | 0 | 4 |
+| `ext/pcntl/pcntl_setcpuaffinity.php` | 0 | 3 |
 | `ext/pcntl/pcntl_setpriority.php` | 0 | 4 |
 | `ext/pcntl/pcntl_signal.php` | 0 | 3 |
 | `ext/pcntl/pcntl_signal_dispatch.php` | 0 | 3 |
@@ -12739,9 +12742,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new pcntl_waitid (line 44)
 - new pcntl_getpriority (line 45)
 - new pcntl_setpriority (line 46)
-- new pcntl_unshare (line 47)
-- new pcntl_strerror (line 48)
-- new pcntl_get_last_error (line 49)
+- new pcntl_getcpuaffinity (line 47)
+- new pcntl_setcpuaffinity (line 48)
+- new pcntl_getcpu (line 49)
+- new pcntl_unshare (line 50)
+- new pcntl_strerror (line 51)
+- new pcntl_get_last_error (line 52)
 - 2 class method(s)
 
 ### `ext/pcntl/PcntlConstants.php`
@@ -12758,7 +12764,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pcntl/PcntlLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
-- 33 class method(s)
+- 40 class method(s)
 - 1 closure(s)
 
 ### `ext/pcntl/VmPcntl.php`
@@ -12777,15 +12783,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 272)
 - new Error (line 310)
 - new Error (line 341)
-- new Variable (line 384)
-- new Variable (line 392)
-- new Variable (line 406)
-- new Error (line 487)
-- new Error (line 502)
-- new Variable (line 530)
-- new HashTable (line 612)
-- new Variable (line 614)
-- 38 class method(s)
+- new Error (line 352)
+- new Error (line 389)
+- new Error (line 440)
+- new Variable (line 486)
+- new Variable (line 494)
+- new Variable (line 508)
+- new Error (line 589)
+- new Error (line 604)
+- new Variable (line 632)
+- new HashTable (line 714)
+- new Variable (line 716)
+- 41 class method(s)
 
 ### `ext/pcntl/VmPcntlArg.php`
 
@@ -12830,12 +12839,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 37)
 - 2 class method(s)
 
+### `ext/pcntl/pcntl_getcpu.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 37)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_getcpuaffinity.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new HashTable (line 47)
+- new Variable (line 50)
+- new Error (line 60)
+- 2 class method(s)
+
 ### `ext/pcntl/pcntl_getpriority.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
 - new Error (line 36)
 - new Error (line 62)
+- 2 class method(s)
+
+### `ext/pcntl/pcntl_setcpuaffinity.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 76)
 - 2 class method(s)
 
 ### `ext/pcntl/pcntl_setpriority.php`
