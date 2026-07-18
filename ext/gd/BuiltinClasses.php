@@ -22,6 +22,7 @@ final class BuiltinClasses
 
         $before = array_keys($ctx->classes);
         self::registerGdImage($ctx);
+        self::registerGdFont($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -34,5 +35,14 @@ final class BuiltinClasses
         }
 
         $ctx->classes['gdimage'] = new ClassEntry('GdImage');
+    }
+
+    private static function registerGdFont(Context $ctx): void
+    {
+        if (isset($ctx->classes['gdfont'])) {
+            return;
+        }
+
+        $ctx->classes['gdfont'] = new ClassEntry('GdFont');
     }
 }

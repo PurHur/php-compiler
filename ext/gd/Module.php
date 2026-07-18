@@ -71,6 +71,7 @@ class Module extends ModuleAbstract
             $functions[] = new imagecolorresolvealpha();
             $functions[] = new imagecolorset();
             $functions[] = new imagecolortransparent();
+            $functions[] = new imagecolormatch();
             $functions[] = new imagealphablending();
             $functions[] = new imagelayereffect();
             $functions[] = new imageresolution();
@@ -110,6 +111,7 @@ class Module extends ModuleAbstract
             $functions[] = new imagestringup();
             $functions[] = new imagechar();
             $functions[] = new imagecharup();
+            $functions[] = new imageloadfont();
             $functions[] = new imagegammacorrect();
             $functions[] = new imageinterlace();
             $functions[] = new imagesetclip();
