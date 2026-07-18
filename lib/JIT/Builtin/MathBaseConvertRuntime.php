@@ -187,7 +187,7 @@ final class MathBaseConvertRuntime
         $dblPhi = $context->builder->phi($double, 'mbc_btz_dbl_phi');
         $longPhi->addIncoming($longI64, $fetchLong);
         $longPhi->addIncoming($i64->constInt(0, false), $fetchDouble);
-        $dblPhi->addIncoming($double->constFloat(0.0), $fetchLong);
+        $dblPhi->addIncoming($double->constReal(0.0), $fetchLong);
         $dblPhi->addIncoming($dblVal, $fetchDouble);
 
         $storeLong = BasicBlockHelper::append($context, 'mbc_btz_store_long');

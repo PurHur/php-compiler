@@ -22,7 +22,7 @@ use PHPLLVM\Value;
 /**
  * octdec() for string arguments (subset of PHP standard library).
  *
- * php-src: ext/standard/math.c — PHP_FUNCTION(octdec)
+ * php-src: ext/standard/math.c — PHP_FUNCTION(octdec) / Z_PARAM_STR (#20658).
  */
 final class octdec extends Internal
 {
@@ -31,7 +31,8 @@ final class octdec extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('octdec() requires exactly one argument');
         }
-        $octalString = VmString::stringBuiltinArgForFrame($frame, 0, 'octdec', 0, 'octal_string');
+        // Z_PARAM_STR $octal_string — null TypeError on 8.4 forward profile (#20658).
+        $octalString = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'octdec', 0, 'octal_string');
         VmMath::assignRadixToReturn($frame->returnVar, $octalString, 8);
     }
 
@@ -44,13 +45,42 @@ final class octdec extends Internal
             throw new \LogicException('octdec() requires exactly one argument');
         }
 
+        // Null operand: TypeError under PROFILE=8.4 / strict_types without linking
+        // MathBaseConvert (AOT IR still clears insert block on abort; #20658).
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            self::jitStringArg($context, $args[0]);
+
+            return $context->getTypeFromString('__value__*')->constNull();
+        }
+
         return MathBaseConvert::baseToZvalCall(
             $context,
             $this->stringDataPtr(
                 $context,
-                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'octdec', 0, 'octal_string')
+                self::jitStringArg($context, $args[0])
             ),
             8
+        );
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'octdec',
+                0,
+                'octal_string'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'octdec',
+            0,
+            'octal_string'
         );
     }
 }
