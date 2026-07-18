@@ -19,6 +19,7 @@ abstract class GettextFunction extends Internal
     {
         return match ($this->getName()) {
             'gettext' => JitGettext::gettext($context, ...$args),
+            '_' => JitGettext::underscore($context, ...$args),
             'dgettext' => JitGettext::dgettext($context, ...$args),
             'dcgettext' => JitGettext::dcgettext($context, ...$args),
             'dngettext' => JitGettext::dngettext($context, ...$args),

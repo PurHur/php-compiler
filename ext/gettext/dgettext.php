@@ -17,8 +17,8 @@ final class dgettext extends GettextFunction
     public function execute(Frame $frame): void
     {
         $this->requireArgCount($frame, 2);
-        $domain = VmGettext::coerceDomainArg($frame->calledArgs[0], 'dgettext', 0, 'domain');
-        $msgid = VmGettext::coerceMsgidArg($frame->calledArgs[1], 'dgettext', 1, 'message');
+        $domain = VmGettext::domainArgForFrame($frame, 0, 'dgettext', 0, 'domain');
+        $msgid = VmGettext::msgidArgForFrame($frame, 1, 'dgettext', 1, 'message');
         if (null === $frame->returnVar) {
             return;
         }

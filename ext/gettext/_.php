@@ -17,7 +17,7 @@ final class _ extends GettextFunction
     public function execute(Frame $frame): void
     {
         $this->requireArgCount($frame, 1);
-        $msgid = VmGettext::coerceMsgidArg($frame->calledArgs[0], '_', 0, 'msgid');
+        $msgid = VmGettext::msgidArgForFrame($frame, 0, '_', 0, 'msgid');
         if (null === $frame->returnVar) {
             return;
         }
