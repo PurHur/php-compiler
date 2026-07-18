@@ -85,6 +85,7 @@ class Module extends ModuleAbstract
             $functions[] = new imagefilledarc();
             $functions[] = new imagepolygon();
             $functions[] = new imageopenpolygon();
+            $functions[] = new imagefilledpolygon();
             $functions[] = new imagefilledrectangle();
             $functions[] = new imagestring();
             $functions[] = new imagechar();
