@@ -26,7 +26,7 @@ final class SimpleXmlJsonExport
     {
         VmSimpleXml::requireElement($object, 'json_encode');
         if (SimpleXmlRegistry::isAttributesView($object)) {
-            $attrs = SimpleXmlRegistry::state($object)->attributes;
+            $attrs = VmSimpleXml::attributesMap($object);
 
             return [] === $attrs ? [] : ['@attributes' => $attrs];
         }

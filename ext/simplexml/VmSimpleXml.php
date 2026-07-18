@@ -288,7 +288,7 @@ final class VmSimpleXml
         if (Variable::TYPE_INTEGER === $offset->type) {
             $index = $offset->toInt();
             if (SimpleXmlRegistry::isAttributesView($entry)) {
-                $values = array_values(SimpleXmlRegistry::state($entry)->attributes);
+                $values = array_values(self::attributesMap($entry));
                 if ($index < 0 || $index >= \count($values)) {
                     $result = new Variable();
                     $result->null();
@@ -315,8 +315,11 @@ final class VmSimpleXml
         }
         if (Variable::TYPE_STRING === $offset->type) {
             $name = $offset->toString();
-            $state = SimpleXmlRegistry::state($entry);
-            $value = $state->attributes[$name] ?? null;
+            if (SimpleXmlRegistry::isAttributesView($entry)) {
+                $value = self::attributesMap($entry)[$name] ?? null;
+            } else {
+                $value = SimpleXmlRegistry::state($entry)->attributes[$name] ?? null;
+            }
             $result = new Variable();
             if (null === $value) {
                 $result->null();
@@ -336,7 +339,7 @@ final class VmSimpleXml
         if (Variable::TYPE_INTEGER === $offset->type) {
             $index = $offset->toInt();
             if (SimpleXmlRegistry::isAttributesView($entry)) {
-                $values = array_values(SimpleXmlRegistry::state($entry)->attributes);
+                $values = array_values(self::attributesMap($entry));
 
                 return $index >= 0 && $index < \count($values);
             }
@@ -345,6 +348,9 @@ final class VmSimpleXml
             return $index >= 0 && $index < \count($elements);
         }
         if (Variable::TYPE_STRING === $offset->type) {
+            if (SimpleXmlRegistry::isAttributesView($entry)) {
+                return \array_key_exists($offset->toString(), self::attributesMap($entry));
+            }
             $state = SimpleXmlRegistry::state($entry);
 
             return \array_key_exists($offset->toString(), $state->attributes);
@@ -375,7 +381,7 @@ final class VmSimpleXml
             $stringValue = $value->toString($vm, $frame);
             if (SimpleXmlRegistry::isAttributesView($entry)) {
                 $state = SimpleXmlRegistry::state($entry);
-                $keys = array_keys($state->attributes);
+                $keys = array_keys(self::attributesMap($entry));
                 if ($index < 0 || $index >= \count($keys)) {
                     self::warn($ctx, 'SimpleXMLElement::offsetSet(): Cannot add attribute number '.$index.' when only '.\count($keys).' such attributes exist', $frame);
 
@@ -413,7 +419,7 @@ final class VmSimpleXml
 
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             $state = SimpleXmlRegistry::state($entry);
-            if (!\array_key_exists($name, $state->attributes)) {
+            if (!\array_key_exists($name, self::attributesMap($entry))) {
                 // php-src: attributes() view cannot introduce new attributes.
                 return;
             }
@@ -459,7 +465,7 @@ final class VmSimpleXml
             $index = $offset->toInt();
             if (SimpleXmlRegistry::isAttributesView($entry)) {
                 $state = SimpleXmlRegistry::state($entry);
-                $keys = array_keys($state->attributes);
+                $keys = array_keys(self::attributesMap($entry));
                 if ($index >= 0 && $index < \count($keys)) {
                     unset($state->attributes[$keys[$index]]);
                 }
@@ -478,6 +484,14 @@ final class VmSimpleXml
         if ('' === $name) {
             return;
         }
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            if (!\array_key_exists($name, self::attributesMap($entry))) {
+                return;
+            }
+            unset(SimpleXmlRegistry::state($entry)->attributes[$name]);
+
+            return;
+        }
         $state = SimpleXmlRegistry::state($entry);
         unset($state->attributes[$name]);
     }
@@ -485,7 +499,7 @@ final class VmSimpleXml
     public static function countElements(ObjectEntry $entry): int
     {
         if (SimpleXmlRegistry::isAttributesView($entry)) {
-            return \count(SimpleXmlRegistry::state($entry)->attributes);
+            return \count(self::attributesMap($entry));
         }
         if (SimpleXmlRegistry::isView($entry)) {
             return \count(SimpleXmlRegistry::view($entry));
@@ -497,7 +511,7 @@ final class VmSimpleXml
     public static function elementName(ObjectEntry $entry): string
     {
         if (SimpleXmlRegistry::isAttributesView($entry)) {
-            $attrs = SimpleXmlRegistry::state($entry)->attributes;
+            $attrs = self::attributesMap($entry);
             if ([] === $attrs) {
                 return '';
             }
@@ -552,18 +566,15 @@ final class VmSimpleXml
             return self::wrapAttributesView($ctx, $entry->class, new SimpleXmlNodeState(''), SimpleXmlRegistry::documentKey($entry));
         }
 
-        $state = SimpleXmlRegistry::state($entry);
-        if (null !== $namespaceOrPrefix && '' !== $namespaceOrPrefix) {
-            $filtered = self::filterAttributesByNamespace($state->attributes, $namespaceOrPrefix, $isPrefix, $entry);
-            $viewState = new SimpleXmlNodeState($state->name, $filtered);
-
-            return self::wrapAttributesView($ctx, $entry->class, $viewState, SimpleXmlRegistry::documentKey($entry));
-        }
-
-        $plain = self::filterUnqualifiedAttributes($state->attributes);
-        $viewState = new SimpleXmlNodeState($state->name, $plain);
-
-        return self::wrapAttributesView($ctx, $entry->class, $viewState, SimpleXmlRegistry::documentKey($entry));
+        // Live attributes view: share the element node state; filter is applied on each read (#20332).
+        return self::wrapAttributesView(
+            $ctx,
+            $entry->class,
+            SimpleXmlRegistry::state($entry),
+            SimpleXmlRegistry::documentKey($entry),
+            $namespaceOrPrefix,
+            $isPrefix
+        );
     }
 
     public static function asXml(ObjectEntry $entry, bool $includeDeclaration = false): string|false
@@ -783,7 +794,7 @@ final class VmSimpleXml
     {
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             $out = [];
-            foreach (SimpleXmlRegistry::state($entry)->attributes as $name => $value) {
+            foreach (self::attributesMap($entry) as $name => $value) {
                 // php-src sxe.c: attributes() foreach yields name => attribute SimpleXMLElement (#19351).
                 $out[] = new SimpleXmlNodeState($name, [], [], $value);
             }
@@ -874,14 +885,36 @@ final class VmSimpleXml
         Context $ctx,
         ClassEntry $class,
         SimpleXmlNodeState $state,
-        ?int $documentKey = null
+        ?int $documentKey = null,
+        ?string $namespaceOrPrefix = null,
+        bool $isPrefix = true
     ): ObjectEntry {
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $docKey = $documentKey ?? $entry->id;
-        SimpleXmlRegistry::attachAttributesView($entry, $state, $docKey);
+        SimpleXmlRegistry::attachAttributesView($entry, $state, $docKey, $namespaceOrPrefix, $isPrefix);
 
         return $entry;
+    }
+
+    /**
+     * Attribute name=>value map for an element or live attributes() view (php-src sxe.c; #20332).
+     *
+     * @return array<string, string>
+     */
+    public static function attributesMap(ObjectEntry $entry): array
+    {
+        $state = SimpleXmlRegistry::state($entry);
+        if (!SimpleXmlRegistry::isAttributesView($entry)) {
+            return $state->attributes;
+        }
+        $filter = SimpleXmlRegistry::attributesViewFilter($entry);
+        $ns = $filter['ns'];
+        if (null !== $ns && '' !== $ns) {
+            return self::filterAttributesByNamespace($state->attributes, $ns, $filter['isPrefix'], $entry);
+        }
+
+        return self::filterUnqualifiedAttributes($state->attributes);
     }
 
     private static function serializeNode(SimpleXmlNodeState $node): string
@@ -1056,6 +1089,9 @@ final class VmSimpleXml
     {
         $map = SimpleXmlRegistry::xpathNamespaces($entry);
         if (SimpleXmlRegistry::isAttributesView($entry)) {
+            // Live attributes views share the element node — read xmlns from that state (#20332).
+            self::collectNamespacesFromNode(SimpleXmlRegistry::state($entry), $map, false);
+
             return $map;
         }
         $nodes = SimpleXmlRegistry::isView($entry) ? SimpleXmlRegistry::view($entry) : [SimpleXmlRegistry::state($entry)];

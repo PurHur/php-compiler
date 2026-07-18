@@ -18,6 +18,14 @@ final class SimpleXmlRegistry
     /** @var array<int, true> */
     private static array $attributeViews = [];
 
+    /**
+     * Namespace filter for live attributes() views (php-src sxe.c; #20332).
+     * null/`''` ns ⇒ unqualified attrs only; non-empty ⇒ URI/prefix filter.
+     *
+     * @var array<int, array{ns: ?string, isPrefix: bool}>
+     */
+    private static array $attributeViewFilters = [];
+
     /** @var array<int, int> */
     private static array $documentKeys = [];
 
@@ -29,6 +37,7 @@ final class SimpleXmlRegistry
         self::$states = [];
         self::$views = [];
         self::$attributeViews = [];
+        self::$attributeViewFilters = [];
         self::$documentKeys = [];
         self::$xpathNamespaces = [];
     }
@@ -49,10 +58,25 @@ final class SimpleXmlRegistry
         }
     }
 
-    public static function attachAttributesView(ObjectEntry $entry, SimpleXmlNodeState $state, ?int $documentKey = null): void
-    {
+    public static function attachAttributesView(
+        ObjectEntry $entry,
+        SimpleXmlNodeState $state,
+        ?int $documentKey = null,
+        ?string $namespaceOrPrefix = null,
+        bool $isPrefix = true
+    ): void {
         self::attach($entry, $state, $documentKey);
         self::$attributeViews[$entry->id] = true;
+        self::$attributeViewFilters[$entry->id] = [
+            'ns' => $namespaceOrPrefix,
+            'isPrefix' => $isPrefix,
+        ];
+    }
+
+    /** @return array{ns: ?string, isPrefix: bool} */
+    public static function attributesViewFilter(ObjectEntry $entry): array
+    {
+        return self::$attributeViewFilters[$entry->id] ?? ['ns' => null, 'isPrefix' => true];
     }
 
     public static function state(ObjectEntry $entry): SimpleXmlNodeState
