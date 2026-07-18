@@ -22,8 +22,7 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
-        // Procedural aliases mirror implemented OOP methods (php-src php_xmlwriter.c; #19514, #20049, #20320).
-        // Remaining stub aliases (start_cdata / start_dtd / write_dtd_* pairs) tracked in #20322.
+        // Procedural aliases mirror implemented OOP methods (php-src php_xmlwriter.c; #19514, #20049, #20320, #20322).
         return [
             new xmlwriter_open_memory(),
             new xmlwriter_open_uri(),
@@ -43,6 +42,8 @@ class Module extends ModuleAbstract
             new xmlwriter_write_element(),
             new xmlwriter_write_element_ns(),
             new xmlwriter_write_cdata(),
+            new xmlwriter_start_cdata(),
+            new xmlwriter_end_cdata(),
             new xmlwriter_write_comment(),
             new xmlwriter_start_comment(),
             new xmlwriter_end_comment(),
@@ -51,6 +52,13 @@ class Module extends ModuleAbstract
             new xmlwriter_start_pi(),
             new xmlwriter_end_pi(),
             new xmlwriter_write_dtd(),
+            new xmlwriter_start_dtd(),
+            new xmlwriter_end_dtd(),
+            new xmlwriter_write_dtd_element(),
+            new xmlwriter_write_dtd_attlist(),
+            new xmlwriter_start_dtd_entity(),
+            new xmlwriter_end_dtd_entity(),
+            new xmlwriter_write_dtd_entity(),
             new xmlwriter_text(),
             new xmlwriter_start_dtd_attlist(),
             new xmlwriter_end_dtd_attlist(),
