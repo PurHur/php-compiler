@@ -17,7 +17,7 @@ try {
     echo "ok method_exists\n";
 }
 try {
-    property_exists(new stdClass, null);
+    property_exists('stdClass', null);
     echo "fail property_exists\n";
 } catch (TypeError $e) {
     echo "ok property_exists\n";
