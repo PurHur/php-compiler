@@ -1940,7 +1940,6 @@ require_once __DIR__.'/../../../ext/standard/JitHtmlEntityDecode.php';
 require_once __DIR__.'/../../../ext/standard/JitHtmlentities.php';
 require_once __DIR__.'/../../../ext/standard/JitHtmlspecialchars.php';
 require_once __DIR__.'/../../../ext/standard/JitHtmlspecialcharsDecode.php';
-require_once __DIR__.'/../../../ext/standard/JitHtmlspecialcharsKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitHttpBuildQuery.php';
 require_once __DIR__.'/../../../ext/standard/JitHttpLastResponseHeaders.php';
 require_once __DIR__.'/../../../ext/standard/JitHttpResponseCode.php';

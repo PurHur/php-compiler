@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Lowered into JIT/AOT modules for htmlspecialchars() runtime (#9445, php-in-PHP).
+ * Lowered into JIT/AOT modules for htmlspecialchars() runtime (#9445, #20487, php-in-PHP).
  *
  * Logic mirrors {@see VmString::htmlspecialchars()} UTF-8 subset (php-src ext/standard/html.c).
- * Self-contained so parseAndCompile() does not depend on compiling all of VmString.php.
+ * Self-contained (no VmString / strlen / ord / substr) so NestedJIT helper units are not
+ * ExternalMethod-stubbed (#16075; peer Bin2hex #20452 / HashEquals #20469).
+ * Length via isset-scan; UTF-8 structural checks via one-byte string range compares.
  */
 final class HtmlspecialcharsJitHelper
 {
@@ -24,7 +26,10 @@ final class HtmlspecialcharsJitHelper
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $entHtml5 = 0 !== ($flags & ENT_HTML5);
         $out = '';
-        $len = \strlen($string);
+        $len = 0;
+        while (isset($string[$len])) {
+            ++$len;
+        }
         for ($i = 0; $i < $len; ++$i) {
             $ch = $string[$i];
             switch ($ch) {
@@ -53,38 +58,18 @@ final class HtmlspecialcharsJitHelper
 
     private static function isValidUtf8(string $string): bool
     {
-        $len = \strlen($string);
-        for ($i = 0; $i < $len; ) {
-            $byte = \ord($string[$i]);
-            if ($byte < 0x80) {
+        $i = 0;
+        while (isset($string[$i])) {
+            $ch = $string[$i];
+            if ($ch <= "\x7F") {
                 ++$i;
                 continue;
             }
-            $need = 0;
-            if (($byte & 0xE0) === 0xC0) {
-                $need = 1;
-                $min = 0x80;
-            } elseif (($byte & 0xF0) === 0xE0) {
-                $need = 2;
-                $min = 0x800;
-            } elseif (($byte & 0xF8) === 0xF0) {
-                $need = 3;
-                $min = 0x10000;
-            } else {
+            $need = self::utf8Need($ch);
+            if (0 === $need) {
                 return false;
             }
-            if ($i + $need >= $len) {
-                return false;
-            }
-            $cp = $byte & (0xFF >> (2 + $need));
-            for ($j = 1; $j <= $need; ++$j) {
-                $next = \ord($string[$i + $j]);
-                if (($next & 0xC0) !== 0x80) {
-                    return false;
-                }
-                $cp = ($cp << 6) | ($next & 0x3F);
-            }
-            if ($cp < $min || ($cp >= 0xD800 && $cp <= 0xDFFF)) {
+            if (!self::utf8TrailValid($string, $i, $need, $ch)) {
                 return false;
             }
             $i += $need + 1;
@@ -96,46 +81,19 @@ final class HtmlspecialcharsJitHelper
     private static function substituteInvalidUtf8(string $string): string
     {
         $out = '';
-        $len = \strlen($string);
-        for ($i = 0; $i < $len; ) {
-            $byte = \ord($string[$i]);
-            if ($byte < 0x80) {
-                $out .= $string[$i];
+        $i = 0;
+        while (isset($string[$i])) {
+            $ch = $string[$i];
+            if ($ch <= "\x7F") {
+                $out .= $ch;
                 ++$i;
                 continue;
             }
-            $need = 0;
-            $valid = true;
-            if (($byte & 0xE0) === 0xC0) {
-                $need = 1;
-                $min = 0x80;
-            } elseif (($byte & 0xF0) === 0xE0) {
-                $need = 2;
-                $min = 0x800;
-            } elseif (($byte & 0xF8) === 0xF0) {
-                $need = 3;
-                $min = 0x10000;
-            } else {
-                $valid = false;
-            }
-            if ($valid && $i + $need < $len) {
-                $cp = $byte & (0xFF >> (2 + $need));
-                for ($j = 1; $j <= $need; ++$j) {
-                    $next = \ord($string[$i + $j]);
-                    if (($next & 0xC0) !== 0x80) {
-                        $valid = false;
-                        break;
-                    }
-                    $cp = ($cp << 6) | ($next & 0x3F);
+            $need = self::utf8Need($ch);
+            if (0 !== $need && self::utf8TrailValid($string, $i, $need, $ch)) {
+                for ($j = 0; $j <= $need; ++$j) {
+                    $out .= $string[$i + $j];
                 }
-                if ($valid && ($cp < $min || ($cp >= 0xD800 && $cp <= 0xDFFF))) {
-                    $valid = false;
-                }
-            } else {
-                $valid = false;
-            }
-            if ($valid) {
-                $out .= \substr($string, $i, $need + 1);
                 $i += $need + 1;
             } else {
                 $out .= "\xEF\xBF\xBD";
@@ -144,5 +102,50 @@ final class HtmlspecialcharsJitHelper
         }
 
         return $out;
+    }
+
+    /** @return int continuation bytes required, or 0 if lead is invalid */
+    private static function utf8Need(string $lead): int
+    {
+        if ($lead >= "\xC2" && $lead <= "\xDF") {
+            return 1;
+        }
+        if ($lead >= "\xE0" && $lead <= "\xEF") {
+            return 2;
+        }
+        if ($lead >= "\xF0" && $lead <= "\xF4") {
+            return 3;
+        }
+
+        return 0;
+    }
+
+    private static function utf8TrailValid(string $string, int $i, int $need, string $lead): bool
+    {
+        for ($j = 1; $j <= $need; ++$j) {
+            if (!isset($string[$i + $j])) {
+                return false;
+            }
+            $next = $string[$i + $j];
+            if ($next < "\x80" || $next > "\xBF") {
+                return false;
+            }
+        }
+        // Overlong / surrogate / out-of-range second-byte windows (php-src utf8 checks).
+        $b1 = $string[$i + 1];
+        if ("\xE0" === $lead && $b1 < "\xA0") {
+            return false;
+        }
+        if ("\xED" === $lead && $b1 > "\x9F") {
+            return false;
+        }
+        if ("\xF0" === $lead && $b1 < "\x90") {
+            return false;
+        }
+        if ("\xF4" === $lead && $b1 > "\x8F") {
+            return false;
+        }
+
+        return true;
     }
 }
