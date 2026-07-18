@@ -83,4 +83,19 @@ final class XsltHostBridge
         }
         $proc->registerPHPFunctions($restrict);
     }
+
+    public static function hasExsltSupport(\XSLTProcessor $proc): bool
+    {
+        return $proc->hasExsltSupport();
+    }
+
+    public static function setSecurityPrefs(\XSLTProcessor $proc, int $securityPrefs): int
+    {
+        return $proc->setSecurityPrefs($securityPrefs);
+    }
+
+    public static function getSecurityPrefs(\XSLTProcessor $proc): int
+    {
+        return $proc->getSecurityPrefs();
+    }
 }

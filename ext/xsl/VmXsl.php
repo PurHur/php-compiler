@@ -58,6 +58,15 @@ final class VmXsl
         $entry->methods['registerphpfunctions'] = new XsltProcessorRegisterPhpFunctions();
         $entry->methodVisibility['registerphpfunctions'] = $pub;
         $entry->methodNames['registerphpfunctions'] = 'registerPHPFunctions';
+        $entry->methods['hasexsltsupport'] = new XsltProcessorHasExsltSupport();
+        $entry->methodVisibility['hasexsltsupport'] = $pub;
+        $entry->methodNames['hasexsltsupport'] = 'hasExsltSupport';
+        $entry->methods['setsecurityprefs'] = new XsltProcessorSetSecurityPrefs();
+        $entry->methodVisibility['setsecurityprefs'] = $pub;
+        $entry->methodNames['setsecurityprefs'] = 'setSecurityPrefs';
+        $entry->methods['getsecurityprefs'] = new XsltProcessorGetSecurityPrefs();
+        $entry->methodVisibility['getsecurityprefs'] = $pub;
+        $entry->methodNames['getsecurityprefs'] = 'getSecurityPrefs';
 
         $ctx->classes[self::CLASS_LC] = $entry;
         $ctx->classes[self::CLASS_LC]->isInternal = true;
@@ -147,6 +156,21 @@ final class VmXsl
             XsltRegistry::processor($entry),
             self::hostRegisterPhpFunctionsRestrict($restrict)
         );
+    }
+
+    public static function hasExsltSupport(ObjectEntry $entry): bool
+    {
+        return XsltHostBridge::hasExsltSupport(XsltRegistry::processor($entry));
+    }
+
+    public static function setSecurityPrefs(ObjectEntry $entry, int $securityPrefs): int
+    {
+        return XsltHostBridge::setSecurityPrefs(XsltRegistry::processor($entry), $securityPrefs);
+    }
+
+    public static function getSecurityPrefs(ObjectEntry $entry): int
+    {
+        return XsltHostBridge::getSecurityPrefs(XsltRegistry::processor($entry));
     }
 
     /**

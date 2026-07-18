@@ -1,0 +1,32 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\xsl;
+
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/** Dispatch XSLTProcessor user-script AOT methods (#20392). */
+final class JitXsltMethod
+{
+    public static function invoke(Context $context, string $methodLc, JITVariable ...$args): Value
+    {
+        $result = match ($methodLc) {
+            'hasexsltsupport' => JitXsltUserScript::tryHasExsltSupport($context, ...$args),
+            'setsecurityprefs' => JitXsltUserScript::trySetSecurityPrefs($context, ...$args),
+            'getsecurityprefs' => JitXsltUserScript::tryGetSecurityPrefs($context, ...$args),
+            default => null,
+        };
+        if (null === $result) {
+            throw new \LogicException(
+                'XSLTProcessor::'.$methodLc.'() user-script AOT requires a tracked host processor'
+                .(('setsecurityprefs' === $methodLc) ? ' and compile-time int prefs' : '')
+                .' (#20392)'
+            );
+        }
+
+        return $result;
+    }
+}
