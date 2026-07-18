@@ -27,6 +27,12 @@ final class VmDomLiving
     /** php-src Dom\TokenList (ext/dom/token_list.c / php_dom.stub.php; #20512). */
     public const CLASS_TOKEN_LIST = 'dom\\tokenlist';
 
+    /** php-src Dom\HTMLCollection (ext/dom/html_collection.c / php_dom.stub.php; #20709). */
+    public const CLASS_HTML_COLLECTION = 'dom\\htmlcollection';
+
+    /** HTML namespace URI (https://html.spec.whatwg.org/#html-namespace). */
+    public const HTML_NS = 'http://www.w3.org/1999/xhtml';
+
     public const CLASS_DOCUMENT = 'dom\\document';
 
     public const CLASS_HTML_DOCUMENT = 'dom\\htmldocument';

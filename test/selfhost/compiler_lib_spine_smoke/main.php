@@ -344,6 +344,7 @@ require_once __DIR__.'/../../../ext/dom/ElementToggleAttribute.php';
 require_once __DIR__.'/../../../ext/dom/FragmentAppendChild.php';
 require_once __DIR__.'/../../../ext/dom/FragmentAppendXML.php';
 require_once __DIR__.'/../../../ext/dom/FragmentConstruct.php';
+require_once __DIR__.'/../../../ext/dom/HtmlCollectionNamedItem.php';
 require_once __DIR__.'/../../../ext/dom/HtmlDocumentCreateEmpty.php';
 require_once __DIR__.'/../../../ext/dom/HtmlDocumentCreateFromFile.php';
 require_once __DIR__.'/../../../ext/dom/HtmlDocumentCreateFromString.php';
