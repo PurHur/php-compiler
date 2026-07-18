@@ -21,6 +21,13 @@ final class Sqlite3Constants
 
     public const BOTH = 3;
 
+    /** SQLite3Stmt::EXPLAIN_MODE_* (php-src; SQLite ≥ 3.43; #20600). */
+    public const EXPLAIN_MODE_PREPARED = 0;
+
+    public const EXPLAIN_MODE_EXPLAIN = 1;
+
+    public const EXPLAIN_MODE_EXPLAIN_QUERY_PLAN = 2;
+
     /** @var array<string, int> */
     public const CLASS_CONSTANTS = [
         'OPEN_READONLY' => self::OPEN_READONLY,
@@ -39,5 +46,19 @@ final class Sqlite3Constants
         'ASSOC' => 'ASSOC',
         'NUM' => 'NUM',
         'BOTH' => 'BOTH',
+    ];
+
+    /** @var array<string, int> Storage keys lowercase (VM class-const lookup). */
+    public const STMT_CLASS_CONSTANTS = [
+        'explain_mode_prepared' => self::EXPLAIN_MODE_PREPARED,
+        'explain_mode_explain' => self::EXPLAIN_MODE_EXPLAIN,
+        'explain_mode_explain_query_plan' => self::EXPLAIN_MODE_EXPLAIN_QUERY_PLAN,
+    ];
+
+    /** @var array<string, string> */
+    public const STMT_CLASS_CONSTANT_NAMES = [
+        'explain_mode_prepared' => 'EXPLAIN_MODE_PREPARED',
+        'explain_mode_explain' => 'EXPLAIN_MODE_EXPLAIN',
+        'explain_mode_explain_query_plan' => 'EXPLAIN_MODE_EXPLAIN_QUERY_PLAN',
     ];
 }

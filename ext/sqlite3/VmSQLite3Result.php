@@ -36,6 +36,7 @@ final class VmSQLite3Result
         $pub = CfgFunc::FLAG_PUBLIC;
         foreach ([
             'fetcharray' => new SQLite3ResultFetchArray(),
+            'fetchall' => new SQLite3ResultFetchAll(),
             'numcolumns' => new SQLite3ResultNumColumns(),
             'columnname' => new SQLite3ResultColumnName(),
             'columntype' => new SQLite3ResultColumnType(),
@@ -46,6 +47,7 @@ final class VmSQLite3Result
             $entry->methodVisibility[$name] = $pub;
         }
         $entry->methodNames['fetcharray'] = 'fetchArray';
+        $entry->methodNames['fetchall'] = 'fetchAll';
         $entry->methodNames['numcolumns'] = 'numColumns';
         $entry->methodNames['columnname'] = 'columnName';
         $entry->methodNames['columntype'] = 'columnType';
@@ -168,6 +170,65 @@ final class SQLite3ResultFetchArray extends SQLite3ResultMethod
         };
         if (null !== $frame->returnVar) {
             VmSQLite3::assignReturnValue($frame->returnVar, $row);
+        }
+    }
+}
+
+/**
+ * php-src zim_SQLite3Result_fetchAll — fetch remaining rows into a list (#20600).
+ */
+final class SQLite3ResultFetchAll extends SQLite3ResultMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fetchAll');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'SQLite3Result::fetchAll()');
+        $st = VmSQLite3Result::state($receiver);
+        if ($st->finalized || null === $st->stmt) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        $mode = Sqlite3Constants::BOTH;
+        if (\count($frame->calledArgs) >= 2) {
+            $mode = $this->intArg($frame->calledArgs[1], 'SQLite3Result::fetchAll', 0, 'mode', Sqlite3Constants::BOTH);
+        }
+        $rows = [];
+        while (true) {
+            $rc = VmSqlite3Native::step($st->stmt);
+            if (VmSqlite3Native::STEP_DONE === $rc) {
+                break;
+            }
+            if (VmSqlite3Native::STEP_ROW !== $rc) {
+                if (null !== $frame->returnVar) {
+                    $frame->returnVar->bool(false);
+                }
+
+                return;
+            }
+            $count = VmSqlite3Native::columnCount($st->stmt);
+            $assoc = [];
+            $num = [];
+            for ($i = 0; $i < $count; ++$i) {
+                $name = VmSqlite3Native::columnName($st->stmt, $i);
+                $value = VmSqlite3Native::columnValueAt($st->stmt, $i);
+                $assoc[$name] = $value;
+                $num[$i] = $value;
+            }
+            $rows[] = match (true) {
+                ($mode & Sqlite3Constants::ASSOC) !== 0 && ($mode & Sqlite3Constants::NUM) !== 0 => $num + $assoc,
+                ($mode & Sqlite3Constants::ASSOC) !== 0 => $assoc,
+                default => $num,
+            };
+        }
+        if (null !== $frame->returnVar) {
+            VmSQLite3::assignReturnValue($frame->returnVar, $rows);
         }
     }
 }

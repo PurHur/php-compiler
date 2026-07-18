@@ -33,6 +33,12 @@ final class VmSQLite3Stmt
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SQLite3Stmt');
         $entry->isInternal = true;
+        foreach (Sqlite3Constants::STMT_CLASS_CONSTANTS as $name => $value) {
+            $const = new Variable(Variable::TYPE_INTEGER);
+            $const->int($value);
+            $entry->constants[$name] = $const;
+            $entry->constNames[$name] = Sqlite3Constants::STMT_CLASS_CONSTANT_NAMES[$name];
+        }
         $pub = CfgFunc::FLAG_PUBLIC;
         foreach ([
             'bindparam' => new SQLite3StmtBindParam(),
@@ -43,6 +49,9 @@ final class VmSQLite3Stmt
             'getsql' => new SQLite3StmtGetSQL(),
             'paramcount' => new SQLite3StmtParamCount(),
             'readonly' => new SQLite3StmtReadOnly(),
+            'busy' => new SQLite3StmtBusy(),
+            'explain' => new SQLite3StmtExplain(),
+            'setexplain' => new SQLite3StmtSetExplain(),
             'reset' => new SQLite3StmtReset(),
         ] as $name => $method) {
             $entry->methods[$name] = $method;
@@ -53,6 +62,7 @@ final class VmSQLite3Stmt
         $entry->methodNames['getsql'] = 'getSQL';
         $entry->methodNames['paramcount'] = 'paramCount';
         $entry->methodNames['readonly'] = 'readOnly';
+        $entry->methodNames['setexplain'] = 'setExplain';
 
         self::$classEntry = $entry;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -468,6 +478,91 @@ final class SQLite3StmtReadOnly extends SQLite3StmtMethod
         $ro = (null !== $st->stmt && !$st->closed) ? VmSqlite3Native::stmtReadonly($st->stmt) : false;
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ro);
+        }
+    }
+}
+
+/** php-src zim_SQLite3Stmt_busy — sqlite3_stmt_busy (#20600). */
+final class SQLite3StmtBusy extends SQLite3StmtMethod
+{
+    public function __construct()
+    {
+        parent::__construct('busy');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'SQLite3Stmt::busy()');
+        $st = VmSQLite3Stmt::state($receiver);
+        $busy = (null !== $st->stmt && !$st->closed) ? VmSqlite3Native::stmtBusy($st->stmt) : false;
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($busy);
+        }
+    }
+}
+
+/**
+ * php-src zim_SQLite3Stmt_explain — returns current explain mode (#20600).
+ * Requires host SQLite ≥ 3.43; otherwise throws Error like php-src Apple fallback.
+ */
+final class SQLite3StmtExplain extends SQLite3StmtMethod
+{
+    public function __construct()
+    {
+        parent::__construct('explain');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'SQLite3Stmt::explain()');
+        $st = VmSQLite3Stmt::state($receiver);
+        if ($st->closed || null === $st->stmt) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->int(0);
+            }
+
+            return;
+        }
+        $mode = VmSqlite3Native::stmtIsExplain($st->stmt);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int($mode);
+        }
+    }
+}
+
+/**
+ * php-src zim_SQLite3Stmt_setExplain — set EXPLAIN / EXPLAIN QUERY PLAN mode (#20600).
+ */
+final class SQLite3StmtSetExplain extends SQLite3StmtMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setExplain');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'SQLite3Stmt::setExplain()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('SQLite3Stmt::setExplain() expects exactly 1 argument, 0 given');
+        }
+        $mode = $this->intArg($frame->calledArgs[1], 'SQLite3Stmt::setExplain', 0, 'mode');
+        if ($mode < 0 || $mode > 2) {
+            throw new \ValueError(
+                'SQLite3Stmt::setExplain(): Argument #1 ($mode) must be one of the SQLite3Stmt::EXPLAIN_MODE_* constants'
+            );
+        }
+        $st = VmSQLite3Stmt::state($receiver);
+        if ($st->closed || null === $st->stmt) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
+        $ok = VmSqlite3Native::stmtExplain($st->stmt, $mode);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
         }
     }
 }
