@@ -33,7 +33,12 @@ final class SimpleXmlElementXpath extends VmClassMethod
             throw new \TypeError('SimpleXMLElement::xpath(): Argument #1 ($path) must be of type string');
         }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->array(VmSimpleXml::xpath($frame->vmContext, $entry, $pathVar->toString()));
+            $result = VmSimpleXml::xpath($frame->vmContext, $entry, $pathVar->toString(), $frame);
+            if (false === $result) {
+                $frame->returnVar->bool(false);
+            } else {
+                $frame->returnVar->array($result);
+            }
         }
     }
 }
