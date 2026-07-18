@@ -303,50 +303,29 @@ final class VmDomXPath
             return $nsPredIds;
         }
 
-        // //tag, //tag[@attr='v'], //tag[n] — positional preds keep element string-value (#19456).
-        if (preg_match(
-            '~^//([*\w][\w:-]*)(?:\[(?:@([^\]=]+)=["\']([^"\']*)["\']|(\d+))\])?$~',
-            $expression,
-            $matches
-        )) {
-            $tag = $matches[1];
-            $attr = isset($matches[2]) && '' !== $matches[2] ? $matches[2] : null;
-            $attrValue = $matches[3] ?? '';
-            $position = isset($matches[4]) && '' !== $matches[4] ? (int) $matches[4] : null;
-            $nodeIds = self::collectDescendantElements($context, $tag, $state->xpathNamespaces);
-            if (null !== $attr) {
-                $nodeIds = array_values(array_filter(
-                    $nodeIds,
-                    static fn (int $id): bool => self::elementAttributeEquals(
-                        DomRegistry::entry($id),
-                        $attr,
-                        $attrValue,
-                        $state->xpathNamespaces
-                    )
-                ));
-            }
-            if (null !== $position) {
-                if ($position < 1 || $position > \count($nodeIds)) {
-                    return [];
-                }
-
-                return [$nodeIds[$position - 1]];
-            }
-
-            return $nodeIds;
+        // //… — descendant axis (node tests + multi-segment //a/b, //a/text(); #20456).
+        // Must run before absolute `/…` — otherwise `//text()` is eaten as `/` + `/text()`.
+        if (str_starts_with($expression, '//')) {
+            return self::evaluateDescendantPath(
+                $context,
+                substr($expression, 2),
+                $state->xpathNamespaces
+            );
         }
 
-        if (preg_match('~^/(.+)$~', $expression, $matches)) {
-            return self::evaluateAbsolutePath($context, $matches[1], $state->xpathNamespaces);
+        // Absolute /… from the document root (#19709).
+        if (str_starts_with($expression, '/')) {
+            return self::evaluateAbsolutePath($context, substr($expression, 1), $state->xpathNamespaces);
         }
 
-        if (preg_match('~^([*\w][\w:-]*)$~', $expression, $matches)) {
-            return self::collectChildElements($context, $matches[1], $state->xpathNamespaces);
+        // Relative multi-segment child path: wrap/a, a/text() (#20456).
+        if (str_contains($expression, '/')) {
+            return self::evaluateChildAxisPath($context, $expression, $state->xpathNamespaces);
         }
 
-        // //text() — all text nodes under context (document when context is doc; #20257).
-        if ('//text()' === $expression) {
-            return self::collectDescendantTextNodes($context, false);
+        // Child axis: tag / * / text() / comment() / node() / processing-instruction() (#20456).
+        if (self::looksLikePathSegment($expression)) {
+            return self::collectMatchingChildren($context, $expression, $state->xpathNamespaces);
         }
 
         throw new \DOMException('Invalid expression');
@@ -385,7 +364,7 @@ final class VmDomXPath
     }
 
     /**
-     * `.//inner` — descendant axis from context (excludes context self for element tests; #20257).
+     * `.//inner` — descendant axis from context (excludes context self for element tests; #20257, #20456).
      *
      * @param array<string, string> $namespaces
      *
@@ -402,98 +381,14 @@ final class VmDomXPath
         if ('' === $inner) {
             throw new \DOMException('Invalid expression');
         }
-        if ('text()' === $inner) {
-            return self::collectDescendantTextNodes($context, true);
-        }
         // .//@attr / .//tag/@attr — attribute axis under context descendants.
         $attrIds = self::tryEvaluateAttributeAxis($ctx, $context, '//'.$inner, $namespaces);
         if (null !== $attrIds) {
-            // //@attr via collectDescendantElements includes context when it matches; exclude
-            // attributes whose owner is the context only when inner is bare @attr? Keep as-is —
-            // .//@id should include attrs on context element (descendant-or-self for attrs).
             return $attrIds;
-        }
-        // .//tag[@a='v'] / .//tag[n] / .//tag / .//*
-        if (preg_match(
-            '~^([*\w][\w:-]*)(?:\[(?:@([^\]=]+)=["\']([^"\']*)["\']|(\d+))\])?$~',
-            $inner,
-            $matches
-        )) {
-            $tag = $matches[1];
-            $attr = isset($matches[2]) && '' !== $matches[2] ? $matches[2] : null;
-            $attrValue = $matches[3] ?? '';
-            $position = isset($matches[4]) && '' !== $matches[4] ? (int) $matches[4] : null;
-            $nodeIds = self::collectDescendantElements($context, $tag, $namespaces);
-            // `.//y` ≡ descendant::y — exclude context even when it matches the tag.
-            $nodeIds = array_values(array_filter(
-                $nodeIds,
-                static fn (int $id): bool => $id !== $context->id
-            ));
-            if (null !== $attr) {
-                $nodeIds = array_values(array_filter(
-                    $nodeIds,
-                    static fn (int $id): bool => self::elementAttributeEquals(
-                        DomRegistry::entry($id),
-                        $attr,
-                        $attrValue,
-                        $namespaces
-                    )
-                ));
-            }
-            if (null !== $position) {
-                if ($position < 1 || $position > \count($nodeIds)) {
-                    return [];
-                }
-
-                return [$nodeIds[$position - 1]];
-            }
-
-            return $nodeIds;
         }
         unset($xpath);
 
-        throw new \DOMException('Invalid expression');
-    }
-
-    /**
-     * Collect text nodes under $context (optionally excluding walking into non-elements first).
-     *
-     * @return list<int>
-     */
-    private static function collectDescendantTextNodes(ObjectEntry $context, bool $descendantsOnly): array
-    {
-        $ids = [];
-        self::collectDescendantTextNodesRecursive($context, $ids, $descendantsOnly ? false : true);
-
-        return $ids;
-    }
-
-    /**
-     * @param list<int> $ids
-     */
-    private static function collectDescendantTextNodesRecursive(
-        ObjectEntry $node,
-        array &$ids,
-        bool $includeSelf
-    ): void {
-        if ($includeSelf && DomRegistry::has($node) && VmDom::isTextNode($node)) {
-            $ids[] = $node->id;
-        }
-        if (!DomRegistry::has($node)) {
-            return;
-        }
-        foreach (DomRegistry::state($node)->childIds as $childId) {
-            $child = DomRegistry::entry($childId);
-            if (null === $child) {
-                continue;
-            }
-            if (VmDom::isTextNode($child)) {
-                $ids[] = $child->id;
-            }
-            if (VmDom::isElement($child)) {
-                self::collectDescendantTextNodesRecursive($child, $ids, false);
-            }
-        }
+        return self::evaluateDescendantPath($context, $inner, $namespaces);
     }
 
     /**
@@ -844,7 +739,7 @@ final class VmDomXPath
     }
 
     /**
-     * Absolute location path from the document root (XPath 1.0 / php-src xpath.c; #19709).
+     * Absolute location path from the document root (XPath 1.0 / php-src xpath.c; #19709, #20456).
      *
      * Leading `/` selects from the document node — not from documentElement as context —
      * so `/r` matches the root element `r`, and `/r/a` walks child axis from there.
@@ -864,27 +759,76 @@ final class VmDomXPath
         if (null === $document || !VmDom::isDocument($document)) {
             return [];
         }
-
-        $segments = [];
-        foreach (explode('/', $path) as $segment) {
-            if ('' !== $segment) {
-                $segments[] = $segment;
-            }
-        }
-        if ([] === $segments) {
+        $path = trim($path);
+        if ('' === $path) {
             return [];
         }
 
-        $currentIds = self::collectChildElements($document, $segments[0], $namespaces);
-        $n = \count($segments);
-        for ($i = 1; $i < $n; ++$i) {
+        return self::evaluateChildAxisPath($document, $path, $namespaces);
+    }
+
+    /**
+     * `//path` — first segment is descendant axis, remaining segments are child (#20456).
+     *
+     * @param array<string, string> $namespaces
+     *
+     * @return list<int>
+     */
+    private static function evaluateDescendantPath(
+        ObjectEntry $context,
+        string $path,
+        array $namespaces
+    ): array {
+        $segments = self::splitLocationPath($path);
+        if ([] === $segments) {
+            throw new \DOMException('Invalid expression');
+        }
+        $currentIds = self::collectMatchingDescendants($context, $segments[0], $namespaces);
+
+        return self::walkChildAxisSegments($currentIds, array_slice($segments, 1), $namespaces);
+    }
+
+    /**
+     * Child-axis location path from $start (absolute from document or relative from context).
+     *
+     * @param array<string, string> $namespaces
+     *
+     * @return list<int>
+     */
+    private static function evaluateChildAxisPath(
+        ObjectEntry $start,
+        string $path,
+        array $namespaces
+    ): array {
+        $segments = self::splitLocationPath($path);
+        if ([] === $segments) {
+            return [];
+        }
+        $currentIds = self::collectMatchingChildren($start, $segments[0], $namespaces);
+
+        return self::walkChildAxisSegments($currentIds, array_slice($segments, 1), $namespaces);
+    }
+
+    /**
+     * @param list<int>             $currentIds
+     * @param list<string>          $segments
+     * @param array<string, string> $namespaces
+     *
+     * @return list<int>
+     */
+    private static function walkChildAxisSegments(
+        array $currentIds,
+        array $segments,
+        array $namespaces
+    ): array {
+        foreach ($segments as $segment) {
             $nextIds = [];
             foreach ($currentIds as $id) {
                 $node = DomRegistry::entry($id);
                 if (null === $node) {
                     continue;
                 }
-                foreach (self::collectChildElements($node, $segments[$i], $namespaces) as $childId) {
+                foreach (self::collectMatchingChildren($node, $segment, $namespaces) as $childId) {
                     $nextIds[] = $childId;
                 }
             }
@@ -895,6 +839,255 @@ final class VmDomXPath
         }
 
         return $currentIds;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function splitLocationPath(string $path): array
+    {
+        $segments = [];
+        foreach (explode('/', $path) as $segment) {
+            if ('' !== $segment) {
+                $segments[] = $segment;
+            }
+        }
+
+        return $segments;
+    }
+
+    private static function looksLikePathSegment(string $expression): bool
+    {
+        if (self::isNodeTypeTestName(self::parsePathSegment($expression)['test'])) {
+            return true;
+        }
+
+        return (bool) preg_match('~^[*\w][\w:-]*(?:\[(?:@[^\]]+|[\d]+)\])?$~', $expression);
+    }
+
+    /**
+     * @return array{test: string, attr: ?string, attrValue: string, position: ?int}
+     */
+    private static function parsePathSegment(string $segment): array
+    {
+        if (preg_match(
+            '~^(.+?)(?:\[(?:@([^\]=]+)=["\']([^"\']*)["\']|(\d+))\])?$~',
+            $segment,
+            $matches
+        )) {
+            return [
+                'test' => $matches[1],
+                'attr' => isset($matches[2]) && '' !== $matches[2] ? $matches[2] : null,
+                'attrValue' => $matches[3] ?? '',
+                'position' => isset($matches[4]) && '' !== $matches[4] ? (int) $matches[4] : null,
+            ];
+        }
+
+        return [
+            'test' => $segment,
+            'attr' => null,
+            'attrValue' => '',
+            'position' => null,
+        ];
+    }
+
+    private static function isNodeTypeTestName(string $test): bool
+    {
+        return 'node()' === $test
+            || 'text()' === $test
+            || 'comment()' === $test
+            || 'processing-instruction()' === $test
+            || (bool) preg_match('~^processing-instruction\(([\'"])([^\'"]*)\1\)$~', $test);
+    }
+
+    /**
+     * XPath `node()` principal node types in a content model (not attr / namespace / document).
+     */
+    private static function isXPathContentNode(ObjectEntry $node): bool
+    {
+        return VmDom::isElement($node)
+            || VmDom::isTextOrCdataNode($node)
+            || VmDom::isCommentNode($node)
+            || VmDom::isProcessingInstruction($node);
+    }
+
+    /**
+     * @param array<string, string> $namespaces
+     */
+    private static function nodeMatchesPathTest(
+        ObjectEntry $node,
+        string $test,
+        array $namespaces
+    ): bool {
+        $test = trim($test);
+        if ('node()' === $test) {
+            return self::isXPathContentNode($node);
+        }
+        if ('text()' === $test) {
+            return VmDom::isTextOrCdataNode($node);
+        }
+        if ('comment()' === $test) {
+            return VmDom::isCommentNode($node);
+        }
+        if ('processing-instruction()' === $test) {
+            return VmDom::isProcessingInstruction($node);
+        }
+        if (preg_match('~^processing-instruction\(([\'"])([^\'"]*)\1\)$~', $test, $matches)) {
+            return VmDom::isProcessingInstruction($node)
+                && DomRegistry::state($node)->nodeName === $matches[2];
+        }
+        if (!VmDom::isElement($node)) {
+            return false;
+        }
+        [$localName, $namespaceUri] = self::resolveQName($test, $namespaces);
+
+        return self::elementMatchesTag($node, $localName, $namespaceUri);
+    }
+
+    /**
+     * Apply optional [@attr='v'] / [n] predicates to a node-id list (#19456, #20456).
+     *
+     * @param list<int>             $nodeIds
+     * @param array<string, string> $namespaces
+     *
+     * @return list<int>
+     */
+    private static function applyPathSegmentPredicates(
+        array $nodeIds,
+        ?string $attr,
+        string $attrValue,
+        ?int $position,
+        array $namespaces
+    ): array {
+        if (null !== $attr) {
+            $nodeIds = array_values(array_filter(
+                $nodeIds,
+                static fn (int $id): bool => self::elementAttributeEquals(
+                    DomRegistry::entry($id),
+                    $attr,
+                    $attrValue,
+                    $namespaces
+                )
+            ));
+        }
+        if (null !== $position) {
+            if ($position < 1 || $position > \count($nodeIds)) {
+                return [];
+            }
+
+            return [$nodeIds[$position - 1]];
+        }
+
+        return $nodeIds;
+    }
+
+    /**
+     * Child axis: nodes matching a path segment under $parent.
+     *
+     * @param array<string, string> $namespaces
+     *
+     * @return list<int>
+     */
+    private static function collectMatchingChildren(
+        ObjectEntry $parent,
+        string $segment,
+        array $namespaces
+    ): array {
+        $parsed = self::parsePathSegment($segment);
+        $ids = [];
+        if (!DomRegistry::has($parent)) {
+            return $ids;
+        }
+        foreach (DomRegistry::state($parent)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            if (self::nodeMatchesPathTest($child, $parsed['test'], $namespaces)) {
+                $ids[] = $child->id;
+            }
+        }
+
+        return self::applyPathSegmentPredicates(
+            $ids,
+            $parsed['attr'],
+            $parsed['attrValue'],
+            $parsed['position'],
+            $namespaces
+        );
+    }
+
+    /**
+     * Descendant axis for the first `//` segment (excludes context element self; #20377/#20456).
+     *
+     * @param array<string, string> $namespaces
+     *
+     * @return list<int>
+     */
+    private static function collectMatchingDescendants(
+        ObjectEntry $context,
+        string $segment,
+        array $namespaces
+    ): array {
+        $parsed = self::parsePathSegment($segment);
+        $test = $parsed['test'];
+        // Fast path: element name / * via existing collectors.
+        if (!self::isNodeTypeTestName($test)) {
+            $ids = self::collectDescendantElements($context, $test, $namespaces);
+
+            return self::applyPathSegmentPredicates(
+                $ids,
+                $parsed['attr'],
+                $parsed['attrValue'],
+                $parsed['position'],
+                $namespaces
+            );
+        }
+        $ids = [];
+        self::collectMatchingDescendantsRecursive($context, $test, $namespaces, $ids, false);
+
+        return self::applyPathSegmentPredicates(
+            $ids,
+            $parsed['attr'],
+            $parsed['attrValue'],
+            $parsed['position'],
+            $namespaces
+        );
+    }
+
+    /**
+     * @param list<int>             $ids
+     * @param array<string, string> $namespaces
+     */
+    private static function collectMatchingDescendantsRecursive(
+        ObjectEntry $node,
+        string $test,
+        array $namespaces,
+        array &$ids,
+        bool $includeSelf
+    ): void {
+        if ($includeSelf && self::nodeMatchesPathTest($node, $test, $namespaces)) {
+            $ids[] = $node->id;
+        }
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            if (self::nodeMatchesPathTest($child, $test, $namespaces)) {
+                $ids[] = $child->id;
+            }
+            // Descend into elements (and document / fragment roots).
+            if (VmDom::isElement($child)
+                || VmDom::isDocument($child)
+                || VmDom::isDocumentFragment($child)
+            ) {
+                self::collectMatchingDescendantsRecursive($child, $test, $namespaces, $ids, false);
+            }
+        }
     }
 
     /**
