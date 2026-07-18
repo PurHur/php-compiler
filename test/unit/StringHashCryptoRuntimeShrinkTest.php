@@ -30,7 +30,10 @@ final class StringHashCryptoRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringContainsString('implementThin', $source);
         $this->assertStringContainsString('StringHashEquals::ensureLinked', $source);
-        $this->assertStringContainsString('JitHashEqualsKernel', (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHashEquals.php'));
+        $equals = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHashEquals.php');
+        $this->assertStringContainsString('HashEqualsJitHelper', $equals);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $equals);
+        $this->assertStringNotContainsString('JitHashEqualsKernel', $equals);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('implementDeferred', $source);
         $this->assertStringNotContainsString('ensureDeferredEqualsStub', $source);

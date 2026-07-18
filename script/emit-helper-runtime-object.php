@@ -190,6 +190,8 @@ if (null !== $unitPath) {
         // NestedJIT of self-contained helper is green; prelinked unit.o still
         // segfaults at c:main_before_php under HELPER_RUNTIME_O (#20452).
         '/ext/standard/Bin2hexJitHelper.php' => true,
+        // Peer always-helper (#20469); keep off HELPER_RUNTIME_O until unit.o green.
+        '/ext/standard/HashEqualsJitHelper.php' => true,
     ];
     file_put_contents($dir.'/manifest.json', json_encode([
         'fingerprint' => HelperRuntimeCache::unitFingerprint($sourceAbs),
