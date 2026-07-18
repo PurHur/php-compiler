@@ -382,6 +382,52 @@ final class VmGd
     }
 
     /**
+     * imageresolution() getter — [res_x, res_y] (php-src ext/gd/gd.c; #20430).
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    public static function getResolution(ObjectEntry $image): ?array
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return null;
+        }
+
+        return [$state->resX, $state->resY];
+    }
+
+    /**
+     * imageresolution() setter — gdImageSetResolution (php-src ext/gd/libgd/gd.c; #20430).
+     * Values of 0 leave that axis unchanged (libgd `if (res > 0)`).
+     */
+    public static function setResolution(ObjectEntry $image, int $resX, int $resY): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        if ($resX > 0) {
+            $state->resX = $resX;
+        }
+        if ($resY > 0) {
+            $state->resY = $resY;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return HashTable indexed [res_x, res_y]
+     */
+    public static function resolutionToHashTable(int $resX, int $resY): HashTable
+    {
+        return self::brectToHashTable([$resX, $resY]);
+    }
+
+    /** UINT_MAX — imageresolution() ValueError upper bound (php-src #20430). */
+    public const RESOLUTION_UINT_MAX = 4294967295;
+
+    /**
      * imagesavealpha() — always true like php-src RETURN_TRUE (#6535).
      */
     public static function setSaveAlpha(ObjectEntry $image, bool $enable): bool
@@ -2712,6 +2758,12 @@ final class VmGd
             'imagelayereffect' => match ($position) {
                 1 => 'image',
                 2 => 'effect',
+                default => 'arg',
+            },
+            'imageresolution' => match ($position) {
+                1 => 'image',
+                2 => 'resolution_x',
+                3 => 'resolution_y',
                 default => 'arg',
             },
             'imagesetthickness' => match ($position) {

@@ -61,6 +61,7 @@ class Module extends ModuleAbstract
             $functions[] = new imagecolorallocatealpha();
             $functions[] = new imagealphablending();
             $functions[] = new imagelayereffect();
+            $functions[] = new imageresolution();
             $functions[] = new imagesavealpha();
             $functions[] = new imageantialias();
             $functions[] = new imagesetthickness();
