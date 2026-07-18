@@ -51,6 +51,22 @@ final class VmCurlNative
     /**
      * @param \FFI\CData $ch CURL*
      */
+    public static function easyReset(\FFI\CData $ch): void
+    {
+        self::requireCurl()->curl_easy_reset($ch);
+    }
+
+    /**
+     * @param \FFI\CData $ch CURL*
+     */
+    public static function easyPause(\FFI\CData $ch, int $bitmask): int
+    {
+        return (int) self::requireCurl()->curl_easy_pause($ch, $bitmask);
+    }
+
+    /**
+     * @param \FFI\CData $ch CURL*
+     */
     public static function easySetoptLong(\FFI\CData $ch, int $option, int $value): int
     {
         return (int) self::requireCurl()->curl_easy_setopt($ch, $option, $value);
@@ -115,6 +131,9 @@ final class VmCurlNative
         if (0 !== $rc || null === $out) {
             return '';
         }
+        if (\is_string($out)) {
+            return $out;
+        }
 
         return (string) \FFI::string($out);
     }
@@ -123,7 +142,7 @@ final class VmCurlNative
     {
         $msg = self::requireCurl()->curl_easy_strerror($code);
 
-        return null === $msg ? '' : (string) \FFI::string($msg);
+        return self::cstringToString($msg);
     }
 
     /**
@@ -203,7 +222,7 @@ final class VmCurlNative
     {
         $msg = self::requireCurl()->curl_multi_strerror($code);
 
-        return null === $msg ? '' : (string) \FFI::string($msg);
+        return self::cstringToString($msg);
     }
 
     /**
@@ -330,6 +349,8 @@ struct curl_slist {
 typedef struct curl_slist curl_slist;
 CURL *curl_easy_init(void);
 void curl_easy_cleanup(CURL *curl);
+void curl_easy_reset(CURL *curl);
+int curl_easy_pause(CURL *curl, int bitmask);
 int curl_easy_setopt(CURL *curl, int option, ...);
 int curl_easy_perform(CURL *curl);
 int curl_easy_getinfo(CURL *curl, int info, ...);
@@ -403,5 +424,18 @@ CDEF;
         }
 
         return \class_exists(\FFI::class, false) || \extension_loaded('ffi');
+    }
+
+    /** @param mixed $ptr const char* from FFI (CData or PHP string depending on PHP/FFI) */
+    private static function cstringToString(mixed $ptr): string
+    {
+        if (null === $ptr) {
+            return '';
+        }
+        if (\is_string($ptr)) {
+            return $ptr;
+        }
+
+        return (string) \FFI::string($ptr);
     }
 }

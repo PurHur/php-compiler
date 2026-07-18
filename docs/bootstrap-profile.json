@@ -147,6 +147,8 @@
         "ext/curl/curl_multi_remove_handle.php",
         "ext/curl/curl_multi_select.php",
         "ext/curl/curl_multi_strerror.php",
+        "ext/curl/curl_pause.php",
+        "ext/curl/curl_reset.php",
         "ext/curl/curl_setopt.php",
         "ext/curl/curl_setopt_array.php",
         "ext/curl/curl_share_close.php",

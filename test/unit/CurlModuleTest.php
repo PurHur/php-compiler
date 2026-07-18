@@ -23,7 +23,7 @@ final class CurlModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['curl_init', 'curl_setopt', 'curl_setopt_array', 'curl_exec', 'curl_getinfo', 'curl_error', 'curl_errno', 'curl_close'] as $fn) {
+        foreach (['curl_init', 'curl_setopt', 'curl_setopt_array', 'curl_exec', 'curl_getinfo', 'curl_error', 'curl_errno', 'curl_close', 'curl_reset', 'curl_pause'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_share_init', 'curl_share_setopt', 'curl_share_close'] as $fn) {
@@ -56,6 +56,8 @@ echo (int) function_exists('curl_init');
 echo (int) function_exists('curl_setopt');
 echo (int) function_exists('curl_exec');
 echo (int) function_exists('curl_close');
+echo (int) function_exists('curl_reset');
+echo (int) function_exists('curl_pause');
 echo (int) function_exists('curl_version');
 echo (int) function_exists('curl_strerror');
 echo (int) function_exists('curl_escape');
@@ -68,10 +70,11 @@ echo (int) defined('CURLOPT_URL');
 echo CURLOPT_URL;
 echo (int) defined('CURLE_OK');
 echo (int) defined('CURLINFO_HTTP_CODE');
+echo (int) defined('CURLPAUSE_ALL');
 PHP;
         $block = $runtime->parseAndCompile($code, 'curl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('11111111111111000211', ob_get_clean());
+        self::assertSame('11111111111111110002111', ob_get_clean());
     }
 }
