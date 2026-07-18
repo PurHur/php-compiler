@@ -134,6 +134,11 @@ final class VmSoapClient
                 $state->connectionTimeout = $timeout;
             }
         }
+        // php-src SoapClient ctor: keep_alive false / long 0 → Connection: close (#20364).
+        if (\array_key_exists('keep_alive', $options)) {
+            $ka = $options['keep_alive'];
+            $state->keepAlive = !(false === $ka || 0 === $ka || '0' === $ka);
+        }
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
@@ -285,7 +290,8 @@ final class VmSoapClient
             $contentEncoding,
             $proxyAuthHeader,
             $useProxy,
-            $state->userAgent
+            $state->userAgent,
+            $state->keepAlive
         );
         if ($state->trace) {
             $state->lastRequestHeaders = $requestHeaders;
@@ -329,7 +335,9 @@ final class VmSoapClient
             throw new \SoapFault('Client', 'SoapClient location is not set');
         }
 
-        $headers = "Content-Type: text/xml; charset=utf-8\r\n".
+        // php-src php_http.c: Connection close vs Keep-Alive (#20364).
+        $headers = ($state->keepAlive ? "Connection: Keep-Alive\r\n" : "Connection: close\r\n").
+            "Content-Type: text/xml; charset=utf-8\r\n".
             'SOAPAction: "'.$action."\"\r\n";
         if ('' !== $acceptEncoding) {
             $headers .= 'Accept-Encoding: '.$acceptEncoding."\r\n";
@@ -696,7 +704,8 @@ final class VmSoapClient
         string $contentEncoding = '',
         string $proxyAuthHeader = '',
         bool $useProxy = false,
-        ?string $userAgent = null
+        ?string $userAgent = null,
+        bool $keepAlive = true
     ): string {
         $path = '/';
         $host = 'localhost';
@@ -711,9 +720,11 @@ final class VmSoapClient
             $path = $location;
         }
 
+        // php-src php_http.c: keep_alive false → Connection: close (#20364).
+        $connection = $keepAlive ? 'Keep-Alive' : 'close';
         $hdr = 'POST '.$path." HTTP/1.1\r\n".
             'Host: '.$host."\r\n".
-            "Connection: Keep-Alive\r\n";
+            'Connection: '.$connection."\r\n";
         // php-src: custom user_agent, else PHP-SOAP/VERSION (#20341).
         if (null !== $userAgent) {
             if ('' !== $userAgent) {
@@ -1194,6 +1205,9 @@ final class SoapClientState
 
     /** php-src _connection_timeout seconds — null means stream default (#20341). */
     public ?int $connectionTimeout = null;
+
+    /** php-src _keep_alive — default true; false → Connection: close (#20364). */
+    public bool $keepAlive = true;
 
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
