@@ -369,6 +369,20 @@ final class VmPDO
         }
     }
 
+    /**
+     * php-src pdo_raise_impl_error() — SQLSTATE + supplemental (#20413).
+     *
+     * IM001 label: "Driver does not support this function" (ext/pdo/pdo_sqlstate.c).
+     */
+    public static function raiseImplError(PdoState $state, string $sqlState, string $supp): void
+    {
+        $label = 'IM001' === $sqlState
+            ? 'Driver does not support this function'
+            : 'General error';
+        $message = 'SQLSTATE['.$sqlState.']: '.$label.': '.$supp;
+        self::raise($state, $message, $sqlState);
+    }
+
     /** Run a sqlite exec and map SQLite3Exception through {@see raise()}. */
     public static function execSql(PdoState $state, \FFI\CData $db, string $sql): void
     {
@@ -671,13 +685,20 @@ final class PDOSetAttribute extends PdoClassMethod
         $attr = $this->intArg($frame->calledArgs[1], 'PDO::setAttribute', 0, 'attribute');
         $value = $this->intArg($frame->calledArgs[2], 'PDO::setAttribute', 1, 'value');
         $state = VmPDO::state($receiver);
+        // php-src pdo_dbh_attribute_set + pdo_sqlite_set_attr (#20413): only a small
+        // PDO-level set is honored on sqlite; ATTR_EMULATE_PREPARES is not sticky.
+        $ok = true;
         if (PdoConstants::ATTR_ERRMODE === $attr) {
             $state->errMode = $value;
         } elseif (PdoConstants::ATTR_DEFAULT_FETCH_MODE === $attr) {
             $state->fetchMode = $value;
+        } else {
+            // sqlite driver set_attr returns false → setAttribute returns false (no IM001
+            // unless the driver method pointer is NULL — pdo_dbh.c fail path).
+            $ok = false;
         }
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(true);
+            $frame->returnVar->bool($ok);
         }
     }
 }
@@ -697,13 +718,32 @@ final class PDOGetAttribute extends PdoClassMethod
         }
         $attr = $this->intArg($frame->calledArgs[1], 'PDO::getAttribute', 0, 'attribute');
         $state = VmPDO::state($receiver);
-        $value = match ($attr) {
-            PdoConstants::ATTR_ERRMODE => $state->errMode,
-            PdoConstants::ATTR_DEFAULT_FETCH_MODE => $state->fetchMode,
-            default => 0,
-        };
+        // php-src PDO::getAttribute generic cases + pdo_sqlite_get_attribute (#20413).
+        if (PdoConstants::ATTR_ERRMODE === $attr) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->int($state->errMode);
+            }
+
+            return;
+        }
+        if (PdoConstants::ATTR_DEFAULT_FETCH_MODE === $attr) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->int($state->fetchMode);
+            }
+
+            return;
+        }
+        if (PdoConstants::ATTR_DRIVER_NAME === $attr) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->string('sqlite');
+            }
+
+            return;
+        }
+        // ATTR_EMULATE_PREPARES and other unsupported attrs → IM001 (pdo_dbh.c).
+        VmPDO::raiseImplError($state, 'IM001', 'driver does not support that attribute');
         if (null !== $frame->returnVar) {
-            $frame->returnVar->int($value);
+            $frame->returnVar->bool(false);
         }
     }
 }
