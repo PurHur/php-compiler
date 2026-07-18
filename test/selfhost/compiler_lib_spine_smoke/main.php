@@ -5765,4 +5765,5 @@ require_once __DIR__.'/../../../ext/posix/posix_eaccess.php';
 require_once __DIR__.'/../../../ext/posix/posix_fpathconf.php';
 require_once __DIR__.'/../../../ext/posix/posix_pathconf.php';
 require_once __DIR__.'/../../../ext/posix/posix_sysconf.php';
+require_once __DIR__.'/../../../ext/gmp/gmp_binomial.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
