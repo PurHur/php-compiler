@@ -27,13 +27,14 @@ final class simplexml_load_file extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('simplexml_load_file() requires VM context');
         }
-        $filename = VmString::coercePathBuiltinArg(
+        // Z_PARAM_PATH $filename — null TypeError on PROFILE=8.4 (re-#19055 / #20352); soft-null on older.
+        $filename = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'simplexml_load_file',
             0,
-            'filename',
-            true
+            'filename'
         );
+        VmString::rejectNullByteBuiltinStringArg($filename, 'simplexml_load_file', 0, 'filename');
         $entry = VmSimpleXml::loadFile($frame->vmContext, $filename, $frame);
         if (null !== $frame->returnVar) {
             if (null === $entry) {
