@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5546 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15839 |
+| Source constructs flagged (warnings) | 15860 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -949,7 +949,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/Module.php` | 0 | 2 |
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
-| `ext/pdo/VmPDO.php` | 0 | 43 |
+| `ext/pdo/VmPDO.php` | 0 | 44 |
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/phar/BuiltinClasses.php` | 0 | 10 |
@@ -3733,7 +3733,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/yaml/yaml_parse_file.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/Module.php` | 0 | 9 |
-| `ext/zip/VmZipArchive.php` | 0 | 56 |
+| `ext/zip/VmZipArchive.php` | 0 | 65 |
 | `ext/zip/VmZipProcedural.php` | 0 | 1 |
 | `ext/zip/VmZipResourceArg.php` | 0 | 1 |
 | `ext/zip/ZipArchiveAddFile.php` | 0 | 2 |
@@ -3743,7 +3743,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipArchiveConstruct.php` | 0 | 1 |
 | `ext/zip/ZipArchiveExtractTo.php` | 0 | 2 |
 | `ext/zip/ZipArchiveGetFromName.php` | 0 | 2 |
-| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 38 |
+| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 49 |
 | `ext/zip/ZipArchiveOpen.php` | 0 | 2 |
 | `ext/zip/ZipClassMethod.php` | 0 | 1 |
 | `ext/zip/ZipEngine.php` | 0 | 1 |
@@ -12131,47 +12131,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 40)
-- new Variable (line 43)
-- new PDOConstruct (line 50)
-- new PDOExec (line 55)
-- new PDOPrepare (line 56)
-- new PDOQuery (line 57)
-- new PDOSetAttribute (line 58)
-- new PDOGetAttribute (line 59)
-- new PDOGetAvailableDrivers (line 60)
-- new PDOLastInsertId (line 61)
-- new PDOQuote (line 62)
-- new PDOBeginTransaction (line 63)
-- new PDOCommit (line 64)
-- new PDORollBack (line 65)
-- new PDOInTransaction (line 66)
-- new PDOErrorCode (line 67)
-- new PDOErrorInfo (line 68)
-- new PDOSqliteCreateFunction (line 69)
-- new PDOSqliteCreateAggregate (line 70)
-- new HashTable (line 97)
-- new Variable (line 99)
-- new PDOException (line 119)
-- new PDOException (line 125)
-- new PdoState (line 127)
-- new PDOException (line 149)
-- new PDOException (line 158)
-- new PDOException (line 185)
-- new HashTable (line 233)
-- new Variable (line 235)
-- new ArgumentCountError (line 296)
-- new ArgumentCountError (line 323)
-- new ArgumentCountError (line 360)
-- new ArgumentCountError (line 397)
-- new ArgumentCountError (line 449)
-- new ArgumentCountError (line 478)
-- new ArgumentCountError (line 542)
-- new HashTable (line 691)
-- new Variable (line 692)
-- new Variable (line 695)
-- new Variable (line 702)
-- new ArgumentCountError (line 725)
-- new ArgumentCountError (line 778)
+- new Variable (line 44)
+- new Variable (line 47)
+- new PDOConstruct (line 55)
+- new PDOExec (line 60)
+- new PDOPrepare (line 61)
+- new PDOQuery (line 62)
+- new PDOSetAttribute (line 63)
+- new PDOGetAttribute (line 64)
+- new PDOGetAvailableDrivers (line 65)
+- new PDOLastInsertId (line 66)
+- new PDOQuote (line 67)
+- new PDOBeginTransaction (line 68)
+- new PDOCommit (line 69)
+- new PDORollBack (line 70)
+- new PDOInTransaction (line 71)
+- new PDOErrorCode (line 72)
+- new PDOErrorInfo (line 73)
+- new PDOSqliteCreateFunction (line 74)
+- new PDOSqliteCreateAggregate (line 75)
+- new HashTable (line 102)
+- new Variable (line 104)
+- new PDOException (line 124)
+- new PDOException (line 130)
+- new PdoState (line 132)
+- new PDOException (line 154)
+- new PDOException (line 163)
+- new PDOException (line 190)
+- new HashTable (line 238)
+- new Variable (line 240)
+- new ArgumentCountError (line 301)
+- new ArgumentCountError (line 328)
+- new ArgumentCountError (line 365)
+- new ArgumentCountError (line 402)
+- new ArgumentCountError (line 454)
+- new ArgumentCountError (line 483)
+- new ArgumentCountError (line 547)
+- new HashTable (line 696)
+- new Variable (line 697)
+- new Variable (line 700)
+- new Variable (line 707)
+- new ArgumentCountError (line 730)
+- new ArgumentCountError (line 783)
 - 31 class method(s)
 
 ### `ext/pdo/VmPDOStatement.php`
@@ -30977,11 +30978,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ZipArchiveGetCommentIndex (line 116)
 - new ZipArchiveSetArchiveComment (line 117)
 - new ZipArchiveGetArchiveComment (line 118)
-- new ZipArchiveState (line 134)
-- new Variable (line 822)
-- new Variable (line 837)
-- new Variable (line 852)
-- 63 class method(s)
+- new ZipArchiveUnchangeAll (line 120)
+- new ZipArchiveUnchangeArchive (line 121)
+- new ZipArchiveUnchangeIndex (line 122)
+- new ZipArchiveUnchangeName (line 123)
+- new ZipArchiveReplaceFile (line 124)
+- new ZipArchiveAddGlob (line 125)
+- new ZipArchiveAddPattern (line 126)
+- new ZipArchiveIsWritable (line 128)
+- new ZipArchiveSetReadOnly (line 129)
+- new ZipArchiveState (line 145)
+- new Variable (line 856)
+- new Variable (line 871)
+- new Variable (line 886)
+- 77 class method(s)
 
 ### `ext/zip/VmZipProcedural.php`
 
@@ -31072,7 +31082,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 1148)
 - new ArgumentCountError (line 1181)
 - new ArgumentCountError (line 1214)
-- 40 class method(s)
+- new ArgumentCountError (line 1269)
+- new ArgumentCountError (line 1293)
+- new ArgumentCountError (line 1317)
+- new ArgumentCountError (line 1339)
+- new ArgumentCountError (line 1364)
+- new ArgumentCountError (line 1402)
+- new HashTable (line 1483)
+- new Variable (line 1485)
+- new ArgumentCountError (line 1508)
+- new ArgumentCountError (line 1536)
+- new ArgumentCountError (line 1562)
+- 51 class method(s)
 
 ### `ext/zip/ZipArchiveOpen.php`
 

@@ -19,6 +19,9 @@ final class ZipArchiveState
 
     public bool $dirty = false;
 
+    /** Archive AFL_RDONLY / setReadOnly (#20412). */
+    public bool $readOnly = false;
+
     /** Default archive password for setEncryptionName / decrypt (#19873). */
     public string $password = '';
 

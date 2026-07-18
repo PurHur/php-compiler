@@ -71,6 +71,9 @@ final class ZipArchiveConstants
 
     public const ER_DELETED = 23;
 
+    /** Read-only archive — libzip ZIP_ER_RDONLY / php-src ZipArchive::ER_RDONLY (#20412). */
+    public const ER_RDONLY = 25;
+
     /** Encryption methods — libzip ZIP_EM_* / php-src ZipArchive::EM_* (#19873). */
     public const EM_NONE = 0;
 
@@ -249,6 +252,7 @@ final class ZipArchiveConstants
         'er_incons' => self::ER_INCONS,
         'er_remove' => self::ER_REMOVE,
         'er_deleted' => self::ER_DELETED,
+        'er_rdonly' => self::ER_RDONLY,
     ];
 
     /** @var array<string, string> lowercase key => php-src constant casing */
@@ -330,6 +334,7 @@ final class ZipArchiveConstants
         'er_incons' => 'ER_INCONS',
         'er_remove' => 'ER_REMOVE',
         'er_deleted' => 'ER_DELETED',
+        'er_rdonly' => 'ER_RDONLY',
     ];
 
     public static function statusString(int $code): string
@@ -359,6 +364,7 @@ final class ZipArchiveConstants
             self::ER_INCONS => 'Zip archive inconsistent',
             self::ER_REMOVE => 'Can\'t remove file',
             self::ER_DELETED => 'Entry has been deleted',
+            self::ER_RDONLY => 'Read-only archive',
             default => 'Unknown status ' . $code,
         };
     }
