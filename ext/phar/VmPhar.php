@@ -21,6 +21,19 @@ final class VmPhar
 
     public const COMPRESSED_BZ2 = 0x00002000;
 
+    /** Startup {@code -d phar.readonly=} override (bin/vm.php −d → VmIni::applyStartupIniOverride). */
+    private static ?bool $startupReadonly = null;
+
+    public static function setStartupReadonly(?bool $readonly): void
+    {
+        self::$startupReadonly = $readonly;
+    }
+
+    public static function startupReadonly(): ?bool
+    {
+        return self::$startupReadonly;
+    }
+
     /**
      * Resolve archive path from SCRIPT_FILENAME / phar:// URI (#3436).
      */
@@ -44,9 +57,14 @@ final class VmPhar
 
     /**
      * Phar::canWrite() — !PHAR_G(readonly); default phar.readonly=1 (phar.c PHP_INI).
+     *
+     * Honors {@code php bin/vm.php -d phar.readonly=0} via startup override (#20628), then host ini_get.
      */
     public static function canWrite(): bool
     {
+        if (null !== self::$startupReadonly) {
+            return !self::$startupReadonly;
+        }
         $raw = \ini_get('phar.readonly');
         if (false === $raw || '' === $raw) {
             // Zend default when unset in this build is still readonly-on for CLI packages.
