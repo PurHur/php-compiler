@@ -9074,12 +9074,11 @@ class JIT {
                             $builder->branch($mergeBb);
                         }
                         $builder->positionAtEnd($mergeBb);
-                        // Refresh inherited locals after ?? (#866). IncludeBindingEmitHelper skips
-                        // in-flight coalesceAssignTargets (e.g. $scriptBase) so MiniWebApp AOT
-                        // does not munmap (#20507).
-                        if ($this->context->inlineIncludeDepth > 0) {
-                            JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
-                        }
+                        // Do not full-frame refresh at ?? merge: even with coalesceAssignTargets
+                        // skips, MiniWebApp AOT still sees intermittent free()/munmap on
+                        // $scriptBase (#20507). Echo/ARG_SEND refresh restores inherited locals
+                        // when those operands are used (#866); echo also refreshes when the live
+                        // variable still carries includeBinding (OperandName may be null).
                         $mergeLimit = JIT\CoalesceHelper::mergeBlockOpcodeLimit($op->block3);
                         $savedSynthetic = $op->block3->syntheticCfgBranch ?? false;
                         if (null !== $mergeLimit && $mergeLimit < $op->block3->nOpCodes) {
@@ -9141,10 +9140,7 @@ class JIT {
                             $builder->branch($mergeBb);
                         }
                         $builder->positionAtEnd($mergeBb);
-                        // Mirror ?? : refresh inherited locals; skip in-flight assign targets (#20507).
-                        if ($this->context->inlineIncludeDepth > 0) {
-                            JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
-                        }
+                        // Mirror ?? : skip full-frame include-binding refresh at ?-> merge (#20507).
                         $mergeLimit = JIT\CoalesceHelper::mergeBlockOpcodeLimit($op->block3);
                         $savedSynthetic = $op->block3->syntheticCfgBranch ?? false;
                         if (null !== $mergeLimit && $mergeLimit < $op->block3->nOpCodes) {
@@ -9691,9 +9687,23 @@ class JIT {
                             ?? $block->getOperand($sendSlotPeek);
                         $sendName = null !== $sendOpPeek ? JIT\OperandName::resolve($sendOpPeek) : null;
                         // Refresh inherited locals before calls that read them after ?? (#866).
-                        // Do not refresh when sending post-include locals ($scriptBase): full-frame
-                        // restore was corrupting those string slots (MiniWebApp munmap, #20507).
-                        if (JIT\IncludeBindingEmitHelper::refreshFrameDeclaresName($this->context, $sendName)) {
+                        // Also refresh when the live variable is still an include-binding even if
+                        // OperandName is null on a Temporary wrapper. Skip post-include locals
+                        // like $scriptBase (#20507).
+                        $sendNeedsRefresh = JIT\IncludeBindingEmitHelper::refreshFrameDeclaresName(
+                            $this->context,
+                            $sendName
+                        );
+                        if (
+                            !$sendNeedsRefresh
+                            && null !== $sendOpPeek
+                            && $this->context->hasVariableOp($sendOpPeek)
+                        ) {
+                            $sendVarPeek = $this->context->getVariableFromOp($sendOpPeek);
+                            $sendNeedsRefresh = $sendVarPeek->includeBinding
+                                && !$this->context->coalesceAssignTargets->contains($sendOpPeek);
+                        }
+                        if ($sendNeedsRefresh) {
                             JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                         }
                     }
