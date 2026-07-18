@@ -6549,13 +6549,23 @@ final class VmDom
     }
 
     /**
-     * @return list<int> matching element object ids in document order (php-src dom_document_get_elements_by_tag_name)
+     * Matching element object ids in document order (php-src ext/dom/nodelist.c).
+     *
+     * Document-rooted walks include every matching element under the document.
+     * Element-rooted walks are descendants-only (context element excluded), matching
+     * DOMElement::getElementsByTagName* (#20377).
+     *
+     * @return list<int>
      */
     public static function collectElementsByTagName(ObjectEntry $node, string $tagName): array
     {
         $matches = [];
         $want = '*' === $tagName ? null : $tagName;
-        self::collectElementsByTagNameRecursive($node, $want, $matches);
+        if (self::isElement($node)) {
+            self::collectElementsByTagNameFromChildren($node, $want, $matches);
+        } else {
+            self::collectElementsByTagNameRecursive($node, $want, $matches);
+        }
 
         return $matches;
     }
@@ -6563,12 +6573,8 @@ final class VmDom
     public static function getElementsByTagName(Context $ctx, ObjectEntry $document, string $tagName): Variable
     {
         self::ensureDocument($document);
-        $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $rootVar->type) {
-            return self::createNodeList($ctx, []);
-        }
 
-        return self::getElementsByTagNameFromNode($ctx, $rootVar->toObject(), $tagName);
+        return self::createLiveTagNameNodeList($ctx, $document, $tagName);
     }
 
     public static function getElementsByTagNameFromNode(
@@ -6584,7 +6590,10 @@ final class VmDom
     }
 
     /**
-     * @return list<int> matching element object ids in document order (php-src dom_document_get_elements_by_tag_name_ns)
+     * Matching element object ids in document order (php-src ext/dom/nodelist.c NS).
+     * Element-rooted: descendants only (#20377).
+     *
+     * @return list<int>
      */
     public static function collectElementsByTagNameNS(
         ObjectEntry $node,
@@ -6592,7 +6601,11 @@ final class VmDom
         string $localName
     ): array {
         $matches = [];
-        self::collectElementsByTagNameNSRecursive($node, $namespaceUri, $localName, $matches);
+        if (self::isElement($node)) {
+            self::collectElementsByTagNameNSFromChildren($node, $namespaceUri, $localName, $matches);
+        } else {
+            self::collectElementsByTagNameNSRecursive($node, $namespaceUri, $localName, $matches);
+        }
 
         return $matches;
     }
@@ -6604,12 +6617,8 @@ final class VmDom
         string $localName
     ): Variable {
         self::ensureDocument($document);
-        $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $rootVar->type) {
-            return self::createNodeList($ctx, []);
-        }
 
-        return self::getElementsByTagNameNSFromNode($ctx, $rootVar->toObject(), $namespaceUri, $localName);
+        return self::createLiveTagNameNSNodeList($ctx, $document, $namespaceUri, $localName);
     }
 
     public static function getElementsByTagNameNSFromNode(
@@ -7700,6 +7709,25 @@ final class VmDom
     /**
      * @param list<int> $matches
      */
+    private static function collectElementsByTagNameFromChildren(
+        ObjectEntry $node,
+        ?string $want,
+        array &$matches
+    ): void {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::collectElementsByTagNameRecursive($child, $want, $matches);
+            }
+        }
+    }
+
+    /**
+     * @param list<int> $matches
+     */
     private static function collectElementsByTagNameRecursive(
         ObjectEntry $node,
         ?string $want,
@@ -7711,13 +7739,25 @@ final class VmDom
                 $matches[] = $node->id;
             }
         }
+        self::collectElementsByTagNameFromChildren($node, $want, $matches);
+    }
+
+    /**
+     * @param list<int> $matches
+     */
+    private static function collectElementsByTagNameNSFromChildren(
+        ObjectEntry $node,
+        string $namespaceUri,
+        string $localName,
+        array &$matches
+    ): void {
         if (!DomRegistry::has($node)) {
             return;
         }
         foreach (DomRegistry::state($node)->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                self::collectElementsByTagNameRecursive($child, $want, $matches);
+                self::collectElementsByTagNameNSRecursive($child, $namespaceUri, $localName, $matches);
             }
         }
     }
@@ -7740,15 +7780,7 @@ final class VmDom
                 $matches[] = $node->id;
             }
         }
-        if (!DomRegistry::has($node)) {
-            return;
-        }
-        foreach (DomRegistry::state($node)->childIds as $childId) {
-            $child = DomRegistry::entry($childId);
-            if (null !== $child) {
-                self::collectElementsByTagNameNSRecursive($child, $namespaceUri, $localName, $matches);
-            }
-        }
+        self::collectElementsByTagNameNSFromChildren($node, $namespaceUri, $localName, $matches);
     }
 
     public static function isDomNode(ObjectEntry $entry): bool

@@ -297,5 +297,5 @@ For **009-FastCGIWeb**, the benchmark row is omitted until `phpc lint --all exam
 |    006-FileUploadWeb |         0.00870 |         0.16485 |         0.27495 |             n/a |             n/a |
 |        007-ThrowsWeb |         0.00865 |         0.16456 |         0.16525 |             n/a |             n/a |
 |    008-SelfHostProbe |         0.00902 |         0.16125 |         0.16047 |         1.00328 |         0.00159 |
-|       009-FastCGIWeb |         0.00841 |         0.16516 |         0.16457 |         1.23404 |         0.00151 |
+|       009-FastCGIWeb |         0.00841 |         0.16516 |         0.16457 |             n/a |             n/a |
 <!-- benchmark table end -->

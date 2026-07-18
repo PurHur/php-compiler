@@ -1,5 +1,5 @@
 {
-    "scanned": 5171,
+    "scanned": 5544,
     "top": 50,
     "rows": [
         {
@@ -55,15 +55,6 @@
             ],
             "issue": null,
             "rank": 6
-        },
-        {
-            "message": "Unknown type declaration found: PHPCompiler\\OpCode[]",
-            "file_count": 1,
-            "examples": [
-                "lib/Compiler.php"
-            ],
-            "issue": null,
-            "rank": 7
         }
     ],
     "source": "live"
