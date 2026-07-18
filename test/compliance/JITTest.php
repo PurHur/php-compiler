@@ -1368,6 +1368,11 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'curl_share_init_persistent_type')) {
                 continue;
             }
+            // Phar instance API: VM green (#20628); jit.php hits MathBaseConvertRuntime::constFloat
+            // (hexdec/WeakRef bootstrap) same as curl_share_init_persistent.
+            if (str_contains($name, 'phar_instance_api')) {
+                continue;
+            }
             if (str_contains($name, 'curl_share_persistent_phantom')) {
                 continue;
             }

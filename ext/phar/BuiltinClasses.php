@@ -19,6 +19,7 @@ final class BuiltinClasses
     public static function register(Context $ctx): void
     {
         self::registerPhar($ctx);
+        PharBuiltin::registerInstanceMethods($ctx);
         PharDataBuiltin::register($ctx);
         VmPharFileInfo::register($ctx);
     }
@@ -26,7 +27,8 @@ final class BuiltinClasses
     public static function registerPhar(Context $ctx): void
     {
         if (isset($ctx->classes[VmPhar::CLASS_LC])
-            && isset($ctx->classes[VmPhar::CLASS_LC]->methods['canwrite'])) {
+            && isset($ctx->classes[VmPhar::CLASS_LC]->methods['canwrite'])
+            && isset($ctx->classes[VmPhar::CLASS_LC]->methods['addfromstring'])) {
             return;
         }
 

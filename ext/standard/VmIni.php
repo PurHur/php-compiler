@@ -431,6 +431,11 @@ final class VmIni
 
             return true;
         }
+        if ('phar.readonly' === $key) {
+            \PHPCompiler\ext\phar\VmPhar::setStartupReadonly(self::parseBoolIni($value));
+
+            return true;
+        }
 
         return false;
     }

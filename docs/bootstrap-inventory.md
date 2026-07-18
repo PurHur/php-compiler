@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5756 |
-| Phase A inventory files (M2 ratio SSOT) | 5756 |
+| PHP files on vm.php path | 5758 |
+| Phase A inventory files (M2 ratio SSOT) | 5758 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16642 |
+| Source constructs flagged (warnings) | 16679 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1138,9 +1138,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/pg_untrace.php` | 0 | 2 |
 | `ext/phar/BuiltinClasses.php` | 0 | 10 |
 | `ext/phar/Module.php` | 0 | 1 |
+| `ext/phar/PharBuiltin.php` | 0 | 17 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 15 |
 | `ext/phar/PharExtensionPolicy.php` | 0 | 1 |
 | `ext/phar/VmPhar.php` | 0 | 1 |
+| `ext/phar/VmPharArchive.php` | 0 | 20 |
 | `ext/phar/VmPharData.php` | 0 | 29 |
 | `ext/phar/VmPharFileInfo.php` | 0 | 6 |
 | `ext/phar/VmPharTar.php` | 0 | 1 |
@@ -13777,14 +13779,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 34)
-- new PharRunning (line 37)
-- new PharCanWrite (line 41)
-- new PharCanCompress (line 45)
-- new PharApiVersion (line 49)
-- new PharIsValidPharFilename (line 53)
-- new Variable (line 62)
-- new ArgumentCountError (line 145)
+- new ClassEntry (line 36)
+- new PharRunning (line 39)
+- new PharCanWrite (line 43)
+- new PharCanCompress (line 47)
+- new PharApiVersion (line 51)
+- new PharIsValidPharFilename (line 55)
+- new Variable (line 64)
+- new ArgumentCountError (line 147)
 - 6 class method(s)
 - 8 closure(s)
 
@@ -13792,6 +13794,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/phar/PharBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new PharConstruct (line 36)
+- new ArgumentCountError (line 79)
+- new ArgumentCountError (line 95)
+- new ArgumentCountError (line 113)
+- new ArgumentCountError (line 129)
+- new ArgumentCountError (line 149)
+- new ArgumentCountError (line 170)
+- new UnexpectedValueException (line 188)
+- new ArgumentCountError (line 204)
+- new ArgumentCountError (line 223)
+- new ArgumentCountError (line 254)
+- new ArgumentCountError (line 309)
+- new ArgumentCountError (line 335)
+- new ArgumentCountError (line 351)
+- new ArgumentCountError (line 371)
+- new ArgumentCountError (line 388)
+- 21 class method(s)
 
 ### `ext/phar/PharDataBuiltin.php`
 
@@ -13820,7 +13843,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/phar/VmPhar.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 10 class method(s)
+
+### `ext/phar/VmPharArchive.php`
+
+**Warnings** (review for bootstrap subset):
+- new UnexpectedValueException (line 61)
+- new UnexpectedValueException (line 71)
+- new UnexpectedValueException (line 83)
+- new UnexpectedValueException (line 95)
+- new UnexpectedValueException (line 107)
+- new UnexpectedValueException (line 120)
+- new UnexpectedValueException (line 124)
+- new UnexpectedValueException (line 138)
+- new RecursiveIteratorIterator (line 141)
+- new RecursiveDirectoryIterator (line 142)
+- new UnexpectedValueException (line 225)
+- new BadMethodCallException (line 282)
+- new BadMethodCallException (line 306)
+- new BadMethodCallException (line 309)
+- new Variable (line 311)
+- new Error (line 357)
+- new UnexpectedValueException (line 391)
+- new UnexpectedValueException (line 406)
+- new Error (line 437)
+- 29 class method(s)
 
 ### `ext/phar/VmPharData.php`
 
@@ -24324,12 +24371,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 801)
-- new HashTable (line 808)
-- new Variable (line 819)
-- new Variable (line 923)
-- new Variable (line 931)
-- new Variable (line 939)
+- new HashTable (line 806)
+- new HashTable (line 813)
+- new Variable (line 824)
+- new Variable (line 928)
+- new Variable (line 936)
+- new Variable (line 944)
 - 57 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
@@ -35353,7 +35400,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GethostbynamelRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 175)
+- new JIT (line 183)
 - 8 class method(s)
 - 1 closure(s)
 
