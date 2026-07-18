@@ -67,6 +67,23 @@ class Module extends ModuleAbstract
             new gmp_random_range(),
             new gmp_import(),
             new gmp_export(),
+            new gmp_sign(),
+            new gmp_prob_prime(),
+            new gmp_nextprime(),
+            new gmp_invert(),
+            new gmp_jacobi(),
+            new gmp_legendre(),
+            new gmp_gcdext(),
+            new gmp_root(),
+            new gmp_rootrem(),
+            new gmp_perfect_power(),
+            new gmp_testbit(),
+            new gmp_setbit(),
+            new gmp_clrbit(),
+            new gmp_scan0(),
+            new gmp_scan1(),
+            new gmp_popcount(),
+            new gmp_hamdist(),
         ];
     }
 }

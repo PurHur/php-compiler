@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5546 |
-| Phase A inventory files (M2 ratio SSOT) | 5546 |
+| PHP files on vm.php path | 5563 |
+| Phase A inventory files (M2 ratio SSOT) | 5563 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15839 |
+| Source constructs flagged (warnings) | 15910 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -527,12 +527,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gettext/textdomain.php` | 0 | 2 |
 | `ext/gmp/GmpFunction.php` | 0 | 1 |
 | `ext/gmp/GmpToString.php` | 0 | 1 |
-| `ext/gmp/Module.php` | 0 | 32 |
-| `ext/gmp/VmGmp.php` | 0 | 5 |
+| `ext/gmp/Module.php` | 0 | 49 |
+| `ext/gmp/VmGmp.php` | 0 | 6 |
 | `ext/gmp/VmGmpObject.php` | 0 | 7 |
 | `ext/gmp/gmp_abs.php` | 0 | 2 |
 | `ext/gmp/gmp_add.php` | 0 | 2 |
 | `ext/gmp/gmp_and.php` | 0 | 2 |
+| `ext/gmp/gmp_clrbit.php` | 0 | 2 |
 | `ext/gmp/gmp_cmp.php` | 0 | 2 |
 | `ext/gmp/gmp_com.php` | 0 | 2 |
 | `ext/gmp/gmp_div_q.php` | 0 | 2 |
@@ -541,24 +542,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gmp/gmp_export.php` | 0 | 2 |
 | `ext/gmp/gmp_fact.php` | 0 | 2 |
 | `ext/gmp/gmp_gcd.php` | 0 | 2 |
+| `ext/gmp/gmp_gcdext.php` | 0 | 3 |
+| `ext/gmp/gmp_hamdist.php` | 0 | 2 |
 | `ext/gmp/gmp_import.php` | 0 | 2 |
 | `ext/gmp/gmp_init.php` | 0 | 2 |
 | `ext/gmp/gmp_intval.php` | 0 | 2 |
+| `ext/gmp/gmp_invert.php` | 0 | 2 |
+| `ext/gmp/gmp_jacobi.php` | 0 | 2 |
 | `ext/gmp/gmp_lcm.php` | 0 | 2 |
+| `ext/gmp/gmp_legendre.php` | 0 | 2 |
 | `ext/gmp/gmp_mod.php` | 0 | 2 |
 | `ext/gmp/gmp_mul.php` | 0 | 2 |
 | `ext/gmp/gmp_neg.php` | 0 | 2 |
+| `ext/gmp/gmp_nextprime.php` | 0 | 2 |
 | `ext/gmp/gmp_or.php` | 0 | 2 |
+| `ext/gmp/gmp_perfect_power.php` | 0 | 2 |
 | `ext/gmp/gmp_perfect_square.php` | 0 | 2 |
+| `ext/gmp/gmp_popcount.php` | 0 | 2 |
 | `ext/gmp/gmp_pow.php` | 0 | 2 |
 | `ext/gmp/gmp_powm.php` | 0 | 2 |
+| `ext/gmp/gmp_prob_prime.php` | 0 | 2 |
 | `ext/gmp/gmp_random_bits.php` | 0 | 2 |
 | `ext/gmp/gmp_random_range.php` | 0 | 2 |
 | `ext/gmp/gmp_random_seed.php` | 0 | 2 |
+| `ext/gmp/gmp_root.php` | 0 | 2 |
+| `ext/gmp/gmp_rootrem.php` | 0 | 3 |
+| `ext/gmp/gmp_scan0.php` | 0 | 2 |
+| `ext/gmp/gmp_scan1.php` | 0 | 2 |
+| `ext/gmp/gmp_setbit.php` | 0 | 2 |
+| `ext/gmp/gmp_sign.php` | 0 | 2 |
 | `ext/gmp/gmp_sqrt.php` | 0 | 2 |
 | `ext/gmp/gmp_sqrtrem.php` | 0 | 2 |
 | `ext/gmp/gmp_strval.php` | 0 | 2 |
 | `ext/gmp/gmp_sub.php` | 0 | 2 |
+| `ext/gmp/gmp_testbit.php` | 0 | 2 |
 | `ext/gmp/gmp_xor.php` | 0 | 2 |
 | `ext/hash/BuiltinClasses.php` | 0 | 1 |
 | `ext/hash/HashAlgosJitHelper.php` | 0 | 1 |
@@ -949,7 +966,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/Module.php` | 0 | 2 |
 | `ext/pdo/PdoClassMethod.php` | 0 | 1 |
 | `ext/pdo/PdoExtensionPolicy.php` | 0 | 1 |
-| `ext/pdo/VmPDO.php` | 0 | 43 |
+| `ext/pdo/VmPDO.php` | 0 | 44 |
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/phar/BuiltinClasses.php` | 0 | 10 |
@@ -3733,7 +3750,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/yaml/yaml_parse_file.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
 | `ext/zip/Module.php` | 0 | 9 |
-| `ext/zip/VmZipArchive.php` | 0 | 56 |
+| `ext/zip/VmZipArchive.php` | 0 | 63 |
 | `ext/zip/VmZipProcedural.php` | 0 | 1 |
 | `ext/zip/VmZipResourceArg.php` | 0 | 1 |
 | `ext/zip/ZipArchiveAddFile.php` | 0 | 2 |
@@ -3743,7 +3760,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipArchiveConstruct.php` | 0 | 1 |
 | `ext/zip/ZipArchiveExtractTo.php` | 0 | 2 |
 | `ext/zip/ZipArchiveGetFromName.php` | 0 | 2 |
-| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 38 |
+| `ext/zip/ZipArchiveGetStatusString.php` | 0 | 47 |
 | `ext/zip/ZipArchiveOpen.php` | 0 | 2 |
 | `ext/zip/ZipClassMethod.php` | 0 | 1 |
 | `ext/zip/ZipEngine.php` | 0 | 1 |
@@ -9020,16 +9037,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new gmp_random_range (line 67)
 - new gmp_import (line 68)
 - new gmp_export (line 69)
+- new gmp_sign (line 70)
+- new gmp_prob_prime (line 71)
+- new gmp_nextprime (line 72)
+- new gmp_invert (line 73)
+- new gmp_jacobi (line 74)
+- new gmp_legendre (line 75)
+- new gmp_gcdext (line 76)
+- new gmp_root (line 77)
+- new gmp_rootrem (line 78)
+- new gmp_perfect_power (line 79)
+- new gmp_testbit (line 80)
+- new gmp_setbit (line 81)
+- new gmp_clrbit (line 82)
+- new gmp_scan0 (line 83)
+- new gmp_scan1 (line 84)
+- new gmp_popcount (line 85)
+- new gmp_hamdist (line 86)
 - 3 class method(s)
 
 ### `ext/gmp/VmGmp.php`
 
 **Warnings** (review for bootstrap subset):
-- new DivisionByZeroError (line 273)
-- new DivisionByZeroError (line 301)
-- new DivisionByZeroError (line 379)
-- new DivisionByZeroError (line 897)
-- 61 class method(s)
+- new DivisionByZeroError (line 274)
+- new DivisionByZeroError (line 302)
+- new DivisionByZeroError (line 380)
+- new DivisionByZeroError (line 654)
+- new DivisionByZeroError (line 1362)
+- 83 class method(s)
 
 ### `ext/gmp/VmGmpObject.php`
 
@@ -9055,6 +9090,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/gmp/gmp_and.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_clrbit.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -9109,6 +9150,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/gmp/gmp_gcdext.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- new HashTable (line 32)
+- 1 class method(s)
+
+### `ext/gmp/gmp_hamdist.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_import.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9127,7 +9181,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/gmp/gmp_invert.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_jacobi.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_lcm.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_legendre.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -9151,13 +9223,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/gmp/gmp_nextprime.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_or.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
 - 1 class method(s)
 
+### `ext/gmp/gmp_perfect_power.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
 ### `ext/gmp/gmp_perfect_square.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_popcount.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -9173,6 +9263,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_prob_prime.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
 - 1 class method(s)
 
 ### `ext/gmp/gmp_random_bits.php`
@@ -9191,6 +9287,43 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/gmp/gmp_root.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_rootrem.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- new HashTable (line 32)
+- 1 class method(s)
+
+### `ext/gmp/gmp_scan0.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_scan1.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_setbit.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/gmp/gmp_sign.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
 - 1 class method(s)
 
 ### `ext/gmp/gmp_sqrt.php`
@@ -9212,6 +9345,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/gmp/gmp_sub.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/gmp/gmp_testbit.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
@@ -12131,47 +12270,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 40)
-- new Variable (line 43)
-- new PDOConstruct (line 50)
-- new PDOExec (line 55)
-- new PDOPrepare (line 56)
-- new PDOQuery (line 57)
-- new PDOSetAttribute (line 58)
-- new PDOGetAttribute (line 59)
-- new PDOGetAvailableDrivers (line 60)
-- new PDOLastInsertId (line 61)
-- new PDOQuote (line 62)
-- new PDOBeginTransaction (line 63)
-- new PDOCommit (line 64)
-- new PDORollBack (line 65)
-- new PDOInTransaction (line 66)
-- new PDOErrorCode (line 67)
-- new PDOErrorInfo (line 68)
-- new PDOSqliteCreateFunction (line 69)
-- new PDOSqliteCreateAggregate (line 70)
-- new HashTable (line 97)
-- new Variable (line 99)
-- new PDOException (line 119)
-- new PDOException (line 125)
-- new PdoState (line 127)
-- new PDOException (line 149)
-- new PDOException (line 158)
-- new PDOException (line 185)
-- new HashTable (line 233)
-- new Variable (line 235)
-- new ArgumentCountError (line 296)
-- new ArgumentCountError (line 323)
-- new ArgumentCountError (line 360)
-- new ArgumentCountError (line 397)
-- new ArgumentCountError (line 449)
-- new ArgumentCountError (line 478)
-- new ArgumentCountError (line 542)
-- new HashTable (line 691)
-- new Variable (line 692)
-- new Variable (line 695)
-- new Variable (line 702)
-- new ArgumentCountError (line 725)
-- new ArgumentCountError (line 778)
+- new Variable (line 44)
+- new Variable (line 47)
+- new PDOConstruct (line 55)
+- new PDOExec (line 60)
+- new PDOPrepare (line 61)
+- new PDOQuery (line 62)
+- new PDOSetAttribute (line 63)
+- new PDOGetAttribute (line 64)
+- new PDOGetAvailableDrivers (line 65)
+- new PDOLastInsertId (line 66)
+- new PDOQuote (line 67)
+- new PDOBeginTransaction (line 68)
+- new PDOCommit (line 69)
+- new PDORollBack (line 70)
+- new PDOInTransaction (line 71)
+- new PDOErrorCode (line 72)
+- new PDOErrorInfo (line 73)
+- new PDOSqliteCreateFunction (line 74)
+- new PDOSqliteCreateAggregate (line 75)
+- new HashTable (line 102)
+- new Variable (line 104)
+- new PDOException (line 124)
+- new PDOException (line 130)
+- new PdoState (line 132)
+- new PDOException (line 154)
+- new PDOException (line 163)
+- new PDOException (line 190)
+- new HashTable (line 238)
+- new Variable (line 240)
+- new ArgumentCountError (line 301)
+- new ArgumentCountError (line 328)
+- new ArgumentCountError (line 365)
+- new ArgumentCountError (line 402)
+- new ArgumentCountError (line 454)
+- new ArgumentCountError (line 483)
+- new ArgumentCountError (line 547)
+- new HashTable (line 696)
+- new Variable (line 697)
+- new Variable (line 700)
+- new Variable (line 707)
+- new ArgumentCountError (line 730)
+- new ArgumentCountError (line 783)
 - 31 class method(s)
 
 ### `ext/pdo/VmPDOStatement.php`
@@ -30977,11 +31117,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ZipArchiveGetCommentIndex (line 116)
 - new ZipArchiveSetArchiveComment (line 117)
 - new ZipArchiveGetArchiveComment (line 118)
-- new ZipArchiveState (line 134)
-- new Variable (line 822)
-- new Variable (line 837)
-- new Variable (line 852)
-- 63 class method(s)
+- new ZipArchiveUnchangeAll (line 120)
+- new ZipArchiveUnchangeArchive (line 121)
+- new ZipArchiveUnchangeIndex (line 122)
+- new ZipArchiveUnchangeName (line 123)
+- new ZipArchiveReplaceFile (line 124)
+- new ZipArchiveAddGlob (line 125)
+- new ZipArchiveAddPattern (line 126)
+- new ZipArchiveState (line 142)
+- new Variable (line 844)
+- new Variable (line 859)
+- new Variable (line 874)
+- 74 class method(s)
 
 ### `ext/zip/VmZipProcedural.php`
 
@@ -31072,7 +31219,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 1148)
 - new ArgumentCountError (line 1181)
 - new ArgumentCountError (line 1214)
-- 40 class method(s)
+- new ArgumentCountError (line 1269)
+- new ArgumentCountError (line 1293)
+- new ArgumentCountError (line 1317)
+- new ArgumentCountError (line 1339)
+- new ArgumentCountError (line 1364)
+- new ArgumentCountError (line 1402)
+- new HashTable (line 1483)
+- new Variable (line 1485)
+- new ArgumentCountError (line 1508)
+- 49 class method(s)
 
 ### `ext/zip/ZipArchiveOpen.php`
 
