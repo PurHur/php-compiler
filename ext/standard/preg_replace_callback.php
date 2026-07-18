@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -38,7 +39,8 @@ final class preg_replace_callback extends Internal
             return;
         }
 
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace_callback() pattern', 0);
+        // Z_PARAM_STR $pattern — null TypeError on 8.4 forward profile (#20226).
+        $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'preg_replace_callback', 0, 'pattern');
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_replace_callback', $pattern);
         $callbackVar = $frame->calledArgs[1]->resolveIndirect();
         $subjectVar = VmPreg::requireStringOrArraySubject(
@@ -147,9 +149,14 @@ final class preg_replace_callback extends Internal
             );
         }
 
+        // Z_PARAM_STR $pattern — null TypeError on 8.4 forward profile (#20226).
+        $pattern = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_replace_callback', 0, 'pattern')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'preg_replace_callback', 0, 'pattern');
+
         return JitPregReplaceCallback::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'preg_replace_callback() pattern'),
+            $pattern,
             $args[1],
             JitStringArg::lower($context, $args[2], 'preg_replace_callback() subject')
         );

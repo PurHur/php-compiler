@@ -9,7 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
@@ -30,7 +30,8 @@ final class preg_grep extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('preg_grep() requires two or three arguments in this compiler build');
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_grep() pattern', 0);
+        // Z_PARAM_STR $pattern — null TypeError on 8.4 forward profile (#20226, ext/pcre/php_pcre.c).
+        $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'preg_grep', 0, 'pattern');
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_grep', $pattern);
         $array = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
@@ -110,9 +111,14 @@ final class preg_grep extends Internal
             $invert = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $flags, $one);
         }
 
+        // Z_PARAM_STR $pattern — null TypeError on 8.4 forward profile (#20226).
+        $pattern = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_grep', 0, 'pattern')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'preg_grep', 0, 'pattern');
+
         return JitPregGrep::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'preg_grep() pattern'),
+            $pattern,
             $args[1],
             $invert
         );

@@ -38,7 +38,8 @@ final class preg_filter extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_filter() pattern', 0);
+        // Z_PARAM_STR $pattern — null TypeError on 8.4 forward profile (#20226).
+        $pattern = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'preg_filter', 0, 'pattern');
         $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_filter() replacement', 1);
         VmPregFailure::warnPatternCompileFailure($frame, 'preg_filter', $pattern);
         $subjectVar = VmPreg::resolveStringOrArraySubject(
@@ -124,7 +125,10 @@ final class preg_filter extends Internal
             return $context->getTypeFromString('__string__*')->constNull();
         }
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_filter', 2, 'subject');
-        $pattern = JitStringArg::lower($context, $args[0], 'preg_filter() pattern');
+        // Z_PARAM_STR $pattern — null TypeError on 8.4 forward profile (#20226).
+        $pattern = $context->callerStrictTypes
+            ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_filter', 0, 'pattern')
+            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'preg_filter', 0, 'pattern');
         $replacement = JitStringArg::lower($context, $args[1], 'preg_filter() replacement');
         if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
             return JitPregFilter::invoke(

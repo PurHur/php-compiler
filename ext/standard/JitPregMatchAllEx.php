@@ -29,9 +29,14 @@ final class JitPregMatchAllEx
 
         StringPregMatch::ensureLinked($context);
 
-        $pattern = JitStringBuiltinArg::lower($context, $args[0], 'preg_match_all', 0, 'pattern');
-        // Z_PARAM_STR $subject — null TypeError on 8.4 forward profile (#19320).
-        $subject = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'preg_match_all', 1, 'subject');
+        // Z_PARAM_STR $pattern/$subject — null TypeError on 8.4 forward profile (#20226, #19320).
+        if ($context->callerStrictTypes) {
+            $pattern = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'preg_match_all', 0, 'pattern');
+            $subject = JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[1], 'preg_match_all', 1, 'subject');
+        } else {
+            $pattern = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'preg_match_all', 0, 'pattern');
+            $subject = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'preg_match_all', 1, 'subject');
+        }
 
         if (2 === $argc) {
             return JitPregMatchAll::invoke($context, $pattern, $subject);
