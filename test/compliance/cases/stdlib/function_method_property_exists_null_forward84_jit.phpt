@@ -11,7 +11,7 @@ try {
     echo "ok function_exists\n";
 }
 try {
-    method_exists(stdClass::class, null);
+    method_exists('stdClass', null);
     echo "fail method_exists\n";
 } catch (TypeError $e) {
     echo "ok method_exists\n";
