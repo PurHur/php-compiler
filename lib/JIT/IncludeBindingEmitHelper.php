@@ -171,6 +171,28 @@ final class IncludeBindingEmitHelper
     }
 
     /**
+     * True when the current include refresh frame binds this local name (#20507).
+     */
+    public static function refreshFrameDeclaresName(Context $context, ?string $name): bool
+    {
+        if (null === $name || '' === $name || [] === $context->inlineIncludeBindingRefreshStack) {
+            return false;
+        }
+        $frame = $context->inlineIncludeBindingRefreshStack[\count($context->inlineIncludeBindingRefreshStack) - 1];
+        foreach ($frame as $entry) {
+            $calleeOp = $entry[0] ?? null;
+            if (null === $calleeOp) {
+                continue;
+            }
+            if (OperandName::resolve($calleeOp) === $name) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Re-store caller locals materialized before the include entry (#784, #866).
      */
     public static function refreshInlineIncludeBindings(Context $context): void
@@ -220,10 +242,14 @@ final class IncludeBindingEmitHelper
                 if (Variable::KIND_VARIABLE !== $scopeVar->kind) {
                     continue;
                 }
-                // Only refresh known include-binding aliases — never clobber unrelated
-                // slot-backed temps that happen to share a name resolution (#19504).
+                // Restore same-name aliases after ?? (#866, #20507). Skip fromLiteral temps that
+                // only share a bogus OperandName with an inherited local (#19504): those carry a
+                // compileTimeString that differs from the binding's value.
                 if (!$scopeVar->includeBinding) {
-                    continue;
+                    $aliasCt = $scopeVar->compileTimeString;
+                    if (null !== $aliasCt && $aliasCt !== $compileTimeString) {
+                        continue;
+                    }
                 }
                 self::storeIncludeBindingRestore($context, $scopeOp, $scopeVar, $restored);
             }

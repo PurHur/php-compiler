@@ -8645,7 +8645,13 @@ class JIT {
                         break;
                     }
                     if ($this->context->inlineIncludeDepth > 0) {
-                        JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
+                        $echoName = JIT\OperandName::resolve($echoOp);
+                        // Refresh inherited locals before echo of bound names after ?? (#866).
+                        // Skip refresh for post-include locals like $scriptBase — full-frame
+                        // restore was corrupting those string slots (MiniWebApp munmap, #20507).
+                        if (JIT\IncludeBindingEmitHelper::refreshFrameDeclaresName($this->context, $echoName)) {
+                            JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
+                        }
                     }
                     JIT\Builtin\PendingHeaders::emitFlushForStandalone($this->context);
                     if (null !== $this->context->ternaryEchoLiteralConditionSlot) {
@@ -9666,7 +9672,16 @@ class JIT {
                     break;
                 case OpCode::TYPE_ARG_SEND:
                     if ($this->context->inlineIncludeDepth > 0) {
-                        JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
+                        $sendSlotPeek = (int) $op->arg1;
+                        $sendOpPeek = $this->context->coalesceMergeSlotOperands[$sendSlotPeek]
+                            ?? $block->getOperand($sendSlotPeek);
+                        $sendName = null !== $sendOpPeek ? JIT\OperandName::resolve($sendOpPeek) : null;
+                        // Refresh inherited locals before calls that read them after ?? (#866).
+                        // Do not refresh when sending post-include locals ($scriptBase): full-frame
+                        // restore was corrupting those string slots (MiniWebApp munmap, #20507).
+                        if (JIT\IncludeBindingEmitHelper::refreshFrameDeclaresName($this->context, $sendName)) {
+                            JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
+                        }
                     }
                     $sendSlot = (int) $op->arg1;
                     $coalesceMergeOperand = $this->context->coalesceMergeSlotOperands[$sendSlot] ?? null;
