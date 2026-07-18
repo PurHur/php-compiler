@@ -59,6 +59,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -1513,6 +1514,8 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_shorthash.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_shorthash_keygen.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_detached.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_ed25519_pk_to_curve25519.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_ed25519_sk_to_curve25519.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_keypair.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_open.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_publickey.php';
@@ -5776,6 +5779,8 @@ require_once __DIR__.'/../../../ext/posix/posix_fpathconf.php';
 require_once __DIR__.'/../../../ext/posix/posix_pathconf.php';
 require_once __DIR__.'/../../../ext/posix/posix_sysconf.php';
 require_once __DIR__.'/../../../ext/gmp/gmp_binomial.php';
+require_once __DIR__.'/../../../ext/gmp/gmp_divexact.php';
+require_once __DIR__.'/../../../ext/gmp/gmp_kronecker.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 

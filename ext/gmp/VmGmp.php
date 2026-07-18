@@ -744,6 +744,22 @@ final class VmGmp
         );
     }
 
+    /** mpz_kronecker — full Kronecker symbol (#20586). */
+    public static function kronecker(string $a, string $n): int
+    {
+        return self::kroneckerJacobi(
+            self::normalizeSignedDecimal($a),
+            self::normalizeSignedDecimal($n)
+        );
+    }
+
+    /** mpz_divexact — exact division; DivisionByZeroError on zero divisor (#20586). */
+    public static function divExact(string $left, string $right): string
+    {
+        // php-src gmp_binary_ui_op_no_zero(mpz_divexact): undefined if not exact; we use toward-zero quotient.
+        return self::divQ($left, $right);
+    }
+
     /** mpz_legendre */
     public static function legendre(string $a, string $p): int
     {
@@ -1153,6 +1169,10 @@ final class VmGmp
         }
         $aa = $a;
         $nn = $n;
+        // mpz_kronecker: both even → 0
+        if ('0' === self::mod($aa, '2') && '0' === self::mod($nn, '2')) {
+            return 0;
+        }
         $result = 1;
         if (self::cmp($nn, '0') < 0) {
             $nn = self::neg($nn);
