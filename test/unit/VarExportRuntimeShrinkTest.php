@@ -6,21 +6,24 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** StringVarExport JIT/AOT path uses VarExportJitHelper PHP + thin kernel (#9189, #13349, #19430, #20077). */
+/** StringVarExport JIT routes through VarExportJitHelper PHP for embed + user-script AOT (#9189, #20589). */
 final class VarExportRuntimeShrinkTest extends TestCase
 {
-    public function testStringVarExportUsesVarExportJitHelperForJitPath(): void
+    public function testStringVarExportUsesJitHelperNotKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringVarExport.php');
         $this->assertStringContainsString('VarExportJitHelper', $source);
-        $this->assertStringContainsString('JitVarExportKernel', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('var_export_bridge_entry', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('JitVarExportKernel', $source);
+        $this->assertStringNotContainsString('var_export_user_script_bridge', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StringVarExportJit', $source);
         $this->assertStringNotContainsString('StringVarExportUserScriptLlvm', $source);
         $this->assertLessThan(160, \substr_count($source, "\n"), 'StringVarExport must be a thin bridge (#9189)');
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitVarExportKernel.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringVarExportUserScriptLlvm.php');
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitVarExportKernel.php');
     }
 
     public function testVarExportJitHelperDelegatesToVmVarExport(): void
@@ -42,7 +45,7 @@ final class VarExportRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('VarExportJitHelper.php', $spine);
         $this->assertStringContainsString('StringVarExport.php', $spine);
-        $this->assertStringContainsString('JitVarExportKernel.php', $spine);
+        $this->assertStringNotContainsString('JitVarExportKernel.php', $spine);
         $this->assertStringContainsString('VmVarExport.php', $spine);
         $this->assertStringNotContainsString('StringVarExportJit.php', $spine);
         $this->assertStringNotContainsString('StringVarExportUserScriptLlvm.php', $spine);

@@ -2289,7 +2289,6 @@ require_once __DIR__.'/../../../ext/standard/JitUrlencode.php';
 require_once __DIR__.'/../../../ext/standard/JitUtf8Latin1.php';
 require_once __DIR__.'/../../../ext/standard/JitVarDump.php';
 require_once __DIR__.'/../../../ext/standard/JitVarExport.php';
-require_once __DIR__.'/../../../ext/standard/JitVarExportKernel.php';
 require_once __DIR__.'/../../../ext/standard/JitVfprintf.php';
 require_once __DIR__.'/../../../ext/standard/JitVfscanf.php';
 require_once __DIR__.'/../../../ext/standard/JitVsprintf.php';
