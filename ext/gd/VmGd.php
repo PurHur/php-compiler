@@ -427,6 +427,156 @@ final class VmGd
     /** UINT_MAX — imageresolution() ValueError upper bound (php-src #20430). */
     public const RESOLUTION_UINT_MAX = 4294967295;
 
+    /** imageopenpolygon / imagepolygon filled flag (php-src php_imagepolygon; #20431). */
+    public const POLYGON_OPEN = -1;
+
+    public const POLYGON_CLOSED = 0;
+
+    /**
+     * Stroke polygon via gdImageOpenPolygon / gdImagePolygon (php-src ext/gd/libgd/gd.c; #20431).
+     *
+     * @param list<array{0: int, 1: int}> $points
+     */
+    public static function strokePolygon(ObjectEntry $image, array $points, int $color, int $mode): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        $n = \count($points);
+        if ($n <= 0) {
+            return true;
+        }
+        if (self::POLYGON_CLOSED === $mode) {
+            self::line(
+                $image,
+                $points[0][0],
+                $points[0][1],
+                $points[$n - 1][0],
+                $points[$n - 1][1],
+                $color
+            );
+        }
+        for ($i = 1; $i < $n; ++$i) {
+            self::line(
+                $image,
+                $points[$i - 1][0],
+                $points[$i - 1][1],
+                $points[$i][0],
+                $points[$i][1],
+                $color
+            );
+        }
+
+        return true;
+    }
+
+    /**
+     * Parse image*polygon() args (php-src ext/gd/gd.c php_imagepolygon; #20431).
+     *
+     * @return array{0: list<array{0: int, 1: int}>, 1: int}
+     */
+    public static function parsePolygonArgs(Frame $frame, string $function): array
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3 || $argc > 4) {
+            throw new \LogicException($function.'() expects 3 to 4 arguments in this compiler build');
+        }
+        $pointsArg = $frame->calledArgs[1]->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($pointsArg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #2 ($points) must be of type array, %s given',
+                $function,
+                EnumCaseSupport::typeNameForVariable($pointsArg)
+            ));
+        }
+        if (Variable::TYPE_ARRAY !== $pointsArg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #2 ($points) must be of type array, %s given',
+                $function,
+                self::typeLabel($pointsArg)
+            ));
+        }
+        $table = $pointsArg->toArray();
+        $nelem = $table->getNumElements();
+
+        $legacyNumPoints = false;
+        if (4 === $argc) {
+            $colorArg = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_NULL === $colorArg->type) {
+                $color = self::coerceIntArg($frame->calledArgs[2], $function, 3, 'num_points_or_color');
+                if (0 !== $nelem % 2) {
+                    throw new \ValueError($function.'(): Argument #2 ($points) must have an even number of elements');
+                }
+                $npoints = intdiv($nelem, 2);
+            } else {
+                $legacyNumPoints = true;
+                $npoints = self::coerceIntArg($frame->calledArgs[2], $function, 3, 'num_points_or_color');
+                $color = self::coerceIntArg($colorArg, $function, 4, 'color');
+            }
+        } else {
+            $color = self::coerceIntArg($frame->calledArgs[2], $function, 3, 'num_points_or_color');
+            if (0 !== $nelem % 2) {
+                throw new \ValueError($function.'(): Argument #2 ($points) must have an even number of elements');
+            }
+            $npoints = intdiv($nelem, 2);
+        }
+
+        if ($legacyNumPoints && null !== $frame->vmContext) {
+            $frame->vmContext->errors->triggerError(
+                $function.'(): Using the $num_points parameter is deprecated',
+                ErrorReporter::E_DEPRECATED,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+        }
+
+        if ($npoints < 3) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #3 ($num_points_or_color) must be greater than or equal to 3',
+                $function
+            ));
+        }
+        if ($nelem < $npoints * 2) {
+            throw new \ValueError(\sprintf(
+                'Trying to use %d points in array with only %d points',
+                $npoints,
+                intdiv($nelem, 2)
+            ));
+        }
+
+        $points = [];
+        for ($i = 0; $i < $npoints; ++$i) {
+            $xVar = $table->findIndex($i * 2);
+            $yVar = $table->findIndex($i * 2 + 1);
+            $points[] = [
+                null !== $xVar ? self::coercePolygonCoord($xVar->resolveIndirect()) : 0,
+                null !== $yVar ? self::coercePolygonCoord($yVar->resolveIndirect()) : 0,
+            ];
+        }
+
+        return [$points, $color];
+    }
+
+    private static function coercePolygonCoord(Variable $arg): int
+    {
+        if (Variable::TYPE_INTEGER === $arg->type) {
+            return $arg->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $arg->type) {
+            return (int) $arg->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $arg->type) {
+            return $arg->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_STRING === $arg->type) {
+            return (int) $arg->toString();
+        }
+
+        return 0;
+    }
+
     /**
      * imagesavealpha() — always true like php-src RETURN_TRUE (#6535).
      */
@@ -2764,6 +2914,13 @@ final class VmGd
                 1 => 'image',
                 2 => 'resolution_x',
                 3 => 'resolution_y',
+                default => 'arg',
+            },
+            'imagepolygon', 'imageopenpolygon' => match ($position) {
+                1 => 'image',
+                2 => 'points',
+                3 => 'num_points_or_color',
+                4 => 'color',
                 default => 'arg',
             },
             'imagesetthickness' => match ($position) {

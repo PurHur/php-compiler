@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5592 |
-| Phase A inventory files (M2 ratio SSOT) | 5592 |
+| PHP files on vm.php path | 5594 |
+| Phase A inventory files (M2 ratio SSOT) | 5594 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15986 |
+| Source constructs flagged (warnings) | 15990 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -477,7 +477,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 5 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 49 |
+| `ext/gd/Module.php` | 0 | 51 |
 | `ext/gd/VmGd.php` | 0 | 10 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
 | `ext/gd/VmGdBmp.php` | 0 | 1 |
@@ -515,8 +515,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imageistruecolor.php` | 0 | 1 |
 | `ext/gd/imagelayereffect.php` | 0 | 1 |
 | `ext/gd/imageline.php` | 0 | 1 |
+| `ext/gd/imageopenpolygon.php` | 0 | 1 |
 | `ext/gd/imagepalettetotruecolor.php` | 0 | 1 |
 | `ext/gd/imagepng.php` | 0 | 1 |
+| `ext/gd/imagepolygon.php` | 0 | 1 |
 | `ext/gd/imageresolution.php` | 0 | 1 |
 | `ext/gd/imagerotate.php` | 0 | 1 |
 | `ext/gd/imagesavealpha.php` | 0 | 1 |
@@ -8762,27 +8764,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagecopyresized (line 81)
 - new imagesetpixel (line 82)
 - new imageline (line 83)
-- new imagefilledrectangle (line 84)
-- new imagestring (line 85)
-- new imagechar (line 86)
-- new imagettftext (line 88)
-- new imagettfbbox (line 89)
-- new imagefilter (line 91)
-- new imageflip (line 92)
-- new imagecrop (line 93)
-- new imagecropauto (line 94)
-- new imagerotate (line 95)
-- new imagescale (line 96)
-- new imageaffine (line 97)
-- new imageconvolution (line 98)
-- new imagecreatefromstring (line 101)
-- new imagepng (line 102)
-- new imagewebp (line 103)
-- new imageavif (line 104)
-- new imagebmp (line 105)
-- new imagecreatefromwebp (line 106)
-- new imagecreatefromavif (line 107)
-- new imagecreatefrombmp (line 108)
+- new imagepolygon (line 84)
+- new imageopenpolygon (line 85)
+- new imagefilledrectangle (line 86)
+- new imagestring (line 87)
+- new imagechar (line 88)
+- new imagettftext (line 90)
+- new imagettfbbox (line 91)
+- new imagefilter (line 93)
+- new imageflip (line 94)
+- new imagecrop (line 95)
+- new imagecropauto (line 96)
+- new imagerotate (line 97)
+- new imagescale (line 98)
+- new imageaffine (line 99)
+- new imageconvolution (line 100)
+- new imagecreatefromstring (line 103)
+- new imagepng (line 104)
+- new imagewebp (line 105)
+- new imageavif (line 106)
+- new imagebmp (line 107)
+- new imagecreatefromwebp (line 108)
+- new imagecreatefromavif (line 109)
+- new imagecreatefrombmp (line 110)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -8791,13 +8795,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 54)
 - new ObjectEntry (line 77)
 - new ObjectEntry (line 103)
-- new HashTable (line 678)
-- new Variable (line 680)
-- new ObjectEntry (line 2018)
-- new ObjectEntry (line 2042)
-- new ObjectEntry (line 2066)
-- new ObjectEntry (line 2322)
-- 107 class method(s)
+- new HashTable (line 828)
+- new Variable (line 830)
+- new ObjectEntry (line 2168)
+- new ObjectEntry (line 2192)
+- new ObjectEntry (line 2216)
+- new ObjectEntry (line 2472)
+- 110 class method(s)
 
 ### `ext/gd/VmGdAvif.php`
 
@@ -8979,12 +8983,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/gd/imageopenpolygon.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/gd/imagepalettetotruecolor.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `ext/gd/imagepng.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagepolygon.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
