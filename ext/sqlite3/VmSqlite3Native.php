@@ -219,6 +219,58 @@ final class VmSqlite3Native
         return (int) self::requireFfi()->sqlite3_last_insert_rowid($db);
     }
 
+    public static function errcode(\FFI\CData $db): int
+    {
+        return (int) self::requireFfi()->sqlite3_errcode($db);
+    }
+
+    /** @return array{versionString: string, versionNumber: int} */
+    public static function version(): array
+    {
+        $ffi = self::requireFfi();
+
+        return [
+            'versionString' => self::ffiString($ffi->sqlite3_libversion()),
+            'versionNumber' => (int) $ffi->sqlite3_libversion_number(),
+        ];
+    }
+
+    /**
+     * SQLite3::backup — copy source DB into destination (php-src; #20565).
+     *
+     * @param \FFI\CData $sourceDb sqlite3*
+     * @param \FFI\CData $destDb   sqlite3*
+     */
+    public static function backup(
+        \FFI\CData $sourceDb,
+        string $sourceName,
+        \FFI\CData $destDb,
+        string $destName
+    ): bool {
+        $ffi = self::requireFfi();
+        $backup = $ffi->sqlite3_backup_init($destDb, $destName, $sourceDb, $sourceName);
+        if (null === $backup) {
+            $rc = (int) $ffi->sqlite3_errcode($sourceDb);
+        } else {
+            do {
+                $rc = (int) $ffi->sqlite3_backup_step($backup, -1);
+            } while (self::SQLITE_OK === $rc);
+            $rc = (int) $ffi->sqlite3_backup_finish($backup);
+        }
+        if (self::SQLITE_OK !== $rc) {
+            if (5 === $rc) { // SQLITE_BUSY
+                throw new \SQLite3Exception('Backup failed: source database is busy');
+            }
+            if (6 === $rc) { // SQLITE_LOCKED
+                throw new \SQLite3Exception('Backup failed: source database is locked');
+            }
+            $message = self::errmsg($sourceDb);
+            throw new \SQLite3Exception('Backup failed: '.('' !== $message ? $message : 'unknown error'));
+        }
+
+        return true;
+    }
+
     /** php-src SQLite3::escapeString — sqlite3_mprintf("%q", …). */
     public static function escapeString(string $value): string
     {
@@ -421,6 +473,13 @@ double sqlite3_column_double(sqlite3_stmt *pStmt, int iCol);
 int sqlite3_finalize(sqlite3_stmt *pStmt);
 int sqlite3_changes(sqlite3 *db);
 sqlite3_int64 sqlite3_last_insert_rowid(sqlite3 *db);
+int sqlite3_errcode(sqlite3 *db);
+const char *sqlite3_libversion(void);
+int sqlite3_libversion_number(void);
+typedef struct sqlite3_backup sqlite3_backup;
+sqlite3_backup *sqlite3_backup_init(sqlite3 *pDest, const char *zDestName, sqlite3 *pSource, const char *zSourceName);
+int sqlite3_backup_step(sqlite3_backup *p, int nPage);
+int sqlite3_backup_finish(sqlite3_backup *p);
 char *sqlite3_mprintf(const char *zFormat, ...);
 int sqlite3_bind_parameter_count(sqlite3_stmt *pStmt);
 int sqlite3_bind_parameter_index(sqlite3_stmt *pStmt, const char *zName);
