@@ -639,6 +639,7 @@ final class VmDom
         $document->methodNames['normalizedocument'] = 'normalizeDocument';
         $document->methods['xinclude'] = new DocumentXInclude();
         $document->methodVisibility['xinclude'] = $pub;
+        $document->methodNames['xinclude'] = 'xinclude';
         $document->methods['schemavalidate'] = new DocumentSchemaValidate();
         $document->methodVisibility['schemavalidate'] = $pub;
         $document->methodNames['schemavalidate'] = 'schemaValidate';
@@ -3201,10 +3202,18 @@ final class VmDom
         }
     }
 
-    /** Zend dom_document_documenturi_read default for in-memory documents (ext/dom/document.c; #14468). */
+    /**
+     * Zend dom_document_documenturi_read default for in-memory documents (ext/dom/document.c; #14468).
+     *
+     * Prefer {@see PHP_COMPILER_CLI_INVOCATION_CWD} so relative XInclude/href resolution matches the
+     * process cwd before bin/vm.php chdirs to the repo root (#20403, #1770).
+     */
     private static function defaultDocumentUri(): string
     {
-        $cwd = getcwd();
+        $cwd = getenv('PHP_COMPILER_CLI_INVOCATION_CWD');
+        if (!\is_string($cwd) || '' === $cwd) {
+            $cwd = getcwd();
+        }
         if (false === $cwd || '' === $cwd) {
             return '/';
         }
@@ -8914,16 +8923,265 @@ final class VmDom
     }
 
     /**
-     * DOMDocument::xinclude() — no xi:include nodes in PHP-in-PHP DOM yet (php-src ext/dom/document.c; #14370).
+     * DOMDocument::xinclude() — XInclude substitution (php-src ext/dom/document.c; #14370, #20403).
      *
-     * @return int|false substitution count, or false when libxml xinclude fails
+     * PHP-in-PHP walk of {@code xi:include} nodes (text/xml parse + fallback). Return mirrors
+     * libxml {@code xmlXIncludeProcessFlags}: {@code false} when zero substitutions, positive
+     * count on success, {@code -1} when any include failed without fallback.
+     *
+     * @return int|false
      */
     public static function xinclude(Context $ctx, ObjectEntry $document, int $options, ?Frame $frame = null): int|false
     {
         self::ensureDocument($document);
-        unset($ctx, $options, $frame);
+        $count = 0;
+        $failed = false;
+        /** @var array<int, true> $skipIds permanently failed include object ids */
+        $skipIds = [];
+        // Re-collect after each substitution so includes inside newly inserted XML are processed.
+        for ($guard = 0; $guard < 10000; ++$guard) {
+            $includes = self::collectXIncludeElements($document);
+            $candidate = null;
+            usort(
+                $includes,
+                static function (ObjectEntry $a, ObjectEntry $b): int {
+                    return self::nodeDepth($b) <=> self::nodeDepth($a);
+                }
+            );
+            foreach ($includes as $include) {
+                if (!isset($skipIds[$include->id])) {
+                    $candidate = $include;
+                    break;
+                }
+            }
+            if (null === $candidate) {
+                break;
+            }
+            $result = self::processOneXInclude($ctx, $document, $candidate, $options, $frame);
+            if (null === $result) {
+                $failed = true;
+                $skipIds[$candidate->id] = true;
 
-        return false;
+                continue;
+            }
+            $count += $result;
+        }
+
+        if ($failed) {
+            return -1;
+        }
+
+        return $count > 0 ? $count : false;
+    }
+
+    /** @return list<ObjectEntry> */
+    private static function collectXIncludeElements(ObjectEntry $document): array
+    {
+        $ids = array_merge(
+            self::collectElementsByTagNameNS($document, DomConstants::XINCLUDE_NS, 'include'),
+            self::collectElementsByTagNameNS($document, DomConstants::XINCLUDE_OLD_NS, 'include')
+        );
+        $seen = [];
+        $out = [];
+        foreach ($ids as $id) {
+            if (isset($seen[$id])) {
+                continue;
+            }
+            $seen[$id] = true;
+            $entry = DomRegistry::entry($id);
+            if (null !== $entry && self::isXIncludeElement($entry)) {
+                $out[] = $entry;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function isXIncludeElement(ObjectEntry $entry): bool
+    {
+        if (!self::isElement($entry)) {
+            return false;
+        }
+        $local = self::readLocalName($entry);
+        if ('include' !== $local) {
+            return false;
+        }
+        $ns = self::readNamespaceUri($entry) ?? '';
+
+        return DomConstants::XINCLUDE_NS === $ns || DomConstants::XINCLUDE_OLD_NS === $ns;
+    }
+
+    private static function isXIncludeFallbackElement(ObjectEntry $entry): bool
+    {
+        if (!self::isElement($entry)) {
+            return false;
+        }
+        if ('fallback' !== self::readLocalName($entry)) {
+            return false;
+        }
+        $ns = self::readNamespaceUri($entry) ?? '';
+
+        return DomConstants::XINCLUDE_NS === $ns || DomConstants::XINCLUDE_OLD_NS === $ns;
+    }
+
+    private static function nodeDepth(ObjectEntry $node): int
+    {
+        $depth = 0;
+        $parentId = DomRegistry::state($node)->parentId;
+        while (null !== $parentId) {
+            ++$depth;
+            $parent = DomRegistry::entry($parentId);
+            if (null === $parent) {
+                break;
+            }
+            $parentId = DomRegistry::state($parent)->parentId;
+        }
+
+        return $depth;
+    }
+
+    /**
+     * Process one xi:include. Returns substitution weight (1) on success, null on hard failure.
+     */
+    private static function processOneXInclude(
+        Context $ctx,
+        ObjectEntry $document,
+        ObjectEntry $include,
+        int $options,
+        ?Frame $frame
+    ): ?int {
+        $href = self::getAttribute($include, 'href');
+        $parse = self::getAttribute($include, 'parse');
+        if ('' === $parse) {
+            $parse = 'xml';
+        }
+        $path = self::resolveXIncludeHref($include, $href);
+        $contents = '' !== $path ? \PHPCompiler\ext\standard\VmFsReadNative::read($path) : false;
+        if (false === $contents) {
+            $display = '' !== $path ? $path : $href;
+            self::triggerDomWarning(
+                $frame,
+                'DOMDocument::xinclude(): I/O warning : failed to load external entity "'.$display.'"'
+            );
+            $fallbackKids = self::xincludeFallbackChildren($include);
+            if (null !== $fallbackKids) {
+                self::replaceNodeWithNodes($ctx, $include, $fallbackKids);
+
+                return 1;
+            }
+            self::triggerDomWarning(
+                $frame,
+                'DOMDocument::xinclude(): could not load '.$display.', and no fallback was found'
+            );
+
+            return null;
+        }
+
+        if ('text' === $parse) {
+            $text = self::createTextNode($ctx, $contents, $document);
+            self::replaceNodeWithNodes($ctx, $include, [$text]);
+
+            return 1;
+        }
+
+        // parse="xml" (default) — insert the included document element (php-src / libxml).
+        $tmpDoc = self::createDocument($ctx, null, '', null)->toObject();
+        if (!self::loadXML($ctx, $tmpDoc, $contents, $frame, $options)) {
+            $fallbackKids = self::xincludeFallbackChildren($include);
+            if (null !== $fallbackKids) {
+                self::replaceNodeWithNodes($ctx, $include, $fallbackKids);
+
+                return 1;
+            }
+            self::triggerDomWarning(
+                $frame,
+                'DOMDocument::xinclude(): could not load '.$path.', and no fallback was found'
+            );
+
+            return null;
+        }
+        $rootVar = $tmpDoc->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $rootVar->type) {
+            self::replaceNodeWithNodes($ctx, $include, []);
+
+            return 1;
+        }
+        $imported = self::importNodeEntry($ctx, $document, $rootVar->toObject(), true);
+        self::replaceNodeWithNodes($ctx, $include, [$imported]);
+
+        return 1;
+    }
+
+    private static function resolveXIncludeHref(ObjectEntry $include, string $href): string
+    {
+        if ('' === $href) {
+            return '';
+        }
+        if (1 === preg_match('#^[a-zA-Z][a-zA-Z0-9+.-]*:#', $href)) {
+            if (str_starts_with($href, 'file://')) {
+                return substr($href, 7);
+            }
+
+            return $href;
+        }
+        $base = self::readBaseUri($include);
+        if ('' === $base) {
+            $base = self::defaultDocumentUri();
+        }
+        $resolved = self::resolveUri($base, $href);
+        if (str_starts_with($resolved, 'file://')) {
+            return substr($resolved, 7);
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Children of xi:fallback, or null when no fallback element is present.
+     *
+     * @return null|list<ObjectEntry>
+     */
+    private static function xincludeFallbackChildren(ObjectEntry $include): ?array
+    {
+        $state = DomRegistry::state($include);
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child || !self::isXIncludeFallbackElement($child)) {
+                continue;
+            }
+            $kids = [];
+            foreach (DomRegistry::state($child)->childIds as $kidId) {
+                $kid = DomRegistry::entry($kidId);
+                if (null !== $kid) {
+                    $kids[] = $kid;
+                }
+            }
+
+            return $kids;
+        }
+
+        return null;
+    }
+
+    /**
+     * Replace $old with $newNodes in document order (insert before, then remove).
+     *
+     * @param list<ObjectEntry> $newNodes
+     */
+    private static function replaceNodeWithNodes(Context $ctx, ObjectEntry $old, array $newNodes): void
+    {
+        $parentId = DomRegistry::state($old)->parentId;
+        if (null === $parentId) {
+            return;
+        }
+        $parent = DomRegistry::entry($parentId);
+        if (null === $parent) {
+            return;
+        }
+        foreach ($newNodes as $node) {
+            self::insertBefore($ctx, $parent, $node, $old);
+        }
+        self::removeChild($ctx, $parent, $old);
     }
 
     /** DOMDocument::validate() — in-document DTD validation via libxml2 FFI (php-src ext/dom/document.c; #18833). */

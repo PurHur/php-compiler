@@ -38,6 +38,12 @@ final class DomConstants
     /** Built-in xml prefix namespace URI (http://www.w3.org/XML/1998/namespace). */
     public const XML_NS_URI = 'http://www.w3.org/XML/1998/namespace';
 
+    /** XInclude 1.0 namespace (libxml XINCLUDE_NS; php-src ext/dom/document.c). */
+    public const XINCLUDE_NS = 'http://www.w3.org/2001/XInclude';
+
+    /** Legacy XInclude namespace (libxml XINCLUDE_OLD_NS). */
+    public const XINCLUDE_OLD_NS = 'http://www.w3.org/2003/XInclude';
+
     /** Internal marker for {@see VmDom::createNodeList()} handles. */
     public const XML_NODELIST = -1;
 
