@@ -1,5 +1,5 @@
 --TEST--
-DOM/SimpleXML: import bridges share live node identity (#20137, ext/dom/node.c)
+DOM/SimpleXML: import bridges share live node identity (#20137/#20697, ext/dom/node.c)
 --FILE--
 <?php
 $sxe = simplexml_load_string('<root><a>1</a></root>');

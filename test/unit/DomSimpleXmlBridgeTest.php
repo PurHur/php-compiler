@@ -28,5 +28,6 @@ final class DomSimpleXmlBridgeTest extends TestCase
         $this->assertStringContainsString('DomRegistry', $source);
         $this->assertStringContainsString('linkPeers', $source);
         $this->assertStringContainsString('syncSimpleXmlTextFromDom', $source);
+        $this->assertStringContainsString('resolveExportElementState', $source);
     }
 }

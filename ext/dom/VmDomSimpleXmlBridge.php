@@ -29,7 +29,9 @@ final class VmDomSimpleXmlBridge
     public static function importSimpleXml(Context $ctx, ObjectEntry $sxe): ObjectEntry
     {
         VmSimpleXml::requireElement($sxe, 'dom_import_simplexml()');
-        $nodeState = SimpleXmlRegistry::state($sxe);
+        // Named-child / children / multi views attach the parent (or collection) as
+        // registry state; php-src exports the first matching element node (#20697, re-#20137).
+        $nodeState = self::resolveExportElementState($sxe, 'dom_import_simplexml');
 
         $document = self::createEmptyDocument($ctx);
         $root = self::domElementFromSimpleXmlState($ctx, $document, $nodeState);
@@ -75,16 +77,64 @@ final class VmDomSimpleXmlBridge
             return null;
         }
         $docKey = SimpleXmlRegistry::documentKey($sxe);
+        try {
+            $state = self::resolveExportElementState($sxe, 'simplexml_import_dom');
+        } catch (\ValueError) {
+            return null;
+        }
+
+        return VmSimpleXml::wrapIteratorNode($ctx, $class, $state, $docKey);
+    }
+
+    /**
+     * Element node exported by php-src `dom_import_simplexml` / shared-node bridges.
+     *
+     * After #20489, `$sxe->child` is a named-child view whose registry state is the
+     * **parent**; export the first matching child (php-src sxe property ptr).
+     */
+    private static function resolveExportElementState(ObjectEntry $sxe, string $label): SimpleXmlNodeState
+    {
+        if (SimpleXmlRegistry::isAttributesView($sxe)) {
+            throw new \ValueError(sprintf(
+                '%s(): Argument #1 ($node) is not a valid node type',
+                $label
+            ));
+        }
+        if (SimpleXmlRegistry::isNamedChildView($sxe)) {
+            $matches = VmSimpleXml::namedChildViewElements($sxe);
+            if ([] === $matches) {
+                throw new \ValueError(sprintf(
+                    '%s(): Argument #1 ($node) is not a valid node type',
+                    $label
+                ));
+            }
+
+            return $matches[0];
+        }
+        if (SimpleXmlRegistry::isChildrenView($sxe)) {
+            $matches = VmSimpleXml::childrenViewElements($sxe);
+            if ([] === $matches) {
+                throw new \ValueError(sprintf(
+                    '%s(): Argument #1 ($node) is not a valid node type',
+                    $label
+                ));
+            }
+
+            return $matches[0];
+        }
         if (SimpleXmlRegistry::isView($sxe)) {
             $elements = SimpleXmlRegistry::view($sxe);
             if ([] === $elements) {
-                return null;
+                throw new \ValueError(sprintf(
+                    '%s(): Argument #1 ($node) is not a valid node type',
+                    $label
+                ));
             }
 
-            return VmSimpleXml::wrapIteratorNode($ctx, $class, $elements[0], $docKey);
+            return $elements[0];
         }
 
-        return VmSimpleXml::wrapIteratorNode($ctx, $class, SimpleXmlRegistry::state($sxe), $docKey);
+        return SimpleXmlRegistry::state($sxe);
     }
 
     /** Class-hierarchy instanceof SimpleXMLElement (#20291). */
