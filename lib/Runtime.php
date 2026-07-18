@@ -271,6 +271,7 @@ class Runtime {
         $this->load(new ext\brotli\Module);
         $this->load(new ext\sodium\Module);
         $this->load(new ext\sqlite3\Module);
+        $this->load(new ext\pgsql\Module);
         $this->load(new ext\pdo\Module);
         $this->load(new ext\phar\Module);
         $this->load(new ext\uri\Module);
