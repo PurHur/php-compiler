@@ -31,7 +31,7 @@ final class SimpleXmlJsonExport
             return [] === $attrs ? [] : ['@attributes' => $attrs];
         }
         if (SimpleXmlRegistry::isView($object)) {
-            $elements = SimpleXmlRegistry::view($object);
+            $elements = VmSimpleXml::viewElements($object);
             if ([] === $elements) {
                 return [];
             }
