@@ -37,7 +37,10 @@ final class JitHttpResponseCodeArg
             return JitLongArg::lower($context, $arg, 'http_response_code(): Argument #1 ($response_code)');
         }
 
-        throw new \LogicException($fn.' must be an integer in this compiler build');
+        // Non-lowerable static types — Zend Z_PARAM_LONG TypeError (#6037), not LogicException.
+        self::emitTypeErrorAndAbort($context, $fn, self::compileTimeEnumGivenLabel($context, $arg));
+
+        return $context->getTypeFromString('int64')->constInt(0, false);
     }
 
     private static function lowerBoxed(Context $context, Variable $arg, string $fn): Value
@@ -163,7 +166,7 @@ final class JitHttpResponseCodeArg
         TypeErrorRaise::emitRaise(
             $context,
             sprintf(
-                'http_response_code(): Argument #1 ($response_code) must be of type int|ResponseCode|null, %s given',
+                'http_response_code(): Argument #1 ($response_code) must be of type int, %s given',
                 $given
             )
         );
