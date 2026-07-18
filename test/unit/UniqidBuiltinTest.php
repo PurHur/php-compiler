@@ -58,6 +58,41 @@ final class UniqidBuiltinTest extends TestCase
         $fn->execute($frame);
     }
 
+    /** @runInSeparateProcess */
+    public function testNullPrefixTypeErrorOnForward84(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        $runtime = new Runtime();
+        $fn = new uniqid();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $null = new VMVariable();
+        $null->null();
+        $frame->calledArgs = [$null];
+        $frame->returnVar = new VMVariable();
+        $this->expectException(\TypeError::class);
+        $this->expectExceptionMessage('uniqid(): Argument #1 ($prefix) must be of type string, null given');
+        $fn->execute($frame);
+    }
+
+    /** @runInSeparateProcess */
+    public function testNullPrefixCoercesOnReferenceProfile(): void
+    {
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.2';
+        $runtime = new Runtime();
+        $fn = new uniqid();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $null = new VMVariable();
+        $null->null();
+        $frame->calledArgs = [$null];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $id = $frame->returnVar->resolveIndirect()->toString();
+        $this->assertSame(13, strlen($id));
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{13}$/', $id);
+    }
+
     public function testMoreEntropyLength(): void
     {
         $runtime = new Runtime();

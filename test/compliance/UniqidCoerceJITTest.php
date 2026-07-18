@@ -20,6 +20,10 @@ final class UniqidCoerceJITTest extends BaseTest
             __DIR__.'/cases/stdlib/uniqid_coerce_jit.phpt',
             'uniqid_coerce_jit.phpt'
         );
+        yield 'uniqid_null_forward84_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/uniqid_null_forward84_jit.phpt',
+            'uniqid_null_forward84_jit.phpt'
+        );
     }
 
     public function setUp(): void
