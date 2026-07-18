@@ -85,6 +85,16 @@ final class VmPgsqlNative
         return (int) self::requireFfi()->PQresultStatus($result);
     }
 
+    public static function cmdStatus(\FFI\CData $result): string
+    {
+        return self::ffiString(self::requireFfi()->PQcmdStatus($result));
+    }
+
+    public static function backendPid(\FFI\CData $conn): int
+    {
+        return (int) self::requireFfi()->PQbackendPID($conn);
+    }
+
     public static function ntuples(\FFI\CData $result): int
     {
         return (int) self::requireFfi()->PQntuples($result);
@@ -831,6 +841,8 @@ char *PQerrorMessage(const PGconn *conn);
 void PQfinish(PGconn *conn);
 PGresult *PQexec(PGconn *conn, const char *query);
 int PQresultStatus(const PGresult *res);
+char *PQcmdStatus(const PGresult *res);
+int PQbackendPID(const PGconn *conn);
 int PQntuples(const PGresult *res);
 int PQnfields(const PGresult *res);
 char *PQfname(const PGresult *res, int field_num);
