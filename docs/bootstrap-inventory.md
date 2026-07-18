@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5685 |
-| Phase A inventory files (M2 ratio SSOT) | 5685 |
+| PHP files on vm.php path | 5700 |
+| Phase A inventory files (M2 ratio SSOT) | 5700 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16307 |
+| Source constructs flagged (warnings) | 16347 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1071,6 +1071,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/VmPDO.php` | 0 | 83 |
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
+| `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
+| `ext/pgsql/Module.php` | 0 | 8 |
+| `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
+| `ext/pgsql/VmPgsqlArg.php` | 0 | 1 |
+| `ext/pgsql/VmPgsqlConnection.php` | 0 | 4 |
+| `ext/pgsql/VmPgsqlCore.php` | 0 | 5 |
+| `ext/pgsql/VmPgsqlNative.php` | 0 | 1 |
+| `ext/pgsql/VmPgsqlResult.php` | 0 | 4 |
+| `ext/pgsql/pg_close.php` | 0 | 2 |
+| `ext/pgsql/pg_connect.php` | 0 | 2 |
+| `ext/pgsql/pg_fetch_assoc.php` | 0 | 2 |
+| `ext/pgsql/pg_fetch_row.php` | 0 | 2 |
+| `ext/pgsql/pg_last_error.php` | 0 | 2 |
+| `ext/pgsql/pg_num_rows.php` | 0 | 2 |
+| `ext/pgsql/pg_query.php` | 0 | 2 |
 | `ext/phar/BuiltinClasses.php` | 0 | 10 |
 | `ext/phar/Module.php` | 0 | 1 |
 | `ext/phar/PharDataBuiltin.php` | 0 | 15 |
@@ -4993,7 +5008,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 97 |
+| `lib/Runtime.php` | 0 | 98 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -13197,6 +13212,105 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
 - new ArgumentCountError (line 43)
+- 2 class method(s)
+
+### `ext/pgsql/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/pgsql/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new pg_connect (line 66)
+- new pg_close (line 67)
+- new pg_query (line 68)
+- new pg_fetch_assoc (line 69)
+- new pg_fetch_row (line 70)
+- new pg_num_rows (line 71)
+- new pg_last_error (line 72)
+- 6 class method(s)
+
+### `ext/pgsql/PgsqlExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/pgsql/VmPgsqlArg.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/pgsql/VmPgsqlConnection.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 31)
+- new ObjectEntry (line 49)
+- new Variable (line 55)
+- 7 class method(s)
+
+### `ext/pgsql/VmPgsqlCore.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 82)
+- new Variable (line 86)
+- new HashTable (line 110)
+- new Variable (line 113)
+- 4 class method(s)
+
+### `ext/pgsql/VmPgsqlNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 17 class method(s)
+
+### `ext/pgsql/VmPgsqlResult.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 29)
+- new ObjectEntry (line 37)
+- new Variable (line 44)
+- 7 class method(s)
+
+### `ext/pgsql/pg_close.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/pgsql/pg_connect.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/pgsql/pg_fetch_assoc.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/pgsql/pg_fetch_row.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/pgsql/pg_last_error.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/pgsql/pg_num_rows.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/pgsql/pg_query.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
 - 2 class method(s)
 
 ### `ext/phar/BuiltinClasses.php`
@@ -39604,26 +39718,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\brotli\Module (line 271)
 - new ext\sodium\Module (line 272)
 - new ext\sqlite3\Module (line 273)
-- new ext\pdo\Module (line 274)
-- new ext\phar\Module (line 275)
-- new ext\uri\Module (line 276)
-- new ext\uuid\Module (line 277)
-- new ext\uploadprogress\Module (line 278)
-- new ext\sysvshm\Module (line 279)
-- new ext\sysvsem\Module (line 280)
-- new ext\sysvmsg\Module (line 281)
-- new ext\reflection\Module (line 282)
-- new ext\standard\Module (line 283)
-- new JIT (line 359)
-- new JITContext (line 373)
-- new SealedClassPreprocessor (line 439)
-- new StaticClassPreprocessor (line 442)
-- new SourcePreprocessor\PropertyHooks (line 445)
-- new State (line 585)
-- new ReflectionProperty (line 612)
-- new ReflectionProperty (line 615)
-- new LintCompiler (line 1026)
-- new Variable (line 1156)
+- new ext\pgsql\Module (line 274)
+- new ext\pdo\Module (line 275)
+- new ext\phar\Module (line 276)
+- new ext\uri\Module (line 277)
+- new ext\uuid\Module (line 278)
+- new ext\uploadprogress\Module (line 279)
+- new ext\sysvshm\Module (line 280)
+- new ext\sysvsem\Module (line 281)
+- new ext\sysvmsg\Module (line 282)
+- new ext\reflection\Module (line 283)
+- new ext\standard\Module (line 284)
+- new JIT (line 360)
+- new JITContext (line 374)
+- new SealedClassPreprocessor (line 440)
+- new StaticClassPreprocessor (line 443)
+- new SourcePreprocessor\PropertyHooks (line 446)
+- new State (line 586)
+- new ReflectionProperty (line 613)
+- new ReflectionProperty (line 616)
+- new LintCompiler (line 1027)
+- new Variable (line 1157)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
