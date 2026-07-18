@@ -195,15 +195,15 @@ final class VmSimpleXml
     public static function childByName(Context $ctx, ObjectEntry $entry, string $name): ObjectEntry
     {
         $docKey = SimpleXmlRegistry::documentKey($entry);
-        $elements = self::matchingElements($entry, $name);
-        if ([] === $elements) {
-            return self::wrapView($ctx, $entry->class, [], $docKey);
-        }
-        if (1 === \count($elements)) {
-            return self::wrapNode($ctx, $entry->class, $elements[0], $docKey);
-        }
-
-        return self::wrapView($ctx, $entry->class, $elements, $docKey);
+        // Property access is always a live named-sibling selection under the context
+        // parent (php-src sxe.c; #20483) — never a frozen snapshot or bare single node.
+        return self::wrapNamedChildView(
+            $ctx,
+            $entry->class,
+            self::propertyAccessParent($entry),
+            $name,
+            $docKey
+        );
     }
 
     /**
@@ -271,6 +271,8 @@ final class VmSimpleXml
         foreach ($parent->children as $index => $child) {
             if ($child === $target) {
                 array_splice($parent->children, $index, 1);
+                // Live xpath handles keep the ObjectEntry but stringify empty (#20483).
+                $target->markDetached();
 
                 return true;
             }
@@ -317,6 +319,9 @@ final class VmSimpleXml
             $name = $offset->toString();
             if (SimpleXmlRegistry::isAttributesView($entry)) {
                 $value = self::attributesMap($entry)[$name] ?? null;
+            } elseif (SimpleXmlRegistry::isNamedChildView($entry)) {
+                $matches = self::namedChildViewElements($entry);
+                $value = ([] === $matches) ? null : ($matches[0]->attributes[$name] ?? null);
             } else {
                 $value = SimpleXmlRegistry::state($entry)->attributes[$name] ?? null;
             }
@@ -350,6 +355,11 @@ final class VmSimpleXml
         if (Variable::TYPE_STRING === $offset->type) {
             if (SimpleXmlRegistry::isAttributesView($entry)) {
                 return \array_key_exists($offset->toString(), self::attributesMap($entry));
+            }
+            if (SimpleXmlRegistry::isNamedChildView($entry)) {
+                $matches = self::namedChildViewElements($entry);
+
+                return [] !== $matches && \array_key_exists($offset->toString(), $matches[0]->attributes);
             }
             $state = SimpleXmlRegistry::state($entry);
 
@@ -492,6 +502,14 @@ final class VmSimpleXml
 
             return;
         }
+        if (SimpleXmlRegistry::isNamedChildView($entry)) {
+            $matches = self::namedChildViewElements($entry);
+            if ([] !== $matches) {
+                unset($matches[0]->attributes[$name]);
+            }
+
+            return;
+        }
         $state = SimpleXmlRegistry::state($entry);
         unset($state->attributes[$name]);
     }
@@ -500,6 +518,9 @@ final class VmSimpleXml
     {
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             return \count(self::attributesMap($entry));
+        }
+        if (SimpleXmlRegistry::isNamedChildView($entry)) {
+            return \count(self::namedChildViewElements($entry));
         }
         if (SimpleXmlRegistry::isChildrenView($entry)) {
             return \count(self::childrenViewElements($entry));
@@ -513,6 +534,7 @@ final class VmSimpleXml
 
     public static function elementName(ObjectEntry $entry): string
     {
+        self::assertNodeInitialized($entry, 'SimpleXMLElement::getName()');
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             $attrs = self::attributesMap($entry);
             if ([] === $attrs) {
@@ -522,6 +544,9 @@ final class VmSimpleXml
             $first = array_key_first($attrs);
 
             return self::localNameFromQualified($first);
+        }
+        if (SimpleXmlRegistry::isNamedChildView($entry)) {
+            return self::localNameFromQualified(SimpleXmlRegistry::namedChildViewName($entry));
         }
         if (SimpleXmlRegistry::isChildrenView($entry)) {
             $view = self::childrenViewElements($entry);
@@ -557,7 +582,23 @@ final class VmSimpleXml
             return self::wrapView($ctx, $entry->class, [], SimpleXmlRegistry::documentKey($entry));
         }
 
-        // Snapshot multi-match property views (`$sxe->foo` with N matches) stay frozen.
+        // Named property views (`$sxe->foo`): children() is relative to the first match
+        // (php-src sxe.c; #20483). Frozen multi-match snapshots keep prior behavior.
+        if (SimpleXmlRegistry::isNamedChildView($entry)) {
+            $matches = self::namedChildViewElements($entry);
+            if ([] === $matches) {
+                return self::wrapView($ctx, $entry->class, [], SimpleXmlRegistry::documentKey($entry));
+            }
+
+            return self::wrapChildrenView(
+                $ctx,
+                $entry->class,
+                $matches[0],
+                SimpleXmlRegistry::documentKey($entry),
+                $namespaceOrPrefix,
+                $isPrefix
+            );
+        }
         if (SimpleXmlRegistry::isView($entry) && !SimpleXmlRegistry::isChildrenView($entry)) {
             $elements = self::directElementChildren($entry);
             $scope = self::inScopeNamespacesForEntry($entry);
@@ -586,7 +627,25 @@ final class VmSimpleXml
 
     public static function attributes(Context $ctx, ObjectEntry $entry, ?string $namespaceOrPrefix = null, bool $isPrefix = true): ObjectEntry
     {
-        if (SimpleXmlRegistry::isView($entry) || SimpleXmlRegistry::isAttributesView($entry)) {
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            return self::wrapAttributesView($ctx, $entry->class, new SimpleXmlNodeState(''), SimpleXmlRegistry::documentKey($entry));
+        }
+        if (SimpleXmlRegistry::isNamedChildView($entry)) {
+            $matches = self::namedChildViewElements($entry);
+            if ([] === $matches) {
+                return self::wrapAttributesView($ctx, $entry->class, new SimpleXmlNodeState(''), SimpleXmlRegistry::documentKey($entry));
+            }
+
+            return self::wrapAttributesView(
+                $ctx,
+                $entry->class,
+                $matches[0],
+                SimpleXmlRegistry::documentKey($entry),
+                $namespaceOrPrefix,
+                $isPrefix
+            );
+        }
+        if (SimpleXmlRegistry::isView($entry)) {
             return self::wrapAttributesView($ctx, $entry->class, new SimpleXmlNodeState(''), SimpleXmlRegistry::documentKey($entry));
         }
 
@@ -603,8 +662,22 @@ final class VmSimpleXml
 
     public static function asXml(ObjectEntry $entry, bool $includeDeclaration = false): string|false
     {
+        self::assertNodeInitialized($entry, 'SimpleXMLElement::asXML()');
         if (SimpleXmlRegistry::isAttributesView($entry)) {
             return false;
+        }
+        if (SimpleXmlRegistry::isNamedChildView($entry)) {
+            $parts = [];
+            foreach (self::namedChildViewElements($entry) as $node) {
+                $parts[] = self::serializeNode($node);
+            }
+            $body = implode('', $parts);
+            if ('' === $body) {
+                return false;
+            }
+
+            // php-src sxe_as_xml: document serialization ends with trailing newline (#19934, re-#19681).
+            return $includeDeclaration ? '<?xml version="1.0"?>'."\n".$body."\n" : $body;
         }
         if (SimpleXmlRegistry::isChildrenView($entry)) {
             $parts = [];
@@ -617,7 +690,7 @@ final class VmSimpleXml
             }
 
             // php-src sxe_as_xml: document serialization ends with trailing newline (#19934, re-#19681).
-        return $includeDeclaration ? '<?xml version="1.0"?>'."\n".$body."\n" : $body;
+            return $includeDeclaration ? '<?xml version="1.0"?>'."\n".$body."\n" : $body;
         }
         if (SimpleXmlRegistry::isView($entry)) {
             $parts = [];
@@ -630,7 +703,7 @@ final class VmSimpleXml
             }
 
             // php-src sxe_as_xml: document serialization ends with trailing newline (#19934, re-#19681).
-        return $includeDeclaration ? '<?xml version="1.0"?>'."\n".$body."\n" : $body;
+            return $includeDeclaration ? '<?xml version="1.0"?>'."\n".$body."\n" : $body;
         }
 
         $state = SimpleXmlRegistry::state($entry);
@@ -650,7 +723,7 @@ final class VmSimpleXml
         if ('' === $qualifiedName) {
             throw new \ValueError('SimpleXMLElement::addChild(): Argument #1 ($qualifiedName) cannot be empty');
         }
-        if (SimpleXmlRegistry::isView($entry) || SimpleXmlRegistry::isAttributesView($entry)) {
+        if (SimpleXmlRegistry::isNamedChildView($entry) || SimpleXmlRegistry::isView($entry) || SimpleXmlRegistry::isAttributesView($entry)) {
             throw new \LogicException('SimpleXMLElement::addChild() cannot be called on a view in this compiler build');
         }
 
@@ -877,6 +950,9 @@ final class VmSimpleXml
 
             return $out;
         }
+        if (SimpleXmlRegistry::isNamedChildView($entry)) {
+            return self::namedChildViewElements($entry);
+        }
         if (SimpleXmlRegistry::isChildrenView($entry)) {
             return self::childrenViewElements($entry);
         }
@@ -904,6 +980,15 @@ final class VmSimpleXml
 
     public static function textContent(ObjectEntry $entry): string
     {
+        if (SimpleXmlRegistry::isNamedChildView($entry)) {
+            $matches = self::namedChildViewElements($entry);
+            if ([] === $matches) {
+                return '';
+            }
+
+            // php-src: (string)$sxe->name uses the first matching sibling only.
+            return $matches[0]->text;
+        }
         if (SimpleXmlRegistry::isChildrenView($entry)) {
             $parts = [];
             foreach (self::childrenViewElements($entry) as $node) {
@@ -927,6 +1012,15 @@ final class VmSimpleXml
     /** @return list<SimpleXmlNodeState> */
     private static function matchingElements(ObjectEntry $entry, string $name): array
     {
+        if (SimpleXmlRegistry::isNamedChildView($entry)) {
+            // Nested `$sxe->a->b` resolves under the first match only (php-src sxe.c).
+            $matches = self::namedChildViewElements($entry);
+            if ([] === $matches) {
+                return [];
+            }
+
+            return $matches[0]->elementsNamed($name);
+        }
         if (SimpleXmlRegistry::isChildrenView($entry)) {
             $out = [];
             foreach (self::childrenViewElements($entry) as $node) {
@@ -949,6 +1043,35 @@ final class VmSimpleXml
         }
 
         return SimpleXmlRegistry::state($entry)->elementsNamed($name);
+    }
+
+    /**
+     * Parent node for `$sxe->child` property access (php-src sxe get_property_ptr_ptr).
+     *
+     * Named / multi-match views nest under the first current match.
+     */
+    private static function propertyAccessParent(ObjectEntry $entry): SimpleXmlNodeState
+    {
+        if (SimpleXmlRegistry::isNamedChildView($entry)) {
+            $matches = self::namedChildViewElements($entry);
+
+            return $matches[0] ?? new SimpleXmlNodeState('');
+        }
+        if (SimpleXmlRegistry::isChildrenView($entry)) {
+            $els = self::childrenViewElements($entry);
+
+            return $els[0] ?? new SimpleXmlNodeState('');
+        }
+        if (SimpleXmlRegistry::isView($entry)) {
+            $els = self::viewElements($entry);
+
+            return $els[0] ?? new SimpleXmlNodeState('');
+        }
+        if (SimpleXmlRegistry::isAttributesView($entry)) {
+            return new SimpleXmlNodeState('');
+        }
+
+        return SimpleXmlRegistry::state($entry);
     }
 
     private static function wrapNode(Context $ctx, ClassEntry $class, SimpleXmlNodeState $node, ?int $documentKey = null): ObjectEntry
@@ -978,6 +1101,21 @@ final class VmSimpleXml
         return $entry;
     }
 
+    private static function wrapNamedChildView(
+        Context $ctx,
+        ClassEntry $class,
+        SimpleXmlNodeState $parent,
+        string $childName,
+        ?int $documentKey = null
+    ): ObjectEntry {
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $docKey = $documentKey ?? $entry->id;
+        SimpleXmlRegistry::attachNamedChildView($entry, $parent, $childName, $docKey);
+
+        return $entry;
+    }
+
     private static function wrapChildrenView(
         Context $ctx,
         ClassEntry $class,
@@ -995,17 +1133,33 @@ final class VmSimpleXml
     }
 
     /**
-     * Elements represented by a collection view (frozen multi-match or live children(); #20331).
+     * Elements represented by a collection view (named property, frozen multi-match, or live children(); #20331/#20483).
      *
      * @return list<SimpleXmlNodeState>
      */
     public static function viewElements(ObjectEntry $entry): array
     {
+        if (SimpleXmlRegistry::isNamedChildView($entry)) {
+            return self::namedChildViewElements($entry);
+        }
         if (SimpleXmlRegistry::isChildrenView($entry)) {
             return self::childrenViewElements($entry);
         }
 
         return SimpleXmlRegistry::view($entry);
+    }
+
+    /**
+     * Live `$sxe->name` property selection (php-src sxe.c; #20483).
+     *
+     * @return list<SimpleXmlNodeState>
+     */
+    public static function namedChildViewElements(ObjectEntry $entry): array
+    {
+        $parent = SimpleXmlRegistry::state($entry);
+        $name = SimpleXmlRegistry::namedChildViewName($entry);
+
+        return $parent->elementsNamed($name);
     }
 
     /**
@@ -1037,6 +1191,17 @@ final class VmSimpleXml
         }
 
         return $elements;
+    }
+
+    /** Detached xpath/node handles throw like php-src "not properly initialized" (#20483). */
+    private static function assertNodeInitialized(ObjectEntry $entry, string $label): void
+    {
+        if (SimpleXmlRegistry::isView($entry) || SimpleXmlRegistry::isAttributesView($entry)) {
+            return;
+        }
+        if (SimpleXmlRegistry::state($entry)->detached) {
+            throw new \Error('SimpleXMLElement is not properly initialized');
+        }
     }
 
     private static function wrapAttributesView(
