@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -21,7 +22,14 @@ final class parse_url extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('parse_url() requires one or two arguments in this compiler build');
         }
-        $url = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'parse_url', 0, 'url');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20110, ext/standard/url.c)
+        $url = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
+            'parse_url',
+            0,
+            'url'
+        );
         $component = -1;
         if (2 === $argc) {
             $component = VmParseUrl::resolveComponentArg($frame->calledArgs[1]);
