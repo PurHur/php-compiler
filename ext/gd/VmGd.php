@@ -26,6 +26,8 @@ final class VmGd
 {
     public const CLASS_GDIMAGE = 'gdimage';
 
+    public const CLASS_GDFONT = 'gdfont';
+
     /** IMG_GIF — imagetypes() bit (php-src php_gd.h; #20471). */
     public const IMG_GIF = 1;
 
@@ -312,6 +314,161 @@ final class VmGd
         $state->encoded = '';
 
         return true;
+    }
+
+    /**
+     * imageloadfont() — load architecture-dependent .gdf dump (php-src ext/gd/gd.c; #20486).
+     */
+    public static function loadFont(Frame $frame, string $filename): ObjectEntry|false
+    {
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('imageloadfont() requires VM context');
+        }
+        $bytes = VmFs::fileGetContents($filename, false, null, 0, null, $ctx);
+        if (false === $bytes) {
+            return false;
+        }
+        $len = \strlen($bytes);
+        if ($len < 16) {
+            $ctx->errors->triggerError(
+                'imageloadfont(): End of file while reading header',
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $ctx,
+                $frame
+            );
+
+            return false;
+        }
+        $fontData = GdFonts::parseGdf($bytes);
+        if (null === $fontData) {
+            $ctx->errors->triggerError(
+                'imageloadfont(): Error reading font, invalid font header',
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $ctx,
+                $frame
+            );
+
+            return false;
+        }
+        $class = $ctx->classes[self::CLASS_GDFONT] ?? null;
+        if (null === $class) {
+            throw new \LogicException('GdFont is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        GdFontRegistry::attach($entry, $fontData);
+
+        return $entry;
+    }
+
+    /**
+     * imagecolormatch() — gdImageColorMatch (php-src ext/gd/libgd/gd_color_match.c; #20486).
+     *
+     * Averages truecolor source pixels into the palette destination's color table
+     * keyed by palette index occupancy.
+     */
+    public static function colorMatch(ObjectEntry $image1, ObjectEntry $image2): bool
+    {
+        $im1 = GdRegistry::state($image1);
+        $im2 = GdRegistry::state($image2);
+        if (null === $im1 || !$im1->hasRaster() || !$im1->truecolor) {
+            throw new \ValueError('imagecolormatch(): Argument #1 ($image1) must be TrueColor');
+        }
+        if (null === $im2 || !$im2->hasRaster() || $im2->truecolor) {
+            throw new \ValueError('imagecolormatch(): Argument #2 ($image2) must be Palette');
+        }
+        if ($im1->width !== $im2->width || $im1->height !== $im2->height) {
+            throw new \ValueError(
+                'imagecolormatch(): Argument #2 ($image2) must be the same size as argument #1 ($image1)'
+            );
+        }
+        $colorsTotal = \count($im2->colors);
+        if ($colorsTotal < 1) {
+            throw new \ValueError('imagecolormatch(): Argument #2 ($image2) must have at least one color');
+        }
+
+        $count = [];
+        $sumR = [];
+        $sumG = [];
+        $sumB = [];
+        $sumA = [];
+        for ($i = 0; $i < $colorsTotal; ++$i) {
+            $count[$i] = 0;
+            $sumR[$i] = 0;
+            $sumG[$i] = 0;
+            $sumB[$i] = 0;
+            $sumA[$i] = 0;
+        }
+
+        $n = $im1->width * $im1->height;
+        for ($i = 0; $i < $n; ++$i) {
+            $color = $im2->pixels[$i];
+            if ($color < 0 || $color >= $colorsTotal) {
+                continue;
+            }
+            $rgb = $im1->pixels[$i];
+            ++$count[$color];
+            $sumR[$color] += ($rgb >> 16) & 0xFF;
+            $sumG[$color] += ($rgb >> 8) & 0xFF;
+            $sumB[$color] += $rgb & 0xFF;
+            $sumA[$color] += ($rgb >> 24) & 0x7F;
+        }
+
+        for ($color = 0; $color < $colorsTotal; ++$color) {
+            $c = $count[$color];
+            if ($c > 0) {
+                $im2->colors[$color] = (((int) ($sumA[$color] / $c) & 0x7F) << 24)
+                    | (((int) ($sumR[$color] / $c) & 0xFF) << 16)
+                    | (((int) ($sumG[$color] / $c) & 0xFF) << 8)
+                    | ((int) ($sumB[$color] / $c) & 0xFF);
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Resolve GdFont|int for imagestring/imagechar (php-src php_find_gd_font; #20486).
+     *
+     * @return array{nchars:int,offset:int,w:int,h:int,data:string}
+     */
+    public static function resolveFont(Variable $arg, string $function, int $position): array
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $object = $arg->toObject();
+            $fontData = GdFontRegistry::font($object);
+            if (null !== $fontData) {
+                return $fontData;
+            }
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($font) must be of type GdFont|int, %s given',
+                $function,
+                $position,
+                $object->class->name
+            ));
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($font) must be of type GdFont|int, %s given',
+                $function,
+                $position,
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($font) must be of type GdFont|int, %s given',
+                $function,
+                $position,
+                self::typeLabel($arg)
+            ));
+        }
+
+        return GdFonts::get($arg->toInt());
     }
 
     /**
@@ -2355,25 +2512,28 @@ final class VmGd
     }
 
     /**
-     * imagechar() — single glyph from built-in font (php-src gdImageChar; #6534).
+     * imagechar() — single glyph from built-in / loaded font (php-src gdImageChar; #6534, #20486).
+     *
+     * @param array{nchars:int,offset:int,w:int,h:int,data:string} $fontData
      */
-    public static function char(ObjectEntry $image, int $font, int $x, int $y, string $char, int $color): bool
+    public static function char(ObjectEntry $image, array $fontData, int $x, int $y, string $char, int $color): bool
     {
         $ch = '' === $char ? 0 : \ord($char[0]);
 
-        return self::drawChar(GdRegistry::state($image), GdFonts::get($font), $x, $y, $ch, $color);
+        return self::drawChar(GdRegistry::state($image), $fontData, $x, $y, $ch, $color);
     }
 
     /**
-     * imagestring() — horizontal string from built-in font (php-src gdImageString; #6534).
+     * imagestring() — horizontal string from built-in / loaded font (php-src gdImageString; #6534, #20486).
+     *
+     * @param array{nchars:int,offset:int,w:int,h:int,data:string} $fontData
      */
-    public static function string(ObjectEntry $image, int $font, int $x, int $y, string $text, int $color): bool
+    public static function string(ObjectEntry $image, array $fontData, int $x, int $y, string $text, int $color): bool
     {
         $state = GdRegistry::state($image);
         if (null === $state || !$state->hasRaster()) {
             return false;
         }
-        $fontData = GdFonts::get($font);
         $len = \strlen($text);
         for ($i = 0; $i < $len; ++$i) {
             self::drawChar($state, $fontData, $x, $y, \ord($text[$i]), $color);
@@ -2384,25 +2544,28 @@ final class VmGd
     }
 
     /**
-     * imagecharup() — 90° CCW built-in font glyph (php-src gdImageCharUp; #20460).
+     * imagecharup() — 90° CCW built-in / loaded font glyph (php-src gdImageCharUp; #20460, #20486).
+     *
+     * @param array{nchars:int,offset:int,w:int,h:int,data:string} $fontData
      */
-    public static function charUp(ObjectEntry $image, int $font, int $x, int $y, string $char, int $color): bool
+    public static function charUp(ObjectEntry $image, array $fontData, int $x, int $y, string $char, int $color): bool
     {
         $ch = '' === $char ? 0 : \ord($char[0]);
 
-        return self::drawCharUp(GdRegistry::state($image), GdFonts::get($font), $x, $y, $ch, $color);
+        return self::drawCharUp(GdRegistry::state($image), $fontData, $x, $y, $ch, $color);
     }
 
     /**
-     * imagestringup() — vertical string via CharUp (php-src gdImageStringUp; #20460).
+     * imagestringup() — vertical string via CharUp (php-src gdImageStringUp; #20460, #20486).
+     *
+     * @param array{nchars:int,offset:int,w:int,h:int,data:string} $fontData
      */
-    public static function stringUp(ObjectEntry $image, int $font, int $x, int $y, string $text, int $color): bool
+    public static function stringUp(ObjectEntry $image, array $fontData, int $x, int $y, string $text, int $color): bool
     {
         $state = GdRegistry::state($image);
         if (null === $state || !$state->hasRaster()) {
             return false;
         }
-        $fontData = GdFonts::get($font);
         $len = \strlen($text);
         for ($i = 0; $i < $len; ++$i) {
             self::drawCharUp($state, $fontData, $x, $y, \ord($text[$i]), $color);
@@ -4593,6 +4756,12 @@ final class VmGd
                 6 => 'color',
                 default => 'arg',
             },
+            'imagecolormatch' => match ($position) {
+                1 => 'image1',
+                2 => 'image2',
+                default => 'arg',
+            },
+            'imageloadfont' => 'filename',
             'imagestring', 'imagechar' => match ($position) {
                 1 => 'image',
                 2 => 'font',

@@ -28,7 +28,7 @@ final class imagecharup extends Internal
             return;
         }
         $image = VmGd::requireGdImage($frame->calledArgs[0], 'imagecharup', 1);
-        $font = VmGd::coerceIntArg($frame->calledArgs[1], 'imagecharup', 2, 'font');
+        $font = VmGd::resolveFont($frame->calledArgs[1], 'imagecharup', 2);
         $x = VmGd::coerceIntArg($frame->calledArgs[2], 'imagecharup', 3, 'x');
         $y = VmGd::coerceIntArg($frame->calledArgs[3], 'imagecharup', 4, 'y');
         $char = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'imagecharup', 4, 'char');

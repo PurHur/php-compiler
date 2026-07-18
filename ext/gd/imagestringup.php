@@ -28,7 +28,7 @@ final class imagestringup extends Internal
             return;
         }
         $image = VmGd::requireGdImage($frame->calledArgs[0], 'imagestringup', 1);
-        $font = VmGd::coerceIntArg($frame->calledArgs[1], 'imagestringup', 2, 'font');
+        $font = VmGd::resolveFont($frame->calledArgs[1], 'imagestringup', 2);
         $x = VmGd::coerceIntArg($frame->calledArgs[2], 'imagestringup', 3, 'x');
         $y = VmGd::coerceIntArg($frame->calledArgs[3], 'imagestringup', 4, 'y');
         $text = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'imagestringup', 4, 'string');

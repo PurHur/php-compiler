@@ -8,6 +8,7 @@ namespace PHPCompiler\ext\gd;
  * Built-in GD fonts 1–5 from php-src ext/gd/libgd/gdfont*.c (#6534).
  *
  * Pixel bits are packed MSB-first in ext/gd/fonts/*.bin (php-src 0/1 char arrays).
+ * Loaded `.gdf` dumps (imageloadfont) use the same payload shape (#20486).
  */
 final class GdFonts
 {
@@ -29,6 +30,91 @@ final class GdFonts
         }
 
         return self::$cache[$font];
+    }
+
+    /**
+     * Parse architecture-dependent gdFont dump (php-src PHP_FUNCTION(imageloadfont)).
+     *
+     * Header: 4× int32 (nchars, offset, w, h); body: nchars×w×h bytes (one per pixel).
+     *
+     * @return array{nchars:int,offset:int,w:int,h:int,data:string}|null
+     */
+    public static function parseGdf(string $bytes): ?array
+    {
+        $hdrSize = 16;
+        $len = \strlen($bytes);
+        if ($len < $hdrSize) {
+            return null;
+        }
+        $nchars = self::readI32($bytes, 0);
+        $offset = self::readI32($bytes, 4);
+        $w = self::readI32($bytes, 8);
+        $h = self::readI32($bytes, 12);
+        $bodyCheck = $len - $hdrSize;
+        if (!self::bodySizeOk($nchars, $w, $h, $bodyCheck)) {
+            $nchars = self::flipI32($nchars);
+            $offset = self::flipI32($offset);
+            $w = self::flipI32($w);
+            $h = self::flipI32($h);
+            if (!self::bodySizeOk($nchars, $w, $h, $bodyCheck)) {
+                return null;
+            }
+        }
+        $bodySize = $nchars * $w * $h;
+        $raw = \substr($bytes, $hdrSize, $bodySize);
+        if (\strlen($raw) !== $bodySize) {
+            return null;
+        }
+
+        return [
+            'nchars' => $nchars,
+            'offset' => $offset,
+            'w' => $w,
+            'h' => $h,
+            'data' => self::normalizePixelBytes($raw),
+        ];
+    }
+
+    private static function bodySizeOk(int $nchars, int $w, int $h, int $bodyCheck): bool
+    {
+        if ($nchars <= 0 || $w <= 0 || $h <= 0) {
+            return false;
+        }
+        if ($nchars > 0x7FFFFFFF / $h) {
+            return false;
+        }
+        $nh = $nchars * $h;
+        if ($nh > 0x7FFFFFFF / $w) {
+            return false;
+        }
+
+        return ($nh * $w) === $bodyCheck;
+    }
+
+    private static function readI32(string $bytes, int $off): int
+    {
+        $u = \unpack('V', \substr($bytes, $off, 4));
+
+        return (int) $u[1];
+    }
+
+    private static function flipI32(int $v): int
+    {
+        return (($v & 0xFF) << 24)
+            | (($v & 0xFF00) << 8)
+            | (($v >> 8) & 0xFF00)
+            | (($v >> 24) & 0xFF);
+    }
+
+    private static function normalizePixelBytes(string $raw): string
+    {
+        $out = '';
+        $n = \strlen($raw);
+        for ($i = 0; $i < $n; ++$i) {
+            $out .= ("\x00" === $raw[$i]) ? "\x00" : "\x01";
+        }
+
+        return $out;
     }
 
     /**

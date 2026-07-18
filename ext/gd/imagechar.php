@@ -28,7 +28,7 @@ final class imagechar extends Internal
             return;
         }
         $image = VmGd::requireGdImage($frame->calledArgs[0], 'imagechar', 1);
-        $font = VmGd::coerceIntArg($frame->calledArgs[1], 'imagechar', 2, 'font');
+        $font = VmGd::resolveFont($frame->calledArgs[1], 'imagechar', 2);
         $x = VmGd::coerceIntArg($frame->calledArgs[2], 'imagechar', 3, 'x');
         $y = VmGd::coerceIntArg($frame->calledArgs[3], 'imagechar', 4, 'y');
         $char = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'imagechar', 4, 'char');
