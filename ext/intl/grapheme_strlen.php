@@ -18,6 +18,7 @@ use PHPLLVM\Value;
  * grapheme_strlen() — grapheme cluster count (php-src ext/intl/grapheme; #5914).
  *
  * VM: {@see VmGrapheme}; JIT: compile-time fold via {@see JitGrapheme}.
+ * Z_PARAM_STR null TypeError on 8.4 forward profile (#20694).
  */
 final class grapheme_strlen extends Internal
 {
@@ -29,12 +30,8 @@ final class grapheme_strlen extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'grapheme_strlen', 1);
-        $string = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
-            'grapheme_strlen',
-            0,
-            'string'
-        );
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20694, grapheme_string.c).
+        $string = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'grapheme_strlen', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -58,7 +55,19 @@ final class grapheme_strlen extends Internal
         if (null !== $folded) {
             return $folded;
         }
-        JitStringBuiltinArg::lower($context, $args[0], 'grapheme_strlen', 0, 'string');
+        // Z_PARAM_STR — null TypeError on 8.4 forward (constants + boxed VALUE) (#20694).
+        JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'grapheme_strlen', 0, 'string');
+        $zparamStrict = $context->callerStrictTypes
+            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile();
+        $nullConst = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
+        if ($nullConst && $zparamStrict) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        // Boxed VALUE: lowerZparamStr already emitted runtime null TypeError (#20694).
+        // Full cluster-count runtime remains fold/VM; ok-path placeholder keeps AOT IR valid.
+        if (JITVariable::TYPE_VALUE === $args[0]->type && $zparamStrict) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
 
         throw new \LogicException(
             'grapheme_strlen() JIT runtime lowering is deferred; use VM or compile-time literals (#5914)'
