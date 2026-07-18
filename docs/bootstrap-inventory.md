@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5774 |
-| Phase A inventory files (M2 ratio SSOT) | 5774 |
+| PHP files on vm.php path | 5773 |
+| Phase A inventory files (M2 ratio SSOT) | 5773 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16757 |
+| Source constructs flagged (warnings) | 16863 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -777,14 +777,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_init.php` | 0 | 2 |
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
-| `ext/intl/BuiltinClasses.php` | 0 | 20 |
+| `ext/intl/BuiltinClasses.php` | 0 | 19 |
 | `ext/intl/GraphemeStrSplitJitHelper.php` | 0 | 3 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
 | `ext/intl/IntlConstants.php` | 0 | 1 |
 | `ext/intl/IntlDateFormatterCreate.php` | 0 | 2 |
 | `ext/intl/IntlDateFormatterFormat.php` | 0 | 2 |
-| `ext/intl/IntlDateFormatterGetPattern.php` | 0 | 2 |
 | `ext/intl/IntlError.php` | 0 | 1 |
 | `ext/intl/IntlExtensionPolicy.php` | 0 | 4 |
 | `ext/intl/JitGrapheme.php` | 0 | 4 |
@@ -811,7 +810,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmIdn.php` | 0 | 5 |
 | `ext/intl/VmIntlCalendar.php` | 0 | 22 |
 | `ext/intl/VmIntlChar.php` | 0 | 7 |
-| `ext/intl/VmIntlDateFormatter.php` | 0 | 3 |
+| `ext/intl/VmIntlDateFormatter.php` | 0 | 4 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 12 |
 | `ext/intl/VmLocale.php` | 0 | 2 |
 | `ext/intl/VmMessageFormatter.php` | 0 | 18 |
@@ -1239,12 +1238,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/redis/RedisClose.php` | 0 | 1 |
 | `ext/redis/RedisConnect.php` | 0 | 2 |
 | `ext/redis/RedisConstruct.php` | 0 | 1 |
-| `ext/redis/RedisDepthMethods.php` | 0 | 10 |
+| `ext/redis/RedisDepthMethods.php` | 0 | 70 |
 | `ext/redis/RedisExtensionPolicy.php` | 0 | 1 |
-| `ext/redis/RedisGet.php` | 0 | 2 |
-| `ext/redis/RedisSet.php` | 0 | 2 |
-| `ext/redis/VmRedis.php` | 0 | 19 |
-| `ext/redis/VmRedisNative.php` | 0 | 19 |
+| `ext/redis/RedisGet.php` | 0 | 3 |
+| `ext/redis/RedisSet.php` | 0 | 3 |
+| `ext/redis/VmRedis.php` | 0 | 48 |
+| `ext/redis/VmRedisNative.php` | 0 | 36 |
 | `ext/reflection/IsAnonymousClassJitHelper.php` | 0 | 1 |
 | `ext/reflection/JitIsAnonymousClass.php` | 0 | 1 |
 | `ext/reflection/Module.php` | 0 | 2 |
@@ -8272,57 +8271,57 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 4864)
 - new DOMException (line 4870)
 - new DOMException (line 4884)
-- new DOMException (line 5089)
-- new DOMException (line 5286)
-- new DOMException (line 5290)
-- new DOMException (line 5379)
-- new DOMException (line 5383)
-- new DOMException (line 5441)
-- new DOMException (line 5458)
-- new DOMException (line 5490)
-- new DOMException (line 5532)
-- new DOMException (line 5559)
-- new DOMException (line 6448)
-- new Variable (line 6478)
-- new DOMException (line 6748)
-- new DOMException (line 6866)
-- new DOMException (line 6911)
-- new ObjectEntry (line 6996)
-- new DomNodeState (line 7000)
-- new Variable (line 7007)
-- new DOMException (line 7061)
-- new ObjectEntry (line 7278)
-- new DomNodeState (line 7282)
-- new Variable (line 7289)
-- new ObjectEntry (line 7316)
-- new DomNodeState (line 7319)
-- new Variable (line 7327)
-- new Variable (line 7518)
+- new DOMException (line 5082)
+- new DOMException (line 5279)
+- new DOMException (line 5283)
+- new DOMException (line 5372)
+- new DOMException (line 5376)
+- new DOMException (line 5434)
+- new DOMException (line 5451)
+- new DOMException (line 5483)
+- new DOMException (line 5525)
+- new DOMException (line 5552)
+- new DOMException (line 6441)
+- new Variable (line 6471)
+- new DOMException (line 6741)
+- new DOMException (line 6859)
+- new DOMException (line 6904)
+- new ObjectEntry (line 6989)
+- new DomNodeState (line 6993)
+- new Variable (line 7000)
+- new DOMException (line 7054)
+- new ObjectEntry (line 7271)
+- new DomNodeState (line 7275)
+- new Variable (line 7282)
+- new ObjectEntry (line 7309)
+- new DomNodeState (line 7312)
+- new Variable (line 7320)
+- new Variable (line 7511)
+- new DOMException (line 7648)
 - new DOMException (line 7655)
 - new DOMException (line 7662)
+- new DOMException (line 7666)
 - new DOMException (line 7669)
-- new DOMException (line 7673)
-- new DOMException (line 7676)
-- new DOMException (line 7685)
-- new DOMException (line 7697)
-- new DOMException (line 8758)
-- new Variable (line 8817)
-- new Variable (line 8830)
-- new Variable (line 8868)
-- new DOMException (line 8879)
-- new Variable (line 8881)
-- new DOMException (line 9042)
-- new DOMException (line 9069)
-- new DOMException (line 9105)
-- new DOMException (line 9169)
-- new DOMException (line 9177)
-- new DOMException (line 9190)
-- new DOMException (line 9195)
-- new DOMException (line 9198)
-- new DOMException (line 9201)
-- new DOMException (line 9230)
-- new Error (line 10122)
-- new Error (line 10126)
+- new DOMException (line 7678)
+- new DOMException (line 7690)
+- new DOMException (line 8746)
+- new Variable (line 8805)
+- new Variable (line 8818)
+- new Variable (line 8856)
+- new DOMException (line 8867)
+- new Variable (line 8869)
+- new DOMException (line 9030)
+- new DOMException (line 9057)
+- new DOMException (line 9093)
+- new DOMException (line 9157)
+- new DOMException (line 9165)
+- new DOMException (line 9178)
+- new DOMException (line 9183)
+- new DOMException (line 9186)
+- new DOMException (line 9189)
+- new DOMException (line 9218)
+- new Error (line 10110)
+- new Error (line 10114)
 - 417 class method(s)
 - 2 closure(s)
 
@@ -10949,8 +10948,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 137)
 - new IntlDateFormatterCreate (line 148)
 - new IntlDateFormatterFormat (line 151)
-- new IntlDateFormatterGetPattern (line 154)
-- new ClassEntry (line 237)
+- new ClassEntry (line 234)
 - 17 class method(s)
 
 ### `ext/intl/GraphemeStrSplitJitHelper.php`
@@ -10986,12 +10984,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/intl/IntlDateFormatterFormat.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- 1 class method(s)
-
-### `ext/intl/IntlDateFormatterGetPattern.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
@@ -11265,9 +11257,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmIntlDateFormatter.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 77)
-- new ObjectEntry (line 82)
-- 21 class method(s)
+- new Error (line 70)
+- new ObjectEntry (line 75)
+- new Error (line 105)
+- 13 class method(s)
 
 ### `ext/intl/VmIntlTimeZone.php`
 
@@ -14647,7 +14640,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/redis/RedisClassMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/redis/RedisClose.php`
 
@@ -14668,16 +14661,76 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/redis/RedisDepthMethods.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- new ArgumentCountError (line 52)
-- new ArgumentCountError (line 106)
-- new ArgumentCountError (line 134)
-- new ArgumentCountError (line 173)
-- new ArgumentCountError (line 199)
-- new ArgumentCountError (line 230)
-- new HashTable (line 238)
-- new Variable (line 240)
-- 9 class method(s)
+- new ArgumentCountError (line 27)
+- new RedisException (line 38)
+- new ArgumentCountError (line 58)
+- new RedisException (line 69)
+- new RedisException (line 105)
+- new RedisException (line 112)
+- new ArgumentCountError (line 128)
+- new RedisException (line 144)
+- new ArgumentCountError (line 163)
+- new RedisException (line 172)
+- new ArgumentCountError (line 208)
+- new RedisException (line 220)
+- new ArgumentCountError (line 239)
+- new RedisException (line 258)
+- new ArgumentCountError (line 275)
+- new HashTable (line 286)
+- new RedisException (line 291)
+- new ArgumentCountError (line 313)
+- new RedisException (line 327)
+- new ArgumentCountError (line 346)
+- new RedisException (line 360)
+- new ArgumentCountError (line 379)
+- new RedisException (line 395)
+- new ArgumentCountError (line 412)
+- new RedisException (line 428)
+- new ArgumentCountError (line 445)
+- new HashTable (line 465)
+- new RedisException (line 470)
+- new ArgumentCountError (line 491)
+- new RedisException (line 505)
+- new ArgumentCountError (line 524)
+- new RedisException (line 538)
+- new ArgumentCountError (line 557)
+- new HashTable (line 568)
+- new RedisException (line 573)
+- new ArgumentCountError (line 594)
+- new RedisException (line 605)
+- new ArgumentCountError (line 625)
+- new RedisException (line 642)
+- new ArgumentCountError (line 661)
+- new HashTable (line 689)
+- new RedisException (line 694)
+- new ArgumentCountError (line 725)
+- new RedisException (line 739)
+- new RedisException (line 763)
+- new RedisException (line 772)
+- new RedisException (line 795)
+- new RedisException (line 831)
+- new HashTable (line 833)
+- new HashTable (line 849)
+- new RedisException (line 857)
+- new ArgumentCountError (line 872)
+- new ArgumentCountError (line 911)
+- new RedisException (line 922)
+- new ArgumentCountError (line 941)
+- new RedisException (line 949)
+- new ArgumentCountError (line 968)
+- new RedisException (line 981)
+- new ArgumentCountError (line 1000)
+- new RedisException (line 1013)
+- new ArgumentCountError (line 1032)
+- new HashTable (line 1043)
+- new RedisException (line 1048)
+- new ArgumentCountError (line 1069)
+- new HashTable (line 1088)
+- new RedisException (line 1093)
+- new HashTable (line 1095)
+- new ArgumentCountError (line 1114)
+- new RedisException (line 1128)
+- 32 class method(s)
 
 ### `ext/redis/RedisExtensionPolicy.php`
 
@@ -14688,36 +14741,67 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- new RedisException (line 37)
 - 1 class method(s)
 
 ### `ext/redis/RedisSet.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
+- new RedisException (line 33)
 - 1 class method(s)
 
 ### `ext/redis/VmRedis.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 32)
-- new Variable (line 35)
-- new RedisConstruct (line 42)
-- new RedisConnect (line 47)
-- new RedisSet (line 48)
-- new RedisGet (line 49)
-- new RedisClose (line 50)
-- new RedisDel (line 51)
-- new RedisExists (line 52)
-- new RedisPing (line 53)
-- new RedisAuth (line 54)
-- new RedisSelect (line 55)
-- new RedisIsConnected (line 56)
-- new RedisHSet (line 57)
-- new RedisHGet (line 58)
-- new RedisHGetAll (line 59)
-- new RedisState (line 78)
-- new RedisException (line 122)
-- 10 class method(s)
+- new ClassEntry (line 33)
+- new Variable (line 36)
+- new RedisConstruct (line 43)
+- new RedisConnect (line 48)
+- new RedisSet (line 49)
+- new RedisGet (line 50)
+- new RedisClose (line 51)
+- new RedisDel (line 52)
+- new RedisExists (line 53)
+- new RedisPing (line 54)
+- new RedisAuth (line 55)
+- new RedisSelect (line 56)
+- new RedisIsConnected (line 57)
+- new RedisHSet (line 58)
+- new RedisHGet (line 59)
+- new RedisHGetAll (line 60)
+- new RedisLPush (line 61)
+- new RedisLPop (line 62)
+- new RedisRPush (line 63)
+- new RedisRPop (line 64)
+- new RedisLRange (line 65)
+- new RedisSAdd (line 66)
+- new RedisSRem (line 67)
+- new RedisSMembers (line 68)
+- new RedisSIsMember (line 69)
+- new RedisZAdd (line 70)
+- new RedisZRange (line 71)
+- new RedisZRem (line 72)
+- new RedisMulti (line 73)
+- new RedisPipeline (line 74)
+- new RedisExec (line 75)
+- new RedisEval (line 76)
+- new RedisExpire (line 77)
+- new RedisTtl (line 78)
+- new RedisIncr (line 79)
+- new RedisDecr (line 80)
+- new RedisKeys (line 81)
+- new RedisMGet (line 82)
+- new RedisMSet (line 83)
+- new HashTable (line 115)
+- new Variable (line 117)
+- new HashTable (line 128)
+- new Variable (line 130)
+- new Variable (line 141)
+- new HashTable (line 163)
+- new RedisState (line 237)
+- new RedisException (line 281)
+- 15 class method(s)
 
 ### `ext/redis/VmRedisNative.php`
 
@@ -14725,22 +14809,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new RedisException (line 33)
 - new RedisException (line 63)
 - new RedisException (line 83)
-- new RedisException (line 99)
-- new RedisException (line 117)
-- new RedisException (line 135)
-- new RedisException (line 154)
-- new RedisException (line 160)
-- new RedisException (line 179)
-- new RedisException (line 197)
-- new RedisException (line 209)
-- new RedisException (line 232)
-- new RedisException (line 249)
-- new RedisException (line 282)
-- new RedisException (line 290)
-- new RedisException (line 300)
-- new RedisException (line 316)
-- new RedisException (line 329)
-- 18 class method(s)
+- new RedisException (line 97)
+- new RedisException (line 145)
+- new RedisException (line 163)
+- new RedisException (line 182)
+- new RedisException (line 188)
+- new RedisException (line 207)
+- new RedisException (line 225)
+- new RedisException (line 237)
+- new RedisException (line 260)
+- new RedisException (line 277)
+- new RedisException (line 301)
+- new RedisException (line 324)
+- new RedisException (line 341)
+- new RedisException (line 364)
+- new RedisException (line 383)
+- new RedisException (line 403)
+- new RedisException (line 422)
+- new RedisException (line 445)
+- new RedisException (line 469)
+- new RedisException (line 501)
+- new RedisException (line 516)
+- new RedisException (line 531)
+- new RedisException (line 547)
+- new RedisException (line 563)
+- new RedisException (line 583)
+- new RedisException (line 611)
+- new RedisException (line 645)
+- new RedisException (line 683)
+- new RedisException (line 691)
+- new RedisException (line 701)
+- new RedisException (line 717)
+- new RedisException (line 730)
+- 38 class method(s)
 
 ### `ext/reflection/IsAnonymousClassJitHelper.php`
 
