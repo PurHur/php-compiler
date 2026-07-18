@@ -4,11 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\pdo;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * ext/pdo advertisement — php-src ext/pdo/pdo.c (#3367).
  *
  * PDO + PDOException are always advertised (Zend ships ext/pdo). The sqlite driver
  * surface needs libsqlite3 FFI ({@see \PHPCompiler\ext\sqlite3\VmSqlite3Native}).
+ *
+ * PHP 8.4 driver subclasses ({@see Pdo\Mysql}, {@see Pdo\Pgsql}) are advertised on
+ * language profile ≥ 8.4 ahead of native libmysql/libpq FFI (#20548). They are not
+ * listed in getAvailableDrivers() until a real connection factory exists (sqlite-style
+ * lib gate); PDO::connect('mysql:…'/'pgsql:…') therefore throws "could not find driver"
+ * like Zend when the driver module is absent.
  */
 final class PdoExtensionPolicy
 {
@@ -27,5 +35,27 @@ final class PdoExtensionPolicy
     {
         return self::advertisesExtension()
             && \PHPCompiler\ext\sqlite3\VmSqlite3Native::available();
+    }
+
+    /**
+     * PHP 8.4+ Pdo\Mysql / Pdo\Pgsql subclass API (pdo_mysql.stub.php / pdo_pgsql.stub.php).
+     *
+     * Not gated on native client libs yet — class/constants/methods exist for reflection
+     * and instanceof; live connections remain a follow-on (#3435 / #3741).
+     */
+    public static function advertisesDriverSpecificSubclasses(): bool
+    {
+        return self::advertisesExtension()
+            && version_compare(CompilerVersion::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    public static function advertisesMysqlSubclass(): bool
+    {
+        return self::advertisesDriverSpecificSubclasses();
+    }
+
+    public static function advertisesPgsqlSubclass(): bool
+    {
+        return self::advertisesDriverSpecificSubclasses();
     }
 }

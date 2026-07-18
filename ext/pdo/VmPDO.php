@@ -30,13 +30,21 @@ final class VmPDO
 
     public const SQLITE_CLASS_NAME = 'Pdo\\Sqlite';
 
+    public const MYSQL_CLASS_LC = 'pdo\\mysql';
+
+    public const MYSQL_CLASS_NAME = 'Pdo\\Mysql';
+
+    public const PGSQL_CLASS_LC = 'pdo\\pgsql';
+
+    public const PGSQL_CLASS_NAME = 'Pdo\\Pgsql';
+
     /** @var array<int, PdoState> */
     private static array $store = [];
 
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['exec'])) {
-            self::registerSqliteSubclass($ctx);
+            self::registerDriverSubclasses($ctx);
 
             return;
         }
@@ -100,7 +108,15 @@ final class VmPDO
         $entry->methodVisibility['connect'] = CfgFunc::FLAG_STATIC | $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
+        self::registerDriverSubclasses($ctx);
+    }
+
+    /** PHP 8.4 driver-specific subclasses (#20529, #20548). */
+    public static function registerDriverSubclasses(Context $ctx): void
+    {
         self::registerSqliteSubclass($ctx);
+        self::registerMysqlSubclass($ctx);
+        self::registerPgsqlSubclass($ctx);
     }
 
     /**
@@ -123,10 +139,93 @@ final class VmPDO
         $ctx->classes[self::SQLITE_CLASS_LC] = $sqlite;
     }
 
+    /**
+     * PHP 8.4 Pdo\Mysql (php-src ext/pdo_mysql/pdo_mysql.stub.php; #20548).
+     *
+     * Native mysql connection factory is not wired yet — class/constants/methods only.
+     */
+    public static function registerMysqlSubclass(Context $ctx): void
+    {
+        if (!PdoExtensionPolicy::advertisesMysqlSubclass()) {
+            return;
+        }
+        if (isset($ctx->classes[self::MYSQL_CLASS_LC])) {
+            return;
+        }
+        if (!isset($ctx->classes[self::CLASS_LC])) {
+            return;
+        }
+        $mysql = new ClassEntry(self::MYSQL_CLASS_NAME);
+        $mysql->isInternal = true;
+        $mysql->parentLc = self::CLASS_LC;
+        foreach (PdoMysqlConstants::CLASS_CONSTANTS as $name => $value) {
+            $const = new Variable(Variable::TYPE_INTEGER);
+            $const->int($value);
+            $mysql->constants[$name] = $const;
+            $mysql->constNames[$name] = PdoMysqlConstants::CLASS_CONSTANT_NAMES[$name];
+        }
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $mysql->methods['getwarningcount'] = new PDOMysqlGetWarningCount();
+        $mysql->methodVisibility['getwarningcount'] = $pub;
+        $mysql->methodNames['getwarningcount'] = 'getWarningCount';
+        $ctx->classes[self::MYSQL_CLASS_LC] = $mysql;
+    }
+
+    /**
+     * PHP 8.4 Pdo\Pgsql (php-src ext/pdo_pgsql/pdo_pgsql.stub.php; #20548).
+     *
+     * Native pgsql connection factory is not wired yet — class/constants/methods only.
+     */
+    public static function registerPgsqlSubclass(Context $ctx): void
+    {
+        if (!PdoExtensionPolicy::advertisesPgsqlSubclass()) {
+            return;
+        }
+        if (isset($ctx->classes[self::PGSQL_CLASS_LC])) {
+            return;
+        }
+        if (!isset($ctx->classes[self::CLASS_LC])) {
+            return;
+        }
+        $pgsql = new ClassEntry(self::PGSQL_CLASS_NAME);
+        $pgsql->isInternal = true;
+        $pgsql->parentLc = self::CLASS_LC;
+        foreach (PdoPgsqlConstants::CLASS_CONSTANTS as $name => $value) {
+            $const = new Variable(Variable::TYPE_INTEGER);
+            $const->int($value);
+            $pgsql->constants[$name] = $const;
+            $pgsql->constNames[$name] = PdoPgsqlConstants::CLASS_CONSTANT_NAMES[$name];
+        }
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $methods = [
+            'escapeidentifier' => [new PDOPgsqlEscapeIdentifier(), 'escapeIdentifier'],
+            'copyfromarray' => [new PDOPgsqlCopyFromArray(), 'copyFromArray'],
+            'copyfromfile' => [new PDOPgsqlCopyFromFile(), 'copyFromFile'],
+            'copytoarray' => [new PDOPgsqlCopyToArray(), 'copyToArray'],
+            'copytofile' => [new PDOPgsqlCopyToFile(), 'copyToFile'],
+            'lobcreate' => [new PDOPgsqlLobCreate(), 'lobCreate'],
+            'lobopen' => [new PDOPgsqlLobOpen(), 'lobOpen'],
+            'lobunlink' => [new PDOPgsqlLobUnlink(), 'lobUnlink'],
+            'getnotify' => [new PDOPgsqlGetNotify(), 'getNotify'],
+            'getpid' => [new PDOPgsqlGetPid(), 'getPid'],
+            'setnoticecallback' => [new PDOPgsqlSetNoticeCallback(), 'setNoticeCallback'],
+        ];
+        foreach ($methods as $lc => [$method, $display]) {
+            $pgsql->methods[$lc] = $method;
+            $pgsql->methodVisibility[$lc] = $pub;
+            $pgsql->methodNames[$lc] = $display;
+        }
+        $ctx->classes[self::PGSQL_CLASS_LC] = $pgsql;
+    }
+
     public static function isPdoFamily(ClassEntry $class): bool
     {
         $lc = \strtolower($class->name);
-        if (self::CLASS_LC === $lc || self::SQLITE_CLASS_LC === $lc) {
+        if (self::CLASS_LC === $lc
+            || self::SQLITE_CLASS_LC === $lc
+            || self::MYSQL_CLASS_LC === $lc
+            || self::PGSQL_CLASS_LC === $lc
+        ) {
             return true;
         }
 
@@ -134,10 +233,18 @@ final class VmPDO
     }
 
     /**
-     * Allocate and open a PDO (or Pdo\Sqlite) handle from a DSN (#20529).
+     * Allocate and open a PDO (or driver subclass) handle from a DSN (#20529, #20548).
+     *
+     * mysql:/pgsql: throw "could not find driver" until native factories land — subclasses
+     * still exist for class_exists / constants / method_exists.
      */
     public static function connect(Context $ctx, string $dsn): ObjectEntry
     {
+        $driver = self::dsnDriverPrefix($dsn);
+        if ('mysql' === $driver || 'pgsql' === $driver) {
+            // Driver subclass may be registered without a live factory (profile ≥ 8.4).
+            throw new \PDOException('could not find driver');
+        }
         $filename = self::parseSqliteDsn($dsn);
         $class = $ctx->classes[self::SQLITE_CLASS_LC] ?? $ctx->classes[self::CLASS_LC] ?? null;
         if (null === $class) {
@@ -147,6 +254,17 @@ final class VmPDO
         self::initObject($entry, $filename);
 
         return $entry;
+    }
+
+    /** DSN scheme before the first ':' (php-src pdo_find_driver). */
+    public static function dsnDriverPrefix(string $dsn): string
+    {
+        $colon = \strpos($dsn, ':');
+        if (false === $colon || 0 === $colon) {
+            return '';
+        }
+
+        return \strtolower(\substr($dsn, 0, $colon));
     }
 
     /**
@@ -899,5 +1017,118 @@ final class PDOSqliteCreateAggregate extends PdoClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
+    }
+}
+
+/** Pdo\Mysql::getWarningCount() — stub until native mysql factory (#20548). */
+final class PDOMysqlGetWarningCount extends PdoClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getWarningCount');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $this->receiver($frame, 'Pdo\\Mysql::getWarningCount()');
+        throw new \PDOException('could not find driver');
+    }
+}
+
+/** Shared: Pdo\Pgsql methods require a live pgsql handle (not wired yet; #20548). */
+abstract class PDOPgsqlUnimplementedMethod extends PdoClassMethod
+{
+    public function execute(Frame $frame): void
+    {
+        $this->receiver($frame, 'Pdo\\Pgsql::'.$this->getName().'()');
+        throw new \PDOException('could not find driver');
+    }
+}
+
+final class PDOPgsqlEscapeIdentifier extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('escapeIdentifier');
+    }
+}
+
+final class PDOPgsqlCopyFromArray extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('copyFromArray');
+    }
+}
+
+final class PDOPgsqlCopyFromFile extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('copyFromFile');
+    }
+}
+
+final class PDOPgsqlCopyToArray extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('copyToArray');
+    }
+}
+
+final class PDOPgsqlCopyToFile extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('copyToFile');
+    }
+}
+
+final class PDOPgsqlLobCreate extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('lobCreate');
+    }
+}
+
+final class PDOPgsqlLobOpen extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('lobOpen');
+    }
+}
+
+final class PDOPgsqlLobUnlink extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('lobUnlink');
+    }
+}
+
+final class PDOPgsqlGetNotify extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getNotify');
+    }
+}
+
+final class PDOPgsqlGetPid extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPid');
+    }
+}
+
+final class PDOPgsqlSetNoticeCallback extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setNoticeCallback');
     }
 }
