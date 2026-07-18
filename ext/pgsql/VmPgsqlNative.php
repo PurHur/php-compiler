@@ -178,6 +178,82 @@ final class VmPgsqlNative
         self::requireFfi()->PQuntrace($conn);
     }
 
+    public const INV_WRITE = 0x00020000;
+
+    public const INV_READ = 0x00040000;
+
+    public const INVALID_OID = 0;
+
+    public static function loCreat(\FFI\CData $conn, int $mode): int
+    {
+        return (int) self::requireFfi()->lo_creat($conn, $mode);
+    }
+
+    public static function loCreate(\FFI\CData $conn, int $oid): int
+    {
+        return (int) self::requireFfi()->lo_create($conn, $oid);
+    }
+
+    public static function loOpen(\FFI\CData $conn, int $oid, int $mode): int
+    {
+        return (int) self::requireFfi()->lo_open($conn, $oid, $mode);
+    }
+
+    public static function loClose(\FFI\CData $conn, int $fd): int
+    {
+        return (int) self::requireFfi()->lo_close($conn, $fd);
+    }
+
+    public static function loRead(\FFI\CData $conn, int $fd, int $length): string|false
+    {
+        $ffi = self::requireFfi();
+        $buf = $ffi->new('char['.$length.']');
+        $n = (int) $ffi->lo_read($conn, $fd, $buf, $length);
+        if ($n < 0) {
+            return false;
+        }
+        if (0 === $n) {
+            return '';
+        }
+
+        return \FFI::string($buf, $n);
+    }
+
+    public static function loWrite(\FFI\CData $conn, int $fd, string $data, int $length): int
+    {
+        return (int) self::requireFfi()->lo_write($conn, $fd, $data, $length);
+    }
+
+    public static function loLseek(\FFI\CData $conn, int $fd, int $offset, int $whence): int
+    {
+        return (int) self::requireFfi()->lo_lseek($conn, $fd, $offset, $whence);
+    }
+
+    public static function loTell(\FFI\CData $conn, int $fd): int
+    {
+        return (int) self::requireFfi()->lo_tell($conn, $fd);
+    }
+
+    public static function loTruncate(\FFI\CData $conn, int $fd, int $size): int
+    {
+        return (int) self::requireFfi()->lo_truncate($conn, $fd, $size);
+    }
+
+    public static function loUnlink(\FFI\CData $conn, int $oid): int
+    {
+        return (int) self::requireFfi()->lo_unlink($conn, $oid);
+    }
+
+    public static function loImport(\FFI\CData $conn, string $filename): int
+    {
+        return (int) self::requireFfi()->lo_import($conn, $filename);
+    }
+
+    public static function loExport(\FFI\CData $conn, int $oid, string $filename): int
+    {
+        return (int) self::requireFfi()->lo_export($conn, $oid, $filename);
+    }
+
     public static function fclose(\FFI\CData $fp): void
     {
         $libc = self::libc();
@@ -295,6 +371,19 @@ char *PQescapeLiteral(PGconn *conn, const char *str, size_t length);
 void PQfreemem(void *ptr);
 void PQtrace(PGconn *conn, FILE *stream);
 void PQuntrace(PGconn *conn);
+typedef unsigned int Oid;
+Oid lo_creat(PGconn *conn, int mode);
+Oid lo_create(PGconn *conn, Oid lobjId);
+int lo_open(PGconn *conn, Oid lobjId, int mode);
+int lo_close(PGconn *conn, int fd);
+int lo_read(PGconn *conn, int fd, char *buf, size_t len);
+int lo_write(PGconn *conn, int fd, const char *buf, size_t len);
+int lo_lseek(PGconn *conn, int fd, int offset, int whence);
+int lo_tell(PGconn *conn, int fd);
+int lo_truncate(PGconn *conn, int fd, size_t len);
+int lo_unlink(PGconn *conn, Oid lobjId);
+Oid lo_import(PGconn *conn, const char *filename);
+int lo_export(PGconn *conn, Oid lobjId, const char *filename);
 CDEF;
 
         foreach ([

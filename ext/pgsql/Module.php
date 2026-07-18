@@ -62,6 +62,8 @@ class Module extends ModuleAbstract
             return [];
         }
 
+        require_once __DIR__.'/pg_lo_builtins.php';
+
         return [
             new pg_connect(),
             new pg_close(),
@@ -72,6 +74,18 @@ class Module extends ModuleAbstract
             new pg_last_error(),
             new pg_trace(),
             new pg_untrace(),
+            new pg_lo_create(),
+            new pg_lo_unlink(),
+            new pg_lo_open(),
+            new pg_lo_close(),
+            new pg_lo_read(),
+            new pg_lo_write(),
+            new pg_lo_read_all(),
+            new pg_lo_seek(),
+            new pg_lo_tell(),
+            new pg_lo_truncate(),
+            new pg_lo_import(),
+            new pg_lo_export(),
             ...self::php84Functions(),
         ];
     }
