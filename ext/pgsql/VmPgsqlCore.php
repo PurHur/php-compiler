@@ -541,6 +541,276 @@ final class VmPgsqlCore
     }
 
     /**
+     * Match php-src `_php_pgsql_link_has_results` — clears one pending result when present (#20681).
+     */
+    private static function linkHasResults(\FFI\CData $conn): bool
+    {
+        $result = VmPgsqlNative::getResult($conn);
+        if (null === $result) {
+            return false;
+        }
+        VmPgsqlNative::clear($result);
+
+        return true;
+    }
+
+    /**
+     * Shared flush/return mapping for pg_send_* (php-src ext/pgsql/pgsql.c; #20681).
+     *
+     * @return true|int|false
+     */
+    private static function flushAfterSend(\FFI\CData $conn, int $wasNonBlocking, string $fn): bool|int
+    {
+        if (0 !== $wasNonBlocking) {
+            $ret = VmPgsqlNative::flush($conn);
+        } else {
+            while (($ret = VmPgsqlNative::flush($conn))) {
+                if (-1 === $ret) {
+                    @\trigger_error($fn.'(): Could not empty PostgreSQL send buffer', \E_USER_NOTICE);
+                    break;
+                }
+                \usleep(10000);
+            }
+            if (0 !== VmPgsqlNative::setNonBlocking($conn, 0)) {
+                @\trigger_error($fn.'(): Cannot set connection to blocking mode', \E_USER_NOTICE);
+            }
+        }
+
+        return match ($ret) {
+            0 => true,
+            -1 => false,
+            default => 0,
+        };
+    }
+
+    /**
+     * pg_send_query — true / 0 / false (php-src; #20681).
+     *
+     * @return true|int|false
+     */
+    public static function sendQuery(ObjectEntry $connection, string $query): bool|int
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        $wasNonBlocking = VmPgsqlNative::isNonBlocking($conn);
+        if (0 === $wasNonBlocking && -1 === VmPgsqlNative::setNonBlocking($conn, 1)) {
+            @\trigger_error('pg_send_query(): Cannot set connection to nonblocking mode', \E_USER_NOTICE);
+
+            return false;
+        }
+        if (self::linkHasResults($conn)) {
+            @\trigger_error(
+                'pg_send_query(): There are results on this connection. Call pg_get_result() until it returns FALSE',
+                \E_USER_NOTICE
+            );
+        }
+        if (0 !== $wasNonBlocking) {
+            if (!VmPgsqlNative::sendQuery($conn, $query)) {
+                return false;
+            }
+        } else {
+            if (!VmPgsqlNative::sendQuery($conn, $query)) {
+                if (VmPgsqlNative::CONNECTION_OK !== VmPgsqlNative::status($conn)) {
+                    VmPgsqlNative::reset($conn);
+                }
+                if (!VmPgsqlNative::sendQuery($conn, $query)) {
+                    return false;
+                }
+            }
+        }
+
+        return self::flushAfterSend($conn, $wasNonBlocking, 'pg_send_query');
+    }
+
+    /**
+     * pg_send_query_params — true / 0 / false (#20681).
+     *
+     * @param list<string|null> $params
+     *
+     * @return true|int|false
+     */
+    public static function sendQueryParams(ObjectEntry $connection, string $query, array $params): bool|int
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        $wasNonBlocking = VmPgsqlNative::isNonBlocking($conn);
+        if (0 === $wasNonBlocking && -1 === VmPgsqlNative::setNonBlocking($conn, 1)) {
+            @\trigger_error('pg_send_query_params(): Cannot set connection to nonblocking mode', \E_USER_NOTICE);
+
+            return false;
+        }
+        if (self::linkHasResults($conn)) {
+            @\trigger_error(
+                'pg_send_query_params(): There are results on this connection. Call pg_get_result() until it returns FALSE',
+                \E_USER_NOTICE
+            );
+        }
+        if (VmPgsqlNative::sendQueryParams($conn, $query, $params)) {
+            // sent
+        } elseif (0 !== $wasNonBlocking) {
+            return false;
+        } else {
+            if (VmPgsqlNative::CONNECTION_OK !== VmPgsqlNative::status($conn)) {
+                VmPgsqlNative::reset($conn);
+            }
+            if (!VmPgsqlNative::sendQueryParams($conn, $query, $params)) {
+                return false;
+            }
+        }
+
+        return self::flushAfterSend($conn, $wasNonBlocking, 'pg_send_query_params');
+    }
+
+    /**
+     * pg_send_prepare — true / 0 / false (#20681).
+     *
+     * @return true|int|false
+     */
+    public static function sendPrepare(ObjectEntry $connection, string $stmtName, string $query): bool|int
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        $wasNonBlocking = VmPgsqlNative::isNonBlocking($conn);
+        if (0 === $wasNonBlocking && -1 === VmPgsqlNative::setNonBlocking($conn, 1)) {
+            @\trigger_error('pg_send_prepare(): Cannot set connection to nonblocking mode', \E_USER_NOTICE);
+
+            return false;
+        }
+        if (self::linkHasResults($conn)) {
+            @\trigger_error(
+                'pg_send_prepare(): There are results on this connection. Call pg_get_result() until it returns FALSE',
+                \E_USER_NOTICE
+            );
+        }
+        if (!VmPgsqlNative::sendPrepare($conn, $stmtName, $query)) {
+            if (0 !== $wasNonBlocking) {
+                return false;
+            }
+            if (VmPgsqlNative::CONNECTION_OK !== VmPgsqlNative::status($conn)) {
+                VmPgsqlNative::reset($conn);
+            }
+            if (!VmPgsqlNative::sendPrepare($conn, $stmtName, $query)) {
+                return false;
+            }
+        }
+
+        return self::flushAfterSend($conn, $wasNonBlocking, 'pg_send_prepare');
+    }
+
+    /**
+     * pg_send_execute — true / 0 / false (#20681).
+     *
+     * @param list<string|null> $params
+     *
+     * @return true|int|false
+     */
+    public static function sendExecute(ObjectEntry $connection, string $stmtName, array $params): bool|int
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        $wasNonBlocking = VmPgsqlNative::isNonBlocking($conn);
+        if (0 === $wasNonBlocking && -1 === VmPgsqlNative::setNonBlocking($conn, 1)) {
+            @\trigger_error('pg_send_execute(): Cannot set connection to nonblocking mode', \E_USER_NOTICE);
+
+            return false;
+        }
+        if (self::linkHasResults($conn)) {
+            @\trigger_error(
+                'pg_send_execute(): There are results on this connection. Call pg_get_result() until it returns FALSE',
+                \E_USER_NOTICE
+            );
+        }
+        if (VmPgsqlNative::sendQueryPrepared($conn, $stmtName, $params)) {
+            // sent
+        } elseif (0 !== $wasNonBlocking) {
+            return false;
+        } else {
+            if (VmPgsqlNative::CONNECTION_OK !== VmPgsqlNative::status($conn)) {
+                VmPgsqlNative::reset($conn);
+            }
+            if (!VmPgsqlNative::sendQueryPrepared($conn, $stmtName, $params)) {
+                return false;
+            }
+        }
+
+        return self::flushAfterSend($conn, $wasNonBlocking, 'pg_send_execute');
+    }
+
+    /**
+     * pg_get_result — PgSql\Result or false (#20681).
+     *
+     * @return Variable|false
+     */
+    public static function getResult(ObjectEntry $connection, Context $ctx): Variable|false
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        $result = VmPgsqlNative::getResult($conn);
+        if (null === $result) {
+            return false;
+        }
+
+        return VmPgsqlResult::wrap($result, $ctx, $connection);
+    }
+
+    /**
+     * pg_cancel_query (#20681).
+     */
+    public static function cancelQuery(ObjectEntry $connection): bool
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        if (0 !== VmPgsqlNative::setNonBlocking($conn, 1)) {
+            @\trigger_error('pg_cancel_query(): Cannot set connection to nonblocking mode', \E_USER_NOTICE);
+
+            return false;
+        }
+        [$ok, $err] = VmPgsqlNative::cancel($conn);
+        if (!$ok) {
+            @\trigger_error('cannot cancel the query: '.$err, \E_USER_WARNING);
+        }
+        while (null !== ($res = VmPgsqlNative::getResult($conn))) {
+            VmPgsqlNative::clear($res);
+        }
+        if (0 !== VmPgsqlNative::setNonBlocking($conn, 0)) {
+            @\trigger_error('pg_cancel_query(): Cannot set connection to blocking mode', \E_USER_NOTICE);
+        }
+
+        return $ok;
+    }
+
+    /**
+     * pg_get_notify — assoc/num/both array or false (#20681).
+     *
+     * @return HashTable|false
+     */
+    public static function getNotify(ObjectEntry $connection, int $mode = PgsqlConstants::PGSQL_ASSOC): HashTable|false
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        VmPgsqlNative::consumeInput($conn);
+        $notify = VmPgsqlNative::notifies($conn);
+        if (null === $notify) {
+            return false;
+        }
+        $includePayload = true;
+        $server = VmPgsqlNative::parameterStatus($conn, 'server_version');
+        if (null !== $server && (float) $server < 9.0) {
+            $includePayload = false;
+        }
+        $ht = new HashTable();
+        if ($mode & PgsqlConstants::PGSQL_NUM) {
+            self::htAddString($ht, '0', $notify['relname']);
+            self::htAddLong($ht, '1', $notify['be_pid']);
+            if ($includePayload) {
+                self::htAddString($ht, '2', $notify['extra']);
+            }
+        }
+        if ($mode & PgsqlConstants::PGSQL_ASSOC) {
+            self::htAddString($ht, 'message', $notify['relname']);
+            self::htAddLong($ht, 'pid', $notify['be_pid']);
+            if ($includePayload) {
+                self::htAddString($ht, 'payload', $notify['extra']);
+            }
+        }
+
+        return $ht;
+    }
+
+    /**
      * pg_version assoc array (php-src php_pgsql_get_link_info PHP_PG_VERSION; #20680).
      */
     public static function version(ObjectEntry $connection): HashTable

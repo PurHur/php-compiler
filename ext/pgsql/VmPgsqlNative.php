@@ -168,6 +168,80 @@ final class VmPgsqlNative
         return self::requireFfi()->PQgetResult($conn);
     }
 
+    /** PQsendQuery — 1 on success, 0 on failure (php-src pg_send_query; #20681). */
+    public static function sendQuery(\FFI\CData $conn, string $query): bool
+    {
+        return 1 === (int) self::requireFfi()->PQsendQuery($conn, $query);
+    }
+
+    /**
+     * PQsendQueryParams (#20681).
+     *
+     * @param list<string|null> $params
+     */
+    public static function sendQueryParams(\FFI\CData $conn, string $query, array $params): bool
+    {
+        return self::sendWithParams(false, $conn, $query, $params);
+    }
+
+    /** PQsendPrepare (#20681). */
+    public static function sendPrepare(\FFI\CData $conn, string $stmtName, string $query): bool
+    {
+        return 1 === (int) self::requireFfi()->PQsendPrepare($conn, $stmtName, $query, 0, null);
+    }
+
+    /**
+     * PQsendQueryPrepared (#20681).
+     *
+     * @param list<string|null> $params
+     */
+    public static function sendQueryPrepared(\FFI\CData $conn, string $stmtName, array $params): bool
+    {
+        return self::sendWithParams(true, $conn, $stmtName, $params);
+    }
+
+    /**
+     * PQcancel via PQgetCancel — returns [ok, errbuf] (php-src pg_cancel_query; #20681).
+     *
+     * @return array{0: bool, 1: string}
+     */
+    public static function cancel(\FFI\CData $conn): array
+    {
+        $ffi = self::requireFfi();
+        $cancel = $ffi->PQgetCancel($conn);
+        if (null === $cancel) {
+            return [false, 'PQgetCancel failed'];
+        }
+        $err = $ffi->new('char[256]');
+        $rc = (int) $ffi->PQcancel($cancel, $err, 256);
+        $msg = 0 === $rc ? self::ffiString($err) : '';
+        $ffi->PQfreeCancel($cancel);
+
+        return [1 === $rc, $msg];
+    }
+
+    /**
+     * PQnotifies — returns null when no pending notify (php-src pg_get_notify; #20681).
+     *
+     * @return array{relname: string, be_pid: int, extra: string}|null
+     */
+    public static function notifies(\FFI\CData $conn): ?array
+    {
+        $ffi = self::requireFfi();
+        $notify = $ffi->PQnotifies($conn);
+        if (null === $notify) {
+            return null;
+        }
+        $out = [
+            'relname' => self::ffiString($notify->relname),
+            'be_pid' => (int) $notify->be_pid,
+            'extra' => self::ffiString($notify->extra),
+        ];
+        $ffi->PQfreemem($notify);
+
+        return $out;
+    }
+
     /**
      * PQgetCopyData — returns [status, rowString]. status: >0 bytes, -1 done, -2 error, 0 would-block.
      *
@@ -489,6 +563,42 @@ final class VmPgsqlNative
      */
     private static function execWithParams(bool $prepared, \FFI\CData $conn, string $commandOrStmt, array $params): ?\FFI\CData
     {
+        [$ffi, $n, $values, $owned] = self::marshalParamValues($params);
+        if ($prepared) {
+            $res = $ffi->PQexecPrepared($conn, $commandOrStmt, $n, $values, null, null, 0);
+        } else {
+            $res = $ffi->PQexecParams($conn, $commandOrStmt, $n, null, $values, null, null, 0);
+        }
+        unset($owned);
+
+        return null === $res ? null : $res;
+    }
+
+    /**
+     * Shared PQsendQueryParams / PQsendQueryPrepared param marshalling (#20681).
+     *
+     * @param list<string|null> $params
+     */
+    private static function sendWithParams(bool $prepared, \FFI\CData $conn, string $commandOrStmt, array $params): bool
+    {
+        [$ffi, $n, $values, $owned] = self::marshalParamValues($params);
+        if ($prepared) {
+            $ok = 1 === (int) $ffi->PQsendQueryPrepared($conn, $commandOrStmt, $n, $values, null, null, 0);
+        } else {
+            $ok = 1 === (int) $ffi->PQsendQueryParams($conn, $commandOrStmt, $n, null, $values, null, null, 0);
+        }
+        unset($owned);
+
+        return $ok;
+    }
+
+    /**
+     * @param list<string|null> $params
+     *
+     * @return array{0: \FFI, 1: int, 2: \FFI\CData|null, 3: list<\FFI\CData>}
+     */
+    private static function marshalParamValues(array $params): array
+    {
         $ffi = self::requireFfi();
         $n = \count($params);
         $owned = [];
@@ -508,14 +618,8 @@ final class VmPgsqlNative
         } else {
             $values = null;
         }
-        if ($prepared) {
-            $res = $ffi->PQexecPrepared($conn, $commandOrStmt, $n, $values, null, null, 0);
-        } else {
-            $res = $ffi->PQexecParams($conn, $commandOrStmt, $n, null, $values, null, null, 0);
-        }
-        unset($owned);
 
-        return null === $res ? null : $res;
+        return [$ffi, $n, $values, $owned];
     }
 
     /**
@@ -712,6 +816,13 @@ CDEF;
         $cdef = <<<'CDEF'
 typedef struct pg_conn PGconn;
 typedef struct pg_result PGresult;
+typedef struct pg_cancel PGcancel;
+typedef struct pgNotify {
+    char *relname;
+    int be_pid;
+    char *extra;
+    struct pgNotify *next;
+} PGnotify;
 typedef struct _IO_FILE FILE;
 typedef unsigned int Oid;
 PGconn *PQconnectdb(const char *conninfo);
@@ -733,6 +844,14 @@ int PQputline(PGconn *conn, const char *string);
 int PQendcopy(PGconn *conn);
 int PQgetCopyData(PGconn *conn, char **buffer, int async);
 PGresult *PQgetResult(PGconn *conn);
+int PQsendQuery(PGconn *conn, const char *query);
+int PQsendQueryParams(PGconn *conn, const char *command, int nParams, const Oid *paramTypes, const char **paramValues, const int *paramLengths, const int *paramFormats, int resultFormat);
+int PQsendPrepare(PGconn *conn, const char *stmtName, const char *query, int nParams, const Oid *paramTypes);
+int PQsendQueryPrepared(PGconn *conn, const char *stmtName, int nParams, const char **paramValues, const int *paramLengths, const int *paramFormats, int resultFormat);
+PGcancel *PQgetCancel(const PGconn *conn);
+void PQfreeCancel(PGcancel *cancel);
+int PQcancel(PGcancel *cancel, char *errbuf, int errbufsize);
+PGnotify *PQnotifies(PGconn *conn);
 int PQsocket(const PGconn *conn);
 int PQconsumeInput(PGconn *conn);
 int PQflush(PGconn *conn);
