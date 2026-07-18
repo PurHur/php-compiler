@@ -338,3 +338,304 @@ final class pg_set_error_context_visibility extends Internal
         throw new \LogicException('pg_set_error_context_visibility() is not implemented for JIT (#20674)');
     }
 }
+
+/**
+ * Shared true / 0 / false return for pg_send_* (#20681).
+ */
+trait PgSendAsyncReturn
+{
+    private function assignSendReturn(\PHPCompiler\VM\Variable $returnVar, bool|int $out): void
+    {
+        if (true === $out) {
+            $returnVar->bool(true);
+
+            return;
+        }
+        if (false === $out) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $returnVar->int($out);
+    }
+}
+
+/**
+ * pg_send_query (php-src ext/pgsql/pgsql.c; #20681).
+ */
+final class pg_send_query extends Internal
+{
+    use PgSendAsyncReturn;
+
+    public function __construct()
+    {
+        parent::__construct('pg_send_query');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_send_query() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_send_query', 1);
+        $query = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_send_query', 1, 'query');
+        $this->assignSendReturn($frame->returnVar, VmPgsqlCore::sendQuery($conn, $query));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_send_query() is not implemented for JIT (#20681)');
+    }
+}
+
+/**
+ * pg_send_query_params (php-src ext/pgsql/pgsql.c; #20681).
+ */
+final class pg_send_query_params extends Internal
+{
+    use PgSendAsyncReturn;
+
+    public function __construct()
+    {
+        parent::__construct('pg_send_query_params');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_send_query_params() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_send_query_params', 1);
+        $query = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_send_query_params', 1, 'query');
+        $params = pg_query_params::coerceParamList($frame->calledArgs[2], 'pg_send_query_params', 2);
+        $this->assignSendReturn($frame->returnVar, VmPgsqlCore::sendQueryParams($conn, $query, $params));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_send_query_params() is not implemented for JIT (#20681)');
+    }
+}
+
+/**
+ * pg_send_prepare (php-src ext/pgsql/pgsql.c; #20681).
+ */
+final class pg_send_prepare extends Internal
+{
+    use PgSendAsyncReturn;
+
+    public function __construct()
+    {
+        parent::__construct('pg_send_prepare');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_send_prepare() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_send_prepare', 1);
+        $stmt = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_send_prepare', 1, 'statement_name');
+        $query = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'pg_send_prepare', 2, 'query');
+        $this->assignSendReturn($frame->returnVar, VmPgsqlCore::sendPrepare($conn, $stmt, $query));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_send_prepare() is not implemented for JIT (#20681)');
+    }
+}
+
+/**
+ * pg_send_execute (php-src ext/pgsql/pgsql.c; #20681).
+ */
+final class pg_send_execute extends Internal
+{
+    use PgSendAsyncReturn;
+
+    public function __construct()
+    {
+        parent::__construct('pg_send_execute');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_send_execute() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_send_execute', 1);
+        $stmt = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_send_execute', 1, 'statement_name');
+        $params = pg_query_params::coerceParamList($frame->calledArgs[2], 'pg_send_execute', 2);
+        $this->assignSendReturn($frame->returnVar, VmPgsqlCore::sendExecute($conn, $stmt, $params));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_send_execute() is not implemented for JIT (#20681)');
+    }
+}
+
+/**
+ * pg_get_result (php-src ext/pgsql/pgsql.c; #20681).
+ */
+final class pg_get_result extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_get_result');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_get_result() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_get_result', 1);
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('pg_get_result() requires a VM context');
+        }
+        $result = VmPgsqlCore::getResult($conn, $ctx);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->object($result->toObject());
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_get_result() is not implemented for JIT (#20681)');
+    }
+}
+
+/**
+ * pg_cancel_query (php-src ext/pgsql/pgsql.c; #20681).
+ */
+final class pg_cancel_query extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_cancel_query');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_cancel_query() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_cancel_query', 1);
+        $frame->returnVar->bool(VmPgsqlCore::cancelQuery($conn));
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_cancel_query() is not implemented for JIT (#20681)');
+    }
+}
+
+/**
+ * pg_get_notify (php-src ext/pgsql/pgsql.c; #20681).
+ */
+final class pg_get_notify extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_get_notify');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_get_notify() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $conn = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_get_notify', 1);
+        $mode = PgsqlConstants::PGSQL_ASSOC;
+        if (2 === $argc) {
+            $modeVar = $frame->calledArgs[1]->resolveIndirect();
+            if (\PHPCompiler\VM\Variable::TYPE_INTEGER !== $modeVar->type
+                && \PHPCompiler\VM\Variable::TYPE_FLOAT !== $modeVar->type
+                && \PHPCompiler\VM\Variable::TYPE_BOOLEAN !== $modeVar->type
+                && \PHPCompiler\VM\Variable::TYPE_STRING !== $modeVar->type
+            ) {
+                throw new \TypeError(\sprintf(
+                    'pg_get_notify(): Argument #2 ($mode) must be of type int, %s given',
+                    match ($modeVar->type) {
+                        \PHPCompiler\VM\Variable::TYPE_NULL => 'null',
+                        \PHPCompiler\VM\Variable::TYPE_ARRAY => 'array',
+                        \PHPCompiler\VM\Variable::TYPE_OBJECT => 'object',
+                        default => 'mixed',
+                    }
+                ));
+            }
+            $mode = (int) $modeVar->toInt();
+        }
+        if (0 === ($mode & PgsqlConstants::PGSQL_BOTH)) {
+            throw new \ValueError(
+                'pg_get_notify(): Argument #2 ($mode) must be one of PGSQL_ASSOC, PGSQL_NUM, or PGSQL_BOTH'
+            );
+        }
+        $notify = VmPgsqlCore::getNotify($conn, $mode);
+        if (false === $notify) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->array($notify);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_get_notify() is not implemented for JIT (#20681)');
+    }
+}

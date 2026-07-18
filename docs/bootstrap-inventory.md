@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5789 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17007 |
+| Source constructs flagged (warnings) | 17023 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1114,16 +1114,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
-| `ext/pgsql/Module.php` | 0 | 72 |
+| `ext/pgsql/Module.php` | 0 | 79 |
 | `ext/pgsql/PgsqlConstants.php` | 0 | 1 |
 | `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlArg.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlConnection.php` | 0 | 4 |
-| `ext/pgsql/VmPgsqlCore.php` | 0 | 24 |
+| `ext/pgsql/VmPgsqlCore.php` | 0 | 25 |
 | `ext/pgsql/VmPgsqlLob.php` | 0 | 4 |
 | `ext/pgsql/VmPgsqlNative.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlResult.php` | 0 | 4 |
-| `ext/pgsql/pg_async_builtins.php` | 0 | 8 |
+| `ext/pgsql/pg_async_builtins.php` | 0 | 16 |
 | `ext/pgsql/pg_change_password.php` | 0 | 2 |
 | `ext/pgsql/pg_close.php` | 0 | 2 |
 | `ext/pgsql/pg_connect.php` | 0 | 2 |
@@ -13669,46 +13669,53 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new pg_socket (line 108)
 - new pg_consume_input (line 109)
 - new pg_flush (line 110)
-- new pg_set_error_verbosity (line 111)
-- new pg_set_error_context_visibility (line 112)
-- new pg_put_line (line 113)
-- new pg_end_copy (line 114)
-- new pg_version (line 115)
-- new pg_parameter_status (line 116)
-- new pg_host (line 117)
-- new pg_port (line 118)
-- new pg_dbname (line 119)
-- new pg_options (line 120)
-- new pg_tty (line 121)
-- new pg_client_encoding (line 122)
-- new pg_set_client_encoding (line 123)
-- new pg_ping (line 124)
-- new pg_connection_reset (line 125)
-- new pg_connection_busy (line 126)
-- new pg_connection_status (line 127)
-- new pg_transaction_status (line 128)
-- new pg_insert (line 129)
-- new pg_update (line 130)
-- new pg_delete (line 131)
-- new pg_select (line 132)
-- new pg_query_params (line 133)
-- new pg_prepare (line 134)
-- new pg_execute (line 135)
-- new pg_escape_string (line 136)
-- new pg_escape_literal (line 137)
-- new pg_escape_identifier (line 138)
-- new pg_escape_bytea (line 139)
-- new pg_unescape_bytea (line 140)
-- new pg_affected_rows (line 141)
-- new pg_fetch_all (line 142)
-- new pg_num_fields (line 143)
-- new pg_change_password (line 158)
-- new pg_jit (line 159)
-- new pg_put_copy_data (line 160)
-- new pg_put_copy_end (line 161)
-- new pg_result_memory_size (line 162)
-- new pg_set_chunked_rows_size (line 163)
-- new pg_socket_poll (line 164)
+- new pg_send_query (line 111)
+- new pg_send_query_params (line 112)
+- new pg_send_prepare (line 113)
+- new pg_send_execute (line 114)
+- new pg_get_result (line 115)
+- new pg_cancel_query (line 116)
+- new pg_get_notify (line 117)
+- new pg_set_error_verbosity (line 118)
+- new pg_set_error_context_visibility (line 119)
+- new pg_put_line (line 120)
+- new pg_end_copy (line 121)
+- new pg_version (line 122)
+- new pg_parameter_status (line 123)
+- new pg_host (line 124)
+- new pg_port (line 125)
+- new pg_dbname (line 126)
+- new pg_options (line 127)
+- new pg_tty (line 128)
+- new pg_client_encoding (line 129)
+- new pg_set_client_encoding (line 130)
+- new pg_ping (line 131)
+- new pg_connection_reset (line 132)
+- new pg_connection_busy (line 133)
+- new pg_connection_status (line 134)
+- new pg_transaction_status (line 135)
+- new pg_insert (line 136)
+- new pg_update (line 137)
+- new pg_delete (line 138)
+- new pg_select (line 139)
+- new pg_query_params (line 140)
+- new pg_prepare (line 141)
+- new pg_execute (line 142)
+- new pg_escape_string (line 143)
+- new pg_escape_literal (line 144)
+- new pg_escape_identifier (line 145)
+- new pg_escape_bytea (line 146)
+- new pg_unescape_bytea (line 147)
+- new pg_affected_rows (line 148)
+- new pg_fetch_all (line 149)
+- new pg_num_fields (line 150)
+- new pg_change_password (line 165)
+- new pg_jit (line 166)
+- new pg_put_copy_data (line 167)
+- new pg_put_copy_end (line 168)
+- new pg_result_memory_size (line 169)
+- new pg_set_chunked_rows_size (line 170)
+- new pg_socket_poll (line 171)
 - 7 class method(s)
 
 ### `ext/pgsql/PgsqlConstants.php`
@@ -13745,22 +13752,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 371)
 - new Variable (line 392)
 - new Variable (line 506)
-- new HashTable (line 549)
-- new Variable (line 554)
-- new Variable (line 574)
-- new HashTable (line 943)
-- new HashTable (line 947)
-- new Variable (line 952)
-- new Variable (line 961)
-- new Variable (line 970)
-- new HashTable (line 989)
-- new Variable (line 993)
-- new HashTable (line 1017)
-- new Variable (line 1020)
-- new Variable (line 1064)
-- new Variable (line 1071)
-- new Variable (line 1078)
-- 36 class method(s)
+- new HashTable (line 794)
+- new HashTable (line 819)
+- new Variable (line 824)
+- new Variable (line 844)
+- new HashTable (line 1213)
+- new HashTable (line 1217)
+- new Variable (line 1222)
+- new Variable (line 1231)
+- new Variable (line 1240)
+- new HashTable (line 1259)
+- new Variable (line 1263)
+- new HashTable (line 1287)
+- new Variable (line 1290)
+- new Variable (line 1334)
+- new Variable (line 1341)
+- new Variable (line 1348)
+- 45 class method(s)
 
 ### `ext/pgsql/VmPgsqlLob.php`
 
@@ -13773,7 +13781,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/VmPgsqlNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 77 class method(s)
+- 85 class method(s)
 
 ### `ext/pgsql/VmPgsqlResult.php`
 
@@ -13793,7 +13801,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 192)
 - new ArgumentCountError (line 246)
 - new ArgumentCountError (line 298)
-- 14 class method(s)
+- trait PgSendAsyncReturn (line 345)
+- new ArgumentCountError (line 379)
+- new ArgumentCountError (line 414)
+- new ArgumentCountError (line 450)
+- new ArgumentCountError (line 486)
+- new ArgumentCountError (line 520)
+- new ArgumentCountError (line 562)
+- new ArgumentCountError (line 594)
+- 29 class method(s)
 
 ### `ext/pgsql/pg_change_password.php`
 
