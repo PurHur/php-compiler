@@ -155,6 +155,80 @@ final class VmPgsqlNative
         return $out;
     }
 
+    /**
+     * Enable libpq protocol tracing to a stdio FILE* (php-src pg_trace; #20574).
+     *
+     * @return \FFI\CData|null FILE* owned by caller (fclose on untrace/close)
+     */
+    public static function trace(\FFI\CData $conn, string $pathname, string $mode): ?\FFI\CData
+    {
+        $fp = self::fopen($pathname, $mode);
+        if (null === $fp) {
+            return null;
+        }
+        $ffi = self::requireFfi();
+        // libc FILE* → libpq FILE* (opaque pointer cast across FFI instances).
+        $ffi->PQtrace($conn, $ffi->cast('FILE*', $fp));
+
+        return $fp;
+    }
+
+    public static function untrace(\FFI\CData $conn): void
+    {
+        self::requireFfi()->PQuntrace($conn);
+    }
+
+    public static function fclose(\FFI\CData $fp): void
+    {
+        $libc = self::libc();
+        if (null !== $libc) {
+            $libc->fclose($fp);
+        }
+    }
+
+    /** @return \FFI\CData|null FILE* */
+    private static function fopen(string $pathname, string $mode): ?\FFI\CData
+    {
+        $libc = self::libc();
+        if (null === $libc) {
+            return null;
+        }
+        $fp = $libc->fopen($pathname, $mode);
+        if (null === $fp) {
+            return null;
+        }
+
+        return $fp;
+    }
+
+    /** @return \FFI|null */
+    private static function libc()
+    {
+        if (!self::ffiEnabled() || !\extension_loaded('ffi')) {
+            return null;
+        }
+        static $libc = false;
+        if (false !== $libc) {
+            return $libc;
+        }
+        $cdef = <<<'CDEF'
+typedef struct _IO_FILE FILE;
+FILE *fopen(const char *pathname, const char *mode);
+int fclose(FILE *stream);
+CDEF;
+        foreach (['libc.so.6', 'libc.so'] as $lib) {
+            try {
+                $libc = \FFI::cdef($cdef, $lib);
+
+                return $libc;
+            } catch (\Throwable) {
+            }
+        }
+        $libc = null;
+
+        return null;
+    }
+
     /** @return \FFI */
     private static function requireFfi()
     {
@@ -199,6 +273,7 @@ final class VmPgsqlNative
         $cdef = <<<'CDEF'
 typedef struct pg_conn PGconn;
 typedef struct pg_result PGresult;
+typedef struct _IO_FILE FILE;
 PGconn *PQconnectdb(const char *conninfo);
 int PQstatus(const PGconn *conn);
 char *PQerrorMessage(const PGconn *conn);
@@ -218,9 +293,16 @@ int PQsocket(const PGconn *conn);
 char *PQescapeIdentifier(PGconn *conn, const char *str, size_t length);
 char *PQescapeLiteral(PGconn *conn, const char *str, size_t length);
 void PQfreemem(void *ptr);
+void PQtrace(PGconn *conn, FILE *stream);
+void PQuntrace(PGconn *conn);
 CDEF;
 
-        foreach (['libpq.so.5', 'libpq.so'] as $lib) {
+        foreach ([
+            'libpq.so.5',
+            'libpq.so',
+            '/usr/lib/x86_64-linux-gnu/libpq.so.5',
+            '/usr/lib/x86_64-linux-gnu/libpq.so',
+        ] as $lib) {
             try {
                 self::$ffi = \FFI::cdef($cdef, $lib);
 

@@ -74,6 +74,19 @@ final class VmPgsqlArg
         return $object;
     }
 
+    /**
+     * Optional PgSql\Connection or null → default link (php-src; #20574).
+     */
+    public static function optionalConnection(Variable $var, string $functionName, int $argNum): ?ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+
+        return self::requireConnection($var, $functionName, $argNum);
+    }
+
     private static function typeLabel(Variable $var): string
     {
         return match ($var->type) {

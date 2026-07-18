@@ -18,10 +18,13 @@ final class VmPgsqlConnection
 
     public const CLASS_NAME = 'PgSql\\Connection';
 
-    /** @var array<int, array{native: \FFI\CData, closed: bool}> */
+    /** @var array<int, array{native: \FFI\CData, closed: bool, trace_fp: ?\FFI\CData, object: ObjectEntry}> */
     private static array $state = [];
 
     private static string $lastError = '';
+
+    /** Default link id for optional-connection builtins (php-src FETCH_DEFAULT_LINK; #20574). */
+    private static ?int $defaultLinkId = null;
 
     public static function registerClass(Context $ctx): void
     {
@@ -51,7 +54,10 @@ final class VmPgsqlConnection
         self::$state[$object->id] = [
             'native' => $native,
             'closed' => false,
+            'trace_fp' => null,
+            'object' => $object,
         ];
+        self::$defaultLinkId = $object->id;
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($object);
 
@@ -72,13 +78,60 @@ final class VmPgsqlConnection
         return self::$state[$object->id]['native'];
     }
 
+    /**
+     * Resolve optional connection arg or default link (php-src FETCH_DEFAULT_LINK; #20574).
+     */
+    public static function resolveOptionalConnection(?ObjectEntry $provided): ?ObjectEntry
+    {
+        if (null !== $provided) {
+            return $provided;
+        }
+        if (null === self::$defaultLinkId) {
+            return null;
+        }
+        $row = self::$state[self::$defaultLinkId] ?? null;
+        if (null === $row || $row['closed']) {
+            return null;
+        }
+
+        return $row['object'];
+    }
+
+    public static function setTraceFp(ObjectEntry $object, ?\FFI\CData $fp): void
+    {
+        if (!isset(self::$state[$object->id])) {
+            return;
+        }
+        $prev = self::$state[$object->id]['trace_fp'];
+        if (null !== $prev && $prev !== $fp) {
+            VmPgsqlNative::fclose($prev);
+        }
+        self::$state[$object->id]['trace_fp'] = $fp;
+    }
+
+    public static function clearTraceFp(ObjectEntry $object): void
+    {
+        if (!isset(self::$state[$object->id])) {
+            return;
+        }
+        $fp = self::$state[$object->id]['trace_fp'];
+        if (null !== $fp) {
+            VmPgsqlNative::fclose($fp);
+            self::$state[$object->id]['trace_fp'] = null;
+        }
+    }
+
     public static function close(ObjectEntry $object): bool
     {
         if (!isset(self::$state[$object->id]) || self::$state[$object->id]['closed']) {
             return false;
         }
+        self::clearTraceFp($object);
         VmPgsqlNative::finish(self::$state[$object->id]['native']);
         self::$state[$object->id]['closed'] = true;
+        if (self::$defaultLinkId === $object->id) {
+            self::$defaultLinkId = null;
+        }
 
         return true;
     }

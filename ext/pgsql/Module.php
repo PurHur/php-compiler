@@ -70,6 +70,8 @@ class Module extends ModuleAbstract
             new pg_fetch_row(),
             new pg_num_rows(),
             new pg_last_error(),
+            new pg_trace(),
+            new pg_untrace(),
             ...self::php84Functions(),
         ];
     }
