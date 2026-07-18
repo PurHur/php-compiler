@@ -6,13 +6,17 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\GethostbynamelRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * gethostbyname() — forward DNS returning first IPv4 (ext/standard/dns.c parity, #7419).
+ *
+ * Z_PARAM_STR $hostname — null TypeError on 8.4 forward profile (#20555, re-#19098).
  *
  * VM: VmDns (reuses gethostbynamel getaddrinfo path). JIT/AOT: JitGethostbyname LLVM delegate.
  *
@@ -30,13 +34,11 @@ final class gethostbyname extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('gethostbyname() requires exactly one argument in this compiler build');
         }
-        $hostname = VmString::coerceStringBuiltinArg(
+        $hostname = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'gethostbyname',
             0,
-            'hostname',
-            'string',
-            false
+            'hostname'
         );
         if (null === $frame->returnVar) {
             return;
@@ -50,18 +52,24 @@ final class gethostbyname extends Internal
             throw new \LogicException('gethostbyname() requires exactly one argument in this compiler build');
         }
 
-        return JitGethostbyname::invoke(
+        GethostbynamelRuntime::ensureLinked($context);
+        $hostnameArg = $args[0];
+        $hostname = JitStringBuiltinArg::lowerZparamStr(
             $context,
-            JitStringBuiltinArg::lower(
-                $context,
-                $args[0],
-                'gethostbyname',
-                0,
-                'hostname',
-                'string',
-                null,
-                false
-            )
+            $hostnameArg,
+            'gethostbyname',
+            0,
+            'hostname'
         );
+        $nullOperand = JITVariable::TYPE_NULL === $hostnameArg->type
+            || ($hostnameArg->isNullConstant ?? false);
+        if ($nullOperand && (VmString::requiresZparamStrStrictNullOnForwardProfile() || $context->callerStrictTypes)) {
+            // TypeError already emitted; skip DNS IR after abort (#20555, dns_get_record pattern).
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+
+        return JitGethostbyname::invoke($context, $hostname);
     }
 }

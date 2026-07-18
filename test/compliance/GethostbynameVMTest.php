@@ -17,6 +17,14 @@ final class GethostbynameVMTest extends BaseTest
             __DIR__.'/cases/stdlib/gethostbyname_localhost.phpt',
             'gethostbyname_localhost.phpt'
         );
+        yield 'gethostbyname_null.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/gethostbyname_null.phpt',
+            'gethostbyname_null.phpt'
+        );
+        yield 'gethostbyname_null_forward84.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/gethostbyname_null_forward84.phpt',
+            'gethostbyname_null_forward84.phpt'
+        );
     }
 
     public function setUp(): void
