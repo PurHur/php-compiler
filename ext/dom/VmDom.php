@@ -3759,14 +3759,23 @@ final class VmDom
         if (!preg_match('/^<!DOCTYPE\s+/i', $trimmed)) {
             return null;
         }
-        if (preg_match('/^<!DOCTYPE\s+([A-Za-z_][\w:.-]*)\s+PUBLIC\s+"([^"]*)"\s+"([^"]*)"\s*>/is', $trimmed, $match)) {
+        // Optional internal subset after PUBLIC/SYSTEM (libxml; #20504 / re-#15292).
+        if (preg_match(
+            '/^<!DOCTYPE\s+([A-Za-z_][\w:.-]*)\s+PUBLIC\s+"([^"]*)"\s+"([^"]*)"(?:\s*\[[^\]]*\])?\s*>/is',
+            $trimmed,
+            $match
+        )) {
             return [
                 'name' => $match[1],
                 'publicId' => $match[2],
                 'systemId' => $match[3],
             ];
         }
-        if (preg_match('/^<!DOCTYPE\s+([A-Za-z_][\w:.-]*)\s+SYSTEM\s+"([^"]*)"\s*>/is', $trimmed, $match)) {
+        if (preg_match(
+            '/^<!DOCTYPE\s+([A-Za-z_][\w:.-]*)\s+SYSTEM\s+"([^"]*)"(?:\s*\[[^\]]*\])?\s*>/is',
+            $trimmed,
+            $match
+        )) {
             return [
                 'name' => $match[1],
                 'publicId' => '',
