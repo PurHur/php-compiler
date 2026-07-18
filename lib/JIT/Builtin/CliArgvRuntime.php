@@ -16,9 +16,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for CLI $argc/$argv via CliArgvJitHelper + VmCliArgv PHP (#9439).
+ * JIT/AOT link for CLI $argc/$argv via CliArgvJitHelper + VmCliArgv PHP (#9439, #20401).
  *
- * Embed and standalone: hashtable materialization via compiled {@see \PHPCompiler\ext\standard\CliArgvJitHelper}.
+ * Embed / non-thin: hashtable materialization via compiled {@see \PHPCompiler\ext\standard\CliArgvJitHelper}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20395 / #20380 shape): {@see ensureUserScriptMainStubs}
+ * without nested JIT (#13571).
  * php-src: ext/standard/basic_functions.c — $argc / $argv in CLI SAPI
  */
 final class CliArgvRuntime
@@ -52,11 +54,6 @@ final class CliArgvRuntime
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::ensureUserScriptMainStubs($context);
-
-            return;
-        }
         self::implement($context);
     }
 
@@ -125,6 +122,12 @@ final class CliArgvRuntime
         $probe = $context->module->getNamedFunction('__phpc_cli_refresh_argv_global');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        if ($context->isThinStandaloneAotMain()) {
+            self::ensureUserScriptMainStubs($context);
 
             return;
         }

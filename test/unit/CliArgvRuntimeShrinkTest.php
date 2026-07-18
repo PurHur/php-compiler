@@ -6,7 +6,9 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** CliArgvRuntime routes hashtable materialization through CliArgvJitHelper PHP (#9439, #12811). */
+/**
+ * CliArgvRuntime routes hashtable materialization through CliArgvJitHelper PHP (#9439, #12811, #20401).
+ */
 final class CliArgvRuntimeShrinkTest extends TestCase
 {
     public function testCliArgvRuntimeUsesJitHelperNotLlvmHashtableAllocOnEmbed(): void
@@ -25,6 +27,16 @@ final class CliArgvRuntimeShrinkTest extends TestCase
         $this->assertNotFalse($helperPos);
         $this->assertLessThan($helperPos, $storePos, 'CLI argv ABI stubs must emit before nested CliArgvJitHelper compile (#14470)');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/CliArgvStandaloneLlvm.php');
+    }
+
+    public function testStandaloneUsesSamePhpBridgeAsEmbed(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CliArgvRuntime.php');
+        $this->assertStringContainsString('ensureStandaloneBodies', $source);
+        $this->assertStringContainsString('self::implement($context)', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('ensureUserScriptMainStubs', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
     }
 
     public function testVmCliArgvBuildsIndexedArgvTable(): void
