@@ -93,4 +93,61 @@ final class ErrorLogBuiltinTest extends TestCase
         $this->expectExceptionMessage('Path cannot be empty');
         $builtin->execute($frame);
     }
+
+    /** @see https://github.com/PurHur/php-compiler/issues/20253 */
+    public function test_null_message_type_error_on_forward84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.4';
+        try {
+            $runtime = new Runtime();
+            $builtin = new error_log();
+            $frame = $builtin->getFrame($runtime->vmContext);
+            $frame->returnVar = new VMVariable();
+            $message = new VMVariable();
+            $message->null();
+            $frame->calledArgs[] = $message;
+            $this->expectException(\TypeError::class);
+            $this->expectExceptionMessage(
+                'error_log(): Argument #1 ($message) must be of type string, null given'
+            );
+            $builtin->execute($frame);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
+
+    /** Reference 8.2 profile still coerces null message like Zend 8.2 (#20253). */
+    public function test_null_message_coerces_on_reference_profile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        $_ENV['PHP_COMPILER_PROFILE'] = '8.2';
+        try {
+            $runtime = new Runtime();
+            $builtin = new error_log();
+            $frame = $builtin->getFrame($runtime->vmContext);
+            $frame->returnVar = new VMVariable();
+            $message = new VMVariable();
+            $message->null();
+            $frame->calledArgs[] = $message;
+            $builtin->execute($frame);
+            self::assertTrue($frame->returnVar->resolveIndirect()->toBool());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+                unset($_ENV['PHP_COMPILER_PROFILE']);
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+                $_ENV['PHP_COMPILER_PROFILE'] = $prev;
+            }
+        }
+    }
 }
