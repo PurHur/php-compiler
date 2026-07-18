@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5580 |
-| Phase A inventory files (M2 ratio SSOT) | 5580 |
+| PHP files on vm.php path | 5583 |
+| Phase A inventory files (M2 ratio SSOT) | 5583 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15961 |
+| Source constructs flagged (warnings) | 15967 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -477,9 +477,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 5 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 45 |
-| `ext/gd/VmGd.php` | 0 | 9 |
+| `ext/gd/Module.php` | 0 | 47 |
+| `ext/gd/VmGd.php` | 0 | 10 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
+| `ext/gd/VmGdBmp.php` | 0 | 1 |
 | `ext/gd/VmGdFreeType.php` | 0 | 1 |
 | `ext/gd/VmGdPng.php` | 0 | 1 |
 | `ext/gd/VmGdWebp.php` | 0 | 1 |
@@ -487,6 +488,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagealphablending.php` | 0 | 1 |
 | `ext/gd/imageantialias.php` | 0 | 1 |
 | `ext/gd/imageavif.php` | 0 | 1 |
+| `ext/gd/imagebmp.php` | 0 | 1 |
 | `ext/gd/imagechar.php` | 0 | 1 |
 | `ext/gd/imagecolorallocate.php` | 0 | 1 |
 | `ext/gd/imagecolorallocatealpha.php` | 0 | 1 |
@@ -498,6 +500,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagecopyresized.php` | 0 | 1 |
 | `ext/gd/imagecreate.php` | 0 | 1 |
 | `ext/gd/imagecreatefromavif.php` | 0 | 1 |
+| `ext/gd/imagecreatefrombmp.php` | 0 | 1 |
 | `ext/gd/imagecreatefromstring.php` | 0 | 1 |
 | `ext/gd/imagecreatefromwebp.php` | 0 | 1 |
 | `ext/gd/imagecreatetruecolor.php` | 0 | 1 |
@@ -8765,8 +8768,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagepng (line 100)
 - new imagewebp (line 101)
 - new imageavif (line 102)
-- new imagecreatefromwebp (line 103)
-- new imagecreatefromavif (line 104)
+- new imagebmp (line 103)
+- new imagecreatefromwebp (line 104)
+- new imagecreatefromavif (line 105)
+- new imagecreatefrombmp (line 106)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -8779,13 +8784,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 618)
 - new ObjectEntry (line 1956)
 - new ObjectEntry (line 1980)
-- new ObjectEntry (line 2206)
-- 97 class method(s)
+- new ObjectEntry (line 2004)
+- new ObjectEntry (line 2260)
+- 100 class method(s)
 
 ### `ext/gd/VmGdAvif.php`
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/gd/VmGdBmp.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/gd/VmGdFreeType.php`
 
@@ -8818,6 +8829,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imageavif.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagebmp.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -8873,6 +8889,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imagecreatefromavif.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecreatefrombmp.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
