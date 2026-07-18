@@ -9495,6 +9495,10 @@ restart:
                         $resolved->objectPropertyOwner,
                         $resolved->objectPropertyName
                     );
+                    ext\dom\DomNodePropertySupport::rejectReadOnlyPropertyWrite(
+                        $resolved->objectPropertyOwner,
+                        $resolved->objectPropertyName
+                    );
                 } catch (\Error $e) {
                     return $this->dispatchVmError($e->getMessage(), $frame);
                 }
@@ -9668,7 +9672,7 @@ restart:
         return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
-    /** php-src ext/dom/php_dom.c — DOMDocument::$documentElement rejects user writes (#15550). */
+    /** php-src ext/dom/php_dom.c — DOMDocument::$documentElement / DOMAttr::$specified reject user writes (#15550, #20605). */
     private function enforceDomDocumentReadOnlyPropertyWrite(
         ObjectEntry $object,
         string $name,
@@ -9676,6 +9680,7 @@ restart:
     ): ?Frame {
         try {
             ext\dom\DomDocumentPropertySupport::rejectReadOnlyPropertyWrite($object, $name);
+            ext\dom\DomNodePropertySupport::rejectReadOnlyPropertyWrite($object, $name);
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $frame);
         }
