@@ -10,9 +10,10 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_serialize_* via SerializeJitHelper PHP (#9180).
+ * JIT/AOT link for __compiler_serialize_* via SerializeJitHelper PHP (#9180, #20336).
  *
- * JIT/normal modules and standalone AOT use compiled {@see SerializeJitHelper} (#13311).
+ * Embed / non-thin: NestedJIT {@see SerializeJitHelper} (#13311).
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20327 / #20308 shape): thin stubs without nested JIT (#13322).
  * php-src: ext/standard/var.c — php_var_serialize
  */
 final class StringSerialize
@@ -42,21 +43,16 @@ final class StringSerialize
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::ensureDeferredStubsForInventoryEmit($context);
-
-            return;
-        }
         self::implement($context);
     }
 
-    /** Inventory argv emit: link serialize ABI without nested SerializeJitHelper JIT (#13322). */
+    /** Thin standalone AOT: linkable serialize ABI without nested SerializeJitHelper (#13322, #20336). */
     public static function ensureDeferredStubsForInventoryEmit(Context $context): void
     {
-        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if (!$context->isThinStandaloneAotMain()) {
             return;
         }
-        self::implementDeferredInventoryStubs($context);
+        self::implementThinStandaloneStubs($context);
     }
 
     public static function implement(Context $context): void
@@ -68,8 +64,8 @@ final class StringSerialize
             return;
         }
 
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::implementDeferredInventoryStubs($context);
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementThinStandaloneStubs($context);
 
             return;
         }
@@ -166,8 +162,8 @@ final class StringSerialize
         }
     }
 
-    /** Return null __string__* — inventory emit only needs linkable ABI symbols (#13322). */
-    private static function implementDeferredInventoryStubs(Context $context): void
+    /** Return null __string__* — thin standalone only needs linkable ABI symbols (#13322, #20336). */
+    private static function implementThinStandaloneStubs(Context $context): void
     {
         $strPtr = $context->getTypeFromString('__string__*');
         $nullStr = $strPtr->constNull();
@@ -187,7 +183,7 @@ final class StringSerialize
                 ? $probe
                 : $context->module->addFunction($abiName, $ft);
 
-            $entry = $fn->appendBasicBlock('serialize_inv_stub');
+            $entry = $fn->appendBasicBlock('serialize_thin_stub');
             $context->builder->positionAtEnd($entry);
             $context->builder->returnValue($nullStr);
             $context->registerFunction($abiName, $fn);
