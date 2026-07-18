@@ -260,6 +260,44 @@ final class VmGd
         return true;
     }
 
+    /**
+     * imagegetinterpolation() — im->interpolation_id (php-src ext/gd/gd.c; #20416).
+     */
+    public static function getInterpolation(ObjectEntry $image): int
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return GdConstants::REGISTERED['IMG_BILINEAR_FIXED'];
+        }
+
+        return $state->interpolationId;
+    }
+
+    /**
+     * imagesetinterpolation() — gdImageSetInterpolationMethod (php-src ext/gd/libgd; #20416).
+     *
+     * method -1 resets to IMG_BILINEAR_FIXED; IMG_DEFAULT remaps to BILINEAR_FIXED (PHP-8.4 libgd).
+     */
+    public static function setInterpolation(ObjectEntry $image, int $method): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        if (-1 === $method) {
+            $method = GdConstants::REGISTERED['IMG_BILINEAR_FIXED'];
+        }
+        if ($method < 0 || $method > GdConstants::REGISTERED['IMG_WEIGHTED4']) {
+            return false;
+        }
+        if (GdConstants::REGISTERED['IMG_DEFAULT'] === $method) {
+            $method = GdConstants::REGISTERED['IMG_BILINEAR_FIXED'];
+        }
+        $state->interpolationId = $method;
+
+        return true;
+    }
+
     public static function colorAllocate(ObjectEntry $image, int $red, int $green, int $blue): int|false
     {
         $state = GdRegistry::state($image);
@@ -2273,7 +2311,12 @@ final class VmGd
             'imagepng', 'imagewebp', 'imageavif' => 1 === $position ? 'image' : 'arg',
             'imagecreatefromstring' => 'image',
             'imagecreatefromwebp', 'imagecreatefromavif' => 'filename',
-            'imagesx', 'imagesy', 'imageistruecolor', 'imagepalettetotruecolor', 'imagedestroy' => 'image',
+            'imagesx', 'imagesy', 'imageistruecolor', 'imagepalettetotruecolor', 'imagedestroy', 'imagegetinterpolation' => 'image',
+            'imagesetinterpolation' => match ($position) {
+                1 => 'image',
+                2 => 'method',
+                default => 'arg',
+            },
             'imagetruecolortopalette' => match ($position) {
                 1 => 'image',
                 2 => 'dither',
