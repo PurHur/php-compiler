@@ -19,6 +19,7 @@ final class BuiltinClasses
 
         $before = array_keys($ctx->classes);
         self::registerException($ctx);
+        require_once __DIR__.'/RedisDepthMethods.php';
         VmRedis::registerClass($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;

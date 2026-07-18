@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5735 |
-| Phase A inventory files (M2 ratio SSOT) | 5735 |
+| PHP files on vm.php path | 5736 |
+| Phase A inventory files (M2 ratio SSOT) | 5736 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16476 |
+| Source constructs flagged (warnings) | 16504 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1210,11 +1210,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/redis/RedisClose.php` | 0 | 1 |
 | `ext/redis/RedisConnect.php` | 0 | 2 |
 | `ext/redis/RedisConstruct.php` | 0 | 1 |
+| `ext/redis/RedisDepthMethods.php` | 0 | 10 |
 | `ext/redis/RedisExtensionPolicy.php` | 0 | 1 |
 | `ext/redis/RedisGet.php` | 0 | 2 |
 | `ext/redis/RedisSet.php` | 0 | 2 |
-| `ext/redis/VmRedis.php` | 0 | 10 |
-| `ext/redis/VmRedisNative.php` | 0 | 10 |
+| `ext/redis/VmRedis.php` | 0 | 19 |
+| `ext/redis/VmRedisNative.php` | 0 | 19 |
 | `ext/reflection/IsAnonymousClassJitHelper.php` | 0 | 1 |
 | `ext/reflection/JitIsAnonymousClass.php` | 0 | 1 |
 | `ext/reflection/Module.php` | 0 | 2 |
@@ -14307,6 +14308,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/redis/RedisDepthMethods.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 52)
+- new ArgumentCountError (line 106)
+- new ArgumentCountError (line 134)
+- new ArgumentCountError (line 173)
+- new ArgumentCountError (line 199)
+- new ArgumentCountError (line 230)
+- new HashTable (line 238)
+- new Variable (line 240)
+- 9 class method(s)
+
 ### `ext/redis/RedisExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14327,15 +14342,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/redis/VmRedis.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 30)
-- new Variable (line 33)
-- new RedisConstruct (line 40)
-- new RedisConnect (line 45)
-- new RedisSet (line 46)
-- new RedisGet (line 47)
-- new RedisClose (line 48)
-- new RedisState (line 61)
-- new RedisException (line 105)
+- new ClassEntry (line 32)
+- new Variable (line 35)
+- new RedisConstruct (line 42)
+- new RedisConnect (line 47)
+- new RedisSet (line 48)
+- new RedisGet (line 49)
+- new RedisClose (line 50)
+- new RedisDel (line 51)
+- new RedisExists (line 52)
+- new RedisPing (line 53)
+- new RedisAuth (line 54)
+- new RedisSelect (line 55)
+- new RedisIsConnected (line 56)
+- new RedisHSet (line 57)
+- new RedisHGet (line 58)
+- new RedisHGetAll (line 59)
+- new RedisState (line 78)
+- new RedisException (line 122)
 - 10 class method(s)
 
 ### `ext/redis/VmRedisNative.php`
@@ -14345,12 +14369,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new RedisException (line 63)
 - new RedisException (line 83)
 - new RedisException (line 99)
-- new RedisException (line 127)
+- new RedisException (line 117)
 - new RedisException (line 135)
-- new RedisException (line 145)
-- new RedisException (line 161)
-- new RedisException (line 174)
-- 10 class method(s)
+- new RedisException (line 154)
+- new RedisException (line 160)
+- new RedisException (line 179)
+- new RedisException (line 197)
+- new RedisException (line 209)
+- new RedisException (line 232)
+- new RedisException (line 249)
+- new RedisException (line 282)
+- new RedisException (line 290)
+- new RedisException (line 300)
+- new RedisException (line 316)
+- new RedisException (line 329)
+- 18 class method(s)
 
 ### `ext/reflection/IsAnonymousClassJitHelper.php`
 

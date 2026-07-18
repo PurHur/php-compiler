@@ -23,11 +23,13 @@ final class VmRedis
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['del'])) {
             return;
         }
 
-        $entry = new ClassEntry('Redis');
+        $entry = isset($ctx->classes[self::CLASS_LC])
+            ? $ctx->classes[self::CLASS_LC]
+            : new ClassEntry('Redis');
         $entry->isInternal = true;
         foreach (RedisConstants::CLASS_CONSTANTS as $name => $value) {
             $const = new Variable(Variable::TYPE_INTEGER);
@@ -46,11 +48,26 @@ final class VmRedis
             'set' => new RedisSet(),
             'get' => new RedisGet(),
             'close' => new RedisClose(),
+            'del' => new RedisDel(),
+            'exists' => new RedisExists(),
+            'ping' => new RedisPing(),
+            'auth' => new RedisAuth(),
+            'select' => new RedisSelect(),
+            'isconnected' => new RedisIsConnected(),
+            'hset' => new RedisHSet(),
+            'hget' => new RedisHGet(),
+            'hgetall' => new RedisHGetAll(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;
-            $entry->methodNames[$name] = $name;
+            $entry->methodNames[$name] = match ($name) {
+                'isconnected' => 'isConnected',
+                'hset' => 'hSet',
+                'hget' => 'hGet',
+                'hgetall' => 'hGetAll',
+                default => $name,
+            };
         }
 
         $ctx->classes[self::CLASS_LC] = $entry;

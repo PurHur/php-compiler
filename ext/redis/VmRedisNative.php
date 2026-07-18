@@ -91,7 +91,7 @@ final class VmRedisNative
      *
      * @throws \RedisException
      */
-    private static function command($socket, array $args)
+    public static function command($socket, array $args)
     {
         $payload = self::encode($args);
         $written = @\fwrite($socket, $payload);
@@ -100,6 +100,161 @@ final class VmRedisNative
         }
 
         return self::readReply($socket);
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @throws \RedisException
+     */
+    public static function del($socket, string ...$keys): int
+    {
+        if ([] === $keys) {
+            return 0;
+        }
+        $reply = self::command($socket, \array_merge(['DEL'], $keys));
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'DEL failed'));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @throws \RedisException
+     */
+    public static function exists($socket, string ...$keys): int
+    {
+        if ([] === $keys) {
+            return 0;
+        }
+        $reply = self::command($socket, \array_merge(['EXISTS'], $keys));
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'EXISTS failed'));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @throws \RedisException
+     */
+    public static function ping($socket, ?string $message = null): string|true
+    {
+        $args = null === $message ? ['PING'] : ['PING', $message];
+        $reply = self::command($socket, $args);
+        if (null === $message) {
+            if (\is_string($reply) && 'PONG' === $reply) {
+                return true;
+            }
+            throw new \RedisException(self::errorMessage($reply, 'PING failed'));
+        }
+        if (\is_string($reply)) {
+            return $reply;
+        }
+
+        throw new \RedisException(self::errorMessage($reply, 'PING failed'));
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @throws \RedisException
+     */
+    public static function auth($socket, string $password, ?string $username = null): bool
+    {
+        $args = null === $username ? ['AUTH', $password] : ['AUTH', $username, $password];
+        $reply = self::command($socket, $args);
+        if (\is_string($reply) && 'OK' === $reply) {
+            return true;
+        }
+        if (true === $reply) {
+            return true;
+        }
+
+        throw new \RedisException(self::errorMessage($reply, 'AUTH failed'));
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @throws \RedisException
+     */
+    public static function select($socket, int $db): bool
+    {
+        $reply = self::command($socket, ['SELECT', (string) $db]);
+        if (\is_string($reply) && 'OK' === $reply) {
+            return true;
+        }
+        if (true === $reply) {
+            return true;
+        }
+
+        throw new \RedisException(self::errorMessage($reply, 'SELECT failed'));
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @throws \RedisException
+     */
+    public static function hSet($socket, string $key, string $field, string $value): int
+    {
+        $reply = self::command($socket, ['HSET', $key, $field, $value]);
+        if (!\is_int($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'HSET failed'));
+        }
+
+        return $reply;
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @return string|false
+     *
+     * @throws \RedisException
+     */
+    public static function hGet($socket, string $key, string $field)
+    {
+        $reply = self::command($socket, ['HGET', $key, $field]);
+        if (null === $reply) {
+            return false;
+        }
+        if (\is_string($reply)) {
+            return $reply;
+        }
+
+        throw new \RedisException(self::errorMessage($reply, 'HGET failed'));
+    }
+
+    /**
+     * @param resource $socket
+     *
+     * @return array<string, string>
+     *
+     * @throws \RedisException
+     */
+    public static function hGetAll($socket, string $key): array
+    {
+        $reply = self::command($socket, ['HGETALL', $key]);
+        if (null === $reply) {
+            return [];
+        }
+        if (!\is_array($reply)) {
+            throw new \RedisException(self::errorMessage($reply, 'HGETALL failed'));
+        }
+        $out = [];
+        $n = \count($reply);
+        for ($i = 0; $i + 1 < $n; $i += 2) {
+            $out[(string) $reply[$i]] = (string) $reply[$i + 1];
+        }
+
+        return $out;
     }
 
     /** @param list<string> $args */
