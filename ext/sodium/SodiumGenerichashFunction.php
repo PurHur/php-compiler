@@ -15,7 +15,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * Shared VM wiring for sodium_crypto_generichash() (php-src ext/sodium/libsodium.c; #15530).
+ * Shared VM wiring for sodium_crypto_generichash() (php-src ext/sodium/libsodium.c; #15530, #20696).
  */
 abstract class SodiumGenerichashFunction extends Internal
 {
@@ -24,10 +24,11 @@ abstract class SodiumGenerichashFunction extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireArgCountRange($frame, $this->getName(), 1, 3);
-        $message = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $this->getName(), 0, 'message');
+        // Z_PARAM_STR $message / $key — null TypeError on 8.4 forward profile (#20696, ext/sodium/libsodium.c).
+        $message = VmString::zparamStrBuiltinArgForFrame($frame, 0, $this->getName(), 0, 'message');
         $key = '';
         if (\count($frame->calledArgs) >= 2) {
-            $key = VmString::coerceStringBuiltinArg($frame->calledArgs[1], $this->getName(), 1, 'key');
+            $key = VmString::zparamStrBuiltinArgForFrame($frame, 1, $this->getName(), 1, 'key');
         }
         $length = VmSodium::CRYPTO_GENERICHASH_BYTES;
         if (\count($frame->calledArgs) >= 3) {
