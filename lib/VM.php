@@ -836,6 +836,11 @@ class VM {
         if (null !== $hookedIsset) {
             return $hookedIsset;
         }
+        // Dom\HTMLDocument computed props (body/title/…) — not the null ClassProperty slot (#20540).
+        $domHtmlIsset = ext\dom\DomHtmlDocumentPropertySupport::propertyIsSet($object, $propName);
+        if (null !== $domHtmlIsset) {
+            return $domHtmlIsset;
+        }
         $props = $object->getRawProperties();
         if (isset($props[$propName])) {
             return VmIsset::storedPropertyIsSet($props[$propName]);
@@ -1205,6 +1210,13 @@ class VM {
             && ext\simplexml\SimpleXmlRegistry::has($object)
         ) {
             $dst->bool(ext\simplexml\VmSimpleXml::childPropertyIsEmpty($object, $propName));
+
+            return null;
+        }
+        // Dom\HTMLDocument::$body|/title — computed get + truthiness (php-src html_document.c; #20540).
+        $domHtmlEmpty = ext\dom\DomHtmlDocumentPropertySupport::propertyIsEmpty($object, $propName);
+        if (null !== $domHtmlEmpty) {
+            $dst->bool($domHtmlEmpty);
 
             return null;
         }

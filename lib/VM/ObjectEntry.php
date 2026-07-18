@@ -238,6 +238,11 @@ class ObjectEntry {
 
     public function issetProperty(string $name): bool
     {
+        // Computed Dom\HTMLDocument props (body/title/…) ignore the null ClassProperty slot (#20540).
+        $domHtmlIsset = \PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::propertyIsSet($this, $name);
+        if (null !== $domHtmlIsset) {
+            return $domHtmlIsset;
+        }
         if (!isset($this->properties[$name])) {
             return false;
         }

@@ -1,5 +1,5 @@
 --TEST--
-stdlib Dom\HTMLDocument living surface — body/title/querySelector/getElementById/createFromFile/saveHtml (#6506, #19580)
+stdlib Dom\HTMLDocument living surface — body/title/querySelector/getElementById/createFromFile/saveHtml (#6506, #19580, #20540)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -19,6 +19,10 @@ $d = Dom\HTMLDocument::createFromString($html);
 $body = $d->body;
 echo 'body=', ($body !== null ? $body->nodeName : 'NULL'), "\n";
 echo 'title=', $d->title, "\n";
+echo 'isset_body=', (int) isset($d->body), ' empty_body=', (int) empty($d->body), "\n";
+echo 'isset_title=', (int) isset($d->title), ' empty_title=', (int) empty($d->title), "\n";
+$blankTitle = Dom\HTMLDocument::createFromString('<!DOCTYPE html><html><head><title></title></head><body></body></html>');
+echo 'blank_isset_title=', (int) isset($blankTitle->title), ' blank_empty_title=', (int) empty($blankTitle->title), "\n";
 echo 'qs=', method_exists($d, 'querySelector') ? 'yes' : 'no', "\n";
 echo 'gid=', method_exists($d, 'getElementById') ? 'yes' : 'no', "\n";
 echo 'cff=', method_exists(Dom\HTMLDocument::class, 'createFromFile') ? 'yes' : 'no', "\n";
@@ -45,6 +49,9 @@ hi
 empty_body
 body=body
 title=T
+isset_body=1 empty_body=0
+isset_title=1 empty_title=0
+blank_isset_title=1 blank_empty_title=1
 qs=yes
 gid=yes
 cff=yes
