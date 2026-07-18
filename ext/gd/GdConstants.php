@@ -62,6 +62,12 @@ final class GdConstants
         'IMG_EFFECT_NORMAL' => 2,
         'IMG_EFFECT_OVERLAY' => 3,
         'IMG_EFFECT_MULTIPLY' => 4,
+        // gdAffineStandardMatrix (php-src ext/gd/libgd/gd.h; #20441)
+        'IMG_AFFINE_TRANSLATE' => 0,
+        'IMG_AFFINE_SCALE' => 1,
+        'IMG_AFFINE_ROTATE' => 2,
+        'IMG_AFFINE_SHEAR_HORIZONTAL' => 3,
+        'IMG_AFFINE_SHEAR_VERTICAL' => 4,
     ];
 
     /** GD_METHOD_COUNT — exclusive upper bound for imagescale() $mode (#20405). */

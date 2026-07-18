@@ -1696,34 +1696,40 @@ final class VmGd
     /**
      * @return list<float>
      */
-    public static function coerceAffineMatrix(Variable $arg, string $function, int $position): array
-    {
+    public static function coerceAffineMatrix(
+        Variable $arg,
+        string $function,
+        int $position,
+        string $paramName = 'affine'
+    ): array {
         $arg = $arg->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($arg)) {
             throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($affine) must be of type array, %s given',
+                '%s(): Argument #%d ($%s) must be of type array, %s given',
                 $function,
                 $position,
+                $paramName,
                 EnumCaseSupport::typeNameForVariable($arg)
             ));
         }
         if (Variable::TYPE_ARRAY !== $arg->type) {
             throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($affine) must be of type array, %s given',
+                '%s(): Argument #%d ($%s) must be of type array, %s given',
                 $function,
                 $position,
+                $paramName,
                 self::typeLabel($arg)
             ));
         }
         $table = $arg->toArray();
         if (6 !== $table->getNumElements()) {
-            throw new \ValueError($function.'(): Argument #'.$position.' ($affine) must have 6 elements');
+            throw new \ValueError($function.'(): Argument #'.$position.' ($'.$paramName.') must have 6 elements');
         }
         $affine = [];
         for ($i = 0; $i < 6; ++$i) {
             $elem = $table->findIndex($i);
             if (null === $elem) {
-                throw new \ValueError($function.'(): Argument #'.$position.' ($affine) must have 6 elements');
+                throw new \ValueError($function.'(): Argument #'.$position.' ($'.$paramName.') must have 6 elements');
             }
             $elem = $elem->resolveIndirect();
             if (Variable::TYPE_INTEGER === $elem->type) {
@@ -1734,15 +1740,118 @@ final class VmGd
                 $affine[] = (float) $elem->toString();
             } else {
                 throw new \TypeError(\sprintf(
-                    '%s(): Argument #%d ($affine) contains invalid type for element %d',
+                    '%s(): Argument #%d ($%s) contains invalid type for element %d',
                     $function,
                     $position,
+                    $paramName,
                     $i
                 ));
             }
         }
 
         return $affine;
+    }
+
+    /**
+     * imageaffinematrixget() — gdAffineTranslate/Scale/Rotate/Shear* (php-src ext/gd/gd.c; #20441).
+     *
+     * @return list<float>|null
+     */
+    public static function affineMatrixGet(int $type, Variable $options): ?array
+    {
+        $options = $options->resolveIndirect();
+        switch ($type) {
+            case GdConstants::REGISTERED['IMG_AFFINE_TRANSLATE']:
+            case GdConstants::REGISTERED['IMG_AFFINE_SCALE']:
+                if (Variable::TYPE_ARRAY !== $options->type) {
+                    // php-src zend_argument_type_error(1, ...) — Argument #1 wording (#20441).
+                    throw new \TypeError(
+                        'imageaffinematrixget(): Argument #1 ($type) must be of type array when using translate or scale'
+                    );
+                }
+                $table = $options->toArray();
+                $xVar = $table->find('x');
+                if (null === $xVar) {
+                    throw new \ValueError('imageaffinematrixget(): Argument #2 ($options) must have an "x" key');
+                }
+                $yVar = $table->find('y');
+                if (null === $yVar) {
+                    throw new \ValueError('imageaffinematrixget(): Argument #2 ($options) must have a "y" key');
+                }
+                $x = self::zvalGetDouble($xVar);
+                $y = self::zvalGetDouble($yVar);
+                if (GdConstants::REGISTERED['IMG_AFFINE_TRANSLATE'] === $type) {
+                    return [1.0, 0.0, 0.0, 1.0, $x, $y];
+                }
+
+                return [$x, 0.0, 0.0, $y, 0.0, 0.0];
+
+            case GdConstants::REGISTERED['IMG_AFFINE_ROTATE']:
+            case GdConstants::REGISTERED['IMG_AFFINE_SHEAR_HORIZONTAL']:
+            case GdConstants::REGISTERED['IMG_AFFINE_SHEAR_VERTICAL']:
+                $angle = self::zvalGetDouble($options);
+                $rad = $angle * M_PI / 180.0;
+                if (GdConstants::REGISTERED['IMG_AFFINE_SHEAR_HORIZONTAL'] === $type) {
+                    return [1.0, 0.0, \tan($rad), 1.0, 0.0, 0.0];
+                }
+                if (GdConstants::REGISTERED['IMG_AFFINE_SHEAR_VERTICAL'] === $type) {
+                    return [1.0, \tan($rad), 0.0, 1.0, 0.0, 0.0];
+                }
+                $sinT = \sin($rad);
+                $cosT = \cos($rad);
+
+                return [$cosT, $sinT, -$sinT, $cosT, 0.0, 0.0];
+
+            default:
+                throw new \ValueError('imageaffinematrixget(): Argument #1 ($type) must be a valid element type');
+        }
+    }
+
+    /**
+     * @param list<float> $m1
+     * @param list<float> $m2
+     * @return list<float>
+     */
+    public static function concatAffineMatrices(array $m1, array $m2): array
+    {
+        return self::affineConcat($m1, $m2);
+    }
+
+    /**
+     * @param list<float> $matrix
+     */
+    public static function affineMatrixToHashTable(array $matrix): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($matrix as $index => $value) {
+            $slot = new Variable();
+            $slot->float($value);
+            $ht->updateIndex((int) $index, $slot);
+        }
+
+        return $ht;
+    }
+
+    /** zval_get_double-style coercion for affine options (php-src Zend/zend_operators.c). */
+    private static function zvalGetDouble(Variable $arg): float
+    {
+        $arg = $arg->resolveIndirect();
+        switch ($arg->type) {
+            case Variable::TYPE_FLOAT:
+                return $arg->toFloat();
+            case Variable::TYPE_INTEGER:
+                return (float) $arg->toInt();
+            case Variable::TYPE_BOOLEAN:
+                return $arg->toBool() ? 1.0 : 0.0;
+            case Variable::TYPE_NULL:
+                return 0.0;
+            case Variable::TYPE_STRING:
+                return (float) $arg->toString();
+            case Variable::TYPE_ARRAY:
+                return 1.0;
+            default:
+                return 1.0;
+        }
     }
 
     /**
@@ -2887,6 +2996,16 @@ final class VmGd
                 1 => 'image',
                 2 => 'affine',
                 3 => 'clip',
+                default => 'arg',
+            },
+            'imageaffinematrixget' => match ($position) {
+                1 => 'type',
+                2 => 'options',
+                default => 'arg',
+            },
+            'imageaffinematrixconcat' => match ($position) {
+                1 => 'matrix1',
+                2 => 'matrix2',
                 default => 'arg',
             },
             'imagesetinterpolation' => match ($position) {
