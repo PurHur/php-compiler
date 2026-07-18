@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5676 |
-| Phase A inventory files (M2 ratio SSOT) | 5676 |
+| PHP files on vm.php path | 5679 |
+| Phase A inventory files (M2 ratio SSOT) | 5679 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16260 |
+| Source constructs flagged (warnings) | 16269 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -124,7 +124,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/CurlFileBuiltin.php` | 0 | 12 |
 | `ext/curl/CurlFunction.php` | 0 | 1 |
 | `ext/curl/CurlStringFileBuiltin.php` | 0 | 7 |
-| `ext/curl/Module.php` | 0 | 29 |
+| `ext/curl/Module.php` | 0 | 31 |
 | `ext/curl/VmCurlArg.php` | 0 | 1 |
 | `ext/curl/VmCurlCore.php` | 0 | 3 |
 | `ext/curl/VmCurlEasy.php` | 0 | 4 |
@@ -153,8 +153,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_setopt.php` | 0 | 2 |
 | `ext/curl/curl_setopt_array.php` | 0 | 2 |
 | `ext/curl/curl_share_close.php` | 0 | 2 |
+| `ext/curl/curl_share_errno.php` | 0 | 2 |
 | `ext/curl/curl_share_init.php` | 0 | 2 |
 | `ext/curl/curl_share_setopt.php` | 0 | 2 |
+| `ext/curl/curl_share_strerror.php` | 0 | 2 |
 | `ext/curl/curl_strerror.php` | 0 | 2 |
 | `ext/curl/curl_unescape.php` | 0 | 3 |
 | `ext/curl/curl_version.php` | 0 | 2 |
@@ -1203,6 +1205,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/SimpleXmlElementOffsetSet.php` | 0 | 2 |
 | `ext/simplexml/SimpleXmlElementOffsetUnset.php` | 0 | 2 |
 | `ext/simplexml/SimpleXmlElementRegisterXPathNamespace.php` | 0 | 1 |
+| `ext/simplexml/SimpleXmlElementSet.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementToString.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementUnset.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlElementXpath.php` | 0 | 1 |
@@ -1210,7 +1213,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/SimpleXmlJsonExport.php` | 0 | 3 |
 | `ext/simplexml/SimpleXmlNodeState.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlRegistry.php` | 0 | 1 |
-| `ext/simplexml/VmSimpleXml.php` | 0 | 58 |
+| `ext/simplexml/VmSimpleXml.php` | 0 | 60 |
 | `ext/simplexml/VmSimpleXmlIterator.php` | 0 | 4 |
 | `ext/simplexml/simplexml_import_dom.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
@@ -6244,25 +6247,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new curl_share_init (line 67)
 - new curl_share_setopt (line 68)
 - new curl_share_close (line 69)
-- new curl_escape (line 73)
-- new curl_unescape (line 74)
-- new curl_init (line 75)
-- new curl_setopt (line 76)
-- new curl_setopt_array (line 77)
-- new curl_exec (line 78)
-- new curl_getinfo (line 79)
-- new curl_error (line 80)
-- new curl_errno (line 81)
-- new curl_close (line 82)
-- new curl_reset (line 84)
-- new curl_pause (line 85)
-- new curl_multi_init (line 88)
-- new curl_multi_add_handle (line 89)
-- new curl_multi_exec (line 90)
-- new curl_multi_select (line 91)
-- new curl_multi_getcontent (line 92)
-- new curl_multi_remove_handle (line 93)
-- new curl_multi_close (line 94)
+- new curl_share_errno (line 71)
+- new curl_share_strerror (line 72)
+- new curl_escape (line 76)
+- new curl_unescape (line 77)
+- new curl_init (line 78)
+- new curl_setopt (line 79)
+- new curl_setopt_array (line 80)
+- new curl_exec (line 81)
+- new curl_getinfo (line 82)
+- new curl_error (line 83)
+- new curl_errno (line 84)
+- new curl_close (line 85)
+- new curl_reset (line 87)
+- new curl_pause (line 88)
+- new curl_multi_init (line 91)
+- new curl_multi_add_handle (line 92)
+- new curl_multi_exec (line 93)
+- new curl_multi_select (line 94)
+- new curl_multi_getcontent (line 95)
+- new curl_multi_remove_handle (line 96)
+- new curl_multi_close (line 97)
 - 5 class method(s)
 
 ### `ext/curl/VmCurlArg.php`
@@ -6275,7 +6280,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 43)
 - new Variable (line 45)
-- 5 class method(s)
+- 6 class method(s)
 
 ### `ext/curl/VmCurlEasy.php`
 
@@ -6307,10 +6312,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/VmCurlShare.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 32)
-- new Variable (line 40)
-- new ObjectEntry (line 41)
-- 10 class method(s)
+- new ClassEntry (line 38)
+- new Variable (line 46)
+- new ObjectEntry (line 47)
+- 14 class method(s)
 
 ### `ext/curl/curl_close.php`
 
@@ -6443,6 +6448,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 26)
 - 2 class method(s)
 
+### `ext/curl/curl_share_errno.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
 ### `ext/curl/curl_share_init.php`
 
 **Warnings** (review for bootstrap subset):
@@ -6453,6 +6464,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/curl/curl_share_strerror.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
 - 2 class method(s)
 
 ### `ext/curl/curl_strerror.php`
@@ -14178,6 +14195,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/simplexml/SimpleXmlElementSet.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/simplexml/SimpleXmlElementToString.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14218,63 +14240,65 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/VmSimpleXml.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 33)
-- new SimpleXmlElementConstruct (line 42)
-- new SimpleXmlElementGet (line 45)
-- new SimpleXmlElementIsset (line 47)
-- new SimpleXmlElementUnset (line 49)
-- new SimpleXmlElementToString (line 51)
-- new SimpleXmlElementOffsetGet (line 54)
-- new SimpleXmlElementOffsetExists (line 57)
-- new SimpleXmlElementOffsetSet (line 60)
-- new SimpleXmlElementOffsetUnset (line 63)
-- new SimpleXmlElementCount (line 66)
-- new SimpleXmlElementGetName (line 68)
-- new SimpleXmlElementChildren (line 71)
-- new SimpleXmlElementAsXml (line 73)
-- new SimpleXmlElementAsXml (line 77)
-- new SimpleXmlElementAddChild (line 80)
-- new SimpleXmlElementAddAttribute (line 83)
-- new SimpleXmlElementXpath (line 86)
-- new SimpleXmlElementAttributes (line 89)
-- new SimpleXmlElementGetDocNamespaces (line 91)
-- new SimpleXmlElementGetNamespaces (line 94)
-- new SimpleXmlElementRegisterXPathNamespace (line 97)
-- new Exception (line 146)
-- new Exception (line 150)
-- new Exception (line 157)
-- new Variable (line 295)
-- new Variable (line 300)
-- new Variable (line 307)
-- new Variable (line 313)
-- new Variable (line 328)
-- new SimpleXmlNodeState (line 631)
-- new SimpleXmlNodeState (line 636)
-- new SimpleXmlNodeState (line 649)
-- new SimpleXmlNodeState (line 730)
-- new HashTable (line 811)
-- new Variable (line 834)
-- new Variable (line 843)
-- new Variable (line 890)
-- new Variable (line 911)
-- new SimpleXmlNodeState (line 948)
-- new ObjectEntry (line 972)
-- new SimpleXmlNodeState (line 1058)
-- new SimpleXmlNodeState (line 1063)
-- new SimpleXmlNodeState (line 1068)
-- new SimpleXmlNodeState (line 1071)
-- new ObjectEntry (line 1079)
-- new ObjectEntry (line 1090)
-- new SimpleXmlNodeState (line 1094)
-- new ObjectEntry (line 1111)
-- new ObjectEntry (line 1127)
-- new Error (line 1203)
-- new ObjectEntry (line 1215)
-- new HashTable (line 1574)
-- new Variable (line 1576)
-- new SimpleXmlNodeState (line 1635)
-- new SimpleXmlNodeState (line 1644)
-- 66 class method(s)
+- new ClassEntry (line 34)
+- new SimpleXmlElementConstruct (line 43)
+- new SimpleXmlElementGet (line 46)
+- new SimpleXmlElementSet (line 48)
+- new SimpleXmlElementIsset (line 50)
+- new SimpleXmlElementUnset (line 52)
+- new SimpleXmlElementToString (line 54)
+- new SimpleXmlElementOffsetGet (line 57)
+- new SimpleXmlElementOffsetExists (line 60)
+- new SimpleXmlElementOffsetSet (line 63)
+- new SimpleXmlElementOffsetUnset (line 66)
+- new SimpleXmlElementCount (line 69)
+- new SimpleXmlElementGetName (line 71)
+- new SimpleXmlElementChildren (line 74)
+- new SimpleXmlElementAsXml (line 76)
+- new SimpleXmlElementAsXml (line 80)
+- new SimpleXmlElementAddChild (line 83)
+- new SimpleXmlElementAddAttribute (line 86)
+- new SimpleXmlElementXpath (line 89)
+- new SimpleXmlElementAttributes (line 92)
+- new SimpleXmlElementGetDocNamespaces (line 94)
+- new SimpleXmlElementGetNamespaces (line 97)
+- new SimpleXmlElementRegisterXPathNamespace (line 100)
+- new Exception (line 149)
+- new Exception (line 153)
+- new Exception (line 160)
+- new SimpleXmlNodeState (line 321)
+- new Variable (line 412)
+- new Variable (line 417)
+- new Variable (line 424)
+- new Variable (line 430)
+- new Variable (line 445)
+- new SimpleXmlNodeState (line 748)
+- new SimpleXmlNodeState (line 753)
+- new SimpleXmlNodeState (line 766)
+- new SimpleXmlNodeState (line 847)
+- new HashTable (line 928)
+- new Variable (line 951)
+- new Variable (line 960)
+- new Variable (line 1007)
+- new Variable (line 1028)
+- new SimpleXmlNodeState (line 1065)
+- new ObjectEntry (line 1089)
+- new SimpleXmlNodeState (line 1175)
+- new SimpleXmlNodeState (line 1180)
+- new SimpleXmlNodeState (line 1185)
+- new SimpleXmlNodeState (line 1188)
+- new ObjectEntry (line 1196)
+- new ObjectEntry (line 1207)
+- new SimpleXmlNodeState (line 1211)
+- new ObjectEntry (line 1228)
+- new ObjectEntry (line 1244)
+- new Error (line 1320)
+- new ObjectEntry (line 1332)
+- new HashTable (line 1691)
+- new Variable (line 1693)
+- new SimpleXmlNodeState (line 1752)
+- new SimpleXmlNodeState (line 1761)
+- 69 class method(s)
 - 4 closure(s)
 
 ### `ext/simplexml/VmSimpleXmlIterator.php`
@@ -20038,7 +20062,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamFilterKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 282)
+- new JIT (line 283)
 - 20 class method(s)
 - 1 closure(s)
 
@@ -35809,7 +35833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamIoRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 38 class method(s)
+- 39 class method(s)
 
 ### `lib/JIT/Builtin/StreamLibcHandleRuntime.php`
 
@@ -35868,7 +35892,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamReadRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 165)
+- new JIT (line 168)
 - 9 class method(s)
 - 1 closure(s)
 
