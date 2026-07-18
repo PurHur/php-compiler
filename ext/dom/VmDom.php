@@ -1335,6 +1335,7 @@ final class VmDom
         $elementState->attributeNamespaces[$name] = $attrState->namespaceUri ?? '';
         $elementState->attributeNodeIds[$name] = $attr->id;
         $attrState->ownerElementId = $element->id;
+        $attrState->parentId = $element->id;
         $attr->getProperty(self::PROP_OWNER_ELEMENT)->object($element);
         self::ensureNamespaceDeclarationForPrefixedAttribute(
             $element,
@@ -1449,6 +1450,7 @@ final class VmDom
         $idBearing = self::elementAttributeIsIdBearing($element, $name);
         unset($elementState->attributes[$name], $elementState->attributeNamespaces[$name], $elementState->attributeNodeIds[$name]);
         self::detachAttributeNode($attr);
+        self::syncSubtree($ctx, $attr);
         self::rebindElementIdOnAttributeWrite($element, $name, $previousIdValue, false, $idBearing);
         self::syncElementAttributes($ctx, $element);
         $var = new Variable(Variable::TYPE_OBJECT);
@@ -1468,9 +1470,10 @@ final class VmDom
         if (null !== $cachedId) {
             $cached = DomRegistry::entry($cachedId);
             if (null !== $cached && self::isAttr($cached)) {
-                self::syncAttributeNodeValue($cached, $value);
+                self::syncAttributeNodeValue($ctx, $cached, $value, true);
                 $cachedState = DomRegistry::state($cached);
                 $cachedState->ownerElementId = $element->id;
+                $cachedState->parentId = $element->id;
                 $cached->getProperty(self::PROP_OWNER_ELEMENT)->object($element);
 
                 return $cached;
@@ -1484,17 +1487,29 @@ final class VmDom
             $ownerDocument
         );
         $attr = $attrVar->toObject();
-        self::syncAttributeNodeValue($attr, $value);
+        self::syncAttributeNodeValue($ctx, $attr, $value, true);
         $attrState = DomRegistry::state($attr);
         $attrState->ownerElementId = $element->id;
+        $attrState->parentId = $element->id;
         $attr->getProperty(self::PROP_OWNER_ELEMENT)->object($element);
         $state->attributeNodeIds[$name] = $attr->id;
 
         return $attr;
     }
 
-    private static function syncAttributeNodeValue(ObjectEntry $attr, string $value): void
-    {
+    /**
+     * Keep Attr::$value / nodeValue and the libxml-style value text child in sync
+     * (php-src ext/dom/attr.c; #20501).
+     *
+     * @param bool $ensureTextChild Create a DOMText child even for empty values (element-attached
+     *                              attrs and user writes). Fresh createAttribute() leaves no child.
+     */
+    private static function syncAttributeNodeValue(
+        Context $ctx,
+        ObjectEntry $attr,
+        string $value,
+        bool $ensureTextChild = false
+    ): void {
         $attrState = DomRegistry::state($attr);
         $attrState->textContent = $value;
         if ($attr->hasProperty(self::PROP_VALUE)) {
@@ -1503,15 +1518,48 @@ final class VmDom
         if ($attr->hasProperty(self::PROP_NODE_VALUE)) {
             $attr->getProperty(self::PROP_NODE_VALUE)->string($value);
         }
+        $hasChildren = [] !== $attrState->childIds;
+        if ($ensureTextChild || $hasChildren || '' !== $value) {
+            self::ensureAttrValueTextChild($ctx, $attr, $value);
+        } else {
+            self::syncSubtree($ctx, $attr);
+        }
+    }
+
+    /** Materialize / refresh Attr value text node (libxml xmlAttr->children; #20501). */
+    private static function ensureAttrValueTextChild(Context $ctx, ObjectEntry $attr, string $value): void
+    {
+        $attrState = DomRegistry::state($attr);
+        $ownerDocument = self::ownerDocumentEntry($attr);
+        if ([] !== $attrState->childIds) {
+            $existing = DomRegistry::entry($attrState->childIds[0]);
+            if (null !== $existing && self::isTextNode($existing)) {
+                DomRegistry::state($existing)->textContent = $value;
+                // Drop any extra children; php-src Attr value write replaces content.
+                $attrState->childIds = [$existing->id];
+                self::linkChildToParent($existing, $attr);
+                self::syncSubtree($ctx, $attr);
+
+                return;
+            }
+            $attrState->childIds = [];
+        }
+        $text = self::createTextNode($ctx, $value, $ownerDocument);
+        $attrState->childIds = [$text->id];
+        self::linkChildToParent($text, $attr);
+        self::syncSubtree($ctx, $attr);
     }
 
     private static function detachAttributeNode(ObjectEntry $attr): void
     {
         $attrState = DomRegistry::state($attr);
         $attrState->ownerElementId = null;
+        $attrState->parentId = null;
         if ($attr->hasProperty(self::PROP_OWNER_ELEMENT)) {
             $attr->getProperty(self::PROP_OWNER_ELEMENT)->null();
         }
+        // Clear parent/sibling slots; keep value text children (php-src xmlUnlinkNode on Attr; #20501).
+        self::clearDetachedNodeLinkProperties($attr);
     }
 
     /**
@@ -1687,7 +1735,7 @@ final class VmDom
         if (isset($state->attributeNodeIds[$qualifiedName])) {
             $cached = DomRegistry::entry($state->attributeNodeIds[$qualifiedName]);
             if (null !== $cached && self::isAttr($cached)) {
-                self::syncAttributeNodeValue($cached, $value);
+                self::syncAttributeNodeValue($ctx, $cached, $value, true);
             }
         }
         // Bogus Attr named xmlns:* (null NS) stays in the Attr map — do not promote to nsDef.
@@ -7198,7 +7246,7 @@ final class VmDom
             if (null !== $cachedId) {
                 $cached = DomRegistry::entry($cachedId);
                 if (null !== $cached && self::isAttr($cached)) {
-                    self::syncAttributeNodeValue($cached, $value);
+                    self::syncAttributeNodeValue($ctx, $cached, $value, true);
                     $ids[] = $cachedId;
 
                     continue;
@@ -7241,6 +7289,7 @@ final class VmDom
         self::initElementPropertySlots($element);
         $state = DomRegistry::state($element);
         $attrIds = self::collectAttributeNodeIds($ctx, $element);
+        self::syncAttributeTreeLinks($ctx, $element, $attrIds);
 
         $props = $element->propertiesWithNames();
         if (!isset($props[self::PROP_ATTRIBUTES])) {
@@ -7271,6 +7320,35 @@ final class VmDom
         $map = $mapVar->toObject();
         $state->attributesListId = $map->id;
         $attrsVar->copyFrom($mapVar);
+    }
+
+    /**
+     * Link Attr parent/siblings like libxml xmlAttr (php-src ext/dom/node.c; #20501).
+     *
+     * @param list<int> $attrIds
+     */
+    private static function syncAttributeTreeLinks(Context $ctx, ObjectEntry $element, array $attrIds): void
+    {
+        foreach ($attrIds as $attrId) {
+            $attr = DomRegistry::entry($attrId);
+            if (null === $attr || !self::isAttr($attr)) {
+                continue;
+            }
+            $attrState = DomRegistry::state($attr);
+            $attrState->ownerElementId = $element->id;
+            $attrState->parentId = $element->id;
+            if ($attr->hasProperty(self::PROP_OWNER_ELEMENT)) {
+                $attr->getProperty(self::PROP_OWNER_ELEMENT)->object($element);
+            }
+        }
+        self::syncChildSiblingLinks($attrIds);
+        foreach ($attrIds as $attrId) {
+            $attr = DomRegistry::entry($attrId);
+            if (null === $attr || !self::isAttr($attr)) {
+                continue;
+            }
+            self::syncNodeLinks($ctx, $attr);
+        }
     }
 
     /** @param list<int> $nodeIds */
@@ -8177,8 +8255,8 @@ final class VmDom
         }
         $state = DomRegistry::state($node);
         if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
-            // Live Attr handle (php-src dom_attr_value_write / ext/dom/attr.c; #19281).
-            self::syncAttributeNodeValue($node, $value);
+            // Live Attr handle (php-src dom_attr_value_write / ext/dom/attr.c; #19281, #20501).
+            self::syncAttributeNodeValue($ctx, $node, $value, true);
             $ownerElementId = $state->ownerElementId;
             if (null === $ownerElementId) {
                 return;
@@ -8584,7 +8662,12 @@ final class VmDom
         if (self::isAttr($node)) {
             $state = DomRegistry::state($node);
             $attr = self::createAttributeNS($ctx, $state->namespaceUri, $state->nodeName, $document)->toObject();
-            self::syncAttributeNodeValue($attr, $state->textContent ?? '');
+            self::syncAttributeNodeValue(
+                $ctx,
+                $attr,
+                $state->textContent ?? '',
+                [] !== $state->childIds
+            );
             self::linkChildToParent($attr, null);
 
             return $attr;
@@ -8688,7 +8771,12 @@ final class VmDom
         }
         if (self::isAttr($source)) {
             $cloned = self::createAttributeNS($ctx, $sourceState->namespaceUri, $sourceState->nodeName, $ownerDocument)->toObject();
-            self::syncAttributeNodeValue($cloned, $sourceState->textContent ?? '');
+            self::syncAttributeNodeValue(
+                $ctx,
+                $cloned,
+                $sourceState->textContent ?? '',
+                [] !== $sourceState->childIds
+            );
             self::linkChildToParent($cloned, null);
 
             return $cloned;
