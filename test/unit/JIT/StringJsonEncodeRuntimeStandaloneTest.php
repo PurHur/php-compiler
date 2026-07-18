@@ -19,6 +19,8 @@ final class StringJsonEncodeRuntimeStandaloneTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/JsonLastErrorGlobal.php');
         $runtime = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringJsonEncode.php');
         $this->assertStringContainsString('JsonEncodeJitHelper', $runtime);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $runtime);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $runtime);
         $this->assertStringNotContainsString('StringJsonEncodeJit', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
         $this->assertLessThan(250, \substr_count($runtime, "\n"), 'StringJsonEncode must be a thin bridge (#9267)');
