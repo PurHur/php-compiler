@@ -9,14 +9,10 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
-use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\RuntimeStrictness;
-use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -33,8 +29,21 @@ final class str_replace extends Internal
             throw new \LogicException('str_replace() requires 3 or 4 arguments in this compiler build');
         }
         $hasCount = $argc >= 4;
-        $searchVar = self::requireStringOrArrayReplace($frame, $frame->calledArgs[0], 'str_replace', 0, 'search');
-        $replaceVar = self::requireStringOrArrayReplace($frame, $frame->calledArgs[1], 'str_replace', 1, 'replace');
+        // Z_PARAM_STR_OR_ARR — null TypeError on PROFILE=8.4 (#20173, #18914; php-src string.c).
+        $searchVar = VmPreg::resolveStringOrArraySubject(
+            $frame,
+            $frame->calledArgs[0],
+            'str_replace',
+            0,
+            'search'
+        );
+        $replaceVar = VmPreg::resolveStringOrArraySubject(
+            $frame,
+            $frame->calledArgs[1],
+            'str_replace',
+            1,
+            'replace'
+        );
         $subjectVar = VmPreg::resolveStringOrArraySubject(
             $frame,
             $frame->calledArgs[2],
@@ -109,6 +118,13 @@ final class str_replace extends Internal
             throw new \LogicException('str_replace() requires 3 or 4 arguments in this compiler build');
         }
 
+        // Z_PARAM_STR_OR_ARR null TypeError on PROFILE=8.4 (#20173 search/replace; #18914 subject).
+        if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[0], 'str_replace', 'search', 1)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
+        if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[1], 'str_replace', 'replace', 2)) {
+            return $context->getTypeFromString('__string__*')->constNull();
+        }
         if (JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'str_replace', 'subject', 3)) {
             return $context->getTypeFromString('__string__*')->constNull();
         }
@@ -200,7 +216,11 @@ final class str_replace extends Internal
         int $argIndex,
         string $paramName
     ): array {
-        if (Variable::TYPE_STRING === $var->type || Variable::TYPE_NULL === $var->type) {
+        // Prefer already-resolved Z_PARAM_STR_OR_ARR value (#20173) — avoid re-coercing the raw arg.
+        if (Variable::TYPE_STRING === $var->type) {
+            return [$var->toString()];
+        }
+        if (Variable::TYPE_NULL === $var->type) {
             return [VmString::coerceStringBuiltinArg($arg, $function, $argIndex, $paramName, 'array|string')];
         }
 
@@ -222,7 +242,10 @@ final class str_replace extends Internal
         int $argIndex,
         string $paramName
     ): array|string {
-        if (Variable::TYPE_STRING === $var->type || Variable::TYPE_NULL === $var->type) {
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+        if (Variable::TYPE_NULL === $var->type) {
             return VmString::coerceStringBuiltinArg($arg, $function, $argIndex, $paramName, 'array|string');
         }
 
@@ -246,50 +269,6 @@ final class str_replace extends Internal
         return $slot;
     }
 
-    /**
-     * php-src Z_PARAM_STR on str_replace() search/replace — null coerces outside strict_types (#11014, ext/standard/string.c).
-     */
-    private static function requireStringOrArrayReplace(
-        Frame $frame,
-        Variable $var,
-        string $function,
-        int $argIndex,
-        string $paramName
-    ): Variable {
-        $var = $var->resolveIndirect();
-        if (InternalStrictArg::isCallerStrict($frame) && Variable::TYPE_NULL === $var->type) {
-            throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($%s) must be of type array|string, null given',
-                $function,
-                $argIndex + 1,
-                $paramName
-            ));
-        }
-        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
-            throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($%s) must be of type array|string, %s given',
-                $function,
-                $argIndex + 1,
-                $paramName,
-                EnumCaseSupport::typeNameForVariable($var)
-            ));
-        }
-        if (Variable::TYPE_STRING === $var->type
-            || Variable::TYPE_ARRAY === $var->type
-            || Variable::TYPE_NULL === $var->type
-        ) {
-            return $var;
-        }
-
-        throw new \TypeError(\sprintf(
-            '%s(): Argument #%d ($%s) must be of type array|string, %s given',
-            $function,
-            $argIndex + 1,
-            $paramName,
-            self::replaceArgTypeLabel($var)
-        ));
-    }
-
     private static function isArrayReplaceArg(JITVariable $arg): bool
     {
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
@@ -300,23 +279,5 @@ final class str_replace extends Internal
         }
 
         return false;
-    }
-
-    private static function replaceArgTypeLabel(Variable $var): string
-    {
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            return EnumCaseSupport::typeNameForVariable($var);
-        }
-
-        return match ($var->type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => $var->toObject()->class->name,
-            default => 'mixed',
-        };
     }
 }
