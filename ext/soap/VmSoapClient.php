@@ -152,6 +152,10 @@ final class VmSoapClient
         if (isset($options['ssl_method']) && (\is_int($options['ssl_method']) || \is_float($options['ssl_method']))) {
             $state->sslMethod = (int) $options['ssl_method'];
         }
+        // php-src SoapClient ctor: features bitmask (#20367).
+        if (isset($options['features']) && (\is_int($options['features']) || \is_float($options['features']))) {
+            $state->features = (int) $options['features'];
+        }
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
@@ -252,7 +256,7 @@ final class VmSoapClient
             $response = self::doRequest($object, $request, $state->location, $action, $state->soapVersion, $frame);
             $state->lastResponse = $response;
 
-            $decoded = self::decodeResponse($response, $name);
+            $decoded = self::decodeResponse($response, $name, $state->features);
 
             return self::importValue($decoded, $ctx);
         } catch (\SoapFault $e) {
@@ -1117,7 +1121,7 @@ final class VmSoapClient
         return '<'.$tag.' xsi:type="xsd:string">'.\htmlspecialchars((string) $value, \ENT_XML1).'</'.$tag.'>';
     }
 
-    private static function decodeResponse(string $response, string $name): mixed
+    private static function decodeResponse(string $response, string $name, int $features = 0): mixed
     {
         $dom = new \DOMDocument();
         if (!@$dom->loadXML($response)) {
@@ -1158,10 +1162,11 @@ final class VmSoapClient
             return null;
         }
 
+        $singleElementArrays = 0 !== ($features & SoapConstants::SOAP_SINGLE_ELEMENT_ARRAYS);
         $children = [];
         foreach ($responseEl->childNodes as $child) {
             if ($child instanceof \DOMElement) {
-                $children[$child->localName ?? $child->nodeName] = self::domElementToValue($child);
+                $children[$child->localName ?? $child->nodeName] = self::domElementToValue($child, $singleElementArrays);
             }
         }
         if (0 === \count($children)) {
@@ -1174,7 +1179,7 @@ final class VmSoapClient
         return (object) $children;
     }
 
-    private static function domElementToValue(\DOMElement $el): mixed
+    private static function domElementToValue(\DOMElement $el, bool $singleElementArrays = false): mixed
     {
         $childElements = [];
         foreach ($el->childNodes as $child) {
@@ -1198,9 +1203,9 @@ final class VmSoapClient
                 if (!\is_array($map[$key]) || !\array_is_list($map[$key])) {
                     $map[$key] = [$map[$key]];
                 }
-                $map[$key][] = self::domElementToValue($child);
+                $map[$key][] = self::domElementToValue($child, $singleElementArrays);
             } else {
-                $map[$key] = self::domElementToValue($child);
+                $map[$key] = self::domElementToValue($child, $singleElementArrays);
             }
             if ('item' !== $key) {
                 $list = false;
@@ -1208,6 +1213,14 @@ final class VmSoapClient
         }
         if ($list) {
             return \array_values($map);
+        }
+        // php-src php_encoding.c SOAP_SINGLE_ELEMENT_ARRAYS — wrap singleton children (#20367).
+        if ($singleElementArrays) {
+            foreach ($map as $k => $v) {
+                if (!\is_array($v) || !\array_is_list($v)) {
+                    $map[$k] = [$v];
+                }
+            }
         }
 
         return (object) $map;
@@ -1365,6 +1378,9 @@ final class SoapClientState
 
     /** php-src _ssl_method — null when unset (#20366). */
     public ?int $sslMethod = null;
+
+    /** php-src features bitmask (SOAP_SINGLE_ELEMENT_ARRAYS, …) (#20367). */
+    public int $features = 0;
 
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
