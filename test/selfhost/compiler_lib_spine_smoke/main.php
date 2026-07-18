@@ -1461,6 +1461,8 @@ require_once __DIR__.'/../../../ext/sodium/VmSodium.php';
 require_once __DIR__.'/../../../ext/sodium/VmSodiumSecretstream.php';
 require_once __DIR__.'/../../../ext/sodium/bootstrap_sodiumexception.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_add.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_base642bin.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_bin2base64.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_bin2hex.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_compare.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aegis128l_decrypt.php';

@@ -200,6 +200,15 @@ final class VmSodium
 
     public const CRYPTO_PWHASH_MEMLIMIT_SENSITIVE = 1073741824;
 
+    /** sodium_base64_VARIANT_* (libsodium helpers.h; #20675). */
+    public const BASE64_VARIANT_ORIGINAL = 1;
+
+    public const BASE64_VARIANT_ORIGINAL_NO_PADDING = 3;
+
+    public const BASE64_VARIANT_URLSAFE = 5;
+
+    public const BASE64_VARIANT_URLSAFE_NO_PADDING = 7;
+
     /** Internal: crypto_pwhash_STRBYTES / OPSLIMIT_MIN / MEMLIMIT_MIN (not advertised as SODIUM_*). */
     private const CRYPTO_PWHASH_STRBYTES = 128;
 
@@ -1694,6 +1703,32 @@ final class VmSodium
     }
 
     /**
+     * sodium_bin2base64() — binary→base64 variant (php-src ext/sodium/libsodium.c; #20675).
+     */
+    public static function bin2base64(string $string, int $id): string
+    {
+        self::assertValidBase64Variant($id, 'sodium_bin2base64', 2, 'id');
+        if (\function_exists('sodium_bin2base64')) {
+            return \sodium_bin2base64($string, $id);
+        }
+
+        return self::pureBin2base64($string, $id);
+    }
+
+    /**
+     * sodium_base642bin() — base64 variant→binary (php-src ext/sodium/libsodium.c; #20675).
+     */
+    public static function base642bin(string $string, int $id, string $ignore = ''): string
+    {
+        self::assertValidBase64Variant($id, 'sodium_base642bin', 2, 'id');
+        if (\function_exists('sodium_base642bin')) {
+            return \sodium_base642bin($string, $id, $ignore);
+        }
+
+        return self::pureBase642bin($string, $id, $ignore);
+    }
+
+    /**
      * sodium_memzero() — wipe buffer then null the PHP string (php-src ext/sodium/libsodium.c; #3438).
      */
     public static function memzero(Variable $var): void
@@ -2174,6 +2209,102 @@ final class VmSodium
         $bin = \hex2bin($hex);
         if (false === $bin) {
             self::throwSodium('sodium_hex2bin(): Argument #1 ($string) must be a valid hexadecimal string');
+        }
+
+        return $bin;
+    }
+
+    /**
+     * libsodium: ((((unsigned int) variant) & ~0x6U) != 0x1U) → invalid.
+     */
+    private static function assertValidBase64Variant(int $id, string $fn, int $argNum, string $param): void
+    {
+        if (0x1 !== ($id & ~0x6)) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($%s) must be a valid base64 variant identifier',
+                $fn,
+                $argNum,
+                $param
+            ));
+        }
+    }
+
+    private static function pureBin2base64(string $string, int $id): string
+    {
+        $b64 = \base64_encode($string);
+        if (0 !== ($id & 0x4)) {
+            $b64 = \strtr($b64, '+/', '-_');
+        }
+        if (0 !== ($id & 0x2)) {
+            $b64 = \rtrim($b64, '=');
+        }
+
+        return $b64;
+    }
+
+    private static function pureBase642bin(string $string, int $id, string $ignore): string
+    {
+        if ('' !== $ignore) {
+            $ignoreSet = [];
+            $ignoreLen = \strlen($ignore);
+            for ($i = 0; $i < $ignoreLen; ++$i) {
+                $ignoreSet[$ignore[$i]] = true;
+            }
+            $filtered = '';
+            $len = \strlen($string);
+            for ($i = 0; $i < $len; ++$i) {
+                $ch = $string[$i];
+                if (!isset($ignoreSet[$ch])) {
+                    $filtered .= $ch;
+                }
+            }
+            $string = $filtered;
+        }
+        if ('' === $string) {
+            return '';
+        }
+
+        $urlSafe = 0 !== ($id & 0x4);
+        $noPad = 0 !== ($id & 0x2);
+        if ($noPad) {
+            if (false !== \strpos($string, '=')) {
+                self::throwSodium('sodium_base642bin(): Argument #1 ($string) must be a valid base64 string');
+            }
+        } elseif (0 !== (\strlen($string) % 4)) {
+            self::throwSodium('sodium_base642bin(): Argument #1 ($string) must be a valid base64 string');
+        }
+
+        if ($urlSafe) {
+            if (1 === \preg_match('/[\/+]/', $string)) {
+                self::throwSodium('sodium_base642bin(): Argument #1 ($string) must be a valid base64 string');
+            }
+            if (1 !== \preg_match('/^[A-Za-z0-9\-_]*={0,2}$/', $string)) {
+                self::throwSodium('sodium_base642bin(): Argument #1 ($string) must be a valid base64 string');
+            }
+            $canonical = \strtr($string, '-_', '+/');
+        } else {
+            if (1 === \preg_match('/[\-_]/', $string)) {
+                self::throwSodium('sodium_base642bin(): Argument #1 ($string) must be a valid base64 string');
+            }
+            if (1 !== \preg_match('/^[A-Za-z0-9\/+]*={0,2}$/', $string)) {
+                self::throwSodium('sodium_base642bin(): Argument #1 ($string) must be a valid base64 string');
+            }
+            $canonical = $string;
+        }
+
+        if ($noPad) {
+            $pad = (4 - (\strlen($canonical) % 4)) % 4;
+            $canonical .= \str_repeat('=', $pad);
+        }
+
+        $bin = \base64_decode($canonical, true);
+        if (false === $bin) {
+            self::throwSodium('sodium_base642bin(): Argument #1 ($string) must be a valid base64 string');
+        }
+        // Reject non-canonical padding / leftover bits (php-src requires full consume).
+        $reencoded = self::pureBin2base64($bin, $id);
+        if ($reencoded !== $string) {
+            self::throwSodium('sodium_base642bin(): Argument #1 ($string) must be a valid base64 string');
         }
 
         return $bin;
