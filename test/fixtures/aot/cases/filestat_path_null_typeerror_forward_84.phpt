@@ -7,4 +7,4 @@ PHP_COMPILER_PROFILE=8.4
 touch(null);
 --EXPECT--
 --EXPECT_EXIT--
-134
+255

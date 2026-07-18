@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
  */
 final class VmZipProcedural
 {
-    /** @var array<int, array{path: string, entries: list<array{name: string, data: string, crc: int, size: int}>, index: int}> */
+    /** @var array<int, array{path: string, entries: list<array{name: string, data: string, crc: int, size: int, comp_size?: int, comp_method?: int}>, index: int}> */
     private static array $archives = [];
 
     /** @var array<int, array{archive: int, entryIndex: int, pos: int, open: bool}> */
@@ -159,20 +159,53 @@ final class VmZipProcedural
 
     public static function zipEntryFilesize(int $entryHandle): int|false
     {
-        $entry = self::$entries[$entryHandle] ?? null;
-        if (null === $entry) {
-            return false;
-        }
-        $archive = self::$archives[$entry['archive']] ?? null;
-        if (null === $archive) {
-            return false;
-        }
-        $zipEntry = $archive['entries'][$entry['entryIndex']] ?? null;
+        $zipEntry = self::entryMeta($entryHandle);
         if (null === $zipEntry) {
             return false;
         }
 
         return (int) $zipEntry['size'];
+    }
+
+    /** Compressed size from central directory (php_zip.c zip_entry_compressedsize; #20485). */
+    public static function zipEntryCompressedsize(int $entryHandle): int|false
+    {
+        $zipEntry = self::entryMeta($entryHandle);
+        if (null === $zipEntry) {
+            return false;
+        }
+        if (isset($zipEntry['comp_size'])) {
+            return (int) $zipEntry['comp_size'];
+        }
+
+        // Stored archives write comp_size == size; fall back for in-memory rows.
+        return (int) $zipEntry['size'];
+    }
+
+    /**
+     * Compression method name (php_zip.c zip_entry_compressionmethod; #20485).
+     *
+     * @return string|false
+     */
+    public static function zipEntryCompressionmethod(int $entryHandle): string|false
+    {
+        $zipEntry = self::entryMeta($entryHandle);
+        if (null === $zipEntry) {
+            return false;
+        }
+        $method = (int) ($zipEntry['comp_method'] ?? 0);
+
+        return match ($method) {
+            0 => 'stored',
+            1 => 'shrunk',
+            2, 3, 4, 5 => 'reduced',
+            6 => 'imploded',
+            7 => 'tokenized',
+            8 => 'deflated',
+            9 => 'deflatedX',
+            10 => 'implodedX',
+            default => false,
+        };
     }
 
     public static function isArchiveHandle(int $handle): bool
@@ -228,5 +261,22 @@ final class VmZipProcedural
         }
 
         return $archive['entries'][$entry['entryIndex']]['data'] ?? null;
+    }
+
+    /**
+     * @return array{name: string, data: string, crc: int, size: int, comp_size?: int, comp_method?: int}|null
+     */
+    private static function entryMeta(int $entryHandle): ?array
+    {
+        $entry = self::$entries[$entryHandle] ?? null;
+        if (null === $entry) {
+            return null;
+        }
+        $archive = self::$archives[$entry['archive']] ?? null;
+        if (null === $archive) {
+            return null;
+        }
+
+        return $archive['entries'][$entry['entryIndex']] ?? null;
     }
 }

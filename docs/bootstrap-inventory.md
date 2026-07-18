@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5644 |
-| Phase A inventory files (M2 ratio SSOT) | 5644 |
+| PHP files on vm.php path | 5646 |
+| Phase A inventory files (M2 ratio SSOT) | 5646 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16122 |
+| Source constructs flagged (warnings) | 16126 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3829,7 +3829,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/yaml/yaml_parse.php` | 0 | 1 |
 | `ext/yaml/yaml_parse_file.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
-| `ext/zip/Module.php` | 0 | 9 |
+| `ext/zip/Module.php` | 0 | 11 |
 | `ext/zip/VmZipArchive.php` | 0 | 65 |
 | `ext/zip/VmZipProcedural.php` | 0 | 1 |
 | `ext/zip/VmZipResourceArg.php` | 0 | 1 |
@@ -3848,6 +3848,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipProceduralFunction.php` | 0 | 1 |
 | `ext/zip/zip_close.php` | 0 | 1 |
 | `ext/zip/zip_entry_close.php` | 0 | 1 |
+| `ext/zip/zip_entry_compressedsize.php` | 0 | 1 |
+| `ext/zip/zip_entry_compressionmethod.php` | 0 | 1 |
 | `ext/zip/zip_entry_filesize.php` | 0 | 1 |
 | `ext/zip/zip_entry_name.php` | 0 | 1 |
 | `ext/zip/zip_entry_open.php` | 0 | 2 |
@@ -24483,8 +24485,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1772)
-- new Error (line 1783)
+- new Error (line 1776)
+- new Error (line 1787)
 - 219 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
@@ -31668,6 +31670,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new zip_entry_read (line 54)
 - new zip_entry_name (line 55)
 - new zip_entry_filesize (line 56)
+- new zip_entry_compressedsize (line 57)
+- new zip_entry_compressionmethod (line 58)
 - 4 class method(s)
 
 ### `ext/zip/VmZipArchive.php`
@@ -31742,7 +31746,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/VmZipProcedural.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 16 class method(s)
 
 ### `ext/zip/VmZipResourceArg.php`
 
@@ -31873,6 +31877,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/zip/zip_entry_close.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/zip_entry_compressedsize.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/zip_entry_compressionmethod.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -38451,7 +38465,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 450)
+- new Variable (line 453)
 - 28 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`

@@ -18,7 +18,7 @@ final class opendir extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('opendir() requires exactly one argument in this compiler build');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'opendir', 0, 'directory', $frame, true);
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'opendir', 0, 'directory', $frame);
         if (null === $frame->returnVar) {
             return;
         }
@@ -42,7 +42,7 @@ final class opendir extends Internal
         }
         return JitOpendir::invoke(
             $context,
-            JitFilestatArg::lowerFilename($context, $args[0], 'opendir', 0, 'directory', true)
+            JitFilestatArg::lowerFilename($context, $args[0], 'opendir', 0, 'directory')
         );
     }
 }

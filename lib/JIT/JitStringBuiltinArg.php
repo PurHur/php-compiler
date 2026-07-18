@@ -230,7 +230,9 @@ final class JitStringBuiltinArg
     }
 
     /**
-     * Z_PARAM_PATH — null coerces to "" when caller is not strict; TypeError under strict_types (#13419).
+     * Z_PARAM_PATH — TypeError on 8.4 forward profile / strict_types; else coerce+deprecate (#13419, #20474).
+     *
+     * $softNullPath keeps basename/dirname/pathinfo soft-coerce on 8.4 (#19997) until #20099.
      */
     public static function lowerPath(
         Context $context,
@@ -244,20 +246,21 @@ final class JitStringBuiltinArg
     ): Value {
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             JitNativeString::ensureInsertBlock($context);
-            if (!$softNullPath && $context->callerStrictTypes) {
+            if (
+                (!$softNullPath && $context->callerStrictTypes)
+                || (!$softNullPath && self::requiresZparamStrStrictNullOnForwardProfile())
+            ) {
                 self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
 
                 return self::unreachableStringPtr($context);
             }
 
-            if (!self::requiresForwardProfileStrictStringNull()) {
-                self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName, $expectedType);
-            }
+            self::emitNullStringParamDeprecation($context, $function, $argIndex, $paramName, $expectedType);
 
             return $context->builder->load($context->constantStringFromString(''));
         }
 
-        // Boxed null / VALUE: coerce like trim family on forward profile (#19997, ext/standard/filestat.c).
+        // Boxed null / VALUE: TypeError on 8.4 when !$softNullPath (#20474); else soft-coerce (#19997).
         return self::lower(
             $context,
             $arg,
@@ -267,7 +270,7 @@ final class JitStringBuiltinArg
             $expectedType,
             $arrayExpectedType,
             false,
-            false
+            !$softNullPath
         );
     }
 

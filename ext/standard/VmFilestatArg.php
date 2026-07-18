@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 final class VmFilestatArg
 {
     /**
-     * Z_PARAM_PATH filename — null coerces to "" + deprecation (#14597, re-#18850 #19997).
+     * Z_PARAM_PATH filename — TypeError on 8.4 forward profile; else "" + deprecation (#14597, #20474).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
@@ -33,7 +33,7 @@ final class VmFilestatArg
     }
 
     /**
-     * Z_PARAM_PATH for compiled call sites — null coerces to "" (deprecated).
+     * Z_PARAM_PATH for compiled call sites — TypeError on 8.4; else "" (deprecated) (#20474).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
@@ -53,7 +53,7 @@ final class VmFilestatArg
     }
 
     /**
-     * basename/dirname/pathinfo $path — null coerces with deprecation on forward profile (#19997, php-src basename.c).
+     * basename/dirname/pathinfo $path — soft-null on forward profile (#19997; TypeError tracked in #20099).
      */
     public static function pathComponentFilenameArgForFrame(
         Frame $frame,

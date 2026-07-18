@@ -54,6 +54,8 @@ class Module extends ModuleAbstract
             new zip_entry_read(),
             new zip_entry_name(),
             new zip_entry_filesize(),
+            new zip_entry_compressedsize(),
+            new zip_entry_compressionmethod(),
         ];
     }
 }
