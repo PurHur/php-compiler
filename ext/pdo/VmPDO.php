@@ -40,10 +40,15 @@ final class VmPDO
             : new ClassEntry('PDO');
         $entry->isInternal = true;
         foreach (PdoConstants::CLASS_CONSTANTS as $name => $value) {
-            $const = new Variable(Variable::TYPE_INTEGER);
-            $const->int($value);
+            if (\is_string($value)) {
+                $const = new Variable(Variable::TYPE_STRING);
+                $const->string($value);
+            } else {
+                $const = new Variable(Variable::TYPE_INTEGER);
+                $const->int($value);
+            }
             $entry->constants[$name] = $const;
-            $entry->constNames[$name] = $name;
+            $entry->constNames[$name] = PdoConstants::CLASS_CONSTANT_NAMES[$name];
         }
 
         $pub = CfgFunc::FLAG_PUBLIC;
