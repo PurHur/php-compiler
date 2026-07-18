@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5530 |
-| Phase A inventory files (M2 ratio SSOT) | 5530 |
+| PHP files on vm.php path | 5534 |
+| Phase A inventory files (M2 ratio SSOT) | 5534 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15735 |
+| Source constructs flagged (warnings) | 15747 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3612,7 +3612,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/BuiltinClasses.php` | 0 | 1 |
 | `ext/xmlwriter/JitXmlWriterMethod.php` | 0 | 1 |
 | `ext/xmlwriter/JitXmlWriterUserScript.php` | 0 | 5 |
-| `ext/xmlwriter/Module.php` | 0 | 30 |
+| `ext/xmlwriter/Module.php` | 0 | 34 |
 | `ext/xmlwriter/VmXmlWriter.php` | 0 | 53 |
 | `ext/xmlwriter/XmlWriterClassMethod.php` | 0 | 1 |
 | `ext/xmlwriter/XmlWriterEndAttribute.php` | 0 | 3 |
@@ -3677,18 +3677,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/xmlwriter_set_indent.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_set_indent_string.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_start_attribute.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_start_attribute_ns.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_start_comment.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_start_document.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_start_dtd_attlist.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_start_dtd_element.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_start_element.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_start_element_ns.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_start_pi.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_text.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_write_attribute.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_write_attribute_ns.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_write_cdata.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_write_comment.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_write_dtd.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_write_element.php` | 0 | 2 |
+| `ext/xmlwriter/xmlwriter_write_element_ns.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_write_pi.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_write_raw.php` | 0 | 2 |
 | `ext/xsl/BuiltinClasses.php` | 0 | 1 |
@@ -30011,10 +30015,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new XMLWriter (line 41)
-- new XMLWriter (line 691)
-- new XMLWriter (line 711)
-- new XMLWriter (line 854)
-- 53 class method(s)
+- new XMLWriter (line 733)
+- new XMLWriter (line 753)
+- new XMLWriter (line 896)
+- 55 class method(s)
 
 ### `ext/xmlwriter/Module.php`
 
@@ -30026,28 +30030,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new xmlwriter_start_document (line 32)
 - new xmlwriter_end_document (line 33)
 - new xmlwriter_start_element (line 34)
-- new xmlwriter_end_element (line 35)
-- new xmlwriter_full_end_element (line 36)
-- new xmlwriter_write_attribute (line 37)
-- new xmlwriter_start_attribute (line 38)
-- new xmlwriter_end_attribute (line 39)
-- new xmlwriter_write_element (line 40)
-- new xmlwriter_write_cdata (line 41)
-- new xmlwriter_write_comment (line 42)
-- new xmlwriter_start_comment (line 43)
-- new xmlwriter_end_comment (line 44)
-- new xmlwriter_write_raw (line 45)
-- new xmlwriter_write_pi (line 46)
-- new xmlwriter_start_pi (line 47)
-- new xmlwriter_end_pi (line 48)
-- new xmlwriter_write_dtd (line 49)
-- new xmlwriter_text (line 50)
-- new xmlwriter_start_dtd_attlist (line 51)
-- new xmlwriter_end_dtd_attlist (line 52)
-- new xmlwriter_start_dtd_element (line 53)
-- new xmlwriter_end_dtd_element (line 54)
-- new xmlwriter_output_memory (line 55)
-- new xmlwriter_flush (line 56)
+- new xmlwriter_start_element_ns (line 35)
+- new xmlwriter_end_element (line 36)
+- new xmlwriter_full_end_element (line 37)
+- new xmlwriter_write_attribute (line 38)
+- new xmlwriter_write_attribute_ns (line 39)
+- new xmlwriter_start_attribute (line 40)
+- new xmlwriter_start_attribute_ns (line 41)
+- new xmlwriter_end_attribute (line 42)
+- new xmlwriter_write_element (line 43)
+- new xmlwriter_write_element_ns (line 44)
+- new xmlwriter_write_cdata (line 45)
+- new xmlwriter_write_comment (line 46)
+- new xmlwriter_start_comment (line 47)
+- new xmlwriter_end_comment (line 48)
+- new xmlwriter_write_raw (line 49)
+- new xmlwriter_write_pi (line 50)
+- new xmlwriter_start_pi (line 51)
+- new xmlwriter_end_pi (line 52)
+- new xmlwriter_write_dtd (line 53)
+- new xmlwriter_text (line 54)
+- new xmlwriter_start_dtd_attlist (line 55)
+- new xmlwriter_end_dtd_attlist (line 56)
+- new xmlwriter_start_dtd_element (line 57)
+- new xmlwriter_end_dtd_element (line 58)
+- new xmlwriter_output_memory (line 59)
+- new xmlwriter_flush (line 60)
 - 2 class method(s)
 
 ### `ext/xmlwriter/VmXmlWriter.php`
@@ -30103,9 +30111,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 209)
 - new Error (line 233)
 - new Error (line 246)
-- new Error (line 1377)
-- new Error (line 1381)
-- 69 class method(s)
+- new Error (line 1378)
+- new Error (line 1382)
+- 70 class method(s)
 
 ### `ext/xmlwriter/XmlWriterClassMethod.php`
 
@@ -30513,6 +30521,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 - 1 closure(s)
 
+### `ext/xmlwriter/xmlwriter_start_attribute_ns.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
 ### `ext/xmlwriter/xmlwriter_start_comment.php`
 
 **Warnings** (review for bootstrap subset):
@@ -30543,6 +30557,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 - 1 closure(s)
 
+### `ext/xmlwriter/xmlwriter_start_element_ns.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
 ### `ext/xmlwriter/xmlwriter_start_pi.php`
 
 **Warnings** (review for bootstrap subset):
@@ -30556,6 +30576,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 closure(s)
 
 ### `ext/xmlwriter/xmlwriter_write_attribute.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_write_attribute_ns.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -30580,6 +30606,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 closure(s)
 
 ### `ext/xmlwriter/xmlwriter_write_element.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xmlwriter/xmlwriter_write_element_ns.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -38025,7 +38057,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/XmlWriterInstanceMethodJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\XmlWriterMethod (line 73)
+- new Call\XmlWriterMethod (line 75)
 - 3 class method(s)
 
 ### `lib/JitMcjitEmbed.php`

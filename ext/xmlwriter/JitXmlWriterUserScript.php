@@ -124,6 +124,44 @@ final class JitXmlWriterUserScript
         return self::boolValue($context, (bool) $ok);
     }
 
+    public static function tryStartElementNS(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1], $args[2], $args[3])) {
+            return null;
+        }
+        $prefix = self::nullableCompileTimeString($args[1]);
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        $uri = self::nullableCompileTimeString($args[3]);
+        if (false === $prefix || false === $uri
+            || null === $name || str_starts_with($name, '__phpc_xw_')
+        ) {
+            return null;
+        }
+        $ok = $writer->startElementNS($prefix, $name, $uri);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
+    public static function tryStartAttributeNS(Context $context, JITVariable ...$args): ?Value
+    {
+        $writer = self::requireWriter($args[0] ?? null);
+        if (null === $writer || !isset($args[1], $args[2], $args[3])) {
+            return null;
+        }
+        $prefix = self::nullableCompileTimeString($args[1]);
+        $name = JitStringBuiltinArg::compileTimeLiteral($args[2]) ?? $args[2]->compileTimeString;
+        $uri = self::nullableCompileTimeString($args[3]);
+        if (false === $prefix || false === $uri
+            || null === $name || str_starts_with($name, '__phpc_xw_')
+        ) {
+            return null;
+        }
+        $ok = $writer->startAttributeNS($prefix, $name, $uri);
+
+        return self::boolValue($context, (bool) $ok);
+    }
+
     public static function tryWriteAttributeNS(Context $context, JITVariable ...$args): ?Value
     {
         $writer = self::requireWriter($args[0] ?? null);
@@ -664,12 +702,16 @@ final class JitXmlWriterUserScript
             'xmlwriter_start_document' => self::tryStartDocument($context, ...$args),
             'xmlwriter_end_document' => self::tryEndDocument($context, ...$args),
             'xmlwriter_start_element' => self::tryStartElement($context, ...$args),
+            'xmlwriter_start_element_ns' => self::tryStartElementNS($context, ...$args),
             'xmlwriter_end_element' => self::tryEndElement($context, ...$args),
             'xmlwriter_full_end_element' => self::tryFullEndElement($context, ...$args),
             'xmlwriter_write_attribute' => self::tryWriteAttribute($context, ...$args),
+            'xmlwriter_write_attribute_ns' => self::tryWriteAttributeNS($context, ...$args),
             'xmlwriter_start_attribute' => self::tryStartAttribute($context, ...$args),
+            'xmlwriter_start_attribute_ns' => self::tryStartAttributeNS($context, ...$args),
             'xmlwriter_end_attribute' => self::tryEndAttribute($context, ...$args),
             'xmlwriter_write_element' => self::tryProceduralWriteElement($context, ...$args),
+            'xmlwriter_write_element_ns' => self::tryWriteElementNS($context, ...$args),
             'xmlwriter_write_cdata' => self::tryProceduralWriteCData($context, ...$args),
             'xmlwriter_write_comment' => self::tryProceduralWriteComment($context, ...$args),
             'xmlwriter_start_comment' => self::tryStartComment($context, ...$args),

@@ -84,4 +84,14 @@ final class XmlWriterState
      * @var list<array{prefix: ?string, uri: string}>
      */
     public array $pendingNsDecls = [];
+
+    /**
+     * Prefix→uri already emitted on the current open start tag (startElementNS /
+     * flushed pending decls). Prevents duplicate xmlns:prefix (#20324 / #20320).
+     *
+     * Key is the prefix string, or '' for the default xmlns= declaration.
+     *
+     * @var array<string, string>
+     */
+    public array $openTagNsDecls = [];
 }

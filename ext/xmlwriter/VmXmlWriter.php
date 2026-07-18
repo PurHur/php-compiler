@@ -445,8 +445,10 @@ final class VmXmlWriter
         $qname = self::composeQName($prefix, $name);
         $state->elementStack[] = ['name' => $qname, 'hasIndentedChild' => false];
         $state->buffer .= '<'.self::escapeElementName($qname);
+        $state->openTagNsDecls = [];
         if (null !== $uri) {
             $state->buffer .= self::xmlnsAttribute($prefix, $uri);
+            $state->openTagNsDecls[null === $prefix ? '' : $prefix] = $uri;
         }
         $state->startTagOpen = true;
 
@@ -578,8 +580,10 @@ final class VmXmlWriter
         $qname = self::composeQName($prefix, $name);
         $state->elementStack[] = ['name' => $qname, 'hasIndentedChild' => false];
         $state->buffer .= '<'.self::escapeElementName($qname);
+        $state->openTagNsDecls = [];
         if (null !== $uri) {
             $state->buffer .= self::xmlnsAttribute($prefix, $uri);
+            $state->openTagNsDecls[null === $prefix ? '' : $prefix] = $uri;
         }
         $state->startTagOpen = true;
         if (null !== $content) {
@@ -1168,13 +1172,11 @@ final class VmXmlWriter
         }
         if ($state->startTagOpen) {
             self::endOpenAttributeIfNeeded($state);
-            foreach ($state->pendingNsDecls as $decl) {
-                $state->buffer .= self::xmlnsAttribute($decl['prefix'], $decl['uri']);
-            }
-            $state->pendingNsDecls = [];
+            self::flushPendingNsDecls($state);
             $state->buffer .= '/>';
             array_pop($state->elementStack);
             $state->startTagOpen = false;
+            $state->openTagNsDecls = [];
 
             return true;
         }
@@ -1194,12 +1196,10 @@ final class VmXmlWriter
         }
         if ($state->startTagOpen) {
             self::endOpenAttributeIfNeeded($state);
-            foreach ($state->pendingNsDecls as $decl) {
-                $state->buffer .= self::xmlnsAttribute($decl['prefix'], $decl['uri']);
-            }
-            $state->pendingNsDecls = [];
+            self::flushPendingNsDecls($state);
             $state->buffer .= '>';
             $state->startTagOpen = false;
+            $state->openTagNsDecls = [];
         }
 
         return self::writeFullEndElement($state);
@@ -1331,6 +1331,7 @@ final class VmXmlWriter
         $state->inDtdElement = false;
         $state->dtdElementHasContent = false;
         $state->pendingNsDecls = [];
+        $state->openTagNsDecls = [];
     }
 
     /** Open `[` for DOCTYPE internal subset on first subset decl while inDtd (#19468). */
@@ -1396,13 +1397,28 @@ final class VmXmlWriter
     {
         self::endOpenAttributeIfNeeded($state);
         if ($state->startTagOpen) {
-            foreach ($state->pendingNsDecls as $decl) {
-                $state->buffer .= self::xmlnsAttribute($decl['prefix'], $decl['uri']);
-            }
-            $state->pendingNsDecls = [];
+            self::flushPendingNsDecls($state);
             $state->buffer .= '>';
             $state->startTagOpen = false;
+            $state->openTagNsDecls = [];
         }
+    }
+
+    /**
+     * Emit deferred xmlns decls, skipping prefix→uri already on the open tag
+     * (libxml / Zend; #20324, #20320).
+     */
+    private static function flushPendingNsDecls(XmlWriterState $state): void
+    {
+        foreach ($state->pendingNsDecls as $decl) {
+            $key = null === $decl['prefix'] ? '' : $decl['prefix'];
+            if (isset($state->openTagNsDecls[$key]) && $state->openTagNsDecls[$key] === $decl['uri']) {
+                continue;
+            }
+            $state->buffer .= self::xmlnsAttribute($decl['prefix'], $decl['uri']);
+            $state->openTagNsDecls[$key] = $decl['uri'];
+        }
+        $state->pendingNsDecls = [];
     }
 
     private static function isValidElementName(string $name): bool
