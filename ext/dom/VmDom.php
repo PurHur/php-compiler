@@ -4074,8 +4074,102 @@ final class VmDom
 
         /** @var list<int> $entityIds */
         $entityIds = [];
-        if (preg_match_all('/<!ENTITY\s+([A-Za-z_][\w:.-]*)\s+"([^"]*)"\s*>/', $subset, $entityMatches, PREG_SET_ORDER)) {
+        // General entities only (skip parameter entities `<!ENTITY % …>`). Order: NDATA → external → internal (#20734).
+        if (preg_match_all(
+            '/<!ENTITY\s+(?!%)([A-Za-z_][\w:.-]*)\s+PUBLIC\s+"([^"]*)"\s+"([^"]*)"\s+NDATA\s+([A-Za-z_][\w:.-]*)\s*>/',
+            $subset,
+            $entityMatches,
+            PREG_SET_ORDER
+        )) {
             foreach ($entityMatches as $match) {
+                $entity = self::createEntityDeclaration(
+                    $ctx,
+                    $match[1],
+                    null,
+                    $match[2],
+                    $match[3],
+                    $match[4],
+                    $document
+                );
+                $entityIds[] = $entity->id;
+            }
+        }
+        if (preg_match_all(
+            '/<!ENTITY\s+(?!%)([A-Za-z_][\w:.-]*)\s+SYSTEM\s+"([^"]*)"\s+NDATA\s+([A-Za-z_][\w:.-]*)\s*>/',
+            $subset,
+            $entityMatches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($entityMatches as $match) {
+                $entity = self::createEntityDeclaration(
+                    $ctx,
+                    $match[1],
+                    null,
+                    null,
+                    $match[2],
+                    $match[3],
+                    $document
+                );
+                $entityIds[] = $entity->id;
+            }
+        }
+        if (preg_match_all(
+            '/<!ENTITY\s+(?!%)([A-Za-z_][\w:.-]*)\s+PUBLIC\s+"([^"]*)"\s+"([^"]*)"\s*>/',
+            $subset,
+            $entityMatches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($entityMatches as $match) {
+                // Skip when already captured as PUBLIC+NDATA (same PUBLIC "…" "…" prefix).
+                if (self::namedNodeMapListContainsName($entityIds, $match[1])) {
+                    continue;
+                }
+                // External parsed entity: present in map, but php-src entity.c nulls publicId/systemId
+                // unless etype is XML_EXTERNAL_GENERAL_UNPARSED_ENTITY (#20734).
+                $entity = self::createEntityDeclaration(
+                    $ctx,
+                    $match[1],
+                    null,
+                    null,
+                    null,
+                    null,
+                    $document
+                );
+                $entityIds[] = $entity->id;
+            }
+        }
+        if (preg_match_all(
+            '/<!ENTITY\s+(?!%)([A-Za-z_][\w:.-]*)\s+SYSTEM\s+"([^"]*)"\s*>/',
+            $subset,
+            $entityMatches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($entityMatches as $match) {
+                if (self::namedNodeMapListContainsName($entityIds, $match[1])) {
+                    continue;
+                }
+                $entity = self::createEntityDeclaration(
+                    $ctx,
+                    $match[1],
+                    null,
+                    null,
+                    null,
+                    null,
+                    $document
+                );
+                $entityIds[] = $entity->id;
+            }
+        }
+        if (preg_match_all(
+            '/<!ENTITY\s+(?!%)([A-Za-z_][\w:.-]*)\s+"([^"]*)"\s*>/',
+            $subset,
+            $entityMatches,
+            PREG_SET_ORDER
+        )) {
+            foreach ($entityMatches as $match) {
+                if (self::namedNodeMapListContainsName($entityIds, $match[1])) {
+                    continue;
+                }
                 $entity = self::createEntityDeclaration(
                     $ctx,
                     $match[1],
@@ -4134,6 +4228,21 @@ final class VmDom
         $notationsMap = self::createNamedNodeMap($ctx, $notationIds);
         $doctypeState->notationsMapId = $notationsMap->toObject()->id;
         $doctype->getProperty(self::PROP_NOTATIONS)->copyFrom($notationsMap);
+    }
+
+    /**
+     * @param list<int> $nodeIds
+     */
+    private static function namedNodeMapListContainsName(array $nodeIds, string $name): bool
+    {
+        foreach ($nodeIds as $nodeId) {
+            $node = DomRegistry::entry($nodeId);
+            if (null !== $node && DomRegistry::state($node)->nodeName === $name) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function createEntityDeclaration(
@@ -7259,10 +7368,11 @@ final class VmDom
         if (!self::isNamedNodeMap($namedNodeMap)) {
             throw new \LogicException('DOMNamedNodeMap::getNamedItem() called on non-namednodemap in this compiler build');
         }
+        // php-src namednodemap.c — lookup by nodeName for Attr, Entity, and Notation members (#20734).
         $state = DomRegistry::state($namedNodeMap);
         foreach ($state->listNodeIds as $nodeId) {
             $node = DomRegistry::entry($nodeId);
-            if (null === $node || !self::isAttr($node)) {
+            if (null === $node) {
                 continue;
             }
             if (DomRegistry::state($node)->nodeName === $name) {
