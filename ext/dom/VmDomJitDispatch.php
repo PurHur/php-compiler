@@ -155,6 +155,44 @@ final class VmDomJitDispatch
     /**
      * @param list<Variable> $extra
      */
+    public static function normalize(VmContext $ctx, ObjectEntry $node, array $extra): Variable
+    {
+        if (\count($extra) > 0) {
+            throw new \ArgumentCountError(
+                'DOMNode::normalize() expects exactly 0 arguments, '.\count($extra).' given'
+            );
+        }
+        $canonical = DomRegistry::entry($node->id) ?? $node;
+        VmDom::normalizeLiveStandard($ctx, $canonical);
+        if ($canonical !== $node) {
+            VmDom::mirrorNodeLinkProperties($node, $canonical);
+        }
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
+    public static function normalizeDocument(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        if (\count($extra) > 0) {
+            throw new \ArgumentCountError(
+                'DOMDocument::normalizeDocument() expects exactly 0 arguments, '.\count($extra).' given'
+            );
+        }
+        VmDom::normalizeDocument($ctx, $document);
+        $null = new Variable();
+        $null->null();
+
+        return $null;
+    }
+
+    /**
+     * @param list<Variable> $extra
+     */
     public static function appendChild(VmContext $ctx, ObjectEntry $parent, array $extra): Variable
     {
         $child = VariableObject::entry($extra[0] ?? self::missingArg('appendChild', 0));
@@ -601,6 +639,20 @@ final class VmDomJitDispatch
         unset($extra);
         $result = new Variable();
         $result->object(VmDom::getRootNode($node));
+
+        return $result;
+    }
+
+    /**
+     * DOMDocument::createTextNode() — AOT bridge for normalize merge repros (#20642).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function createTextNode(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        $data = self::stringArg($extra[0] ?? self::missingArg('createTextNode', 0), 'createTextNode', 0);
+        $result = new Variable();
+        $result->object(VmDom::createTextNode($ctx, $data, $document));
 
         return $result;
     }
