@@ -32,12 +32,13 @@ final class transliterator_create extends Internal
         if ($argc >= 2) {
             $dir = VmTransliterator::coerceDirectionArg($frame->calledArgs[1], 'transliterator_create', 1);
         }
+        VmTransliterator::assertDirection($dir, 'transliterator_create');
         if (null === $frame->returnVar) {
             return;
         }
         $object = VmTransliterator::create($frame->vmContext, $id, $dir);
         if (null === $object) {
-            $frame->returnVar->bool(false);
+            $frame->returnVar->null();
 
             return;
         }

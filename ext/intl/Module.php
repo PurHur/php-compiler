@@ -120,7 +120,12 @@ class Module extends ModuleAbstract
         $transliterator = IntlExtensionPolicy::advertisesTransliterator()
             ? [
                 new transliterator_create(),
+                new transliterator_create_from_rules(),
+                new transliterator_create_inverse(),
+                new transliterator_list_ids(),
                 new transliterator_transliterate(),
+                new transliterator_get_error_code(),
+                new transliterator_get_error_message(),
             ]
             : [];
 

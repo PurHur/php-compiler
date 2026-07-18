@@ -9,15 +9,17 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * Transliterator create/transliterate — ICU utrans_* via FFI + Latin-ASCII PHP fallback (#6139).
+ * Transliterator create/transliterate/createFromRules/createInverse/listIDs — ICU utrans_* via FFI
+ * + Latin-ASCII PHP fallback (#6139, #20719).
  *
- * php-src: ext/intl/transliterator/transliterator_class.c, transliterator_methods.c
- * ICU: unicode/utrans.h — versioned utrans_openU_N / utrans_transUChars_N / utrans_close_N
+ * php-src: ext/intl/transliterator/transliterator_methods.c
+ * ICU: unicode/utrans.h — utrans_openU / utrans_openInverse / utrans_openIDs / utrans_transUChars
  */
 final class VmTransliterator
 {
@@ -26,7 +28,10 @@ final class VmTransliterator
     public const FORWARD = 0;
     public const REVERSE = 1;
 
-    /** @var array<int, array{id: string, handle: object|null, use_fallback: bool}> */
+    /** Fixed id used by php-src transliterator_create_from_rules (RulesTransPHP). */
+    private const RULES_ID = 'RulesTransPHP';
+
+    /** @var array<int, array{id: string, handle: object|null, use_fallback: bool, errorCode: int, errorMessage: string}> */
     private static array $state = [];
 
     private static ?\FFI $ffi = null;
@@ -61,12 +66,29 @@ final class VmTransliterator
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
-        $entry->methods['create'] = new TransliteratorCreate();
-        $entry->methodVisibility['create'] = $pubStatic;
-        $entry->methodNames['create'] = 'create';
-        $entry->methods['transliterate'] = new TransliteratorTransliterate();
-        $entry->methodVisibility['transliterate'] = $pub;
-        $entry->methodNames['transliterate'] = 'transliterate';
+        $methods = [
+            'create' => [new TransliteratorCreate(), $pubStatic],
+            'createfromrules' => [new TransliteratorCreateFromRules(), $pubStatic],
+            'createinverse' => [new TransliteratorCreateInverse(), $pub],
+            'listids' => [new TransliteratorListIDs(), $pubStatic],
+            'transliterate' => [new TransliteratorTransliterate(), $pub],
+            'geterrorcode' => [new TransliteratorGetErrorCode(), $pub],
+            'geterrormessage' => [new TransliteratorGetErrorMessage(), $pub],
+        ];
+        $names = [
+            'create' => 'create',
+            'createfromrules' => 'createFromRules',
+            'createinverse' => 'createInverse',
+            'listids' => 'listIDs',
+            'transliterate' => 'transliterate',
+            'geterrorcode' => 'getErrorCode',
+            'geterrormessage' => 'getErrorMessage',
+        ];
+        foreach ($methods as $lc => [$handler, $vis]) {
+            $entry->methods[$lc] = $handler;
+            $entry->methodVisibility[$lc] = $vis;
+            $entry->methodNames[$lc] = $names[$lc];
+        }
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
@@ -101,23 +123,110 @@ final class VmTransliterator
 
             return null;
         }
-        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
-        $object->constructed = true;
-        self::$state[$object->id] = [
-            'id' => $id,
-            'handle' => $handle,
-            'use_fallback' => $fallback,
-        ];
-        if ($fallback) {
+        return self::finishConstruct($ctx, $id, $handle, $fallback, 'transliterator_create');
+    }
+
+    /**
+     * transliterator_create_from_rules — php-src opens utrans_openU("RulesTransPHP", rules=…).
+     *
+     * @return ObjectEntry|null
+     */
+    public static function createFromRules(Context $ctx, string $rules, int $direction = self::FORWARD): ?ObjectEntry
+    {
+        if (!isset($ctx->classes[self::CLASS_LC])) {
+            throw new \Error('Class "Transliterator" not found');
+        }
+        self::assertDirection($direction, 'transliterator_create_from_rules');
+        if ('' === $rules) {
             IntlError::set(
-                IntlError::U_USING_FALLBACK_WARNING,
-                'transliterator_create: ICU unavailable; using Latin-ASCII PHP fallback: U_USING_DEFAULT_WARNING'
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'transliterator_create_from_rules: rules is empty: U_ILLEGAL_ARGUMENT_ERROR'
             );
-        } elseif (IntlError::U_ZERO_ERROR === IntlError::getCode()) {
-            IntlError::clear();
+
+            return null;
+        }
+        $handle = self::openTransliterator(self::RULES_ID, $direction, $rules);
+        if (null === $handle) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'transliterator_create_from_rules: unable to create ICU transliterator from rules: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return null;
         }
 
-        return $object;
+        return self::finishConstruct($ctx, self::RULES_ID, $handle, false, 'transliterator_create_from_rules');
+    }
+
+    /**
+     * transliterator_create_inverse — utrans_openInverse (#20719).
+     *
+     * @return ObjectEntry|null
+     */
+    public static function createInverse(Context $ctx, ObjectEntry $orig): ?ObjectEntry
+    {
+        if (!isset($ctx->classes[self::CLASS_LC])) {
+            throw new \Error('Class "Transliterator" not found');
+        }
+        $state = self::$state[$orig->id] ?? null;
+        if (null === $state || null === $state['handle']) {
+            $msg = 'transliterator_create_inverse: could not create inverse ICU transliterator: U_ILLEGAL_ARGUMENT_ERROR';
+            IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, $msg);
+            self::setObjectError($orig, IntlError::U_ILLEGAL_ARGUMENT_ERROR, $msg);
+
+            return null;
+        }
+        $inv = self::openInverse($state['handle']);
+        if (null === $inv) {
+            $msg = 'transliterator_create_inverse: could not create inverse ICU transliterator: U_ILLEGAL_ARGUMENT_ERROR';
+            IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, $msg);
+            self::setObjectError($orig, IntlError::U_ILLEGAL_ARGUMENT_ERROR, $msg);
+
+            return null;
+        }
+
+        return self::finishConstruct($ctx, $state['id'].'/inverse', $inv, false, 'transliterator_create_inverse');
+    }
+
+    /**
+     * transliterator_list_ids — utrans_openIDs + uenum_unext (#20719).
+     *
+     * @return HashTable|false
+     */
+    public static function listIDs()
+    {
+        $ids = self::enumerateIds();
+        if (null === $ids) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'transliterator_list_ids: Failed to obtain registered transliterators: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+        $ht = new HashTable();
+        foreach ($ids as $id) {
+            $slot = new Variable();
+            $slot->string($id);
+            $ht->append($slot);
+        }
+
+        return $ht;
+    }
+
+    public static function getErrorCode(ObjectEntry $tr): int
+    {
+        $state = self::$state[$tr->id] ?? null;
+
+        return null === $state ? IntlError::U_ZERO_ERROR : $state['errorCode'];
+    }
+
+    public static function getErrorMessage(ObjectEntry $tr): string
+    {
+        $state = self::$state[$tr->id] ?? null;
+
+        return null === $state ? 'U_ZERO_ERROR' : $state['errorMessage'];
     }
 
     /**
@@ -127,10 +236,8 @@ final class VmTransliterator
     {
         $state = self::$state[$tr->id] ?? null;
         if (null === $state) {
-            IntlError::set(
-                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
-                'transliterator_transliterate: bad transliterator: U_ILLEGAL_ARGUMENT_ERROR'
-            );
+            $msg = 'transliterator_transliterate: bad transliterator: U_ILLEGAL_ARGUMENT_ERROR';
+            IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, $msg);
 
             return false;
         }
@@ -143,6 +250,7 @@ final class VmTransliterator
         }
         if ($start > $end) {
             IntlError::clear();
+            self::setObjectError($tr, IntlError::U_ZERO_ERROR, 'U_ZERO_ERROR');
 
             return $subject;
         }
@@ -153,16 +261,71 @@ final class VmTransliterator
         if (null !== $state['handle']) {
             $converted = self::transUChars($state['handle'], $middle);
             if (null === $converted) {
+                $msg = 'transliterator_transliterate: transliteration failed: U_ILLEGAL_ARGUMENT_ERROR';
+                IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, $msg);
+                self::setObjectError($tr, IntlError::U_ILLEGAL_ARGUMENT_ERROR, $msg);
+
                 return false;
             }
+            self::setObjectError($tr, IntlError::U_ZERO_ERROR, 'U_ZERO_ERROR');
 
             return $prefix.$converted.$suffix;
         }
         if ($state['use_fallback']) {
+            self::setObjectError($tr, IntlError::U_ZERO_ERROR, 'U_ZERO_ERROR');
+
             return $prefix.self::fallbackLatinAscii($middle).$suffix;
         }
 
         return false;
+    }
+
+    /** @return ObjectEntry */
+    private static function finishConstruct(
+        Context $ctx,
+        string $id,
+        ?object $handle,
+        bool $fallback,
+        string $op
+    ): ObjectEntry {
+        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        $object->constructed = true;
+        self::$state[$object->id] = [
+            'id' => $id,
+            'handle' => $handle,
+            'use_fallback' => $fallback,
+            'errorCode' => IntlError::U_ZERO_ERROR,
+            'errorMessage' => 'U_ZERO_ERROR',
+        ];
+        if ($fallback) {
+            IntlError::set(
+                IntlError::U_USING_FALLBACK_WARNING,
+                $op.': ICU unavailable; using Latin-ASCII PHP fallback: U_USING_DEFAULT_WARNING'
+            );
+        } elseif (IntlError::U_ZERO_ERROR === IntlError::getCode()) {
+            IntlError::clear();
+        }
+
+        return $object;
+    }
+
+    private static function setObjectError(ObjectEntry $tr, int $code, string $message): void
+    {
+        if (!isset(self::$state[$tr->id])) {
+            return;
+        }
+        self::$state[$tr->id]['errorCode'] = $code;
+        self::$state[$tr->id]['errorMessage'] = $message;
+    }
+
+    public static function assertDirection(int $direction, string $function): void
+    {
+        if (self::FORWARD !== $direction && self::REVERSE !== $direction) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #2 ($direction) must be either Transliterator::FORWARD or Transliterator::REVERSE',
+                $function
+            ));
+        }
     }
 
     public static function coerceIdArg(Variable $var, string $function, int $position): string
@@ -233,7 +396,7 @@ final class VmTransliterator
     }
 
     /** @return object|null FFI CData UTransliterator* */
-    private static function openTransliterator(string $id, int $direction): ?object
+    private static function openTransliterator(string $id, int $direction, ?string $rules = null): ?object
     {
         $ffi = self::ffi();
         if (null === $ffi) {
@@ -248,13 +411,22 @@ final class VmTransliterator
             if (null === $uId) {
                 return null;
             }
+            $uRules = null;
+            $rulesLen = -1;
+            if (null !== $rules) {
+                $uRules = self::utf8ToUChars($ffi, $rules);
+                if (null === $uRules) {
+                    return null;
+                }
+                $rulesLen = self::uCharLen($uRules);
+            }
             $dir = 0 === $direction ? 0 : 1; // UTRANS_FORWARD / UTRANS_REVERSE
             $trans = $ffi->$open(
                 $uId,
                 -1,
                 $dir,
-                null,
-                -1,
+                $uRules,
+                $rulesLen,
                 null,
                 \FFI::addr($status)
             );
@@ -268,6 +440,69 @@ final class VmTransliterator
             }
 
             return $trans;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @param object $handle @return object|null */
+    private static function openInverse(object $handle): ?object
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $fn = 'utrans_openInverse'.self::$symSuffix;
+        $close = 'utrans_close'.self::$symSuffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $trans = $ffi->$fn($handle, \FFI::addr($status));
+            if (null === $trans || (int) $status->cdata > 0) {
+                if (null !== $trans) {
+                    $ffi->$close($trans);
+                }
+
+                return null;
+            }
+
+            return $trans;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @return list<string>|null null when ICU unavailable / enumeration failed */
+    private static function enumerateIds(): ?array
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $open = 'utrans_openIDs'.self::$symSuffix;
+        $next = 'uenum_unext'.self::$symSuffix;
+        $close = 'uenum_close'.self::$symSuffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $en = $ffi->$open(\FFI::addr($status));
+            if (null === $en || (int) $status->cdata > 0) {
+                return null;
+            }
+            $ids = [];
+            while (true) {
+                $status->cdata = 0;
+                $len = $ffi->new('int32_t');
+                $len->cdata = 0;
+                $elem = $ffi->$next($en, \FFI::addr($len), \FFI::addr($status));
+                if (null === $elem || (int) $status->cdata > 0) {
+                    break;
+                }
+                $ids[] = self::uCharsToUtf8($elem, (int) $len->cdata);
+            }
+            $ffi->$close($en);
+
+            return $ids;
         } catch (\Throwable) {
             return null;
         }
@@ -455,7 +690,12 @@ final class VmTransliterator
 typedef int32_t UErrorCode;
 typedef uint16_t UChar;
 typedef struct UTransliterator UTransliterator;
+typedef struct UEnumeration UEnumeration;
 UTransliterator *utrans_openU{$suffix}(const UChar *id, int32_t idLength, int32_t dir, const UChar *rules, int32_t rulesLength, void *parseError, UErrorCode *status);
+UTransliterator *utrans_openInverse{$suffix}(const UTransliterator *trans, UErrorCode *status);
+UEnumeration *utrans_openIDs{$suffix}(UErrorCode *status);
+const UChar *uenum_unext{$suffix}(UEnumeration *en, int32_t *resultLength, UErrorCode *status);
+void uenum_close{$suffix}(UEnumeration *en);
 void utrans_close{$suffix}(UTransliterator *trans);
 void utrans_transUChars{$suffix}(const UTransliterator *trans, UChar *text, int32_t *textLength, int32_t textCapacity, int32_t start, int32_t *limit, UErrorCode *status);
 C;
@@ -484,16 +724,181 @@ final class TransliteratorCreate extends VmClassMethod
         if ($argc >= 2) {
             $dir = VmTransliterator::coerceDirectionArg($frame->calledArgs[1], 'Transliterator::create', 1);
         }
+        VmTransliterator::assertDirection($dir, 'Transliterator::create');
         if (null === $frame->returnVar) {
             return;
         }
         $object = VmTransliterator::create($frame->vmContext, $id, $dir);
         if (null === $object) {
-            $frame->returnVar->bool(false);
+            $frame->returnVar->null();
 
             return;
         }
         $frame->returnVar->object($object);
+    }
+}
+
+/** Transliterator::createFromRules() — php-src transliterator_create_from_rules (#20719). */
+final class TransliteratorCreateFromRules extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('createFromRules');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'Transliterator::createFromRules() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $rules = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'Transliterator::createFromRules',
+            0,
+            'rules'
+        );
+        $dir = VmTransliterator::FORWARD;
+        if ($argc >= 2) {
+            $dir = VmTransliterator::coerceDirectionArg($frame->calledArgs[1], 'Transliterator::createFromRules', 1);
+        }
+        VmTransliterator::assertDirection($dir, 'Transliterator::createFromRules');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $object = VmTransliterator::createFromRules($frame->vmContext, $rules, $dir);
+        if (null === $object) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->object($object);
+    }
+}
+
+/** Transliterator::createInverse() — php-src transliterator_create_inverse (#20719). */
+final class TransliteratorCreateInverse extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('createInverse');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'Transliterator::createInverse() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmTransliterator::isTransliteratorObject($receiver->toObject())) {
+            throw new \Error('Transliterator::createInverse() called on incompatible object');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $object = VmTransliterator::createInverse($frame->vmContext, $receiver->toObject());
+        if (null === $object) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->object($object);
+    }
+}
+
+/** Transliterator::listIDs() — php-src transliterator_list_ids (#20719). */
+final class TransliteratorListIDs extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('listIDs');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'Transliterator::listIDs() expects exactly 0 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $ids = VmTransliterator::listIDs();
+        if (false === $ids) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->array($ids);
+    }
+}
+
+/** Transliterator::getErrorCode() — php-src transliterator_get_error_code (#20719). */
+final class TransliteratorGetErrorCode extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getErrorCode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'Transliterator::getErrorCode() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmTransliterator::isTransliteratorObject($receiver->toObject())) {
+            throw new \Error('Transliterator::getErrorCode() called on incompatible object');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmTransliterator::getErrorCode($receiver->toObject()));
+    }
+}
+
+/** Transliterator::getErrorMessage() — php-src transliterator_get_error_message (#20719). */
+final class TransliteratorGetErrorMessage extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getErrorMessage');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'Transliterator::getErrorMessage() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmTransliterator::isTransliteratorObject($receiver->toObject())) {
+            throw new \Error('Transliterator::getErrorMessage() called on incompatible object');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(VmTransliterator::getErrorMessage($receiver->toObject()));
     }
 }
 
