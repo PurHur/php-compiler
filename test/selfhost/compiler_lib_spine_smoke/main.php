@@ -555,6 +555,7 @@ require_once __DIR__.'/../../../ext/gd/imagecolorallocatealpha.php';
 require_once __DIR__.'/../../../ext/gd/imagecolorat.php';
 require_once __DIR__.'/../../../ext/gd/imagecolorclosest.php';
 require_once __DIR__.'/../../../ext/gd/imagecolorclosestalpha.php';
+require_once __DIR__.'/../../../ext/gd/imagecolorclosesthwb.php';
 require_once __DIR__.'/../../../ext/gd/imagecolorexact.php';
 require_once __DIR__.'/../../../ext/gd/imagecolorexactalpha.php';
 require_once __DIR__.'/../../../ext/gd/imagecolorresolve.php';
