@@ -22,7 +22,7 @@ final class stristr extends Internal
             throw new \LogicException('stristr() requires two or three arguments in this compiler build');
         }
         $haystackStr = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'stristr', 0, 'haystack');
-        $needleStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'stristr', 1, 'needle');
+        $needleStr = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[1], 'stristr', 1, 'needle');
         $beforeNeedle = false;
         if (3 === $argc) {
             $flag = $frame->calledArgs[2]->resolveIndirect();
@@ -59,7 +59,7 @@ final class stristr extends Internal
         return JitStrstr::find(
             $context,
             JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'stristr', 0, 'haystack'),
-            JitStringBuiltinArg::lower($context, $args[1], 'stristr', 1, 'needle'),
+            JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'stristr', 1, 'needle'),
             $before,
             true
         );
