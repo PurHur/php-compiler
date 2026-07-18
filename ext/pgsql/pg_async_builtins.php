@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
 /**
@@ -170,5 +171,112 @@ final class pg_set_error_verbosity extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         throw new \LogicException('pg_set_error_verbosity() is not implemented for JIT (#20660)');
+    }
+}
+
+/**
+ * pg_put_line (php-src ext/pgsql/pgsql.c; #20673).
+ * 1-arg form uses the default link; 2-arg form takes Connection + data.
+ */
+final class pg_put_line extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_put_line');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_put_line() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (1 === $argc) {
+            $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pg_put_line', 1, 'query');
+            $connObj = VmPgsqlConnection::resolveOptionalConnection(null);
+            if (null === $connObj) {
+                @\trigger_error('pg_put_line(): No PostgreSQL connection opened yet', \E_USER_WARNING);
+                $frame->returnVar->bool(false);
+
+                return;
+            }
+        } else {
+            $connObj = VmPgsqlArg::requireConnection($frame->calledArgs[0], 'pg_put_line', 1);
+            $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'pg_put_line', 2, 'query');
+        }
+        $native = VmPgsqlConnection::native($connObj);
+        $ok = VmPgsqlNative::putLine($native, $data);
+        if (!$ok) {
+            $msg = VmPgsqlNative::errorMessage($native);
+            VmPgsqlConnection::setLastError($msg);
+            @\trigger_error('pg_put_line(): Query failed: '.$msg, \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(true);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_put_line() is not implemented for JIT (#20673)');
+    }
+}
+
+/**
+ * pg_end_copy (php-src ext/pgsql/pgsql.c; #20673).
+ */
+final class pg_end_copy extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('pg_end_copy');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'pg_end_copy() expects at most 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $provided = null;
+        if (1 === $argc) {
+            $provided = VmPgsqlArg::optionalConnection($frame->calledArgs[0], 'pg_end_copy', 1);
+        }
+        $connObj = VmPgsqlConnection::resolveOptionalConnection($provided);
+        if (null === $connObj) {
+            @\trigger_error('pg_end_copy(): No PostgreSQL connection opened yet', \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $native = VmPgsqlConnection::native($connObj);
+        $ok = VmPgsqlNative::endCopy($native);
+        if (!$ok) {
+            $msg = VmPgsqlNative::errorMessage($native);
+            VmPgsqlConnection::setLastError($msg);
+            @\trigger_error('pg_end_copy(): Query failed: '.$msg, \E_USER_WARNING);
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->bool(true);
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('pg_end_copy() is not implemented for JIT (#20673)');
     }
 }

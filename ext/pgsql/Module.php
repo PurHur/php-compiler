@@ -108,6 +108,8 @@ class Module extends ModuleAbstract
             new pg_consume_input(),
             new pg_flush(),
             new pg_set_error_verbosity(),
+            new pg_put_line(),
+            new pg_end_copy(),
             new pg_insert(),
             new pg_update(),
             new pg_delete(),
