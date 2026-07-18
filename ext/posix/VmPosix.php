@@ -6,9 +6,13 @@ namespace PHPCompiler\ext\posix;
 
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\ext\standard\VmDate;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsAccessPure;
+use PHPCompiler\ext\standard\VmFsStdio;
 use PHPCompiler\ext\standard\VmGetcwdNative;
+use PHPCompiler\ext\standard\VmPhpFdStream;
 use PHPCompiler\ext\standard\VmProcessIdentityPure;
 use PHPCompiler\ext\standard\VmStatCache;
 use PHPCompiler\ext\standard\VmUnamePure;
@@ -609,6 +613,153 @@ final class VmPosix
         }
 
         return 0 === $rc;
+    }
+
+    /**
+     * posix_sysconf() — sysconf(3) (php-src ext/posix/posix.c; #20509).
+     */
+    public static function sysconf(int $confId): int
+    {
+        self::$lastError = 0;
+        if (!PosixLibcThinAbi::available()) {
+            throw new \Error('posix_sysconf() is not available in this compiler build');
+        }
+
+        return PosixLibcThinAbi::sysconf($confId);
+    }
+
+    /**
+     * posix_pathconf() — pathconf(3) (php-src ext/posix/posix.c; #20509).
+     *
+     * @return int|false
+     */
+    public static function pathconf(string $path, int $name): int|false
+    {
+        self::$lastError = 0;
+        if (!PosixLibcThinAbi::available()) {
+            throw new \Error('posix_pathconf() is not available in this compiler build');
+        }
+        [$ret, $errno] = PosixLibcThinAbi::pathconf($path, $name);
+        if ($ret < 0 && 0 !== $errno) {
+            self::$lastError = $errno;
+
+            return false;
+        }
+
+        return $ret;
+    }
+
+    /**
+     * posix_fpathconf() — fpathconf(3) (php-src ext/posix/posix.c; #20509).
+     *
+     * @return int|false
+     */
+    public static function fpathconf(int $fd, int $name): int|false
+    {
+        self::$lastError = 0;
+        if (!PosixLibcThinAbi::available()) {
+            throw new \Error('posix_fpathconf() is not available in this compiler build');
+        }
+        [$ret, $errno] = PosixLibcThinAbi::fpathconf($fd, $name);
+        if ($ret < 0 && 0 !== $errno) {
+            self::$lastError = $errno;
+
+            return false;
+        }
+
+        return $ret;
+    }
+
+    /**
+     * posix_eaccess() — eaccess(3) effective-UID probe (php-src ext/posix/posix.c; #20509).
+     */
+    public static function eaccess(string $path, int $mode): bool
+    {
+        self::$lastError = 0;
+        if (!PosixLibcThinAbi::available()) {
+            throw new \Error('posix_eaccess() is not available in this compiler build');
+        }
+        if (str_contains($path, "\0")) {
+            self::$lastError = 2;
+
+            return false;
+        }
+        [$ret, $errno] = PosixLibcThinAbi::eaccess($path, $mode);
+        if (0 !== $ret) {
+            self::$lastError = 0 !== $errno ? $errno : 13;
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * Resolve posix_fpathconf() $file_descriptor (int|resource) like php-src (#20509).
+     *
+     * @return int|null native fd, or null when a stream resource cannot yield an fd (return false)
+     *
+     * @throws \TypeError
+     */
+    public static function resolveFileDescriptorArg(
+        Variable $var,
+        string $function,
+        int $argIndex
+    ): ?int {
+        $v = $var->resolveIndirect();
+        if ($v->isStreamResource()) {
+            $handle = ResourceSupport::resolveHandle($v);
+            if (null === $handle) {
+                return null;
+            }
+
+            return self::nativeFdForStreamHandle($handle);
+        }
+        if (\PHPCompiler\ext\standard\is_resource_::isResource($v)) {
+            // Non-stream resources cannot supply an fd (php_posix_stream_get_fd FAILURE).
+            return null;
+        }
+        self::rejectEnumCaseIntArg($v, $function, $argIndex, 'file_descriptor');
+        if (Variable::TYPE_INTEGER !== $v->type
+            && Variable::TYPE_FLOAT !== $v->type
+            && Variable::TYPE_BOOLEAN !== $v->type
+            && Variable::TYPE_NULL !== $v->type
+            && Variable::TYPE_STRING !== $v->type
+        ) {
+            $given = EnumCaseSupport::typeNameForVariable($v);
+            throw new \TypeError(
+                \sprintf(
+                    '%s(): Argument #%d ($file_descriptor) must be of type int|resource, %s given',
+                    $function,
+                    $argIndex + 1,
+                    $given
+                )
+            );
+        }
+
+        return $v->toInt();
+    }
+
+    /**
+     * Map a VM stream handle to a native fd for fpathconf (php-src php_posix_stream_get_fd).
+     */
+    public static function nativeFdForStreamHandle(int $handle): ?int
+    {
+        $fd = VmPhpFdStream::fdForHandle($handle);
+        if (null !== $fd) {
+            return $fd;
+        }
+        $fd = VmFs::socketFdForHandle($handle);
+        if (null !== $fd) {
+            return $fd;
+        }
+        $uri = VmFs::handleUri($handle);
+        $stdio = VmFsStdio::stdioFdForUri($uri);
+        if (null !== $stdio) {
+            return $stdio;
+        }
+
+        return null;
     }
 
     private static function setId(string $fn, int $id): bool
