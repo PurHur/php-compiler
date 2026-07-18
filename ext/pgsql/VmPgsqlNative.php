@@ -252,6 +252,12 @@ final class VmPgsqlNative
         return (int) self::requireFfi()->PQsetErrorVerbosity($conn, $verbosity);
     }
 
+    /** PQsetErrorContextVisibility — previous visibility (php-src pg_set_error_context_visibility; #20674). */
+    public static function setErrorContextVisibility(\FFI\CData $conn, int $visibility): int
+    {
+        return (int) self::requireFfi()->PQsetErrorContextVisibility($conn, $visibility);
+    }
+
     public static function escapeIdentifier(\FFI\CData $conn, string $value): string
     {
         $ffi = self::requireFfi();
@@ -657,6 +663,7 @@ int PQflush(PGconn *conn);
 int PQisnonblocking(const PGconn *conn);
 int PQsetnonblocking(PGconn *conn, int arg);
 int PQsetErrorVerbosity(PGconn *conn, int verbosity);
+int PQsetErrorContextVisibility(PGconn *conn, int visibility);
 Oid PQftable(const PGresult *res, int field_num);
 Oid PQftype(const PGresult *res, int field_num);
 int PQfnumber(const PGresult *res, const char *field_name);
