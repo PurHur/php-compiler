@@ -542,14 +542,27 @@ final class VmReflection
     }
 
     /**
-     * Language constructs and compile-time-only symbols excluded from function_exists() (php-src basic_functions.c).
+     * Always-hidden language constructs / compile-time-only symbols for function_exists()
+     * (php-src zend_builtin_functions.c / basic_functions.c).
+     *
+     * `exit` / `die` are omitted here: on PHP 8.4+ they are real functions (#20575, re-#6975);
+     * on the 8.2 reference profile they stay hidden (#14738).
      *
      * @var list<string> lowercase names
      */
     private const FUNCTION_EXISTS_EXCLUDED = [
         '__halt_compiler',
-        'die',
         'eval',
+    ];
+
+    /**
+     * Symbols that are language constructs on PHP &lt; 8.4 and proper functions on 8.4+
+     * (RFC exit-as-function; CompilerVersion::supportsExitFunctionForm).
+     *
+     * @var list<string> lowercase names
+     */
+    private const FUNCTION_EXISTS_EXIT_DIE = [
+        'die',
         'exit',
     ];
 
@@ -560,8 +573,16 @@ final class VmReflection
         if (self::isCompilerAbiHelperName($lc)) {
             return false;
         }
+        if (\in_array($lc, self::FUNCTION_EXISTS_EXCLUDED, true)) {
+            return false;
+        }
+        // PHP 8.2: exit/die are constructs → false. PHP 8.4 profile: real functions → true (#20575).
+        if (\in_array($lc, self::FUNCTION_EXISTS_EXIT_DIE, true)
+            && !CompilerVersion::supportsExitFunctionForm()) {
+            return false;
+        }
 
-        return !\in_array($lc, self::FUNCTION_EXISTS_EXCLUDED, true);
+        return true;
     }
 
     /** JIT/AOT self-host ABI helpers — linkable but hidden from user introspection (#15046). */
