@@ -57,8 +57,9 @@ final class DomTokenListPropertySupport
     $resolved = $value->resolveIndirect();
     if (Variable::TYPE_STRING !== $resolved->type) {
       throw new \TypeError(sprintf(
-        'Cannot assign %s to property DOMTokenList::$value of type string',
-        VmDom::typeLabel($resolved)
+        'Cannot assign %s to property %s::$value of type string',
+        VmDom::typeLabel($resolved),
+        $owner->class->name
       ));
     }
     VmDomTokenList::setValue($ctx, $owner, $resolved->toString());
