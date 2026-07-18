@@ -19,14 +19,15 @@ echo '    <a href="', htmlspecialchars($scriptBase), '/hello?name=Dev">Hello</a>
 echo '    <a href="', htmlspecialchars($scriptBase), '/contact">Contact</a>', "\n";
 echo '</nav>', "\n";
 echo '<main>', "\n";
+// Thank-you is rendered via Router::renderContactThankYou → thankyou.php directly.
+// Do not nest thankyou.php here: compiling that dead elseif (unbound $name) into the
+// layout CFG corrupts sibling arms and intermittently aborts MiniWebApp AOT (#20507).
 if ('Home' === $title) {
     include __DIR__ . '/home.php';
 } elseif ('Hello' === $title) {
     include __DIR__ . '/hello.php';
 } elseif ('Contact' === $title) {
     include __DIR__ . '/contact.php';
-} elseif ('Thank you' === $title) {
-    include __DIR__ . '/thankyou.php';
 }
 echo '</main>', "\n";
 echo '</body>', "\n";
