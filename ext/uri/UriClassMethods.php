@@ -269,16 +269,241 @@ final class WhatWgUrlToAsciiString extends WhatWgUrlGetter
 
     public function execute(Frame $frame): void
     {
-        $state = $this->receiverState($frame);
-        $scheme = (string) ($state['scheme'] ?? 'http');
-        $host = (string) ($state['host'] ?? '');
-        $path = (string) ($state['path'] ?? '/');
-        $uri = $scheme.'://'.$host.$path;
-        if (isset($state['query']) && \is_string($state['query']) && '' !== $state['query']) {
-            $uri .= '?'.$state['query'];
-        }
+        $uri = VmUri::composeUrlString($this->receiverState($frame), true);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($uri): void {
             $ret->string($uri);
+        });
+    }
+}
+
+final class WhatWgUrlToUnicodeString extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('toUnicodeString');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        // ASCII hosts: unicode form matches ascii (#20541 MVP).
+        $uri = VmUri::composeUrlString($this->receiverState($frame), true);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($uri): void {
+            $ret->string($uri);
+        });
+    }
+}
+
+final class WhatWgUrlGetQuery extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('getQuery');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $query = $this->receiverState($frame)['query'] ?? null;
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($query): void {
+            if (null === $query) {
+                $ret->null();
+            } else {
+                $ret->string($query);
+            }
+        });
+    }
+}
+
+final class WhatWgUrlGetFragment extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('getFragment');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $fragment = $this->receiverState($frame)['fragment'] ?? null;
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($fragment): void {
+            if (null === $fragment) {
+                $ret->null();
+            } else {
+                $ret->string($fragment);
+            }
+        });
+    }
+}
+
+final class WhatWgUrlGetPort extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('getPort');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $port = $this->receiverState($frame)['port'] ?? null;
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($port): void {
+            if (null === $port) {
+                $ret->null();
+            } else {
+                $ret->int((int) $port);
+            }
+        });
+    }
+}
+
+final class WhatWgUrlGetUsername extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('getUsername');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $user = $this->receiverState($frame)['username'] ?? null;
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($user): void {
+            if (null === $user) {
+                $ret->null();
+            } else {
+                $ret->string($user);
+            }
+        });
+    }
+}
+
+final class WhatWgUrlGetPassword extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('getPassword');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $pass = $this->receiverState($frame)['password'] ?? null;
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($pass): void {
+            if (null === $pass) {
+                $ret->null();
+            } else {
+                $ret->string($pass);
+            }
+        });
+    }
+}
+
+final class WhatWgUrlGetUnicodeHost extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('getUnicodeHost');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        // ASCII domain: unicode host equals ascii host (#20541 MVP).
+        $host = $this->receiverState($frame)['host'] ?? null;
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($host): void {
+            if (null === $host) {
+                $ret->null();
+            } else {
+                $ret->string($host);
+            }
+        });
+    }
+}
+
+final class WhatWgUrlEquals extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('equals');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::equals() expects at least 1 argument, 0 given');
+        }
+        $left = $this->receiverState($frame);
+        $otherVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $otherVar->type) {
+            throw new \TypeError(
+                'Uri\\WhatWg\\Url::equals(): Argument #1 ($url) must be of type Uri\\WhatWg\\Url'
+            );
+        }
+        $otherObj = $otherVar->toObject();
+        if (VmUri::CLASS_WHATWG_URL !== strtolower($otherObj->class->name)) {
+            throw new \TypeError(
+                'Uri\\WhatWg\\Url::equals(): Argument #1 ($url) must be of type Uri\\WhatWg\\Url, '
+                .$otherObj->class->name.' given'
+            );
+        }
+        $right = VmUri::whatWgState($otherObj);
+        $includeFragment = false;
+        if (\count($frame->calledArgs) >= 3) {
+            $mode = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $mode->type) {
+                $includeFragment = 'IncludeFragment' === ($mode->toObject()->enumCaseName ?? '');
+            }
+        }
+        $eq = VmUri::composeUrlString($left, $includeFragment)
+            === VmUri::composeUrlString($right, $includeFragment);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($eq): void {
+            $ret->bool($eq);
+        });
+    }
+}
+
+final class WhatWgUrlWithQuery extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('withQuery');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::withQuery() requires VM context');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::withQuery() expects exactly 1 argument, 0 given');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $query = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            $query = VmReflection::stringArg($arg, 'Uri\\WhatWg\\Url::withQuery() query', 0);
+        }
+        $next = VmUri::whatWgWith($ctx, $self, ['query' => $query]);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($next): void {
+            $ret->copyFrom($next);
+        });
+    }
+}
+
+final class WhatWgUrlWithFragment extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('withFragment');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::withFragment() requires VM context');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::withFragment() expects exactly 1 argument, 0 given');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $fragment = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            $fragment = VmReflection::stringArg($arg, 'Uri\\WhatWg\\Url::withFragment() fragment', 0);
+        }
+        $next = VmUri::whatWgWith($ctx, $self, ['fragment' => $fragment]);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($next): void {
+            $ret->copyFrom($next);
         });
     }
 }

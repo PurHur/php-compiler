@@ -152,8 +152,18 @@ final class BuiltinClasses
         foreach ([
             'getscheme' => new WhatWgUrlGetScheme(),
             'getasciihost' => new WhatWgUrlGetAsciiHost(),
+            'getunicodehost' => new WhatWgUrlGetUnicodeHost(),
             'getpath' => new WhatWgUrlGetPath(),
+            'getquery' => new WhatWgUrlGetQuery(),
+            'getfragment' => new WhatWgUrlGetFragment(),
+            'getport' => new WhatWgUrlGetPort(),
+            'getusername' => new WhatWgUrlGetUsername(),
+            'getpassword' => new WhatWgUrlGetPassword(),
             'toasciistring' => new WhatWgUrlToAsciiString(),
+            'tounicodestring' => new WhatWgUrlToUnicodeString(),
+            'equals' => new WhatWgUrlEquals(),
+            'withquery' => new WhatWgUrlWithQuery(),
+            'withfragment' => new WhatWgUrlWithFragment(),
         ] as $name => $method) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;

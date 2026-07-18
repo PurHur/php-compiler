@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5676 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16247 |
+| Source constructs flagged (warnings) | 16260 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3632,9 +3632,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/uploadprogress/VmUploadprogress.php` | 0 | 1 |
 | `ext/uploadprogress/uploadprogress_get_contents.php` | 0 | 2 |
 | `ext/uploadprogress/uploadprogress_get_info.php` | 0 | 2 |
-| `ext/uri/BuiltinClasses.php` | 0 | 19 |
+| `ext/uri/BuiltinClasses.php` | 0 | 29 |
 | `ext/uri/Module.php` | 0 | 1 |
-| `ext/uri/UriClassMethods.php` | 0 | 4 |
+| `ext/uri/UriClassMethods.php` | 0 | 7 |
 | `ext/uri/UriExtensionPolicy.php` | 0 | 1 |
 | `ext/uri/VmUri.php` | 0 | 5 |
 | `ext/uuid/Module.php` | 0 | 4 |
@@ -30300,8 +30300,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new WhatWgUrlParse (line 150)
 - new WhatWgUrlGetScheme (line 153)
 - new WhatWgUrlGetAsciiHost (line 154)
-- new WhatWgUrlGetPath (line 155)
-- new WhatWgUrlToAsciiString (line 156)
+- new WhatWgUrlGetUnicodeHost (line 155)
+- new WhatWgUrlGetPath (line 156)
+- new WhatWgUrlGetQuery (line 157)
+- new WhatWgUrlGetFragment (line 158)
+- new WhatWgUrlGetPort (line 159)
+- new WhatWgUrlGetUsername (line 160)
+- new WhatWgUrlGetPassword (line 161)
+- new WhatWgUrlToAsciiString (line 162)
+- new WhatWgUrlToUnicodeString (line 163)
+- new WhatWgUrlEquals (line 164)
+- new WhatWgUrlWithQuery (line 165)
+- new WhatWgUrlWithFragment (line 166)
 - 7 class method(s)
 
 ### `ext/uri/Module.php`
@@ -30314,8 +30324,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
 - new ArgumentCountError (line 176)
-- 13 class method(s)
-- 10 closure(s)
+- new ArgumentCountError (line 427)
+- new ArgumentCountError (line 470)
+- new ArgumentCountError (line 496)
+- 23 class method(s)
+- 20 closure(s)
 
 ### `ext/uri/UriExtensionPolicy.php`
 
@@ -30325,11 +30338,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/uri/VmUri.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 94)
-- new Variable (line 97)
-- new ObjectEntry (line 125)
-- new Variable (line 128)
-- 9 class method(s)
+- new ObjectEntry (line 164)
+- new Variable (line 167)
+- new ObjectEntry (line 195)
+- new Variable (line 198)
+- 12 class method(s)
 
 ### `ext/uuid/Module.php`
 
