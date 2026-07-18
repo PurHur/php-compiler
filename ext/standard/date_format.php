@@ -16,6 +16,7 @@ use PHPLLVM\Value;
  * date_format() — procedural DateTimeInterface::format wrapper (ext/date/php_date.c, #9219).
  *
  * php-src: ext/date/php_date.c — PHP_FUNCTION(date_format)
+ * Z_PARAM_STR $format — null TypeError on 8.4 forward profile (#20693).
  */
 final class date_format extends Internal
 {
@@ -39,12 +40,8 @@ final class date_format extends Internal
             1,
             'object'
         );
-        $format = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[1],
-            'date_format',
-            2,
-            'format'
-        );
+        // Z_PARAM_STR $format — null TypeError on PROFILE=8.4 / strict_types (#20693).
+        $format = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'date_format', 1, 'format');
         $formatted = DateTimeSupport::format($datetime, $format);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($formatted): void {
             $ret->string($formatted);
@@ -53,6 +50,17 @@ final class date_format extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('date_format() is VM-only in this compiler build (issue #9219)');
+        if (2 !== \count($args)) {
+            throw new \LogicException('date_format() expects exactly 2 arguments');
+        }
+
+        // Same lowering as DateTime::format — Z_PARAM_STR null TypeError on 8.4 (#20693).
+        return \PHPCompiler\VM\DateTimeFormatJitHelper::compileFormat(
+            $context,
+            $args[0],
+            $args[1],
+            'date_format',
+            1
+        );
     }
 }

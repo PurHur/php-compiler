@@ -19,8 +19,13 @@ final class DateTimeFormatJitHelper
 {
     private const CLASS_DATETIME = 'DateTime';
 
-    public static function compileFormat(Context $context, JITVariable $receiver, JITVariable $formatArg): Value
-    {
+    public static function compileFormat(
+        Context $context,
+        JITVariable $receiver,
+        JITVariable $formatArg,
+        string $function = 'DateTime::format',
+        int $formatArgIndex = 0
+    ): Value {
         DateTimeFormatRuntime::ensureLinked($context);
         $obj = ReflectionSetup::loadObjectFromArg($context, $receiver);
         $objectType = $context->type->object;
@@ -35,11 +40,12 @@ final class DateTimeFormatJitHelper
             $context->lookupFunction('__value__readString'),
             JitValueBox::valuePtrFromVariable($context, $tzVar)
         );
-        $formatPtr = JitStringBuiltinArg::lowerStrictOrCoercible(
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20693, ext/date/php_date.c).
+        $formatPtr = JitStringBuiltinArg::lowerZparamStr(
             $context,
             $formatArg,
-            'DateTime::format',
-            0,
+            $function,
+            $formatArgIndex,
             'format'
         );
 
