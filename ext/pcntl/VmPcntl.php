@@ -341,6 +341,108 @@ final class VmPcntl
         throw new \Error('pcntl_setpriority() is not available in this compiler build');
     }
 
+    /**
+     * php-src pcntl_getcpuaffinity() — sched_getaffinity(2) (ext/pcntl/pcntl.c; #20510).
+     *
+     * @return list<int>|false
+     */
+    public static function getcpuaffinity(?int $pid): array|false
+    {
+        if (!PcntlLibcThinAbi::cpuAffinityAvailable()) {
+            throw new \Error('pcntl_getcpuaffinity() is not available in this compiler build');
+        }
+        // php-src: null → 0 (current process without getpid syscall)
+        $processId = null === $pid ? 0 : $pid;
+        $errno = 0;
+        $cpus = PcntlLibcThinAbi::getcpuaffinity($processId, $errno);
+        if (false === $cpus) {
+            self::$lastError = $errno;
+            if (PcntlConstants::PCNTL_ESRCH === $errno) {
+                throw new \ValueError(
+                    \sprintf('pcntl_getcpuaffinity(): Argument #1 ($process_id) invalid process (%d)', $processId)
+                );
+            }
+            if (PcntlConstants::PCNTL_EINVAL === $errno) {
+                throw new \ValueError('invalid cpu affinity mask size');
+            }
+            if (PcntlConstants::PCNTL_EPERM === $errno) {
+                \trigger_error(
+                    'pcntl_getcpuaffinity(): Calling process not having the proper privileges',
+                    \E_USER_WARNING
+                );
+            }
+
+            return false;
+        }
+
+        return $cpus;
+    }
+
+    /**
+     * php-src pcntl_setcpuaffinity() — sched_setaffinity(2) (ext/pcntl/pcntl.c; #20510).
+     *
+     * @param list<int> $cpuIds
+     */
+    public static function setcpuaffinity(?int $pid, array $cpuIds): bool
+    {
+        if (!PcntlLibcThinAbi::cpuAffinityAvailable()) {
+            throw new \Error('pcntl_setcpuaffinity() is not available in this compiler build');
+        }
+        if ([] === $cpuIds) {
+            throw new \ValueError('pcntl_setcpuaffinity(): Argument #2 ($cpu_ids) must not be empty');
+        }
+        $maxCpus = PcntlLibcThinAbi::configuredProcessorCount();
+        foreach ($cpuIds as $cpu) {
+            if ($cpu < 0 || $cpu >= $maxCpus) {
+                throw new \ValueError(
+                    \sprintf(
+                        'pcntl_setcpuaffinity(): Argument #2 ($cpu_ids) cpu id must be between 0 and %d (%d)',
+                        $maxCpus,
+                        $cpu
+                    )
+                );
+            }
+        }
+        $processId = null === $pid ? 0 : $pid;
+        $errno = 0;
+        $ok = PcntlLibcThinAbi::setcpuaffinity($processId, $cpuIds, $errno);
+        if (!$ok) {
+            self::$lastError = $errno;
+            if (PcntlConstants::PCNTL_ESRCH === $errno) {
+                throw new \ValueError(
+                    \sprintf('pcntl_setcpuaffinity(): Argument #1 ($process_id) invalid process (%d)', $processId)
+                );
+            }
+            if (PcntlConstants::PCNTL_EINVAL === $errno) {
+                throw new \ValueError(
+                    'pcntl_setcpuaffinity(): Argument #2 ($cpu_ids) invalid cpu affinity mask size or unmapped cpu id(s)'
+                );
+            }
+            if (PcntlConstants::PCNTL_EPERM === $errno) {
+                \trigger_error(
+                    'pcntl_setcpuaffinity(): Calling process not having the proper privileges',
+                    \E_USER_WARNING
+                );
+            }
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * php-src pcntl_getcpu() — sched_getcpu(3) (ext/pcntl/pcntl.c; #20510).
+     */
+    public static function getcpu(): int
+    {
+        if (!PcntlLibcThinAbi::cpuAffinityAvailable()) {
+            throw new \Error('pcntl_getcpu() is not available in this compiler build');
+        }
+
+        return PcntlLibcThinAbi::getcpu();
+    }
+
     private static function isValidPrioWho(int $who): bool
     {
         return PcntlConstants::PRIO_PROCESS === $who

@@ -367,21 +367,136 @@ final class PcntlLibcThinAbi
         return true;
     }
 
-    private static function clearErrno(\FFI $ffi): void
+    public static function cpuAffinityAvailable(): bool
     {
-        if (!\method_exists($ffi, '__errno_location')) {
+        return null !== self::ffi();
+    }
+
+    /**
+     * sched_getaffinity(2) — list of CPU ids in the process affinity mask (#20510).
+     *
+     * @param-out int $errno
+     *
+     * @return list<int>|false
+     */
+    public static function getcpuaffinity(int $pid, int &$errno): array|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            $errno = PcntlConstants::PCNTL_EINVAL;
+
+            return false;
+        }
+        $mask = $ffi->new('unsigned char['.self::CPU_SET_BYTES.']');
+        for ($i = 0; $i < self::CPU_SET_BYTES; ++$i) {
+            $mask[$i] = 0;
+        }
+        self::clearErrno($ffi);
+        $rc = (int) $ffi->sched_getaffinity($pid, self::CPU_SET_BYTES, $mask);
+        if (0 !== $rc) {
+            $errno = self::errno($ffi);
+
+            return false;
+        }
+        $errno = 0;
+        $maxCpus = self::configuredProcessorCount($ffi);
+        $cpus = [];
+        for ($cpu = 0; $cpu < $maxCpus; ++$cpu) {
+            if (self::cpuIsSet($mask, $cpu)) {
+                $cpus[] = $cpu;
+            }
+        }
+
+        return $cpus;
+    }
+
+    /**
+     * sched_setaffinity(2) (#20510).
+     *
+     * @param list<int> $cpuIds
+     * @param-out int $errno
+     */
+    public static function setcpuaffinity(int $pid, array $cpuIds, int &$errno): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            $errno = PcntlConstants::PCNTL_EINVAL;
+
+            return false;
+        }
+        $mask = $ffi->new('unsigned char['.self::CPU_SET_BYTES.']');
+        for ($i = 0; $i < self::CPU_SET_BYTES; ++$i) {
+            $mask[$i] = 0;
+        }
+        foreach ($cpuIds as $cpu) {
+            self::cpuSet($mask, (int) $cpu);
+        }
+        self::clearErrno($ffi);
+        $rc = (int) $ffi->sched_setaffinity($pid, self::CPU_SET_BYTES, $mask);
+        if (0 !== $rc) {
+            $errno = self::errno($ffi);
+
+            return false;
+        }
+        $errno = 0;
+
+        return true;
+    }
+
+    public static function getcpu(): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+
+        return (int) $ffi->sched_getcpu();
+    }
+
+    public static function configuredProcessorCount(?\FFI $ffi = null): int
+    {
+        $ffi ??= self::ffi();
+        if (null === $ffi) {
+            return 1;
+        }
+        // _SC_NPROCESSORS_CONF = 83 on Linux
+        $n = (int) $ffi->sysconf(83);
+
+        return $n > 0 ? $n : 1;
+    }
+
+    /** Linux cpu_set_t size for CPU_SETSIZE=1024 (128 bytes). */
+    private const CPU_SET_BYTES = 128;
+
+    private static function cpuIsSet(\FFI\CData $mask, int $cpu): bool
+    {
+        $byte = intdiv($cpu, 8);
+        $bit = $cpu % 8;
+        if ($byte < 0 || $byte >= self::CPU_SET_BYTES) {
+            return false;
+        }
+
+        return 0 !== (((int) $mask[$byte]) & (1 << $bit));
+    }
+
+    private static function cpuSet(\FFI\CData $mask, int $cpu): void
+    {
+        $byte = intdiv($cpu, 8);
+        $bit = $cpu % 8;
+        if ($byte < 0 || $byte >= self::CPU_SET_BYTES) {
             return;
         }
+        $mask[$byte] = ((int) $mask[$byte]) | (1 << $bit);
+    }
+
+    private static function clearErrno(\FFI $ffi): void
+    {
         $errnoPtr = $ffi->__errno_location();
         $errnoPtr[0] = 0;
     }
 
     private static function errno(\FFI $ffi): int
     {
-        if (!\method_exists($ffi, '__errno_location')) {
-            return 0;
-        }
-
         return (int) $ffi->__errno_location()[0];
     }
 
@@ -423,6 +538,10 @@ int execve(const char *path, char *const argv[], char *const envp[]);
 typedef int idtype_t;
 typedef struct { int si_signo; int si_errno; int si_code; } siginfo_t;
 int waitid(idtype_t idtype, id_t id, siginfo_t *infop, int options);
+long sysconf(int name);
+int sched_getaffinity(pid_t pid, unsigned long cpusetsize, void *mask);
+int sched_setaffinity(pid_t pid, unsigned long cpusetsize, const void *mask);
+int sched_getcpu(void);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {
