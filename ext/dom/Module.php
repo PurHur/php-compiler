@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 
@@ -30,8 +31,15 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
-        return [
+        $fns = [
             new dom_import_simplexml(),
         ];
+        // PHP 8.4 Dom\ living API (php-src php_dom.stub.php; #20711).
+        // Class ns_import_simplexml — not Dom_import_* (case-collides with legacy).
+        if (CompilerVersion::supportsDomLivingStandardNamespace()) {
+            $fns[] = new ns_import_simplexml();
+        }
+
+        return $fns;
     }
 }

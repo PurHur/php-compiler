@@ -26,14 +26,19 @@ final class VmDomSimpleXmlBridge
     /** Re-entrancy guard while syncing Dom ↔ SimpleXML peers. */
     private static bool $syncing = false;
 
-    public static function importSimpleXml(Context $ctx, ObjectEntry $sxe): ObjectEntry
+    /**
+     * @param bool $modern When true, wrap as Dom\Element under Dom\XMLDocument
+     *                     (php-src Dom\import_simplexml / PHP_LIBXML_CLASS_MODERN; #20711).
+     */
+    public static function importSimpleXml(Context $ctx, ObjectEntry $sxe, bool $modern = false): ObjectEntry
     {
-        VmSimpleXml::requireElement($sxe, 'dom_import_simplexml()');
+        $label = $modern ? 'Dom\\import_simplexml' : 'dom_import_simplexml';
+        VmSimpleXml::requireElement($sxe, $label);
         // Named-child / children / multi views attach the parent (or collection) as
         // registry state; php-src exports the first matching element node (#20697, re-#20137).
-        $nodeState = self::resolveExportElementState($sxe, 'dom_import_simplexml');
+        $nodeState = self::resolveExportElementState($sxe, $label);
 
-        $document = self::createEmptyDocument($ctx);
+        $document = self::createEmptyDocument($ctx, $modern);
         $root = self::domElementFromSimpleXmlState($ctx, $document, $nodeState);
         VmDom::appendChild($ctx, $document, $root);
 
@@ -255,8 +260,13 @@ final class VmDomSimpleXmlBridge
         unset($GLOBALS[self::PEERS_KEY]);
     }
 
-    private static function createEmptyDocument(Context $ctx): ObjectEntry
+    private static function createEmptyDocument(Context $ctx, bool $modern = false): ObjectEntry
     {
+        if ($modern) {
+            // Living Dom\XMLDocument so createElement resolves Dom\Element (#20711).
+            return VmDomLiving::allocateXmlDocument($ctx);
+        }
+
         $class = $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null;
         if (null === $class) {
             throw new \LogicException('DOMDocument is not registered in this compiler build');

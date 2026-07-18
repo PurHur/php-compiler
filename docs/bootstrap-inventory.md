@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5803 |
-| Phase A inventory files (M2 ratio SSOT) | 5803 |
+| PHP files on vm.php path | 5804 |
+| Phase A inventory files (M2 ratio SSOT) | 5804 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17107 |
+| Source constructs flagged (warnings) | 17110 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -349,7 +349,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/JitDomXPathEvaluateUserScript.php` | 0 | 1 |
 | `ext/dom/JitDomXPathQuery.php` | 0 | 1 |
 | `ext/dom/JitDomXPathQueryUserScript.php` | 0 | 2 |
-| `ext/dom/Module.php` | 0 | 2 |
+| `ext/dom/Module.php` | 0 | 3 |
 | `ext/dom/NamedNodeMapCount.php` | 0 | 1 |
 | `ext/dom/NamedNodeMapCurrent.php` | 0 | 1 |
 | `ext/dom/NamedNodeMapGetNamedItem.php` | 0 | 1 |
@@ -425,6 +425,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/XmlDocumentCreateEmpty.php` | 0 | 2 |
 | `ext/dom/XmlDocumentCreateFromString.php` | 0 | 3 |
 | `ext/dom/dom_import_simplexml.php` | 0 | 2 |
+| `ext/dom/ns_import_simplexml.php` | 0 | 2 |
 | `ext/enchant/BuiltinClasses.php` | 0 | 1 |
 | `ext/enchant/EnchantExtensionPolicy.php` | 0 | 1 |
 | `ext/enchant/Module.php` | 0 | 22 |
@@ -7763,7 +7764,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new dom_import_simplexml (line 34)
+- new dom_import_simplexml (line 35)
+- new ns_import_simplexml (line 40)
 - 3 class method(s)
 
 ### `ext/dom/NamedNodeMapCount.php`
@@ -8527,9 +8529,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomSimpleXmlBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 265)
-- new SimpleXmlNodeState (line 312)
-- new ObjectEntry (line 342)
+- new ObjectEntry (line 275)
+- new SimpleXmlNodeState (line 322)
+- new ObjectEntry (line 352)
 - 21 class method(s)
 
 ### `ext/dom/VmDomTokenList.php`
@@ -8642,6 +8644,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- 2 class method(s)
+
+### `ext/dom/ns_import_simplexml.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 
 ### `ext/enchant/BuiltinClasses.php`
@@ -11452,16 +11460,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmNumberFormatter.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 69)
-- new Variable (line 73)
-- new NumberFormatterCreate (line 80)
-- new NumberFormatterFormat (line 83)
-- new Error (line 97)
-- new ObjectEntry (line 99)
-- new Error (line 140)
-- new ArgumentCountError (line 256)
-- new ArgumentCountError (line 286)
-- new Error (line 294)
+- new ClassEntry (line 96)
+- new Variable (line 100)
+- new NumberFormatterCreate (line 107)
+- new NumberFormatterFormat (line 110)
+- new Error (line 124)
+- new ObjectEntry (line 126)
+- new Error (line 167)
+- new ArgumentCountError (line 283)
+- new ArgumentCountError (line 313)
+- new Error (line 321)
 - 12 class method(s)
 
 ### `ext/intl/VmResourceBundle.php`
