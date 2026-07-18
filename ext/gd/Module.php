@@ -63,6 +63,11 @@ class Module extends ModuleAbstract
             $functions[] = new imagesavealpha();
             $functions[] = new imageantialias();
             $functions[] = new imagesetthickness();
+            $functions[] = new imageistruecolor();
+            $functions[] = new imagetruecolortopalette();
+            $functions[] = new imagepalettetotruecolor();
+            $functions[] = new imagesetinterpolation();
+            $functions[] = new imagegetinterpolation();
             $functions[] = new imagefill();
             $functions[] = new imagedestroy();
             $functions[] = new imagesx();
@@ -87,6 +92,7 @@ class Module extends ModuleAbstract
             $functions[] = new imagecropauto();
             $functions[] = new imagerotate();
             $functions[] = new imagescale();
+            $functions[] = new imageaffine();
             $functions[] = new imageconvolution();
         }
         if (GdExtensionPolicy::advertisesDecodeFromString()) {
@@ -94,8 +100,10 @@ class Module extends ModuleAbstract
             $functions[] = new imagepng();
             $functions[] = new imagewebp();
             $functions[] = new imageavif();
+            $functions[] = new imagebmp();
             $functions[] = new imagecreatefromwebp();
             $functions[] = new imagecreatefromavif();
+            $functions[] = new imagecreatefrombmp();
         }
 
         return $functions;

@@ -81,17 +81,247 @@ final class VmGd
         return $entry;
     }
 
+    /**
+     * imagecreate() — palette canvas (php-src gdImageCreate; #20415).
+     */
+    public static function createPaletteImage(Frame $frame, int $width, int $height): ObjectEntry|false
+    {
+        if ($width <= 0 || $height <= 0) {
+            self::warnInvalidDimensions($frame, 'imagecreate');
+
+            return false;
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('imagecreate() requires VM context');
+        }
+        $class = $ctx->classes[self::CLASS_GDIMAGE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('GdImage is not registered in this compiler build');
+        }
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        GdRegistry::attach($entry, GdImageState::createPalette($width, $height));
+
+        return $entry;
+    }
+
+    /**
+     * imageistruecolor() — im->trueColor (php-src ext/gd/gd.c; #20415).
+     */
+    public static function isTruecolor(ObjectEntry $image): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+
+        return $state->truecolor;
+    }
+
+    /**
+     * imagetruecolortopalette() — gdImageTrueColorToPalette (php-src ext/gd/gd.c; #20415).
+     *
+     * Honest PHP quantization: exact map when unique colors fit; otherwise popularity
+     * sampling + nearest-color remap with optional Floyd–Steinberg dither.
+     */
+    public static function trueColorToPalette(
+        Frame $frame,
+        ObjectEntry $image,
+        bool $dither,
+        int $numColors
+    ): bool {
+        if ($numColors <= 0 || $numColors >= 2147483647) {
+            throw new \ValueError(
+                'imagetruecolortopalette(): Argument #3 ($num_colors) must be greater than 0 and less than 2147483647'
+            );
+        }
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if (!$state->truecolor) {
+            return true;
+        }
+        $wanted = $numColors > 256 ? 256 : $numColors;
+        if ($wanted < 1) {
+            self::warnCouldNotConvertToPalette($frame);
+
+            return false;
+        }
+
+        $pixels = $state->pixels;
+        $n = $state->width * $state->height;
+        $counts = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $rgb = $pixels[$i] & 0xFFFFFF;
+            $counts[$rgb] = ($counts[$rgb] ?? 0) + 1;
+        }
+        arsort($counts, SORT_NUMERIC);
+        $paletteKeys = array_keys($counts);
+        if (\count($paletteKeys) > $wanted) {
+            $paletteKeys = array_slice($paletteKeys, 0, $wanted);
+        }
+        $palette = [];
+        foreach ($paletteKeys as $rgb) {
+            $palette[] = $rgb & 0xFFFFFF;
+        }
+        if ([] === $palette) {
+            $palette[] = 0;
+        }
+
+        $indexOf = [];
+        foreach ($palette as $idx => $rgb) {
+            $indexOf[$rgb] = $idx;
+        }
+
+        $mapped = [];
+        if ($dither) {
+            $width = $state->width;
+            $height = $state->height;
+            $work = [];
+            for ($i = 0; $i < $n; ++$i) {
+                $c = $pixels[$i];
+                $work[$i] = [
+                    (float) (($c >> 16) & 0xFF),
+                    (float) (($c >> 8) & 0xFF),
+                    (float) ($c & 0xFF),
+                ];
+            }
+            for ($y = 0; $y < $height; ++$y) {
+                for ($x = 0; $x < $width; ++$x) {
+                    $pos = $y * $width + $x;
+                    $r = (int) max(0, min(255, (int) round($work[$pos][0])));
+                    $g = (int) max(0, min(255, (int) round($work[$pos][1])));
+                    $b = (int) max(0, min(255, (int) round($work[$pos][2])));
+                    $idx = self::nearestPaletteIndex($palette, $r, $g, $b);
+                    $mapped[$pos] = $idx;
+                    $pr = ($palette[$idx] >> 16) & 0xFF;
+                    $pg = ($palette[$idx] >> 8) & 0xFF;
+                    $pb = $palette[$idx] & 0xFF;
+                    $er = $work[$pos][0] - $pr;
+                    $eg = $work[$pos][1] - $pg;
+                    $eb = $work[$pos][2] - $pb;
+                    self::ditherDiffuse($work, $width, $height, $x, $y, $er, $eg, $eb);
+                }
+            }
+        } else {
+            for ($i = 0; $i < $n; ++$i) {
+                $rgb = $pixels[$i] & 0xFFFFFF;
+                if (isset($indexOf[$rgb])) {
+                    $mapped[$i] = $indexOf[$rgb];
+                } else {
+                    $mapped[$i] = self::nearestPaletteIndex(
+                        $palette,
+                        ($rgb >> 16) & 0xFF,
+                        ($rgb >> 8) & 0xFF,
+                        $rgb & 0xFF
+                    );
+                }
+            }
+        }
+
+        $state->pixels = $mapped;
+        $state->colors = $palette;
+        $state->truecolor = false;
+        $state->alphaBlending = false;
+        $state->encoded = '';
+
+        return true;
+    }
+
+    /**
+     * imagepalettetotruecolor() — gdImagePaletteToTrueColor (php-src ext/gd/gd.c; #20415).
+     */
+    public static function paletteToTrueColor(ObjectEntry $image): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if ($state->truecolor) {
+            return true;
+        }
+        $colors = $state->colors;
+        $n = $state->width * $state->height;
+        $pixels = $state->pixels;
+        $expanded = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $idx = $pixels[$i];
+            $expanded[$i] = isset($colors[$idx]) ? ($colors[$idx] & 0xFFFFFF) : 0;
+        }
+        $state->pixels = $expanded;
+        $state->colors = [];
+        $state->truecolor = true;
+        $state->alphaBlending = true;
+        $state->encoded = '';
+
+        return true;
+    }
+
+    /**
+     * imagegetinterpolation() — im->interpolation_id (php-src ext/gd/gd.c; #20416).
+     */
+    public static function getInterpolation(ObjectEntry $image): int
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return GdConstants::REGISTERED['IMG_BILINEAR_FIXED'];
+        }
+
+        return $state->interpolationId;
+    }
+
+    /**
+     * imagesetinterpolation() — gdImageSetInterpolationMethod (php-src ext/gd/libgd; #20416).
+     *
+     * method -1 resets to IMG_BILINEAR_FIXED; IMG_DEFAULT remaps to BILINEAR_FIXED (PHP-8.4 libgd).
+     */
+    public static function setInterpolation(ObjectEntry $image, int $method): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        if (-1 === $method) {
+            $method = GdConstants::REGISTERED['IMG_BILINEAR_FIXED'];
+        }
+        if ($method < 0 || $method > GdConstants::REGISTERED['IMG_WEIGHTED4']) {
+            return false;
+        }
+        if (GdConstants::REGISTERED['IMG_DEFAULT'] === $method) {
+            $method = GdConstants::REGISTERED['IMG_BILINEAR_FIXED'];
+        }
+        $state->interpolationId = $method;
+
+        return true;
+    }
+
     public static function colorAllocate(ObjectEntry $image, int $red, int $green, int $blue): int|false
     {
         $state = GdRegistry::state($image);
-        if (null === $state || !$state->hasRaster() || !$state->truecolor) {
+        if (null === $state || !$state->hasRaster()) {
             return false;
         }
         if ($red < 0 || $red > 255 || $green < 0 || $green > 255 || $blue < 0 || $blue > 255) {
             return false;
         }
+        $rgb = ($red << 16) | ($green << 8) | $blue;
+        if ($state->truecolor) {
+            return $rgb;
+        }
+        foreach ($state->colors as $idx => $existing) {
+            if (($existing & 0xFFFFFF) === $rgb) {
+                return $idx;
+            }
+        }
+        if (\count($state->colors) >= 256) {
+            return false;
+        }
+        $state->colors[] = $rgb;
 
-        return ($red << 16) | ($green << 8) | $blue;
+        return \count($state->colors) - 1;
     }
 
     /**
@@ -1043,6 +1273,311 @@ final class VmGd
     }
 
     /**
+     * imageaffine() — gdTransformAffineGetImage (php-src ext/gd/gd.c / libgd; #20404).
+     *
+     * @param list<float> $affine 6-element matrix [a,b,c,d,e,f]: x'=a*x+c*y+e, y'=b*x+d*y+f
+     * @param array{x: int, y: int, width: int, height: int}|null $clip
+     */
+    public static function affine(
+        Frame $frame,
+        ObjectEntry $image,
+        array $affine,
+        ?array $clip
+    ): ObjectEntry|false {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return false;
+        }
+        if (!$state->truecolor) {
+            if (!self::paletteToTrueColor($image)) {
+                return false;
+            }
+            $state = GdRegistry::state($image);
+            if (null === $state || !$state->hasRaster()) {
+                return false;
+            }
+        }
+
+        $srcX = 0;
+        $srcY = 0;
+        $srcW = $state->width;
+        $srcH = $state->height;
+        if (null !== $clip) {
+            $srcX = $clip['x'];
+            $srcY = $clip['y'];
+            $srcW = $clip['width'];
+            $srcH = $clip['height'];
+            if ($srcW <= 0 || $srcH <= 0) {
+                return false;
+            }
+            if ($srcX < 0 || $srcY < 0
+                || $srcX + $srcW > $state->width
+                || $srcY + $srcH > $state->height) {
+                return false;
+            }
+        }
+
+        $bbox = self::affineBoundingBox($srcW, $srcH, $affine);
+        if (null === $bbox) {
+            return false;
+        }
+        [$bboxX, $bboxY, $dstW, $dstH] = $bbox;
+        if ($dstW <= 0 || $dstH <= 0) {
+            return false;
+        }
+
+        // Translate so bbox origin lands at (0,0) — gdAffineTranslate(-bbox) ∘ affine.
+        $m = self::affineConcat($affine, [1.0, 0.0, 0.0, 1.0, (float) (-$bboxX), (float) (-$bboxY)]);
+        $inv = self::affineInvert($m);
+        if (null === $inv) {
+            return false;
+        }
+
+        $srcPixels = $state->pixels;
+        $srcWidth = $state->width;
+        $srcHeight = $state->height;
+        $nearest = GdConstants::REGISTERED['IMG_NEAREST_NEIGHBOUR'] === $state->interpolationId;
+        $dstPixels = array_fill(0, $dstW * $dstH, 0);
+
+        for ($y = 0; $y < $dstH; ++$y) {
+            for ($x = 0; $x < $dstW; ++$x) {
+                $ptX = $x + 0.5;
+                $ptY = $y + 0.5;
+                $srcPtX = $ptX * $inv[0] + $ptY * $inv[2] + $inv[4];
+                $srcPtY = $ptX * $inv[1] + $ptY * $inv[3] + $inv[5];
+                $sx = $srcX + $srcPtX;
+                $sy = $srcY + $srcPtY;
+                if ($nearest) {
+                    $ix = (int) floor($sx);
+                    $iy = (int) floor($sy);
+                    if ($ix < $srcX || $iy < $srcY
+                        || $ix >= $srcX + $srcW || $iy >= $srcY + $srcH
+                        || $ix < 0 || $iy < 0 || $ix >= $srcWidth || $iy >= $srcHeight) {
+                        $dstPixels[$y * $dstW + $x] = 0;
+
+                        continue;
+                    }
+                    $dstPixels[$y * $dstW + $x] = $srcPixels[$iy * $srcWidth + $ix];
+                } else {
+                    if ($sx < $srcX || $sy < $srcY
+                        || $sx >= $srcX + $srcW || $sy >= $srcY + $srcH) {
+                        $dstPixels[$y * $dstW + $x] = 0;
+
+                        continue;
+                    }
+                    $dstPixels[$y * $dstW + $x] = self::sampleBilinear(
+                        $srcPixels,
+                        $srcWidth,
+                        $srcHeight,
+                        $sx,
+                        $sy
+                    );
+                }
+            }
+        }
+
+        $out = self::createTruecolorFromPixels($frame, $dstW, $dstH, $dstPixels);
+        if (false === $out) {
+            return false;
+        }
+        $outState = GdRegistry::state($out);
+        if (null !== $outState) {
+            $outState->interpolationId = $state->interpolationId;
+            $outState->saveAlpha = true;
+            $outState->alphaBlending = false;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<float> $affine
+     * @return array{0: int, 1: int, 2: int, 3: int}|null bbox x,y,width,height
+     */
+    private static function affineBoundingBox(int $width, int $height, array $affine): ?array
+    {
+        $corners = [
+            [0.0, 0.0],
+            [(float) $width, 0.0],
+            [(float) $width, (float) $height],
+            [0.0, (float) $height],
+        ];
+        $minX = INF;
+        $minY = INF;
+        $maxX = -INF;
+        $maxY = -INF;
+        foreach ($corners as [$cx, $cy]) {
+            $x = $cx * $affine[0] + $cy * $affine[2] + $affine[4];
+            $y = $cx * $affine[1] + $cy * $affine[3] + $affine[5];
+            if (!is_finite($x) || !is_finite($y)) {
+                return null;
+            }
+            if ($x < $minX) {
+                $minX = $x;
+            }
+            if ($y < $minY) {
+                $minY = $y;
+            }
+            if ($x > $maxX) {
+                $maxX = $x;
+            }
+            if ($y > $maxY) {
+                $maxY = $y;
+            }
+        }
+        $dstW = (int) floor($maxX - $minX);
+        $dstH = (int) floor($maxY - $minY);
+        // Match php-src identity “same dimensions” (libgd bbox_width uses width-1 + inclusive loops).
+        if ($dstW < 1) {
+            $dstW = 1;
+        }
+        if ($dstH < 1) {
+            $dstH = 1;
+        }
+
+        return [(int) $minX, (int) $minY, $dstW, $dstH];
+    }
+
+    /**
+     * @param list<float> $m1
+     * @param list<float> $m2
+     * @return list<float>
+     */
+    private static function affineConcat(array $m1, array $m2): array
+    {
+        return [
+            $m1[0] * $m2[0] + $m1[1] * $m2[2],
+            $m1[0] * $m2[1] + $m1[1] * $m2[3],
+            $m1[2] * $m2[0] + $m1[3] * $m2[2],
+            $m1[2] * $m2[1] + $m1[3] * $m2[3],
+            $m1[4] * $m2[0] + $m1[5] * $m2[2] + $m2[4],
+            $m1[4] * $m2[1] + $m1[5] * $m2[3] + $m2[5],
+        ];
+    }
+
+    /**
+     * @param list<float> $src
+     * @return list<float>|null
+     */
+    private static function affineInvert(array $src): ?array
+    {
+        $det = $src[0] * $src[3] - $src[1] * $src[2];
+        if ($det <= 0.0) {
+            return null;
+        }
+        $rDet = 1.0 / $det;
+        $dst0 = $src[3] * $rDet;
+        $dst1 = -$src[1] * $rDet;
+        $dst2 = -$src[2] * $rDet;
+        $dst3 = $src[0] * $rDet;
+
+        return [
+            $dst0,
+            $dst1,
+            $dst2,
+            $dst3,
+            -$src[4] * $dst0 - $src[5] * $dst2,
+            -$src[4] * $dst1 - $src[5] * $dst3,
+        ];
+    }
+
+    /**
+     * @return list<float>
+     */
+    public static function coerceAffineMatrix(Variable $arg, string $function, int $position): array
+    {
+        $arg = $arg->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($arg)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($affine) must be of type array, %s given',
+                $function,
+                $position,
+                EnumCaseSupport::typeNameForVariable($arg)
+            ));
+        }
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($affine) must be of type array, %s given',
+                $function,
+                $position,
+                self::typeLabel($arg)
+            ));
+        }
+        $table = $arg->toArray();
+        if (6 !== $table->getNumElements()) {
+            throw new \ValueError($function.'(): Argument #'.$position.' ($affine) must have 6 elements');
+        }
+        $affine = [];
+        for ($i = 0; $i < 6; ++$i) {
+            $elem = $table->findIndex($i);
+            if (null === $elem) {
+                throw new \ValueError($function.'(): Argument #'.$position.' ($affine) must have 6 elements');
+            }
+            $elem = $elem->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $elem->type) {
+                $affine[] = (float) $elem->toInt();
+            } elseif (Variable::TYPE_FLOAT === $elem->type) {
+                $affine[] = $elem->toFloat();
+            } elseif (Variable::TYPE_STRING === $elem->type) {
+                $affine[] = (float) $elem->toString();
+            } else {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d ($affine) contains invalid type for element %d',
+                    $function,
+                    $position,
+                    $i
+                ));
+            }
+        }
+
+        return $affine;
+    }
+
+    /**
+     * @return array{x: int, y: int, width: int, height: int}
+     */
+    public static function coerceAffineClipRect(Variable $arg, string $function, int $position): array
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($clip) must be of type ?array, %s given',
+                $function,
+                $position,
+                self::typeLabel($arg)
+            ));
+        }
+        $table = $arg->toArray();
+        $values = [];
+        foreach (['x', 'y', 'width', 'height'] as $key) {
+            $valueVar = $table->find($key);
+            if (null === $valueVar) {
+                throw new \ValueError(\sprintf(
+                    '%s(): Argument #%d ($clip) must have a "%s" key',
+                    $function,
+                    $position,
+                    $key
+                ));
+            }
+            $valueVar = $valueVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $valueVar->type) {
+                $values[$key] = $valueVar->toInt();
+            } elseif (Variable::TYPE_FLOAT === $valueVar->type) {
+                $values[$key] = (int) $valueVar->toFloat();
+            } else {
+                $values[$key] = (int) $valueVar->toInt();
+            }
+        }
+
+        return [
+            'x' => $values['x'],
+            'y' => $values['y'],
+            'width' => $values['width'],
+            'height' => $values['height'],
+        ];
+    }
+
+    /**
      * imageconvolution() — in-place 3×3 kernel (php-src gdImageConvolution; #20405).
      *
      * @param list<list<float>> $matrix
@@ -1337,11 +1872,12 @@ final class VmGd
             return $state->encoded;
         }
         if ($state->hasRaster()) {
+            $pixels = self::truecolorPixelsForEncode($state);
             if ($state->saveAlpha) {
-                return VmGdPng::encodeRgba($state->width, $state->height, $state->pixels);
+                return VmGdPng::encodeRgba($state->width, $state->height, $pixels);
             }
 
-            return VmGdPng::encodeRgb($state->width, $state->height, $state->pixels);
+            return VmGdPng::encodeRgb($state->width, $state->height, $pixels);
         }
 
         throw new \TypeError('imagepng(): Argument #1 ($image) must be of type GdImage');
@@ -1361,7 +1897,7 @@ final class VmGd
             throw new \TypeError('imagewebp(): Argument #1 ($image) must be of type GdImage');
         }
         if ($state->hasRaster()) {
-            return VmGdWebp::encodeRgb($state->width, $state->height, $state->pixels);
+            return VmGdWebp::encodeRgb($state->width, $state->height, self::truecolorPixelsForEncode($state));
         }
         if ($state->hasEncoded() && VmImage::IMAGETYPE_WEBP === $state->imageType) {
             return $state->encoded;
@@ -1384,7 +1920,7 @@ final class VmGd
             throw new \TypeError('imageavif(): Argument #1 ($image) must be of type GdImage');
         }
         if ($state->hasRaster()) {
-            return VmGdAvif::encodeRgb($state->width, $state->height, $state->pixels);
+            return VmGdAvif::encodeRgb($state->width, $state->height, self::truecolorPixelsForEncode($state));
         }
         if ($state->hasEncoded() && VmImage::IMAGETYPE_AVIF === $state->imageType) {
             return $state->encoded;
@@ -1448,6 +1984,60 @@ final class VmGd
         return $entry;
     }
 
+    public static function createFromBmpBytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdBmp::decodeRgb($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefrombmp');
+
+            return false;
+        }
+        [$width, $height, $pixels] = $decoded;
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('imagecreatefrombmp() requires VM context');
+        }
+        $class = $ctx->classes[self::CLASS_GDIMAGE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('GdImage is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $state = GdImageState::fromRaster($width, $height, $pixels);
+        $state->imageType = VmImage::IMAGETYPE_BMP;
+        GdRegistry::attach($entry, $state);
+
+        return $entry;
+    }
+
+    public static function encodedBmpBytes(ObjectEntry $image, bool $compressed = true): string
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            throw new \TypeError('imagebmp(): Argument #1 ($image) must be of type GdImage');
+        }
+        if ($state->hasRaster()) {
+            return VmGdBmp::encodeRgb(
+                $state->width,
+                $state->height,
+                self::truecolorPixelsForEncode($state),
+                $compressed
+            );
+        }
+        if ($state->hasEncoded() && VmImage::IMAGETYPE_BMP === $state->imageType) {
+            return $state->encoded;
+        }
+
+        throw new \TypeError('imagebmp(): Argument #1 ($image) must be of type GdImage');
+    }
+
+    public static function writeBmpToOutput(Frame $frame, ObjectEntry $image, bool $compressed = true): bool
+    {
+        OutputBuffer::append(self::encodedBmpBytes($image, $compressed), $frame->scriptPath ?: null);
+
+        return true;
+    }
+
     public static function applyFilter(
         Frame $frame,
         ObjectEntry $image,
@@ -1458,7 +2048,7 @@ final class VmGd
         int $arg4
     ): bool {
         $state = GdRegistry::state($image);
-        if (null === $state || !$state->hasRaster()) {
+        if (null === $state || !$state->hasRaster() || !$state->truecolor) {
             return false;
         }
 
@@ -1911,6 +2501,100 @@ final class VmGd
         );
     }
 
+    private static function warnCouldNotConvertToPalette(Frame $frame): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            'imagetruecolortopalette(): Couldn\'t convert to palette',
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    /**
+     * Expand palette indices to truecolor RGB for encoders (#20415).
+     *
+     * @return list<int>
+     */
+    private static function truecolorPixelsForEncode(GdImageState $state): array
+    {
+        if ($state->truecolor) {
+            return $state->pixels;
+        }
+        $colors = $state->colors;
+        $n = $state->width * $state->height;
+        $out = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $idx = $state->pixels[$i];
+            $out[$i] = isset($colors[$idx]) ? ($colors[$idx] & 0xFFFFFF) : 0;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $palette
+     */
+    private static function nearestPaletteIndex(array $palette, int $r, int $g, int $b): int
+    {
+        $best = 0;
+        $bestDist = PHP_INT_MAX;
+        foreach ($palette as $idx => $rgb) {
+            $pr = ($rgb >> 16) & 0xFF;
+            $pg = ($rgb >> 8) & 0xFF;
+            $pb = $rgb & 0xFF;
+            $dr = $pr - $r;
+            $dg = $pg - $g;
+            $db = $pb - $b;
+            $dist = $dr * $dr + $dg * $dg + $db * $db;
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $best = $idx;
+                if (0 === $dist) {
+                    break;
+                }
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Floyd–Steinberg error diffusion for truecolor→palette (#20415).
+     *
+     * @param list<array{0: float, 1: float, 2: float}> $work
+     */
+    private static function ditherDiffuse(
+        array &$work,
+        int $width,
+        int $height,
+        int $x,
+        int $y,
+        float $er,
+        float $eg,
+        float $eb
+    ): void {
+        $neighbors = [
+            [$x + 1, $y, 7 / 16],
+            [$x - 1, $y + 1, 3 / 16],
+            [$x, $y + 1, 5 / 16],
+            [$x + 1, $y + 1, 1 / 16],
+        ];
+        foreach ($neighbors as [$nx, $ny, $w]) {
+            if ($nx < 0 || $ny < 0 || $nx >= $width || $ny >= $height) {
+                continue;
+            }
+            $pos = $ny * $width + $nx;
+            $work[$pos][0] += $er * $w;
+            $work[$pos][1] += $eg * $w;
+            $work[$pos][2] += $eb * $w;
+        }
+    }
+
     private static function typeLabel(Variable $var): string
     {
         $var = $var->resolveIndirect();
@@ -1986,7 +2670,24 @@ final class VmGd
             'imagepng', 'imagewebp', 'imageavif' => 1 === $position ? 'image' : 'arg',
             'imagecreatefromstring' => 'image',
             'imagecreatefromwebp', 'imagecreatefromavif' => 'filename',
-            'imagesx', 'imagesy' => 'image',
+            'imagesx', 'imagesy', 'imageistruecolor', 'imagepalettetotruecolor', 'imagedestroy', 'imagegetinterpolation' => 'image',
+            'imageaffine' => match ($position) {
+                1 => 'image',
+                2 => 'affine',
+                3 => 'clip',
+                default => 'arg',
+            },
+            'imagesetinterpolation' => match ($position) {
+                1 => 'image',
+                2 => 'method',
+                default => 'arg',
+            },
+            'imagetruecolortopalette' => match ($position) {
+                1 => 'image',
+                2 => 'dither',
+                3 => 'num_colors',
+                default => 'arg',
+            },
             'imagealphablending', 'imagesavealpha', 'imageantialias' => match ($position) {
                 1 => 'image',
                 2 => 'enable',
