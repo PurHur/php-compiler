@@ -45,6 +45,7 @@ final class VmPDO
     {
         if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['exec'])) {
             self::registerDriverSubclasses($ctx);
+            self::registerPgsqlExtensionMethods($ctx->classes[self::CLASS_LC]);
 
             return;
         }
@@ -109,6 +110,41 @@ final class VmPDO
 
         $ctx->classes[self::CLASS_LC] = $entry;
         self::registerDriverSubclasses($ctx);
+        self::registerPgsqlExtensionMethods($entry);
+    }
+
+    /**
+     * Legacy PDO::pgsql* driver methods (php-src pgsql_driver.stub.php PDO_PGSql_Ext; #20566).
+     *
+     * Registered on PDO when {@see PdoExtensionPolicy::advertisesPgsqlDriver()} so
+     * method_exists(PDO::class, 'pgsqlGetPid') matches the issue repro. Live libpq
+     * I/O remains #3741 — calls without a pgsql handle throw like the Pdo\Pgsql stubs.
+     */
+    public static function registerPgsqlExtensionMethods(ClassEntry $entry): void
+    {
+        if (!PdoExtensionPolicy::advertisesPgsqlDriver()) {
+            return;
+        }
+        if (isset($entry->methods['pgsqlgetpid'])) {
+            return;
+        }
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $methods = [
+            'pgsqlcopyfromarray' => [new PDOPgsqlCopyFromArrayLegacy(), 'pgsqlCopyFromArray'],
+            'pgsqlcopyfromfile' => [new PDOPgsqlCopyFromFileLegacy(), 'pgsqlCopyFromFile'],
+            'pgsqlcopytoarray' => [new PDOPgsqlCopyToArrayLegacy(), 'pgsqlCopyToArray'],
+            'pgsqlcopytofile' => [new PDOPgsqlCopyToFileLegacy(), 'pgsqlCopyToFile'],
+            'pgsqllobcreate' => [new PDOPgsqlLobCreateLegacy(), 'pgsqlLOBCreate'],
+            'pgsqllobopen' => [new PDOPgsqlLobOpenLegacy(), 'pgsqlLOBOpen'],
+            'pgsqllobunlink' => [new PDOPgsqlLobUnlinkLegacy(), 'pgsqlLOBUnlink'],
+            'pgsqlgetnotify' => [new PDOPgsqlGetNotifyLegacy(), 'pgsqlGetNotify'],
+            'pgsqlgetpid' => [new PDOPgsqlGetPidLegacy(), 'pgsqlGetPid'],
+        ];
+        foreach ($methods as $lc => [$method, $display]) {
+            $entry->methods[$lc] = $method;
+            $entry->methodVisibility[$lc] = $pub;
+            $entry->methodNames[$lc] = $display;
+        }
     }
 
     /** PHP 8.4 driver-specific subclasses (#20529, #20548). */
@@ -1075,12 +1111,27 @@ final class PDOMysqlGetWarningCount extends PdoClassMethod
     }
 }
 
-/** Shared: Pdo\Pgsql methods require a live pgsql handle (not wired yet; #20548). */
+/**
+ * Shared: Pdo\Pgsql / PDO::pgsql* methods need a live libpq handle (#20548, #20566).
+ *
+ * Until #3741 wires native pgsql connections, validate the receiver then throw the
+ * same "could not find driver" path used by PDO::connect('pgsql:…').
+ */
 abstract class PDOPgsqlUnimplementedMethod extends PdoClassMethod
 {
+    protected function methodLabel(): string
+    {
+        $name = $this->getName();
+        if (str_starts_with($name, 'pgsql') || str_starts_with($name, 'PDO::')) {
+            return 'PDO::'.$name.'()';
+        }
+
+        return 'Pdo\\Pgsql::'.$name.'()';
+    }
+
     public function execute(Frame $frame): void
     {
-        $this->receiver($frame, 'Pdo\\Pgsql::'.$this->getName().'()');
+        $this->receiver($frame, $this->methodLabel());
         throw new \PDOException('could not find driver');
     }
 }
@@ -1170,5 +1221,163 @@ final class PDOPgsqlSetNoticeCallback extends PDOPgsqlUnimplementedMethod
     public function __construct()
     {
         parent::__construct('setNoticeCallback');
+    }
+}
+
+/** Legacy PDO::pgsqlCopyFromArray — pgsql_driver.stub.php (#20566). */
+final class PDOPgsqlCopyFromArrayLegacy extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('pgsqlCopyFromArray');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $this->receiver($frame, $this->methodLabel());
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'PDO::pgsqlCopyFromArray() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $this->stringArg($frame->calledArgs[1], 'PDO::pgsqlCopyFromArray', 0, 'tableName');
+        $rows = $frame->calledArgs[2]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $rows->type) {
+            // Traversable accepted in php-src stub; array-only until libpq (#3741).
+            if (Variable::TYPE_OBJECT !== $rows->type) {
+                throw new \TypeError(\sprintf(
+                    'PDO::pgsqlCopyFromArray(): Argument #2 ($rows) must be of type array|Traversable, %s given',
+                    self::typeLabel($frame->calledArgs[2])
+                ));
+            }
+        }
+        if ($argc >= 3) {
+            $this->stringArg($frame->calledArgs[3], 'PDO::pgsqlCopyFromArray', 2, 'separator');
+        }
+        if ($argc >= 4) {
+            $this->stringArg($frame->calledArgs[4], 'PDO::pgsqlCopyFromArray', 3, 'nullAs');
+        }
+        if ($argc >= 5) {
+            $fields = $frame->calledArgs[5]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $fields->type) {
+                $this->stringArg($frame->calledArgs[5], 'PDO::pgsqlCopyFromArray', 4, 'fields');
+            }
+        }
+        if ($argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'PDO::pgsqlCopyFromArray() expects at most 5 arguments, %d given',
+                $argc
+            ));
+        }
+        // Live COPY FROM needs libpq + Postgres (#3741); harness has no server by default.
+        throw new \PDOException('could not find driver');
+    }
+}
+
+/** Legacy PDO::pgsqlCopyFromFile — pgsql_driver.stub.php (#20566). */
+final class PDOPgsqlCopyFromFileLegacy extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('pgsqlCopyFromFile');
+    }
+}
+
+/** Legacy PDO::pgsqlCopyToArray — pgsql_driver.stub.php (#20566). */
+final class PDOPgsqlCopyToArrayLegacy extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('pgsqlCopyToArray');
+    }
+}
+
+/** Legacy PDO::pgsqlCopyToFile — pgsql_driver.stub.php (#20566). */
+final class PDOPgsqlCopyToFileLegacy extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('pgsqlCopyToFile');
+    }
+}
+
+/** Legacy PDO::pgsqlLOBCreate — pgsql_driver.stub.php (#20566). */
+final class PDOPgsqlLobCreateLegacy extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('pgsqlLOBCreate');
+    }
+}
+
+/** Legacy PDO::pgsqlLOBOpen — pgsql_driver.stub.php (#20566). */
+final class PDOPgsqlLobOpenLegacy extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('pgsqlLOBOpen');
+    }
+}
+
+/** Legacy PDO::pgsqlLOBUnlink — pgsql_driver.stub.php (#20566). */
+final class PDOPgsqlLobUnlinkLegacy extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('pgsqlLOBUnlink');
+    }
+}
+
+/** Legacy PDO::pgsqlGetNotify — pgsql_driver.stub.php (#20566). */
+final class PDOPgsqlGetNotifyLegacy extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('pgsqlGetNotify');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $this->receiver($frame, $this->methodLabel());
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'PDO::pgsqlGetNotify() expects at most 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc >= 1) {
+            $this->intArg($frame->calledArgs[1], 'PDO::pgsqlGetNotify', 0, 'fetchMode');
+        }
+        if ($argc >= 2) {
+            $this->intArg($frame->calledArgs[2], 'PDO::pgsqlGetNotify', 1, 'timeoutMilliseconds');
+        }
+        // LISTEN/NOTIFY needs a live pgsql connection (#3741).
+        throw new \PDOException('could not find driver');
+    }
+}
+
+/** Legacy PDO::pgsqlGetPid — pgsql_driver.stub.php (#20566). */
+final class PDOPgsqlGetPidLegacy extends PDOPgsqlUnimplementedMethod
+{
+    public function __construct()
+    {
+        parent::__construct('pgsqlGetPid');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $this->receiver($frame, $this->methodLabel());
+        $argc = \count($frame->calledArgs) - 1;
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'PDO::pgsqlGetPid() expects exactly 0 arguments, %d given',
+                $argc
+            ));
+        }
+        // Backend PID needs libpq PQbackendPID (#3741).
+        throw new \PDOException('could not find driver');
     }
 }

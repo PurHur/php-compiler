@@ -10,7 +10,8 @@ use PHPCompiler\Runtime;
 /**
  * pdo extension module entry (php-src ext/pdo/pdo.c; #3367).
  *
- * Also advertises logical {@code pdo_sqlite} when libsqlite3 FFI is available.
+ * Also advertises logical {@code pdo_sqlite} when libsqlite3 FFI is available,
+ * and {@code pdo_pgsql} when the PHP 8.4 Pdo\Pgsql surface ships (#20566).
  */
 class Module extends ModuleAbstract
 {
@@ -30,20 +31,28 @@ class Module extends ModuleAbstract
 
     public function getAdditionalExtensionNames(): array
     {
+        $names = [];
         if (PdoExtensionPolicy::advertisesSqliteDriver()) {
-            return ['pdo_sqlite'];
+            $names[] = 'pdo_sqlite';
+        }
+        if (PdoExtensionPolicy::advertisesPgsqlDriver()) {
+            $names[] = 'pdo_pgsql';
         }
 
-        return [];
+        return $names;
     }
 
     public function getAdditionalExtensionVersions(): array
     {
+        $versions = [];
         if (PdoExtensionPolicy::advertisesSqliteDriver()) {
-            return ['pdo_sqlite' => '1.0.2'];
+            $versions['pdo_sqlite'] = '1.0.2';
+        }
+        if (PdoExtensionPolicy::advertisesPgsqlDriver()) {
+            $versions['pdo_pgsql'] = '1.0.2';
         }
 
-        return [];
+        return $versions;
     }
 
     public function getFunctions(): array

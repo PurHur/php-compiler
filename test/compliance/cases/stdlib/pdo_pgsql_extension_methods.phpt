@@ -1,0 +1,26 @@
+--TEST--
+pdo_pgsql extension_loaded + PDO::pgsql* methods (#20566)
+--ENV--
+PHP_COMPILER_PROFILE=8.4
+--SKIPIF--
+<?php
+if (!class_exists('PDO')) die('skip no PDO');
+?>
+--FILE--
+<?php
+declare(strict_types=1);
+
+echo 'ext=', (int) extension_loaded('pdo_pgsql'), "\n";
+echo 'pgsqlCopyFromArray=', (int) method_exists('PDO', 'pgsqlCopyFromArray'), "\n";
+echo 'pgsqlCopyToArray=', (int) method_exists('PDO', 'pgsqlCopyToArray'), "\n";
+echo 'pgsqlGetNotify=', (int) method_exists('PDO', 'pgsqlGetNotify'), "\n";
+echo 'pgsqlGetPid=', (int) method_exists('PDO', 'pgsqlGetPid'), "\n";
+echo 'has_pgsql_driver=', (int) in_array('pgsql', PDO::getAvailableDrivers(), true), "\n";
+?>
+--EXPECT--
+ext=1
+pgsqlCopyFromArray=1
+pgsqlCopyToArray=1
+pgsqlGetNotify=1
+pgsqlGetPid=1
+has_pgsql_driver=0
