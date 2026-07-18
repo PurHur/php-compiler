@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5604 |
-| Phase A inventory files (M2 ratio SSOT) | 5604 |
+| PHP files on vm.php path | 5607 |
+| Phase A inventory files (M2 ratio SSOT) | 5607 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16010 |
+| Source constructs flagged (warnings) | 16018 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -477,8 +477,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 5 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 60 |
-| `ext/gd/VmGd.php` | 0 | 12 |
+| `ext/gd/Module.php` | 0 | 63 |
+| `ext/gd/VmGd.php` | 0 | 14 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
 | `ext/gd/VmGdBmp.php` | 0 | 1 |
 | `ext/gd/VmGdFreeType.php` | 0 | 1 |
@@ -496,6 +496,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagecolorallocate.php` | 0 | 1 |
 | `ext/gd/imagecolorallocatealpha.php` | 0 | 1 |
 | `ext/gd/imagecolorat.php` | 0 | 1 |
+| `ext/gd/imagecolorclosest.php` | 0 | 1 |
+| `ext/gd/imagecolorset.php` | 0 | 1 |
+| `ext/gd/imagecolorsforindex.php` | 0 | 1 |
 | `ext/gd/imageconvolution.php` | 0 | 1 |
 | `ext/gd/imagecopy.php` | 0 | 1 |
 | `ext/gd/imagecopymerge.php` | 0 | 1 |
@@ -8751,60 +8754,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagecreatetruecolor (line 57)
 - new imagecolorallocate (line 60)
 - new imagecolorallocatealpha (line 61)
-- new imagealphablending (line 62)
-- new imagelayereffect (line 63)
-- new imageresolution (line 64)
-- new imagesavealpha (line 65)
-- new imageantialias (line 66)
-- new imagesetthickness (line 67)
-- new imageistruecolor (line 68)
-- new imagetruecolortopalette (line 69)
-- new imagepalettetotruecolor (line 70)
-- new imagesetinterpolation (line 71)
-- new imagegetinterpolation (line 72)
-- new imagefill (line 73)
-- new imagedestroy (line 74)
-- new imagesx (line 75)
-- new imagesy (line 76)
-- new imagecolorat (line 77)
-- new imagecopy (line 78)
-- new imagecopymerge (line 79)
-- new imagecopyresampled (line 80)
-- new imagecopyresized (line 81)
-- new imagesetpixel (line 82)
-- new imageline (line 83)
-- new imagedashedline (line 84)
-- new imagerectangle (line 85)
-- new imageellipse (line 86)
-- new imagefilledellipse (line 87)
-- new imagearc (line 88)
-- new imagefilledarc (line 89)
-- new imagepolygon (line 90)
-- new imageopenpolygon (line 91)
-- new imagefilledpolygon (line 92)
-- new imagefilledrectangle (line 93)
-- new imagestring (line 94)
-- new imagechar (line 95)
-- new imagettftext (line 97)
-- new imagettfbbox (line 98)
-- new imagefilter (line 100)
-- new imageflip (line 101)
-- new imagecrop (line 102)
-- new imagecropauto (line 103)
-- new imagerotate (line 104)
-- new imagescale (line 105)
-- new imageaffine (line 106)
-- new imageaffinematrixget (line 107)
-- new imageaffinematrixconcat (line 108)
-- new imageconvolution (line 109)
-- new imagecreatefromstring (line 112)
-- new imagepng (line 113)
-- new imagewebp (line 114)
-- new imageavif (line 115)
-- new imagebmp (line 116)
-- new imagecreatefromwebp (line 117)
-- new imagecreatefromavif (line 118)
-- new imagecreatefrombmp (line 119)
+- new imagecolorsforindex (line 62)
+- new imagecolorclosest (line 63)
+- new imagecolorset (line 64)
+- new imagealphablending (line 65)
+- new imagelayereffect (line 66)
+- new imageresolution (line 67)
+- new imagesavealpha (line 68)
+- new imageantialias (line 69)
+- new imagesetthickness (line 70)
+- new imageistruecolor (line 71)
+- new imagetruecolortopalette (line 72)
+- new imagepalettetotruecolor (line 73)
+- new imagesetinterpolation (line 74)
+- new imagegetinterpolation (line 75)
+- new imagefill (line 76)
+- new imagedestroy (line 77)
+- new imagesx (line 78)
+- new imagesy (line 79)
+- new imagecolorat (line 80)
+- new imagecopy (line 81)
+- new imagecopymerge (line 82)
+- new imagecopyresampled (line 83)
+- new imagecopyresized (line 84)
+- new imagesetpixel (line 85)
+- new imageline (line 86)
+- new imagedashedline (line 87)
+- new imagerectangle (line 88)
+- new imageellipse (line 89)
+- new imagefilledellipse (line 90)
+- new imagearc (line 91)
+- new imagefilledarc (line 92)
+- new imagepolygon (line 93)
+- new imageopenpolygon (line 94)
+- new imagefilledpolygon (line 95)
+- new imagefilledrectangle (line 96)
+- new imagestring (line 97)
+- new imagechar (line 98)
+- new imagettftext (line 100)
+- new imagettfbbox (line 101)
+- new imagefilter (line 103)
+- new imageflip (line 104)
+- new imagecrop (line 105)
+- new imagecropauto (line 106)
+- new imagerotate (line 107)
+- new imagescale (line 108)
+- new imageaffine (line 109)
+- new imageaffinematrixget (line 110)
+- new imageaffinematrixconcat (line 111)
+- new imageconvolution (line 112)
+- new imagecreatefromstring (line 115)
+- new imagepng (line 116)
+- new imagewebp (line 117)
+- new imageavif (line 118)
+- new imagebmp (line 119)
+- new imagecreatefromwebp (line 120)
+- new imagecreatefromavif (line 121)
+- new imagecreatefrombmp (line 122)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -8813,15 +8819,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 54)
 - new ObjectEntry (line 77)
 - new ObjectEntry (line 103)
-- new HashTable (line 828)
-- new Variable (line 830)
-- new HashTable (line 2390)
-- new Variable (line 2392)
-- new ObjectEntry (line 2842)
-- new ObjectEntry (line 2866)
-- new ObjectEntry (line 2890)
-- new ObjectEntry (line 3146)
-- 122 class method(s)
+- new HashTable (line 440)
+- new Variable (line 442)
+- new HashTable (line 970)
+- new Variable (line 972)
+- new HashTable (line 2532)
+- new Variable (line 2534)
+- new ObjectEntry (line 2984)
+- new ObjectEntry (line 3008)
+- new ObjectEntry (line 3032)
+- new ObjectEntry (line 3288)
+- 128 class method(s)
 
 ### `ext/gd/VmGdAvif.php`
 
@@ -8904,6 +8912,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imagecolorat.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecolorclosest.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecolorset.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagecolorsforindex.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
