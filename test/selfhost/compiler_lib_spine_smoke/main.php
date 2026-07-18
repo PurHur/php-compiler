@@ -821,6 +821,7 @@ require_once __DIR__.'/../../../ext/intl/IntlClassMethod.php';
 require_once __DIR__.'/../../../ext/intl/IntlConstants.php';
 require_once __DIR__.'/../../../ext/intl/IntlDateFormatterCreate.php';
 require_once __DIR__.'/../../../ext/intl/IntlDateFormatterFormat.php';
+require_once __DIR__.'/../../../ext/intl/IntlDateFormatterGetPattern.php';
 require_once __DIR__.'/../../../ext/intl/IntlError.php';
 require_once __DIR__.'/../../../ext/intl/IntlExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/intl/JitGrapheme.php';

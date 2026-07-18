@@ -16,7 +16,11 @@ use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 
 /**
- * IntlDateFormatter create/format — ICU pattern subset without full ext/intl (#19549, #5201).
+ * IntlDateFormatter create/format — ICU pattern subset (#19549, #5201, #3336).
+ *
+ * Style-only create (no explicit pattern) resolves CLDR-like date/time patterns for a
+ * documented locale set, then formats via {@see icuPatternToPhpFormat()} — php-src
+ * dateformat_create.c / dateformat_format.c / udat_open(UDAT_SHORT, …) semantics.
  *
  * php-src: ext/intl/dateformat/dateformat_create.c, dateformat_format.c, dateformat.stub.php
  */
@@ -35,6 +39,9 @@ final class VmIntlDateFormatter
     public const RELATIVE_SHORT = 131;
     public const GREGORIAN = 1;
     public const TRADITIONAL = 0;
+
+    /** Narrow no-break space (U+202F) — ICU en_US time patterns before `a`. */
+    private const NNBSP = "\u{202F}";
 
     /** @var array<int, array{locale: string, dateType: int, timeType: int, timezone: string, calendar: int, pattern: ?string}> */
     private static array $state = [];
@@ -100,11 +107,14 @@ final class VmIntlDateFormatter
 
             return false;
         }
-        $pattern = $state['pattern'];
+        $pattern = self::effectivePattern($state);
         if (null === $pattern || '' === $pattern) {
-            throw new \Error(
-                'IntlDateFormatter::format() without an ICU pattern requires full ext/intl (issue #5201)'
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'datefmt_format: no date/time pattern available for locale/styles: U_ILLEGAL_ARGUMENT_ERROR'
             );
+
+            return false;
         }
         $resolved = self::resolveFormatInstant($datetimeArg, $frame->vmContext);
         if (null === $resolved) {
@@ -115,6 +125,195 @@ final class VmIntlDateFormatter
         $phpFormat = self::icuPatternToPhpFormat($pattern);
 
         return VmDateTimeNative::format($timestamp, $microsecond, $state['timezone'], $phpFormat);
+    }
+
+    /**
+     * IntlDateFormatter::getPattern() — php-src datefmt_get_pattern (#3336).
+     *
+     * @return string|false
+     */
+    public static function getPattern(ObjectEntry $formatter)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'datefmt_get_pattern: bad formatter: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $pattern = self::effectivePattern($state);
+        if (null === $pattern) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'datefmt_get_pattern: no date/time pattern available for locale/styles: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+
+        return $pattern;
+    }
+
+    /**
+     * @param array{locale: string, dateType: int, timeType: int, timezone: string, calendar: int, pattern: ?string} $state
+     */
+    public static function effectivePattern(array $state): ?string
+    {
+        $explicit = $state['pattern'];
+        if (null !== $explicit && '' !== $explicit) {
+            return $explicit;
+        }
+
+        return self::patternFromStyles($state['locale'], $state['dateType'], $state['timeType']);
+    }
+
+    /**
+     * Resolve ICU SimpleDateFormat pattern from locale + date/time styles (#3336).
+     *
+     * Tables match ICU/CLDR output observed on Zend PHP 8.2 (en_US / en_GB / de_DE / fr_FR).
+     * Unknown locales fall back to en_US patterns (documented subset — not full udat_open).
+     */
+    public static function patternFromStyles(string $locale, int $dateType, int $timeType): ?string
+    {
+        $dateType = self::normalizeStyle($dateType);
+        $timeType = self::normalizeStyle($timeType);
+        $loc = self::normalizeLocaleKey($locale);
+        $datePat = self::dateStylePattern($loc, $dateType);
+        $timePat = self::timeStylePattern($loc, $timeType);
+        if (null === $datePat && null === $timePat) {
+            return null;
+        }
+        if (null === $datePat || '' === $datePat) {
+            return $timePat ?? '';
+        }
+        if (null === $timePat || '' === $timePat) {
+            return $datePat;
+        }
+
+        return $datePat.self::dateTimeConnector($loc, $dateType).$timePat;
+    }
+
+    private static function normalizeStyle(int $style): int
+    {
+        if ($style >= self::RELATIVE_FULL) {
+            return $style - self::RELATIVE_FULL;
+        }
+
+        return $style;
+    }
+
+    private static function normalizeLocaleKey(string $locale): string
+    {
+        $locale = str_replace('-', '_', trim($locale));
+        if ('' === $locale) {
+            return 'en_US';
+        }
+        $parts = explode('_', $locale);
+        $lang = strtolower($parts[0] ?? 'en');
+        $region = isset($parts[1]) ? strtoupper($parts[1]) : '';
+        $key = '' !== $region ? $lang.'_'.$region : $lang;
+        $known = ['en_US', 'en_GB', 'de_DE', 'fr_FR'];
+        if (\in_array($key, $known, true)) {
+            return $key;
+        }
+        // Language-only fallbacks used by common short locales.
+        return match ($lang) {
+            'en' => 'en_US',
+            'de' => 'de_DE',
+            'fr' => 'fr_FR',
+            default => 'en_US',
+        };
+    }
+
+    private static function dateStylePattern(string $loc, int $dateType): ?string
+    {
+        if (self::NONE === $dateType) {
+            return '';
+        }
+        /** @var array<string, array<int, string>> $table */
+        $table = [
+            'en_US' => [
+                self::FULL => 'EEEE, MMMM d, y',
+                self::LONG => 'MMMM d, y',
+                self::MEDIUM => 'MMM d, y',
+                self::SHORT => 'M/d/yy',
+            ],
+            'en_GB' => [
+                self::FULL => 'EEEE, d MMMM y',
+                self::LONG => 'd MMMM y',
+                self::MEDIUM => 'd MMM y',
+                self::SHORT => 'dd/MM/y',
+            ],
+            'de_DE' => [
+                self::FULL => 'EEEE, d. MMMM y',
+                self::LONG => 'd. MMMM y',
+                self::MEDIUM => 'dd.MM.y',
+                self::SHORT => 'dd.MM.yy',
+            ],
+            'fr_FR' => [
+                self::FULL => 'EEEE d MMMM y',
+                self::LONG => 'd MMMM y',
+                self::MEDIUM => 'd MMM y',
+                self::SHORT => 'dd/MM/y',
+            ],
+        ];
+
+        return $table[$loc][$dateType] ?? $table['en_US'][$dateType] ?? null;
+    }
+
+    private static function timeStylePattern(string $loc, int $timeType): ?string
+    {
+        if (self::NONE === $timeType) {
+            return '';
+        }
+        $nn = self::NNBSP;
+        /** @var array<string, array<int, string>> $table */
+        $table = [
+            'en_US' => [
+                self::FULL => 'h:mm:ss'.$nn.'a zzzz',
+                self::LONG => 'h:mm:ss'.$nn.'a z',
+                self::MEDIUM => 'h:mm:ss'.$nn.'a',
+                self::SHORT => 'h:mm'.$nn.'a',
+            ],
+            'en_GB' => [
+                self::FULL => 'HH:mm:ss zzzz',
+                self::LONG => 'HH:mm:ss z',
+                self::MEDIUM => 'HH:mm:ss',
+                self::SHORT => 'HH:mm',
+            ],
+            'de_DE' => [
+                self::FULL => 'HH:mm:ss zzzz',
+                self::LONG => 'HH:mm:ss z',
+                self::MEDIUM => 'HH:mm:ss',
+                self::SHORT => 'HH:mm',
+            ],
+            'fr_FR' => [
+                self::FULL => 'HH:mm:ss zzzz',
+                self::LONG => 'HH:mm:ss z',
+                self::MEDIUM => 'HH:mm:ss',
+                self::SHORT => 'HH:mm',
+            ],
+        ];
+
+        return $table[$loc][$timeType] ?? $table['en_US'][$timeType] ?? null;
+    }
+
+    /**
+     * ICU date+time glue for style pairs (Zend 8.2 / ICU observations).
+     */
+    private static function dateTimeConnector(string $loc, int $dateType): string
+    {
+        if ('fr_FR' === $loc && $dateType >= self::MEDIUM) {
+            return ' ';
+        }
+        if ($dateType <= self::LONG) {
+            return " 'at' ";
+        }
+
+        return ', ';
     }
 
     public static function coerceLocaleArg(Variable $var, string $function, int $position): string
@@ -256,7 +455,8 @@ final class VmIntlDateFormatter
     /**
      * Map a small ICU SimpleDateFormat subset to PHP date() tokens (#19549).
      *
-     * Supported: y/yy/yyyy, M/MM, d/dd, H/HH, h/hh, m/mm, s/ss, a, and literal punctuation.
+     * Supported: y/yy/yyyy, M/MM/MMM/MMMM, d/dd, E/EEE/EEEE, H/HH, h/hh, m/mm, s/ss, a, z/zzzz,
+     * and literal punctuation (including U+202F).
      */
     public static function icuPatternToPhpFormat(string $pattern): string
     {
@@ -319,11 +519,14 @@ final class VmIntlDateFormatter
                 default => 'n',
             },
             'd' => $n >= 2 ? 'd' : 'j',
+            'E' => $n >= 4 ? 'l' : 'D',
             'H' => $n >= 2 ? 'H' : 'G',
             'h' => $n >= 2 ? 'h' : 'g',
             'm' => 'i',
             's' => 's',
             'a' => 'A',
+            // ICU zone: z..zzz ≈ short; zzzz ≈ long — PHP date() only has T / e (#3336 subset).
+            'z' => $n >= 4 ? 'e' : 'T',
             default => self::escapePhpDateLiteral($run),
         };
     }

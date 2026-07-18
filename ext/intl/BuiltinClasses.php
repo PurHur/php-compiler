@@ -151,6 +151,9 @@ final class BuiltinClasses
         $entry->methods['format'] = new IntlDateFormatterFormat();
         $entry->methodVisibility['format'] = $pub;
         $entry->methodNames['format'] = 'format';
+        $entry->methods['getpattern'] = new IntlDateFormatterGetPattern();
+        $entry->methodVisibility['getpattern'] = $pub;
+        $entry->methodNames['getpattern'] = 'getPattern';
         $ctx->classes[VmIntlDateFormatter::CLASS_LC] = $entry;
     }
 
