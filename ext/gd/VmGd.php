@@ -369,6 +369,87 @@ final class VmGd
     }
 
     /**
+     * imagecolorclosesthwb() — gdImageColorClosestHWB (php-src ext/gd/libgd/gd.c; #20473).
+     *
+     * Palette images: HWB distance (Smith/Lyons + Philip Warner metric).
+     * Truecolor: gdTrueColor pack (opaque RGB).
+     */
+    public static function colorClosestHwb(ObjectEntry $image, int $red, int $green, int $blue): int
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            return -1;
+        }
+        if ($state->truecolor) {
+            return (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+        }
+        $ct = -1;
+        $first = true;
+        $mindist = 0.0;
+        foreach ($state->colors as $i => $packed) {
+            $dist = self::hwbDiff(
+                ($packed >> 16) & 0xFF,
+                ($packed >> 8) & 0xFF,
+                $packed & 0xFF,
+                $red,
+                $green,
+                $blue
+            );
+            if ($first || $dist < $mindist) {
+                $mindist = $dist;
+                $ct = (int) $i;
+                $first = false;
+            }
+        }
+
+        return $ct;
+    }
+
+    /** HWB_UNDEFINED sentinel from libgd (hue not defined when W == 1 - B). */
+    private const HWB_UNDEFINED = -1.0;
+
+    /**
+     * HWB_Diff — php-src ext/gd/libgd/gd.c (Smith/Lyons RGB↔HWB + Warner distance).
+     */
+    private static function hwbDiff(int $r1, int $g1, int $b1, int $r2, int $g2, int $b2): float
+    {
+        $hwb1 = self::rgbToHwb($r1 / 255.0, $g1 / 255.0, $b1 / 255.0);
+        $hwb2 = self::rgbToHwb($r2 / 255.0, $g2 / 255.0, $b2 / 255.0);
+
+        if ($hwb1[0] === self::HWB_UNDEFINED || $hwb2[0] === self::HWB_UNDEFINED) {
+            $diff = 0.0;
+        } else {
+            $diff = \abs($hwb1[0] - $hwb2[0]);
+            if ($diff > 3.0) {
+                $diff = 6.0 - $diff;
+            }
+        }
+
+        return $diff * $diff
+            + ($hwb1[1] - $hwb2[1]) * ($hwb1[1] - $hwb2[1])
+            + ($hwb1[2] - $hwb2[2]) * ($hwb1[2] - $hwb2[2]);
+    }
+
+    /**
+     * RGB_to_HWB — returns [H, W, B] with H on [0,6] or HWB_UNDEFINED.
+     *
+     * @return array{0: float, 1: float, 2: float}
+     */
+    private static function rgbToHwb(float $R, float $G, float $B): array
+    {
+        $w = \min($R, $G, $B);
+        $v = \max($R, $G, $B);
+        $b = 1.0 - $v;
+        if ($v === $w) {
+            return [self::HWB_UNDEFINED, $w, $b];
+        }
+        $f = ($R === $w) ? ($G - $B) : (($G === $w) ? ($B - $R) : ($R - $G));
+        $i = ($R === $w) ? 3 : (($G === $w) ? 5 : 1);
+
+        return [$i - $f / ($v - $w), $w, $b];
+    }
+
+    /**
      * imagecolorexact() — opaque exact match (php-src gdImageColorExact; #20459).
      */
     public static function colorExact(ObjectEntry $image, int $red, int $green, int $blue): int

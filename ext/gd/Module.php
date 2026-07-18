@@ -62,6 +62,7 @@ class Module extends ModuleAbstract
             $functions[] = new imagecolorsforindex();
             $functions[] = new imagecolorclosest();
             $functions[] = new imagecolorclosestalpha();
+            $functions[] = new imagecolorclosesthwb();
             $functions[] = new imagecolorexact();
             $functions[] = new imagecolorexactalpha();
             $functions[] = new imagecolorresolve();
