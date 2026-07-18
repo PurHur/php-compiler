@@ -58,13 +58,12 @@ final class PosixConstants
             'POSIX_RLIMIT_MEMLOCK' => self::RLIMIT_MEMLOCK,
             'POSIX_RLIMIT_AS' => self::RLIMIT_AS,
             'POSIX_RLIMIT_INFINITY' => self::RLIMIT_INFINITY,
-            'S_IFIFO' => self::S_IFIFO,
-            'S_IFCHR' => self::S_IFCHR,
-            'S_IFDIR' => self::S_IFDIR,
-            'S_IFBLK' => self::S_IFBLK,
-            'S_IFREG' => self::S_IFREG,
-            'S_IFLNK' => self::S_IFLNK,
-            'S_IFSOCK' => self::S_IFSOCK,
+            // php-src registers POSIX_S_IF* (not bare S_IF* / not DIR/LNK) — #20517
+            'POSIX_S_IFIFO' => self::S_IFIFO,
+            'POSIX_S_IFCHR' => self::S_IFCHR,
+            'POSIX_S_IFBLK' => self::S_IFBLK,
+            'POSIX_S_IFREG' => self::S_IFREG,
+            'POSIX_S_IFSOCK' => self::S_IFSOCK,
         ];
     }
 

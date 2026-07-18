@@ -18,30 +18,7 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
-        foreach ([
-            'POSIX_F_OK' => PosixConstants::POSIX_F_OK,
-            'POSIX_R_OK' => PosixConstants::POSIX_R_OK,
-            'POSIX_W_OK' => PosixConstants::POSIX_W_OK,
-            'POSIX_X_OK' => PosixConstants::POSIX_X_OK,
-            'POSIX_RLIMIT_CPU' => PosixConstants::RLIMIT_CPU,
-            'POSIX_RLIMIT_FSIZE' => PosixConstants::RLIMIT_FSIZE,
-            'POSIX_RLIMIT_DATA' => PosixConstants::RLIMIT_DATA,
-            'POSIX_RLIMIT_STACK' => PosixConstants::RLIMIT_STACK,
-            'POSIX_RLIMIT_CORE' => PosixConstants::RLIMIT_CORE,
-            'POSIX_RLIMIT_RSS' => PosixConstants::RLIMIT_RSS,
-            'POSIX_RLIMIT_NPROC' => PosixConstants::RLIMIT_NPROC,
-            'POSIX_RLIMIT_NOFILE' => PosixConstants::RLIMIT_NOFILE,
-            'POSIX_RLIMIT_MEMLOCK' => PosixConstants::RLIMIT_MEMLOCK,
-            'POSIX_RLIMIT_AS' => PosixConstants::RLIMIT_AS,
-            'POSIX_RLIMIT_INFINITY' => PosixConstants::RLIMIT_INFINITY,
-            'S_IFIFO' => PosixConstants::S_IFIFO,
-            'S_IFCHR' => PosixConstants::S_IFCHR,
-            'S_IFDIR' => PosixConstants::S_IFDIR,
-            'S_IFBLK' => PosixConstants::S_IFBLK,
-            'S_IFREG' => PosixConstants::S_IFREG,
-            'S_IFLNK' => PosixConstants::S_IFLNK,
-            'S_IFSOCK' => PosixConstants::S_IFSOCK,
-        ] as $name => $value) {
+        foreach (PosixConstants::registeredConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
