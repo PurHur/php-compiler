@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5664 |
-| Phase A inventory files (M2 ratio SSOT) | 5664 |
+| PHP files on vm.php path | 5666 |
+| Phase A inventory files (M2 ratio SSOT) | 5666 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16162 |
+| Source constructs flagged (warnings) | 16168 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -124,7 +124,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/CurlFileBuiltin.php` | 0 | 12 |
 | `ext/curl/CurlFunction.php` | 0 | 1 |
 | `ext/curl/CurlStringFileBuiltin.php` | 0 | 7 |
-| `ext/curl/Module.php` | 0 | 27 |
+| `ext/curl/Module.php` | 0 | 29 |
 | `ext/curl/VmCurlArg.php` | 0 | 1 |
 | `ext/curl/VmCurlCore.php` | 0 | 3 |
 | `ext/curl/VmCurlEasy.php` | 0 | 4 |
@@ -148,6 +148,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_multi_remove_handle.php` | 0 | 2 |
 | `ext/curl/curl_multi_select.php` | 0 | 2 |
 | `ext/curl/curl_multi_strerror.php` | 0 | 2 |
+| `ext/curl/curl_pause.php` | 0 | 2 |
+| `ext/curl/curl_reset.php` | 0 | 2 |
 | `ext/curl/curl_setopt.php` | 0 | 2 |
 | `ext/curl/curl_setopt_array.php` | 0 | 2 |
 | `ext/curl/curl_share_close.php` | 0 | 2 |
@@ -6244,13 +6246,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new curl_error (line 80)
 - new curl_errno (line 81)
 - new curl_close (line 82)
-- new curl_multi_init (line 85)
-- new curl_multi_add_handle (line 86)
-- new curl_multi_exec (line 87)
-- new curl_multi_select (line 88)
-- new curl_multi_getcontent (line 89)
-- new curl_multi_remove_handle (line 90)
-- new curl_multi_close (line 91)
+- new curl_reset (line 84)
+- new curl_pause (line 85)
+- new curl_multi_init (line 88)
+- new curl_multi_add_handle (line 89)
+- new curl_multi_exec (line 90)
+- new curl_multi_select (line 91)
+- new curl_multi_getcontent (line 92)
+- new curl_multi_remove_handle (line 93)
+- new curl_multi_close (line 94)
 - 5 class method(s)
 
 ### `ext/curl/VmCurlArg.php`
@@ -6271,7 +6275,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 54)
 - new Variable (line 66)
 - new ObjectEntry (line 67)
-- 26 class method(s)
+- 28 class method(s)
 
 ### `ext/curl/VmCurlEscape.php`
 
@@ -6289,8 +6293,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/VmCurlNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 137)
-- 29 class method(s)
+- new Error (line 156)
+- 32 class method(s)
 
 ### `ext/curl/VmCurlShare.php`
 
@@ -6400,6 +6404,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 23)
 - 1 class method(s)
+
+### `ext/curl/curl_pause.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+
+### `ext/curl/curl_reset.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
 
 ### `ext/curl/curl_setopt.php`
 
@@ -13170,44 +13186,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 45)
-- new posix_getpid (line 54)
-- new posix_getppid (line 55)
-- new posix_getuid (line 56)
-- new posix_geteuid (line 57)
-- new posix_getgid (line 58)
-- new posix_getegid (line 59)
-- new posix_getgroups (line 60)
-- new posix_uname (line 61)
-- new posix_strerror (line 62)
-- new posix_get_last_error (line 63)
-- new posix_getcwd (line 64)
-- new posix_ctermid (line 65)
-- new posix_errno (line 66)
-- new posix_access (line 67)
-- new posix_mknod (line 68)
-- new posix_mkfifo (line 69)
-- new posix_setuid (line 70)
-- new posix_setgid (line 71)
-- new posix_seteuid (line 72)
-- new posix_setegid (line 73)
-- new posix_times (line 74)
-- new posix_getrlimit (line 75)
-- new posix_setrlimit (line 76)
-- new posix_setsid (line 77)
-- new posix_getsid (line 78)
-- new posix_getpgid (line 79)
-- new posix_getpgrp (line 80)
-- new posix_setpgid (line 81)
-- new posix_initgroups (line 82)
-- new posix_kill (line 83)
-- new posix_getlogin (line 84)
-- new posix_ttyname (line 85)
-- new posix_isatty (line 86)
-- new posix_getpwuid (line 87)
-- new posix_getpwnam (line 88)
-- new posix_getgrgid (line 89)
-- new posix_getgrnam (line 90)
+- new VM\Variable (line 22)
+- new posix_getpid (line 31)
+- new posix_getppid (line 32)
+- new posix_getuid (line 33)
+- new posix_geteuid (line 34)
+- new posix_getgid (line 35)
+- new posix_getegid (line 36)
+- new posix_getgroups (line 37)
+- new posix_uname (line 38)
+- new posix_strerror (line 39)
+- new posix_get_last_error (line 40)
+- new posix_getcwd (line 41)
+- new posix_ctermid (line 42)
+- new posix_errno (line 43)
+- new posix_access (line 44)
+- new posix_mknod (line 45)
+- new posix_mkfifo (line 46)
+- new posix_setuid (line 47)
+- new posix_setgid (line 48)
+- new posix_seteuid (line 49)
+- new posix_setegid (line 50)
+- new posix_times (line 51)
+- new posix_getrlimit (line 52)
+- new posix_setrlimit (line 53)
+- new posix_setsid (line 54)
+- new posix_getsid (line 55)
+- new posix_getpgid (line 56)
+- new posix_getpgrp (line 57)
+- new posix_setpgid (line 58)
+- new posix_initgroups (line 59)
+- new posix_kill (line 60)
+- new posix_getlogin (line 61)
+- new posix_ttyname (line 62)
+- new posix_isatty (line 63)
+- new posix_getpwuid (line 64)
+- new posix_getpwnam (line 65)
+- new posix_getgrgid (line 66)
+- new posix_getgrnam (line 67)
 - 2 class method(s)
 
 ### `ext/posix/PosixConstants.php`

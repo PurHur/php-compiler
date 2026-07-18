@@ -80,6 +80,9 @@ class Module extends ModuleAbstract
             $functions[] = new curl_error();
             $functions[] = new curl_errno();
             $functions[] = new curl_close();
+            // curl_reset / curl_pause — easy-handle lifecycle (php-src interface.c; #20494)
+            $functions[] = new curl_reset();
+            $functions[] = new curl_pause();
         }
         if (CurlExtensionPolicy::advertisesMultiHandles()) {
             $functions[] = new curl_multi_init();

@@ -332,6 +332,55 @@ final class VmCurlEasy
         unset(self::$state[$easy->id]);
     }
 
+    /**
+     * curl_reset() — curl_easy_reset + PHP handler defaults
+     * (php-src ext/curl/interface.c PHP_FUNCTION(curl_reset); #20494).
+     */
+    public static function reset(ObjectEntry $easy): void
+    {
+        self::ensureLive($easy, 'curl_reset');
+        if (!isset(self::$state[$easy->id])) {
+            return;
+        }
+        $st = &self::$state[$easy->id];
+        $native = $st['native'];
+        if (null === $native) {
+            return;
+        }
+        self::cleanupMultiWriteBuffers($easy);
+        VmCurlNative::easyReset($native);
+        $st['url'] = null;
+        $st['share_id'] = null;
+        $st['return_transfer'] = false;
+        $st['nobody'] = false;
+        $st['post'] = false;
+        $st['headers'] = [];
+        $st['headers_on_handle'] = false;
+        $st['errno'] = 0;
+        $st['error'] = '';
+        $st['http_code'] = 0;
+        $st['effective_url'] = '';
+        $st['last_body'] = '';
+        $st['multi_harvested'] = false;
+    }
+
+    /**
+     * curl_pause() — curl_easy_pause (php-src ext/curl/interface.c; #20494).
+     */
+    public static function pause(ObjectEntry $easy, int $flags): int
+    {
+        self::ensureLive($easy, 'curl_pause');
+        if (!isset(self::$state[$easy->id])) {
+            return CurlConstants::CURLE_OK;
+        }
+        $native = self::$state[$easy->id]['native'];
+        if (null === $native) {
+            return CurlConstants::CURLE_OK;
+        }
+
+        return VmCurlNative::easyPause($native, $flags);
+    }
+
     public static function isEasyObject(?ObjectEntry $object): bool
     {
         return null !== $object && self::CLASS_LC === strtolower($object->class->name);

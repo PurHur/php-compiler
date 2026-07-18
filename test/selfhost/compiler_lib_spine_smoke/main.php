@@ -192,6 +192,8 @@ require_once __DIR__.'/../../../ext/curl/curl_multi_init.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_remove_handle.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_select.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_strerror.php';
+require_once __DIR__.'/../../../ext/curl/curl_pause.php';
+require_once __DIR__.'/../../../ext/curl/curl_reset.php';
 require_once __DIR__.'/../../../ext/curl/curl_setopt.php';
 require_once __DIR__.'/../../../ext/curl/curl_setopt_array.php';
 require_once __DIR__.'/../../../ext/curl/curl_share_close.php';

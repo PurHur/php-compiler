@@ -37,6 +37,13 @@ final class CurlConstants
     public const CURL_LOCK_DATA_DNS = 3;
     public const CURL_LOCK_DATA_SSL_SESSION = 4;
     public const CURL_LOCK_DATA_CONNECT = 5;
+    /** curl_easy_pause bitmasks (curl/curl.h; php-src curl.stub.php; #20494). */
+    public const CURLPAUSE_RECV = 1;
+    public const CURLPAUSE_RECV_CONT = 0;
+    public const CURLPAUSE_SEND = 4;
+    public const CURLPAUSE_SEND_CONT = 0;
+    public const CURLPAUSE_ALL = 5; // CURLPAUSE_RECV | CURLPAUSE_SEND
+    public const CURLPAUSE_CONT = 0; // CURLPAUSE_RECV_CONT | CURLPAUSE_SEND_CONT
 
     /** @var array<int, true> */
     private const EASY_OPTIONS = [
@@ -82,6 +89,12 @@ final class CurlConstants
         if (CurlExtensionPolicy::advertisesExtension()) {
             $constants['CURLINFO_HTTP_CODE'] = self::CURLINFO_HTTP_CODE;
             $constants['CURLINFO_EFFECTIVE_URL'] = self::CURLINFO_EFFECTIVE_URL;
+            $constants['CURLPAUSE_ALL'] = self::CURLPAUSE_ALL;
+            $constants['CURLPAUSE_CONT'] = self::CURLPAUSE_CONT;
+            $constants['CURLPAUSE_RECV'] = self::CURLPAUSE_RECV;
+            $constants['CURLPAUSE_RECV_CONT'] = self::CURLPAUSE_RECV_CONT;
+            $constants['CURLPAUSE_SEND'] = self::CURLPAUSE_SEND;
+            $constants['CURLPAUSE_SEND_CONT'] = self::CURLPAUSE_SEND_CONT;
         }
 
         return $constants;
