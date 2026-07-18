@@ -9,7 +9,7 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * Computed Dom\HTMLDocument / Dom\XMLDocument properties (php-src ext/dom/html_document.c; #6506, #19580).
+ * Computed Dom\HTMLDocument / Dom\XMLDocument properties (php-src ext/dom/html_document.c; #6506, #19580, #20540).
  */
 final class DomHtmlDocumentPropertySupport
 {
@@ -20,10 +20,44 @@ final class DomHtmlDocumentPropertySupport
         }
         $lc = strtolower($name);
 
-        return VmDomLiving::PROP_BODY === $lc
+        if (VmDomLiving::PROP_BODY === $lc
             || VmDomLiving::PROP_HEAD === $lc
-            || VmDomLiving::PROP_DOCUMENT_ELEMENT === $lc
-            || VmDomLiving::PROP_TITLE === $lc;
+            || VmDomLiving::PROP_DOCUMENT_ELEMENT === $lc) {
+            return true;
+        }
+        // title is HTMLDocument-only (php-src stub; XMLDocument has no title getter).
+        return VmDomLiving::PROP_TITLE === $lc
+            && VmDomLiving::CLASS_HTML_DOCUMENT === strtolower($object->class->name);
+    }
+
+    /**
+     * isset($doc->body|/title|/head|/documentElement) — computed value, not the null ClassProperty slot (#20540).
+     *
+     * @return bool|null null when this support does not own the property
+     */
+    public static function propertyIsSet(ObjectEntry $object, string $name): ?bool
+    {
+        if (!self::isManagedProperty($object, $name)) {
+            return null;
+        }
+        $var = self::getProperty($object, $name)->resolveIndirect();
+
+        return !$var->isUndefined() && Variable::TYPE_NULL !== $var->type;
+    }
+
+    /**
+     * empty($doc->body|/title|/…) — Zend has_property then value truthiness (#20540).
+     *
+     * @return bool|null null when this support does not own the property
+     */
+    public static function propertyIsEmpty(ObjectEntry $object, string $name): ?bool
+    {
+        if (!self::isManagedProperty($object, $name)) {
+            return null;
+        }
+        $var = self::getProperty($object, $name);
+
+        return !\PHPCompiler\ext\standard\boolval::isTruthy($var);
     }
 
     public static function getProperty(ObjectEntry $object, string $name): Variable
