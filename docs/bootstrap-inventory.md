@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5766 |
-| Phase A inventory files (M2 ratio SSOT) | 5766 |
+| PHP files on vm.php path | 5768 |
+| Phase A inventory files (M2 ratio SSOT) | 5768 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16727 |
+| Source constructs flagged (warnings) | 16741 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -46,7 +46,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/NumberSqrt.php` | 0 | 1 |
 | `ext/bcmath/NumberSub.php` | 0 | 2 |
 | `ext/bcmath/NumberToString.php` | 0 | 1 |
-| `ext/bcmath/VmBcMathNumber.php` | 0 | 23 |
+| `ext/bcmath/VmBcMathNumber.php` | 0 | 22 |
 | `ext/bcmath/VmBcmath.php` | 0 | 5 |
 | `ext/bcmath/bcadd.php` | 0 | 1 |
 | `ext/bcmath/bcceil.php` | 0 | 1 |
@@ -1111,11 +1111,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pdo/VmPDOStatement.php` | 0 | 37 |
 | `ext/pdo/pdo_drivers.php` | 0 | 3 |
 | `ext/pgsql/BuiltinClasses.php` | 0 | 1 |
-| `ext/pgsql/Module.php` | 0 | 39 |
+| `ext/pgsql/Module.php` | 0 | 43 |
+| `ext/pgsql/PgsqlConstants.php` | 0 | 1 |
 | `ext/pgsql/PgsqlExtensionPolicy.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlArg.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlConnection.php` | 0 | 4 |
-| `ext/pgsql/VmPgsqlCore.php` | 0 | 16 |
+| `ext/pgsql/VmPgsqlCore.php` | 0 | 21 |
 | `ext/pgsql/VmPgsqlLob.php` | 0 | 4 |
 | `ext/pgsql/VmPgsqlNative.php` | 0 | 1 |
 | `ext/pgsql/VmPgsqlResult.php` | 0 | 4 |
@@ -1124,6 +1125,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/pgsql/pg_close.php` | 0 | 2 |
 | `ext/pgsql/pg_connect.php` | 0 | 2 |
 | `ext/pgsql/pg_copy_meta_builtins.php` | 0 | 8 |
+| `ext/pgsql/pg_dml_builtins.php` | 0 | 5 |
 | `ext/pgsql/pg_fetch_assoc.php` | 0 | 2 |
 | `ext/pgsql/pg_fetch_row.php` | 0 | 2 |
 | `ext/pgsql/pg_jit.php` | 0 | 5 |
@@ -5815,29 +5817,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bcmath/VmBcMathNumber.php`
 
 **Warnings** (review for bootstrap subset):
+- new Variable (line 39)
 - new Variable (line 40)
-- new Variable (line 41)
-- new ClassEntry (line 45)
+- new ClassEntry (line 44)
+- new ClassProperty (line 47)
 - new ClassProperty (line 48)
-- new ClassProperty (line 49)
-- new NumberConstruct (line 51)
-- new NumberFrom (line 55)
-- new NumberAdd (line 59)
-- new NumberSub (line 60)
-- new NumberMul (line 61)
-- new NumberDiv (line 62)
-- new NumberMod (line 63)
-- new NumberPow (line 64)
-- new NumberSqrt (line 65)
-- new NumberFloor (line 66)
-- new NumberCeil (line 67)
-- new NumberRound (line 68)
-- new NumberCompare (line 69)
-- new NumberToString (line 70)
-- new ObjectEntry (line 94)
-- new Variable (line 96)
-- new Variable (line 309)
-- 19 class method(s)
+- new NumberConstruct (line 50)
+- new NumberFrom (line 54)
+- new NumberAdd (line 58)
+- new NumberSub (line 59)
+- new NumberMul (line 60)
+- new NumberDiv (line 61)
+- new NumberMod (line 62)
+- new NumberPow (line 63)
+- new NumberSqrt (line 64)
+- new NumberFloor (line 65)
+- new NumberCeil (line 66)
+- new NumberRound (line 67)
+- new NumberCompare (line 68)
+- new NumberToString (line 69)
+- new ObjectEntry (line 93)
+- new Variable (line 95)
+- 9 class method(s)
 
 ### `ext/bcmath/VmBcmath.php`
 
@@ -13591,45 +13592,54 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/pgsql/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new pg_connect (line 70)
-- new pg_close (line 71)
-- new pg_query (line 72)
-- new pg_fetch_assoc (line 73)
-- new pg_fetch_row (line 74)
-- new pg_num_rows (line 75)
-- new pg_last_error (line 76)
-- new pg_trace (line 77)
-- new pg_untrace (line 78)
-- new pg_lo_create (line 79)
-- new pg_lo_unlink (line 80)
-- new pg_lo_open (line 81)
-- new pg_lo_close (line 82)
-- new pg_lo_read (line 83)
-- new pg_lo_write (line 84)
-- new pg_lo_read_all (line 85)
-- new pg_lo_seek (line 86)
-- new pg_lo_tell (line 87)
-- new pg_lo_truncate (line 88)
-- new pg_lo_import (line 89)
-- new pg_lo_export (line 90)
-- new pg_copy_to (line 91)
-- new pg_copy_from (line 92)
-- new pg_meta_data (line 93)
-- new pg_convert (line 94)
-- new pg_field_table (line 95)
-- new pg_field_type_oid (line 96)
-- new pg_field_is_null (line 97)
-- new pg_socket (line 98)
-- new pg_consume_input (line 99)
-- new pg_flush (line 100)
-- new pg_change_password (line 115)
-- new pg_jit (line 116)
-- new pg_put_copy_data (line 117)
-- new pg_put_copy_end (line 118)
-- new pg_result_memory_size (line 119)
-- new pg_set_chunked_rows_size (line 120)
-- new pg_socket_poll (line 121)
+- new pg_connect (line 78)
+- new pg_close (line 79)
+- new pg_query (line 80)
+- new pg_fetch_assoc (line 81)
+- new pg_fetch_row (line 82)
+- new pg_num_rows (line 83)
+- new pg_last_error (line 84)
+- new pg_trace (line 85)
+- new pg_untrace (line 86)
+- new pg_lo_create (line 87)
+- new pg_lo_unlink (line 88)
+- new pg_lo_open (line 89)
+- new pg_lo_close (line 90)
+- new pg_lo_read (line 91)
+- new pg_lo_write (line 92)
+- new pg_lo_read_all (line 93)
+- new pg_lo_seek (line 94)
+- new pg_lo_tell (line 95)
+- new pg_lo_truncate (line 96)
+- new pg_lo_import (line 97)
+- new pg_lo_export (line 98)
+- new pg_copy_to (line 99)
+- new pg_copy_from (line 100)
+- new pg_meta_data (line 101)
+- new pg_convert (line 102)
+- new pg_field_table (line 103)
+- new pg_field_type_oid (line 104)
+- new pg_field_is_null (line 105)
+- new pg_socket (line 106)
+- new pg_consume_input (line 107)
+- new pg_flush (line 108)
+- new pg_insert (line 109)
+- new pg_update (line 110)
+- new pg_delete (line 111)
+- new pg_select (line 112)
+- new pg_change_password (line 127)
+- new pg_jit (line 128)
+- new pg_put_copy_data (line 129)
+- new pg_put_copy_end (line 130)
+- new pg_result_memory_size (line 131)
+- new pg_set_chunked_rows_size (line 132)
+- new pg_socket_poll (line 133)
 - 7 class method(s)
+
+### `ext/pgsql/PgsqlConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/pgsql/PgsqlExtensionPolicy.php`
 
@@ -13660,14 +13670,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 301)
 - new Variable (line 322)
 - new Variable (line 436)
-- new HashTable (line 484)
-- new Variable (line 488)
-- new HashTable (line 512)
-- new Variable (line 515)
-- new Variable (line 559)
-- new Variable (line 566)
-- new Variable (line 573)
-- 19 class method(s)
+- new HashTable (line 788)
+- new HashTable (line 792)
+- new Variable (line 797)
+- new Variable (line 806)
+- new Variable (line 815)
+- new HashTable (line 834)
+- new Variable (line 838)
+- new HashTable (line 862)
+- new Variable (line 865)
+- new Variable (line 909)
+- new Variable (line 916)
+- new Variable (line 923)
+- 27 class method(s)
 
 ### `ext/pgsql/VmPgsqlLob.php`
 
@@ -13727,6 +13742,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 271)
 - new ArgumentCountError (line 301)
 - 14 class method(s)
+
+### `ext/pgsql/pg_dml_builtins.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 95)
+- new ArgumentCountError (line 145)
+- new ArgumentCountError (line 194)
+- 8 class method(s)
 
 ### `ext/pgsql/pg_fetch_assoc.php`
 
@@ -44545,26 +44569,26 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new EnumCaseEntry (line 1305)
 - new self (line 1788)
 - new self (line 1806)
-- new self (line 1965)
-- new self (line 1973)
-- new self (line 1981)
-- new self (line 1983)
-- new self (line 2210)
-- new self (line 2321)
-- new self (line 2412)
-- new Error (line 2419)
-- new DivisionByZeroError (line 2524)
-- new DivisionByZeroError (line 2531)
-- new self (line 2552)
-- new Error (line 2581)
-- new self (line 2602)
-- new self (line 2614)
-- new Error (line 2641)
-- new self (line 2662)
-- new self (line 2670)
-- new Error (line 2849)
-- new Error (line 2855)
-- new Error (line 2864)
+- new self (line 1956)
+- new self (line 1964)
+- new self (line 1972)
+- new self (line 1974)
+- new self (line 2186)
+- new self (line 2297)
+- new self (line 2382)
+- new Error (line 2389)
+- new DivisionByZeroError (line 2494)
+- new DivisionByZeroError (line 2501)
+- new self (line 2522)
+- new Error (line 2551)
+- new self (line 2572)
+- new self (line 2584)
+- new Error (line 2611)
+- new self (line 2632)
+- new self (line 2640)
+- new Error (line 2814)
+- new Error (line 2820)
+- new Error (line 2829)
 - 123 class method(s)
 
 ### `lib/VM/VariableFunctionCall.php`

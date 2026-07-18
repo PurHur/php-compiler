@@ -470,6 +470,356 @@ final class VmPgsqlCore
         };
     }
 
+    public static function quoteTableName(\FFI\CData $conn, string $table): string|false
+    {
+        $dot = \strpos($table, '.');
+        if (false === $dot) {
+            $esc = VmPgsqlNative::escapeIdentifier($conn, $table);
+
+            return '' !== $esc ? $esc : false;
+        }
+        $schema = \substr($table, 0, $dot);
+        $rel = \substr($table, $dot + 1);
+        $escSchema = VmPgsqlNative::escapeIdentifier($conn, $schema);
+        $escRel = VmPgsqlNative::escapeIdentifier($conn, $rel);
+        if ('' === $escSchema || '' === $escRel) {
+            return false;
+        }
+
+        return $escSchema.'.'.$escRel;
+    }
+
+    /**
+     * @return array{sql: string}|array{error: true}|array{result: Variable}|array{ok: true}|array{rows: HashTable}|array{sql_out: string}
+     */
+    public static function insert(ObjectEntry $connection, string $table, HashTable $values, int $flags, Context $ctx): array
+    {
+        if ('' === $table) {
+            throw new \ValueError('pg_insert(): Argument #2 ($table_name) must not be empty');
+        }
+        $conn = VmPgsqlConnection::native($connection);
+        VmPgsqlNative::drainResults($conn);
+        $quoted = self::quoteTableName($conn, $table);
+        if (false === $quoted) {
+            return ['error' => true];
+        }
+        $converted = $values;
+        if (0 === ($flags & (PgsqlConstants::PGSQL_DML_NO_CONV | PgsqlConstants::PGSQL_DML_ESCAPE))) {
+            $tmp = self::convert($connection, $table, $values, $flags & (PgsqlConstants::PGSQL_CONV_IGNORE_DEFAULT | PgsqlConstants::PGSQL_CONV_FORCE_NULL | PgsqlConstants::PGSQL_CONV_IGNORE_NOT_NULL));
+            if (false === $tmp) {
+                return ['error' => true];
+            }
+            $converted = $tmp;
+        }
+        $cols = [];
+        $vals = [];
+        $empty = true;
+        foreach ($converted->iterateKeyed(true) as [$keyVar, $valVar]) {
+            $empty = false;
+            $field = $keyVar->resolveIndirect()->toString();
+            if ('' === $field) {
+                throw new \ValueError('Array of values must be an associative array with string keys');
+            }
+            if ($flags & PgsqlConstants::PGSQL_DML_ESCAPE) {
+                $esc = VmPgsqlNative::escapeIdentifier($conn, $field);
+                $cols[] = '' !== $esc ? $esc : '"'.$field.'"';
+            } else {
+                $cols[] = $field;
+            }
+            $vals[] = self::sqlLiteralFromConverted($conn, $valVar->resolveIndirect(), (bool) ($flags & PgsqlConstants::PGSQL_DML_ESCAPE));
+        }
+        if ($empty) {
+            $sql = 'INSERT INTO '.$quoted.' DEFAULT VALUES';
+        } else {
+            $sql = 'INSERT INTO '.$quoted.' ('.\implode(',', $cols).') VALUES ('.\implode(',', $vals).')';
+        }
+        if ($flags & PgsqlConstants::PGSQL_DML_STRING && 0 === ($flags & PgsqlConstants::PGSQL_DML_EXEC)) {
+            return ['sql_out' => $sql];
+        }
+        if ($flags & PgsqlConstants::PGSQL_DML_EXEC || 0 === ($flags & PgsqlConstants::PGSQL_DML_STRING)) {
+            // Default EXEC path (Zend clears EXEC bit then runs with STRING then PQexec)
+            $wantString = (bool) ($flags & PgsqlConstants::PGSQL_DML_STRING);
+            $res = VmPgsqlNative::exec($conn, $sql);
+            if (null === $res) {
+                VmPgsqlConnection::setLastError(VmPgsqlNative::errorMessage($conn));
+                @\trigger_error('pg_insert(): Query failed: '.VmPgsqlNative::errorMessage($conn), \E_USER_WARNING);
+
+                return ['error' => true];
+            }
+            $status = VmPgsqlNative::resultStatus($res);
+            if (VmPgsqlNative::PGRES_COMMAND_OK !== $status && VmPgsqlNative::PGRES_TUPLES_OK !== $status) {
+                VmPgsqlConnection::setLastError(VmPgsqlNative::errorMessage($conn));
+                @\trigger_error('pg_insert(): Query failed: '.VmPgsqlNative::errorMessage($conn), \E_USER_WARNING);
+                VmPgsqlNative::clear($res);
+
+                return ['error' => true];
+            }
+            if ($wantString) {
+                VmPgsqlNative::clear($res);
+
+                return ['sql_out' => $sql];
+            }
+
+            return ['result' => VmPgsqlResult::wrap($res, $ctx, $connection)];
+        }
+
+        return ['sql_out' => $sql];
+    }
+
+    /**
+     * @return true|string|false
+     */
+    public static function update(ObjectEntry $connection, string $table, HashTable $values, HashTable $conditions, int $flags): bool|string
+    {
+        if ('' === $table) {
+            throw new \ValueError('pg_update(): Argument #2 ($table_name) must not be empty');
+        }
+        $conn = VmPgsqlConnection::native($connection);
+        VmPgsqlNative::drainResults($conn);
+        $quoted = self::quoteTableName($conn, $table);
+        if (false === $quoted) {
+            return false;
+        }
+        $setVals = $values;
+        $whereVals = $conditions;
+        if (0 === ($flags & (PgsqlConstants::PGSQL_DML_NO_CONV | PgsqlConstants::PGSQL_DML_ESCAPE))) {
+            $convOpts = $flags & (PgsqlConstants::PGSQL_CONV_IGNORE_DEFAULT | PgsqlConstants::PGSQL_CONV_FORCE_NULL | PgsqlConstants::PGSQL_CONV_IGNORE_NOT_NULL);
+            $setVals = self::convert($connection, $table, $values, $convOpts);
+            $whereVals = self::convert($connection, $table, $conditions, $convOpts);
+            if (false === $setVals || false === $whereVals) {
+                return false;
+            }
+        }
+        $set = self::buildAssignmentList($conn, $setVals, ', ', (bool) ($flags & PgsqlConstants::PGSQL_DML_ESCAPE));
+        $where = self::buildAssignmentList($conn, $whereVals, ' AND ', (bool) ($flags & PgsqlConstants::PGSQL_DML_ESCAPE));
+        if (null === $set || null === $where) {
+            return false;
+        }
+        $sql = 'UPDATE '.$quoted.' SET '.$set.' WHERE '.$where.';';
+        if ($flags & PgsqlConstants::PGSQL_DML_STRING && 0 === ($flags & PgsqlConstants::PGSQL_DML_EXEC)) {
+            return $sql;
+        }
+        if (!($flags & PgsqlConstants::PGSQL_DML_EXEC) && ($flags & PgsqlConstants::PGSQL_DML_STRING)) {
+            return $sql;
+        }
+        $res = VmPgsqlNative::exec($conn, $sql);
+        if (null === $res || VmPgsqlNative::PGRES_COMMAND_OK !== VmPgsqlNative::resultStatus($res)) {
+            if (null !== $res) {
+                VmPgsqlNative::clear($res);
+            }
+            @\trigger_error('pg_update(): '.VmPgsqlNative::errorMessage($conn), \E_USER_WARNING);
+
+            return false;
+        }
+        VmPgsqlNative::clear($res);
+        if ($flags & PgsqlConstants::PGSQL_DML_STRING) {
+            return $sql;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return true|string|false
+     */
+    public static function delete(ObjectEntry $connection, string $table, HashTable $conditions, int $flags): bool|string
+    {
+        if ('' === $table) {
+            throw new \ValueError('pg_delete(): Argument #2 ($table_name) must not be empty');
+        }
+        $conn = VmPgsqlConnection::native($connection);
+        VmPgsqlNative::drainResults($conn);
+        $quoted = self::quoteTableName($conn, $table);
+        if (false === $quoted) {
+            return false;
+        }
+        $whereVals = $conditions;
+        if (0 === ($flags & (PgsqlConstants::PGSQL_DML_NO_CONV | PgsqlConstants::PGSQL_DML_ESCAPE))) {
+            $whereVals = self::convert(
+                $connection,
+                $table,
+                $conditions,
+                $flags & (PgsqlConstants::PGSQL_CONV_IGNORE_DEFAULT | PgsqlConstants::PGSQL_CONV_FORCE_NULL | PgsqlConstants::PGSQL_CONV_IGNORE_NOT_NULL)
+            );
+            if (false === $whereVals) {
+                return false;
+            }
+        }
+        $where = self::buildAssignmentList($conn, $whereVals, ' AND ', (bool) ($flags & PgsqlConstants::PGSQL_DML_ESCAPE));
+        if (null === $where) {
+            return false;
+        }
+        $sql = 'DELETE FROM '.$quoted.' WHERE '.$where.';';
+        if (($flags & PgsqlConstants::PGSQL_DML_STRING) && 0 === ($flags & PgsqlConstants::PGSQL_DML_EXEC)) {
+            return $sql;
+        }
+        $res = VmPgsqlNative::exec($conn, $sql);
+        if (null === $res || VmPgsqlNative::PGRES_COMMAND_OK !== VmPgsqlNative::resultStatus($res)) {
+            if (null !== $res) {
+                VmPgsqlNative::clear($res);
+            }
+            @\trigger_error('pg_delete(): '.VmPgsqlNative::errorMessage($conn), \E_USER_WARNING);
+
+            return false;
+        }
+        VmPgsqlNative::clear($res);
+        if ($flags & PgsqlConstants::PGSQL_DML_STRING) {
+            return $sql;
+        }
+
+        return true;
+    }
+
+    /**
+     * @return HashTable|string|false
+     */
+    public static function select(ObjectEntry $connection, string $table, ?HashTable $conditions, int $flags, int $mode): HashTable|string|false
+    {
+        if ('' === $table) {
+            throw new \ValueError('pg_select(): Argument #2 ($table_name) must not be empty');
+        }
+        if (0 === ($mode & PgsqlConstants::PGSQL_BOTH)) {
+            throw new \ValueError('pg_select(): Argument #5 ($mode) must be one of PGSQL_ASSOC, PGSQL_NUM, or PGSQL_BOTH');
+        }
+        $conn = VmPgsqlConnection::native($connection);
+        VmPgsqlNative::drainResults($conn);
+        $quoted = self::quoteTableName($conn, $table);
+        if (false === $quoted) {
+            return false;
+        }
+        $sql = 'SELECT * FROM '.$quoted;
+        if (null !== $conditions) {
+            $has = false;
+            foreach ($conditions->iterateKeyed(true) as $_) {
+                $has = true;
+                break;
+            }
+            if ($has) {
+                $whereVals = $conditions;
+                if (0 === ($flags & (PgsqlConstants::PGSQL_DML_NO_CONV | PgsqlConstants::PGSQL_DML_ESCAPE))) {
+                    $whereVals = self::convert(
+                        $connection,
+                        $table,
+                        $conditions,
+                        $flags & (PgsqlConstants::PGSQL_CONV_IGNORE_DEFAULT | PgsqlConstants::PGSQL_CONV_FORCE_NULL | PgsqlConstants::PGSQL_CONV_IGNORE_NOT_NULL)
+                    );
+                    if (false === $whereVals) {
+                        return false;
+                    }
+                }
+                $where = self::buildAssignmentList($conn, $whereVals, ' AND ', (bool) ($flags & PgsqlConstants::PGSQL_DML_ESCAPE));
+                if (null === $where) {
+                    return false;
+                }
+                $sql .= ' WHERE '.$where;
+            }
+        }
+        $sql .= ';';
+        if (($flags & PgsqlConstants::PGSQL_DML_STRING) && 0 === ($flags & PgsqlConstants::PGSQL_DML_EXEC)) {
+            return $sql;
+        }
+        $res = VmPgsqlNative::exec($conn, $sql);
+        if (null === $res || VmPgsqlNative::PGRES_TUPLES_OK !== VmPgsqlNative::resultStatus($res)) {
+            @\trigger_error(\sprintf("pg_select(): Failed to execute '%s'", $sql), \E_USER_NOTICE);
+            if (null !== $res) {
+                VmPgsqlNative::clear($res);
+            }
+
+            return false;
+        }
+        $rows = self::resultToArray($res, $mode);
+        VmPgsqlNative::clear($res);
+        if ($flags & PgsqlConstants::PGSQL_DML_STRING) {
+            return $sql;
+        }
+
+        return $rows;
+    }
+
+    private static function sqlLiteralFromConverted(\FFI\CData $conn, Variable $val, bool $escape): string
+    {
+        if (Variable::TYPE_NULL === $val->type) {
+            return 'NULL';
+        }
+        if (Variable::TYPE_INTEGER === $val->type) {
+            return (string) $val->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $val->type) {
+            return (string) $val->toFloat();
+        }
+        $str = $val->toString();
+        if (!$escape) {
+            // Already SQL literals from convert() (e.g. 't', NULL, 'foo')
+            return $str;
+        }
+        $esc = VmPgsqlNative::escapeStringConn($conn, $str);
+        if (false === $esc) {
+            return "'".\str_replace("'", "''", $str)."'";
+        }
+
+        return "'".$esc."'";
+    }
+
+    private static function buildAssignmentList(\FFI\CData $conn, HashTable $ht, string $sep, bool $escape): ?string
+    {
+        $parts = [];
+        foreach ($ht->iterateKeyed(true) as [$keyVar, $valVar]) {
+            $field = $keyVar->resolveIndirect()->toString();
+            if ('' === $field) {
+                return null;
+            }
+            if ($escape) {
+                $col = VmPgsqlNative::escapeIdentifier($conn, $field);
+                $col = '' !== $col ? $col : '"'.$field.'"';
+            } else {
+                $col = $field;
+            }
+            $parts[] = $col.' = '.self::sqlLiteralFromConverted($conn, $valVar->resolveIndirect(), $escape);
+        }
+        if ([] === $parts) {
+            return null;
+        }
+
+        return \implode($sep, $parts);
+    }
+
+    private static function resultToArray(\FFI\CData $result, int $mode): HashTable
+    {
+        $out = new HashTable();
+        $ntuples = VmPgsqlNative::ntuples($result);
+        $nfields = VmPgsqlNative::nfields($result);
+        for ($r = 0; $r < $ntuples; ++$r) {
+            $row = new HashTable();
+            for ($f = 0; $f < $nfields; ++$f) {
+                $isNull = VmPgsqlNative::getisnull($result, $r, $f);
+                $value = $isNull ? null : VmPgsqlNative::getvalue($result, $r, $f);
+                if ($mode & PgsqlConstants::PGSQL_ASSOC) {
+                    $slot = new Variable();
+                    if ($isNull) {
+                        $slot->null();
+                    } else {
+                        $slot->string($value);
+                    }
+                    $row->add(VmPgsqlNative::fname($result, $f), $slot);
+                }
+                if ($mode & PgsqlConstants::PGSQL_NUM) {
+                    $slot = new Variable();
+                    if ($isNull) {
+                        $slot->null();
+                    } else {
+                        $slot->string($value);
+                    }
+                    $row->add((string) $f, $slot);
+                }
+            }
+            $rowVar = new Variable();
+            $rowVar->array($row);
+            $out->add((string) $r, $rowVar);
+        }
+
+        return $out;
+    }
+
     /**
      * @return HashTable|false
      */

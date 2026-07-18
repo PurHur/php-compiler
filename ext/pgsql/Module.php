@@ -50,6 +50,13 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
+        if (PgsqlExtensionPolicy::advertisesBuiltins()) {
+            foreach (PgsqlConstants::registeredConstants() as $name => $value) {
+                $var = new \PHPCompiler\VM\Variable();
+                $var->int($value);
+                $runtime->vmContext->defineConstant($name, $var);
+            }
+        }
         if (!PgsqlExtensionPolicy::advertisesClasses()) {
             return;
         }
@@ -65,6 +72,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/pg_lo_builtins.php';
         require_once __DIR__.'/pg_copy_meta_builtins.php';
         require_once __DIR__.'/pg_async_builtins.php';
+        require_once __DIR__.'/pg_dml_builtins.php';
 
         return [
             new pg_connect(),
@@ -98,6 +106,10 @@ class Module extends ModuleAbstract
             new pg_socket(),
             new pg_consume_input(),
             new pg_flush(),
+            new pg_insert(),
+            new pg_update(),
+            new pg_delete(),
+            new pg_select(),
             ...self::php84Functions(),
         ];
     }
