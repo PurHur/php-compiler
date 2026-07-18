@@ -144,6 +144,7 @@
         "ext/curl/curl_multi_close.php",
         "ext/curl/curl_multi_errno.php",
         "ext/curl/curl_multi_exec.php",
+        "ext/curl/curl_multi_get_handles.php",
         "ext/curl/curl_multi_getcontent.php",
         "ext/curl/curl_multi_info_read.php",
         "ext/curl/curl_multi_init.php",
@@ -1225,6 +1226,7 @@
         "ext/redis/RedisConnect.php",
         "ext/redis/RedisConstants.php",
         "ext/redis/RedisConstruct.php",
+        "ext/redis/RedisDepthMethods.php",
         "ext/redis/RedisExtensionPolicy.php",
         "ext/redis/RedisGet.php",
         "ext/redis/RedisSet.php",
@@ -1570,6 +1572,7 @@
         "ext/sqlite3/SQLite3LastInsertRowID.php",
         "ext/sqlite3/SQLite3LoadExtension.php",
         "ext/sqlite3/SQLite3Open.php",
+        "ext/sqlite3/SQLite3OpenBlob.php",
         "ext/sqlite3/SQLite3Prepare.php",
         "ext/sqlite3/SQLite3Query.php",
         "ext/sqlite3/SQLite3QuerySingle.php",
@@ -1581,6 +1584,7 @@
         "ext/sqlite3/VmSQLite3.php",
         "ext/sqlite3/VmSQLite3Result.php",
         "ext/sqlite3/VmSQLite3Stmt.php",
+        "ext/sqlite3/VmSqlite3BlobStream.php",
         "ext/sqlite3/VmSqlite3Native.php",
         "ext/sqlite3/VmSqlite3Udf.php",
         "ext/sqlite3/bootstrap_sqlite3exception.php",
@@ -5967,9 +5971,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5733,
+        "inventory_files": 5737,
         "excluded": 0,
-        "eligible": 5733,
+        "eligible": 5737,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
