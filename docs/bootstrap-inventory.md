@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5789 |
-| Phase A inventory files (M2 ratio SSOT) | 5789 |
+| PHP files on vm.php path | 5798 |
+| Phase A inventory files (M2 ratio SSOT) | 5798 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17007 |
+| Source constructs flagged (warnings) | 17046 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -26,6 +26,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | File | Blockers | Warnings |
 |------|----------|----------|
 | `bin/vm.php` | 0 | 1 |
+| `ext/apcu/ApcuFunction.php` | 0 | 8 |
+| `ext/apcu/Module.php` | 0 | 7 |
+| `ext/apcu/VmApcu.php` | 0 | 3 |
+| `ext/apcu/apcu_cache_info.php` | 0 | 2 |
+| `ext/apcu/apcu_clear_cache.php` | 0 | 2 |
+| `ext/apcu/apcu_delete.php` | 0 | 4 |
+| `ext/apcu/apcu_exists.php` | 0 | 4 |
+| `ext/apcu/apcu_fetch.php` | 0 | 3 |
+| `ext/apcu/apcu_store.php` | 0 | 5 |
 | `ext/bcmath/BcMathNumberMethod.php` | 0 | 1 |
 | `ext/bcmath/BcmathFunction.php` | 0 | 1 |
 | `ext/bcmath/BcmathJitHelper.php` | 0 | 1 |
@@ -5097,7 +5106,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 99 |
+| `lib/Runtime.php` | 0 | 100 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -5706,6 +5715,80 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Runtime (line 17)
+
+### `ext/apcu/ApcuFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 69)
+- new Variable (line 71)
+- new HashTable (line 79)
+- new HashTable (line 85)
+- new Variable (line 87)
+- new Variable (line 95)
+- new Variable (line 106)
+- 6 class method(s)
+
+### `ext/apcu/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new apcu_store (line 27)
+- new apcu_fetch (line 28)
+- new apcu_delete (line 29)
+- new apcu_clear_cache (line 30)
+- new apcu_exists (line 31)
+- new apcu_cache_info (line 32)
+- 2 class method(s)
+
+### `ext/apcu/VmApcu.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 35)
+- new Variable (line 58)
+- 8 class method(s)
+
+### `ext/apcu/apcu_cache_info.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+
+### `ext/apcu/apcu_clear_cache.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/apcu/apcu_delete.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- new HashTable (line 33)
+- new Variable (line 35)
+- 1 class method(s)
+
+### `ext/apcu/apcu_exists.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- new HashTable (line 33)
+- new Variable (line 36)
+- 1 class method(s)
+
+### `ext/apcu/apcu_fetch.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- new HashTable (line 35)
+- 1 class method(s)
+
+### `ext/apcu/apcu_store.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new HashTable (line 36)
+- new Variable (line 40)
+- new ArgumentCountError (line 50)
+- 1 class method(s)
 
 ### `ext/bcmath/BcMathNumberMethod.php`
 
@@ -8426,10 +8509,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomSimpleXmlBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 215)
-- new SimpleXmlNodeState (line 262)
-- new ObjectEntry (line 292)
-- 20 class method(s)
+- new ObjectEntry (line 265)
+- new SimpleXmlNodeState (line 312)
+- new ObjectEntry (line 342)
+- 21 class method(s)
 
 ### `ext/dom/VmDomTokenList.php`
 
@@ -40829,21 +40912,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\uri\Module (line 278)
 - new ext\uuid\Module (line 279)
 - new ext\uploadprogress\Module (line 280)
-- new ext\sysvshm\Module (line 281)
-- new ext\sysvsem\Module (line 282)
-- new ext\sysvmsg\Module (line 283)
-- new ext\reflection\Module (line 284)
-- new ext\standard\Module (line 285)
-- new JIT (line 361)
-- new JITContext (line 375)
-- new SealedClassPreprocessor (line 441)
-- new StaticClassPreprocessor (line 444)
-- new SourcePreprocessor\PropertyHooks (line 447)
-- new State (line 587)
-- new ReflectionProperty (line 614)
-- new ReflectionProperty (line 617)
-- new LintCompiler (line 1028)
-- new Variable (line 1158)
+- new ext\apcu\Module (line 281)
+- new ext\sysvshm\Module (line 282)
+- new ext\sysvsem\Module (line 283)
+- new ext\sysvmsg\Module (line 284)
+- new ext\reflection\Module (line 285)
+- new ext\standard\Module (line 286)
+- new JIT (line 362)
+- new JITContext (line 376)
+- new SealedClassPreprocessor (line 442)
+- new StaticClassPreprocessor (line 445)
+- new SourcePreprocessor\PropertyHooks (line 448)
+- new State (line 588)
+- new ReflectionProperty (line 615)
+- new ReflectionProperty (line 618)
+- new LintCompiler (line 1029)
+- new Variable (line 1159)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

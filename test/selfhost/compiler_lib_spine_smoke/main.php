@@ -5884,4 +5884,13 @@ require_once __DIR__.'/../../../ext/enchant/enchant_dict_remove_from_session.php
 require_once __DIR__.'/../../../ext/enchant/enchant_dict_store_replacement.php';
 require_once __DIR__.'/../../../ext/phar/PharBuiltin.php';
 require_once __DIR__.'/../../../ext/phar/VmPharArchive.php';
+require_once __DIR__.'/../../../ext/apcu/ApcuFunction.php';
+require_once __DIR__.'/../../../ext/apcu/Module.php';
+require_once __DIR__.'/../../../ext/apcu/VmApcu.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_cache_info.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_clear_cache.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_delete.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_exists.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_fetch.php';
+require_once __DIR__.'/../../../ext/apcu/apcu_store.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

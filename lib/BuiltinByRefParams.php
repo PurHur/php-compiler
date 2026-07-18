@@ -210,6 +210,9 @@ final class BuiltinByRefParams
             case 'enchant_dict_quick_check':
                 // php-src ext/enchant/enchant.stub.php — &$suggestions (#20613)
                 return [2];
+            case 'apcu_fetch':
+                // PECL apcu apcu.stub.php — &$success (#6574)
+                return [1];
         }
 
         return [];

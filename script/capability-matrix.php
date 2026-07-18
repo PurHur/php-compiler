@@ -46,6 +46,7 @@ function collectCapabilities(string $root): array
         'enchant' => new PHPCompiler\ext\enchant\Module(),
         'redis' => new PHPCompiler\ext\redis\Module(),
         'uploadprogress' => new PHPCompiler\ext\uploadprogress\Module(),
+        'apcu' => new PHPCompiler\ext\apcu\Module(),
         'sysvshm' => new PHPCompiler\ext\sysvshm\Module(),
         'sysvsem' => new PHPCompiler\ext\sysvsem\Module(),
         'sysvmsg' => new PHPCompiler\ext\sysvmsg\Module(),
