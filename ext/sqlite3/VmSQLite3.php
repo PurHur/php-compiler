@@ -26,7 +26,7 @@ final class VmSQLite3
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['query'])) {
+        if (isset($ctx->classes[self::CLASS_LC]) && isset($ctx->classes[self::CLASS_LC]->methods['openblob'])) {
             return;
         }
 
@@ -65,6 +65,7 @@ final class VmSQLite3
             'createcollation' => new SQLite3CreateCollation(),
             'loadextension' => new SQLite3LoadExtension(),
             'backup' => new SQLite3Backup(),
+            'openblob' => new SQLite3OpenBlob(),
             'version' => new SQLite3Version(),
         ];
         foreach ($methods as $name => $method) {
@@ -289,6 +290,7 @@ final class VmSQLite3
             'createaggregate' => 'createAggregate',
             'createcollation' => 'createCollation',
             'loadextension' => 'loadExtension',
+            'openblob' => 'openBlob',
             default => $lc,
         };
     }

@@ -1256,6 +1256,13 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return self::freadMergePushback($handle, $fromPushback, VmPhpMemoryStream::read($handle, $length));
         }
+        if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
+            return self::freadMergePushback(
+                $handle,
+                $fromPushback,
+                \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::read($handle, $length)
+            );
+        }
         if (VmPhpInputOutputStream::isValidHandle($handle)) {
             return self::freadMergePushback($handle, $fromPushback, VmPhpInputOutputStream::read($handle, $length));
         }
@@ -1362,6 +1369,11 @@ final class VmFs
 
             return VmPhpMemoryStream::write($handle, $data, $length);
         }
+        if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
+            $data = VmStreamFilterChain::applyWriteFilters($handle, $data);
+
+            return \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::write($handle, $data, $length);
+        }
         if (VmPhpInputOutputStream::isValidHandle($handle)) {
             return VmPhpInputOutputStream::write($handle, $data, $length);
         }
@@ -1400,6 +1412,11 @@ final class VmFs
             unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
 
             return VmPhpMemoryStream::close($handle);
+        }
+        if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
+
+            return \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::close($handle);
         }
         if (VmPhpInputOutputStream::isValidHandle($handle)) {
             return VmPhpInputOutputStream::close($handle);
@@ -1484,6 +1501,9 @@ final class VmFs
         }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::eof($handle);
+        }
+        if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
+            return \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::eof($handle);
         }
         if (VmPhpInputOutputStream::isValidHandle($handle)) {
             return VmPhpInputOutputStream::eof($handle);
@@ -1912,6 +1932,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::tell($handle);
         }
+        if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
+            return \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::tell($handle);
+        }
         if (VmPhpInputOutputStream::isValidHandle($handle)) {
             return VmPhpInputOutputStream::tell($handle);
         }
@@ -2126,6 +2149,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::seek($handle, $offset, $whence);
         }
+        if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
+            return \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::seek($handle, $offset, $whence);
+        }
         if (VmPhpInputOutputStream::isValidHandle($handle)) {
             return VmPhpInputOutputStream::seek($handle, $offset, $whence);
         }
@@ -2144,6 +2170,9 @@ final class VmFs
     {
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return 0 === VmPhpMemoryStream::seek($handle, 0, \SEEK_SET);
+        }
+        if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
+            return 0 === \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::seek($handle, 0, \SEEK_SET);
         }
         if (VmPhpInputOutputStream::isValidHandle($handle)) {
             return 0 === VmPhpInputOutputStream::seek($handle, 0, \SEEK_SET);
@@ -2179,6 +2208,14 @@ final class VmFs
     {
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             $data = VmPhpMemoryStream::streamGetContents($handle, $maxlength, $offset);
+            if (false === $data) {
+                return false;
+            }
+
+            return VmStreamFilterChain::applyReadFilters($handle, $data);
+        }
+        if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
+            $data = \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::streamGetContents($handle, $maxlength, $offset);
             if (false === $data) {
                 return false;
             }
@@ -2543,7 +2580,7 @@ final class VmFs
      */
     public static function getResourceType(int $handle): ?string
     {
-        if (isset(self::$handles[$handle]) || VmPhpMemoryStream::isValidHandle($handle) || VmPhpInputOutputStream::isValidHandle($handle) || VmPhpFdStream::isValidHandle($handle)) {
+        if (isset(self::$handles[$handle]) || VmPhpMemoryStream::isValidHandle($handle) || \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle) || VmPhpInputOutputStream::isValidHandle($handle) || VmPhpFdStream::isValidHandle($handle)) {
             return 'stream';
         }
 
@@ -2575,6 +2612,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return 'stream';
         }
+        if (\PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)) {
+            return 'stream';
+        }
         if (VmPhpInputOutputStream::isValidHandle($handle)) {
             return 'stream';
         }
@@ -2594,6 +2634,7 @@ final class VmFs
         return isset(self::$handles[$handle])
             || VmUserStream::isValidHandle($handle)
             || VmPhpMemoryStream::isValidHandle($handle)
+            || \PHPCompiler\ext\sqlite3\VmSqlite3BlobStream::isValidHandle($handle)
             || VmPhpInputOutputStream::isValidHandle($handle)
             || VmPhpFdStream::isValidHandle($handle);
     }

@@ -499,6 +499,78 @@ CDEF;
         return self::SQLITE_OK === $rc;
     }
 
+    /**
+     * SQLite3::openBlob — sqlite3_blob_open (#20599).
+     *
+     * @return \FFI\CData sqlite3_blob*
+     */
+    public static function blobOpen(
+        \FFI\CData $db,
+        string $dbname,
+        string $table,
+        string $column,
+        int $rowid,
+        int $flags
+    ): \FFI\CData {
+        $ffi = self::requireFfi();
+        $blobPtr = $ffi->new('sqlite3_blob*');
+        // php-src: (flags & SQLITE_OPEN_READWRITE) ? 1 : 0
+        $sqliteFlags = ($flags & 2 /* SQLITE_OPEN_READWRITE */) !== 0 ? 1 : 0;
+        $rc = (int) $ffi->sqlite3_blob_open(
+            $db,
+            $dbname,
+            $table,
+            $column,
+            $rowid,
+            $sqliteFlags,
+            \FFI::addr($blobPtr)
+        );
+        if (self::SQLITE_OK !== $rc || null === $blobPtr) {
+            throw new \SQLite3Exception('Unable to open blob: '.self::errmsg($db));
+        }
+
+        return $blobPtr;
+    }
+
+    public static function blobBytes(\FFI\CData $blob): int
+    {
+        return (int) self::requireFfi()->sqlite3_blob_bytes($blob);
+    }
+
+    public static function blobRead(\FFI\CData $blob, int $count, int $offset): ?string
+    {
+        if ($count <= 0) {
+            return '';
+        }
+        $ffi = self::requireFfi();
+        $buf = $ffi->new('char['.$count.']');
+        $rc = (int) $ffi->sqlite3_blob_read($blob, $buf, $count, $offset);
+        if (self::SQLITE_OK !== $rc) {
+            return null;
+        }
+
+        return \FFI::string($buf, $count);
+    }
+
+    public static function blobWrite(\FFI\CData $blob, string $data, int $offset): bool
+    {
+        $ffi = self::requireFfi();
+        $len = \strlen($data);
+        if (0 === $len) {
+            return true;
+        }
+        $buf = $ffi->new('char['.$len.']');
+        \FFI::memcpy($buf, $data, $len);
+        $rc = (int) $ffi->sqlite3_blob_write($blob, $buf, $len, $offset);
+
+        return self::SQLITE_OK === $rc;
+    }
+
+    public static function blobClose(\FFI\CData $blob): void
+    {
+        self::requireFfi()->sqlite3_blob_close($blob);
+    }
+
     public const STEP_ROW = 100;
 
     public const STEP_DONE = 101;
@@ -620,6 +692,12 @@ int sqlite3_stmt_busy(sqlite3_stmt *pStmt);
 int sqlite3_data_count(sqlite3_stmt *pStmt);
 const char *sqlite3_column_decltype(sqlite3_stmt *pStmt, int N);
 int sqlite3_busy_timeout(sqlite3 *db, int ms);
+typedef struct sqlite3_blob sqlite3_blob;
+int sqlite3_blob_open(sqlite3 *db, const char *zDb, const char *zTable, const char *zColumn, sqlite3_int64 iRow, int flags, sqlite3_blob **ppBlob);
+int sqlite3_blob_close(sqlite3_blob *pBlob);
+int sqlite3_blob_bytes(sqlite3_blob *pBlob);
+int sqlite3_blob_read(sqlite3_blob *pBlob, void *Z, int N, int iOffset);
+int sqlite3_blob_write(sqlite3_blob *pBlob, const void *z, int n, int iOffset);
 CDEF;
 
         foreach (['libsqlite3.so.0', 'libsqlite3.so'] as $lib) {
