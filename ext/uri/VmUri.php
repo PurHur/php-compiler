@@ -136,6 +136,47 @@ final class VmUri
     }
 
     /**
+     * Clone RFC 3986 Uri state with overrides and allocate a new Uri object (#20614).
+     *
+     * @param array<string, mixed> $overrides
+     */
+    public static function rfc3986With(Context $ctx, ObjectEntry $object, array $overrides): Variable
+    {
+        $state = self::rfc3986State($object);
+        foreach ($overrides as $key => $value) {
+            $state[$key] = $value;
+        }
+        if (\array_key_exists('userinfo', $overrides)) {
+            $ui = $overrides['userinfo'];
+            if (null === $ui || '' === $ui) {
+                $state['username'] = null;
+                $state['password'] = null;
+                $state['userinfo'] = null;
+            } elseif (\is_string($ui)) {
+                $colon = strpos($ui, ':');
+                if (false === $colon) {
+                    $state['username'] = $ui;
+                    $state['password'] = null;
+                } else {
+                    $state['username'] = substr($ui, 0, $colon);
+                    $state['password'] = substr($ui, $colon + 1);
+                }
+                $state['userinfo'] = self::composeUserinfo($state['username'], $state['password']);
+            }
+        } elseif (\array_key_exists('username', $overrides) || \array_key_exists('password', $overrides)) {
+            $state['userinfo'] = self::composeUserinfo(
+                isset($state['username']) && \is_string($state['username']) ? $state['username'] : null,
+                isset($state['password']) && \is_string($state['password']) ? $state['password'] : null
+            );
+        }
+        if (\array_key_exists('scheme', $overrides) && \is_string($state['scheme'])) {
+            $state['scheme'] = strtolower($state['scheme']);
+        }
+
+        return self::newRfc3986UriVariable($ctx, $state);
+    }
+
+    /**
      * @return array{scheme: ?string, userinfo: ?string, host: ?string, port: ?int, path: string, query: ?string, fragment: ?string}
      */
     public static function parseRfc3986(string $uri): array
