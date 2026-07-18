@@ -78,6 +78,92 @@ final class ZipArchiveConstants
 
     public const EM_UNKNOWN = 0xffff;
 
+    /** Compression methods — libzip ZIP_CM_* / php-src ZipArchive::CM_* (#20363). */
+    public const CM_DEFAULT = -1;
+
+    public const CM_STORE = 0;
+
+    public const CM_SHRINK = 1;
+
+    public const CM_REDUCE_1 = 2;
+
+    public const CM_REDUCE_2 = 3;
+
+    public const CM_REDUCE_3 = 4;
+
+    public const CM_REDUCE_4 = 5;
+
+    public const CM_IMPLODE = 6;
+
+    public const CM_DEFLATE = 8;
+
+    public const CM_DEFLATE64 = 9;
+
+    public const CM_PKWARE_IMPLODE = 10;
+
+    public const CM_BZIP2 = 12;
+
+    public const CM_LZMA = 14;
+
+    public const CM_TERSE = 18;
+
+    public const CM_LZ77 = 19;
+
+    public const CM_LZMA2 = 33;
+
+    public const CM_ZSTD = 93;
+
+    public const CM_XZ = 95;
+
+    public const CM_JPEG = 96;
+
+    public const CM_WAVPACK = 97;
+
+    public const CM_PPMD = 98;
+
+    /** External attribute OS — libzip ZIP_OPSYS_* / php-src ZipArchive::OPSYS_* (#20363). */
+    public const OPSYS_DOS = 0;
+
+    public const OPSYS_AMIGA = 1;
+
+    public const OPSYS_OPENVMS = 2;
+
+    public const OPSYS_UNIX = 3;
+
+    public const OPSYS_VM_CMS = 4;
+
+    public const OPSYS_ATARI_ST = 5;
+
+    public const OPSYS_OS_2 = 6;
+
+    public const OPSYS_MACINTOSH = 7;
+
+    public const OPSYS_Z_SYSTEM = 8;
+
+    public const OPSYS_CPM = 9;
+
+    public const OPSYS_WINDOWS_NTFS = 10;
+
+    public const OPSYS_MVS = 11;
+
+    public const OPSYS_VSE = 12;
+
+    public const OPSYS_ACORN_RISC = 13;
+
+    public const OPSYS_VFAT = 14;
+
+    public const OPSYS_ALTERNATE_MVS = 15;
+
+    public const OPSYS_BEOS = 16;
+
+    public const OPSYS_TANDEM = 17;
+
+    public const OPSYS_OS_400 = 18;
+
+    public const OPSYS_OS_X = 19;
+
+    public const OPSYS_DEFAULT = self::OPSYS_UNIX;
+
     /** @var array<string, int> */
     public const CLASS_CONSTANTS = [
         'create' => self::CREATE,
@@ -90,6 +176,48 @@ final class ZipArchiveConstants
         'em_aes_192' => self::EM_AES_192,
         'em_aes_256' => self::EM_AES_256,
         'em_unknown' => self::EM_UNKNOWN,
+        'cm_default' => self::CM_DEFAULT,
+        'cm_store' => self::CM_STORE,
+        'cm_shrink' => self::CM_SHRINK,
+        'cm_reduce_1' => self::CM_REDUCE_1,
+        'cm_reduce_2' => self::CM_REDUCE_2,
+        'cm_reduce_3' => self::CM_REDUCE_3,
+        'cm_reduce_4' => self::CM_REDUCE_4,
+        'cm_implode' => self::CM_IMPLODE,
+        'cm_deflate' => self::CM_DEFLATE,
+        'cm_deflate64' => self::CM_DEFLATE64,
+        'cm_pkware_implode' => self::CM_PKWARE_IMPLODE,
+        'cm_bzip2' => self::CM_BZIP2,
+        'cm_lzma' => self::CM_LZMA,
+        'cm_terse' => self::CM_TERSE,
+        'cm_lz77' => self::CM_LZ77,
+        'cm_lzma2' => self::CM_LZMA2,
+        'cm_zstd' => self::CM_ZSTD,
+        'cm_xz' => self::CM_XZ,
+        'cm_jpeg' => self::CM_JPEG,
+        'cm_wavpack' => self::CM_WAVPACK,
+        'cm_ppmd' => self::CM_PPMD,
+        'opsys_dos' => self::OPSYS_DOS,
+        'opsys_amiga' => self::OPSYS_AMIGA,
+        'opsys_openvms' => self::OPSYS_OPENVMS,
+        'opsys_unix' => self::OPSYS_UNIX,
+        'opsys_vm_cms' => self::OPSYS_VM_CMS,
+        'opsys_atari_st' => self::OPSYS_ATARI_ST,
+        'opsys_os_2' => self::OPSYS_OS_2,
+        'opsys_macintosh' => self::OPSYS_MACINTOSH,
+        'opsys_z_system' => self::OPSYS_Z_SYSTEM,
+        'opsys_cpm' => self::OPSYS_CPM,
+        'opsys_windows_ntfs' => self::OPSYS_WINDOWS_NTFS,
+        'opsys_mvs' => self::OPSYS_MVS,
+        'opsys_vse' => self::OPSYS_VSE,
+        'opsys_acorn_risc' => self::OPSYS_ACORN_RISC,
+        'opsys_vfat' => self::OPSYS_VFAT,
+        'opsys_alternate_mvs' => self::OPSYS_ALTERNATE_MVS,
+        'opsys_beos' => self::OPSYS_BEOS,
+        'opsys_tandem' => self::OPSYS_TANDEM,
+        'opsys_os_400' => self::OPSYS_OS_400,
+        'opsys_os_x' => self::OPSYS_OS_X,
+        'opsys_default' => self::OPSYS_DEFAULT,
         'er_ok' => self::ER_OK,
         'er_multidisk' => self::ER_MULTIDISK,
         'er_rename' => self::ER_RENAME,
@@ -128,6 +256,48 @@ final class ZipArchiveConstants
         'em_aes_192' => 'EM_AES_192',
         'em_aes_256' => 'EM_AES_256',
         'em_unknown' => 'EM_UNKNOWN',
+        'cm_default' => 'CM_DEFAULT',
+        'cm_store' => 'CM_STORE',
+        'cm_shrink' => 'CM_SHRINK',
+        'cm_reduce_1' => 'CM_REDUCE_1',
+        'cm_reduce_2' => 'CM_REDUCE_2',
+        'cm_reduce_3' => 'CM_REDUCE_3',
+        'cm_reduce_4' => 'CM_REDUCE_4',
+        'cm_implode' => 'CM_IMPLODE',
+        'cm_deflate' => 'CM_DEFLATE',
+        'cm_deflate64' => 'CM_DEFLATE64',
+        'cm_pkware_implode' => 'CM_PKWARE_IMPLODE',
+        'cm_bzip2' => 'CM_BZIP2',
+        'cm_lzma' => 'CM_LZMA',
+        'cm_terse' => 'CM_TERSE',
+        'cm_lz77' => 'CM_LZ77',
+        'cm_lzma2' => 'CM_LZMA2',
+        'cm_zstd' => 'CM_ZSTD',
+        'cm_xz' => 'CM_XZ',
+        'cm_jpeg' => 'CM_JPEG',
+        'cm_wavpack' => 'CM_WAVPACK',
+        'cm_ppmd' => 'CM_PPMD',
+        'opsys_dos' => 'OPSYS_DOS',
+        'opsys_amiga' => 'OPSYS_AMIGA',
+        'opsys_openvms' => 'OPSYS_OPENVMS',
+        'opsys_unix' => 'OPSYS_UNIX',
+        'opsys_vm_cms' => 'OPSYS_VM_CMS',
+        'opsys_atari_st' => 'OPSYS_ATARI_ST',
+        'opsys_os_2' => 'OPSYS_OS_2',
+        'opsys_macintosh' => 'OPSYS_MACINTOSH',
+        'opsys_z_system' => 'OPSYS_Z_SYSTEM',
+        'opsys_cpm' => 'OPSYS_CPM',
+        'opsys_windows_ntfs' => 'OPSYS_WINDOWS_NTFS',
+        'opsys_mvs' => 'OPSYS_MVS',
+        'opsys_vse' => 'OPSYS_VSE',
+        'opsys_acorn_risc' => 'OPSYS_ACORN_RISC',
+        'opsys_vfat' => 'OPSYS_VFAT',
+        'opsys_alternate_mvs' => 'OPSYS_ALTERNATE_MVS',
+        'opsys_beos' => 'OPSYS_BEOS',
+        'opsys_tandem' => 'OPSYS_TANDEM',
+        'opsys_os_400' => 'OPSYS_OS_400',
+        'opsys_os_x' => 'OPSYS_OS_X',
+        'opsys_default' => 'OPSYS_DEFAULT',
         'er_ok' => 'ER_OK',
         'er_multidisk' => 'ER_MULTIDISK',
         'er_rename' => 'ER_RENAME',

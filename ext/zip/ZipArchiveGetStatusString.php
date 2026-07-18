@@ -497,3 +497,303 @@ final class ZipArchiveGetStream extends ZipClassMethod
         $frame->returnVar->streamHandle($handle, $frame->vmContext);
     }
 }
+
+/**
+ * ZipArchive::setMtimeName(string $name, int $timestamp, int $flags = 0) — php-src php_zip.c (#20363).
+ */
+final class ZipArchiveSetMtimeName extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setMtimeName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setMtimeName()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::setMtimeName() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::setMtimeName', 1, 'name');
+        $timestamp = $this->intArg($frame->calledArgs[2], 'ZipArchive::setMtimeName', 2, 'timestamp');
+        $flags = $argc >= 3
+            ? $this->intArg($frame->calledArgs[3], 'ZipArchive::setMtimeName', 3, 'flags')
+            : 0;
+        $ok = VmZipArchive::setMtimeName($receiver, $name, $timestamp, $flags);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::setMtimeIndex(int $index, int $timestamp, int $flags = 0) — php-src php_zip.c (#20363).
+ */
+final class ZipArchiveSetMtimeIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setMtimeIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setMtimeIndex()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::setMtimeIndex() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::setMtimeIndex', 1, 'index');
+        $timestamp = $this->intArg($frame->calledArgs[2], 'ZipArchive::setMtimeIndex', 2, 'timestamp');
+        $flags = $argc >= 3
+            ? $this->intArg($frame->calledArgs[3], 'ZipArchive::setMtimeIndex', 3, 'flags')
+            : 0;
+        $ok = VmZipArchive::setMtimeIndex($receiver, $index, $timestamp, $flags);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::setExternalAttributesName(string $name, int $opsys, int $attr, int $flags = 0)
+ * — php-src php_zip.c (#20363).
+ */
+final class ZipArchiveSetExternalAttributesName extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setExternalAttributesName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setExternalAttributesName()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::setExternalAttributesName() expects at least 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::setExternalAttributesName', 1, 'name');
+        $opsys = $this->intArg($frame->calledArgs[2], 'ZipArchive::setExternalAttributesName', 2, 'opsys');
+        $attr = $this->intArg($frame->calledArgs[3], 'ZipArchive::setExternalAttributesName', 3, 'attr');
+        $flags = $argc >= 4
+            ? $this->intArg($frame->calledArgs[4], 'ZipArchive::setExternalAttributesName', 4, 'flags')
+            : 0;
+        $ok = VmZipArchive::setExternalAttributesName($receiver, $name, $opsys, $attr, $flags);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::setExternalAttributesIndex(int $index, int $opsys, int $attr, int $flags = 0)
+ * — php-src php_zip.c (#20363).
+ */
+final class ZipArchiveSetExternalAttributesIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setExternalAttributesIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setExternalAttributesIndex()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::setExternalAttributesIndex() expects at least 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::setExternalAttributesIndex', 1, 'index');
+        $opsys = $this->intArg($frame->calledArgs[2], 'ZipArchive::setExternalAttributesIndex', 2, 'opsys');
+        $attr = $this->intArg($frame->calledArgs[3], 'ZipArchive::setExternalAttributesIndex', 3, 'attr');
+        $flags = $argc >= 4
+            ? $this->intArg($frame->calledArgs[4], 'ZipArchive::setExternalAttributesIndex', 4, 'flags')
+            : 0;
+        $ok = VmZipArchive::setExternalAttributesIndex($receiver, $index, $opsys, $attr, $flags);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::getExternalAttributesName(string $name, &$opsys, &$attr, int $flags = 0)
+ * — php-src php_zip.c (#20363).
+ */
+final class ZipArchiveGetExternalAttributesName extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getExternalAttributesName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::getExternalAttributesName()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::getExternalAttributesName() expects at least 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::getExternalAttributesName', 1, 'name');
+        $flags = $argc >= 4
+            ? $this->intArg($frame->calledArgs[4], 'ZipArchive::getExternalAttributesName', 4, 'flags')
+            : 0;
+        $result = VmZipArchive::getExternalAttributesName($receiver, $name, $flags);
+        if (false !== $result) {
+            $frame->calledArgs[2]->resolveIndirect()->int($result['opsys']);
+            $frame->calledArgs[3]->resolveIndirect()->int($result['attr']);
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(false !== $result);
+        }
+    }
+}
+
+/**
+ * ZipArchive::getExternalAttributesIndex(int $index, &$opsys, &$attr, int $flags = 0)
+ * — php-src php_zip.c (#20363).
+ */
+final class ZipArchiveGetExternalAttributesIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getExternalAttributesIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::getExternalAttributesIndex()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::getExternalAttributesIndex() expects at least 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::getExternalAttributesIndex', 1, 'index');
+        $flags = $argc >= 4
+            ? $this->intArg($frame->calledArgs[4], 'ZipArchive::getExternalAttributesIndex', 4, 'flags')
+            : 0;
+        $result = VmZipArchive::getExternalAttributesIndex($receiver, $index, $flags);
+        if (false !== $result) {
+            $frame->calledArgs[2]->resolveIndirect()->int($result['opsys']);
+            $frame->calledArgs[3]->resolveIndirect()->int($result['attr']);
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(false !== $result);
+        }
+    }
+}
+
+/**
+ * ZipArchive::setCompressionName(string $name, int $method, int $compflags = 0)
+ * — php-src php_zip.c (#20363).
+ */
+final class ZipArchiveSetCompressionName extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setCompressionName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setCompressionName()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::setCompressionName() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::setCompressionName', 1, 'name');
+        $method = $this->intArg($frame->calledArgs[2], 'ZipArchive::setCompressionName', 2, 'method');
+        $compflags = $argc >= 3
+            ? $this->intArg($frame->calledArgs[3], 'ZipArchive::setCompressionName', 3, 'compflags')
+            : 0;
+        $ok = VmZipArchive::setCompressionName($receiver, $name, $method, $compflags);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::setCompressionIndex(int $index, int $method, int $compflags = 0)
+ * — php-src php_zip.c (#20363).
+ */
+final class ZipArchiveSetCompressionIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setCompressionIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setCompressionIndex()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::setCompressionIndex() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::setCompressionIndex', 1, 'index');
+        $method = $this->intArg($frame->calledArgs[2], 'ZipArchive::setCompressionIndex', 2, 'method');
+        $compflags = $argc >= 3
+            ? $this->intArg($frame->calledArgs[3], 'ZipArchive::setCompressionIndex', 3, 'compflags')
+            : 0;
+        $ok = VmZipArchive::setCompressionIndex($receiver, $index, $method, $compflags);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::isCompressionMethodSupported(int $method, bool $enc = true) — static (#20363).
+ */
+final class ZipArchiveIsCompressionMethodSupported extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isCompressionMethodSupported');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        // Static: calledArgs[0] is $method (no $this).
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(
+                'ZipArchive::isCompressionMethodSupported() expects at least 1 argument, 0 given'
+            );
+        }
+        $method = $this->intArg($frame->calledArgs[0], 'ZipArchive::isCompressionMethodSupported', 1, 'method');
+        $enc = true;
+        if ($argc >= 2) {
+            $enc = $this->boolArg($frame->calledArgs[1], 'ZipArchive::isCompressionMethodSupported', 2, 'enc');
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmZipArchive::isCompressionMethodSupported($method, $enc));
+        }
+    }
+}

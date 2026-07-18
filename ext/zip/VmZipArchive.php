@@ -44,6 +44,7 @@ final class VmZipArchive
         $intProto = new Variable(Variable::TYPE_INTEGER);
         $strProto = new Variable(Variable::TYPE_STRING);
         $pub = CfgFunc::FLAG_PUBLIC;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
 
         $entry = new ClassEntry('ZipArchive');
         $entry->isInternal = true;
@@ -89,10 +90,20 @@ final class VmZipArchive
             'renamename' => new ZipArchiveRenameName(),
             'renameindex' => new ZipArchiveRenameIndex(),
             'getstream' => new ZipArchiveGetStream(),
+            // mtime / external attributes / compression — php-src php_zip.c (#20363)
+            'setmtimename' => new ZipArchiveSetMtimeName(),
+            'setmtimeindex' => new ZipArchiveSetMtimeIndex(),
+            'setexternalattributesname' => new ZipArchiveSetExternalAttributesName(),
+            'setexternalattributesindex' => new ZipArchiveSetExternalAttributesIndex(),
+            'getexternalattributesname' => new ZipArchiveGetExternalAttributesName(),
+            'getexternalattributesindex' => new ZipArchiveGetExternalAttributesIndex(),
+            'setcompressionname' => new ZipArchiveSetCompressionName(),
+            'setcompressionindex' => new ZipArchiveSetCompressionIndex(),
+            'iscompressionmethodsupported' => new ZipArchiveIsCompressionMethodSupported(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
-            $entry->methodVisibility[$name] = $pub;
+            $entry->methodVisibility[$name] = ('iscompressionmethodsupported' === $name) ? $pubStatic : $pub;
             $entry->methodNames[$name] = self::methodDisplayName($name);
         }
 
@@ -692,6 +703,217 @@ final class VmZipArchive
         return false;
     }
 
+    /**
+     * ZipArchive::setMtimeName — php-src zim_ZipArchive_setMtimeName (#20363).
+     */
+    public static function setMtimeName(ObjectEntry $entry, string $name, int $timestamp, int $flags = 0): bool
+    {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ('' === $name) {
+            throw new \ValueError('ZipArchive::setMtimeName(): Argument #1 ($name) must not be empty');
+        }
+        $index = self::locateEntryIndex($state, $name);
+        if (null === $index) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+            return false;
+        }
+
+        return self::setMtimeIndex($entry, $index, $timestamp, 0);
+    }
+
+    /**
+     * ZipArchive::setMtimeIndex — php-src zim_ZipArchive_setMtimeIndex (#20363).
+     */
+    public static function setMtimeIndex(ObjectEntry $entry, int $index, int $timestamp, int $flags = 0): bool
+    {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        $state->entries[$index]['mtime'] = $timestamp;
+        $state->dirty = true;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::setExternalAttributesName — php-src zim_ZipArchive_setExternalAttributesName (#20363).
+     */
+    public static function setExternalAttributesName(
+        ObjectEntry $entry,
+        string $name,
+        int $opsys,
+        int $attr,
+        int $flags = 0
+    ): bool {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ('' === $name) {
+            throw new \ValueError('ZipArchive::setExternalAttributesName(): Argument #1 ($name) must not be empty');
+        }
+        $index = self::locateEntryIndex($state, $name);
+        if (null === $index) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+            return false;
+        }
+
+        return self::setExternalAttributesIndex($entry, $index, $opsys, $attr, 0);
+    }
+
+    /**
+     * ZipArchive::setExternalAttributesIndex — php-src zim_ZipArchive_setExternalAttributesIndex (#20363).
+     */
+    public static function setExternalAttributesIndex(
+        ObjectEntry $entry,
+        int $index,
+        int $opsys,
+        int $attr,
+        int $flags = 0
+    ): bool {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        $state->entries[$index]['opsys'] = $opsys & 0xff;
+        $state->entries[$index]['external_attr'] = $attr & 0xffffffff;
+        $state->dirty = true;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::getExternalAttributesName — php-src zim_ZipArchive_getExternalAttributesName (#20363).
+     *
+     * @return array{opsys: int, attr: int}|false
+     */
+    public static function getExternalAttributesName(
+        ObjectEntry $entry,
+        string $name,
+        int $flags = 0
+    ): array|false {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ('' === $name) {
+            throw new \ValueError('ZipArchive::getExternalAttributesName(): Argument #1 ($name) must not be empty');
+        }
+        $index = self::locateEntryIndex($state, $name);
+        if (null === $index) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+            return false;
+        }
+
+        return self::getExternalAttributesIndex($entry, $index, 0);
+    }
+
+    /**
+     * ZipArchive::getExternalAttributesIndex — php-src zim_ZipArchive_getExternalAttributesIndex (#20363).
+     *
+     * @return array{opsys: int, attr: int}|false
+     */
+    public static function getExternalAttributesIndex(
+        ObjectEntry $entry,
+        int $index,
+        int $flags = 0
+    ): array|false {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        $zipEntry = $state->entries[$index];
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return [
+            'opsys' => (int) ($zipEntry['opsys'] ?? ZipArchiveConstants::OPSYS_DEFAULT),
+            'attr' => (int) ($zipEntry['external_attr'] ?? 0),
+        ];
+    }
+
+    /**
+     * ZipArchive::setCompressionName — php-src zim_ZipArchive_setCompressionName (#20363).
+     *
+     * Pure-PHP ZipEngine writes stored (CM_STORE) payloads; method is retained for API/stat
+     * parity. Unsupported encode methods return false (libzip zip_set_file_compression).
+     */
+    public static function setCompressionName(
+        ObjectEntry $entry,
+        string $name,
+        int $method,
+        int $compflags = 0
+    ): bool {
+        unset($compflags);
+        $state = self::requireOpen($entry);
+        if ('' === $name) {
+            throw new \ValueError('ZipArchive::setCompressionName(): Argument #1 ($name) must not be empty');
+        }
+        $index = self::locateEntryIndex($state, $name);
+        if (null === $index) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+            return false;
+        }
+
+        return self::setCompressionIndex($entry, $index, $method, 0);
+    }
+
+    /**
+     * ZipArchive::setCompressionIndex — php-src zim_ZipArchive_setCompressionIndex (#20363).
+     */
+    public static function setCompressionIndex(
+        ObjectEntry $entry,
+        int $index,
+        int $method,
+        int $compflags = 0
+    ): bool {
+        unset($compflags);
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        if (!self::isCompressionMethodSupported($method, true)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_COMPNOTSUPP);
+
+            return false;
+        }
+        $normalized = ZipArchiveConstants::CM_DEFAULT === $method
+            ? ZipArchiveConstants::CM_STORE
+            : $method;
+        $state->entries[$index]['comp_method'] = $normalized;
+        $state->dirty = true;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::isCompressionMethodSupported — php-src zim_ZipArchive_isCompressionMethodSupported (#20363).
+     *
+     * Pure-PHP ZipEngine only stores/unstores CM_STORE (and CM_DEFAULT → store).
+     */
+    public static function isCompressionMethodSupported(int $method, bool $enc = true): bool
+    {
+        unset($enc);
+
+        return ZipArchiveConstants::CM_STORE === $method
+            || ZipArchiveConstants::CM_DEFAULT === $method;
+    }
+
     public static function extractTo(ObjectEntry $entry, string $pathto, ?Variable $files = null): bool
     {
         $state = self::state($entry);
@@ -764,7 +986,17 @@ final class VmZipArchive
     }
 
     /**
-     * @param array{name: string, data: string, crc: int, size: int, mtime?: int, encryption_method?: int} $zipEntry
+     * @param array{
+     *     name: string,
+     *     data: string,
+     *     crc: int,
+     *     size: int,
+     *     mtime?: int,
+     *     comp_method?: int,
+     *     opsys?: int,
+     *     external_attr?: int,
+     *     encryption_method?: int
+     * } $zipEntry
      * @return array{
      *     name: string,
      *     index: int,
@@ -787,13 +1019,23 @@ final class VmZipArchive
             'size' => $size,
             'mtime' => (int) ($zipEntry['mtime'] ?? 0),
             'comp_size' => $size,
-            'comp_method' => 0,
+            'comp_method' => (int) ($zipEntry['comp_method'] ?? ZipArchiveConstants::CM_STORE),
             'encryption_method' => (int) ($zipEntry['encryption_method'] ?? ZipArchiveConstants::EM_NONE),
         ];
     }
 
     /**
-     * @return array{name: string, data: string, crc: int, size: int, mtime: int, encryption_method: int}
+     * @return array{
+     *     name: string,
+     *     data: string,
+     *     crc: int,
+     *     size: int,
+     *     mtime: int,
+     *     comp_method: int,
+     *     opsys: int,
+     *     external_attr: int,
+     *     encryption_method: int
+     * }
      */
     private static function makeEntry(string $name, string $data, int $crc, int $size): array
     {
@@ -803,8 +1045,23 @@ final class VmZipArchive
             'crc' => $crc,
             'size' => $size,
             'mtime' => time(),
+            'comp_method' => ZipArchiveConstants::CM_STORE,
+            'opsys' => ZipArchiveConstants::OPSYS_DEFAULT,
+            'external_attr' => 0,
             'encryption_method' => ZipArchiveConstants::EM_NONE,
         ];
+    }
+
+    /** @return int|null */
+    private static function locateEntryIndex(ZipArchiveState $state, string $name): ?int
+    {
+        foreach ($state->entries as $index => $zipEntry) {
+            if ($zipEntry['name'] === $name) {
+                return $index;
+            }
+        }
+
+        return null;
     }
 
     private static function setStatus(ObjectEntry $entry, ZipArchiveState $state, int $code): void
@@ -876,8 +1133,42 @@ final class VmZipArchive
             'renamename' => 'renameName',
             'renameindex' => 'renameIndex',
             'getstream' => 'getStream',
+            'setmtimename' => 'setMtimeName',
+            'setmtimeindex' => 'setMtimeIndex',
+            'setexternalattributesname' => 'setExternalAttributesName',
+            'setexternalattributesindex' => 'setExternalAttributesIndex',
+            'getexternalattributesname' => 'getExternalAttributesName',
+            'getexternalattributesindex' => 'getExternalAttributesIndex',
+            'setcompressionname' => 'setCompressionName',
+            'setcompressionindex' => 'setCompressionIndex',
+            'iscompressionmethodsupported' => 'isCompressionMethodSupported',
             default => $lc,
         };
+    }
+
+    public static function coerceBoolArg(Variable $var, string $label, int $index, string $paramName): bool
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type bool, %s given',
+                $label,
+                $index,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_BOOLEAN !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type bool, %s given',
+                $label,
+                $index,
+                $paramName,
+                self::typeLabel($var)
+            ));
+        }
+
+        return $var->toBool();
     }
 
     private static function typeLabel(Variable $var): string

@@ -27,6 +27,9 @@ final class ZipArchiveState
      *     crc: int,
      *     size: int,
      *     mtime?: int,
+     *     comp_method?: int,
+     *     opsys?: int,
+     *     external_attr?: int,
      *     encryption_method?: int,
      *     encryption_password?: string
      * }>
