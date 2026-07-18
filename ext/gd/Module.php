@@ -105,7 +105,13 @@ class Module extends ModuleAbstract
             $functions[] = new imagefilledpolygon();
             $functions[] = new imagefilledrectangle();
             $functions[] = new imagestring();
+            $functions[] = new imagestringup();
             $functions[] = new imagechar();
+            $functions[] = new imagecharup();
+            $functions[] = new imagegammacorrect();
+            $functions[] = new imageinterlace();
+            $functions[] = new imagesetclip();
+            $functions[] = new imagegetclip();
             if (VmGdFreeType::available()) {
                 $functions[] = new imagettftext();
                 $functions[] = new imagettfbbox();

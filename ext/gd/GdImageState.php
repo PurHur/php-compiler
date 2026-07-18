@@ -95,6 +95,22 @@ final class GdImageState
     public array $brushColorMap = [];
 
     /**
+     * libgd interlace flag (php-src gdImageInterlace; #20460).
+     */
+    public bool $interlace = false;
+
+    /**
+     * libgd clip rectangle cx1,cy1,cx2,cy2 (inclusive; #20460).
+     */
+    public int $cx1 = 0;
+
+    public int $cy1 = 0;
+
+    public int $cx2 = 0;
+
+    public int $cy2 = 0;
+
+    /**
      * @param list<int> $pixels
      * @param list<int> $colors
      */
@@ -130,6 +146,10 @@ final class GdImageState
         $this->resX = $resX;
         $this->resY = $resY;
         $this->transparent = $transparent;
+        if ($width > 0 && $height > 0) {
+            $this->cx2 = $width - 1;
+            $this->cy2 = $height - 1;
+        }
     }
 
     public static function fromEncoded(string $encoded, int $imageType): self
