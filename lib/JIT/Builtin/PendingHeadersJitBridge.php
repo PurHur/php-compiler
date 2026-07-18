@@ -14,8 +14,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed + standalone link for pending HTTP headers via PendingHeadersJitHelper PHP (#9545, #12898).
+ * JIT/AOT embed + standalone link for pending HTTP headers via PendingHeadersJitHelper PHP (#9545, #12898, #20420).
  *
+ * Embed / non-thin: honest NestedJIT bridges via compiled {@see \PHPCompiler\ext\standard\PendingHeadersJitHelper}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20401 / #20395 shape): {@see implementDeferredInventoryStubs}
+ * without nested JIT (#13301 / #13571).
  * SSOT: {@see \PHPCompiler\ext\standard\PendingHeadersJitHelper}.
  * php-src: ext/standard/head.c
  */
@@ -74,7 +77,7 @@ final class PendingHeadersJitBridge
             return;
         }
 
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             self::ensureHashtableHelpers($context);
             self::implementDeferredInventoryStubs($context);
 
@@ -378,7 +381,7 @@ final class PendingHeadersJitBridge
         }
     }
 
-    /** Inventory emit only needs linkable ABI symbols — skip nested STDOUT JIT (#13301). */
+    /** Thin standalone AOT: linkable ABI stubs — skip nested PendingHeadersJitHelper JIT (#13301, #20420). */
     private static function implementDeferredInventoryStubs(Context $context): void
     {
         $voidTy = $context->getTypeFromString('void');

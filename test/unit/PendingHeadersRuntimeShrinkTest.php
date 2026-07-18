@@ -6,7 +6,9 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** PendingHeaders routes through PendingHeadersJitHelper PHP (#9545, #13679). */
+/**
+ * PendingHeaders routes through PendingHeadersJitHelper PHP (#9545, #13679, #20420).
+ */
 final class PendingHeadersRuntimeShrinkTest extends TestCase
 {
     public function testPendingHeadersRuntimeIsThinRouter(): void
@@ -16,5 +18,15 @@ final class PendingHeadersRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('PendingHeadersStandaloneLlvm', $runtime);
         $this->assertLessThan(35, substr_count($runtime, "\n"), 'PendingHeadersRuntime should be a thin router');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
+    }
+
+    public function testBridgeGatesThinStubsOnIsThinStandaloneAotMain(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersJitBridge.php');
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('implementDeferredInventoryStubs', $source);
+        $this->assertStringContainsString('PendingHeadersJitHelper', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
     }
 }

@@ -24,6 +24,9 @@ final class PendingHeadersRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('PendingHeadersJitBridge::implement', $runtime);
         $this->assertStringNotContainsString('PendingHeadersStandaloneLlvm', $runtime);
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
+        $bridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersJitBridge.php');
+        $this->assertStringContainsString('isThinStandaloneAotMain', $bridge);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $bridge);
     }
 
     public function testEnsureLinkedDefinesPendingHeadersForStandalone(): void
