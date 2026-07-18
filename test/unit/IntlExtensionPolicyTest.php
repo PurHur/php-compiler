@@ -10,68 +10,71 @@ use PHPUnit\Framework\TestCase;
 /** @group intl_extension_policy */
 final class IntlExtensionPolicyTest extends TestCase
 {
-    public function testGraphemeBuiltinsWithheldUntilIntlLoaded(): void
+    public function testUnicodeCoreAdvertisedWhenIcuAvailable(): void
     {
-        self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
-        self::assertFalse(IntlExtensionPolicy::advertisesIdn());
-        self::assertFalse(IntlExtensionPolicy::advertisesNormalizer());
-        self::assertFalse(IntlExtensionPolicy::advertisesLocale());
-        self::assertFalse(IntlExtensionPolicy::advertisesIntlDateFormatter());
-        self::assertFalse(IntlExtensionPolicy::advertisesIntlCalendar());
-        self::assertFalse(IntlExtensionPolicy::advertisesNumberFormatter());
-        self::assertFalse(IntlExtensionPolicy::advertisesMessageFormatter());
-        self::assertFalse(IntlExtensionPolicy::advertisesTransliterator());
-        self::assertFalse(IntlExtensionPolicy::advertisesResourceBundle());
-        self::assertFalse(IntlExtensionPolicy::advertisesBreakIterator());
-        // locale parsers follow forward profile only once Locale is gated (#19670 / #17072).
-        self::assertFalse(IntlExtensionPolicy::advertisesLocaleParsers());
+        if (!IntlExtensionPolicy::icuAvailable()) {
+            self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
+            self::assertFalse(IntlExtensionPolicy::advertisesIdn());
+            self::assertFalse(IntlExtensionPolicy::advertisesNormalizer());
+            self::assertFalse(IntlExtensionPolicy::advertisesLocale());
+            self::assertFalse(IntlExtensionPolicy::advertisesIntlDateFormatter());
+
+            $runtime = new Runtime();
+            self::assertFalse(
+                ext\standard\VmReflection::functionExists($runtime->vmContext, 'grapheme_strlen')
+            );
+
+            return;
+        }
+
+        self::assertTrue(IntlExtensionPolicy::advertisesExtension());
+        self::assertTrue(IntlExtensionPolicy::advertisesBuiltins());
+        self::assertTrue(IntlExtensionPolicy::advertisesGraphemeCore());
+        self::assertTrue(IntlExtensionPolicy::advertisesNormalizer());
+        self::assertTrue(IntlExtensionPolicy::advertisesLocale());
+        self::assertTrue(IntlExtensionPolicy::advertisesIntlDateFormatter());
+        self::assertTrue(IntlExtensionPolicy::advertisesIntlCalendar());
+        self::assertTrue(IntlExtensionPolicy::advertisesNumberFormatter());
+        self::assertSame(
+            IntlExtensionPolicy::advertisesIdn(),
+            \PHPCompiler\ext\intl\VmIdn::available()
+        );
+
         $runtime = new Runtime();
-        self::assertFalse(
+        self::assertTrue(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'grapheme_strlen')
         );
-        self::assertFalse(
-            ext\standard\VmReflection::functionExists($runtime->vmContext, 'idn_to_ascii')
-        );
-        self::assertFalse(
-            ext\standard\VmReflection::functionExists($runtime->vmContext, 'idn_to_utf8')
-        );
-        self::assertFalse(
+        self::assertTrue(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'normalizer_normalize')
         );
-        self::assertFalse(
+        self::assertTrue(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'Normalizer')
         );
-        self::assertFalse(
+        self::assertTrue(
             ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_default')
         );
-        self::assertFalse(
+        self::assertTrue(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'Locale')
         );
-        self::assertFalse(
+        self::assertTrue(
             ext\standard\VmReflection::classExists($runtime->vmContext, 'IntlDateFormatter')
         );
-        self::assertFalse(
-            ext\standard\VmReflection::classExists($runtime->vmContext, 'IntlCalendar')
-        );
-        self::assertFalse(
-            ext\standard\VmReflection::classExists($runtime->vmContext, 'IntlTimeZone')
-        );
-        self::assertFalse(
-            ext\standard\VmReflection::classExists($runtime->vmContext, 'NumberFormatter')
-        );
-        self::assertFalse(
-            ext\standard\VmReflection::classExists($runtime->vmContext, 'MessageFormatter')
-        );
-        self::assertFalse(
-            ext\standard\VmReflection::functionExists($runtime->vmContext, 'msgfmt_create')
-        );
-        self::assertFalse(
-            ext\standard\VmReflection::functionExists($runtime->vmContext, 'locale_get_primary_language')
-        );
+        if (IntlExtensionPolicy::advertisesIdn()) {
+            self::assertTrue(
+                ext\standard\VmReflection::functionExists($runtime->vmContext, 'idn_to_ascii')
+            );
+            self::assertTrue(
+                ext\standard\VmReflection::functionExists($runtime->vmContext, 'idn_to_utf8')
+            );
+        }
     }
 
     public function testLocaleParsersWithheldOnDefault84DevProfileWithoutForwardGate(): void
     {
+        if (IntlExtensionPolicy::advertisesLocale()) {
+            self::markTestSkipped('Locale advertises with ICU-backed ext/intl (#20630)');
+        }
+
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE');
         try {
@@ -109,7 +112,6 @@ final class IntlExtensionPolicyTest extends TestCase
             self::assertTrue(CompilerVersion::supportsLocaleParserForwardProfile());
             self::assertTrue(CompilerVersion::advertisesLocaleParserForwardProfile());
             self::assertTrue(IntlExtensionPolicy::advertisesLocaleParsers());
-            self::assertFalse(IntlExtensionPolicy::advertisesLocale());
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
@@ -120,9 +122,15 @@ final class IntlExtensionPolicyTest extends TestCase
                     $fn.' must be visible on forward 8.4 profile'
                 );
             }
-            self::assertFalse(
-                ext\standard\VmReflection::functionExists($ctx, 'locale_get_default')
-            );
+            if (IntlExtensionPolicy::advertisesLocale()) {
+                self::assertTrue(
+                    ext\standard\VmReflection::functionExists($ctx, 'locale_get_default')
+                );
+            } else {
+                self::assertFalse(
+                    ext\standard\VmReflection::functionExists($ctx, 'locale_get_default')
+                );
+            }
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -132,17 +140,40 @@ final class IntlExtensionPolicyTest extends TestCase
         }
     }
 
-    public function testGraphemeCoreWithheldOnForwardProfile84WithoutIntl(): void
+    public function testGraphemeCoreWithIntlWhenIcuAvailable(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');
         try {
             self::assertTrue(CompilerVersion::supportsGraphemeForwardProfileCore());
-            self::assertFalse(CompilerVersion::advertisesGraphemeForwardProfileCore());
-            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeCore());
-            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeStrContains());
-            self::assertFalse(IntlExtensionPolicy::advertisesGraphemeStrimwidth());
-            self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
+            if (!IntlExtensionPolicy::icuAvailable()) {
+                self::assertFalse(CompilerVersion::advertisesGraphemeForwardProfileCore());
+                self::assertFalse(IntlExtensionPolicy::advertisesGraphemeCore());
+                self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
+
+                $runtime = new Runtime();
+                $ctx = $runtime->vmContext;
+                foreach ([
+                    'grapheme_strlen',
+                    'grapheme_substr',
+                    'grapheme_strpos',
+                    'grapheme_extract',
+                    'grapheme_str_split',
+                    'grapheme_str_contains',
+                    'grapheme_strimwidth',
+                ] as $fn) {
+                    self::assertFalse(isset($ctx->functions[$fn]), $fn.' must not register without ext/intl');
+                    self::assertFalse(
+                        ext\standard\VmReflection::functionExists($ctx, $fn),
+                        $fn.' must not be visible on forward 8.4 profile without intl'
+                    );
+                }
+
+                return;
+            }
+
+            self::assertTrue(IntlExtensionPolicy::advertisesGraphemeCore());
+            self::assertTrue(IntlExtensionPolicy::advertisesBuiltins());
 
             $runtime = new Runtime();
             $ctx = $runtime->vmContext;
@@ -152,19 +183,11 @@ final class IntlExtensionPolicyTest extends TestCase
                 'grapheme_strpos',
                 'grapheme_extract',
                 'grapheme_str_split',
-                'grapheme_str_contains',
-                'grapheme_strimwidth',
             ] as $fn) {
-                self::assertFalse(isset($ctx->functions[$fn]), $fn.' must not register without ext/intl');
-                self::assertFalse(
+                self::assertTrue(isset($ctx->functions[$fn]), $fn.' must register with ICU-backed intl');
+                self::assertTrue(
                     ext\standard\VmReflection::functionExists($ctx, $fn),
-                    $fn.' must not be visible on forward 8.4 profile without intl'
-                );
-            }
-            foreach (['grapheme_stripos', 'grapheme_stristr', 'grapheme_strrpos'] as $fn) {
-                self::assertFalse(
-                    ext\standard\VmReflection::functionExists($ctx, $fn),
-                    $fn.' must stay gated without full ext/intl'
+                    $fn.' must be visible when ext/intl advertises (#20630)'
                 );
             }
         } finally {

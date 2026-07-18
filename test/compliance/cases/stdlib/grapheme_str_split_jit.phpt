@@ -16,7 +16,7 @@ $chunked = grapheme_str_split('abcdef', 2);
 var_export($chunked);
 echo "\n";
 --EXPECT--
-0
+1
 array (
   0 => 'é',
 )

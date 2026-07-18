@@ -27,7 +27,7 @@ echo "\n";
 var_export(grapheme_extract('abc', 1, 99));
 echo "\n";
 --EXPECT--
-0
+1
 1
 'á'
 'áb'

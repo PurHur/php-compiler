@@ -8,7 +8,7 @@ echo grapheme_str_contains('hello', 'z') ? 'y' : 'n', "\n";
 echo grapheme_str_contains('', '') ? 'y' : 'n', "\n";
 echo grapheme_str_contains('café', 'é') ? 'y' : 'n', "\n";
 --EXPECT--
-0
+1
 y
 n
 y

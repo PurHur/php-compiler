@@ -29,7 +29,7 @@ try {
     echo 'enum=', str_contains($e->getMessage(), 'must be of type string') ? 'yes' : 'no', "\n";
 }
 --EXPECT--
-loaded=0
+loaded=1
 class=1
 method=1
 lang=en

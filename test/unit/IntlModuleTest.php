@@ -20,23 +20,45 @@ final class IntlModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        self::assertFalse(VmReflection::classExists($ctx, 'IntlDateFormatter'));
-        self::assertFalse(VmReflection::classExists($ctx, 'Collator'));
-        self::assertFalse(VmReflection::classExists($ctx, 'IntlException'));
-        self::assertFalse(VmReflection::functionExists($ctx, 'intl_get_error_code'));
-        self::assertFalse(VmReflection::functionExists($ctx, 'grapheme_str_contains'));
+        if (!IntlExtensionPolicy::advertisesBuiltins()) {
+            self::assertFalse(VmReflection::classExists($ctx, 'IntlDateFormatter'));
+            self::assertFalse(VmReflection::classExists($ctx, 'Collator'));
+            self::assertFalse(VmReflection::classExists($ctx, 'IntlException'));
+            self::assertFalse(VmReflection::functionExists($ctx, 'intl_get_error_code'));
+            self::assertFalse(VmReflection::functionExists($ctx, 'grapheme_str_contains'));
 
-        $code = <<<'PHP'
+            $code = <<<'PHP'
 <?php
 echo (int) class_exists('IntlDateFormatter', false);
 echo (int) class_exists('Collator', false);
 echo (int) function_exists('intl_get_error_code');
 echo (int) function_exists('grapheme_str_contains');
 PHP;
-        $block = $runtime->parseAndCompile($code, 'intl_module.php');
+            $block = $runtime->parseAndCompile($code, 'intl_module.php');
+            ob_start();
+            $runtime->run($block);
+            self::assertSame('0000', ob_get_clean());
+
+            return;
+        }
+
+        self::assertTrue(VmReflection::classExists($ctx, 'IntlDateFormatter'));
+        self::assertTrue(VmReflection::classExists($ctx, 'Collator'));
+        self::assertTrue(VmReflection::functionExists($ctx, 'intl_get_error_code'));
+        self::assertTrue(\PHPCompiler\ext\standard\ModuleRegistry::extensionLoaded('intl'));
+
+        $code = <<<'PHP'
+<?php
+echo (int) extension_loaded('intl');
+echo (int) class_exists('IntlDateFormatter', false);
+echo (int) class_exists('Collator', false);
+echo (int) function_exists('intl_get_error_code');
+echo (int) function_exists('grapheme_strlen');
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_module_icu.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('0000', ob_get_clean());
+        self::assertSame('11111', ob_get_clean());
     }
 
     public function test_intl_date_formatter_pattern_create_format(): void
@@ -49,19 +71,13 @@ PHP;
 <?php
 $f = IntlDateFormatter::create('en_US', IntlDateFormatter::NONE, IntlDateFormatter::NONE, 'UTC', IntlDateFormatter::GREGORIAN, 'yyyy-MM-dd');
 echo $f->format(new DateTime('2024-03-15 12:34:56', new DateTimeZone('UTC'))), "\n";
-try {
-    Collator::create('en_US');
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+$c = Collator::create('en_US');
+echo (int) ($c->compare('a', 'b') < 0), "\n";
 PHP;
         $block = $runtime->parseAndCompile($code, 'intl_datefmt.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame(
-            "2024-03-15\nError: Class \"Collator\" not found\n",
-            ob_get_clean()
-        );
+        self::assertSame("2024-03-15\n1\n", ob_get_clean());
     }
 
     public function test_intl_skeleton_create_stubs_throw_when_advertised(): void

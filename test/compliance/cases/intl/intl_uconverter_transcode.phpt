@@ -29,5 +29,5 @@ try {
 uconverter=1
 latin1=636166e9
 match=true
-roundtrip=c3a9
+roundtrip=636166c3a9
 UConverter::transcode(): Argument #1 ($str) must be of type string, Es given

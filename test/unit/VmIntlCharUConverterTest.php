@@ -15,6 +15,9 @@ final class VmIntlCharUConverterTest extends TestCase
 {
     public function test_withheld_without_intl(): void
     {
+        if (IntlExtensionPolicy::advertisesBuiltins()) {
+            self::markTestSkipped('IntlChar/UConverter advertise with ICU-backed ext/intl (#20630)');
+        }
         $runtime = new Runtime();
         self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
         self::assertFalse(VmReflection::classExists($runtime->vmContext, 'IntlChar'));

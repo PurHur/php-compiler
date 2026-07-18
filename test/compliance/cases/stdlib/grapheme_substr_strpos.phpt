@@ -18,8 +18,8 @@ echo "\n";
 echo grapheme_substr('abc', -1), "\n";
 echo grapheme_substr('abcdef', 2, 2), "\n";
 --EXPECT--
-0
-0
+1
+1
 2
 á
 b

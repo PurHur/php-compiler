@@ -15,6 +15,9 @@ final class VmSpoofcheckerTest extends TestCase
 {
     public function test_withheld_without_intl(): void
     {
+        if (IntlExtensionPolicy::advertisesBuiltins()) {
+            self::markTestSkipped('Spoofchecker advertises with ICU-backed ext/intl (#20630)');
+        }
         $runtime = new Runtime();
         self::assertFalse(IntlExtensionPolicy::advertisesBuiltins());
         self::assertFalse(VmReflection::classExists($runtime->vmContext, 'Spoofchecker'));
