@@ -47,6 +47,7 @@ class Module extends ModuleAbstract
             new openssl_get_curve_names(),
             new openssl_pkey_new(),
             new openssl_pkey_get_private(),
+            new openssl_get_privatekey(),
             new openssl_pkey_get_public(),
             new openssl_get_publickey(),
             new openssl_pkey_get_details(),

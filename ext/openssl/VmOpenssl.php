@@ -1206,6 +1206,7 @@ final class VmOpenssl
 
     /**
      * openssl_pkey_get_public() / openssl_get_publickey() (php-src ext/openssl/openssl.c; #20240).
+     * Pair: openssl_pkey_get_private() / openssl_get_privatekey() (#20306).
      *
      * @return \PHPCompiler\VM\Variable|false
      */
