@@ -23,7 +23,13 @@ final class CurlConstants
     public const CURLINFO_EFFECTIVE_URL = 1048577;
     public const CURLINFO_HTTP_CODE = 2097154;
     public const CURLE_OK = 0;
+    public const CURLM_CALL_MULTI_PERFORM = -1;
     public const CURLM_OK = 0;
+    public const CURLM_BAD_HANDLE = 1;
+    public const CURLM_BAD_EASY_HANDLE = 2;
+    public const CURLM_OUT_OF_MEMORY = 3;
+    public const CURLM_INTERNAL_ERROR = 4;
+    public const CURLM_ADDED_ALREADY = 7;
     public const CURLSHOPT_NONE = 0;
     public const CURLSHOPT_SHARE = 1;
     public const CURLSHOPT_UNSHARE = 2;
@@ -58,7 +64,13 @@ final class CurlConstants
             'CURLOPT_SHARE' => self::CURLOPT_SHARE,
             'CURLOPT_NOBODY' => self::CURLOPT_NOBODY,
             'CURLE_OK' => self::CURLE_OK,
+            'CURLM_CALL_MULTI_PERFORM' => self::CURLM_CALL_MULTI_PERFORM,
             'CURLM_OK' => self::CURLM_OK,
+            'CURLM_BAD_HANDLE' => self::CURLM_BAD_HANDLE,
+            'CURLM_BAD_EASY_HANDLE' => self::CURLM_BAD_EASY_HANDLE,
+            'CURLM_OUT_OF_MEMORY' => self::CURLM_OUT_OF_MEMORY,
+            'CURLM_INTERNAL_ERROR' => self::CURLM_INTERNAL_ERROR,
+            'CURLM_ADDED_ALREADY' => self::CURLM_ADDED_ALREADY,
             'CURLSHOPT_NONE' => self::CURLSHOPT_NONE,
             'CURLSHOPT_SHARE' => self::CURLSHOPT_SHARE,
             'CURLSHOPT_UNSHARE' => self::CURLSHOPT_UNSHARE,

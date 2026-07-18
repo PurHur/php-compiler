@@ -334,6 +334,16 @@ class AotTest extends BaseTest
                 && str_contains($name, 'curl_easy_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::runsCurlMultiCompliance($name)
+                && str_contains($name, 'curl_multi')
+                && !str_contains($name, 'curl_multi_strerror')
+                && !str_contains($name, 'curl_multi_phantom')) {
+                continue;
+            }
+            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesMultiHandles()
+                && str_contains($name, 'curl_multi_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsArrayReplaceKey()
                 && str_contains($name, 'array_replace_key')
                 && !str_contains($name, 'array_replace_key_phantom')) {

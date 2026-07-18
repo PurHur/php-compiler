@@ -108,6 +108,14 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([2], BuiltinByRefParams::forFunction('PREG_MATCH_ALL'));
     }
 
+    public function testCurlMultiExecStillRunningByRef(): void
+    {
+        $this->assertSame([1], BuiltinByRefParams::forFunction('curl_multi_exec'));
+        $this->assertSame([1], BuiltinByRefParams::forFunction('CURL_MULTI_EXEC'));
+        $this->assertTrue(BuiltinByRefParams::isByRefArg('curl_multi_exec', 1));
+        $this->assertFalse(BuiltinByRefParams::isByRefArg('curl_multi_exec', 0));
+    }
+
     /** Issue #19637 — preg_replace_callback() &$count must be ZEND_SEND_REF like preg_replace(). */
     public function testPregReplaceFamilyCountByRef(): void
     {

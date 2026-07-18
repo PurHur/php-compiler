@@ -79,6 +79,24 @@ final class CurlExtensionPolicy
     }
 
     /**
+     * curl_multi_* + CurlMultiHandle — with loaded ext/curl (#3721, same gate as easy).
+     */
+    public static function advertisesMultiHandles(): bool
+    {
+        return self::advertisesExtension();
+    }
+
+    /** Run curl_multi_* compliance when multi is advertised or a phantom guard matches (#3721). */
+    public static function runsCurlMultiCompliance(string $testFileName): bool
+    {
+        if (self::advertisesMultiHandles()) {
+            return true;
+        }
+
+        return str_contains($testFileName, 'curl_multi_phantom');
+    }
+
+    /**
      * curl_init/curl_setopt/curl_close — only when ext/curl is loaded (#18470, #11627).
      *
      * Share + easy-handle entrypoints must not appear in function_exists until

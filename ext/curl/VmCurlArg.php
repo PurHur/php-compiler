@@ -76,6 +76,38 @@ final class VmCurlArg
         return $object;
     }
 
+    public static function requireMultiObject(Variable $var, string $functionName, int $argNum): ObjectEntry
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($multi_handle) must be of type CurlMultiHandle, %s given',
+                $functionName,
+                $argNum,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($multi_handle) must be of type CurlMultiHandle, %s given',
+                $functionName,
+                $argNum,
+                VmStreamArg::debugTypeName($var)
+            ));
+        }
+        $object = $var->toObject();
+        if (!VmCurlMulti::isMultiObject($object)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($multi_handle) must be of type CurlMultiHandle, %s given',
+                $functionName,
+                $argNum,
+                self::objectTypeName($object)
+            ));
+        }
+
+        return $object;
+    }
+
     private static function objectTypeName(ObjectEntry $object): string
     {
         return 'object('.$object->class->name.')';

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5633 |
-| Phase A inventory files (M2 ratio SSOT) | 5633 |
+| PHP files on vm.php path | 5641 |
+| Phase A inventory files (M2 ratio SSOT) | 5641 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16082 |
+| Source constructs flagged (warnings) | 16107 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -118,18 +118,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/ctype/JitCtype.php` | 0 | 1 |
 | `ext/ctype/Module.php` | 0 | 13 |
 | `ext/ctype/VmCtype.php` | 0 | 1 |
-| `ext/curl/BuiltinClasses.php` | 0 | 2 |
+| `ext/curl/BuiltinClasses.php` | 0 | 1 |
 | `ext/curl/CurlConstants.php` | 0 | 1 |
 | `ext/curl/CurlExtensionPolicy.php` | 0 | 1 |
 | `ext/curl/CurlFileBuiltin.php` | 0 | 12 |
 | `ext/curl/CurlFunction.php` | 0 | 1 |
 | `ext/curl/CurlStringFileBuiltin.php` | 0 | 7 |
-| `ext/curl/Module.php` | 0 | 20 |
+| `ext/curl/Module.php` | 0 | 27 |
 | `ext/curl/VmCurlArg.php` | 0 | 1 |
 | `ext/curl/VmCurlCore.php` | 0 | 3 |
 | `ext/curl/VmCurlEasy.php` | 0 | 4 |
 | `ext/curl/VmCurlEscape.php` | 0 | 1 |
-| `ext/curl/VmCurlNative.php` | 0 | 1 |
+| `ext/curl/VmCurlMulti.php` | 0 | 4 |
+| `ext/curl/VmCurlNative.php` | 0 | 2 |
 | `ext/curl/VmCurlShare.php` | 0 | 4 |
 | `ext/curl/curl_close.php` | 0 | 2 |
 | `ext/curl/curl_errno.php` | 0 | 2 |
@@ -139,6 +140,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_file_create.php` | 0 | 3 |
 | `ext/curl/curl_getinfo.php` | 0 | 5 |
 | `ext/curl/curl_init.php` | 0 | 2 |
+| `ext/curl/curl_multi_add_handle.php` | 0 | 2 |
+| `ext/curl/curl_multi_close.php` | 0 | 2 |
+| `ext/curl/curl_multi_exec.php` | 0 | 2 |
+| `ext/curl/curl_multi_getcontent.php` | 0 | 2 |
+| `ext/curl/curl_multi_init.php` | 0 | 2 |
+| `ext/curl/curl_multi_remove_handle.php` | 0 | 2 |
+| `ext/curl/curl_multi_select.php` | 0 | 2 |
 | `ext/curl/curl_multi_strerror.php` | 0 | 2 |
 | `ext/curl/curl_setopt.php` | 0 | 2 |
 | `ext/curl/curl_setopt_array.php` | 0 | 2 |
@@ -6147,8 +6155,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 48)
-- 2 class method(s)
+- 1 class method(s)
 
 ### `ext/curl/CurlConstants.php`
 
@@ -6158,7 +6165,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/CurlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 12 class method(s)
 
 ### `ext/curl/CurlFileBuiltin.php`
 
@@ -6195,31 +6202,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 46)
-- new curl_escape (line 59)
-- new curl_unescape (line 60)
-- new curl_version (line 61)
-- new curl_strerror (line 62)
-- new curl_multi_strerror (line 63)
-- new curl_upkeep (line 64)
-- new curl_file_create (line 67)
-- new curl_share_init (line 70)
-- new curl_share_setopt (line 71)
-- new curl_share_close (line 72)
-- new curl_init (line 75)
-- new curl_setopt (line 76)
-- new curl_setopt_array (line 77)
-- new curl_exec (line 78)
-- new curl_getinfo (line 79)
-- new curl_error (line 80)
-- new curl_errno (line 81)
-- new curl_close (line 82)
+- new VM\Variable (line 45)
+- new curl_escape (line 58)
+- new curl_unescape (line 59)
+- new curl_version (line 60)
+- new curl_strerror (line 61)
+- new curl_multi_strerror (line 62)
+- new curl_upkeep (line 63)
+- new curl_file_create (line 66)
+- new curl_share_init (line 69)
+- new curl_share_setopt (line 70)
+- new curl_share_close (line 71)
+- new curl_init (line 74)
+- new curl_setopt (line 75)
+- new curl_setopt_array (line 76)
+- new curl_exec (line 77)
+- new curl_getinfo (line 78)
+- new curl_error (line 79)
+- new curl_errno (line 80)
+- new curl_close (line 81)
+- new curl_multi_init (line 84)
+- new curl_multi_add_handle (line 85)
+- new curl_multi_exec (line 86)
+- new curl_multi_select (line 87)
+- new curl_multi_getcontent (line 88)
+- new curl_multi_remove_handle (line 89)
+- new curl_multi_close (line 90)
 - 5 class method(s)
 
 ### `ext/curl/VmCurlArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/curl/VmCurlCore.php`
 
@@ -6231,20 +6245,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/VmCurlEasy.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 49)
-- new Variable (line 61)
-- new ObjectEntry (line 62)
-- 16 class method(s)
+- new ClassEntry (line 54)
+- new Variable (line 66)
+- new ObjectEntry (line 67)
+- 26 class method(s)
 
 ### `ext/curl/VmCurlEscape.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/curl/VmCurlMulti.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 36)
+- new Variable (line 48)
+- new ObjectEntry (line 49)
+- 10 class method(s)
+
 ### `ext/curl/VmCurlNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 22 class method(s)
+- new Error (line 137)
+- 29 class method(s)
 
 ### `ext/curl/VmCurlShare.php`
 
@@ -6305,6 +6328,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/curl/curl_multi_add_handle.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/curl/curl_multi_close.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/curl/curl_multi_exec.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+
+### `ext/curl/curl_multi_getcontent.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/curl/curl_multi_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/curl/curl_multi_remove_handle.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
+
+### `ext/curl/curl_multi_select.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/curl/curl_multi_strerror.php`
