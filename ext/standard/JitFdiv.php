@@ -194,7 +194,9 @@ final class JitFdiv
         $arrayTy = $i8->constInt(VmVariable::TYPE_ARRAY, false);
         $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
         $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
-        $doubleTy = $i8->constInt(VmVariable::TYPE_FLOAT, false);
+        // Value boxes store JIT tags ({@see __value__writeDouble} → TYPE_NATIVE_DOUBLE=3).
+        // VmVariable::TYPE_FLOAT=2 collides with TYPE_NATIVE_BOOL and misses doubles (#20651).
+        $doubleTy = $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false);
         $stringTy = $i8->constInt(VmVariable::TYPE_STRING, false);
 
         $nullBlock = BasicBlockHelper::append($context, 'fdiv_box_null');

@@ -50,6 +50,26 @@ final class FpowRuntimeShrinkTest extends TestCase
         );
     }
 
+    public function testJitFdivBoxedDoubleUsesJitNativeDoubleTag(): void
+    {
+        // __value__writeDouble stores JIT TYPE_NATIVE_DOUBLE (3); VM float tag (2) is BOOL (#20651).
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitFdiv.php');
+        $this->assertMatchesRegularExpression(
+            '/\$doubleTy\s*=\s*\$i8->constInt\(\s*JITVariable::TYPE_NATIVE_DOUBLE/',
+            $source
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\$doubleTy\s*=\s*\$i8->constInt\(\s*VmVariable::TYPE_FLOAT/',
+            $source
+        );
+        $this->assertSame(3, \PHPCompiler\JIT\Variable::TYPE_NATIVE_DOUBLE);
+        $this->assertSame(2, \PHPCompiler\VM\Variable::TYPE_FLOAT);
+        $this->assertNotSame(
+            \PHPCompiler\JIT\Variable::TYPE_NATIVE_DOUBLE,
+            \PHPCompiler\VM\Variable::TYPE_FLOAT
+        );
+    }
+
     public function testFpowJitHelperDelegatesToKernel(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/FpowJitHelper.php');

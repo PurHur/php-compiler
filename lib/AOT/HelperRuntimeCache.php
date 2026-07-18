@@ -219,20 +219,29 @@ final class HelperRuntimeCache
     /**
      * Nested helper units embed ext/dom semantics pulled in at emit time; hash SSOT
      * alongside the helper stub so VmDom edits invalidate stale units (#17954).
+     *
+     * Float math *JitHelper units NestedJIT through {@see \PHPCompiler\ext\standard\JitFdiv}
+     * boxed-double lowering — hash it so JitFdiv edits invalidate those units (#20651).
      */
     private static function unitDependencyFingerprintMaterial(string $unitSourceAbsPath): string
     {
         $root = \dirname(__DIR__, 2);
-        if (!str_starts_with($unitSourceAbsPath, $root.'/ext/dom/')) {
-            return '';
-        }
         $parts = [];
-        foreach ([
-            '/ext/dom/VmDom.php',
-            '/ext/dom/VmDomJitFrame.php',
-            '/ext/dom/DomRegistry.php',
-        ] as $rel) {
-            $parts[] = $rel.':'.@hash_file('sha256', $root.$rel);
+        if (str_starts_with($unitSourceAbsPath, $root.'/ext/dom/')) {
+            foreach ([
+                '/ext/dom/VmDom.php',
+                '/ext/dom/VmDomJitFrame.php',
+                '/ext/dom/DomRegistry.php',
+            ] as $rel) {
+                $parts[] = $rel.':'.@hash_file('sha256', $root.$rel);
+            }
+        }
+        $base = \basename($unitSourceAbsPath);
+        if (1 === preg_match(
+            '/^(Fpow|Nextafter|Sqrt|Hypot|Log|Log10|Log1p|Sin|Cos|Tan|Asin|Acos|Atan|Atan2|Sinh|Cosh|Tanh|Exp|Expm1|Floor|Ceil|Round|Fmod|Fdiv)JitHelper\.php$/',
+            $base
+        )) {
+            $parts[] = '/ext/standard/JitFdiv.php:'.@hash_file('sha256', $root.'/ext/standard/JitFdiv.php');
         }
 
         return implode("\n", $parts);
