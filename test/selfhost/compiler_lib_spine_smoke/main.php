@@ -685,7 +685,6 @@ require_once __DIR__.'/../../../ext/hash/JitHashAlgos.php';
 require_once __DIR__.'/../../../ext/hash/JitHashAlgosKernel.php';
 require_once __DIR__.'/../../../ext/hash/JitHashContext.php';
 require_once __DIR__.'/../../../ext/hash/JitHashCryptoKernel.php';
-require_once __DIR__.'/../../../ext/hash/JitHashEqualsKernel.php';
 require_once __DIR__.'/../../../ext/hash/MhashRegistry.php';
 require_once __DIR__.'/../../../ext/hash/Module.php';
 require_once __DIR__.'/../../../ext/hash/VmHashContext.php';

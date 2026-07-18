@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5616 |
-| Phase A inventory files (M2 ratio SSOT) | 5616 |
+| PHP files on vm.php path | 5615 |
+| Phase A inventory files (M2 ratio SSOT) | 5615 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16045 |
+| Source constructs flagged (warnings) | 16044 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -634,7 +634,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/hash/JitHashAlgosKernel.php` | 0 | 1 |
 | `ext/hash/JitHashContext.php` | 0 | 3 |
 | `ext/hash/JitHashCryptoKernel.php` | 0 | 1 |
-| `ext/hash/JitHashEqualsKernel.php` | 0 | 1 |
 | `ext/hash/MhashRegistry.php` | 0 | 1 |
 | `ext/hash/Module.php` | 0 | 16 |
 | `ext/hash/VmHashContext.php` | 0 | 6 |
@@ -9773,11 +9772,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 18 class method(s)
-
-### `ext/hash/JitHashEqualsKernel.php`
-
-**Warnings** (review for bootstrap subset):
-- 4 class method(s)
 
 ### `ext/hash/MhashRegistry.php`
 

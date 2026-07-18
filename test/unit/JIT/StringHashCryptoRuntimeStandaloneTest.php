@@ -78,7 +78,7 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
         }
     }
 
-    public function testThinUserScriptLinksRealHashEqualsKernel(): void
+    public function testThinUserScriptLinksHashEqualsHelperBridge(): void
     {
         $prev = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
@@ -91,8 +91,11 @@ final class StringHashCryptoRuntimeStandaloneTest extends TestCase
             $this->assertNotNull($fn);
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
             $this->assertTrue(
-                \PHPCompiler\JIT\JitVmHelperLink::hasNamedBridgeEntry($fn, 'hash_equals_kernel_entry'),
-                'thin user-script AOT must emit real hash_equals kernel, not deferred stub'
+                \PHPCompiler\JIT\JitVmHelperLink::hasNamedBridgeEntry($fn, 'hash_equals_bridge_entry'),
+                'thin user-script AOT must emit HashEqualsJitHelper bridge, not deferred stub'
+            );
+            $this->assertFalse(
+                \PHPCompiler\JIT\JitVmHelperLink::hasNamedBridgeEntry($fn, 'hash_equals_kernel_entry')
             );
             $this->assertFalse(
                 \PHPCompiler\JIT\JitVmHelperLink::hasNamedBridgeEntry($fn, 'hash_equals_deferred_stub')
