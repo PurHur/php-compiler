@@ -724,8 +724,15 @@ final class VmSimpleXml
         $state->attributes[$qualifiedName] = $value;
     }
 
-    /** @return HashTable list of SimpleXMLElement objects */
-    public static function xpath(Context $ctx, ObjectEntry $entry, string $expression): HashTable
+    /**
+     * SimpleXMLElement::xpath — php-src zim_simplexmlelement_xpath (#20334).
+     *
+     * Prefixes resolve from in-scope xmlns (xmlGetNsList) plus registerXPathNamespace
+     * (xmlXPathRegisterNs). `//name` is document-wide (absolute), not context-scoped.
+     *
+     * @return HashTable|false list of SimpleXMLElement objects, or false on undefined prefix
+     */
+    public static function xpath(Context $ctx, ObjectEntry $entry, string $expression, ?Frame $frame = null): HashTable|false
     {
         $expression = trim($expression);
         $ht = new HashTable();
@@ -733,17 +740,27 @@ final class VmSimpleXml
             return $ht;
         }
 
+        $nsMap = self::xpathNamespaceMap($entry);
         $contextNodes = self::xpathContextNodes($entry);
+        $docKey = SimpleXmlRegistry::documentKey($entry);
+
+        // `//tag` / `//ns:tag` / `//tag[@attr="v"]` — absolute from document root (XPath //).
         if (preg_match('~^//([\w:-]+)(?:\[@([\w:-]+)=["\']([^"\']*)["\']\])?$~', $expression, $m)) {
-            foreach ($contextNodes as $context) {
-                foreach (self::collectDescendantsNamed($context, $m[1]) as $node) {
-                    if (isset($m[2]) && (!\array_key_exists($m[2], $node->attributes) || $node->attributes[$m[2]] !== $m[3])) {
-                        continue;
-                    }
-                    $var = new Variable();
-                    $var->object(self::wrapNode($ctx, $entry->class, $node, SimpleXmlRegistry::documentKey($entry)));
-                    $ht->append($var);
+            $resolved = self::resolveXPathQName($m[1], $nsMap);
+            if (null === $resolved) {
+                self::warn($ctx, 'SimpleXMLElement::xpath(): Undefined namespace prefix', $frame);
+
+                return false;
+            }
+            [$localName, $nsUri] = $resolved;
+            $root = SimpleXmlRegistry::rootState($docKey);
+            foreach (self::collectDescendantsByQName($root, $localName, $nsUri, []) as $node) {
+                if (isset($m[2]) && (!\array_key_exists($m[2], $node->attributes) || $node->attributes[$m[2]] !== $m[3])) {
+                    continue;
                 }
+                $var = new Variable();
+                $var->object(self::wrapNode($ctx, $entry->class, $node, $docKey));
+                $ht->append($var);
             }
 
             return $ht;
@@ -751,7 +768,7 @@ final class VmSimpleXml
         if ('.' === $expression) {
             foreach ($contextNodes as $context) {
                 $var = new Variable();
-                $var->object(self::wrapNode($ctx, $entry->class, $context, SimpleXmlRegistry::documentKey($entry)));
+                $var->object(self::wrapNode($ctx, $entry->class, $context, $docKey));
                 $ht->append($var);
             }
 
@@ -763,29 +780,40 @@ final class VmSimpleXml
             if ([] === $segments) {
                 return $ht;
             }
-            $docKey = SimpleXmlRegistry::documentKey($entry);
-            $nodes = [SimpleXmlRegistry::rootState($docKey)];
+            // Each entry: [node, in-scope xmlns map at that node].
+            /** @var list<array{0: SimpleXmlNodeState, 1: array<string, string>}> $frontier */
+            $frontier = [[SimpleXmlRegistry::rootState($docKey), []]];
             foreach ($segments as $index => $segment) {
+                $resolved = self::resolveXPathQName($segment, $nsMap);
+                if (null === $resolved) {
+                    self::warn($ctx, 'SimpleXMLElement::xpath(): Undefined namespace prefix', $frame);
+
+                    return false;
+                }
+                [$localName, $nsUri] = $resolved;
                 $next = [];
                 if (0 === $index) {
-                    foreach ($nodes as $node) {
-                        if ($node->name === $segment) {
-                            $next[] = $node;
+                    foreach ($frontier as [$node, $parentScope]) {
+                        $nodeScope = self::scopeAfterNode($node, $parentScope);
+                        if (self::nodeMatchesQName($node, $localName, $nsUri, $nodeScope)) {
+                            $next[] = [$node, $nodeScope];
                         }
                     }
                 } else {
-                    foreach ($nodes as $node) {
-                        foreach ($node->elementsNamed($segment) as $child) {
-                            $next[] = $child;
+                    foreach ($frontier as [$node, $nodeScope]) {
+                        foreach ($node->children as $child) {
+                            if (self::nodeMatchesQName($child, $localName, $nsUri, $nodeScope)) {
+                                $next[] = [$child, self::scopeAfterNode($child, $nodeScope)];
+                            }
                         }
                     }
                 }
-                $nodes = $next;
-                if ([] === $nodes) {
+                $frontier = $next;
+                if ([] === $frontier) {
                     break;
                 }
             }
-            foreach ($nodes as $node) {
+            foreach ($frontier as [$node]) {
                 $var = new Variable();
                 $var->object(self::wrapNode($ctx, $entry->class, $node, $docKey));
                 $ht->append($var);
@@ -795,11 +823,22 @@ final class VmSimpleXml
         }
 
         if (preg_match('~^[\w:-]+$~', $expression)) {
+            $resolved = self::resolveXPathQName($expression, $nsMap);
+            if (null === $resolved) {
+                self::warn($ctx, 'SimpleXMLElement::xpath(): Undefined namespace prefix', $frame);
+
+                return false;
+            }
+            [$localName, $nsUri] = $resolved;
+            $root = SimpleXmlRegistry::rootState($docKey);
             foreach ($contextNodes as $context) {
-                foreach ($context->elementsNamed($expression) as $node) {
-                    $var = new Variable();
-                    $var->object(self::wrapNode($ctx, $entry->class, $node, SimpleXmlRegistry::documentKey($entry)));
-                    $ht->append($var);
+                $parentScope = self::namespacesAtNodeWalk($root, $context, []) ?? [];
+                foreach ($context->children as $node) {
+                    if (self::nodeMatchesQName($node, $localName, $nsUri, $parentScope)) {
+                        $var = new Variable();
+                        $var->object(self::wrapNode($ctx, $entry->class, $node, $docKey));
+                        $ht->append($var);
+                    }
                 }
             }
 
@@ -1079,17 +1118,104 @@ final class VmSimpleXml
         return [SimpleXmlRegistry::state($entry)];
     }
 
-    /** @return list<SimpleXmlNodeState> */
-    private static function collectDescendantsNamed(SimpleXmlNodeState $node, string $name): array
+    /**
+     * In-scope xmlns plus registerXPathNamespace bindings (php-src xmlGetNsList + xmlXPathRegisterNs).
+     *
+     * @return array<string, string> prefix => URI
+     */
+    private static function xpathNamespaceMap(ObjectEntry $entry): array
     {
+        return array_merge(
+            self::inScopeNamespacesForEntry($entry),
+            SimpleXmlRegistry::xpathNamespaces($entry)
+        );
+    }
+
+    /**
+     * Resolve an XPath NameTest to local name + namespace URI.
+     * Unprefixed names select the null namespace (XPath 1.0). Unknown prefix → null.
+     *
+     * @param array<string, string> $namespaces
+     *
+     * @return array{0: string, 1: string}|null [localName, namespaceUri] or null if prefix undefined
+     */
+    private static function resolveXPathQName(string $qName, array $namespaces): ?array
+    {
+        if ('*' === $qName) {
+            return ['*', '*'];
+        }
+        if (!str_contains($qName, ':')) {
+            return [$qName, ''];
+        }
+        [$prefix, $local] = explode(':', $qName, 2);
+        if (!isset($namespaces[$prefix])) {
+            return null;
+        }
+
+        return [$local, $namespaces[$prefix]];
+    }
+
+    /**
+     * @param array<string, string> $parentScope
+     *
+     * @return array<string, string>
+     */
+    private static function scopeAfterNode(SimpleXmlNodeState $node, array $parentScope): array
+    {
+        $scope = $parentScope;
+        foreach ($node->attributes as $name => $value) {
+            if ('xmlns' === $name) {
+                $scope[''] = $value;
+            } elseif (str_starts_with($name, 'xmlns:')) {
+                $scope[substr($name, 6)] = $value;
+            }
+        }
+
+        return $scope;
+    }
+
+    /**
+     * @param array<string, string> $parentScope xmlns in scope on the parent (before this node's decls)
+     */
+    private static function nodeMatchesQName(
+        SimpleXmlNodeState $node,
+        string $localName,
+        string $namespaceUri,
+        array $parentScope
+    ): bool {
+        $nodeScope = self::scopeAfterNode($node, $parentScope);
+        $nodeLocal = self::localNameFromQualified($node->name);
+        if ('*' !== $localName && $nodeLocal !== $localName) {
+            return false;
+        }
+        if ('*' === $namespaceUri) {
+            return true;
+        }
+        $nodeUri = self::resolveElementNamespaceUri($node, $nodeScope);
+
+        return $nodeUri === $namespaceUri;
+    }
+
+    /**
+     * Document-order descendants-or-self matching local name + namespace URI.
+     *
+     * @param array<string, string> $parentScope
+     *
+     * @return list<SimpleXmlNodeState>
+     */
+    private static function collectDescendantsByQName(
+        SimpleXmlNodeState $node,
+        string $localName,
+        string $namespaceUri,
+        array $parentScope
+    ): array {
         $out = [];
-        if ('*' !== $name && $node->name === $name) {
-            $out[] = $node;
-        } elseif ('*' === $name) {
+        $nodeScope = self::scopeAfterNode($node, $parentScope);
+        if (self::nodeMatchesQName($node, $localName, $namespaceUri, $parentScope)) {
             $out[] = $node;
         }
         foreach ($node->children as $child) {
-            foreach (self::collectDescendantsNamed($child, $name) as $match) {
+            foreach (self::collectDescendantsByQName($child, $localName, $namespaceUri, $nodeScope) as $match) {
                 $out[] = $match;
             }
         }
