@@ -1385,6 +1385,36 @@ final class VmOpenssl
         return $exported;
     }
 
+    /**
+     * openssl_pkey_export_to_file() — PEM to path (php-src ext/openssl/openssl.c; #20287).
+     *
+     * @return string|false
+     */
+    public static function pkeyExportPemToFile(
+        Variable $keyArg,
+        ?string $passphrase,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslPkeyNative::available()) {
+            self::userWarning(
+                'openssl_pkey_export_to_file(): OpenSSL is unavailable in this compiler build',
+                $frame
+            );
+
+            return false;
+        }
+
+        $pem = self::coercePkeyPem($keyArg, 'openssl_pkey_export_to_file', 0, 'key');
+        $exported = VmOpensslPkeyNative::exportPrivateKeyPem($pem, $passphrase);
+        if (false === $exported) {
+            self::userWarning('openssl_pkey_export_to_file(): Cannot get key from parameter 1', $frame);
+
+            return false;
+        }
+
+        return $exported;
+    }
+
     public static function coercePkeyPem(Variable $var, string $function, int $argIndex, string $paramName): string
     {
         $var = $var->resolveIndirect();

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5528 |
-| Phase A inventory files (M2 ratio SSOT) | 5528 |
+| PHP files on vm.php path | 5529 |
+| Phase A inventory files (M2 ratio SSOT) | 5529 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15725 |
+| Source constructs flagged (warnings) | 15729 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -832,7 +832,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
-| `ext/openssl/Module.php` | 0 | 61 |
+| `ext/openssl/Module.php` | 0 | 62 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
@@ -889,6 +889,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_pkcs7_verify.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_derive.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_export.php` | 0 | 2 |
+| `ext/openssl/openssl_pkey_export_to_file.php` | 0 | 3 |
 | `ext/openssl/openssl_pkey_free.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_get_details.php` | 0 | 2 |
 | `ext/openssl/openssl_pkey_get_private.php` | 0 | 2 |
@@ -11268,46 +11269,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new openssl_get_publickey (line 52)
 - new openssl_pkey_get_details (line 53)
 - new openssl_pkey_export (line 54)
-- new openssl_pkey_derive (line 55)
-- new openssl_dh_compute_key (line 56)
-- new openssl_cipher_iv_length (line 57)
-- new openssl_cipher_key_length (line 58)
-- new openssl_digest (line 59)
-- new openssl_pbkdf2 (line 60)
-- new openssl_x509_read (line 61)
-- new openssl_x509_parse (line 62)
-- new openssl_x509_fingerprint (line 63)
-- new openssl_x509_export (line 64)
-- new openssl_x509_export_to_file (line 65)
-- new openssl_pkcs12_read (line 66)
-- new openssl_pkcs12_export (line 67)
-- new openssl_pkcs12_export_to_file (line 68)
-- new openssl_pkcs7_sign (line 69)
-- new openssl_pkcs7_verify (line 70)
-- new openssl_pkcs7_encrypt (line 71)
-- new openssl_pkcs7_decrypt (line 72)
-- new openssl_cms_sign (line 73)
-- new openssl_cms_verify (line 74)
-- new openssl_cms_encrypt (line 75)
-- new openssl_cms_decrypt (line 76)
-- new openssl_cms_read (line 77)
-- new openssl_x509_verify (line 78)
-- new openssl_x509_free (line 79)
-- new openssl_csr_new (line 80)
-- new openssl_csr_export (line 81)
-- new openssl_csr_export_to_file (line 82)
-- new openssl_csr_sign (line 83)
-- new openssl_csr_get_subject (line 84)
-- new openssl_csr_get_public_key (line 85)
-- new openssl_free_key (line 86)
-- new openssl_pkey_free (line 87)
-- new openssl_spki_new (line 88)
-- new openssl_spki_verify (line 89)
-- new openssl_spki_export (line 90)
-- new openssl_spki_export_challenge (line 91)
-- new openssl_seal (line 92)
-- new openssl_open (line 93)
-- new openssl_error_string (line 94)
+- new openssl_pkey_export_to_file (line 55)
+- new openssl_pkey_derive (line 56)
+- new openssl_dh_compute_key (line 57)
+- new openssl_cipher_iv_length (line 58)
+- new openssl_cipher_key_length (line 59)
+- new openssl_digest (line 60)
+- new openssl_pbkdf2 (line 61)
+- new openssl_x509_read (line 62)
+- new openssl_x509_parse (line 63)
+- new openssl_x509_fingerprint (line 64)
+- new openssl_x509_export (line 65)
+- new openssl_x509_export_to_file (line 66)
+- new openssl_pkcs12_read (line 67)
+- new openssl_pkcs12_export (line 68)
+- new openssl_pkcs12_export_to_file (line 69)
+- new openssl_pkcs7_sign (line 70)
+- new openssl_pkcs7_verify (line 71)
+- new openssl_pkcs7_encrypt (line 72)
+- new openssl_pkcs7_decrypt (line 73)
+- new openssl_cms_sign (line 74)
+- new openssl_cms_verify (line 75)
+- new openssl_cms_encrypt (line 76)
+- new openssl_cms_decrypt (line 77)
+- new openssl_cms_read (line 78)
+- new openssl_x509_verify (line 79)
+- new openssl_x509_free (line 80)
+- new openssl_csr_new (line 81)
+- new openssl_csr_export (line 82)
+- new openssl_csr_export_to_file (line 83)
+- new openssl_csr_sign (line 84)
+- new openssl_csr_get_subject (line 85)
+- new openssl_csr_get_public_key (line 86)
+- new openssl_free_key (line 87)
+- new openssl_pkey_free (line 88)
+- new openssl_spki_new (line 89)
+- new openssl_spki_verify (line 90)
+- new openssl_spki_export (line 91)
+- new openssl_spki_export_challenge (line 92)
+- new openssl_seal (line 93)
+- new openssl_open (line 94)
+- new openssl_error_string (line 95)
 - 2 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
@@ -11340,11 +11342,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 92)
 - new Variable (line 883)
-- new HashTable (line 2108)
-- new Variable (line 2110)
-- new HashTable (line 2121)
-- new Variable (line 2123)
-- 65 class method(s)
+- new HashTable (line 2138)
+- new Variable (line 2140)
+- new HashTable (line 2151)
+- new Variable (line 2153)
+- 66 class method(s)
 
 ### `ext/openssl/VmOpensslCipherNative.php`
 
@@ -11656,6 +11658,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/openssl/openssl_pkey_export_to_file.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 34)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_pkey_free.php`
@@ -32791,8 +32800,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/AttributeRegistryLookupRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 389)
-- new JIT (line 420)
+- new JIT (line 391)
+- new JIT (line 422)
 - 19 class method(s)
 - 2 closure(s)
 

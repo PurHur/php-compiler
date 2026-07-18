@@ -598,7 +598,18 @@ final class VmOpensslPkeyNative
         }
 
         try {
-            if (1 !== (int) $ffi->PEM_write_bio_PrivateKey($bio, $pkey, null, null, 0, null, null)) {
+            // php-src openssl_pkey_export(_to_file): encrypt with 3DES when passphrase set
+            // (priv_key_encrypt default true; ext/openssl/openssl.c PEM_write_bio_PrivateKey).
+            $cipher = null;
+            $kstr = null;
+            $klen = 0;
+            if (null !== $passphrase && '' !== $passphrase) {
+                $cipher = $ffi->EVP_des_ede3_cbc();
+                $klen = \strlen($passphrase);
+                $kstr = $ffi->new('unsigned char['.$klen.']');
+                \FFI::memcpy($kstr, $passphrase, $klen);
+            }
+            if (1 !== (int) $ffi->PEM_write_bio_PrivateKey($bio, $pkey, $cipher, $kstr, $klen, null, null)) {
                 return false;
             }
         } finally {
@@ -636,6 +647,7 @@ final class VmOpensslPkeyNative
 typedef struct bio_st BIO;
 typedef struct evp_pkey_st EVP_PKEY;
 typedef struct evp_pkey_ctx_st EVP_PKEY_CTX;
+typedef struct evp_cipher_st EVP_CIPHER;
 typedef struct rsa_st RSA;
 typedef struct bignum_st BIGNUM;
 
@@ -644,6 +656,7 @@ BIO *BIO_new_file(const char *filename, const char *mode);
 void BIO_free(BIO *a);
 EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, void *cb, void *u);
 EVP_PKEY *PEM_read_bio_PUBKEY(BIO *bp, EVP_PKEY **x, void *cb, void *u);
+const EVP_CIPHER *EVP_des_ede3_cbc(void);
 void EVP_PKEY_free(EVP_PKEY *pkey);
 EVP_PKEY_CTX *EVP_PKEY_CTX_new_id(int id, void *e);
 EVP_PKEY_CTX *EVP_PKEY_CTX_new(EVP_PKEY *pkey, void *e);
@@ -677,8 +690,8 @@ BIGNUM *RSA_get0_dmq1(const RSA *d);
 BIGNUM *RSA_get0_iqmp(const RSA *d);
 int BN_num_bits(const BIGNUM *a);
 int BN_bn2bin(const BIGNUM *a, unsigned char *to);
-int PEM_write_bio_PrivateKey(BIO *bp, EVP_PKEY *x, void *enc,
-    void *kstr, int klen, void *cb, void *u);
+int PEM_write_bio_PrivateKey(BIO *bp, EVP_PKEY *x, const EVP_CIPHER *enc,
+    const unsigned char *kstr, int klen, void *cb, void *u);
 int PEM_write_bio_PUBKEY(BIO *bp, EVP_PKEY *x);
 CDEF;
 

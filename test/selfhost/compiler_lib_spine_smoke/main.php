@@ -954,6 +954,7 @@ require_once __DIR__.'/../../../ext/openssl/openssl_pkcs7_sign.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkcs7_verify.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkey_derive.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkey_export.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_pkey_export_to_file.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkey_free.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkey_get_details.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkey_get_private.php';

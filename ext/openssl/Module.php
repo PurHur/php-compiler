@@ -52,6 +52,7 @@ class Module extends ModuleAbstract
             new openssl_get_publickey(),
             new openssl_pkey_get_details(),
             new openssl_pkey_export(),
+            new openssl_pkey_export_to_file(),
             new openssl_pkey_derive(),
             new openssl_dh_compute_key(),
             new openssl_cipher_iv_length(),
