@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** function_exists() — whether a function is registered in this compile unit (issue #1216). */
+/** function_exists() — whether a function is registered in this compile unit (issue #1216, #20360). */
 final class function_exists extends Internal
 {
     public function __construct()
@@ -27,7 +27,8 @@ final class function_exists extends Internal
             return;
         }
         $ctx = VmReflection::requireContext($frame);
-        $name = VmString::stringBuiltinArgForFrame($frame, 0, 'function_exists', 0, 'function');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20360, zend_builtin_functions.c).
+        $name = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'function_exists', 0, 'function');
         $frame->returnVar->bool(VmReflection::functionExists($ctx, $name));
     }
 
@@ -36,6 +37,7 @@ final class function_exists extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('function_exists() requires exactly one argument');
         }
+
         return JitFunctionExists::invoke($context, $args[0]);
     }
 }

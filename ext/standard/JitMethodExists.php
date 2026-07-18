@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\StringMethodExists;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\MagicMethodDispatch;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
@@ -143,7 +144,7 @@ final class JitMethodExists
         JITVariable $methodArg
     ): Value {
         $operandPtr = JitValueBox::valuePtrFromVariable($context, $objectOrClass);
-        $methodStr = JitStringArg::lower($context, $methodArg, 'method_exists() method name');
+        $methodStr = self::jitMethodNameArg($context, $methodArg);
 
         return StringMethodExists::invoke($context, $operandPtr, $methodStr);
     }
@@ -161,9 +162,30 @@ final class JitMethodExists
             $ptr,
             $obj
         );
-        $methodStr = JitStringArg::lower($context, $methodArg, 'method_exists() method name');
+        $methodStr = self::jitMethodNameArg($context, $methodArg);
 
         return StringMethodExists::invoke($context, $ptr, $methodStr);
+    }
+
+    private static function jitMethodNameArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'method_exists',
+                1,
+                'method'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'method_exists',
+            1,
+            'method'
+        );
     }
 
     private static function forObject(

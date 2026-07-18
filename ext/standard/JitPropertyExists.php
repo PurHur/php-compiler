@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\StringPropertyExists;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -142,7 +143,7 @@ final class JitPropertyExists
         JITVariable $propertyArg
     ): Value {
         $operandPtr = JitValueBox::valuePtrFromVariable($context, $objectOrClass);
-        $propertyStr = JitStringArg::lower($context, $propertyArg, 'property_exists() property name');
+        $propertyStr = self::jitPropertyNameArg($context, $propertyArg);
 
         return StringPropertyExists::invoke($context, $operandPtr, $propertyStr);
     }
@@ -160,9 +161,30 @@ final class JitPropertyExists
             $ptr,
             $obj
         );
-        $propertyStr = JitStringArg::lower($context, $propertyArg, 'property_exists() property name');
+        $propertyStr = self::jitPropertyNameArg($context, $propertyArg);
 
         return StringPropertyExists::invoke($context, $ptr, $propertyStr);
+    }
+
+    private static function jitPropertyNameArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'property_exists',
+                1,
+                'property'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'property_exists',
+            1,
+            'property'
+        );
     }
 
     private static function emitTypeErrorAndAbort(Context $context, string $message): void
