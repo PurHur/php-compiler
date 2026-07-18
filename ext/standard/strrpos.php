@@ -32,7 +32,7 @@ final class strrpos extends Internal
             throw new \LogicException('strrpos() requires two or three arguments');
         }
         $haystackStr = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'strrpos', 0, 'haystack');
-        $needleStr = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strrpos', 1, 'needle');
+        $needleStr = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[1], 'strrpos', 1, 'needle');
         if (null === $frame->returnVar) {
             return;
         }
@@ -71,7 +71,7 @@ final class strrpos extends Internal
 
         StringStrrpos::ensureLinked($context);
         $hay = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'strrpos', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lower($context, $args[1], 'strrpos', 1, 'needle');
+        $needle = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'strrpos', 1, 'needle');
         $offset = 3 === $argc
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'strrpos', 3, 'offset')
             : null;

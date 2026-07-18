@@ -30,7 +30,7 @@ final class stripos extends Internal
             return;
         }
         $haystackStr = VmString::coerceZparamStrBuiltinArg($haystack, 'stripos', 0, 'haystack');
-        $needleStr = VmString::coerceStringBuiltinArg($needle, 'stripos', 1, 'needle');
+        $needleStr = VmString::coerceZparamStrBuiltinArg($needle, 'stripos', 1, 'needle');
         $offset = 0;
         if (3 === $argc) {
             $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'stripos', 3, 'offset');
@@ -66,7 +66,7 @@ final class stripos extends Internal
 
         StringStrpos::ensureLinked($context);
         $hay = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'stripos', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lower($context, $args[1], 'stripos', 1, 'needle');
+        $needle = JitStringBuiltinArg::lowerZparamStr($context, $args[1], 'stripos', 1, 'needle');
         $offset = 3 === $argc
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'stripos', 3, 'offset')
             : null;
