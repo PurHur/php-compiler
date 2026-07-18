@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5804 |
-| Phase A inventory files (M2 ratio SSOT) | 5804 |
+| PHP files on vm.php path | 5809 |
+| Phase A inventory files (M2 ratio SSOT) | 5809 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17111 |
+| Source constructs flagged (warnings) | 17148 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -813,7 +813,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleLookup.php` | 0 | 3 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 36 |
+| `ext/intl/Module.php` | 0 | 41 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -832,7 +832,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmNumberFormatter.php` | 0 | 11 |
 | `ext/intl/VmResourceBundle.php` | 0 | 12 |
 | `ext/intl/VmSpoofchecker.php` | 0 | 24 |
-| `ext/intl/VmTransliterator.php` | 0 | 10 |
+| `ext/intl/VmTransliterator.php` | 0 | 27 |
 | `ext/intl/VmUConverter.php` | 0 | 16 |
 | `ext/intl/collator_create.php` | 0 | 3 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
@@ -867,6 +867,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/normalizer_is_normalized.php` | 0 | 2 |
 | `ext/intl/normalizer_normalize.php` | 0 | 2 |
 | `ext/intl/transliterator_create.php` | 0 | 3 |
+| `ext/intl/transliterator_create_from_rules.php` | 0 | 3 |
+| `ext/intl/transliterator_create_inverse.php` | 0 | 3 |
+| `ext/intl/transliterator_get_error_code.php` | 0 | 3 |
+| `ext/intl/transliterator_get_error_message.php` | 0 | 3 |
+| `ext/intl/transliterator_list_ids.php` | 0 | 3 |
 | `ext/intl/transliterator_transliterate.php` | 0 | 3 |
 | `ext/ldap/JitLdapEscape.php` | 0 | 2 |
 | `ext/ldap/LdapConstants.php` | 0 | 1 |
@@ -11251,22 +11256,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new msgfmt_format (line 115)
 - new msgfmt_format_message (line 116)
 - new transliterator_create (line 122)
-- new transliterator_transliterate (line 123)
-- new grapheme_strlen (line 146)
-- new grapheme_substr (line 147)
-- new grapheme_strpos (line 148)
-- new grapheme_str_contains (line 149)
-- new grapheme_strstr (line 150)
-- new grapheme_stristr (line 151)
-- new grapheme_stripos (line 152)
-- new grapheme_strrpos (line 153)
-- new grapheme_extract (line 154)
-- new grapheme_levenshtein (line 155)
-- new grapheme_str_split (line 156)
-- new grapheme_strimwidth (line 157)
-- new intl_get_error_code (line 158)
-- new intl_get_error_message (line 159)
-- new intl_is_failure (line 160)
+- new transliterator_create_from_rules (line 123)
+- new transliterator_create_inverse (line 124)
+- new transliterator_list_ids (line 125)
+- new transliterator_transliterate (line 126)
+- new transliterator_get_error_code (line 127)
+- new transliterator_get_error_message (line 128)
+- new grapheme_strlen (line 151)
+- new grapheme_substr (line 152)
+- new grapheme_strpos (line 153)
+- new grapheme_str_contains (line 154)
+- new grapheme_strstr (line 155)
+- new grapheme_stristr (line 156)
+- new grapheme_stripos (line 157)
+- new grapheme_strrpos (line 158)
+- new grapheme_extract (line 159)
+- new grapheme_levenshtein (line 160)
+- new grapheme_str_split (line 161)
+- new grapheme_strimwidth (line 162)
+- new intl_get_error_code (line 163)
+- new intl_get_error_message (line 164)
+- new intl_is_failure (line 165)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -11519,16 +11529,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmTransliterator.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 53)
-- new Variable (line 57)
-- new TransliteratorCreate (line 64)
-- new TransliteratorTransliterate (line 67)
-- new Error (line 84)
-- new ObjectEntry (line 104)
-- new ArgumentCountError (line 477)
-- new ArgumentCountError (line 512)
-- new Error (line 520)
-- 20 class method(s)
+- new ClassEntry (line 58)
+- new Variable (line 62)
+- new TransliteratorCreate (line 70)
+- new TransliteratorCreateFromRules (line 71)
+- new TransliteratorCreateInverse (line 72)
+- new TransliteratorListIDs (line 73)
+- new TransliteratorTransliterate (line 74)
+- new TransliteratorGetErrorCode (line 75)
+- new TransliteratorGetErrorMessage (line 76)
+- new Error (line 106)
+- new Error (line 137)
+- new Error (line 169)
+- new HashTable (line 208)
+- new Variable (line 210)
+- new ObjectEntry (line 291)
+- new ArgumentCountError (line 717)
+- new ArgumentCountError (line 753)
+- new ArgumentCountError (line 794)
+- new Error (line 802)
+- new ArgumentCountError (line 829)
+- new ArgumentCountError (line 859)
+- new Error (line 867)
+- new ArgumentCountError (line 888)
+- new Error (line 896)
+- new ArgumentCountError (line 917)
+- new Error (line 925)
+- 35 class method(s)
 
 ### `ext/intl/VmUConverter.php`
 
@@ -11766,7 +11793,42 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
-- new Error (line 49)
+- new Error (line 50)
+- 2 class method(s)
+
+### `ext/intl/transliterator_create_from_rules.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 60)
+- 2 class method(s)
+
+### `ext/intl/transliterator_create_inverse.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 53)
+- 2 class method(s)
+
+### `ext/intl/transliterator_get_error_code.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 47)
+- 2 class method(s)
+
+### `ext/intl/transliterator_get_error_message.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 47)
+- 2 class method(s)
+
+### `ext/intl/transliterator_list_ids.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 44)
 - 2 class method(s)
 
 ### `ext/intl/transliterator_transliterate.php`
