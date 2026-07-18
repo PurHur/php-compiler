@@ -10379,6 +10379,22 @@ class JIT {
                                 $this->context->scope->toCall = null;
                                 $this->context->scope->args = [];
                             } elseif ($classOp instanceof Operand\Literal
+                                && 0 === strcasecmp(ltrim($classOp->value, '\\'), 'XSLTProcessor')
+                                && JIT\XsltInstanceMethodJit::isUserScriptAot()
+                            ) {
+                                // Attach host XSLTProcessor at allocate for security/EXSLT fold (#20392).
+                                $xsltReceiver = $this->context->getVariableFromOp($resultOp);
+                                \PHPCompiler\ext\xsl\JitXsltUserScript::tryInit(
+                                    $this->context,
+                                    $xsltReceiver
+                                );
+                                $this->context->scope->preserveNewResultOnNullCall = true;
+                                $this->context->type->object->markObjectConstructed(
+                                    $this->context->helper->loadValue($obj)
+                                );
+                                $this->context->scope->toCall = null;
+                                $this->context->scope->args = [];
+                            } elseif ($classOp instanceof Operand\Literal
                                 && JIT\RandomizerInstanceMethodJit::isUserScriptAot()
                                 && (
                                     0 === strcasecmp(ltrim($classOp->value, '\\'), 'Random\\Engine\\Mt19937')
@@ -15770,6 +15786,12 @@ class JIT {
         ) {
             JIT\XmlWriterInstanceMethodJit::ensureProxy($this->context, $proxyName);
         }
+        // Register XSLTProcessor user-script AOT proxies before functionIsRegistered (#20392).
+        if (JIT\XsltInstanceMethodJit::isXsltInstanceMethodProxy($proxyName)
+            && JIT\XsltInstanceMethodJit::isUserScriptAot()
+        ) {
+            JIT\XsltInstanceMethodJit::ensureProxy($this->context, $proxyName);
+        }
         // Register Randomizer user-script AOT proxies before functionIsRegistered (#19574).
         if (JIT\RandomizerInstanceMethodJit::isRandomizerInstanceMethodProxy($proxyName)
             && JIT\RandomizerInstanceMethodJit::isUserScriptAot()
@@ -15791,7 +15813,9 @@ class JIT {
                 || 'true' === strtolower((string) getenv('PHP_COMPILER_AOT_USER_SCRIPT')));
         $xmlWriterUserScript = JIT\XmlWriterInstanceMethodJit::isXmlWriterInstanceMethodProxy($proxyName)
             && JIT\XmlWriterInstanceMethodJit::isUserScriptAot();
-        if (Type::TYPE_OBJECT === $receiverOp->type?->type && !$splObjectStorageMethod && !$simpleXmlUserScript && !$xmlWriterUserScript) {
+        $xsltUserScript = JIT\XsltInstanceMethodJit::isXsltInstanceMethodProxy($proxyName)
+            && JIT\XsltInstanceMethodJit::isUserScriptAot();
+        if (Type::TYPE_OBJECT === $receiverOp->type?->type && !$splObjectStorageMethod && !$simpleXmlUserScript && !$xmlWriterUserScript && !$xsltUserScript) {
             JIT\LazyObjectHelper::emitEnsureInitialized(
                 $this->context,
                 $this->context->helper->loadValue($dispatchReceiver)
@@ -15861,6 +15885,17 @@ class JIT {
                 && JIT\RandomizerInstanceMethodJit::isUserScriptAot()
             ) {
                 JIT\RandomizerInstanceMethodJit::ensureProxy($this->context, $proxyName);
+                if ($this->context->functionIsRegistered($proxyName)) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+            }
+            if (JIT\XsltInstanceMethodJit::isXsltInstanceMethodProxy($proxyName)
+                && JIT\XsltInstanceMethodJit::isUserScriptAot()
+            ) {
+                JIT\XsltInstanceMethodJit::ensureProxy($this->context, $proxyName);
                 if ($this->context->functionIsRegistered($proxyName)) {
                     $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
                     $this->context->scope->args = [$receiverVar];

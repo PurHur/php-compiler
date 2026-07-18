@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5574 |
-| Phase A inventory files (M2 ratio SSOT) | 5574 |
+| PHP files on vm.php path | 5581 |
+| Phase A inventory files (M2 ratio SSOT) | 5581 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15946 |
+| Source constructs flagged (warnings) | 15961 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3735,18 +3735,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xmlwriter/xmlwriter_write_pi.php` | 0 | 2 |
 | `ext/xmlwriter/xmlwriter_write_raw.php` | 0 | 2 |
 | `ext/xsl/BuiltinClasses.php` | 0 | 1 |
+| `ext/xsl/JitXsltMethod.php` | 0 | 1 |
+| `ext/xsl/JitXsltUserScript.php` | 0 | 1 |
 | `ext/xsl/Module.php` | 0 | 2 |
-| `ext/xsl/VmXsl.php` | 0 | 11 |
+| `ext/xsl/VmXsl.php` | 0 | 14 |
 | `ext/xsl/VmXslDomBridge.php` | 0 | 3 |
 | `ext/xsl/XslExtensionPolicy.php` | 0 | 1 |
 | `ext/xsl/XsltClassMethod.php` | 0 | 1 |
 | `ext/xsl/XsltHostBridge.php` | 0 | 2 |
 | `ext/xsl/XsltProcessorConstruct.php` | 0 | 1 |
 | `ext/xsl/XsltProcessorGetParameter.php` | 0 | 3 |
+| `ext/xsl/XsltProcessorGetSecurityPrefs.php` | 0 | 2 |
+| `ext/xsl/XsltProcessorHasExsltSupport.php` | 0 | 2 |
 | `ext/xsl/XsltProcessorImportStylesheet.php` | 0 | 2 |
 | `ext/xsl/XsltProcessorRegisterPhpFunctions.php` | 0 | 1 |
 | `ext/xsl/XsltProcessorRemoveParameter.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorSetParameter.php` | 0 | 3 |
+| `ext/xsl/XsltProcessorSetSecurityPrefs.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorTransformToDoc.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorTransformToUri.php` | 0 | 3 |
 | `ext/xsl/XsltProcessorTransformToXml.php` | 0 | 3 |
@@ -4691,6 +4696,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/WeakReferenceCreate.php` | 0 | 1 |
 | `lib/JIT/Call/WeakReferenceGet.php` | 0 | 1 |
 | `lib/JIT/Call/XmlWriterMethod.php` | 0 | 1 |
+| `lib/JIT/Call/XsltMethod.php` | 0 | 1 |
 | `lib/JIT/CallUnpackCompileTime.php` | 0 | 7 |
 | `lib/JIT/CallUnpackHelper.php` | 0 | 1 |
 | `lib/JIT/CastArrayNativeJit.php` | 0 | 2 |
@@ -4859,6 +4865,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/VmSpineSmokeNative.php` | 0 | 2 |
 | `lib/JIT/VmUnitProbeExecuteNative.php` | 0 | 2 |
 | `lib/JIT/XmlWriterInstanceMethodJit.php` | 0 | 2 |
+| `lib/JIT/XsltInstanceMethodJit.php` | 0 | 2 |
 | `lib/JitMcjitEmbed.php` | 0 | 2 |
 | `lib/LanguageProfileScope.php` | 0 | 2 |
 | `lib/LazyPropertyRejector.php` | 0 | 2 |
@@ -30959,6 +30966,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/xsl/JitXsltMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/xsl/JitXsltUserScript.php`
+
+**Warnings** (review for bootstrap subset):
+- 12 class method(s)
+
 ### `ext/xsl/Module.php`
 
 **Warnings** (review for bootstrap subset):
@@ -30978,7 +30995,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new XsltProcessorGetParameter (line 52)
 - new XsltProcessorRemoveParameter (line 55)
 - new XsltProcessorRegisterPhpFunctions (line 58)
-- 14 class method(s)
+- new XsltProcessorHasExsltSupport (line 61)
+- new XsltProcessorSetSecurityPrefs (line 64)
+- new XsltProcessorGetSecurityPrefs (line 67)
+- 17 class method(s)
 
 ### `ext/xsl/VmXslDomBridge.php`
 
@@ -31001,7 +31021,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new XSLTProcessor (line 26)
-- 10 class method(s)
+- 13 class method(s)
 
 ### `ext/xsl/XsltProcessorConstruct.php`
 
@@ -31012,6 +31032,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xsl/XsltProcessorGetSecurityPrefs.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xsl/XsltProcessorHasExsltSupport.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 - 1 closure(s)
 
@@ -31034,6 +31066,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 closure(s)
 
 ### `ext/xsl/XsltProcessorSetParameter.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/xsl/XsltProcessorSetSecurityPrefs.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
@@ -32793,68 +32832,68 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Type (line 10318)
 - new Variable (line 10340)
 - new Type (line 10348)
-- new Variable (line 10492)
-- new Variable (line 10513)
-- new Variable (line 11620)
-- new Variable (line 11645)
-- new Variable (line 11666)
-- new CompileError (line 12402)
-- new CompileError (line 12506)
-- new Variable (line 12563)
-- new Variable (line 12946)
-- new Variable (line 12966)
-- new Variable (line 12987)
-- new Variable (line 13021)
-- new Variable (line 13055)
-- new Variable (line 13147)
-- new Variable (line 13169)
-- new Variable (line 13179)
-- new Variable (line 13331)
-- new Variable (line 13349)
-- new Variable (line 13399)
-- new Variable (line 13426)
-- new Variable (line 13451)
-- new Variable (line 13780)
-- new Variable (line 14148)
-- new Variable (line 14178)
-- new Variable (line 14197)
-- new Variable (line 14227)
-- new Variable (line 14264)
-- new Variable (line 14312)
-- new Variable (line 14355)
-- new VM\Variable (line 14700)
-- new Variable (line 14734)
-- new Variable (line 14785)
+- new Variable (line 10508)
+- new Variable (line 10529)
+- new Variable (line 11636)
+- new Variable (line 11661)
+- new Variable (line 11682)
+- new CompileError (line 12418)
+- new CompileError (line 12522)
+- new Variable (line 12579)
+- new Variable (line 12962)
+- new Variable (line 12982)
+- new Variable (line 13003)
+- new Variable (line 13037)
+- new Variable (line 13071)
+- new Variable (line 13163)
+- new Variable (line 13185)
+- new Variable (line 13195)
+- new Variable (line 13347)
+- new Variable (line 13365)
+- new Variable (line 13415)
+- new Variable (line 13442)
+- new Variable (line 13467)
+- new Variable (line 13796)
+- new Variable (line 14164)
+- new Variable (line 14194)
+- new Variable (line 14213)
+- new Variable (line 14243)
+- new Variable (line 14280)
+- new Variable (line 14328)
+- new Variable (line 14371)
+- new VM\Variable (line 14716)
+- new Variable (line 14750)
 - new Variable (line 14801)
-- new Variable (line 14820)
-- new Variable (line 14827)
-- new OpCode (line 14847)
-- new Variable (line 14848)
-- new Variable (line 15020)
-- new Variable (line 15058)
-- new OpCode (line 15072)
-- new Variable (line 15073)
-- new Variable (line 15132)
-- new OpCode (line 15153)
-- new Variable (line 15154)
-- new Variable (line 15251)
-- new Variable (line 15273)
-- new Variable (line 15341)
-- new Operand\Literal (line 15350)
-- new Variable (line 15365)
-- new Variable (line 15547)
-- new VM\PropertyIsInitializedHandler (line 15629)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15669)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15810)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15897)
-- new JIT\Call\VmCoerceVariableToString (line 15987)
-- new JIT\Call\IncludePathResolverResolve (line 16248)
-- new Variable (line 17304)
-- new VM (line 17348)
-- new VM\Variable (line 17357)
-- new Variable (line 17378)
-- new Variable (line 17424)
-- new Variable (line 17918)
+- new Variable (line 14817)
+- new Variable (line 14836)
+- new Variable (line 14843)
+- new OpCode (line 14863)
+- new Variable (line 14864)
+- new Variable (line 15036)
+- new Variable (line 15074)
+- new OpCode (line 15088)
+- new Variable (line 15089)
+- new Variable (line 15148)
+- new OpCode (line 15169)
+- new Variable (line 15170)
+- new Variable (line 15267)
+- new Variable (line 15289)
+- new Variable (line 15357)
+- new Operand\Literal (line 15366)
+- new Variable (line 15381)
+- new Variable (line 15563)
+- new VM\PropertyIsInitializedHandler (line 15645)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15685)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15834)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15932)
+- new JIT\Call\VmCoerceVariableToString (line 16022)
+- new JIT\Call\IncludePathResolverResolve (line 16283)
+- new Variable (line 17339)
+- new VM (line 17383)
+- new VM\Variable (line 17392)
+- new Variable (line 17413)
+- new Variable (line 17459)
+- new Variable (line 17953)
 - 369 class method(s)
 - 7 closure(s)
 
@@ -37257,6 +37296,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Call/XsltMethod.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/CallUnpackCompileTime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -38457,6 +38501,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Call\XmlWriterMethod (line 75)
+- 3 class method(s)
+
+### `lib/JIT/XsltInstanceMethodJit.php`
+
+**Warnings** (review for bootstrap subset):
+- new Call\XsltMethod (line 43)
 - 3 class method(s)
 
 ### `lib/JitMcjitEmbed.php`
