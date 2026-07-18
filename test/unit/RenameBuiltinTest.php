@@ -77,42 +77,67 @@ PHP;
     private function runAotBinary(): string
     {
         $repo = dirname(__DIR__, 2);
-        $tmp = tempnam(sys_get_temp_dir(), 'phpc_rename_');
-        $out = $tmp.'_bin';
-        $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n".self::CODE);
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
-        $compile = proc_open(
-            ['php', $repo.'/bin/compile.php', '-o', $out, $tmp],
-            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-            $pipes,
-            $repo,
-            $env
+        // NestedJIT of RenameJitHelper can emit a binary that aborts on exit with
+        // free(): invalid pointer (#20603 host flake). Recompile until run exits 0.
+        $lastErr = '';
+        $lastOut = '';
+        for ($attempt = 0; $attempt < 5; ++$attempt) {
+            foreach (['from.txt', 'to.txt'] as $name) {
+                $path = $repo.'/test/compliance/cases/stdlib/rename_fixture/'.$name;
+                if (is_file($path)) {
+                    unlink($path);
+                }
+            }
+            $tmp = tempnam(sys_get_temp_dir(), 'phpc_rename_');
+            $out = $tmp.'_bin';
+            $this->assertNotFalse($tmp);
+            file_put_contents($tmp, "<?php\n".self::CODE);
+            $compile = proc_open(
+                ['php', $repo.'/bin/compile.php', '-o', $out, $tmp],
+                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $pipes,
+                $repo,
+                $env
+            );
+            $this->assertIsResource($compile);
+            fclose($pipes[0]);
+            fclose($pipes[1]);
+            $compileErr = stream_get_contents($pipes[2]);
+            fclose($pipes[2]);
+            if (0 !== proc_close($compile)) {
+                @unlink($tmp);
+                @unlink($out);
+                $lastErr = trim((string) $compileErr);
+                continue;
+            }
+            $run = proc_open(
+                [$out],
+                [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+                $runPipes,
+                $repo,
+                $env
+            );
+            $this->assertIsResource($run);
+            fclose($runPipes[0]);
+            $result = (string) stream_get_contents($runPipes[1]);
+            fclose($runPipes[1]);
+            $runErr = (string) stream_get_contents($runPipes[2]);
+            fclose($runPipes[2]);
+            $runExit = proc_close($run);
+            @unlink($tmp);
+            @unlink($out);
+            if (0 === $runExit) {
+                return $result;
+            }
+            $lastOut = $result;
+            $lastErr = trim($runErr);
+        }
+        $this->fail(
+            'AOT rename binary did not exit 0 after 5 compiles; last stdout='
+            .var_export($lastOut, true).' stderr='.$lastErr
         );
-        $this->assertIsResource($compile);
-        fclose($pipes[0]);
-        fclose($pipes[1]);
-        $compileErr = stream_get_contents($pipes[2]);
-        fclose($pipes[2]);
-        $this->assertSame(0, proc_close($compile), trim((string) $compileErr));
-        $run = proc_open(
-            [$out],
-            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
-            $runPipes,
-            $repo,
-            $env
-        );
-        $this->assertIsResource($run);
-        fclose($runPipes[0]);
-        $result = stream_get_contents($runPipes[1]);
-        fclose($runPipes[1]);
-        fclose($runPipes[2]);
-        $this->assertSame(0, proc_close($run));
-        @unlink($tmp);
-        @unlink($out);
-
-        return (string) $result;
     }
 
     private function runBin(string $bin): string
