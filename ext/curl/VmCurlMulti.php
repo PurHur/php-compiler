@@ -169,6 +169,21 @@ final class VmCurlMulti
     }
 
     /**
+     * curl_multi_get_handles() — easy handles currently attached (php-src ext/curl/multi.c; #20520).
+     *
+     * @return list<ObjectEntry>
+     */
+    public static function getHandles(ObjectEntry $multi): array
+    {
+        self::ensureLive($multi, 'curl_multi_get_handles');
+        if (!isset(self::$state[$multi->id])) {
+            return [];
+        }
+
+        return array_values(self::$state[$multi->id]['easy_ids']);
+    }
+
+    /**
      * curl_multi_info_read() — dequeue CURLMsg (php-src ext/curl/multi.c; #20495).
      *
      * @return array{0: ?array{msg: int, result: int, handle: ?ObjectEntry}, 1: int}

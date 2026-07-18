@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5736 |
-| Phase A inventory files (M2 ratio SSOT) | 5736 |
+| PHP files on vm.php path | 5737 |
+| Phase A inventory files (M2 ratio SSOT) | 5737 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16508 |
+| Source constructs flagged (warnings) | 16513 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -124,7 +124,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/CurlFileBuiltin.php` | 0 | 12 |
 | `ext/curl/CurlFunction.php` | 0 | 1 |
 | `ext/curl/CurlStringFileBuiltin.php` | 0 | 7 |
-| `ext/curl/Module.php` | 0 | 35 |
+| `ext/curl/Module.php` | 0 | 36 |
 | `ext/curl/VmCurlArg.php` | 0 | 1 |
 | `ext/curl/VmCurlCore.php` | 0 | 3 |
 | `ext/curl/VmCurlEasy.php` | 0 | 6 |
@@ -145,6 +145,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_multi_close.php` | 0 | 2 |
 | `ext/curl/curl_multi_errno.php` | 0 | 2 |
 | `ext/curl/curl_multi_exec.php` | 0 | 2 |
+| `ext/curl/curl_multi_get_handles.php` | 0 | 4 |
 | `ext/curl/curl_multi_getcontent.php` | 0 | 2 |
 | `ext/curl/curl_multi_info_read.php` | 0 | 6 |
 | `ext/curl/curl_multi_init.php` | 0 | 2 |
@@ -6258,7 +6259,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/CurlExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/curl/CurlFileBuiltin.php`
 
@@ -6329,6 +6330,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new curl_multi_info_read (line 101)
 - new curl_multi_setopt (line 102)
 - new curl_multi_errno (line 103)
+- new curl_multi_get_handles (line 106)
 - 5 class method(s)
 
 ### `ext/curl/VmCurlArg.php`
@@ -6364,7 +6366,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 37)
 - new Variable (line 49)
 - new ObjectEntry (line 50)
-- 14 class method(s)
+- 15 class method(s)
 
 ### `ext/curl/VmCurlNative.php`
 
@@ -6461,6 +6463,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/curl/curl_multi_get_handles.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new HashTable (line 39)
+- new Variable (line 41)
 - 2 class method(s)
 
 ### `ext/curl/curl_multi_getcontent.php`
@@ -33961,7 +33971,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 199 class method(s)
+- 200 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

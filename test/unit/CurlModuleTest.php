@@ -43,6 +43,12 @@ final class CurlModuleTest extends TestCase
         ] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
+        // curl_multi_get_handles is PHP 8.5-only (#20520); withheld on default 8.4 profile.
+        self::assertSame(
+            \PHPCompiler\CompilerVersion::advertisesCurlMultiGetHandles(),
+            VmReflection::functionExists($ctx, 'curl_multi_get_handles'),
+            'curl_multi_get_handles advertisement must match CompilerVersion gate'
+        );
         foreach (['curl_version', 'curl_strerror', 'curl_multi_strerror', 'curl_upkeep', 'curl_file_create'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }

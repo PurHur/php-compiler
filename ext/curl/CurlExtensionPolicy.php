@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\curl;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * ext/curl advertisement — php-src ext/curl/interface.c (#12117, #13588, #16659, #3325).
  *
@@ -84,6 +86,17 @@ final class CurlExtensionPolicy
     public static function advertisesMultiHandles(): bool
     {
         return self::advertisesExtension();
+    }
+
+    /**
+     * curl_multi_get_handles() — PHP 8.5+ only (php-src ext/curl/multi.c; #20520).
+     *
+     * Withheld on 8.4 profiles so function_exists matches Zend 8.4 (no phantom 8.5 symbol).
+     */
+    public static function advertisesMultiGetHandles(): bool
+    {
+        return self::advertisesMultiHandles()
+            && CompilerVersion::advertisesCurlMultiGetHandles();
     }
 
     /** Run curl_multi_* compliance when multi is advertised or a phantom guard matches (#3721). */

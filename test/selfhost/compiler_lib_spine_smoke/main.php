@@ -60,6 +60,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -201,6 +202,7 @@ require_once __DIR__.'/../../../ext/curl/curl_multi_add_handle.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_close.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_errno.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_exec.php';
+require_once __DIR__.'/../../../ext/curl/curl_multi_get_handles.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_getcontent.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_info_read.php';
 require_once __DIR__.'/../../../ext/curl/curl_multi_init.php';
@@ -5780,6 +5782,24 @@ require_once __DIR__.'/../../../ext/posix/posix_fpathconf.php';
 require_once __DIR__.'/../../../ext/posix/posix_pathconf.php';
 require_once __DIR__.'/../../../ext/posix/posix_sysconf.php';
 require_once __DIR__.'/../../../ext/gmp/gmp_binomial.php';
+require_once __DIR__.'/../../../ext/redis/RedisDepthMethods.php';
+require_once __DIR__.'/../../../ext/sqlite3/SQLite3OpenBlob.php';
+require_once __DIR__.'/../../../ext/sqlite3/VmSqlite3BlobStream.php';
+require_once __DIR__.'/../../../ext/enchant/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/enchant/EnchantExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/enchant/Module.php';
+require_once __DIR__.'/../../../ext/enchant/VmEnchantArg.php';
+require_once __DIR__.'/../../../ext/enchant/VmEnchantBroker.php';
+require_once __DIR__.'/../../../ext/enchant/VmEnchantCore.php';
+require_once __DIR__.'/../../../ext/enchant/VmEnchantDictionary.php';
+require_once __DIR__.'/../../../ext/enchant/VmEnchantNative.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_dict_exists.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_free.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_free_dict.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_init.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_request_dict.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_check.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_suggest.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -5812,19 +5832,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../ext/enchant/BuiltinClasses.php';
-require_once __DIR__.'/../../../ext/enchant/EnchantExtensionPolicy.php';
-require_once __DIR__.'/../../../ext/enchant/Module.php';
-require_once __DIR__.'/../../../ext/enchant/VmEnchantArg.php';
-require_once __DIR__.'/../../../ext/enchant/VmEnchantBroker.php';
-require_once __DIR__.'/../../../ext/enchant/VmEnchantCore.php';
-require_once __DIR__.'/../../../ext/enchant/VmEnchantDictionary.php';
-require_once __DIR__.'/../../../ext/enchant/VmEnchantNative.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_broker_dict_exists.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_broker_free.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_broker_free_dict.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_broker_init.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_broker_request_dict.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_dict_check.php';
-require_once __DIR__.'/../../../ext/enchant/enchant_dict_suggest.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
