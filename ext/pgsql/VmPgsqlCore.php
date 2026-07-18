@@ -448,6 +448,113 @@ final class VmPgsqlCore
         return VmPgsqlNative::ftype($result, $field);
     }
 
+    public static function fieldName(ObjectEntry $resultObj, int $field): string
+    {
+        $result = VmPgsqlResult::native($resultObj);
+        self::assertFieldIndex($result, $field, 'pg_field_name');
+
+        return VmPgsqlNative::fname($result, $field);
+    }
+
+    public static function fieldSize(ObjectEntry $resultObj, int $field): int
+    {
+        $result = VmPgsqlResult::native($resultObj);
+        self::assertFieldIndex($result, $field, 'pg_field_size');
+
+        return VmPgsqlNative::fsize($result, $field);
+    }
+
+    /** pg_field_type — typname string (php-src get_field_name; #20703). */
+    public static function fieldType(ObjectEntry $resultObj, int $field): string
+    {
+        $result = VmPgsqlResult::native($resultObj);
+        self::assertFieldIndex($result, $field, 'pg_field_type');
+        $oid = VmPgsqlNative::ftype($result, $field);
+        $connObj = VmPgsqlResult::connection($resultObj);
+        if (null === $connObj || !VmPgsqlConnection::isLive($connObj)) {
+            return '';
+        }
+        $conn = VmPgsqlConnection::native($connObj);
+        $tmp = VmPgsqlNative::exec($conn, 'select typname from pg_type where oid='.(int) $oid);
+        if (null === $tmp || VmPgsqlNative::PGRES_TUPLES_OK !== VmPgsqlNative::resultStatus($tmp)) {
+            if (null !== $tmp) {
+                VmPgsqlNative::clear($tmp);
+            }
+
+            return '';
+        }
+        if (0 === VmPgsqlNative::ntuples($tmp)) {
+            VmPgsqlNative::clear($tmp);
+
+            return '';
+        }
+        $name = VmPgsqlNative::getvalue($tmp, 0, 0);
+        VmPgsqlNative::clear($tmp);
+
+        return $name;
+    }
+
+    public static function fieldNum(ObjectEntry $resultObj, string $field): int
+    {
+        return VmPgsqlNative::fnumber(VmPgsqlResult::native($resultObj), $field);
+    }
+
+    /**
+     * pg_field_prtlen — printed length or false (#20703).
+     *
+     * @return int|false
+     */
+    public static function fieldPrtlen(ObjectEntry $resultObj, ?int $row, string|int $field): int|false
+    {
+        $result = VmPgsqlResult::native($resultObj);
+        if (null === $row) {
+            $pgsqlRow = VmPgsqlResult::currentRow($resultObj);
+            if ($pgsqlRow < 0) {
+                VmPgsqlResult::setCurrentRow($resultObj, 0);
+                $pgsqlRow = 0;
+            }
+            if ($pgsqlRow >= VmPgsqlNative::ntuples($result)) {
+                return false;
+            }
+        } else {
+            if ($row < 0) {
+                throw new \ValueError('pg_field_prtlen(): Argument #2 ($row) must be greater than or equal to 0');
+            }
+            if ($row >= VmPgsqlNative::ntuples($result)) {
+                @\trigger_error(\sprintf('pg_field_prtlen(): Unable to jump to row %d on PostgreSQL result', $row), \E_USER_WARNING);
+
+                return false;
+            }
+            $pgsqlRow = $row;
+        }
+        if (\is_string($field)) {
+            $offset = VmPgsqlNative::fnumber($result, $field);
+            if ($offset < 0) {
+                throw new \ValueError('Argument #3 must be a field name from this result set');
+            }
+        } else {
+            $offset = $field;
+            if ($offset < 0) {
+                throw new \ValueError('Argument #3 must be greater than or equal to 0');
+            }
+            if ($offset >= VmPgsqlNative::nfields($result)) {
+                throw new \ValueError('Argument #3 must be less than the number of fields for this result set');
+            }
+        }
+
+        return VmPgsqlNative::getlength($result, $pgsqlRow, $offset);
+    }
+
+    private static function assertFieldIndex(\FFI\CData $result, int $field, string $fn): void
+    {
+        if ($field < 0) {
+            throw new \ValueError($fn.'(): Argument #2 ($field) must be greater than or equal to 0');
+        }
+        if ($field >= VmPgsqlNative::nfields($result)) {
+            throw new \ValueError($fn.'(): Argument #2 ($field) must be less than the number of fields for this result set');
+        }
+    }
+
     /**
      * @return int|false 1 if null, 0 if not, false on bad row
      */
