@@ -111,6 +111,19 @@ final class VmSoapClient
         if (isset($options['compression'])) {
             $state->compression = (int) $options['compression'];
         }
+        // php-src SoapClient ctor: proxy_host/port/login/password (#20339).
+        if (isset($options['proxy_host'])) {
+            $state->proxyHost = (string) $options['proxy_host'];
+        }
+        if (isset($options['proxy_port'])) {
+            $state->proxyPort = (int) $options['proxy_port'];
+        }
+        if (isset($options['proxy_login'])) {
+            $state->proxyLogin = (string) $options['proxy_login'];
+        }
+        if (isset($options['proxy_password'])) {
+            $state->proxyPassword = (string) $options['proxy_password'];
+        }
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
@@ -249,6 +262,8 @@ final class VmSoapClient
 
         $cookieHeader = self::formatCookieHeader($state->cookies);
         $authHeader = self::formatAuthorizationHeader($state);
+        $proxyAuthHeader = self::formatProxyAuthorizationHeader($state);
+        $useProxy = self::usesHttpProxy($state, $location);
         $requestHeaders = self::buildHttpRequestHeaders(
             $location,
             $action,
@@ -256,7 +271,9 @@ final class VmSoapClient
             $cookieHeader,
             $authHeader,
             $acceptEncoding,
-            $contentEncoding
+            $contentEncoding,
+            $proxyAuthHeader,
+            $useProxy
         );
         if ($state->trace) {
             $state->lastRequestHeaders = $requestHeaders;
@@ -294,14 +311,23 @@ final class VmSoapClient
         if ('' !== $authHeader) {
             $headers .= $authHeader."\r\n";
         }
+        if ($useProxy && '' !== $proxyAuthHeader) {
+            $headers .= $proxyAuthHeader."\r\n";
+        }
+        $httpOpts = [
+            'method' => 'POST',
+            'header' => $headers,
+            'content' => $bodyOut,
+            'ignore_errors' => true,
+            'timeout' => 30,
+        ];
+        if ($useProxy && null !== $state->proxyHost && null !== $state->proxyPort) {
+            // php-src http_connect via proxy — PHP stream proxy URI (#20339).
+            $httpOpts['proxy'] = 'tcp://'.$state->proxyHost.':'.$state->proxyPort;
+            $httpOpts['request_fulluri'] = true;
+        }
         $ctx = \stream_context_create([
-            'http' => [
-                'method' => 'POST',
-                'header' => $headers,
-                'content' => $bodyOut,
-                'ignore_errors' => true,
-                'timeout' => 30,
-            ],
+            'http' => $httpOpts,
         ]);
         $body = @\file_get_contents($location, false, $ctx);
         if (false === $body) {
@@ -424,6 +450,38 @@ final class VmSoapClient
     }
 
     /**
+     * Proxy-Authorization Basic — php-src php_http.c proxy_authentication (#20339).
+     */
+    private static function formatProxyAuthorizationHeader(SoapClientState $state): string
+    {
+        if (null === $state->proxyLogin) {
+            return '';
+        }
+        $user = $state->proxyLogin;
+        $pass = null !== $state->proxyPassword ? $state->proxyPassword : '';
+
+        return 'Proxy-Authorization: Basic '.\base64_encode($user.':'.$pass);
+    }
+
+    /**
+     * php-src use_proxy when proxy_host (string) + proxy_port (long) are set (#20339).
+     * Fixture file locations still count as "using proxy" for traced request headers.
+     */
+    private static function usesHttpProxy(SoapClientState $state, string $location): bool
+    {
+        if (null === $state->proxyHost || null === $state->proxyPort) {
+            return false;
+        }
+        // php-src skips Proxy-Authorization on SSL-through-proxy CONNECT path for the
+        // POST headers block in some branches; http:// and fixture paths emit it.
+        if (\preg_match('#^https://#i', $location)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
      * Build Zend-shaped HTTP request header block for trace (php-src soap_client).
      */
     private static function buildHttpRequestHeaders(
@@ -433,13 +491,19 @@ final class VmSoapClient
         string $cookieHeader = '',
         string $authHeader = '',
         string $acceptEncoding = '',
-        string $contentEncoding = ''
+        string $contentEncoding = '',
+        string $proxyAuthHeader = '',
+        bool $useProxy = false
     ): string {
         $path = '/';
         $host = 'localhost';
         if (\preg_match('#^https?://([^/]+)(/.*)?$#i', $location, $m)) {
             $host = $m[1];
             $path = isset($m[2]) && '' !== $m[2] ? $m[2] : '/';
+            // php-src: POST absolute-URI when use_proxy && !use_ssl (#20339).
+            if ($useProxy) {
+                $path = $location;
+            }
         } elseif ('' !== $location) {
             $path = $location;
         }
@@ -462,6 +526,10 @@ final class VmSoapClient
         }
         if ('' !== $authHeader) {
             $hdr .= $authHeader."\r\n";
+        }
+        // php-src: Proxy-Authorization only when use_proxy && !use_ssl (#20339).
+        if ($useProxy && '' !== $proxyAuthHeader) {
+            $hdr .= $proxyAuthHeader."\r\n";
         }
 
         return $hdr;
@@ -894,6 +962,15 @@ final class SoapClientState
 
     /** php-src Z_CLIENT_COMPRESSION — null when unset (#20313). */
     public ?int $compression = null;
+
+    /** php-src _proxy_host / _proxy_port / _proxy_login / _proxy_password (#20339). */
+    public ?string $proxyHost = null;
+
+    public ?int $proxyPort = null;
+
+    public ?string $proxyLogin = null;
+
+    public ?string $proxyPassword = null;
 
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
