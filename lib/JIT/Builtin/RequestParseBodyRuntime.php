@@ -12,7 +12,6 @@ use PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\MultipartRuntime;
 use PHPCompiler\JIT\Builtin\ParseStrRuntime;
-use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -20,8 +19,11 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for request_parse_body() via RequestParseBodyJitHelper PHP (#16927).
+ * JIT/AOT link for request_parse_body() via RequestParseBodyJitHelper PHP (#16927, #20521).
  *
+ * Embed / non-thin: NestedJIT {@see RequestParseBodyJitHelper}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20499 / #20308 shape):
+ * {@see \PHPCompiler\ext\standard\JitRequestParseBodyKernel} / NativeJitHelper (#5965).
  * Emits a lightweight LLVM bridge calling a nested-compiled PHP helper that reads
  * env CONTENT_TYPE + REQUEST_BODY and writes to native hashtables.
  */
@@ -52,7 +54,8 @@ final class RequestParseBodyRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        // Thin standalone AOT uses JitRequestParseBodyKernel at the call site (#20521).
+        if ($context->isThinStandaloneAotMain()) {
             return;
         }
 
@@ -61,10 +64,6 @@ final class RequestParseBodyRuntime
 
     public static function ensureJitHelperCompiled(Context $context): void
     {
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            return;
-        }
-
         if ($context->isThinStandaloneAotMain()) {
             self::ensureUserScriptJitHelperCompiled($context);
 

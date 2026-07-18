@@ -15,13 +15,14 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\JIT\Builtin\RequestParseBodyRuntime;
-use PHPCompiler\JIT\Builtin\StreamIoRuntime;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPLLVM\Value;
 
 /**
  * request_parse_body() — parse request body without populating superglobals (PHP 8.4+).
  *
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20521): {@see JitRequestParseBodyKernel}.
+ * Embed / non-thin: NestedJIT {@see RequestParseBodyRuntime}.
  * php-src: ext/standard/http.c
  */
 final class request_parse_body extends Internal
@@ -91,7 +92,7 @@ final class request_parse_body extends Internal
 
         $postHt = HashTableHelper::alloc($context);
         $filesHt = HashTableHelper::alloc($context);
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if ($context->isThinStandaloneAotMain()) {
             JitRequestParseBodyKernel::ensureLinked($context);
             $context->builder->call(
                 $context->lookupFunction(JitRequestParseBodyKernel::BRIDGE_NAME),
