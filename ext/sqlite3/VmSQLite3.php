@@ -61,7 +61,9 @@ final class VmSQLite3
             'busytimeout' => new SQLite3BusyTimeout(),
             'enableexceptions' => new SQLite3EnableExceptions(),
             'createfunction' => new SQLite3CreateFunction(),
+            'createaggregate' => new SQLite3CreateAggregate(),
             'createcollation' => new SQLite3CreateCollation(),
+            'loadextension' => new SQLite3LoadExtension(),
             'backup' => new SQLite3Backup(),
             'version' => new SQLite3Version(),
         ];
@@ -108,6 +110,7 @@ final class VmSQLite3
             $state->closed = false;
             $state->functions = [];
             $state->collations = [];
+            $state->aggregates = [];
 
             return;
         }
@@ -283,20 +286,27 @@ final class VmSQLite3
             'busytimeout' => 'busyTimeout',
             'enableexceptions' => 'enableExceptions',
             'createfunction' => 'createFunction',
+            'createaggregate' => 'createAggregate',
             'createcollation' => 'createCollation',
+            'loadextension' => 'loadExtension',
             default => $lc,
         };
     }
 
-    /** Expand registered scalar UDFs in SQL (PHP 8.2 path / always for literal args). */
+    /**
+     * Expand registered scalar UDFs + evaluate aggregates in SQL (#19862 / #20585).
+     */
     public static function expandSql(ObjectEntry $entry, string $sql): string
     {
         $state = self::state($entry);
-        if ([] === $state->functions) {
-            return $sql;
+        if ([] !== $state->functions) {
+            $sql = VmSqlite3Udf::expandSql($sql, $state->functions);
+        }
+        if ([] !== $state->aggregates && null !== $state->db && !$state->closed) {
+            $sql = VmSqlite3Udf::expandAggregates($state->db, $sql, $state->aggregates);
         }
 
-        return VmSqlite3Udf::expandSql($sql, $state->functions);
+        return $sql;
     }
 
     /**
