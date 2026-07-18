@@ -81,6 +81,8 @@ class Module extends ModuleAbstract
             $functions[] = new imagecopyresized();
             $functions[] = new imagesetpixel();
             $functions[] = new imageline();
+            $functions[] = new imagearc();
+            $functions[] = new imagefilledarc();
             $functions[] = new imagepolygon();
             $functions[] = new imageopenpolygon();
             $functions[] = new imagefilledrectangle();

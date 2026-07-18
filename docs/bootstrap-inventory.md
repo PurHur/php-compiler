@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5596 |
-| Phase A inventory files (M2 ratio SSOT) | 5596 |
+| PHP files on vm.php path | 5599 |
+| Phase A inventory files (M2 ratio SSOT) | 5599 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15996 |
+| Source constructs flagged (warnings) | 16000 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -477,7 +477,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/GdImageState.php` | 0 | 5 |
 | `ext/gd/GdRegistry.php` | 0 | 1 |
-| `ext/gd/Module.php` | 0 | 53 |
+| `ext/gd/Module.php` | 0 | 55 |
 | `ext/gd/VmGd.php` | 0 | 12 |
 | `ext/gd/VmGdAvif.php` | 0 | 1 |
 | `ext/gd/VmGdBmp.php` | 0 | 1 |
@@ -489,6 +489,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imageaffinematrixget.php` | 0 | 1 |
 | `ext/gd/imagealphablending.php` | 0 | 1 |
 | `ext/gd/imageantialias.php` | 0 | 1 |
+| `ext/gd/imagearc.php` | 0 | 1 |
 | `ext/gd/imageavif.php` | 0 | 1 |
 | `ext/gd/imagebmp.php` | 0 | 1 |
 | `ext/gd/imagechar.php` | 0 | 1 |
@@ -510,6 +511,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/imagecropauto.php` | 0 | 1 |
 | `ext/gd/imagedestroy.php` | 0 | 1 |
 | `ext/gd/imagefill.php` | 0 | 1 |
+| `ext/gd/imagefilledarc.php` | 0 | 1 |
 | `ext/gd/imagefilledrectangle.php` | 0 | 1 |
 | `ext/gd/imagefilter.php` | 0 | 1 |
 | `ext/gd/imageflip.php` | 0 | 1 |
@@ -8766,31 +8768,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new imagecopyresized (line 81)
 - new imagesetpixel (line 82)
 - new imageline (line 83)
-- new imagepolygon (line 84)
-- new imageopenpolygon (line 85)
-- new imagefilledrectangle (line 86)
-- new imagestring (line 87)
-- new imagechar (line 88)
-- new imagettftext (line 90)
-- new imagettfbbox (line 91)
-- new imagefilter (line 93)
-- new imageflip (line 94)
-- new imagecrop (line 95)
-- new imagecropauto (line 96)
-- new imagerotate (line 97)
-- new imagescale (line 98)
-- new imageaffine (line 99)
-- new imageaffinematrixget (line 100)
-- new imageaffinematrixconcat (line 101)
-- new imageconvolution (line 102)
-- new imagecreatefromstring (line 105)
-- new imagepng (line 106)
-- new imagewebp (line 107)
-- new imageavif (line 108)
-- new imagebmp (line 109)
-- new imagecreatefromwebp (line 110)
-- new imagecreatefromavif (line 111)
-- new imagecreatefrombmp (line 112)
+- new imagearc (line 84)
+- new imagefilledarc (line 85)
+- new imagepolygon (line 86)
+- new imageopenpolygon (line 87)
+- new imagefilledrectangle (line 88)
+- new imagestring (line 89)
+- new imagechar (line 90)
+- new imagettftext (line 92)
+- new imagettfbbox (line 93)
+- new imagefilter (line 95)
+- new imageflip (line 96)
+- new imagecrop (line 97)
+- new imagecropauto (line 98)
+- new imagerotate (line 99)
+- new imagescale (line 100)
+- new imageaffine (line 101)
+- new imageaffinematrixget (line 102)
+- new imageaffinematrixconcat (line 103)
+- new imageconvolution (line 104)
+- new imagecreatefromstring (line 107)
+- new imagepng (line 108)
+- new imagewebp (line 109)
+- new imageavif (line 110)
+- new imagebmp (line 111)
+- new imagecreatefromwebp (line 112)
+- new imagecreatefromavif (line 113)
+- new imagecreatefrombmp (line 114)
 - 4 class method(s)
 
 ### `ext/gd/VmGd.php`
@@ -8801,13 +8805,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 103)
 - new HashTable (line 828)
 - new Variable (line 830)
-- new HashTable (line 1825)
-- new Variable (line 1827)
-- new ObjectEntry (line 2277)
-- new ObjectEntry (line 2301)
-- new ObjectEntry (line 2325)
-- new ObjectEntry (line 2581)
-- 114 class method(s)
+- new HashTable (line 2072)
+- new Variable (line 2074)
+- new ObjectEntry (line 2524)
+- new ObjectEntry (line 2548)
+- new ObjectEntry (line 2572)
+- new ObjectEntry (line 2828)
+- 117 class method(s)
 
 ### `ext/gd/VmGdAvif.php`
 
@@ -8855,6 +8859,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imageantialias.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagearc.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -8960,6 +8969,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/gd/imagefill.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/gd/imagefilledarc.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
