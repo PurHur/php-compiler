@@ -14,6 +14,7 @@ use PHPCompiler\ext\standard\VmStreamArg;
  *
  * Phase 1–3: arithmetic + bit ops.
  * Phase 4: seedable random + import/export — no runtime/*.c growth.
+ * Phase 5: prime / bit-index / number-theory (#20394, re-#19540) — no runtime/*.c growth.
  * PROFILE=8.4: null init/operand TypeError (stub int|string; #20210).
  */
 final class VmGmp
@@ -494,6 +495,387 @@ final class VmGmp
         return 0 === self::cmp(self::mul($root, $root), $n);
     }
 
+    /** mpz_sgn */
+    public static function sign(string $a): int
+    {
+        $cmp = self::cmp(self::normalizeSignedDecimal($a), '0');
+        if (0 === $cmp) {
+            return 0;
+        }
+
+        return $cmp < 0 ? -1 : 1;
+    }
+
+    /** mpz_tstbit — two's-complement bit test. */
+    public static function testbit(string $a, int $index): bool
+    {
+        self::requireBitIndex($index, 'gmp_testbit');
+        $bits = self::toTwosComplementBits(self::normalizeSignedDecimal($a), $index + 2);
+
+        return '1' === $bits[strlen($bits) - 1 - $index];
+    }
+
+    /** mpz_setbit / mpz_clrbit semantics on a decimal encoding. */
+    public static function withBit(string $a, int $index, bool $set): string
+    {
+        self::requireBitIndex($index, $set ? 'gmp_setbit' : 'gmp_clrbit');
+        $n = self::normalizeSignedDecimal($a);
+        $width = max(self::bitLengthMagnitude(self::splitSign($n)['mag']) + 2, $index + 2);
+        $bits = self::toTwosComplementBits($n, $width);
+        $pos = strlen($bits) - 1 - $index;
+        $bits[$pos] = $set ? '1' : '0';
+
+        return self::fromTwosComplementBits($bits);
+    }
+
+    /** mpz_scan0 — first 0 bit at or after $start. */
+    public static function scan0(string $a, int $start): int
+    {
+        self::requireBitIndex($start, 'gmp_scan0');
+        $n = self::normalizeSignedDecimal($a);
+        $width = max(self::bitLengthMagnitude(self::splitSign($n)['mag']) + 8, $start + 8);
+        $bits = self::toTwosComplementBits($n, $width);
+        for ($i = $start; $i < $width; ++$i) {
+            if ('0' === $bits[strlen($bits) - 1 - $i]) {
+                return $i;
+            }
+        }
+        if (self::cmp($n, '0') >= 0) {
+            return $width;
+        }
+
+        return -1;
+    }
+
+    /** mpz_scan1 — first 1 bit at or after $start (-1 if none for non-negative). */
+    public static function scan1(string $a, int $start): int
+    {
+        self::requireBitIndex($start, 'gmp_scan1');
+        $n = self::normalizeSignedDecimal($a);
+        if (self::cmp($n, '0') < 0) {
+            $width = max(self::bitLengthMagnitude(self::splitSign($n)['mag']) + 8, $start + 2);
+            $bits = self::toTwosComplementBits($n, $width);
+            for ($i = $start; $i < $width; ++$i) {
+                if ('1' === $bits[strlen($bits) - 1 - $i]) {
+                    return $i;
+                }
+            }
+
+            return $start;
+        }
+        $magBits = self::bitLengthMagnitude(self::splitSign($n)['mag']);
+        if ($start >= $magBits) {
+            return -1;
+        }
+        $bits = self::toTwosComplementBits($n, max($magBits + 1, $start + 1));
+        for ($i = $start; $i < strlen($bits); ++$i) {
+            if ('1' === $bits[strlen($bits) - 1 - $i]) {
+                return $i;
+            }
+        }
+
+        return -1;
+    }
+
+    /** mpz_popcount — negatives surface as -1 (ULONG_MAX as zend_long). */
+    public static function popcount(string $a): int
+    {
+        $n = self::normalizeSignedDecimal($a);
+        if (self::cmp($n, '0') < 0) {
+            return -1;
+        }
+        $bits = self::magnitudeToBits(self::splitSign($n)['mag']);
+        $count = 0;
+        $len = strlen($bits);
+        for ($i = 0; $i < $len; ++$i) {
+            if ('1' === $bits[$i]) {
+                ++$count;
+            }
+        }
+
+        return $count;
+    }
+
+    /** mpz_hamdist — popcount of xor (non-negative operands). */
+    public static function hamdist(string $left, string $right): int
+    {
+        $a = self::normalizeSignedDecimal($left);
+        $b = self::normalizeSignedDecimal($right);
+        if (self::cmp($a, '0') < 0 || self::cmp($b, '0') < 0) {
+            return -1;
+        }
+
+        return self::popcount(self::bitwiseXor($a, $b));
+    }
+
+    /**
+     * Extended gcd — [g, s, t] with a*s + b*t = g >= 0 (mpz_gcdext).
+     *
+     * @return array{0: string, 1: string, 2: string}
+     */
+    public static function gcdext(string $left, string $right): array
+    {
+        $a = self::normalizeSignedDecimal($left);
+        $b = self::normalizeSignedDecimal($right);
+        $oldR = $a;
+        $r = $b;
+        $oldS = '1';
+        $s = '0';
+        $oldT = '0';
+        $t = '1';
+        while ('0' !== $r) {
+            [$q, $rem] = self::divQr($oldR, $r);
+            $oldR = $r;
+            $r = $rem;
+            $nextS = self::sub($oldS, self::mul($q, $s));
+            $oldS = $s;
+            $s = $nextS;
+            $nextT = self::sub($oldT, self::mul($q, $t));
+            $oldT = $t;
+            $t = $nextT;
+        }
+        $g = $oldR;
+        $sOut = $oldS;
+        $tOut = $oldT;
+        if (self::cmp($g, '0') < 0) {
+            $g = self::neg($g);
+            $sOut = self::neg($sOut);
+            $tOut = self::neg($tOut);
+        }
+
+        return [$g, $sOut, $tOut];
+    }
+
+    /** mpz_invert — modular inverse or null when missing. */
+    public static function invert(string $num, string $modulus): ?string
+    {
+        $mod = self::normalizeSignedDecimal($modulus);
+        if ('0' === $mod) {
+            throw new \DivisionByZeroError('Division by zero');
+        }
+        $m = self::abs($mod);
+        [$g, $s] = self::gcdext($num, $m);
+        if ('1' !== $g) {
+            return null;
+        }
+
+        return self::mod($s, $m);
+    }
+
+    /** mpz_jacobi */
+    public static function jacobi(string $a, string $n): int
+    {
+        return self::kroneckerJacobi(
+            self::normalizeSignedDecimal($a),
+            self::normalizeSignedDecimal($n)
+        );
+    }
+
+    /** mpz_legendre */
+    public static function legendre(string $a, string $p): int
+    {
+        return self::jacobi($a, $p);
+    }
+
+    public static function root(string $a, int $nth): string
+    {
+        return self::rootrem($a, $nth)[0];
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    public static function rootrem(string $a, int $nth): array
+    {
+        if ($nth < 1) {
+            throw new \ValueError('gmp_root(): Argument #2 ($nth) must be greater than or equal to 1');
+        }
+        $n = self::normalizeSignedDecimal($a);
+        $neg = self::cmp($n, '0') < 0;
+        if ($neg && 0 === ($nth % 2)) {
+            throw new \ValueError('gmp_root(): Argument #2 ($nth) must be odd if argument #1 ($a) is negative');
+        }
+        if (1 === $nth) {
+            return [$n, '0'];
+        }
+        $mag = self::abs($n);
+        if (self::cmp($mag, '1') <= 0) {
+            return [$n, '0'];
+        }
+        $low = '1';
+        $high = $mag;
+        $ans = '1';
+        while (self::cmp($low, $high) <= 0) {
+            $mid = self::divQ(self::add($low, $high), '2');
+            $pow = self::pow($mid, $nth);
+            $cmp = self::cmp($pow, $mag);
+            if (0 === $cmp) {
+                $ans = $mid;
+                break;
+            }
+            if ($cmp < 0) {
+                $ans = $mid;
+                $low = self::add($mid, '1');
+            } else {
+                $high = self::sub($mid, '1');
+            }
+        }
+        if ($neg) {
+            $ans = self::neg($ans);
+        }
+        $rem = self::sub($n, self::pow($ans, $nth));
+
+        return [$ans, $rem];
+    }
+
+    public static function perfectPower(string $a): bool
+    {
+        $n = self::normalizeSignedDecimal($a);
+        if (self::cmp($n, '0') < 0) {
+            $mag = self::abs($n);
+            $maxExp = min(64, max(2, self::bitLengthMagnitude(self::splitSign($mag)['mag'])));
+            for ($e = 3; $e <= $maxExp; $e += 2) {
+                $r = self::root($mag, $e);
+                if (0 === self::cmp(self::pow($r, $e), $mag)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+        if (self::cmp($n, '1') <= 0) {
+            return true;
+        }
+        $maxExp = min(64, max(2, self::bitLengthMagnitude(self::splitSign($n)['mag'])));
+        for ($e = 2; $e <= $maxExp; ++$e) {
+            $r = self::root($n, $e);
+            if (0 === self::cmp(self::pow($r, $e), $n)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Miller-Rabin: 0 composite, 1 probable, 2 definite. */
+    public static function probPrime(string $a, int $repetitions = 10): int
+    {
+        if ($repetitions < 0) {
+            $repetitions = 0;
+        }
+        $n = self::normalizeSignedDecimal($a);
+        if (self::cmp($n, '2') < 0) {
+            return 0;
+        }
+        if ('2' === $n || '3' === $n) {
+            return 2;
+        }
+        if (0 === self::toInt(self::mod($n, '2'))) {
+            return 0;
+        }
+        foreach (['5', '7', '11', '13', '17', '19', '23', '29', '31'] as $p) {
+            if ($n === $p) {
+                return 2;
+            }
+            if ('0' === self::mod($n, $p) && self::cmp($n, $p) > 0) {
+                return 0;
+            }
+        }
+        $nm1 = self::sub($n, '1');
+        $d = $nm1;
+        $s = 0;
+        while ('0' === self::mod($d, '2')) {
+            $d = self::divQ($d, '2');
+            ++$s;
+        }
+        $witnesses = self::millerRabinWitnesses($n, $repetitions);
+        $definite = true;
+        foreach ($witnesses as $w) {
+            if (self::cmp($w, '0') <= 0 || self::cmp($w, $n) >= 0) {
+                continue;
+            }
+            $x = self::powm($w, $d, $n);
+            if ('1' === $x || 0 === self::cmp($x, $nm1)) {
+                continue;
+            }
+            $composite = true;
+            for ($r = 1; $r < $s; ++$r) {
+                $x = self::mod(self::mul($x, $x), $n);
+                if (0 === self::cmp($x, $nm1)) {
+                    $composite = false;
+                    break;
+                }
+                if ('1' === $x) {
+                    break;
+                }
+            }
+            if ($composite) {
+                return 0;
+            }
+            $definite = false;
+        }
+
+        return $definite ? 2 : 1;
+    }
+
+    public static function nextprime(string $a): string
+    {
+        $n = self::normalizeSignedDecimal($a);
+        if (self::cmp($n, '2') < 0) {
+            return '2';
+        }
+        $p = self::add($n, '1');
+        if (0 === self::toInt(self::mod($p, '2'))) {
+            $p = self::add($p, '1');
+        }
+        while (0 === self::probPrime($p, 15)) {
+            $p = self::add($p, '2');
+        }
+
+        return $p;
+    }
+
+    public static function coerceBitIndex(Variable $var, string $function, int $index, string $label): int
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $resolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type int, %s given',
+                $function,
+                $index + 1,
+                $label,
+                VmStreamArg::debugTypeName($resolved)
+            ));
+        }
+
+        return $resolved->toInt();
+    }
+
+    public static function coerceRepetitions(Variable $var): int
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $resolved->type) {
+            throw new \TypeError('gmp_prob_prime(): Argument #2 ($repetitions) must be of type int, '
+                .VmStreamArg::debugTypeName($resolved).' given');
+        }
+
+        return $resolved->toInt();
+    }
+
+    public static function coerceNth(Variable $var, string $function): int
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $resolved->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #2 ($nth) must be of type int, %s given',
+                $function,
+                VmStreamArg::debugTypeName($resolved)
+            ));
+        }
+
+        return $resolved->toInt();
+    }
+
     /** Bitwise complement (~n == -n-1). */
     public static function com(string $a): string
     {
@@ -660,6 +1042,89 @@ final class VmGmp
         self::$rngState = $x;
 
         return $x & 0xFFFFFFFF;
+    }
+
+    private static function requireBitIndex(int $index, string $function): void
+    {
+        if ($index < 0) {
+            throw new \ValueError($function.'(): Argument #2 must be greater than or equal to 0');
+        }
+    }
+
+    /** @return list<string> */
+    private static function millerRabinWitnesses(string $n, int $repetitions): array
+    {
+        $bases = ['2', '3', '5', '7', '11', '13', '23', '29', '31', '37'];
+        if ($repetitions <= 0) {
+            return array_slice($bases, 0, 1);
+        }
+        $out = [];
+        foreach ($bases as $b) {
+            if (self::cmp($b, $n) >= 0) {
+                break;
+            }
+            $out[] = $b;
+            if (count($out) >= $repetitions) {
+                return $out;
+            }
+        }
+
+        return $out;
+    }
+
+    /** Jacobi/Kronecker symbol (a/n). */
+    private static function kroneckerJacobi(string $a, string $n): int
+    {
+        if ('0' === $n) {
+            return 0 === self::cmp($a, '0') || '1' === self::abs($a) ? 1 : 0;
+        }
+        $aa = $a;
+        $nn = $n;
+        $result = 1;
+        if (self::cmp($nn, '0') < 0) {
+            $nn = self::neg($nn);
+            if (self::cmp($aa, '0') < 0) {
+                $result = -$result;
+            }
+        }
+        $trail = 0;
+        while ('0' === self::mod($nn, '2')) {
+            $nn = self::divQ($nn, '2');
+            ++$trail;
+        }
+        if ($trail > 0 && 0 !== ($trail % 2)) {
+            $amod8 = self::toInt(self::mod(self::abs($aa), '8'));
+            if (3 === $amod8 || 5 === $amod8) {
+                $result = -$result;
+            }
+        }
+        if ('1' === $nn) {
+            return 0 === self::cmp($aa, '0') ? 0 : $result;
+        }
+        $aa = self::mod($aa, $nn);
+        while ('0' !== $aa) {
+            $trailA = 0;
+            while ('0' === self::mod($aa, '2')) {
+                $aa = self::divQ($aa, '2');
+                ++$trailA;
+            }
+            if (0 !== ($trailA % 2)) {
+                $nmod8 = self::toInt(self::mod($nn, '8'));
+                if (3 === $nmod8 || 5 === $nmod8) {
+                    $result = -$result;
+                }
+            }
+            $amod4 = self::toInt(self::mod($aa, '4'));
+            $nmod4 = self::toInt(self::mod($nn, '4'));
+            if (3 === $amod4 && 3 === $nmod4) {
+                $result = -$result;
+            }
+            $tmp = $aa;
+            $aa = self::mod($nn, $tmp);
+            $nn = $tmp;
+        }
+
+        return '1' === $nn ? $result : 0;
     }
 
     private static function normalizeSignedDecimal(string $value): string
