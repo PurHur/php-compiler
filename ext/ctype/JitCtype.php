@@ -7,16 +7,14 @@ namespace PHPCompiler\ext\ctype;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\CtypeRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM JIT helper for ctype_* (php-src ext/ctype/ctype.c; #7253, #9234, #19717, #20252). */
+/** LLVM JIT helper for ctype_* (php-src ext/ctype/ctype.c; #7253, #9234, #19717, #20611). */
 final class JitCtype
 {
     public static function invoke(Context $context, JITVariable $arg, string $function): Value
@@ -30,15 +28,7 @@ final class JitCtype
             );
         }
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            // Z_PARAM_STR $text — null TypeError on PROFILE=8.4 / strict_types (#20252).
-            if (self::rejectsNullTextArg($context)) {
-                ExceptionBridge::emitTypeErrorAndAbort(
-                    $context,
-                    sprintf('%s(): Argument #1 ($text) must be of type string, null given', $function)
-                );
-
-                return self::boolConst($context, false);
-            }
+            // mixed $text — ctype_fallback for null (never TypeError; #20611 / #19717).
             self::emitFallbackDeprecation($context, $function, 'null');
 
             return self::boolConst($context, false);
@@ -102,12 +92,6 @@ final class JitCtype
         self::emitFallbackDeprecation($context, $function, 'mixed');
 
         return self::boolConst($context, false);
-    }
-
-    private static function rejectsNullTextArg(Context $context): bool
-    {
-        return $context->callerStrictTypes
-            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile();
     }
 
     private static function emitFallbackDeprecation(Context $context, string $function, string $typeName): void
@@ -219,18 +203,10 @@ final class JitCtype
         );
 
         $context->builder->positionAtEnd($nullBlock);
-        $nullEnd = null;
-        if (self::rejectsNullTextArg($context)) {
-            // Z_PARAM_STR — terminate via TypeError; do not join the result phi (#20252).
-            ExceptionBridge::emitTypeErrorAndAbort(
-                $context,
-                sprintf('%s(): Argument #1 ($text) must be of type string, null given', $function)
-            );
-        } else {
-            self::emitFallbackDeprecation($context, $function, 'null');
-            $nullEnd = $context->builder->getInsertBlock();
-            $context->builder->branch($doneBlock);
-        }
+        // mixed $text — ctype_fallback for null (never TypeError; #20611 / #19717).
+        self::emitFallbackDeprecation($context, $function, 'null');
+        $nullEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($falseBlock);
         // Non-string/non-int fallback (bool/float/object/array/…) — php-src ctype_fallback (#19717).
@@ -242,9 +218,7 @@ final class JitCtype
         $phi = $context->builder->phi($i32, 'ctype_value_result');
         $phi->addIncoming($stringResult, $stringEnd);
         $phi->addIncoming($longResult, $longEnd);
-        if (null !== $nullEnd) {
-            $phi->addIncoming($zero, $nullEnd);
-        }
+        $phi->addIncoming($zero, $nullEnd);
         $phi->addIncoming($zero, $falseEnd);
 
         return $context->builder->icmp(Builder::INT_NE, $phi, $zero);
