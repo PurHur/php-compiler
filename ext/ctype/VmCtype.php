@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\ctype;
 
-use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /**
- * Locale-independent ASCII ctype classification (php-src ext/ctype/ctype.c; #7253, #19717, #20252).
+ * Locale-independent ASCII ctype classification (php-src ext/ctype/ctype.c; #7253, #19717, #20611).
+ *
+ * Stubs take {@code mixed $text} ({@code Z_PARAM_ZVAL}); null and other non-strings go through
+ * {@code ctype_fallback()} — {@code E_DEPRECATED} then {@code false} / int ordinal. Never TypeError
+ * for null (reverts mistaken #20252 Z_PARAM_STR mapping; see #20611).
  */
 final class VmCtype
 {
@@ -39,16 +41,7 @@ final class VmCtype
     ): bool {
         $var = $var->resolveIndirect();
 
-        // Z_PARAM_STR $text — null TypeError on PROFILE=8.4 / caller strict_types (#20252;
-        // php-src ext/ctype/ctype.stub.php). Pre-8.4 still uses ctype_fallback (#19717).
-        if (Variable::TYPE_NULL === $var->type && self::rejectsNullTextArg($frame)) {
-            throw new \TypeError(sprintf(
-                '%s(): Argument #1 ($text) must be of type string, null given',
-                $function
-            ));
-        }
-
-        // php-src ctype_impl: strings only; everything else is ctype_fallback (#19717).
+        // php-src ctype_impl: strings only; everything else is ctype_fallback (#19717, #20611).
         if (Variable::TYPE_STRING === $var->type) {
             return self::checkString($var->toString(), $kind);
         }
@@ -59,15 +52,6 @@ final class VmCtype
         }
 
         return false;
-    }
-
-    /**
-     * Null $text is a TypeError under forward 8.4 or declare(strict_types=1) (#20252).
-     */
-    public static function rejectsNullTextArg(?Frame $frame = null): bool
-    {
-        return VmString::requiresZparamStrStrictNullOnForwardProfile()
-            || (null !== $frame && InternalStrictArg::isCallerStrict($frame));
     }
 
     /**

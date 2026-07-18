@@ -1,9 +1,11 @@
 --TEST--
-stdlib ctype_*(null) TypeError on 8.4 forward profile (#20252, ext/ctype/ctype.c)
+stdlib ctype_*(null) E_DEPRECATED+false on 8.4 forward profile (#20611, re-#20252, ext/ctype/ctype.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
+error_reporting(E_ALL);
+
 $fns = [
     'ctype_alnum',
     'ctype_alpha',
@@ -18,27 +20,46 @@ $fns = [
     'ctype_xdigit',
     'ctype_blank',
 ];
+
 foreach ($fns as $fn) {
+    $seen = [];
+    set_error_handler(static function (int $no, string $str) use (&$seen): bool {
+        $seen[] = [$no, $str];
+        return true;
+    });
     try {
-        $r = $fn(null);
-        echo $fn, ': COERCED ', var_export($r, true), "\n";
-    } catch (TypeError $e) {
-        echo $fn, ': ', $e->getMessage(), "\n";
+        $result = $fn(null);
+        $caught = '';
+    } catch (Throwable $e) {
+        $result = null;
+        $caught = get_class($e);
     }
+    restore_error_handler();
+    $depr = 0;
+    $msgOk = 0;
+    foreach ($seen as [$no, $str]) {
+        if (E_DEPRECATED === $no && str_contains($str, 'will be interpreted as string')) {
+            $depr = 1;
+            if (str_contains($str, $fn.'(): Argument of type null will be interpreted as string in the future')) {
+                $msgOk = 1;
+            }
+        }
+    }
+    echo $fn, ':result=', var_export($result, true), ' depr=', $depr, ' msg=', $msgOk, ' err=', $caught, "\n";
 }
 echo 'ok_string=', (int) ctype_alnum('abc'), "\n";
 ?>
 --EXPECT--
-ctype_alnum: ctype_alnum(): Argument #1 ($text) must be of type string, null given
-ctype_alpha: ctype_alpha(): Argument #1 ($text) must be of type string, null given
-ctype_cntrl: ctype_cntrl(): Argument #1 ($text) must be of type string, null given
-ctype_digit: ctype_digit(): Argument #1 ($text) must be of type string, null given
-ctype_graph: ctype_graph(): Argument #1 ($text) must be of type string, null given
-ctype_lower: ctype_lower(): Argument #1 ($text) must be of type string, null given
-ctype_print: ctype_print(): Argument #1 ($text) must be of type string, null given
-ctype_punct: ctype_punct(): Argument #1 ($text) must be of type string, null given
-ctype_space: ctype_space(): Argument #1 ($text) must be of type string, null given
-ctype_upper: ctype_upper(): Argument #1 ($text) must be of type string, null given
-ctype_xdigit: ctype_xdigit(): Argument #1 ($text) must be of type string, null given
-ctype_blank: ctype_blank(): Argument #1 ($text) must be of type string, null given
+ctype_alnum:result=false depr=1 msg=1 err=
+ctype_alpha:result=false depr=1 msg=1 err=
+ctype_cntrl:result=false depr=1 msg=1 err=
+ctype_digit:result=false depr=1 msg=1 err=
+ctype_graph:result=false depr=1 msg=1 err=
+ctype_lower:result=false depr=1 msg=1 err=
+ctype_print:result=false depr=1 msg=1 err=
+ctype_punct:result=false depr=1 msg=1 err=
+ctype_space:result=false depr=1 msg=1 err=
+ctype_upper:result=false depr=1 msg=1 err=
+ctype_xdigit:result=false depr=1 msg=1 err=
+ctype_blank:result=false depr=1 msg=1 err=
 ok_string=1
