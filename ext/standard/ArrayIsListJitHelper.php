@@ -9,13 +9,15 @@ use PHPCompiler\VM\HashTable;
 /**
  * array_is_list() for compiled JIT/AOT modules (#13645, php-in-PHP).
  *
- * SSOT: {@see VmArray::isList()}
+ * Use {@see HashTable::isPackedList()} (NestedJIT → HashTableIsPackedList LLVM) rather than
+ * {@see VmArray::isList()} foreach — NestedJIT user-script AOT miscompiles iterateKeyed
+ * (always-false, #20652).
  * php-src: ext/standard/array.c — php_array_is_list()
  */
 final class ArrayIsListJitHelper
 {
     public static function isList(HashTable $ht): bool
     {
-        return VmArray::isList($ht);
+        return $ht->isPackedList();
     }
 }

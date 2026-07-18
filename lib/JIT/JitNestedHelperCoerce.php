@@ -378,6 +378,51 @@ final class JitNestedHelperCoerce
         return $raw;
     }
 
+    /**
+     * NestedJIT *JitHelper methods returning bool may box as {@see __value__}; ABI bridges want bare i1 (#20652).
+     *
+     * Do not route bool boxes through {@see extractLongFromHelperResult} / {@see __value__readLong}
+     * (segfault / always-false — #8555). Peer {@see extractDoubleFromHelperResult}.
+     */
+    public static function extractBoolFromHelperResult(Context $context, Value $raw): Value
+    {
+        $i1 = $context->getTypeFromString('int1');
+        $have = $raw->typeOf();
+        $haveStr = $context->getStringFromType($have);
+        if ('int1' === $haveStr || 'bool' === $haveStr) {
+            return $raw;
+        }
+        if (self::isValueBox($context, $raw)) {
+            $valuePtr = self::valueBoxPtrFromHelperResult($context, $raw);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'nested_helper_extract_bool');
+            $map = $context->structFieldMap['__value__'];
+            $i8 = $context->getTypeFromString('int8');
+            $valueField = $context->builder->structGep($valuePtr, $map['value']);
+            $boolBytePtr = $context->builder->inBoundsGEP(
+                $valueField,
+                $context->getTypeFromString('int32')->constInt(0, false),
+                $context->getTypeFromString('int64')->constInt(0, false)
+            );
+            $boolByte = $context->builder->load($boolBytePtr);
+
+            return $context->builder->icmp(
+                Builder::INT_NE,
+                $boolByte,
+                $i8->constInt(0, false)
+            );
+        }
+        if ('int8' === $haveStr || 'i8' === $haveStr
+            || 'int32' === $haveStr || 'int64' === $haveStr || 'long long' === $haveStr) {
+            return $context->builder->icmp(
+                Builder::INT_NE,
+                $raw,
+                $have->constInt(0, false)
+            );
+        }
+
+        return $context->builder->truncOrBitCast($raw, $i1);
+    }
+
     public static function coerceBridgeResult(Context $context, Value $raw, Type $wantTy): Value
     {
         $haveTy = $raw->typeOf();
@@ -398,6 +443,10 @@ final class JitNestedHelperCoerce
             }
 
             return $extracted;
+        }
+        // Bool bridges (array_is_list / in_array int1) — before integer KIND uses readLong (#20652).
+        if ('int1' === $wantStr || 'bool' === $wantStr) {
+            return self::extractBoolFromHelperResult($context, $raw);
         }
         if (Type::KIND_INTEGER === $wantTy->getKind()) {
             // Prefer scoped long extract when helper boxed the int (#20266 / rename #20603).
