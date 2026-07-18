@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5718 |
-| Phase A inventory files (M2 ratio SSOT) | 5718 |
+| PHP files on vm.php path | 5733 |
+| Phase A inventory files (M2 ratio SSOT) | 5733 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16419 |
+| Source constructs flagged (warnings) | 16462 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -391,7 +391,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/TokenListReplace.php` | 0 | 1 |
 | `ext/dom/TokenListSupports.php` | 0 | 1 |
 | `ext/dom/TokenListToggle.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 387 |
+| `ext/dom/VmDom.php` | 0 | 391 |
 | `ext/dom/VmDomCollectionDimension.php` | 0 | 1 |
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 37 |
@@ -411,6 +411,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/XmlDocumentCreateEmpty.php` | 0 | 2 |
 | `ext/dom/XmlDocumentCreateFromString.php` | 0 | 3 |
 | `ext/dom/dom_import_simplexml.php` | 0 | 2 |
+| `ext/enchant/BuiltinClasses.php` | 0 | 1 |
+| `ext/enchant/EnchantExtensionPolicy.php` | 0 | 1 |
+| `ext/enchant/Module.php` | 0 | 8 |
+| `ext/enchant/VmEnchantArg.php` | 0 | 1 |
+| `ext/enchant/VmEnchantBroker.php` | 0 | 5 |
+| `ext/enchant/VmEnchantCore.php` | 0 | 3 |
+| `ext/enchant/VmEnchantDictionary.php` | 0 | 4 |
+| `ext/enchant/VmEnchantNative.php` | 0 | 1 |
+| `ext/enchant/enchant_broker_dict_exists.php` | 0 | 2 |
+| `ext/enchant/enchant_broker_free.php` | 0 | 2 |
+| `ext/enchant/enchant_broker_free_dict.php` | 0 | 2 |
+| `ext/enchant/enchant_broker_init.php` | 0 | 2 |
+| `ext/enchant/enchant_broker_request_dict.php` | 0 | 2 |
+| `ext/enchant/enchant_dict_check.php` | 0 | 2 |
+| `ext/enchant/enchant_dict_suggest.php` | 0 | 2 |
 | `ext/exif/ExifImagetypeJitHelper.php` | 0 | 1 |
 | `ext/exif/JitExifImagetype.php` | 0 | 2 |
 | `ext/exif/Module.php` | 0 | 4 |
@@ -5026,7 +5041,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 98 |
+| `lib/Runtime.php` | 0 | 99 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -8099,132 +8114,136 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 971)
 - new DomNodeState (line 994)
 - new DomNodeState (line 1043)
-- new ObjectEntry (line 1067)
-- new DomNodeState (line 1072)
-- new Variable (line 1090)
-- new ObjectEntry (line 1106)
-- new DomNodeState (line 1111)
-- new Variable (line 1134)
-- new Variable (line 1155)
-- new ObjectEntry (line 1173)
-- new DomNodeState (line 1182)
-- new Variable (line 1194)
-- new ObjectEntry (line 1228)
-- new DomNodeState (line 1244)
-- new DOMException (line 1291)
-- new Variable (line 1295)
-- new Variable (line 1301)
-- new DOMException (line 1310)
-- new Variable (line 1348)
-- new DOMException (line 1368)
-- new Variable (line 1371)
-- new DOMException (line 1390)
-- new Variable (line 1422)
-- new DOMException (line 1434)
-- new DOMException (line 1447)
-- new Variable (line 1456)
-- new DOMException (line 1606)
-- new DOMException (line 1658)
-- new DOMException (line 1671)
-- new DOMException (line 1694)
-- new DOMException (line 1707)
-- new DOMException (line 1711)
-- new DOMException (line 1726)
-- new DOMException (line 1738)
-- new DOMException (line 1745)
+- new ObjectEntry (line 1069)
+- new DomNodeState (line 1074)
+- new Variable (line 1092)
+- new ObjectEntry (line 1110)
+- new DomNodeState (line 1115)
+- new Variable (line 1138)
+- new Variable (line 1159)
+- new ObjectEntry (line 1186)
+- new DomNodeState (line 1195)
+- new Variable (line 1207)
+- new ObjectEntry (line 1244)
+- new DomNodeState (line 1260)
+- new DOMException (line 1307)
+- new Variable (line 1311)
+- new Variable (line 1317)
+- new DOMException (line 1326)
+- new Variable (line 1364)
+- new DOMException (line 1384)
+- new Variable (line 1387)
+- new DOMException (line 1406)
+- new Variable (line 1438)
+- new DOMException (line 1450)
+- new DOMException (line 1463)
+- new Variable (line 1472)
+- new DOMException (line 1622)
+- new DOMException (line 1674)
+- new DOMException (line 1687)
+- new DOMException (line 1710)
+- new DOMException (line 1723)
+- new DOMException (line 1727)
+- new DOMException (line 1742)
+- new DOMException (line 1754)
 - new DOMException (line 1761)
-- new DOMException (line 1824)
-- new DOMException (line 1877)
-- new DOMException (line 1933)
-- new DOMException (line 1937)
-- new DOMException (line 1950)
-- new DOMException (line 1954)
+- new DOMException (line 1777)
+- new DOMException (line 1840)
+- new DOMException (line 1893)
+- new DOMException (line 1949)
+- new DOMException (line 1953)
 - new DOMException (line 1966)
-- new DOMException (line 1979)
-- new DOMException (line 1989)
-- new DOMException (line 2742)
+- new DOMException (line 1970)
+- new DOMException (line 1982)
+- new DOMException (line 1995)
+- new DOMException (line 2005)
 - new DOMException (line 2758)
-- new ObjectEntry (line 2845)
-- new DomNodeState (line 2850)
-- new ObjectEntry (line 2866)
-- new DomNodeState (line 2871)
-- new ObjectEntry (line 2887)
-- new DomNodeState (line 2892)
-- new DOMException (line 2931)
-- new DOMException (line 2941)
-- new DOMException (line 2954)
-- new DOMException (line 2973)
-- new ObjectEntry (line 3061)
-- new DomNodeState (line 3066)
-- new Variable (line 3075)
-- new ObjectEntry (line 3085)
-- new DomNodeState (line 3090)
-- new Variable (line 3100)
-- new ObjectEntry (line 3892)
-- new DomNodeState (line 3894)
-- new ObjectEntry (line 4090)
-- new DomNodeState (line 4092)
-- new ObjectEntry (line 4120)
-- new DomNodeState (line 4122)
-- new ObjectEntry (line 4310)
-- new DomNodeState (line 4315)
-- new DOMException (line 4714)
+- new DOMException (line 2774)
+- new ObjectEntry (line 2861)
+- new DomNodeState (line 2866)
+- new ObjectEntry (line 2882)
+- new DomNodeState (line 2887)
+- new ObjectEntry (line 2903)
+- new DomNodeState (line 2908)
+- new DOMException (line 2947)
+- new DOMException (line 2957)
+- new DOMException (line 2970)
+- new DOMException (line 2989)
+- new ObjectEntry (line 3077)
+- new DomNodeState (line 3082)
+- new Variable (line 3091)
+- new ObjectEntry (line 3101)
+- new DomNodeState (line 3106)
+- new Variable (line 3116)
+- new ObjectEntry (line 3908)
+- new DomNodeState (line 3910)
+- new ObjectEntry (line 4106)
+- new DomNodeState (line 4108)
+- new ObjectEntry (line 4136)
+- new DomNodeState (line 4138)
+- new ObjectEntry (line 4326)
+- new DomNodeState (line 4331)
 - new DOMException (line 4730)
-- new Variable (line 4748)
-- new DOMException (line 4762)
-- new DOMException (line 4765)
-- new DOMException (line 4775)
-- new Error (line 4805)
-- new DOMException (line 4811)
-- new DOMException (line 4825)
-- new DOMException (line 5023)
-- new DOMException (line 5220)
-- new DOMException (line 5224)
-- new DOMException (line 5313)
-- new DOMException (line 5317)
-- new DOMException (line 5375)
-- new DOMException (line 5392)
-- new DOMException (line 5424)
-- new DOMException (line 5466)
-- new DOMException (line 5493)
-- new DOMException (line 6349)
-- new Variable (line 6377)
-- new DOMException (line 6647)
-- new DOMException (line 6765)
-- new DOMException (line 6810)
-- new ObjectEntry (line 6895)
-- new DomNodeState (line 6899)
-- new Variable (line 6906)
-- new DOMException (line 6960)
-- new ObjectEntry (line 7177)
-- new DomNodeState (line 7181)
-- new Variable (line 7188)
-- new ObjectEntry (line 7215)
-- new DomNodeState (line 7218)
-- new Variable (line 7226)
-- new Variable (line 7417)
-- new DOMException (line 7554)
-- new DOMException (line 7561)
-- new DOMException (line 7568)
-- new DOMException (line 7572)
-- new DOMException (line 7575)
+- new DOMException (line 4746)
+- new Variable (line 4764)
+- new DOMException (line 4778)
+- new DOMException (line 4781)
+- new DOMException (line 4791)
+- new Error (line 4821)
+- new DOMException (line 4827)
+- new DOMException (line 4841)
+- new DOMException (line 5039)
+- new DOMException (line 5236)
+- new DOMException (line 5240)
+- new DOMException (line 5329)
+- new DOMException (line 5333)
+- new DOMException (line 5391)
+- new DOMException (line 5408)
+- new DOMException (line 5440)
+- new DOMException (line 5482)
+- new DOMException (line 5509)
+- new DOMException (line 6365)
+- new Variable (line 6393)
+- new DOMException (line 6663)
+- new DOMException (line 6781)
+- new DOMException (line 6826)
+- new ObjectEntry (line 6911)
+- new DomNodeState (line 6915)
+- new Variable (line 6922)
+- new DOMException (line 6976)
+- new ObjectEntry (line 7193)
+- new DomNodeState (line 7197)
+- new Variable (line 7204)
+- new ObjectEntry (line 7231)
+- new DomNodeState (line 7234)
+- new Variable (line 7242)
+- new Variable (line 7433)
+- new DOMException (line 7570)
+- new DOMException (line 7577)
 - new DOMException (line 7584)
-- new DOMException (line 7596)
-- new DOMException (line 8652)
-- new Variable (line 8711)
-- new Variable (line 8724)
-- new Variable (line 8762)
-- new DOMException (line 8773)
-- new Variable (line 8775)
-- new DOMException (line 8936)
-- new DOMException (line 8963)
-- new DOMException (line 8999)
-- new DOMException (line 9063)
-- new DOMException (line 9071)
-- new DOMException (line 9080)
-- new Error (line 9972)
-- new Error (line 9976)
-- 413 class method(s)
+- new DOMException (line 7588)
+- new DOMException (line 7591)
+- new DOMException (line 7600)
+- new DOMException (line 7612)
+- new DOMException (line 8668)
+- new Variable (line 8727)
+- new Variable (line 8740)
+- new Variable (line 8778)
+- new DOMException (line 8789)
+- new Variable (line 8791)
+- new DOMException (line 8952)
+- new DOMException (line 8979)
+- new DOMException (line 9015)
+- new DOMException (line 9079)
+- new DOMException (line 9087)
+- new DOMException (line 9100)
+- new DOMException (line 9105)
+- new DOMException (line 9108)
+- new DOMException (line 9111)
+- new DOMException (line 9140)
+- new Error (line 10032)
+- new Error (line 10036)
+- 415 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -8419,6 +8438,104 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- 2 class method(s)
+
+### `ext/enchant/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/enchant/EnchantExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/enchant/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new enchant_broker_init (line 38)
+- new enchant_broker_free (line 39)
+- new enchant_broker_request_dict (line 40)
+- new enchant_broker_free_dict (line 41)
+- new enchant_broker_dict_exists (line 42)
+- new enchant_dict_check (line 43)
+- new enchant_dict_suggest (line 44)
+- 3 class method(s)
+
+### `ext/enchant/VmEnchantArg.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/enchant/VmEnchantBroker.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 29)
+- new ObjectEntry (line 37)
+- new Variable (line 44)
+- new Error (line 91)
+- 8 class method(s)
+
+### `ext/enchant/VmEnchantCore.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 59)
+- new Variable (line 61)
+- 5 class method(s)
+
+### `ext/enchant/VmEnchantDictionary.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 29)
+- new ObjectEntry (line 37)
+- new Variable (line 45)
+- 6 class method(s)
+
+### `ext/enchant/VmEnchantNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
+
+### `ext/enchant/enchant_broker_dict_exists.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_broker_free.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/enchant/enchant_broker_free_dict.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/enchant/enchant_broker_init.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/enchant/enchant_broker_request_dict.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_dict_check.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/enchant/enchant_dict_suggest.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
 - 2 class method(s)
 
 ### `ext/exif/ExifImagetypeJitHelper.php`
@@ -39881,26 +39998,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\sodium\Module (line 272)
 - new ext\sqlite3\Module (line 273)
 - new ext\pgsql\Module (line 274)
-- new ext\pdo\Module (line 275)
-- new ext\phar\Module (line 276)
-- new ext\uri\Module (line 277)
-- new ext\uuid\Module (line 278)
-- new ext\uploadprogress\Module (line 279)
-- new ext\sysvshm\Module (line 280)
-- new ext\sysvsem\Module (line 281)
-- new ext\sysvmsg\Module (line 282)
-- new ext\reflection\Module (line 283)
-- new ext\standard\Module (line 284)
-- new JIT (line 360)
-- new JITContext (line 374)
-- new SealedClassPreprocessor (line 440)
-- new StaticClassPreprocessor (line 443)
-- new SourcePreprocessor\PropertyHooks (line 446)
-- new State (line 586)
-- new ReflectionProperty (line 613)
-- new ReflectionProperty (line 616)
-- new LintCompiler (line 1027)
-- new Variable (line 1157)
+- new ext\enchant\Module (line 275)
+- new ext\pdo\Module (line 276)
+- new ext\phar\Module (line 277)
+- new ext\uri\Module (line 278)
+- new ext\uuid\Module (line 279)
+- new ext\uploadprogress\Module (line 280)
+- new ext\sysvshm\Module (line 281)
+- new ext\sysvsem\Module (line 282)
+- new ext\sysvmsg\Module (line 283)
+- new ext\reflection\Module (line 284)
+- new ext\standard\Module (line 285)
+- new JIT (line 361)
+- new JITContext (line 375)
+- new SealedClassPreprocessor (line 441)
+- new StaticClassPreprocessor (line 444)
+- new SourcePreprocessor\PropertyHooks (line 447)
+- new State (line 587)
+- new ReflectionProperty (line 614)
+- new ReflectionProperty (line 617)
+- new LintCompiler (line 1028)
+- new Variable (line 1158)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

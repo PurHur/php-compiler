@@ -15,6 +15,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential clang llvm-14-dev libjansson4 libpcre2-dev zlib1g-dev \
     libfreetype6 fonts-dejavu-core \
     libpq5 \
+    libenchant-2-2 \
+    enchant-2 \
+    hunspell-en-us \
 
     && rm -rf /var/lib/apt/lists/* \
     && curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
