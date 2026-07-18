@@ -170,6 +170,76 @@ final class PosixLibcThinAbi
         return $ticks >= 0 ? $ticks : null;
     }
 
+    /**
+     * sysconf(3) — configurable system variables (#20509).
+     */
+    public static function sysconf(int $name): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return -1;
+        }
+
+        return (int) $ffi->sysconf($name);
+    }
+
+    /**
+     * pathconf(3) — path-dependent limits (#20509).
+     *
+     * @return array{0: int, 1: int} [return, errno after call]
+     */
+    public static function pathconf(string $path, int $name): array
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return [-1, 0];
+        }
+        self::clearErrno($ffi);
+        $ret = (int) $ffi->pathconf($path, $name);
+
+        return [$ret, self::readErrno()];
+    }
+
+    /**
+     * fpathconf(3) — fd-dependent limits (#20509).
+     *
+     * @return array{0: int, 1: int} [return, errno after call]
+     */
+    public static function fpathconf(int $fd, int $name): array
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return [-1, 0];
+        }
+        self::clearErrno($ffi);
+        $ret = (int) $ffi->fpathconf($fd, $name);
+
+        return [$ret, self::readErrno()];
+    }
+
+    /**
+     * eaccess(3) — effective-UID accessibility probe (#20509).
+     *
+     * @return array{0: int, 1: int} [return, errno after call] — 0 on success
+     */
+    public static function eaccess(string $path, int $mode): array
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return [-1, 0];
+        }
+        self::clearErrno($ffi);
+        $ret = (int) $ffi->eaccess($path, $mode);
+
+        return [$ret, self::readErrno()];
+    }
+
+    private static function clearErrno(\FFI $ffi): void
+    {
+        $loc = $ffi->__errno_location();
+        $loc[0] = 0;
+    }
+
     private static function setId(string $fn, int $id): int
     {
         $ffi = self::ffi();
@@ -229,6 +299,10 @@ struct tms {
 clock_t times(struct tms *buf);
 char *getlogin(void);
 int initgroups(const char *user, gid_t group);
+long sysconf(int name);
+long pathconf(const char *path, int name);
+long fpathconf(int fd, int name);
+int eaccess(const char *pathname, int mode);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

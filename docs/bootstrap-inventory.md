@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5666 |
-| Phase A inventory files (M2 ratio SSOT) | 5666 |
+| PHP files on vm.php path | 5670 |
+| Phase A inventory files (M2 ratio SSOT) | 5670 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16174 |
+| Source constructs flagged (warnings) | 16194 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1075,7 +1075,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/phar/VmPharTar.php` | 0 | 1 |
 | `ext/posix/JitPosix.php` | 0 | 1 |
 | `ext/posix/JitPosixTimes.php` | 0 | 1 |
-| `ext/posix/Module.php` | 0 | 39 |
+| `ext/posix/Module.php` | 0 | 43 |
 | `ext/posix/PosixConstants.php` | 0 | 1 |
 | `ext/posix/PosixCtermidJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixFunction.php` | 0 | 3 |
@@ -1084,7 +1084,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/PosixStrerrorJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixTerminalJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixTimesJitHelper.php` | 0 | 1 |
-| `ext/posix/VmPosix.php` | 0 | 28 |
+| `ext/posix/VmPosix.php` | 0 | 32 |
 | `ext/posix/VmPosixCtermidPure.php` | 0 | 1 |
 | `ext/posix/VmPosixIdentityWritePure.php` | 0 | 1 |
 | `ext/posix/VmPosixMknodPure.php` | 0 | 1 |
@@ -1096,7 +1096,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/VmPosixTimesPure.php` | 0 | 1 |
 | `ext/posix/posix_access.php` | 0 | 3 |
 | `ext/posix/posix_ctermid.php` | 0 | 2 |
+| `ext/posix/posix_eaccess.php` | 0 | 3 |
 | `ext/posix/posix_errno.php` | 0 | 2 |
+| `ext/posix/posix_fpathconf.php` | 0 | 3 |
 | `ext/posix/posix_get_last_error.php` | 0 | 2 |
 | `ext/posix/posix_getcwd.php` | 0 | 2 |
 | `ext/posix/posix_getegid.php` | 0 | 2 |
@@ -1120,6 +1122,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/posix_kill.php` | 0 | 3 |
 | `ext/posix/posix_mkfifo.php` | 0 | 3 |
 | `ext/posix/posix_mknod.php` | 0 | 3 |
+| `ext/posix/posix_pathconf.php` | 0 | 3 |
 | `ext/posix/posix_setegid.php` | 0 | 2 |
 | `ext/posix/posix_seteuid.php` | 0 | 2 |
 | `ext/posix/posix_setgid.php` | 0 | 2 |
@@ -1128,6 +1131,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/posix_setsid.php` | 0 | 2 |
 | `ext/posix/posix_setuid.php` | 0 | 2 |
 | `ext/posix/posix_strerror.php` | 0 | 2 |
+| `ext/posix/posix_sysconf.php` | 0 | 3 |
 | `ext/posix/posix_times.php` | 0 | 2 |
 | `ext/posix/posix_ttyname.php` | 0 | 2 |
 | `ext/posix/posix_uname.php` | 0 | 4 |
@@ -13207,29 +13211,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new posix_ctermid (line 42)
 - new posix_errno (line 43)
 - new posix_access (line 44)
-- new posix_mknod (line 45)
-- new posix_mkfifo (line 46)
-- new posix_setuid (line 47)
-- new posix_setgid (line 48)
-- new posix_seteuid (line 49)
-- new posix_setegid (line 50)
-- new posix_times (line 51)
-- new posix_getrlimit (line 52)
-- new posix_setrlimit (line 53)
-- new posix_setsid (line 54)
-- new posix_getsid (line 55)
-- new posix_getpgid (line 56)
-- new posix_getpgrp (line 57)
-- new posix_setpgid (line 58)
-- new posix_initgroups (line 59)
-- new posix_kill (line 60)
-- new posix_getlogin (line 61)
-- new posix_ttyname (line 62)
-- new posix_isatty (line 63)
-- new posix_getpwuid (line 64)
-- new posix_getpwnam (line 65)
-- new posix_getgrgid (line 66)
-- new posix_getgrnam (line 67)
+- new posix_eaccess (line 45)
+- new posix_sysconf (line 46)
+- new posix_pathconf (line 47)
+- new posix_fpathconf (line 48)
+- new posix_mknod (line 49)
+- new posix_mkfifo (line 50)
+- new posix_setuid (line 51)
+- new posix_setgid (line 52)
+- new posix_seteuid (line 53)
+- new posix_setegid (line 54)
+- new posix_times (line 55)
+- new posix_getrlimit (line 56)
+- new posix_setrlimit (line 57)
+- new posix_setsid (line 58)
+- new posix_getsid (line 59)
+- new posix_getpgid (line 60)
+- new posix_getpgrp (line 61)
+- new posix_setpgid (line 62)
+- new posix_initgroups (line 63)
+- new posix_kill (line 64)
+- new posix_getlogin (line 65)
+- new posix_ttyname (line 66)
+- new posix_isatty (line 67)
+- new posix_getpwuid (line 68)
+- new posix_getpwnam (line 69)
+- new posix_getgrgid (line 70)
+- new posix_getgrnam (line 71)
 - 2 class method(s)
 
 ### `ext/posix/PosixConstants.php`
@@ -13252,7 +13260,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/PosixLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
-- 18 class method(s)
+- 23 class method(s)
 
 ### `ext/posix/PosixSessionJitHelper.php`
 
@@ -13277,34 +13285,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/VmPosix.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 39)
-- new Error (line 49)
-- new Error (line 59)
-- new Error (line 69)
-- new Error (line 79)
-- new Error (line 93)
-- new Error (line 106)
-- new Error (line 148)
-- new Error (line 162)
-- new Error (line 201)
-- new HashTable (line 380)
-- new Variable (line 382)
-- new HashTable (line 399)
-- new Variable (line 401)
-- new HashTable (line 405)
-- new Variable (line 407)
+- new Error (line 43)
+- new Error (line 53)
+- new Error (line 63)
+- new Error (line 73)
+- new Error (line 83)
+- new Error (line 97)
+- new Error (line 110)
+- new Error (line 152)
+- new Error (line 166)
+- new Error (line 205)
+- new HashTable (line 384)
+- new Variable (line 386)
+- new HashTable (line 403)
+- new Variable (line 405)
+- new HashTable (line 409)
 - new Variable (line 411)
-- new Variable (line 414)
-- new Error (line 474)
-- new HashTable (line 482)
-- new Variable (line 484)
-- new Error (line 508)
-- new Error (line 516)
-- new Error (line 530)
-- new Error (line 573)
-- new Error (line 584)
+- new Variable (line 415)
+- new Variable (line 418)
+- new Error (line 478)
+- new HashTable (line 486)
+- new Variable (line 488)
+- new Error (line 512)
+- new Error (line 520)
+- new Error (line 534)
+- new Error (line 577)
+- new Error (line 588)
 - new Error (line 625)
-- 46 class method(s)
+- new Error (line 640)
+- new Error (line 661)
+- new Error (line 680)
+- new Error (line 776)
+- 52 class method(s)
 
 ### `ext/posix/VmPosixCtermidPure.php`
 
@@ -13364,10 +13376,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 27)
 - 2 class method(s)
 
+### `ext/posix/posix_eaccess.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 46)
+- 2 class method(s)
+
 ### `ext/posix/posix_errno.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/posix/posix_fpathconf.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 50)
 - 2 class method(s)
 
 ### `ext/posix/posix_get_last_error.php`
@@ -13522,6 +13548,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 48)
 - 2 class method(s)
 
+### `ext/posix/posix_pathconf.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 49)
+- 2 class method(s)
+
 ### `ext/posix/posix_setegid.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13569,6 +13602,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/posix/posix_sysconf.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new Error (line 38)
 - 2 class method(s)
 
 ### `ext/posix/posix_times.php`

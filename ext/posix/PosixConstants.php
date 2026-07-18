@@ -39,6 +39,29 @@ final class PosixConstants
     /** User-facing unlimited sentinel for posix_setrlimit() (php-src POSIX_RLIMIT_INFINITY). */
     public const RLIMIT_INFINITY = -1;
 
+    /**
+     * sysconf(3) / pathconf(3) name ids — Linux glibc unistd.h values.
+     *
+     * php-src: ext/posix/posix.stub.php POSIX_SC_* / POSIX_PC_* (#20509).
+     */
+    public const SC_ARG_MAX = 0;
+    public const SC_CHILD_MAX = 1;
+    public const SC_CLK_TCK = 2;
+    public const SC_PAGESIZE = 30;
+    public const SC_NPROCESSORS_CONF = 83;
+    public const SC_NPROCESSORS_ONLN = 84;
+
+    public const PC_LINK_MAX = 0;
+    public const PC_MAX_CANON = 1;
+    public const PC_MAX_INPUT = 2;
+    public const PC_NAME_MAX = 3;
+    public const PC_PATH_MAX = 4;
+    public const PC_PIPE_BUF = 5;
+    public const PC_CHOWN_RESTRICTED = 6;
+    public const PC_NO_TRUNC = 7;
+    public const PC_ALLOC_SIZE_MIN = 18;
+    public const PC_SYMLINK_MAX = 19;
+
     /** @return array<string, int> */
     public static function registeredConstants(): array
     {
@@ -64,6 +87,23 @@ final class PosixConstants
             'POSIX_S_IFBLK' => self::S_IFBLK,
             'POSIX_S_IFREG' => self::S_IFREG,
             'POSIX_S_IFSOCK' => self::S_IFSOCK,
+            // php-src POSIX_SC_* / POSIX_PC_* (#20509)
+            'POSIX_SC_ARG_MAX' => self::SC_ARG_MAX,
+            'POSIX_SC_CHILD_MAX' => self::SC_CHILD_MAX,
+            'POSIX_SC_CLK_TCK' => self::SC_CLK_TCK,
+            'POSIX_SC_PAGESIZE' => self::SC_PAGESIZE,
+            'POSIX_SC_NPROCESSORS_CONF' => self::SC_NPROCESSORS_CONF,
+            'POSIX_SC_NPROCESSORS_ONLN' => self::SC_NPROCESSORS_ONLN,
+            'POSIX_PC_LINK_MAX' => self::PC_LINK_MAX,
+            'POSIX_PC_MAX_CANON' => self::PC_MAX_CANON,
+            'POSIX_PC_MAX_INPUT' => self::PC_MAX_INPUT,
+            'POSIX_PC_NAME_MAX' => self::PC_NAME_MAX,
+            'POSIX_PC_PATH_MAX' => self::PC_PATH_MAX,
+            'POSIX_PC_PIPE_BUF' => self::PC_PIPE_BUF,
+            'POSIX_PC_CHOWN_RESTRICTED' => self::PC_CHOWN_RESTRICTED,
+            'POSIX_PC_NO_TRUNC' => self::PC_NO_TRUNC,
+            'POSIX_PC_ALLOC_SIZE_MIN' => self::PC_ALLOC_SIZE_MIN,
+            'POSIX_PC_SYMLINK_MAX' => self::PC_SYMLINK_MAX,
         ];
     }
 
