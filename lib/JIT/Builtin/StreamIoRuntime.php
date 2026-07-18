@@ -9,7 +9,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\LibcExtern;
-use PHPCompiler\JIT\UserScriptAotEnv;
 use PHPCompiler\ext\standard\JitStreamIoKernel;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -36,6 +35,12 @@ final class StreamIoRuntime
     public static function endStandaloneInitPhase(): void
     {
         self::$standaloneInitPhase = false;
+    }
+
+    /** True while {@see beginStandaloneInitPhase} is active (#14472, #20553). */
+    public static function isStandaloneInitPhase(): bool
+    {
+        return self::$standaloneInitPhase;
     }
 
     private static int $implementDepth = 0;
@@ -556,6 +561,10 @@ final class StreamIoRuntime
         }
     }
 
+    /**
+     * M3 inventory / bootstrap-aot-link / standalone Context init — defer NestedJIT stream emitters.
+     * Thin user-script AOT uses {@see Context::isThinStandaloneAotMain()} at call sites (#20229, #20553).
+     */
     public static function shouldDeferHeavyStreamIoEmitters(Context $context): bool
     {
         unset($context);
@@ -573,9 +582,6 @@ final class StreamIoRuntime
             if ('1' === $flag || 'true' === strtolower((string) $flag)) {
                 return true;
             }
-        }
-        if (UserScriptAotEnv::isActive()) {
-            return true;
         }
 
         return false;

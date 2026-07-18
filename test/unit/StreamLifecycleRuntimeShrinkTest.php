@@ -46,6 +46,9 @@ final class StreamLifecycleRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('NestedJitCompileScope::run', $source);
         $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
         $this->assertStringContainsString('StreamLifecycleJitHelper', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('isStandaloneInitPhase', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
         $this->assertLessThan(380, \substr_count($source, "\n") + 1);
     }
