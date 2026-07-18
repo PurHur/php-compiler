@@ -57,6 +57,23 @@ final class ReflectionPropertyHookSupport
         return is_array($propMeta) && !empty($propMeta['virtual']);
     }
 
+    /**
+     * php-src ReflectionProperty::isFinal — prop->flags & ZEND_ACC_FINAL (#20511).
+     */
+    public static function isFinal(ClassEntry $entry, ?ClassProperty $meta, string $property, Context $ctx): bool
+    {
+        if (null !== $meta) {
+            return $meta->propertyFinal;
+        }
+        $lcClass = strtolower($entry->name);
+        $propLc = strtolower($property);
+        $propMeta = $ctx->propertyHookRegistry[$lcClass][$property]
+            ?? $ctx->propertyHookRegistry[$lcClass][$propLc]
+            ?? null;
+
+        return is_array($propMeta) && !empty($propMeta['finalProperty']);
+    }
+
     public static function getMangledName(ClassEntry $entry, ?ClassProperty $meta, string $property, Context $ctx): string
     {
         if (null !== $meta) {

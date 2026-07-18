@@ -5396,6 +5396,7 @@
         "lib/VM/Builtin/ReflectionPropertyIsDefaultValueAvailable.php",
         "lib/VM/Builtin/ReflectionPropertyIsDeprecated.php",
         "lib/VM/Builtin/ReflectionPropertyIsDynamic.php",
+        "lib/VM/Builtin/ReflectionPropertyIsFinal.php",
         "lib/VM/Builtin/ReflectionPropertyIsInitialized.php",
         "lib/VM/Builtin/ReflectionPropertyIsLazy.php",
         "lib/VM/Builtin/ReflectionPropertyIsPrivate.php",
@@ -5887,9 +5888,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5653,
+        "inventory_files": 5654,
         "excluded": 0,
-        "eligible": 5653,
+        "eligible": 5654,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
