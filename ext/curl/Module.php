@@ -55,8 +55,6 @@ class Module extends ModuleAbstract
         }
 
         $functions = [
-            new curl_escape(),
-            new curl_unescape(),
             new curl_version(),
             new curl_strerror(),
             new curl_multi_strerror(),
@@ -71,6 +69,9 @@ class Module extends ModuleAbstract
             $functions[] = new curl_share_close();
         }
         if (CurlExtensionPolicy::advertisesEasyHandleStubs()) {
+            // curl_escape/unescape require CurlHandle (php-src curl.stub.php; #20493)
+            $functions[] = new curl_escape();
+            $functions[] = new curl_unescape();
             $functions[] = new curl_init();
             $functions[] = new curl_setopt();
             $functions[] = new curl_setopt_array();

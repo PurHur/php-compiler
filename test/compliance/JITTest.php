@@ -629,12 +629,13 @@ class JITTest extends BaseTest {
                 || str_contains($name, 'locale_gated')) {
                 continue;
             }
-            if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesBuiltins()
+            // curl_escape/unescape require CurlHandle + easy stubs (#20493)
+            if (!\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesEasyHandleStubs()
                 && str_contains($name, 'curl_escape')
                 && !str_contains($name, 'curl_escape_phantom')) {
                 continue;
             }
-            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesBuiltins()
+            if (\PHPCompiler\ext\curl\CurlExtensionPolicy::advertisesExtension()
                 && str_contains($name, 'curl_escape_phantom')) {
                 continue;
             }
