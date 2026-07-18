@@ -217,6 +217,10 @@ final class IncludeBindingEmitHelper
             if (Variable::KIND_VARIABLE !== $calleeVar->kind) {
                 continue;
             }
+            // Never rewrite an in-flight ?? / ?-> assign target (e.g. $scriptBase) (#20507).
+            if ($context->coalesceAssignTargets->contains($calleeOp)) {
+                continue;
+            }
             if (null !== $compileTimeString && '' !== $compileTimeString) {
                 $restored = $context->builder->load(
                     $context->constantStringFromString($compileTimeString)
@@ -238,18 +242,18 @@ final class IncludeBindingEmitHelper
                 if (OperandName::resolve($scopeOp) !== $bindingName) {
                     continue;
                 }
+                if ($context->coalesceAssignTargets->contains($scopeOp)) {
+                    continue;
+                }
                 $scopeVar = $context->scope->variables[$scopeOp];
                 if (Variable::KIND_VARIABLE !== $scopeVar->kind) {
                     continue;
                 }
-                // Restore same-name aliases after ?? (#866, #20507). Skip fromLiteral temps that
-                // only share a bogus OperandName with an inherited local (#19504): those carry a
-                // compileTimeString that differs from the binding's value.
+                // Only refresh known include-binding aliases — never clobber unrelated
+                // slot-backed temps that share a name resolution (#19504, #20507).
+                // #20526's compileTimeString exception re-opened MiniWebApp munmap flakiness.
                 if (!$scopeVar->includeBinding) {
-                    $aliasCt = $scopeVar->compileTimeString;
-                    if (null !== $aliasCt && $aliasCt !== $compileTimeString) {
-                        continue;
-                    }
+                    continue;
                 }
                 self::storeIncludeBindingRestore($context, $scopeOp, $scopeVar, $restored);
             }
