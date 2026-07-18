@@ -30,14 +30,25 @@ final class VmXmlSaxDispatcher
             return;
         }
         $handlers = $state['handlers'];
-        if (null === $handlers[XmlParserHandlers::HANDLER_ELEMENT_START]
-            && null === $handlers[XmlParserHandlers::HANDLER_ELEMENT_END]
-            && null === $handlers[XmlParserHandlers::HANDLER_CHARACTER_DATA]) {
+        // Proceed when any SAX handler is registered — including NS-only (#20323).
+        $anyHandler = false;
+        foreach ($handlers as $handler) {
+            if (null !== $handler) {
+                $anyHandler = true;
+                break;
+            }
+        }
+        if (!$anyHandler) {
             return;
         }
 
         $dispatcher = new self($ctx, $parser, $state, $frame);
         $trimmed = trim($data);
+        if ('' === $trimmed) {
+            return;
+        }
+        // Drop XML declaration / DOCTYPE / Misc so parse starts at the document element (#20323).
+        $trimmed = VmXml::stripDocumentMiscEnvelope($trimmed);
         if ('' === $trimmed) {
             return;
         }
@@ -85,6 +96,8 @@ final class VmXmlSaxDispatcher
         $attrSpec = $open[2] ?? '';
         $selfClose = isset($open[3]) && '/' === $open[3];
         $savedBindings = $this->nsBindings;
+        // Apply xmlns + fire start-NS before element start (expat / php-src ext/xml/xml.c).
+        $this->applyNamespaceDeclarations($attrSpec);
         $attrs = $this->attributesForHandlers($attrSpec);
         $tag = $this->expandElementName($rawTag);
         $contentStart = $pos + \strlen($open[0]);
@@ -142,6 +155,7 @@ final class VmXmlSaxDispatcher
         }
 
         $this->invokeElementEnd($tag);
+        // libxml-backed php-src does not invoke end-NS handlers (php.net); match Zend (#20323).
         $this->nsBindings = $savedBindings;
 
         return $end;
@@ -206,23 +220,36 @@ final class VmXmlSaxDispatcher
     }
 
     /**
-     * Parse attributes, apply xmlns bindings for this element, expand names when NS-aware,
-     * and omit xmlns declarations from the handler attribute bag (expat NS mode).
+     * Apply xmlns / xmlns:prefix to the binding stack and invoke start-NS handlers
+     * in document order (before the start-element handler; #20323 / php-src xml.c).
+     *
+     * End-NS is intentionally not dispatched: libxml-backed Zend never fires
+     * xml_set_end_namespace_decl_handler (php.net), so php-src-strict matches empty end.
+     */
+    private function applyNamespaceDeclarations(string $attrSpec): void
+    {
+        if (!$this->nsAware()) {
+            return;
+        }
+        foreach (self::parseAttributePairs($attrSpec) as $name => $value) {
+            if ('xmlns' === $name) {
+                $this->nsBindings[''] = $value;
+                $this->invokeStartNamespaceDecl(false, $value);
+            } elseif (str_starts_with($name, 'xmlns:')) {
+                $prefix = substr($name, 6);
+                $this->nsBindings[$prefix] = $value;
+                $this->invokeStartNamespaceDecl($prefix, $value);
+            }
+        }
+    }
+
+    /**
+     * Parse attributes, expand names when NS-aware, and omit xmlns declarations from
+     * the handler attribute bag (expat NS mode). Bindings must already be applied.
      */
     private function attributesForHandlers(string $attrSpec): HashTable
     {
         $parsed = self::parseAttributePairs($attrSpec);
-        if ($this->nsAware()) {
-            foreach ($parsed as $name => $value) {
-                if ('xmlns' === $name) {
-                    $this->nsBindings[''] = $value;
-                } elseif (str_starts_with($name, 'xmlns:')) {
-                    $prefix = substr($name, 6);
-                    $this->nsBindings[$prefix] = $value;
-                }
-            }
-        }
-
         $attrs = new HashTable();
         $fold = $this->caseFolding();
         foreach ($parsed as $name => $value) {
@@ -237,6 +264,25 @@ final class VmXmlSaxDispatcher
         }
 
         return $attrs;
+    }
+
+    /** @param string|false $prefix */
+    private function invokeStartNamespaceDecl($prefix, string $uri): void
+    {
+        $handler = $this->state['handlers'][XmlParserHandlers::HANDLER_START_NS] ?? null;
+        $callback = XmlParserHandlers::handlerCallback($this->parser, $handler);
+        if (null === $callback) {
+            return;
+        }
+        $prefixVar = new Variable();
+        if (false === $prefix) {
+            $prefixVar->bool(false);
+        } else {
+            $prefixVar->string($prefix);
+        }
+        $uriVar = new Variable();
+        $uriVar->string($uri);
+        VmCallable::invoke($this->ctx, $callback, $this->parserVar, $prefixVar, $uriVar);
     }
 
     private function expandElementName(string $rawTag): string
