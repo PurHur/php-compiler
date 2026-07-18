@@ -69,6 +69,76 @@ final class VmPgsqlCore
     }
 
     /**
+     * pg_query_params / pg_execute shared result wrap (#20661).
+     *
+     * @return Variable|false
+     */
+    public static function wrapExecResult(\FFI\CData $conn, ?\FFI\CData $result, ObjectEntry $connection, Context $ctx): Variable|false
+    {
+        if (null === $result) {
+            VmPgsqlConnection::setLastError(VmPgsqlNative::errorMessage($conn));
+
+            return false;
+        }
+        $status = VmPgsqlNative::resultStatus($result);
+        if (VmPgsqlNative::PGRES_TUPLES_OK !== $status
+            && VmPgsqlNative::PGRES_COMMAND_OK !== $status
+            && VmPgsqlNative::PGRES_EMPTY_QUERY !== $status
+        ) {
+            VmPgsqlConnection::setLastError(VmPgsqlNative::errorMessage($conn));
+            VmPgsqlNative::clear($result);
+
+            return false;
+        }
+        VmPgsqlConnection::setLastError('');
+
+        return VmPgsqlResult::wrap($result, $ctx, $connection);
+    }
+
+    /**
+     * @param list<string|null> $params
+     *
+     * @return Variable|false
+     */
+    public static function queryParams(ObjectEntry $connection, string $query, array $params, Context $ctx): Variable|false
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        $result = VmPgsqlNative::execParams($conn, $query, $params);
+
+        return self::wrapExecResult($conn, $result, $connection, $ctx);
+    }
+
+    /**
+     * @return Variable|false
+     */
+    public static function prepare(ObjectEntry $connection, string $stmtName, string $query, Context $ctx): Variable|false
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        $result = VmPgsqlNative::prepare($conn, $stmtName, $query);
+
+        return self::wrapExecResult($conn, $result, $connection, $ctx);
+    }
+
+    /**
+     * @param list<string|null> $params
+     *
+     * @return Variable|false
+     */
+    public static function executePrepared(ObjectEntry $connection, string $stmtName, array $params, Context $ctx): Variable|false
+    {
+        $conn = VmPgsqlConnection::native($connection);
+        $result = VmPgsqlNative::execPrepared($conn, $stmtName, $params);
+
+        return self::wrapExecResult($conn, $result, $connection, $ctx);
+    }
+
+    /** pg_fetch_all (#20661). */
+    public static function fetchAll(ObjectEntry $resultObj, int $mode = PgsqlConstants::PGSQL_ASSOC): HashTable
+    {
+        return self::resultToArray(VmPgsqlResult::native($resultObj), $mode);
+    }
+
+    /**
      * pg_copy_to — COPY table TO STDOUT (php-src ext/pgsql/pgsql.c; #20629).
      *
      * @return HashTable|false packed list of row strings

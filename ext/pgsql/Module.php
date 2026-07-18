@@ -73,6 +73,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/pg_copy_meta_builtins.php';
         require_once __DIR__.'/pg_async_builtins.php';
         require_once __DIR__.'/pg_dml_builtins.php';
+        require_once __DIR__.'/pg_params_escape_builtins.php';
 
         return [
             new pg_connect(),
@@ -111,6 +112,17 @@ class Module extends ModuleAbstract
             new pg_update(),
             new pg_delete(),
             new pg_select(),
+            new pg_query_params(),
+            new pg_prepare(),
+            new pg_execute(),
+            new pg_escape_string(),
+            new pg_escape_literal(),
+            new pg_escape_identifier(),
+            new pg_escape_bytea(),
+            new pg_unescape_bytea(),
+            new pg_affected_rows(),
+            new pg_fetch_all(),
+            new pg_num_fields(),
             ...self::php84Functions(),
         ];
     }

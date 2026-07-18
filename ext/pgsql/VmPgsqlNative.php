@@ -258,6 +258,166 @@ final class VmPgsqlNative
     }
 
     /**
+     * PQescapeString (no connection) — returns escaped text without quotes.
+     */
+    public static function escapeString(string $value): string
+    {
+        $ffi = self::requireFfi();
+        $len = \strlen($value);
+        $buf = $ffi->new('char['.(($len * 2) + 1).']');
+        $newLen = (int) $ffi->PQescapeString($buf, $value, $len);
+
+        return $newLen > 0 ? \FFI::string($buf, $newLen) : '';
+    }
+
+    /**
+     * PQescapeByteaConn — hex/escape text for bytea literals (includes leading \\x when applicable).
+     */
+    public static function escapeByteaConn(\FFI\CData $conn, string $value): string
+    {
+        $ffi = self::requireFfi();
+        $from = self::bytesToUnsignedChar($ffi, $value);
+        $toLen = $ffi->new('size_t');
+        $escaped = $ffi->PQescapeByteaConn($conn, $from, \strlen($value), \FFI::addr($toLen));
+        if (null === $escaped) {
+            return '';
+        }
+        $n = (int) $toLen->cdata;
+        // libpq includes trailing NUL in to_length
+        $out = $n > 0 ? \FFI::string($escaped, \max(0, $n - 1)) : '';
+        $ffi->PQfreemem($escaped);
+
+        return $out;
+    }
+
+    /** PQescapeBytea without connection. */
+    public static function escapeBytea(string $value): string
+    {
+        $ffi = self::requireFfi();
+        $from = self::bytesToUnsignedChar($ffi, $value);
+        $toLen = $ffi->new('size_t');
+        $escaped = $ffi->PQescapeBytea($from, \strlen($value), \FFI::addr($toLen));
+        if (null === $escaped) {
+            return '';
+        }
+        $n = (int) $toLen->cdata;
+        $out = $n > 0 ? \FFI::string($escaped, \max(0, $n - 1)) : '';
+        $ffi->PQfreemem($escaped);
+
+        return $out;
+    }
+
+    /** PQunescapeBytea. */
+    public static function unescapeBytea(string $value): string
+    {
+        $ffi = self::requireFfi();
+        $from = self::bytesToUnsignedChar($ffi, $value);
+        $toLen = $ffi->new('size_t');
+        $raw = $ffi->PQunescapeBytea($from, \FFI::addr($toLen));
+        if (null === $raw) {
+            return '';
+        }
+        $out = \FFI::string($raw, (int) $toLen->cdata);
+        $ffi->PQfreemem($raw);
+
+        return $out;
+    }
+
+    /** @return \FFI\CData unsigned char* */
+    private static function bytesToUnsignedChar(\FFI $ffi, string $value): \FFI\CData
+    {
+        $len = \strlen($value);
+        if (0 === $len) {
+            $buf = $ffi->new('unsigned char[1]');
+            $buf[0] = 0;
+
+            return $ffi->cast('unsigned char*', $buf);
+        }
+        $buf = $ffi->new('unsigned char['.$len.']');
+        \FFI::memcpy($buf, $value, $len);
+
+        return $ffi->cast('unsigned char*', $buf);
+    }
+
+    /**
+     * @param list<string|null> $params
+     *
+     * @return \FFI\CData|null PGresult*
+     */
+    public static function execParams(\FFI\CData $conn, string $query, array $params): ?\FFI\CData
+    {
+        return self::execWithParams(false, $conn, $query, $params);
+    }
+
+    /**
+     * @return \FFI\CData|null PGresult*
+     */
+    public static function prepare(\FFI\CData $conn, string $stmtName, string $query): ?\FFI\CData
+    {
+        $res = self::requireFfi()->PQprepare($conn, $stmtName, $query, 0, null);
+
+        return null === $res ? null : $res;
+    }
+
+    /**
+     * @param list<string|null> $params
+     *
+     * @return \FFI\CData|null PGresult*
+     */
+    public static function execPrepared(\FFI\CData $conn, string $stmtName, array $params): ?\FFI\CData
+    {
+        return self::execWithParams(true, $conn, $stmtName, $params);
+    }
+
+    public static function cmdTuples(\FFI\CData $result): int
+    {
+        $raw = self::ffiString(self::requireFfi()->PQcmdTuples($result));
+        if ('' === $raw) {
+            return 0;
+        }
+
+        return (int) $raw;
+    }
+
+    /**
+     * Shared PQexecParams / PQexecPrepared param marshalling (#20661).
+     *
+     * @param list<string|null> $params
+     *
+     * @return \FFI\CData|null PGresult*
+     */
+    private static function execWithParams(bool $prepared, \FFI\CData $conn, string $commandOrStmt, array $params): ?\FFI\CData
+    {
+        $ffi = self::requireFfi();
+        $n = \count($params);
+        $owned = [];
+        if ($n > 0) {
+            $values = $ffi->new('char*['.$n.']');
+            for ($i = 0; $i < $n; ++$i) {
+                if (null === $params[$i]) {
+                    $values[$i] = null;
+                    continue;
+                }
+                $s = (string) $params[$i];
+                $buf = $ffi->new('char['.(\strlen($s) + 1).']', false);
+                \FFI::memcpy($buf, $s."\0", \strlen($s) + 1);
+                $owned[] = $buf;
+                $values[$i] = $ffi->cast('char*', $buf);
+            }
+        } else {
+            $values = null;
+        }
+        if ($prepared) {
+            $res = $ffi->PQexecPrepared($conn, $commandOrStmt, $n, $values, null, null, 0);
+        } else {
+            $res = $ffi->PQexecParams($conn, $commandOrStmt, $n, null, $values, null, null, 0);
+        }
+        unset($owned);
+
+        return null === $res ? null : $res;
+    }
+
+    /**
      * Enable libpq protocol tracing to a stdio FILE* (php-src pg_trace; #20574).
      *
      * @return \FFI\CData|null FILE* owned by caller (fclose on untrace/close)
@@ -480,8 +640,16 @@ Oid PQftable(const PGresult *res, int field_num);
 Oid PQftype(const PGresult *res, int field_num);
 int PQfnumber(const PGresult *res, const char *field_name);
 size_t PQescapeStringConn(PGconn *conn, char *to, const char *from, size_t length, int *error);
+size_t PQescapeString(char *to, const char *from, size_t length);
 char *PQescapeIdentifier(PGconn *conn, const char *str, size_t length);
 char *PQescapeLiteral(PGconn *conn, const char *str, size_t length);
+unsigned char *PQescapeByteaConn(PGconn *conn, const unsigned char *from, size_t from_length, size_t *to_length);
+unsigned char *PQescapeBytea(const unsigned char *from, size_t from_length, size_t *to_length);
+unsigned char *PQunescapeBytea(const unsigned char *strtext, size_t *retbuflen);
+PGresult *PQexecParams(PGconn *conn, const char *command, int nParams, const Oid *paramTypes, const char **paramValues, const int *paramLengths, const int *paramFormats, int resultFormat);
+PGresult *PQprepare(PGconn *conn, const char *stmtName, const char *query, int nParams, const Oid *paramTypes);
+PGresult *PQexecPrepared(PGconn *conn, const char *stmtName, int nParams, const char **paramValues, const int *paramLengths, const int *paramFormats, int resultFormat);
+char *PQcmdTuples(const PGresult *res);
 void PQfreemem(void *ptr);
 void PQtrace(PGconn *conn, FILE *stream);
 void PQuntrace(PGconn *conn);
