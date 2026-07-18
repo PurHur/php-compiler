@@ -91,6 +91,9 @@ final class GdConstants
         'IMG_BMP' => 64,
         'IMG_TGA' => 128,
         'IMG_AVIF' => 256,
+        // GD2 write modes (php-src ext/gd/gd.c; #20502)
+        'IMG_GD2_RAW' => 1,
+        'IMG_GD2_COMPRESSED' => 2,
     ];
 
     /** gdArc / IMG_ARC_PIE — rounded pie edge (php-src gd.h; #20437). */

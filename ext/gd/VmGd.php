@@ -4070,6 +4070,132 @@ final class VmGd
         return self::attachRasterImage($frame, $width, $height, $pixels, VmImage::IMAGETYPE_WBMP, 'imagecreatefromwbmp');
     }
 
+    /**
+     * imagegd() encode — php-src gdImageGd (#20502).
+     */
+    public static function encodedGdBytes(ObjectEntry $image): string
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            throw new \TypeError('imagegd(): Argument #1 ($image) must be of type GdImage');
+        }
+
+        return VmGdGd::encodeGd($state);
+    }
+
+    public static function writeGdToOutput(Frame $frame, ObjectEntry $image): bool
+    {
+        OutputBuffer::append(self::encodedGdBytes($image), $frame->scriptPath ?: null);
+
+        return true;
+    }
+
+    public static function createFromGdBytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdGd::decodeGd($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefromgd');
+
+            return false;
+        }
+
+        return self::attachGdDecoded($frame, $decoded, 'imagecreatefromgd');
+    }
+
+    /**
+     * imagegd2() encode — php-src gdImageGd2 (#20502).
+     */
+    public static function encodedGd2Bytes(
+        ObjectEntry $image,
+        int $chunkSize = VmGdGd::GD2_CHUNKSIZE,
+        int $mode = VmGdGd::GD2_FMT_RAW
+    ): string {
+        $state = GdRegistry::state($image);
+        if (null === $state || !$state->hasRaster()) {
+            throw new \TypeError('imagegd2(): Argument #1 ($image) must be of type GdImage');
+        }
+
+        return VmGdGd::encodeGd2($state, $chunkSize, $mode);
+    }
+
+    public static function writeGd2ToOutput(
+        Frame $frame,
+        ObjectEntry $image,
+        int $chunkSize = VmGdGd::GD2_CHUNKSIZE,
+        int $mode = VmGdGd::GD2_FMT_RAW
+    ): bool {
+        OutputBuffer::append(self::encodedGd2Bytes($image, $chunkSize, $mode), $frame->scriptPath ?: null);
+
+        return true;
+    }
+
+    public static function createFromGd2Bytes(Frame $frame, string $data): ObjectEntry|false
+    {
+        $decoded = VmGdGd::decodeGd2($data);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefromgd2');
+
+            return false;
+        }
+
+        return self::attachGdDecoded($frame, $decoded, 'imagecreatefromgd2');
+    }
+
+    public static function createFromGd2PartBytes(
+        Frame $frame,
+        string $data,
+        int $srcx,
+        int $srcy,
+        int $width,
+        int $height
+    ): ObjectEntry|false {
+        $decoded = VmGdGd::decodeGd2Part($data, $srcx, $srcy, $width, $height);
+        if (false === $decoded) {
+            self::warnInvalidImageFormat($frame, 'imagecreatefromgd2part');
+
+            return false;
+        }
+
+        return self::attachGdDecoded($frame, $decoded, 'imagecreatefromgd2part');
+    }
+
+    /**
+     * @param array{
+     *   width: int,
+     *   height: int,
+     *   truecolor: bool,
+     *   pixels: list<int>,
+     *   colors: list<int>,
+     *   transparent: int
+     * } $decoded
+     */
+    private static function attachGdDecoded(Frame $frame, array $decoded, string $function): ObjectEntry
+    {
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException($function.'() requires VM context');
+        }
+        $class = $ctx->classes[self::CLASS_GDIMAGE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('GdImage is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        GdRegistry::attach(
+            $entry,
+            GdImageState::fromGdDecoded(
+                $decoded['width'],
+                $decoded['height'],
+                $decoded['truecolor'],
+                $decoded['pixels'],
+                $decoded['colors'],
+                $decoded['transparent']
+            )
+        );
+
+        return $entry;
+    }
+
     public static function encodedXbmBytes(ObjectEntry $image, ?int $foreground = null, string $name = 'image'): string
     {
         $state = GdRegistry::state($image);

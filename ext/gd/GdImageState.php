@@ -180,6 +180,41 @@ final class GdImageState
         return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true, [], 1, false);
     }
 
+    /**
+     * Build raster state from a decoded GD1/GD2 payload (#20502).
+     *
+     * @param list<int> $pixels
+     * @param list<int> $colors
+     */
+    public static function fromGdDecoded(
+        int $width,
+        int $height,
+        bool $truecolor,
+        array $pixels,
+        array $colors,
+        int $transparent
+    ): self {
+        $state = new self(
+            '',
+            VmImage::IMAGETYPE_PNG,
+            $width,
+            $height,
+            $pixels,
+            $truecolor,
+            $colors,
+            $truecolor ? 1 : 0,
+            false,
+            1,
+            false,
+            3,
+            96,
+            96,
+            $transparent
+        );
+
+        return $state;
+    }
+
     public function hasRaster(): bool
     {
         return $this->width > 0 && $this->height > 0;

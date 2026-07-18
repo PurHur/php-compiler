@@ -141,6 +141,8 @@ class Module extends ModuleAbstract
             $functions[] = new imagebmp();
             $functions[] = new imagewbmp();
             $functions[] = new imagexbm();
+            $functions[] = new imagegd();
+            $functions[] = new imagegd2();
             $functions[] = new imagecreatefrompng();
             $functions[] = new imagecreatefromjpeg();
             $functions[] = new imagecreatefromgif();
@@ -150,6 +152,9 @@ class Module extends ModuleAbstract
             $functions[] = new imagecreatefromwbmp();
             $functions[] = new imagecreatefromxbm();
             $functions[] = new imagecreatefromxpm();
+            $functions[] = new imagecreatefromgd();
+            $functions[] = new imagecreatefromgd2();
+            $functions[] = new imagecreatefromgd2part();
         }
 
         return $functions;
