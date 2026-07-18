@@ -35,4 +35,9 @@ abstract class ZipClassMethod extends VmClassMethod
     {
         return VmZipArchive::coerceBoolArg($var, $label, $index, $paramName);
     }
+
+    protected function floatArg(Variable $var, string $label, int $index, string $paramName): float
+    {
+        return VmZipArchive::coerceFloatArg($var, $label, $index, $paramName);
+    }
 }

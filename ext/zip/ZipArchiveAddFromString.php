@@ -23,6 +23,9 @@ final class ZipArchiveAddFromString extends ZipClassMethod
         $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::addFromString', 1, 'name');
         $content = $this->stringArg($frame->calledArgs[2], 'ZipArchive::addFromString', 2, 'content');
         $ok = VmZipArchive::addFromString($receiver, $name, $content);
+        if ($ok && null !== $frame->vmContext) {
+            VmZipArchive::fireProgress($receiver, $frame->vmContext, 1.0);
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }

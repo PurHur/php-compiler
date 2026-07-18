@@ -797,3 +797,280 @@ final class ZipArchiveIsCompressionMethodSupported extends ZipClassMethod
         }
     }
 }
+
+/**
+ * ZipArchive::isEncryptionMethodSupported(int $method, bool $enc = true) — static (#20378).
+ */
+final class ZipArchiveIsEncryptionMethodSupported extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isEncryptionMethodSupported');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(
+                'ZipArchive::isEncryptionMethodSupported() expects at least 1 argument, 0 given'
+            );
+        }
+        $method = $this->intArg($frame->calledArgs[0], 'ZipArchive::isEncryptionMethodSupported', 1, 'method');
+        $enc = true;
+        if ($argc >= 2) {
+            $enc = $this->boolArg($frame->calledArgs[1], 'ZipArchive::isEncryptionMethodSupported', 2, 'enc');
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmZipArchive::isEncryptionMethodSupported($method, $enc));
+        }
+    }
+}
+
+/**
+ * ZipArchive::registerProgressCallback(float $rate, callable $callback) — (#20378).
+ */
+final class ZipArchiveRegisterProgressCallback extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('registerProgressCallback');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::registerProgressCallback()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::registerProgressCallback() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $rate = $this->floatArg($frame->calledArgs[1], 'ZipArchive::registerProgressCallback', 1, 'rate');
+        $callback = $frame->calledArgs[2];
+        if (null === $frame->vmContext) {
+            throw new \LogicException('ZipArchive::registerProgressCallback() requires VM context');
+        }
+        // Accept string/array/closure callables; invoke-time validates (#20378 honest subset).
+        $cbResolved = $callback->resolveIndirect();
+        if (
+            Variable::TYPE_STRING !== $cbResolved->type
+            && Variable::TYPE_ARRAY !== $cbResolved->type
+            && Variable::TYPE_OBJECT !== $cbResolved->type
+            && !\PHPCompiler\ext\standard\VmCallable::isCallable($frame->vmContext, $callback)
+        ) {
+            throw new \TypeError(
+                \PHPCompiler\ext\standard\VmCallable::invalidCallbackTypeError('ZipArchive::registerProgressCallback')
+            );
+        }
+        $ok = VmZipArchive::registerProgressCallback($receiver, $rate, $callback);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::registerCancelCallback(callable $callback) — (#20378).
+ */
+final class ZipArchiveRegisterCancelCallback extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('registerCancelCallback');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::registerCancelCallback()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 1) {
+            throw new \ArgumentCountError(
+                'ZipArchive::registerCancelCallback() expects exactly 1 argument, 0 given'
+            );
+        }
+        $callback = $frame->calledArgs[1];
+        if (null === $frame->vmContext) {
+            throw new \LogicException('ZipArchive::registerCancelCallback() requires VM context');
+        }
+        $cbResolved = $callback->resolveIndirect();
+        if (
+            Variable::TYPE_STRING !== $cbResolved->type
+            && Variable::TYPE_ARRAY !== $cbResolved->type
+            && Variable::TYPE_OBJECT !== $cbResolved->type
+            && !\PHPCompiler\ext\standard\VmCallable::isCallable($frame->vmContext, $callback)
+        ) {
+            throw new \TypeError(
+                \PHPCompiler\ext\standard\VmCallable::invalidCallbackTypeError('ZipArchive::registerCancelCallback')
+            );
+        }
+        $ok = VmZipArchive::registerCancelCallback($receiver, $callback);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+}
+
+/**
+ * ZipArchive::getStreamIndex(int $index, int $flags = 0) — (#20378).
+ */
+final class ZipArchiveGetStreamIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getStreamIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::getStreamIndex()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::getStreamIndex() expects at least 1 argument, 0 given');
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::getStreamIndex', 1, 'index');
+        $flags = \count($frame->calledArgs) >= 3
+            ? $this->intArg($frame->calledArgs[2], 'ZipArchive::getStreamIndex', 2, 'flags')
+            : 0;
+        $handle = VmZipArchive::getStreamIndex($receiver, $index, $flags);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $handle) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->streamHandle($handle, $frame->vmContext);
+    }
+}
+
+/**
+ * ZipArchive::getStreamName(string $name, int $flags = 0) — (#20378).
+ */
+final class ZipArchiveGetStreamName extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getStreamName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::getStreamName()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('ZipArchive::getStreamName() expects at least 1 argument, 0 given');
+        }
+        $name = $this->stringArg($frame->calledArgs[1], 'ZipArchive::getStreamName', 1, 'name');
+        $flags = \count($frame->calledArgs) >= 3
+            ? $this->intArg($frame->calledArgs[2], 'ZipArchive::getStreamName', 2, 'flags')
+            : 0;
+        $handle = VmZipArchive::getStreamName($receiver, $name, $flags);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $handle) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->streamHandle($handle, $frame->vmContext);
+    }
+}
+
+/**
+ * ZipArchive::clearError() — (#20378).
+ */
+final class ZipArchiveClearError extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('clearError');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::clearError()');
+        if (\count($frame->calledArgs) > 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::clearError() expects exactly 0 arguments, %d given',
+                \count($frame->calledArgs) - 1
+            ));
+        }
+        VmZipArchive::clearError($receiver);
+    }
+}
+
+/**
+ * ZipArchive::setEncryptionIndex(int $index, int $method, ?string $password = null) — (#20378).
+ */
+final class ZipArchiveSetEncryptionIndex extends ZipClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setEncryptionIndex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $receiver = $this->receiver($frame, 'ZipArchive::setEncryptionIndex()');
+        $argc = \count($frame->calledArgs) - 1;
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'ZipArchive::setEncryptionIndex() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $index = $this->intArg($frame->calledArgs[1], 'ZipArchive::setEncryptionIndex', 1, 'index');
+        $method = $this->intArg($frame->calledArgs[2], 'ZipArchive::setEncryptionIndex', 2, 'method');
+        $password = null;
+        if ($argc >= 3) {
+            $password = $this->nullableStringArg(
+                $frame->calledArgs[3],
+                'ZipArchive::setEncryptionIndex',
+                3,
+                'password'
+            );
+        }
+        $ok = VmZipArchive::setEncryptionIndex($receiver, $index, $method, $password);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool($ok);
+        }
+    }
+
+    private function nullableStringArg(Variable $var, string $label, int $index, string $paramName): ?string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type ?string, %s given',
+                $label,
+                $index,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_STRING !== $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type ?string, %s given',
+                $label,
+                $index,
+                $paramName,
+                match ($var->type) {
+                    Variable::TYPE_BOOLEAN => 'bool',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_FLOAT => 'float',
+                    Variable::TYPE_ARRAY => 'array',
+                    Variable::TYPE_OBJECT => $var->toObject()->class->name,
+                    Variable::TYPE_RESOURCE => 'resource',
+                    default => 'mixed',
+                }
+            ));
+        }
+
+        return $var->toString();
+    }
+}

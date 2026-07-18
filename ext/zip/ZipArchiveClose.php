@@ -17,7 +17,7 @@ final class ZipArchiveClose extends ZipClassMethod
     public function execute(Frame $frame): void
     {
         $receiver = $this->receiver($frame, 'ZipArchive::close()');
-        $ok = VmZipArchive::close($receiver);
+        $ok = VmZipArchive::close($receiver, $frame->vmContext);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }

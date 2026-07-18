@@ -58,6 +58,14 @@ final class ZipArchiveTest extends TestCase
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setcompressionname'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setcompressionindex'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'iscompressionmethodsupported'));
+        // encryption / callbacks / streams / clearError (#20378)
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'isencryptionmethodsupported'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'registerprogresscallback'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'registercancelcallback'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getstreamindex'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getstreamname'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'clearerror'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setencryptionindex'));
 
         $entry = $ctx->classes['ziparchive'];
         self::assertContains('countable', $entry->interfaces);

@@ -10,6 +10,7 @@ use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsDirNative;
 use PHPCompiler\ext\standard\VmFsReadNative;
@@ -100,10 +101,21 @@ final class VmZipArchive
             'setcompressionname' => new ZipArchiveSetCompressionName(),
             'setcompressionindex' => new ZipArchiveSetCompressionIndex(),
             'iscompressionmethodsupported' => new ZipArchiveIsCompressionMethodSupported(),
+            // encryption capability / callbacks / streams / clearError (#20378)
+            'isencryptionmethodsupported' => new ZipArchiveIsEncryptionMethodSupported(),
+            'registerprogresscallback' => new ZipArchiveRegisterProgressCallback(),
+            'registercancelcallback' => new ZipArchiveRegisterCancelCallback(),
+            'getstreamindex' => new ZipArchiveGetStreamIndex(),
+            'getstreamname' => new ZipArchiveGetStreamName(),
+            'clearerror' => new ZipArchiveClearError(),
+            'setencryptionindex' => new ZipArchiveSetEncryptionIndex(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
-            $entry->methodVisibility[$name] = ('iscompressionmethodsupported' === $name) ? $pubStatic : $pub;
+            $entry->methodVisibility[$name] = \in_array($name, [
+                'iscompressionmethodsupported',
+                'isencryptionmethodsupported',
+            ], true) ? $pubStatic : $pub;
             $entry->methodNames[$name] = self::methodDisplayName($name);
         }
 
@@ -248,10 +260,15 @@ final class VmZipArchive
         return true;
     }
 
-    public static function close(ObjectEntry $entry): bool
+    public static function close(ObjectEntry $entry, ?Context $ctx = null): bool
     {
         $state = self::state($entry);
         if (!$state->open) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        if (null !== $ctx && self::shouldCancel($entry, $ctx)) {
             self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
 
             return false;
@@ -266,6 +283,9 @@ final class VmZipArchive
         $state->open = false;
         $state->dirty = false;
         self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+        if (null !== $ctx) {
+            self::fireProgress($entry, $ctx, 1.0);
+        }
 
         return true;
     }
@@ -699,6 +719,151 @@ final class VmZipArchive
             return true;
         }
         self::setStatus($entry, $state, ZipArchiveConstants::ER_NOENT);
+
+        return false;
+    }
+
+    /**
+     * ZipArchive::setEncryptionIndex — php-src zim_ZipArchive_setEncryptionIndex (#20378).
+     */
+    public static function setEncryptionIndex(
+        ObjectEntry $entry,
+        int $index,
+        int $method,
+        ?string $password = null
+    ): bool {
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        $name = $state->entries[$index]['name'];
+
+        return self::setEncryptionName($entry, $name, $method, $password);
+    }
+
+    /**
+     * ZipArchive::isEncryptionMethodSupported — php-src zim_ZipArchive_isEncryptionMethodSupported (#20378).
+     *
+     * Pure-PHP ZipEngine accepts EM_NONE + AES/PKWARE metadata (setEncryption*); unknown → false.
+     */
+    public static function isEncryptionMethodSupported(int $method, bool $enc = true): bool
+    {
+        unset($enc);
+
+        return match ($method) {
+            ZipArchiveConstants::EM_NONE,
+            ZipArchiveConstants::EM_TRAD_PKWARE,
+            ZipArchiveConstants::EM_AES_128,
+            ZipArchiveConstants::EM_AES_192,
+            ZipArchiveConstants::EM_AES_256 => true,
+            default => false,
+        };
+    }
+
+    /**
+     * ZipArchive::clearError — php-src zim_ZipArchive_clearError (#20378).
+     */
+    public static function clearError(ObjectEntry $entry): void
+    {
+        $state = self::state($entry);
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+    }
+
+    /**
+     * ZipArchive::getStreamIndex — php-src zim_ZipArchive_getStreamIndex (#20378).
+     *
+     * @return int|false
+     */
+    public static function getStreamIndex(ObjectEntry $entry, int $index, int $flags = 0): int|false
+    {
+        unset($flags);
+        $state = self::requireOpen($entry);
+        if ($index < 0 || $index >= \count($state->entries)) {
+            self::setStatus($entry, $state, ZipArchiveConstants::ER_INVAL);
+
+            return false;
+        }
+        $name = $state->entries[$index]['name'];
+
+        return self::getStream($entry, $name);
+    }
+
+    /**
+     * ZipArchive::getStreamName — php-src zim_ZipArchive_getStreamName (#20378).
+     *
+     * @return int|false
+     */
+    public static function getStreamName(ObjectEntry $entry, string $name, int $flags = 0): int|false
+    {
+        unset($flags);
+
+        return self::getStream($entry, $name);
+    }
+
+    /**
+     * ZipArchive::registerProgressCallback — stores callable; fired at end of mutating ops (#20378).
+     */
+    public static function registerProgressCallback(ObjectEntry $entry, float $rate, Variable $callback): bool
+    {
+        $state = self::requireOpen($entry);
+        $cb = new Variable();
+        $cb->copyFrom($callback->resolveIndirect());
+        $state->progressCallback = $cb;
+        $state->progressRate = $rate;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /**
+     * ZipArchive::registerCancelCallback — stores callable; non-zero return aborts close (#20378).
+     */
+    public static function registerCancelCallback(ObjectEntry $entry, Variable $callback): bool
+    {
+        $state = self::requireOpen($entry);
+        $cb = new Variable();
+        $cb->copyFrom($callback->resolveIndirect());
+        $state->cancelCallback = $cb;
+        self::setStatus($entry, $state, ZipArchiveConstants::ER_OK);
+
+        return true;
+    }
+
+    /** Invoke progress callback with state in [0,1] when registered. */
+    public static function fireProgress(ObjectEntry $entry, Context $ctx, float $progress): void
+    {
+        $state = self::state($entry);
+        if (null === $state->progressCallback) {
+            return;
+        }
+        $arg = new Variable(Variable::TYPE_FLOAT);
+        $arg->float($progress);
+        VmCallable::invokeAs('ZipArchive::registerProgressCallback', $ctx, $state->progressCallback, $arg);
+    }
+
+    /**
+     * Invoke cancel callback; true means abort the operation (php-src non-zero return).
+     */
+    public static function shouldCancel(ObjectEntry $entry, Context $ctx): bool
+    {
+        $state = self::state($entry);
+        if (null === $state->cancelCallback) {
+            return false;
+        }
+        $result = VmCallable::invokeAs(
+            'ZipArchive::registerCancelCallback',
+            $ctx,
+            $state->cancelCallback
+        );
+        $result = $result->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $result->type) {
+            return 0 !== $result->toInt();
+        }
+        if (Variable::TYPE_BOOLEAN === $result->type) {
+            return $result->toBool();
+        }
 
         return false;
     }
@@ -1142,8 +1307,42 @@ final class VmZipArchive
             'setcompressionname' => 'setCompressionName',
             'setcompressionindex' => 'setCompressionIndex',
             'iscompressionmethodsupported' => 'isCompressionMethodSupported',
+            'isencryptionmethodsupported' => 'isEncryptionMethodSupported',
+            'registerprogresscallback' => 'registerProgressCallback',
+            'registercancelcallback' => 'registerCancelCallback',
+            'getstreamindex' => 'getStreamIndex',
+            'getstreamname' => 'getStreamName',
+            'clearerror' => 'clearError',
+            'setencryptionindex' => 'setEncryptionIndex',
             default => $lc,
         };
+    }
+
+    public static function coerceFloatArg(Variable $var, string $label, int $index, string $paramName): float
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type float, %s given',
+                $label,
+                $index,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            return $var->toFloat();
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return (float) $var->toInt();
+        }
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type float, %s given',
+            $label,
+            $index,
+            $paramName,
+            self::typeLabel($var)
+        ));
     }
 
     public static function coerceBoolArg(Variable $var, string $label, int $index, string $paramName): bool
