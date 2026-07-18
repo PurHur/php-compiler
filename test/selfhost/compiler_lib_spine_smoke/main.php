@@ -217,6 +217,7 @@ require_once __DIR__.'/../../../ext/curl/curl_setopt_array.php';
 require_once __DIR__.'/../../../ext/curl/curl_share_close.php';
 require_once __DIR__.'/../../../ext/curl/curl_share_errno.php';
 require_once __DIR__.'/../../../ext/curl/curl_share_init.php';
+require_once __DIR__.'/../../../ext/curl/curl_share_init_persistent.php';
 require_once __DIR__.'/../../../ext/curl/curl_share_setopt.php';
 require_once __DIR__.'/../../../ext/curl/curl_share_strerror.php';
 require_once __DIR__.'/../../../ext/curl/curl_strerror.php';
@@ -5836,4 +5837,20 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_describe.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_get_error.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_list_dicts.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_request_pwl_dict.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_broker_set_ordering.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_add.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_add_to_session.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_describe.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_get_error.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_is_added.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_quick_check.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_remove.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_remove_from_session.php';
+require_once __DIR__.'/../../../ext/enchant/enchant_dict_store_replacement.php';
+require_once __DIR__.'/../../../ext/phar/PharBuiltin.php';
+require_once __DIR__.'/../../../ext/phar/VmPharArchive.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
