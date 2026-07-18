@@ -1803,6 +1803,7 @@ require_once __DIR__.'/../../../ext/standard/GetParentClassJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetcwdJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetdateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetenvJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/GetenvLookupJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GethostbyaddrJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GethostbynamelJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetimagesizeJitHelper.php';
@@ -3435,6 +3436,7 @@ require_once __DIR__.'/../../../ext/standard/phpc_destruct_try_invoke_native.php
 require_once __DIR__.'/../../../ext/standard/phpc_file_get_contents_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_file_put_contents_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_fpow_kernel.php';
+require_once __DIR__.'/../../../ext/standard/phpc_getenv_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_hypot_kernel.php';
 require_once __DIR__.'/../../../ext/standard/phpc_gc_native_child_at.php';
 require_once __DIR__.'/../../../ext/standard/phpc_gc_native_free_object.php';

@@ -6,51 +6,38 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\LibcExtern;
-use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM lowering for deferred/user-script AOT getenv — thin libc getenv (#19373).
+ * LLVM lowering for phpc_getenv_kernel() — thin libc getenv(3) (#20644).
  *
- * Nested {@see GetenvJitHelper} does not run under inventory/bootstrap/user-script
- * defer (#16075 / {@see \PHPCompiler\JIT\Builtin\StreamIoRuntime::shouldDeferHeavyStreamIoEmitters});
- * this kernel mirrors the former Builtin libc stub from ext/ not lib/JIT/Builtin/.
+ * Nested leaf inside GetenvJitHelper only (user-script AOT always goes through
+ * {@see GetenvJitHelper} via {@see \PHPCompiler\JIT\Builtin\StringGetenv}).
  * php-src: ext/standard/basic_functions.c — zif_getenv
  */
 final class JitGetenvKernel
 {
-    /**
-     * Emit libc getenv lookup into out __value__; builder must be positioned at the entry block.
-     *
-     * ABI: void (__string__* name, int8 localOnly, __value__* out)
-     */
-    public static function emitBody(Context $context, LlvmFunction $fn): void
+    /** @return Value __string__* — null when getenv(3) returns NULL */
+    public static function invoke(Context $context, Value $nameStr): Value
     {
         LibcExtern::register($context);
 
-        $nameStr = $fn->getParam(0);
-        $localOnly = $fn->getParam(1);
-        $out = $fn->getParam(2);
-        $valMap = $context->structFieldMap['__value__'];
+        $fn = $context->builder->getInsertBlock()->getParent();
         $strMap = $context->structFieldMap['__string__'];
-        $i8 = $context->getTypeFromString('int8');
-        $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
-        $zero = $i64->constInt(0, false);
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
 
-        $isLocal = $context->builder->icmp(Builder::INT_NE, $localOnly, $i8->constInt(0, false));
-        $libcBb = $fn->appendBasicBlock('getenv_kernel_lookup');
-        $missingBb = $fn->appendBasicBlock('getenv_kernel_missing');
         $hitBb = $fn->appendBasicBlock('getenv_kernel_hit');
+        $missBb = $fn->appendBasicBlock('getenv_kernel_miss');
         $doneBb = $fn->appendBasicBlock('getenv_kernel_done');
-        $context->builder->branchIf($isLocal, $missingBb, $libcBb);
 
-        $context->builder->positionAtEnd($libcBb);
         $nameBytes = $context->builder->structGep($nameStr, $strMap['value']);
         $envRaw = $context->builder->call($context->lookupFunction('getenv'), $nameBytes);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $envRaw, $i8p->constNull());
-        $context->builder->branchIf($isNull, $missingBb, $hitBb);
+        $context->builder->branchIf($isNull, $missBb, $hitBb);
 
         $context->builder->positionAtEnd($hitBb);
         $len = $context->builder->call($context->lookupFunction('strlen'), $envRaw);
@@ -62,6 +49,53 @@ final class JitGetenvKernel
             $lenI64,
             $envRaw
         );
+        $hitEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($missBb);
+        $nullStr = $strPtrTy->constNull();
+        $missEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($strPtrTy, 'getenv_kernel_result');
+        $phi->addIncoming($owned, $hitEnd);
+        $phi->addIncoming($nullStr, $missEnd);
+
+        return $phi;
+    }
+
+    /**
+     * @deprecated Prefer {@see invoke}; retained for any residual out-param ABI callers.
+     *
+     * Emit libc getenv lookup into out __value__; builder must be positioned at the entry block.
+     * ABI: void (__string__* name, int8 localOnly, __value__* out)
+     */
+    public static function emitBody(Context $context, LlvmFunction $fn): void
+    {
+        $nameStr = $fn->getParam(0);
+        $localOnly = $fn->getParam(1);
+        $out = $fn->getParam(2);
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+
+        $isLocal = $context->builder->icmp(Builder::INT_NE, $localOnly, $i8->constInt(0, false));
+        $libcBb = $fn->appendBasicBlock('getenv_kernel_lookup');
+        $missingBb = $fn->appendBasicBlock('getenv_kernel_missing');
+        $hitBb = $fn->appendBasicBlock('getenv_kernel_write');
+        $doneBb = $fn->appendBasicBlock('getenv_kernel_done');
+        $context->builder->branchIf($isLocal, $missingBb, $libcBb);
+
+        $context->builder->positionAtEnd($libcBb);
+        $owned = self::invoke($context, $nameStr);
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $owned,
+            $context->getTypeFromString('__string__*')->constNull()
+        );
+        $context->builder->branchIf($isNull, $missingBb, $hitBb);
+
+        $context->builder->positionAtEnd($hitBb);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $out,
@@ -70,17 +104,11 @@ final class JitGetenvKernel
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($missingBb);
-        $context->builder->store(
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false),
-            $context->builder->structGep($out, $valMap['type'])
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $out,
+            $i32->constInt(0, false)
         );
-        $valueField = $context->builder->structGep($out, $valMap['value']);
-        $firstByte = $context->builder->inBoundsGEP(
-            $valueField,
-            $context->getTypeFromString('int32')->constInt(0, false),
-            $zero
-        );
-        $context->builder->store($i8->constInt(0, false), $firstByte);
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
