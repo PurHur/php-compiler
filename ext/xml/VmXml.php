@@ -393,6 +393,47 @@ final class VmXml
         return substr($xml, $rootStart, $rootEnd - $rootStart);
     }
 
+    /**
+     * Drop XML declaration + DOCTYPE only — keep Comment/PI Misc for SAX default/PI handlers (#20333).
+     *
+     * Unlike {@see stripDocumentMiscEnvelope}, trailing Misc after the root is preserved.
+     */
+    public static function stripXmlDeclAndDoctypeKeepMisc(string $xml): string
+    {
+        $pos = 0;
+        $len = \strlen($xml);
+        $pos = self::skipXmlWhitespace($xml, $pos);
+        if (preg_match('/\G<\?xml\s[^?]*\?>/is', $xml, $decl, 0, $pos)) {
+            $pos += \strlen($decl[0]);
+            $pos = self::skipXmlWhitespace($xml, $pos);
+        }
+        // Comments/PIs before DOCTYPE stay in the returned string (Zend default handler sees them).
+        $beforeDoctype = $pos;
+        $scan = $pos;
+        while ($scan < $len) {
+            $ws = self::skipXmlWhitespace($xml, $scan);
+            if (preg_match('/\G<!DOCTYPE\s/i', $xml, $doctypeOpen, 0, $ws)) {
+                unset($doctypeOpen);
+                $doctypeEnd = self::findDoctypeEnd($xml, $ws);
+                if (null === $doctypeEnd) {
+                    break;
+                }
+                // Drop decl/doctype region but keep any Misc that appeared before DOCTYPE.
+                $prefix = substr($xml, $beforeDoctype, $ws - $beforeDoctype);
+                $suffix = substr($xml, self::skipXmlWhitespace($xml, $doctypeEnd));
+
+                return $prefix.$suffix;
+            }
+            $miscEnd = self::consumeDocumentMiscAt($xml, $ws);
+            if (null === $miscEnd) {
+                break;
+            }
+            $scan = $miscEnd;
+        }
+
+        return substr($xml, $beforeDoctype);
+    }
+
     private static function skipXmlWhitespace(string $xml, int $pos): int
     {
         $len = \strlen($xml);

@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5534 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 15747 |
+| Source constructs flagged (warnings) | 15748 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1087,7 +1087,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/SimpleXmlJsonExport.php` | 0 | 3 |
 | `ext/simplexml/SimpleXmlNodeState.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlRegistry.php` | 0 | 1 |
-| `ext/simplexml/VmSimpleXml.php` | 0 | 51 |
+| `ext/simplexml/VmSimpleXml.php` | 0 | 49 |
 | `ext/simplexml/VmSimpleXmlIterator.php` | 0 | 4 |
 | `ext/simplexml/simplexml_import_dom.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
@@ -3532,7 +3532,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/xml/BuiltinClasses.php` | 0 | 1 |
 | `ext/xml/Module.php` | 0 | 23 |
 | `ext/xml/VmXml.php` | 0 | 1 |
-| `ext/xml/VmXmlSaxDispatcher.php` | 0 | 11 |
+| `ext/xml/VmXmlSaxDispatcher.php` | 0 | 14 |
 | `ext/xml/VmXmlStructBuilder.php` | 0 | 18 |
 | `ext/xml/XmlConstants.php` | 0 | 1 |
 | `ext/xml/XmlFunction.php` | 0 | 1 |
@@ -13210,7 +13210,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/SimpleXmlRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `ext/simplexml/VmSimpleXml.php`
 
@@ -13244,27 +13244,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 298)
 - new Variable (line 305)
 - new Variable (line 311)
-- new Variable (line 320)
-- new SimpleXmlNodeState (line 552)
-- new SimpleXmlNodeState (line 558)
-- new SimpleXmlNodeState (line 564)
-- new SimpleXmlNodeState (line 609)
-- new HashTable (line 683)
-- new Variable (line 695)
-- new Variable (line 705)
-- new Variable (line 741)
+- new Variable (line 323)
+- new SimpleXmlNodeState (line 566)
+- new SimpleXmlNodeState (line 620)
+- new HashTable (line 694)
+- new Variable (line 706)
+- new Variable (line 716)
 - new Variable (line 752)
-- new SimpleXmlNodeState (line 788)
-- new ObjectEntry (line 806)
-- new ObjectEntry (line 848)
+- new Variable (line 763)
+- new SimpleXmlNodeState (line 799)
+- new ObjectEntry (line 817)
 - new ObjectEntry (line 859)
-- new SimpleXmlNodeState (line 863)
-- new ObjectEntry (line 879)
-- new HashTable (line 1120)
-- new Variable (line 1122)
-- new SimpleXmlNodeState (line 1181)
-- new SimpleXmlNodeState (line 1190)
-- 54 class method(s)
+- new ObjectEntry (line 870)
+- new SimpleXmlNodeState (line 874)
+- new ObjectEntry (line 892)
+- new HashTable (line 1156)
+- new Variable (line 1158)
+- new SimpleXmlNodeState (line 1217)
+- new SimpleXmlNodeState (line 1226)
+- 55 class method(s)
 - 3 closure(s)
 
 ### `ext/simplexml/VmSimpleXmlIterator.php`
@@ -13352,36 +13350,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SoapClientSetSoapHeaders (line 58)
 - new SoapClientCall (line 59)
 - new SoapClientState (line 83)
-- new SoapFault (line 133)
-- new SoapFault (line 269)
-- new SoapFault (line 280)
-- new SoapFault (line 308)
-- new SoapFault (line 504)
-- new DOMDocument (line 506)
-- new SoapFault (line 508)
-- new DOMXPath (line 510)
-- new DOMDocument (line 686)
-- new SoapFault (line 688)
-- new DOMXPath (line 690)
-- new SoapFault (line 713)
-- new Variable (line 790)
-- new Variable (line 798)
-- new HashTable (line 825)
-- new ObjectEntry (line 843)
-- new ArgumentCountError (line 940)
-- new ArgumentCountError (line 978)
-- new ArgumentCountError (line 1006)
-- new ArgumentCountError (line 1034)
-- new HashTable (line 1063)
-- new Variable (line 1066)
-- new HashTable (line 1088)
-- new Variable (line 1091)
-- new ArgumentCountError (line 1191)
-- new HashTable (line 1221)
-- new Variable (line 1223)
-- new ArgumentCountError (line 1242)
-- new ArgumentCountError (line 1272)
-- 42 class method(s)
+- new SoapFault (line 156)
+- new SoapFault (line 318)
+- new SoapFault (line 329)
+- new SoapFault (line 366)
+- new SoapFault (line 782)
+- new DOMDocument (line 784)
+- new SoapFault (line 786)
+- new DOMXPath (line 788)
+- new DOMDocument (line 964)
+- new SoapFault (line 966)
+- new DOMXPath (line 968)
+- new SoapFault (line 991)
+- new Variable (line 1068)
+- new Variable (line 1076)
+- new HashTable (line 1103)
+- new ObjectEntry (line 1121)
+- new ArgumentCountError (line 1240)
+- new ArgumentCountError (line 1278)
+- new ArgumentCountError (line 1306)
+- new ArgumentCountError (line 1334)
+- new HashTable (line 1363)
+- new Variable (line 1366)
+- new HashTable (line 1388)
+- new Variable (line 1391)
+- new ArgumentCountError (line 1491)
+- new HashTable (line 1521)
+- new Variable (line 1523)
+- new ArgumentCountError (line 1542)
+- new ArgumentCountError (line 1572)
+- 49 class method(s)
 
 ### `ext/soap/VmSoapEncoding.php`
 
@@ -13437,37 +13435,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SoapFault (line 103)
 - new SoapFault (line 196)
 - new SoapFault (line 269)
-- new SoapFault (line 302)
-- new DOMDocument (line 310)
-- new SoapFault (line 312)
-- new DOMXPath (line 314)
+- new SoapFault (line 310)
+- new DOMDocument (line 318)
 - new SoapFault (line 320)
-- new SoapFault (line 324)
-- new Variable (line 346)
-- new HashTable (line 378)
-- new SoapFault (line 409)
-- new SoapFault (line 419)
-- new SoapFault (line 431)
-- new SoapFault (line 443)
-- new SoapFault (line 452)
-- new ObjectEntry (line 477)
-- new Variable (line 480)
-- new HashTable (line 531)
-- new Variable (line 533)
-- new SoapFault (line 787)
-- new DOMDocument (line 789)
-- new SoapFault (line 791)
-- new DOMXPath (line 793)
-- new SoapFault (line 900)
-- new ArgumentCountError (line 917)
-- new ArgumentCountError (line 954)
-- new Variable (line 960)
-- new ArgumentCountError (line 979)
-- new HashTable (line 1002)
-- new Variable (line 1006)
-- new ArgumentCountError (line 1050)
-- new ArgumentCountError (line 1100)
-- new ArgumentCountError (line 1124)
+- new DOMXPath (line 322)
+- new SoapFault (line 328)
+- new SoapFault (line 332)
+- new Variable (line 354)
+- new HashTable (line 386)
+- new SoapFault (line 417)
+- new SoapFault (line 427)
+- new SoapFault (line 439)
+- new SoapFault (line 451)
+- new SoapFault (line 460)
+- new ObjectEntry (line 485)
+- new Variable (line 488)
+- new HashTable (line 539)
+- new Variable (line 541)
+- new SoapFault (line 795)
+- new DOMDocument (line 797)
+- new SoapFault (line 799)
+- new DOMXPath (line 801)
+- new SoapFault (line 908)
+- new ArgumentCountError (line 925)
+- new ArgumentCountError (line 962)
+- new Variable (line 968)
+- new ArgumentCountError (line 987)
+- new HashTable (line 1010)
+- new Variable (line 1014)
+- new ArgumentCountError (line 1058)
+- new ArgumentCountError (line 1108)
+- new ArgumentCountError (line 1132)
 - 37 class method(s)
 
 ### `ext/soap/bootstrap_soapfault.php`
@@ -29440,22 +29438,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/VmXml.php`
 
 **Warnings** (review for bootstrap subset):
-- 36 class method(s)
+- 37 class method(s)
 
 ### `ext/xml/VmXmlSaxDispatcher.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 45)
-- new Variable (line 80)
-- new Variable (line 171)
-- new Variable (line 173)
-- new Variable (line 185)
-- new Variable (line 197)
-- new HashTable (line 253)
-- new Variable (line 261)
-- new Variable (line 277)
-- new Variable (line 283)
-- 17 class method(s)
+- new self (line 51)
+- new Variable (line 86)
+- new Variable (line 224)
+- new Variable (line 226)
+- new Variable (line 240)
+- new Variable (line 254)
+- new Variable (line 268)
+- new Variable (line 270)
+- new Variable (line 286)
+- new HashTable (line 342)
+- new Variable (line 350)
+- new Variable (line 366)
+- new Variable (line 372)
+- 20 class method(s)
 
 ### `ext/xml/VmXmlStructBuilder.php`
 
@@ -35423,7 +35424,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 148)
+- new JIT (line 144)
 - 9 class method(s)
 - 1 closure(s)
 
