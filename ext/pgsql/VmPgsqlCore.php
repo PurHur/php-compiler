@@ -422,54 +422,52 @@ final class VmPgsqlCore
         return VmPgsqlNative::getisnull($result, $pgsqlRow, $offset) ? 1 : 0;
     }
 
-    private static function convertValueToSql(\FFI\CData $conn, Variable $val): string
+    /**
+     * pg_socket — stream resource wrapping connection fd (php-src php_stream_pgsql_fd_ops; #20636).
+     *
+     * @return Variable|false stream resource variable
+     */
+    public static function socket(ObjectEntry $connection, Context $ctx): Variable|false
     {
-        if (Variable::TYPE_NULL === $val->type) {
-            return 'NULL';
+        $fd = VmPgsqlNative::socket(VmPgsqlConnection::native($connection));
+        if ($fd < 0) {
+            return false;
         }
-        if (Variable::TYPE_BOOLEAN === $val->type) {
-            return $val->toBool() ? "'t'" : "'f'";
-        }
-        if (Variable::TYPE_INTEGER === $val->type) {
-            return (string) $val->toInt();
-        }
-        if (Variable::TYPE_FLOAT === $val->type) {
-            return (string) $val->toFloat();
-        }
-        $str = $val->toString();
-        if ('' === $str) {
-            return 'NULL';
-        }
-        $escaped = VmPgsqlNative::escapeLiteral($conn, $str);
+        $var = new Variable();
+        $var->streamHandle($fd, $ctx);
 
-        return '' !== $escaped ? $escaped : ("'".\str_replace("'", "''", $str)."'");
+        return $var;
     }
 
-    /** Escape for embedding in PostgreSQL E'...' (php-src inserts raw; quote-safe). */
-    private static function escapeCopyEString(string $s): string
+    public static function consumeInput(ObjectEntry $connection): bool
     {
-        return \str_replace("'", "''", $s);
+        return VmPgsqlNative::consumeInput(VmPgsqlConnection::native($connection));
     }
 
-    private static function htAddLong(HashTable $ht, string $key, int $value): void
+    /**
+     * pg_flush — true / 0 / false (php-src ext/pgsql/pgsql.c; #20636).
+     *
+     * @return true|int|false
+     */
+    public static function flush(ObjectEntry $connection): bool|int
     {
-        $slot = new Variable();
-        $slot->int($value);
-        $ht->add($key, $slot);
-    }
+        $conn = VmPgsqlConnection::native($connection);
+        $wasNonBlocking = VmPgsqlNative::isNonBlocking($conn);
+        if (0 === $wasNonBlocking && -1 === VmPgsqlNative::setNonBlocking($conn, 1)) {
+            @\trigger_error('pg_flush(): Cannot set connection to nonblocking mode', \E_USER_NOTICE);
 
-    private static function htAddString(HashTable $ht, string $key, string $value): void
-    {
-        $slot = new Variable();
-        $slot->string($value);
-        $ht->add($key, $slot);
-    }
+            return false;
+        }
+        $ret = VmPgsqlNative::flush($conn);
+        if (0 === $wasNonBlocking && -1 === VmPgsqlNative::setNonBlocking($conn, 0)) {
+            @\trigger_error('pg_flush(): Failed resetting connection to blocking mode', \E_USER_NOTICE);
+        }
 
-    private static function htAddBool(HashTable $ht, string $key, bool $value): void
-    {
-        $slot = new Variable();
-        $slot->bool($value);
-        $ht->add($key, $slot);
+        return match ($ret) {
+            0 => true,
+            1 => 0,
+            default => false,
+        };
     }
 
     /**
@@ -525,5 +523,55 @@ final class VmPgsqlCore
         VmPgsqlResult::advanceRow($resultObj);
 
         return $ht;
+    }
+
+    private static function convertValueToSql(\FFI\CData $conn, Variable $val): string
+    {
+        if (Variable::TYPE_NULL === $val->type) {
+            return 'NULL';
+        }
+        if (Variable::TYPE_BOOLEAN === $val->type) {
+            return $val->toBool() ? "'t'" : "'f'";
+        }
+        if (Variable::TYPE_INTEGER === $val->type) {
+            return (string) $val->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $val->type) {
+            return (string) $val->toFloat();
+        }
+        $str = $val->toString();
+        if ('' === $str) {
+            return 'NULL';
+        }
+        $escaped = VmPgsqlNative::escapeLiteral($conn, $str);
+
+        return '' !== $escaped ? $escaped : ("'".\str_replace("'", "''", $str)."'");
+    }
+
+    /** Escape for embedding in PostgreSQL E'...' (php-src inserts raw; quote-safe). */
+    private static function escapeCopyEString(string $s): string
+    {
+        return \str_replace("'", "''", $s);
+    }
+
+    private static function htAddLong(HashTable $ht, string $key, int $value): void
+    {
+        $slot = new Variable();
+        $slot->int($value);
+        $ht->add($key, $slot);
+    }
+
+    private static function htAddString(HashTable $ht, string $key, string $value): void
+    {
+        $slot = new Variable();
+        $slot->string($value);
+        $ht->add($key, $slot);
+    }
+
+    private static function htAddBool(HashTable $ht, string $key, bool $value): void
+    {
+        $slot = new Variable();
+        $slot->bool($value);
+        $ht->add($key, $slot);
     }
 }

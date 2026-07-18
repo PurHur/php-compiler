@@ -217,6 +217,16 @@ final class VmPgsqlNative
         return (int) self::requireFfi()->PQflush($conn);
     }
 
+    public static function isNonBlocking(\FFI\CData $conn): int
+    {
+        return (int) self::requireFfi()->PQisnonblocking($conn);
+    }
+
+    public static function setNonBlocking(\FFI\CData $conn, int $arg): int
+    {
+        return (int) self::requireFfi()->PQsetnonblocking($conn, $arg);
+    }
+
     public static function escapeIdentifier(\FFI\CData $conn, string $value): string
     {
         $ffi = self::requireFfi();
@@ -457,6 +467,8 @@ PGresult *PQgetResult(PGconn *conn);
 int PQsocket(const PGconn *conn);
 int PQconsumeInput(PGconn *conn);
 int PQflush(PGconn *conn);
+int PQisnonblocking(const PGconn *conn);
+int PQsetnonblocking(PGconn *conn, int arg);
 Oid PQftable(const PGresult *res, int field_num);
 Oid PQftype(const PGresult *res, int field_num);
 int PQfnumber(const PGresult *res, const char *field_name);
