@@ -9,13 +9,13 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_unserialize via UnserializeJitHelper PHP (#9163).
+ * JIT/AOT link for __compiler_unserialize via UnserializeJitHelper PHP (#9163, #20355).
  *
- * JIT/normal modules and standalone AOT use compiled {@see UnserializeJitHelper} (#13312).
+ * Embed / non-thin: NestedJIT {@see UnserializeJitHelper} (#13312).
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20336 / #20308 shape): thin stubs without nested JIT (#13322).
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -39,21 +39,16 @@ final class StringUnserialize
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::ensureDeferredStubsForInventoryEmit($context);
-
-            return;
-        }
         self::implement($context);
     }
 
-    /** Inventory argv emit: link unserialize ABI without nested UnserializeJitHelper JIT (#13322). */
+    /** Thin standalone AOT: linkable unserialize ABI without nested UnserializeJitHelper (#13322, #20355). */
     public static function ensureDeferredStubsForInventoryEmit(Context $context): void
     {
-        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if (!$context->isThinStandaloneAotMain()) {
             return;
         }
-        self::implementDeferredInventoryStubs($context);
+        self::implementThinStandaloneStubs($context);
     }
 
     public static function implement(Context $context): void
@@ -65,9 +60,8 @@ final class StringUnserialize
             return;
         }
 
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::ensureRuntimeHelpers($context);
-            self::implementDeferredInventoryStubs($context);
+        if ($context->isThinStandaloneAotMain()) {
+            self::implementThinStandaloneStubs($context);
 
             return;
         }
@@ -238,9 +232,11 @@ final class StringUnserialize
         }
     }
 
-    /** No-op / empty hashtable — inventory emit only needs linkable ABI symbols (#13322). */
-    private static function implementDeferredInventoryStubs(Context $context): void
+    /** No-op / empty hashtable — thin standalone AOT only needs linkable ABI symbols (#13322, #20355). */
+    private static function implementThinStandaloneStubs(Context $context): void
     {
+        self::ensureRuntimeHelpers($context);
+
         $voidTy = $context->getTypeFromString('void');
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
@@ -252,7 +248,7 @@ final class StringUnserialize
             $fn = null !== $unserProbe
                 ? $unserProbe
                 : $context->module->addFunction('__compiler_unserialize', $ft);
-            $entry = $fn->appendBasicBlock('unser_inv_stub');
+            $entry = $fn->appendBasicBlock('unser_thin_stub');
             $context->builder->positionAtEnd($entry);
             $context->builder->returnVoid();
             $context->registerFunction('__compiler_unserialize', $fn);
@@ -268,7 +264,7 @@ final class StringUnserialize
             $fn = null !== $sessionProbe
                 ? $sessionProbe
                 : $context->module->addFunction('phpc_session_decode_payload', $ft);
-            $entry = $fn->appendBasicBlock('session_unser_inv_stub');
+            $entry = $fn->appendBasicBlock('session_unser_thin_stub');
             $context->builder->positionAtEnd($entry);
             $context->builder->returnValue($context->builder->call($context->lookupFunction('__hashtable__alloc')));
             $context->registerFunction('phpc_session_decode_payload', $fn);

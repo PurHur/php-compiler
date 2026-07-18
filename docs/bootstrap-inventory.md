@@ -18337,7 +18337,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitParseUrl.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `ext/standard/JitPassword.php`
 
@@ -26935,8 +26935,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/parse_url.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 35)
-- new Variable (line 37)
+- new HashTable (line 43)
+- new Variable (line 45)
 - 2 class method(s)
 
 ### `ext/standard/passthru.php`
@@ -35764,7 +35764,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUnserialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 220)
+- new JIT (line 214)
 - 11 class method(s)
 - 1 closure(s)
 
