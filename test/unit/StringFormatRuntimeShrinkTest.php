@@ -12,7 +12,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** sprintf/printf/number_format JIT routes through SprintfJitHelper PHP not StringFormatJit LLVM (#9131, #13146). */
+/**
+ * sprintf/printf/number_format JIT: embed via SprintfJitHelper; thin AOT via isThinStandaloneAotMain (#9131, #13146, #20395).
+ */
 final class StringFormatRuntimeShrinkTest extends TestCase
 {
     public function testStringFormatUsesSprintfJitHelperNotLlvmMonolith(): void
@@ -24,9 +26,20 @@ final class StringFormatRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringNotContainsString('emitCompilerSprintf', $source);
         $this->assertStringNotContainsString('__phpc_fmt_append_spec_snprintf', $source);
-        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(400, \substr_count($source, "\n") + 1);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFormatJit.php');
+    }
+
+    public function testStandaloneUsesSamePhpBridgeAsEmbed(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFormat.php');
+        $this->assertStringContainsString('ensureStandaloneBodies', $source);
+        $this->assertStringContainsString('self::implement($context)', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('StringFormatInventoryStubs', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
     }
 
     public function testSprintfJitHelperMatchesVmSprintf(): void
