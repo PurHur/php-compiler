@@ -260,6 +260,86 @@ final class VmOpensslPkcs7Native
         }
     }
 
+    /**
+     * openssl_pkcs7_read() — extract cert/CRL PEMs from PKCS#7 PEM *content*
+     * (php-src ext/openssl/openssl.c PHP_FUNCTION(openssl_pkcs7_read); #20305).
+     *
+     * @return list<string>|false
+     */
+    public static function read(string $pkcs7PemContent): array|false
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $bio = $ffi->BIO_new_mem_buf($pkcs7PemContent, \strlen($pkcs7PemContent));
+        if (null === $bio) {
+            return false;
+        }
+
+        $p7 = null;
+        try {
+            $p7 = $ffi->PEM_read_bio_PKCS7($bio, null, null, null);
+            if (null === $p7) {
+                return false;
+            }
+
+            // Layout mirrors openssl/pkcs7.h through the `d` union (OpenSSL 1.1/3).
+            $layout = $ffi->cast('PKCS7_LAYOUT*', $p7);
+            $nid = (int) $ffi->OBJ_obj2nid($layout->type);
+            $certStack = null;
+            $crlStack = null;
+            // NID_pkcs7_signed = 22; NID_pkcs7_signedAndEnveloped = 24 (obj_mac.h).
+            if (22 === $nid && null !== $layout->d->sign) {
+                $certStack = $layout->d->sign->cert;
+                $crlStack = $layout->d->sign->crl;
+            } elseif (24 === $nid && null !== $layout->d->signed_and_enveloped) {
+                $certStack = $layout->d->signed_and_enveloped->cert;
+                $crlStack = $layout->d->signed_and_enveloped->crl;
+            }
+
+            // php-src always array-inits then RETVAL_TRUE even when stacks are empty.
+            $out = [];
+            if (null !== $certStack) {
+                $count = (int) $ffi->OPENSSL_sk_num($certStack);
+                for ($i = 0; $i < $count; ++$i) {
+                    $x509 = $ffi->OPENSSL_sk_value($certStack, $i);
+                    if (null === $x509) {
+                        continue;
+                    }
+                    $pem = self::x509ToPem($ffi, $x509);
+                    if (false === $pem) {
+                        continue;
+                    }
+                    $out[$i] = $pem;
+                }
+            }
+            if (null !== $crlStack) {
+                // php-src reuses the same indices for CRLs (overwrites cert slots).
+                $count = (int) $ffi->OPENSSL_sk_num($crlStack);
+                for ($i = 0; $i < $count; ++$i) {
+                    $crl = $ffi->OPENSSL_sk_value($crlStack, $i);
+                    if (null === $crl) {
+                        continue;
+                    }
+                    $pem = self::x509CrlToPem($ffi, $crl);
+                    if (false === $pem) {
+                        continue;
+                    }
+                    $out[$i] = $pem;
+                }
+            }
+
+            return array_values($out);
+        } finally {
+            if (null !== $p7) {
+                $ffi->PKCS7_free($p7);
+            }
+            $ffi->BIO_free($bio);
+        }
+    }
+
     public static function decrypt(
         string $inputFilename,
         string $outputFilename,
@@ -365,6 +445,64 @@ final class VmOpensslPkcs7Native
     }
 
     /**
+     * @param \FFI       $ffi
+     * @param \FFI\CData $x509
+     *
+     * @return string|false
+     */
+    private static function x509ToPem($ffi, $x509): string|false
+    {
+        $outBio = $ffi->BIO_new($ffi->BIO_s_mem());
+        if (null === $outBio) {
+            return false;
+        }
+        try {
+            if (1 !== (int) $ffi->PEM_write_bio_X509($outBio, $x509)) {
+                return false;
+            }
+            $pending = (int) $ffi->BIO_ctrl_pending($outBio);
+            if ($pending <= 0) {
+                return false;
+            }
+            $buf = $ffi->new("char[{$pending}]");
+            $read = (int) $ffi->BIO_read($outBio, $buf, $pending);
+
+            return $read > 0 ? \FFI::string($buf, $read) : false;
+        } finally {
+            $ffi->BIO_free($outBio);
+        }
+    }
+
+    /**
+     * @param \FFI       $ffi
+     * @param \FFI\CData $crl
+     *
+     * @return string|false
+     */
+    private static function x509CrlToPem($ffi, $crl): string|false
+    {
+        $outBio = $ffi->BIO_new($ffi->BIO_s_mem());
+        if (null === $outBio) {
+            return false;
+        }
+        try {
+            if (1 !== (int) $ffi->PEM_write_bio_X509_CRL($outBio, $crl)) {
+                return false;
+            }
+            $pending = (int) $ffi->BIO_ctrl_pending($outBio);
+            if ($pending <= 0) {
+                return false;
+            }
+            $buf = $ffi->new("char[{$pending}]");
+            $read = (int) $ffi->BIO_read($outBio, $buf, $pending);
+
+            return $read > 0 ? \FFI::string($buf, $read) : false;
+        } finally {
+            $ffi->BIO_free($outBio);
+        }
+    }
+
+    /**
      * @param \FFI $ffi
      *
      * @return \FFI\CData|null
@@ -422,24 +560,72 @@ final class VmOpensslPkcs7Native
 
         $cdef = <<<'CDEF'
 typedef struct bio_st BIO;
+typedef struct bio_method_st BIO_METHOD;
 typedef struct evp_pkey_st EVP_PKEY;
 typedef struct x509_st X509;
+typedef struct x509_crl_st X509_CRL;
+typedef struct asn1_object_st ASN1_OBJECT;
 typedef struct pkcs7_st PKCS7;
 typedef struct x509_store_st X509_STORE;
 typedef struct evp_cipher_st EVP_CIPHER;
 typedef struct openssl_stack_st OPENSSL_STACK;
+
+typedef struct {
+    void *version;
+    void *md_algs;
+    OPENSSL_STACK *cert;
+    OPENSSL_STACK *crl;
+    void *signer_info;
+    void *contents;
+} PKCS7_SIGNED_LAYOUT;
+
+typedef struct {
+    void *version;
+    void *md_algs;
+    OPENSSL_STACK *cert;
+    OPENSSL_STACK *crl;
+    void *signer_info;
+    void *enc_data;
+    void *recipientinfo;
+} PKCS7_SIGN_ENVELOPE_LAYOUT;
+
+typedef struct {
+    unsigned char *asn1;
+    long length;
+    int state;
+    int detached;
+    ASN1_OBJECT *type;
+    union {
+        char *ptr;
+        void *data;
+        PKCS7_SIGNED_LAYOUT *sign;
+        void *enveloped;
+        PKCS7_SIGN_ENVELOPE_LAYOUT *signed_and_enveloped;
+        void *digest;
+        void *encrypted;
+        void *other;
+    } d;
+} PKCS7_LAYOUT;
+
 BIO *BIO_new_file(const char *filename, const char *mode);
 BIO *BIO_new_mem_buf(const void *buf, int len);
+BIO *BIO_new(const BIO_METHOD *type);
+const BIO_METHOD *BIO_s_mem(void);
 void BIO_free(BIO *a);
 long BIO_ctrl(BIO *bp, int cmd, long larg, void *parg);
+size_t BIO_ctrl_pending(BIO *b);
 int BIO_write(BIO *b, const void *data, int dlen);
+int BIO_read(BIO *b, void *data, int dlen);
 
 X509 *PEM_read_bio_X509(BIO *bp, X509 **x, void *cb, void *u);
 EVP_PKEY *PEM_read_bio_PrivateKey(BIO *bp, EVP_PKEY **x, void *cb, void *u);
 int PEM_write_bio_X509(BIO *bp, const X509 *x);
+int PEM_write_bio_X509_CRL(BIO *bp, const X509_CRL *crl);
 void X509_free(X509 *a);
 void EVP_PKEY_free(EVP_PKEY *pkey);
+int OBJ_obj2nid(const ASN1_OBJECT *o);
 
+PKCS7 *PEM_read_bio_PKCS7(BIO *bp, PKCS7 **x, void *cb, void *u);
 PKCS7 *PKCS7_sign(X509 *signcert, EVP_PKEY *pkey, OPENSSL_STACK *certs, BIO *data, int flags);
 int SMIME_write_PKCS7(BIO *bio, PKCS7 *p7, BIO *data, int flags);
 PKCS7 *SMIME_read_PKCS7(BIO *bio, BIO **bcont);

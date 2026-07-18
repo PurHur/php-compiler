@@ -1762,6 +1762,22 @@ final class VmOpenssl
     }
 
     /**
+     * openssl_pkcs7_read() — extract cert PEMs from PKCS#7 PEM content (php-src ext/openssl/openssl.c; #20305).
+     *
+     * @return list<string>|false
+     */
+    public static function pkcs7Read(string $pkcs7PemContent, ?Frame $frame = null): array|false
+    {
+        if (!VmOpensslPkcs7Native::available()) {
+            self::userWarning('openssl_pkcs7_read(): OpenSSL PKCS#7 is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        return VmOpensslPkcs7Native::read($pkcs7PemContent);
+    }
+
+    /**
      * openssl_pkcs7_encrypt() — S/MIME encrypt (php-src ext/openssl/openssl.c; #6804).
      *
      * @return bool
