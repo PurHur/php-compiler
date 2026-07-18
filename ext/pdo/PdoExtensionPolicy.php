@@ -17,6 +17,10 @@ use PHPCompiler\CompilerVersion;
  * listed in getAvailableDrivers() until a real connection factory exists (sqlite-style
  * lib gate); PDO::connect('mysql:…'/'pgsql:…') therefore throws "could not find driver"
  * like Zend when the driver module is absent.
+ *
+ * Logical {@code pdo_pgsql} follows the subclass advertise gate so
+ * {@code extension_loaded('pdo_pgsql')} matches builds that ship the Pdo\Pgsql API
+ * (#20566). Live COPY / LISTEN-NOTIFY / backend PID need libpq (#3741).
  */
 final class PdoExtensionPolicy
 {
@@ -35,6 +39,17 @@ final class PdoExtensionPolicy
     {
         return self::advertisesExtension()
             && \PHPCompiler\ext\sqlite3\VmSqlite3Native::available();
+    }
+
+    /**
+     * Logical pdo_pgsql for extension_loaded() (#20566).
+     *
+     * Same gate as {@see advertisesPgsqlSubclass()} — not listed in
+     * getAvailableDrivers() until a libpq connection factory exists (#3741).
+     */
+    public static function advertisesPgsqlDriver(): bool
+    {
+        return self::advertisesPgsqlSubclass();
     }
 
     /**

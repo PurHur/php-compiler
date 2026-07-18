@@ -5566,20 +5566,27 @@ final class VmDom
 
         $lines = [self::serializeXmlDeclaration($state)];
 
+        $emittedDoctype = false;
         if (null !== $state->doctypeName) {
             $lines[] = self::serializeDoctype(
                 $state->doctypeName,
                 $state->doctypePublicId ?? '',
                 $state->doctypeSystemId ?? ''
             );
+            $emittedDoctype = true;
         }
 
         if ([] !== $state->childIds) {
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);
-                if (null !== $child) {
-                    $lines[] = self::serializeNode($child, 0, $formatOutput, $noEmptyTag);
+                if (null === $child) {
+                    continue;
                 }
+                // Avoid duplicating doctype when both document state and child list carry it (#20556).
+                if ($emittedDoctype && self::isDocumentType($child)) {
+                    continue;
+                }
+                $lines[] = self::serializeNode($child, 0, $formatOutput, $noEmptyTag);
             }
         } else {
             $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
@@ -6602,6 +6609,15 @@ final class VmDom
 
     private static function serializeNode(ObjectEntry $entry, int $depth = 0, bool $format = false, bool $noEmptyTag = false): string
     {
+        if (self::isDocumentType($entry)) {
+            $dt = DomRegistry::state($entry);
+
+            return self::serializeDoctype(
+                $dt->nodeName,
+                $dt->publicId ?? '',
+                $dt->systemId ?? ''
+            );
+        }
         if (self::isElement($entry)) {
             return self::serializeElement($entry, $depth, $format, $noEmptyTag);
         }
@@ -6924,6 +6940,63 @@ final class VmDom
         return $var;
     }
 
+    /**
+     * Dom\Document::getElementsByClassName() — HTMLCollection by class tokens
+     * (php-src ext/dom/parentnode.c / html5; #20556).
+     */
+    public static function getElementsByClassName(Context $ctx, ObjectEntry $document, string $classNames): Variable
+    {
+        self::ensureDocument($document);
+
+        return self::createLiveClassNameNodeList($ctx, $document, $classNames);
+    }
+
+    public static function getElementsByClassNameFromNode(
+        Context $ctx,
+        ObjectEntry $node,
+        string $classNames
+    ): Variable {
+        if (!self::isElement($node) && !self::isDocument($node) && !self::isDocumentFragment($node)) {
+            throw new \DOMException('Not a ParentNode');
+        }
+
+        return self::createLiveClassNameNodeList($ctx, $node, $classNames);
+    }
+
+    public static function createLiveClassNameNodeList(
+        Context $ctx,
+        ObjectEntry $root,
+        string $classNames
+    ): Variable {
+        $var = self::createNodeList($ctx, self::collectElementsByClassName($root, $classNames));
+        $state = DomRegistry::state($var->toObject());
+        $state->listQueryRootId = $root->id;
+        $state->listQueryClassNames = $classNames;
+
+        return $var;
+    }
+
+    /**
+     * Matching element object ids in document order for class-token queries (#20556).
+     *
+     * @return list<int>
+     */
+    public static function collectElementsByClassName(ObjectEntry $node, string $classNames): array
+    {
+        $want = VmDomTokenList::parseTokens($classNames);
+        $matches = [];
+        if ([] === $want) {
+            return $matches;
+        }
+        if (self::isElement($node)) {
+            self::collectElementsByClassNameFromChildren($node, $want, $matches);
+        } else {
+            self::collectElementsByClassNameRecursive($node, $want, $matches);
+        }
+
+        return $matches;
+    }
+
     public static function refreshNodeListIfLive(ObjectEntry $nodeList): void
     {
         if (!self::isNodeList($nodeList)) {
@@ -6947,6 +7020,8 @@ final class VmDom
                 $state->listQueryNamespaceUri ?? '',
                 $state->listQueryLocalName
             );
+        } elseif (null !== $state->listQueryClassNames) {
+            $ids = self::collectElementsByClassName($root, $state->listQueryClassNames);
         } else {
             return;
         }
@@ -7945,6 +8020,67 @@ final class VmDom
                 self::collectElementsByTagNameRecursive($child, $want, $matches);
             }
         }
+    }
+
+    /**
+     * @param list<string> $want
+     * @param list<int>    $matches
+     */
+    private static function collectElementsByClassNameFromChildren(
+        ObjectEntry $node,
+        array $want,
+        array &$matches
+    ): void {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::collectElementsByClassNameRecursive($child, $want, $matches);
+            }
+        }
+    }
+
+    /**
+     * @param list<string> $want
+     * @param list<int>    $matches
+     */
+    private static function collectElementsByClassNameRecursive(
+        ObjectEntry $node,
+        array $want,
+        array &$matches
+    ): void {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        if (self::isElement($node) && self::elementMatchesClassNames($node, $want)) {
+            $matches[] = $node->id;
+        }
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::collectElementsByClassNameRecursive($child, $want, $matches);
+            }
+        }
+    }
+
+    /**
+     * @param list<string> $want
+     */
+    private static function elementMatchesClassNames(ObjectEntry $element, array $want): bool
+    {
+        $have = VmDomTokenList::parseTokens(VmDomTokenList::elementClassValue($element));
+        if ([] === $have) {
+            return false;
+        }
+        foreach ($want as $token) {
+            if (!\in_array($token, $have, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -9094,6 +9230,10 @@ final class VmDom
                 return $object;
             }
             if (self::CLASS_NODE === $classLc && self::isDomNode($object)) {
+                return $object;
+            }
+            // Dom\HTMLDocument / Dom\XMLDocument share DOMDocument method handlers (#20556).
+            if (self::CLASS_DOCUMENT === $classLc && self::isDocument($object)) {
                 return $object;
             }
             // Dom\TokenList shares DOMTokenList method handlers (#20512).

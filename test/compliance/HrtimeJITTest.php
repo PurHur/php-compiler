@@ -34,6 +34,14 @@ final class HrtimeJITTest extends BaseTest
             __DIR__.'/cases/stdlib/hrtime_nanosecond_precision.phpt',
             'hrtime_nanosecond_precision.phpt'
         );
+        yield 'hrtime_enum_case_typeerror.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/hrtime_enum_case_typeerror.phpt',
+            'hrtime_enum_case_typeerror.phpt'
+        );
+        yield 'hrtime_enum_case_typeerror_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/hrtime_enum_case_typeerror_jit.phpt',
+            'hrtime_enum_case_typeerror_jit.phpt'
+        );
     }
 
     public function setUp(): void

@@ -12,6 +12,8 @@ use PHPCompiler\ext\standard\JitStreamIoKernel;
  *
  * Thin standalone AOT (`isThinStandaloneAotMain`): {@see JitStreamIoKernel} libc + handle-table
  * (VmFs nested helpers skip __init__, #16075 / #19462 / peer #20214).
+ * Context init + M3 inventory: deferred stubs via {@see StreamIoRuntime::isStandaloneInitPhase}
+ * / {@see StreamIoRuntime::shouldDeferHeavyStreamIoEmitters} (#20576 / #20553).
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */
 final class StreamIoJit
@@ -43,7 +45,10 @@ final class StreamIoJit
             return;
         }
 
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        // Context standalone init + M3 inventory: deferred stubs (not NestedJIT) (#20576 / #20553).
+        if (StreamIoRuntime::isStandaloneInitPhase()
+            || StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)
+        ) {
             StreamIoRuntime::implementDeferredStreamIoStubs($context);
 
             return;

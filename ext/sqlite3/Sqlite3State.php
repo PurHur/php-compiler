@@ -23,4 +23,25 @@ final class Sqlite3State
      * @var array<string, array{callback: \PHPCompiler\VM\Variable, closure: ?\PHPCompiler\VM\ClosureState, argc: int, ctx: \PHPCompiler\VM\Context}>
      */
     public array $functions = [];
+
+    /**
+     * Registered collations (name lc => entry) — php-src createCollation (#20565).
+     *
+     * @var array<string, array{callback: \PHPCompiler\VM\Variable, closure: ?\PHPCompiler\VM\ClosureState, ctx: \PHPCompiler\VM\Context}>
+     */
+    public array $collations = [];
+
+    /**
+     * Registered aggregates (name lc => entry) — php-src createAggregate (#20585).
+     *
+     * @var array<string, array{
+     *     step: \PHPCompiler\VM\Variable,
+     *     stepClosure: ?\PHPCompiler\VM\ClosureState,
+     *     final: \PHPCompiler\VM\Variable,
+     *     finalClosure: ?\PHPCompiler\VM\ClosureState,
+     *     argc: int,
+     *     ctx: \PHPCompiler\VM\Context
+     * }>
+     */
+    public array $aggregates = [];
 }

@@ -11,10 +11,13 @@ use PHPCompiler\ext\standard\JitStreamReadBridgeKernel;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #12937, #18672, #19559).
+ * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #12937, #18672, #19559, #20553).
  *
- * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\StreamReadJitHelper}; LLVM bridges
- * live in {@see JitStreamReadBridgeKernel}. SSOT: {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
+ * Embed / non-thin: NestedJIT {@see \PHPCompiler\ext\standard\StreamReadJitHelper}; LLVM bridges
+ * live in {@see JitStreamReadBridgeKernel}.
+ * Thin standalone AOT (`isThinStandaloneAotMain`) + Context standalone init: deferred ABI stubs
+ * without NestedJIT (#13571 / peer #20308).
+ * SSOT: {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
  * php-src: ext/standard/flock.c, ext/standard/streams.c
  */
 final class StreamReadRuntime
@@ -186,7 +189,7 @@ final class StreamReadRuntime
 
     public static function shouldDeferInventoryEmitStubs(Context $context): bool
     {
-        return StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context);
+        return $context->isThinStandaloneAotMain() || StreamIoRuntime::isStandaloneInitPhase();
     }
 
     public static function ensureDeferredStubsForInventoryEmit(Context $context): void

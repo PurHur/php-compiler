@@ -75,7 +75,8 @@ final class JitStreamFilterKernel
             return;
         }
 
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        // Thin standalone AOT + Context standalone init — stubs without NestedJIT (#20553).
+        if ($context->isThinStandaloneAotMain() || StreamIoRuntime::isStandaloneInitPhase()) {
             self::implementDeferredInventoryStubs($context);
 
             return;
@@ -302,10 +303,10 @@ final class JitStreamFilterKernel
         }
     }
 
-    /** Inventory argv emit: link stream_filter ABI without nested helper JIT (#13245). */
+    /** Thin standalone / Context init: link stream_filter ABI without nested helper JIT (#13245, #20553). */
     public static function ensureDeferredStubsForInventoryEmit(Context $context): void
     {
-        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+        if (!$context->isThinStandaloneAotMain() && !StreamIoRuntime::isStandaloneInitPhase()) {
             return;
         }
         self::implementDeferredInventoryStubs($context);

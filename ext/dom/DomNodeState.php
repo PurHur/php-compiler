@@ -99,6 +99,9 @@ final class DomNodeState
 
     public ?string $listQueryLocalName = null;
 
+    /** Live {@see DOMNodeList} class-token query for getElementsByClassName (#20556). */
+    public ?string $listQueryClassNames = null;
+
     /** Persistent childNodes list object id for element/document nodes. */
     public ?int $childNodesListId = null;
 

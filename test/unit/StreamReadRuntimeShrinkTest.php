@@ -8,13 +8,16 @@ use PHPCompiler\ext\standard\StreamReadJitHelper;
 use PHPCompiler\ext\standard\VmPhpMemoryStream;
 use PHPUnit\Framework\TestCase;
 
-/** StreamReadRuntime embed + standalone route through StreamReadJitHelper PHP (#9393, #12937). */
+/** StreamReadRuntime: embed via StreamReadJitHelper; thin AOT via isThinStandaloneAotMain (#9393, #12937, #20553). */
 final class StreamReadRuntimeShrinkTest extends TestCase
 {
     public function testStreamReadRuntimeUsesJitHelperNotStandaloneLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamReadRuntime.php');
         $this->assertStringContainsString('StreamReadJitHelper', $source);
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('isStandaloneInitPhase', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('StreamReadStandaloneLlvm', $source);
         $this->assertStringNotContainsString('__phpc_resolve_stream', $source);
         $this->assertLessThan(360, \substr_count($source, "\n") + 1);

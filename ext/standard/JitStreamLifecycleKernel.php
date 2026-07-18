@@ -318,9 +318,10 @@ final class JitStreamLifecycleKernel
         }
     }
 
+    /** Thin standalone AOT + Context standalone init — stubs without NestedJIT (#20553 / peer #20308). */
     public static function shouldDeferInventoryEmitStubs(Context $context): bool
     {
-        return StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context);
+        return $context->isThinStandaloneAotMain() || StreamIoRuntime::isStandaloneInitPhase();
     }
 
     public static function ensureDeferredStubsForInventoryEmit(Context $context): void

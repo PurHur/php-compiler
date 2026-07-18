@@ -480,4 +480,75 @@ final class ForwardProfilePhantomIntrospectionTest extends TestCase
             }
         }
     }
+
+    /** PHP 8.4 exit-as-function: function_exists/is_callable see exit/die (#20575, re-#6975). */
+    public function testExitDieVisibleToFunctionExistsOnForwardProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsExitFunctionForm());
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists('exit')
+            );
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists('die')
+            );
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertTrue(isset($ctx->functions['exit']));
+            $this->assertTrue(isset($ctx->functions['die']));
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'exit')
+            );
+            $this->assertTrue(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'die')
+            );
+            // Still constructs forever:
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'eval')
+            );
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, '__halt_compiler')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    /** Reference / 8.2 profile: exit/die stay hidden from function_exists (#14738). */
+    public function testExitDieHiddenFromFunctionExistsOnReferenceProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsExitFunctionForm());
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists('exit')
+            );
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::isVisibleToFunctionExists('die')
+            );
+
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'exit')
+            );
+            $this->assertFalse(
+                \PHPCompiler\ext\standard\VmReflection::functionExists($ctx, 'die')
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
 }

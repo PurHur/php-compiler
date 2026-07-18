@@ -1068,8 +1068,9 @@ class Context {
             Builtin\ObOutputRuntime::ensureLinked($this);
             Builtin\ValueEchoRuntime::ensureLinked($this);
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
-            // Nested-JIT string helpers: lazy via ensureLinked during spine init (#14472).
-            if (!Builtin\StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($this)) {
+            // Nested-JIT string helpers: lazy via ensureLinked during spine/thin init (#14472, #20571).
+            // Gate on thin-standalone + init-phase only — not the broad StreamIo M3 defer bag (#20553).
+            if (!$this->isThinStandaloneAotMain() && !Builtin\StreamIoRuntime::isStandaloneInitPhase()) {
                 Builtin\StringSoundex::ensureStandaloneBodies($this);
                 Builtin\StringQuotemeta::ensureStandaloneBodies($this);
                 Builtin\StringNl2br::ensureStandaloneBodies($this);
@@ -1132,8 +1133,8 @@ class Context {
         } finally {
             Builtin\StreamIoRuntime::endStandaloneInitPhase();
         }
-        // After init-phase: NestedJIT GetenvJitHelper (always-helper, #20156) — not during
-        // standaloneInitPhase where StreamIo defer forced the former libc kernel path.
+        // After init-phase: NestedJIT GetenvJitHelper (always-helper, #20156) — skipped during
+        // standaloneInitPhase so stream inventory stubs stay thin (#20576 / #20553).
         Builtin\StringGetenv::ensureStandaloneBodies($this);
         Builtin\StringGetenvAll::ensureStandaloneBodies($this);
     }

@@ -48,16 +48,24 @@ final class VmSQLite3
 
         $methods = [
             'close' => new SQLite3Close(),
+            'open' => new SQLite3Open(),
             'exec' => new SQLite3Exec(),
             'querysingle' => new SQLite3QuerySingle(),
             'query' => new SQLite3Query(),
             'prepare' => new SQLite3Prepare(),
             'changes' => new SQLite3Changes(),
             'lastinsertrowid' => new SQLite3LastInsertRowID(),
+            'lasterrorcode' => new SQLite3LastErrorCode(),
+            'lasterrormsg' => new SQLite3LastErrorMsg(),
             'escapestring' => new SQLite3EscapeString(),
             'busytimeout' => new SQLite3BusyTimeout(),
             'enableexceptions' => new SQLite3EnableExceptions(),
             'createfunction' => new SQLite3CreateFunction(),
+            'createaggregate' => new SQLite3CreateAggregate(),
+            'createcollation' => new SQLite3CreateCollation(),
+            'loadextension' => new SQLite3LoadExtension(),
+            'backup' => new SQLite3Backup(),
+            'version' => new SQLite3Version(),
         ];
         foreach ($methods as $name => $method) {
             $entry->methods[$name] = $method;
@@ -65,6 +73,7 @@ final class VmSQLite3
             $entry->methodNames[$name] = self::methodDisplayName($name);
         }
         $entry->methodVisibility['escapestring'] = CfgFunc::FLAG_STATIC | $pub;
+        $entry->methodVisibility['version'] = CfgFunc::FLAG_STATIC | $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -81,6 +90,58 @@ final class VmSQLite3
         self::$store[$entry->id] = $state;
         self::$objects[$entry->id] = $entry;
         $entry->constructed = true;
+    }
+
+    /**
+     * SQLite3::open() — reopen after close, or reject when already open (php-src; #20565).
+     */
+    public static function openObject(ObjectEntry $entry, string $filename, int $flags): void
+    {
+        if (!VmSqlite3Native::available()) {
+            throw new \LogicException('SQLite3 requires libsqlite3 FFI in this compiler build');
+        }
+        if ($entry->constructed) {
+            $state = self::state($entry);
+            if (!$state->closed && null !== $state->db) {
+                throw new \Exception('Already initialised DB Object');
+            }
+            $state->filename = $filename;
+            $state->db = VmSqlite3Native::open($filename, $flags);
+            $state->closed = false;
+            $state->functions = [];
+            $state->collations = [];
+            $state->aggregates = [];
+
+            return;
+        }
+        self::initObject($entry, $filename, $flags);
+    }
+
+    /** php-src lastErrorCode — 0 when closed / not initialised. */
+    public static function lastErrorCode(ObjectEntry $entry): int
+    {
+        $state = self::state($entry);
+        if ($state->closed || null === $state->db) {
+            return 0;
+        }
+
+        return VmSqlite3Native::errcode($state->db);
+    }
+
+    /** php-src lastErrorMsg — '' when closed / not initialised. */
+    public static function lastErrorMsg(ObjectEntry $entry): string
+    {
+        $state = self::state($entry);
+        if ($state->closed || null === $state->db) {
+            return '';
+        }
+
+        return VmSqlite3Native::errmsg($state->db);
+    }
+
+    public static function publicTypeLabel(Variable $var): string
+    {
+        return self::typeLabel($var);
     }
 
     public static function objectById(int $id): ObjectEntry
@@ -219,23 +280,33 @@ final class VmSQLite3
         return match ($lc) {
             'querysingle' => 'querySingle',
             'lastinsertrowid' => 'lastInsertRowID',
+            'lasterrorcode' => 'lastErrorCode',
+            'lasterrormsg' => 'lastErrorMsg',
             'escapestring' => 'escapeString',
             'busytimeout' => 'busyTimeout',
             'enableexceptions' => 'enableExceptions',
             'createfunction' => 'createFunction',
+            'createaggregate' => 'createAggregate',
+            'createcollation' => 'createCollation',
+            'loadextension' => 'loadExtension',
             default => $lc,
         };
     }
 
-    /** Expand registered scalar UDFs in SQL (PHP 8.2 path / always for literal args). */
+    /**
+     * Expand registered scalar UDFs + evaluate aggregates in SQL (#19862 / #20585).
+     */
     public static function expandSql(ObjectEntry $entry, string $sql): string
     {
         $state = self::state($entry);
-        if ([] === $state->functions) {
-            return $sql;
+        if ([] !== $state->functions) {
+            $sql = VmSqlite3Udf::expandSql($sql, $state->functions);
+        }
+        if ([] !== $state->aggregates && null !== $state->db && !$state->closed) {
+            $sql = VmSqlite3Udf::expandAggregates($state->db, $sql, $state->aggregates);
         }
 
-        return VmSqlite3Udf::expandSql($sql, $state->functions);
+        return $sql;
     }
 
     /**
