@@ -48,6 +48,16 @@ final class ZipArchiveTest extends TestCase
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'renamename'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'renameindex'));
         self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getstream'));
+        // mtime / external attributes / compression (#20363)
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setmtimename'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setmtimeindex'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setexternalattributesname'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setexternalattributesindex'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getexternalattributesname'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'getexternalattributesindex'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setcompressionname'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'setcompressionindex'));
+        self::assertTrue(VmReflection::methodExistsOnClass($ctx->classes['ziparchive'], 'iscompressionmethodsupported'));
 
         $entry = $ctx->classes['ziparchive'];
         self::assertContains('countable', $entry->interfaces);
@@ -55,6 +65,8 @@ final class ZipArchiveTest extends TestCase
         self::assertSame(ZipArchiveConstants::CREATE, $entry->constants['create']->toInt());
         self::assertSame('CREATE', $entry->constNames['create']);
         self::assertSame('ER_OK', $entry->constNames['er_ok']);
+        self::assertSame(ZipArchiveConstants::CM_STORE, $entry->constants['cm_store']->toInt());
+        self::assertSame(ZipArchiveConstants::OPSYS_UNIX, $entry->constants['opsys_unix']->toInt());
     }
 
     public function test_zip_archive_create_add_extract_roundtrip(): void

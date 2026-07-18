@@ -70,6 +70,10 @@ final class ZipEngine
                 'data' => $fileData,
                 'crc' => (int) $header['crc'],
                 'size' => (int) $header['size'],
+                'mtime' => self::unixFromDos((int) $header['mtime'], (int) $header['mdate']),
+                'comp_method' => $method,
+                'opsys' => ((int) $header['version'] >> 8) & 0xff,
+                'external_attr' => (int) $header['extAttr'],
             ];
             $offset += 46 + $nameLen + $extraLen + $commentLen;
         }
@@ -78,7 +82,15 @@ final class ZipEngine
     }
 
     /**
-     * @param list<array{name: string, data: string, crc: int, size: int}> $entries
+     * @param list<array{
+     *     name: string,
+     *     data: string,
+     *     crc: int,
+     *     size: int,
+     *     mtime?: int,
+     *     opsys?: int,
+     *     external_attr?: int
+     * }> $entries
      */
     public static function writeArchive(string $path, array $entries): bool
     {
@@ -88,7 +100,15 @@ final class ZipEngine
     }
 
     /**
-     * @param list<array{name: string, data: string, crc: int, size: int}> $entries
+     * @param list<array{
+     *     name: string,
+     *     data: string,
+     *     crc: int,
+     *     size: int,
+     *     mtime?: int,
+     *     opsys?: int,
+     *     external_attr?: int
+     * }> $entries
      */
     public static function buildArchive(array $entries): string
     {
@@ -100,7 +120,11 @@ final class ZipEngine
             $data = $entry['data'];
             $size = strlen($data);
             $crc = self::crc32Unsigned($data);
-            $time = self::dosTime(time());
+            $mtime = (int) ($entry['mtime'] ?? time());
+            $time = self::dosTime($mtime);
+            $opsys = (int) ($entry['opsys'] ?? ZipArchiveConstants::OPSYS_DEFAULT);
+            $extAttr = (int) ($entry['external_attr'] ?? 0);
+            $versionMadeBy = 20 | (($opsys & 0xff) << 8);
             $localHeader = pack(
                 'VvvvvvVVVvv',
                 self::SIG_LOCAL,
@@ -121,7 +145,7 @@ final class ZipEngine
             $centralHeader = pack(
                 'VvvvvvvVVVvvvvvVV',
                 self::SIG_CENTRAL,
-                20,
+                $versionMadeBy,
                 20,
                 0,
                 0,
@@ -135,7 +159,7 @@ final class ZipEngine
                 0,
                 0,
                 0,
-                0,
+                $extAttr,
                 $offset
             );
             $central .= $centralHeader . $name;
@@ -217,6 +241,22 @@ final class ZipEngine
             'time' => (($dt['hours'] << 11) | ($dt['minutes'] << 5) | ((int) ($dt['seconds'] / 2))),
             'date' => ((($dt['year'] - 1980) << 9) | ($dt['mon'] << 5) | $dt['mday']),
         ];
+    }
+
+    private static function unixFromDos(int $dosTime, int $dosDate): int
+    {
+        $sec = ($dosTime & 0x1f) * 2;
+        $min = ($dosTime >> 5) & 0x3f;
+        $hour = ($dosTime >> 11) & 0x1f;
+        $day = $dosDate & 0x1f;
+        $mon = ($dosDate >> 5) & 0x0f;
+        $year = (($dosDate >> 9) & 0x7f) + 1980;
+        if ($mon < 1 || $mon > 12 || $day < 1 || $day > 31) {
+            return 0;
+        }
+        $ts = mktime($hour, $min, $sec, $mon, $day, $year);
+
+        return false === $ts ? 0 : $ts;
     }
 
     private static function crc32Unsigned(string $data): int

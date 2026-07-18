@@ -156,6 +156,10 @@ final class BuiltinByRefParams
             case 'collator::asort':
                 // $this + &$array (+ optional flags) — php-src collator.stub.php (#5747)
                 return [1];
+            case 'ziparchive::getexternalattributesname':
+            case 'ziparchive::getexternalattributesindex':
+                // $this + $name|$index + &$opsys + &$attr (+ optional flags) — php-src php_zip.stub.php (#20363)
+                return [2, 3];
             case 'sqlite3stmt::bindparam':
                 // $this + $param + &$var (+ optional $type) — php-src sqlite3.stub.php (#19854)
                 return [2];

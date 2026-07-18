@@ -30,4 +30,9 @@ abstract class ZipClassMethod extends VmClassMethod
     {
         return VmZipArchive::coerceIntArg($var, $label, $index, $paramName, $default);
     }
+
+    protected function boolArg(Variable $var, string $label, int $index, string $paramName): bool
+    {
+        return VmZipArchive::coerceBoolArg($var, $label, $index, $paramName);
+    }
 }
