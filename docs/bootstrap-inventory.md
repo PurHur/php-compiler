@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5641 |
-| Phase A inventory files (M2 ratio SSOT) | 5641 |
+| PHP files on vm.php path | 5643 |
+| Phase A inventory files (M2 ratio SSOT) | 5643 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 16107 |
+| Source constructs flagged (warnings) | 16119 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1180,7 +1180,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/simplexml/SimpleXmlJsonExport.php` | 0 | 3 |
 | `ext/simplexml/SimpleXmlNodeState.php` | 0 | 1 |
 | `ext/simplexml/SimpleXmlRegistry.php` | 0 | 1 |
-| `ext/simplexml/VmSimpleXml.php` | 0 | 50 |
+| `ext/simplexml/VmSimpleXml.php` | 0 | 58 |
 | `ext/simplexml/VmSimpleXmlIterator.php` | 0 | 4 |
 | `ext/simplexml/simplexml_import_dom.php` | 0 | 2 |
 | `ext/simplexml/simplexml_load_file.php` | 0 | 2 |
@@ -3826,7 +3826,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/yaml/yaml_parse.php` | 0 | 1 |
 | `ext/yaml/yaml_parse_file.php` | 0 | 1 |
 | `ext/zip/BuiltinClasses.php` | 0 | 1 |
-| `ext/zip/Module.php` | 0 | 9 |
+| `ext/zip/Module.php` | 0 | 11 |
 | `ext/zip/VmZipArchive.php` | 0 | 65 |
 | `ext/zip/VmZipProcedural.php` | 0 | 1 |
 | `ext/zip/VmZipResourceArg.php` | 0 | 1 |
@@ -3845,6 +3845,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipProceduralFunction.php` | 0 | 1 |
 | `ext/zip/zip_close.php` | 0 | 1 |
 | `ext/zip/zip_entry_close.php` | 0 | 1 |
+| `ext/zip/zip_entry_compressedsize.php` | 0 | 1 |
+| `ext/zip/zip_entry_compressionmethod.php` | 0 | 1 |
 | `ext/zip/zip_entry_filesize.php` | 0 | 1 |
 | `ext/zip/zip_entry_name.php` | 0 | 1 |
 | `ext/zip/zip_entry_open.php` | 0 | 2 |
@@ -6345,7 +6347,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/curl_multi_exec.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 28)
 - 2 class method(s)
 
 ### `ext/curl/curl_multi_getcontent.php`
@@ -13929,12 +13931,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/simplexml/SimpleXmlNodeState.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/simplexml/SimpleXmlRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 20 class method(s)
 
 ### `ext/simplexml/VmSimpleXml.php`
 
@@ -13964,30 +13966,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 146)
 - new Exception (line 150)
 - new Exception (line 157)
-- new Variable (line 293)
-- new Variable (line 298)
-- new Variable (line 305)
-- new Variable (line 311)
-- new Variable (line 323)
-- new SimpleXmlNodeState (line 590)
-- new SimpleXmlNodeState (line 657)
-- new HashTable (line 738)
-- new Variable (line 761)
-- new Variable (line 770)
-- new Variable (line 817)
-- new Variable (line 838)
-- new SimpleXmlNodeState (line 875)
-- new ObjectEntry (line 896)
-- new ObjectEntry (line 956)
-- new ObjectEntry (line 967)
-- new SimpleXmlNodeState (line 971)
-- new ObjectEntry (line 989)
-- new ObjectEntry (line 1050)
-- new HashTable (line 1409)
-- new Variable (line 1411)
-- new SimpleXmlNodeState (line 1470)
-- new SimpleXmlNodeState (line 1479)
-- 62 class method(s)
+- new Variable (line 295)
+- new Variable (line 300)
+- new Variable (line 307)
+- new Variable (line 313)
+- new Variable (line 328)
+- new SimpleXmlNodeState (line 631)
+- new SimpleXmlNodeState (line 636)
+- new SimpleXmlNodeState (line 649)
+- new SimpleXmlNodeState (line 730)
+- new HashTable (line 811)
+- new Variable (line 834)
+- new Variable (line 843)
+- new Variable (line 890)
+- new Variable (line 911)
+- new SimpleXmlNodeState (line 948)
+- new ObjectEntry (line 972)
+- new SimpleXmlNodeState (line 1058)
+- new SimpleXmlNodeState (line 1063)
+- new SimpleXmlNodeState (line 1068)
+- new SimpleXmlNodeState (line 1071)
+- new ObjectEntry (line 1079)
+- new ObjectEntry (line 1090)
+- new SimpleXmlNodeState (line 1094)
+- new ObjectEntry (line 1111)
+- new ObjectEntry (line 1127)
+- new Error (line 1203)
+- new ObjectEntry (line 1215)
+- new HashTable (line 1574)
+- new Variable (line 1576)
+- new SimpleXmlNodeState (line 1635)
+- new SimpleXmlNodeState (line 1644)
+- 66 class method(s)
 - 4 closure(s)
 
 ### `ext/simplexml/VmSimpleXmlIterator.php`
@@ -31638,6 +31648,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new zip_entry_read (line 54)
 - new zip_entry_name (line 55)
 - new zip_entry_filesize (line 56)
+- new zip_entry_compressedsize (line 57)
+- new zip_entry_compressionmethod (line 58)
 - 4 class method(s)
 
 ### `ext/zip/VmZipArchive.php`
@@ -31712,7 +31724,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/VmZipProcedural.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 16 class method(s)
 
 ### `ext/zip/VmZipResourceArg.php`
 
@@ -31843,6 +31855,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/zip/zip_entry_close.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/zip_entry_compressedsize.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zip/zip_entry_compressionmethod.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)

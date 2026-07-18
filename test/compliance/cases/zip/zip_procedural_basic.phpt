@@ -28,6 +28,8 @@ echo is_resource($entry) ? '1' : '0', "\n";
 echo get_resource_type($entry), "\n";
 echo zip_entry_name($entry), "\n";
 echo zip_entry_filesize($entry), "\n";
+echo zip_entry_compressedsize($entry), "\n";
+echo zip_entry_compressionmethod($entry), "\n";
 echo zip_entry_open($zh, $entry) ? '1' : '0', "\n";
 echo zip_entry_read($entry, strlen($payload)), "\n";
 echo zip_entry_close($entry) ? '1' : '0', "\n";
@@ -45,6 +47,8 @@ Zip Archive
 Zip Entry
 hello.txt
 22
+22
+stored
 1
 zip procedural payload
 1

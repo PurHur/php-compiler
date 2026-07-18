@@ -3952,6 +3952,8 @@ require_once __DIR__.'/../../../ext/zip/ZipExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/zip/ZipProceduralFunction.php';
 require_once __DIR__.'/../../../ext/zip/zip_close.php';
 require_once __DIR__.'/../../../ext/zip/zip_entry_close.php';
+require_once __DIR__.'/../../../ext/zip/zip_entry_compressedsize.php';
+require_once __DIR__.'/../../../ext/zip/zip_entry_compressionmethod.php';
 require_once __DIR__.'/../../../ext/zip/zip_entry_filesize.php';
 require_once __DIR__.'/../../../ext/zip/zip_entry_name.php';
 require_once __DIR__.'/../../../ext/zip/zip_entry_open.php';
