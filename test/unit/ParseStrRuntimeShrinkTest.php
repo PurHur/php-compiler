@@ -109,6 +109,16 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('shouldDefer', $source);
     }
 
+    /** Issue #20533 — dead StreamIo defer stubs removed; thin AOT uses ensureUserScriptLinked only. */
+    public function testParseStrRuntimeHasNoDeferredUserScriptRefreshStubs(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
+        $this->assertStringNotContainsString('ensureDeferredStubsForUserScriptRefresh', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringNotContainsString('_user_refresh_stub', $source);
+        $this->assertStringContainsString('ensureUserScriptLinked', $source);
+    }
+
     public function testParseStrBridgeReplacesDeferredStubBody(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');

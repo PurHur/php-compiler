@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
 use PHPUnit\Framework\TestCase;
 
-/** Nested HashTable JIT method registry for php-in-PHP JitHelpers (#14601). */
+/** Nested HashTable JIT method registry for php-in-PHP JitHelpers (#14601, #20533). */
 final class NestedVmHashTableMethodLlvmTest extends TestCase
 {
     public function testRegistersPadCopyAndGetNumElements(): void
@@ -27,5 +27,16 @@ final class NestedVmHashTableMethodLlvmTest extends TestCase
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('findindex'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('unshiftprepend'));
         $this->assertFalse(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('iteratekeyed'));
+    }
+
+    /** Issue #20533 — thin AOT gate via isThinStandaloneAotMain, not StreamIo defer bag. */
+    public function testKeysCopyValuesCopyGateOnThinStandaloneAotMain(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/NestedVmHashTableMethodLlvm.php');
+        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringNotContainsString('StreamIoRuntime', $source);
+        $this->assertStringContainsString('keyscopy', $source);
+        $this->assertStringContainsString('valuescopy', $source);
     }
 }

@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\StreamIoRuntime;
-
 /**
  * Nested JIT lowering for {@see \PHPCompiler\VM\HashTable} instance helpers (#14601).
  *
  * JitHelper PHP receives {@see __hashtable__*} bitcast as HashTable; method bodies must
  * lower to LLVM — not compile lib/VM/HashTable.php in nested scope (#12910 pattern).
+ *
+ * Thin standalone AOT (`isThinStandaloneAotMain`, #20533 / #15417): skip keysCopy/valuesCopy
+ * registration so ArrayKeys/ArrayValues NestedJIT is not pulled into user-script init.
  */
 final class NestedVmHashTableMethodLlvm
 {
@@ -37,7 +38,7 @@ final class NestedVmHashTableMethodLlvm
 
     public static function ensureMethod(Context $context, string $methodLc): bool
     {
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)
+        if ($context->isThinStandaloneAotMain()
             && ('keyscopy' === $methodLc || 'valuescopy' === $methodLc)) {
             return false;
         }

@@ -89,41 +89,6 @@ final class ParseStrRuntime
         }
     }
 
-    /** User-script AOT init: linkable parse_str ABI without nested ParseStrJitHelper JIT (#15417). */
-    public static function ensureDeferredStubsForUserScriptRefresh(Context $context): void
-    {
-        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::implement($context);
-
-            return;
-        }
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-
-        foreach (self::RUNTIME_FUNCTIONS as $name) {
-            $probe = $context->module->getNamedFunction($name);
-            if (null !== $probe && $probe->countBasicBlocks() > 0) {
-                $context->registerFunction($name, $probe);
-                continue;
-            }
-            $fn = self::declareFunction($context, $name);
-            $entry = $fn->appendBasicBlock($name.'_user_refresh_stub');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnVoid();
-            $context->registerFunction($name, $fn);
-        }
-        self::registerLinkedRuntime($context);
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
     public static function implement(Context $context): void
     {
         if (self::allRuntimeFunctionsLinked($context)) {
