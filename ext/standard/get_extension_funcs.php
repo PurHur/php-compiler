@@ -10,7 +10,11 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** get_extension_funcs() — list functions registered by an extension (#3433, ext/standard/basic_functions.c). */
+/**
+ * get_extension_funcs() — list functions registered by an extension (#3433, ext/standard/basic_functions.c).
+ *
+ * Z_PARAM_STR $extension_name — null TypeError on PHP_COMPILER_PROFILE=8.4 (#20254).
+ */
 final class get_extension_funcs extends Internal
 {
     public function __construct()
@@ -26,8 +30,10 @@ final class get_extension_funcs extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $name = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20254, ext/standard/info.c).
+        $name = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
             'get_extension_funcs',
             0,
             'extension_name'

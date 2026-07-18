@@ -12,7 +12,12 @@ use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** version_compare() — PHP-standardized version strings (ext/standard/versioning.c parity, #3204). */
+/**
+ * version_compare() — PHP-standardized version strings (ext/standard/versioning.c parity, #3204).
+ *
+ * Z_PARAM_STR $version1 / $version2 — null TypeError on PHP_COMPILER_PROFILE=8.4 (#20254).
+ * Optional $operator remains nullable (?string).
+ */
 final class version_compare extends Internal
 {
     public function __construct()
@@ -26,8 +31,9 @@ final class version_compare extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('version_compare() expects 2 or 3 arguments');
         }
-        $ver1 = VmString::stringBuiltinArgForFrame($frame, 0, 'version_compare', 0, 'version1');
-        $ver2 = VmString::stringBuiltinArgForFrame($frame, 1, 'version_compare', 1, 'version2');
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (#20254, ext/standard/versioning.c).
+        $ver1 = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'version_compare', 0, 'version1');
+        $ver2 = VmString::zparamStrBuiltinArgForFrame($frame, 1, 'version_compare', 1, 'version2');
         $operator = null;
         if (3 === $argc) {
             $opVar = $frame->calledArgs[2]->resolveIndirect();

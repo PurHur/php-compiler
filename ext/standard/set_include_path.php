@@ -13,7 +13,11 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPLLVM\Value;
 
-/** set_include_path() — replace include_path (ext/standard/basic_functions.c; #3223). */
+/**
+ * set_include_path() — replace include_path (ext/standard/basic_functions.c; #3223).
+ *
+ * Z_PARAM_PATH $include_path — null TypeError on PHP_COMPILER_PROFILE=8.4 (#20254).
+ */
 final class set_include_path extends Internal
 {
     public function __construct()
@@ -28,6 +32,7 @@ final class set_include_path extends Internal
                 'set_include_path() expects exactly 1 argument, '.\count($frame->calledArgs).' given'
             );
         }
+        // Z_PARAM_PATH — null TypeError on PROFILE=8.4 (#20254; shared path guard).
         $newPath = VmString::coercePathBuiltinArg(
             $frame->calledArgs[0],
             'set_include_path',
@@ -56,6 +61,7 @@ final class set_include_path extends Internal
         if (null !== $lit) {
             VmString::rejectNullByteBuiltinStringArg($lit, 'set_include_path', 0, 'include_path');
         }
+        $nullPath = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
         $newPath = JitStringBuiltinArg::lowerPath(
             $context,
             $args[0],
@@ -63,6 +69,20 @@ final class set_include_path extends Internal
             0,
             'include_path'
         );
+        if (
+            $nullPath
+            && (
+                $context->callerStrictTypes
+                || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+            )
+        ) {
+            // lowerPath already emitted TypeError+abort; skip setValidated after terminator (#20254).
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return $ptr;
+        }
 
         return JitIncludePath::setValidated($context, $newPath);
     }
