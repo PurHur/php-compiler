@@ -56,13 +56,83 @@ final class VmUri
 
         return [
             'scheme' => isset($parts['scheme']) ? strtolower((string) $parts['scheme']) : null,
-            'userinfo' => isset($parts['user']) ? (string) $parts['user'] : null,
+            'username' => isset($parts['user']) ? (string) $parts['user'] : null,
+            'password' => isset($parts['pass']) ? (string) $parts['pass'] : null,
+            'userinfo' => self::composeUserinfo(
+                isset($parts['user']) ? (string) $parts['user'] : null,
+                isset($parts['pass']) ? (string) $parts['pass'] : null
+            ),
             'host' => isset($parts['host']) ? (string) $parts['host'] : null,
             'port' => isset($parts['port']) ? (int) $parts['port'] : null,
             'path' => (string) $path,
             'query' => isset($parts['query']) ? (string) $parts['query'] : null,
             'fragment' => isset($parts['fragment']) ? (string) $parts['fragment'] : null,
         ];
+    }
+
+    public static function composeUserinfo(?string $username, ?string $password): ?string
+    {
+        if (null === $username) {
+            return null;
+        }
+        if (null === $password) {
+            return $username;
+        }
+
+        return $username.':'.$password;
+    }
+
+    /**
+     * Compose an absolute URL string from parsed components (#20541).
+     *
+     * @param array<string, mixed> $state
+     */
+    public static function composeUrlString(array $state, bool $includeFragment = true): string
+    {
+        $scheme = (string) ($state['scheme'] ?? '');
+        $host = (string) ($state['host'] ?? '');
+        $path = (string) ($state['path'] ?? '');
+        $out = '' !== $scheme ? $scheme.':' : '';
+        if ('' !== $host) {
+            $out .= '//';
+            $userinfo = $state['userinfo'] ?? self::composeUserinfo(
+                isset($state['username']) && \is_string($state['username']) ? $state['username'] : null,
+                isset($state['password']) && \is_string($state['password']) ? $state['password'] : null
+            );
+            if (\is_string($userinfo) && '' !== $userinfo) {
+                $out .= $userinfo.'@';
+            }
+            $out .= $host;
+            if (isset($state['port']) && \is_int($state['port'])) {
+                $out .= ':'.$state['port'];
+            }
+        }
+        $out .= $path;
+        if (isset($state['query']) && \is_string($state['query']) && '' !== $state['query']) {
+            $out .= '?'.$state['query'];
+        }
+        if ($includeFragment && isset($state['fragment']) && \is_string($state['fragment']) && '' !== $state['fragment']) {
+            $out .= '#'.$state['fragment'];
+        }
+
+        return $out;
+    }
+
+    /** Clone WhatWg state with overrides and allocate a new Url object. */
+    public static function whatWgWith(Context $ctx, ObjectEntry $object, array $overrides): Variable
+    {
+        $state = self::whatWgState($object);
+        foreach ($overrides as $key => $value) {
+            $state[$key] = $value;
+        }
+        if (\array_key_exists('username', $overrides) || \array_key_exists('password', $overrides)) {
+            $state['userinfo'] = self::composeUserinfo(
+                isset($state['username']) && \is_string($state['username']) ? $state['username'] : null,
+                isset($state['password']) && \is_string($state['password']) ? $state['password'] : null
+            );
+        }
+
+        return self::newWhatWgUrlVariable($ctx, $state);
     }
 
     /**
