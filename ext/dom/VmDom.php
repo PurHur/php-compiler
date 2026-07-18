@@ -1489,26 +1489,42 @@ final class VmDom
         string $value
     ): ObjectEntry {
         $state = DomRegistry::state($element);
+        [$prefix] = self::splitQualifiedName($name);
+        $resolvedNs = self::resolveAttributeNamespaceUri($element, $name, $prefix);
         $cachedId = $state->attributeNodeIds[$name] ?? null;
         if (null !== $cachedId) {
             $cached = DomRegistry::entry($cachedId);
             if (null !== $cached && self::isAttr($cached)) {
-                self::syncAttributeNodeValue($ctx, $cached, $value, true);
-                $cachedState = DomRegistry::state($cached);
-                $cachedState->ownerElementId = $element->id;
-                $cachedState->parentId = $element->id;
-                $cached->getProperty(self::PROP_OWNER_ELEMENT)->object($element);
+                $cachedNs = DomRegistry::state($cached)->namespaceUri ?? '';
+                // Parent xmlns may resolve only after the tree is linked (#20615).
+                if ($cachedNs === $resolvedNs
+                    || ('' === $resolvedNs && '' === $cachedNs)
+                ) {
+                    self::syncAttributeNodeValue($ctx, $cached, $value, true);
+                    $cachedState = DomRegistry::state($cached);
+                    $cachedState->ownerElementId = $element->id;
+                    $cachedState->parentId = $element->id;
+                    $cached->getProperty(self::PROP_OWNER_ELEMENT)->object($element);
 
-                return $cached;
+                    return $cached;
+                }
+                unset($state->attributeNodeIds[$name]);
             }
         }
         $ownerDocument = self::ownerDocumentEntry($element);
-        $attrVar = self::createAttributeNS(
-            $ctx,
-            $state->attributeNamespaces[$name] ?? null,
-            $name,
-            $ownerDocument
-        );
+        // Declared / xml:* → QName+NS Attr. Undeclared prefix → libxml recovery Name (#20615).
+        if ('' !== $prefix && '' !== $resolvedNs) {
+            $state->attributeNamespaces[$name] = $resolvedNs;
+            $attrVar = self::createAttributeNS($ctx, $resolvedNs, $name, $ownerDocument, true);
+        } else {
+            if ('' === $prefix) {
+                $state->attributeNamespaces[$name] = '';
+            } else {
+                // Leave unset so a later parent xmlns can still resolve.
+                unset($state->attributeNamespaces[$name]);
+            }
+            $attrVar = self::createAttributeNS($ctx, null, $name, $ownerDocument, false);
+        }
         $attr = $attrVar->toObject();
         self::syncAttributeNodeValue($ctx, $attr, $value, true);
         $attrState = DomRegistry::state($attr);
@@ -2260,6 +2276,13 @@ final class VmDom
     public static function lookupNamespaceURI(ObjectEntry $node, ?string $prefix): ?string
     {
         $wantPrefix = $prefix ?? '';
+        // libxml / php-src: xml and xmlns are always in scope (ext/dom/node.c; #20615).
+        if ('xml' === $wantPrefix) {
+            return self::XML_NAMESPACE_URI;
+        }
+        if ('xmlns' === $wantPrefix) {
+            return self::XMLNS_NAMESPACE_URI;
+        }
         $current = $node;
         while (DomRegistry::has($current)) {
             $state = DomRegistry::state($current);
@@ -2727,6 +2750,8 @@ final class VmDom
 
     /**
      * Apply parsed attribute string: nsDef + Attr map without xmlns* (#19718).
+     * Prefixed Attrs get attributeNamespaces when the URI is known locally or via the
+     * built-in xml prefix — parent-declared prefixes stay unset until materialize (#20615).
      *
      * @param array<string, string> $attributes
      */
@@ -2734,6 +2759,17 @@ final class VmDom
     {
         $state->namespaceDeclarations = self::extractNamespaceDeclarations($attributes);
         $state->attributes = self::stripNamespaceDeclarationAttributes($attributes);
+        foreach ($state->attributes as $qName => $_) {
+            [$prefix] = self::splitQualifiedName($qName);
+            if ('' === $prefix) {
+                continue;
+            }
+            if ('xml' === $prefix) {
+                $state->attributeNamespaces[$qName] = self::XML_NAMESPACE_URI;
+            } elseif (\array_key_exists($prefix, $state->namespaceDeclarations)) {
+                $state->attributeNamespaces[$qName] = $state->namespaceDeclarations[$prefix];
+            }
+        }
     }
 
     /** nsDef value for xmlns / xmlns:prefix, or null when absent (#19718). */
@@ -6552,8 +6588,8 @@ final class VmDom
             $pos = $end;
         }
 
-        self::syncSubtree($ctx, $entry);
-
+        // Defer syncSubtree until the caller has linked this node into its parent so
+        // prefixed Attrs can resolve xmlns from ancestors (php-src/libxml; #20615).
         return $entry;
     }
 
