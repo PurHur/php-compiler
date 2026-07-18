@@ -1436,6 +1436,12 @@
         "ext/sodium/sodium_add.php",
         "ext/sodium/sodium_bin2hex.php",
         "ext/sodium/sodium_compare.php",
+        "ext/sodium/sodium_crypto_aead_aegis128l_decrypt.php",
+        "ext/sodium/sodium_crypto_aead_aegis128l_encrypt.php",
+        "ext/sodium/sodium_crypto_aead_aegis128l_keygen.php",
+        "ext/sodium/sodium_crypto_aead_aegis256_decrypt.php",
+        "ext/sodium/sodium_crypto_aead_aegis256_encrypt.php",
+        "ext/sodium/sodium_crypto_aead_aegis256_keygen.php",
         "ext/sodium/sodium_crypto_aead_aes256gcm_decrypt.php",
         "ext/sodium/sodium_crypto_aead_aes256gcm_encrypt.php",
         "ext/sodium/sodium_crypto_aead_aes256gcm_is_available.php",
@@ -5992,9 +5998,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5758,
+        "inventory_files": 5764,
         "excluded": 0,
-        "eligible": 5758,
+        "eligible": 5764,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
