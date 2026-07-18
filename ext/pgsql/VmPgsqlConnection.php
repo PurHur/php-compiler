@@ -97,6 +97,19 @@ final class VmPgsqlConnection
         return $row['object'];
     }
 
+    /**
+     * Optional connection or default link; warn when none (php-src CHECK_DEFAULT_LINK; #20680).
+     */
+    public static function requireOptionalOrDefault(?ObjectEntry $provided, string $functionName): ?ObjectEntry
+    {
+        $connObj = self::resolveOptionalConnection($provided);
+        if (null === $connObj) {
+            @\trigger_error($functionName.'(): No PostgreSQL connection opened yet', \E_USER_WARNING);
+        }
+
+        return $connObj;
+    }
+
     public static function setTraceFp(ObjectEntry $object, ?\FFI\CData $fp): void
     {
         if (!isset(self::$state[$object->id])) {
