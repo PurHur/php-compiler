@@ -228,9 +228,10 @@ final class VmDomLiving
     }
 
     /**
-     * ParentNode::querySelector() — minimal CSS subset for living DOM (#19580).
+     * ParentNode::querySelector() — minimal CSS subset for living DOM (#19580, #20689).
      *
-     * Supports: `*`, tag, `#id`, `.class`, and simple space-separated descendants.
+     * Supports: `*`, tag, `#id`, `.class`, space-separated descendants, and comma
+     * selector lists (CSS Selectors Level 3 / php-src Dom\* lexbor).
      */
     public static function querySelector(ObjectEntry $root, string $selectors): ?ObjectEntry
     {
@@ -251,8 +252,47 @@ final class VmDomLiving
         if ('' === $selectors) {
             throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
         }
+        // CSS selector lists: "a, b" unions groups (php-src Dom\* / lexbor; #20689).
+        $groups = preg_split('/\s*,\s*/', $selectors) ?: [];
+        if ([] === $groups) {
+            throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
+        }
+        $matchIds = [];
+        foreach ($groups as $group) {
+            $group = trim($group);
+            if ('' === $group) {
+                // Empty group ("p,,span" / trailing ",") — SyntaxError like lexbor.
+                throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
+            }
+            foreach (self::querySelectorAllIdsOneGroup($root, $group) as $id) {
+                $matchIds[$id] = true;
+            }
+        }
+
+        // Preserve document order from a single tree walk.
+        $ordered = [];
+        $candidates = self::collectDescendantElements($root);
+        if (VmDom::isElement($root)) {
+            array_unshift($candidates, $root);
+        }
+        foreach ($candidates as $el) {
+            if (isset($matchIds[$el->id])) {
+                $ordered[] = $el->id;
+            }
+        }
+
+        return $ordered;
+    }
+
+    /**
+     * Match one selector group (no top-level commas) — descendant combinator only.
+     *
+     * @return list<int>
+     */
+    private static function querySelectorAllIdsOneGroup(ObjectEntry $root, string $selectors): array
+    {
         $parts = preg_split('/\s+/', $selectors) ?: [];
-        if ([] === $parts || 1 === \count($parts) && '' === $parts[0]) {
+        if ([] === $parts || (1 === \count($parts) && '' === $parts[0])) {
             throw new \DOMException('SyntaxError', DomExceptionConstants::SYNTAX_ERR);
         }
 
