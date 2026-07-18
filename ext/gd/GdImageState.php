@@ -35,9 +35,10 @@ final class GdImageState
     public array $colors;
 
     /**
-     * libgd alphaBlendingFlag — default on for truecolor (php-src ext/gd/libgd/gd.c; #6535).
+     * libgd alphaBlendingFlag — gdEffect* int (php-src ext/gd/libgd/gd.h; #6535, #20429).
+     * Default gdEffectAlphaBlend (1) for truecolor; 0 for palette.
      */
-    public bool $alphaBlending;
+    public int $alphaBlending;
 
     /**
      * libgd saveAlphaFlag — default off (php-src ext/gd/libgd/gd.c; #6535).
@@ -71,7 +72,7 @@ final class GdImageState
         array $pixels,
         bool $truecolor,
         array $colors = [],
-        bool $alphaBlending = true,
+        int $alphaBlending = 1,
         bool $saveAlpha = false,
         int $thick = 1,
         bool $antiAlias = false,
@@ -93,14 +94,14 @@ final class GdImageState
 
     public static function fromEncoded(string $encoded, int $imageType): self
     {
-        return new self($encoded, $imageType, 0, 0, [], false, [], true, false);
+        return new self($encoded, $imageType, 0, 0, [], false, [], 1, false);
     }
 
     public static function createTruecolor(int $width, int $height): self
     {
         $pixels = array_fill(0, $width * $height, 0);
 
-        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true, [], true, false);
+        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true, [], 1, false);
     }
 
     public static function createPalette(int $width, int $height): self
@@ -108,7 +109,7 @@ final class GdImageState
         $pixels = array_fill(0, $width * $height, 0);
 
         // Palette canvases start with alpha blending off (php-src gdImageCreate).
-        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, false, [], false, false);
+        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, false, [], 0, false);
     }
 
     /**
@@ -116,7 +117,7 @@ final class GdImageState
      */
     public static function fromRaster(int $width, int $height, array $pixels): self
     {
-        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true, [], true, false);
+        return new self('', VmImage::IMAGETYPE_PNG, $width, $height, $pixels, true, [], 1, false);
     }
 
     public function hasRaster(): bool

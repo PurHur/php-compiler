@@ -225,7 +225,7 @@ final class VmGd
         $state->pixels = $mapped;
         $state->colors = $palette;
         $state->truecolor = false;
-        $state->alphaBlending = false;
+        $state->alphaBlending = GdConstants::REGISTERED['IMG_EFFECT_REPLACE'];
         $state->encoded = '';
 
         return true;
@@ -254,7 +254,7 @@ final class VmGd
         $state->pixels = $expanded;
         $state->colors = [];
         $state->truecolor = true;
-        $state->alphaBlending = true;
+        $state->alphaBlending = GdConstants::REGISTERED['IMG_EFFECT_ALPHABLEND'];
         $state->encoded = '';
 
         return true;
@@ -352,7 +352,7 @@ final class VmGd
     }
 
     /**
-     * imagealphablending() — always true like php-src RETURN_TRUE (#6535).
+     * imagealphablending() — sets alphaBlendingFlag to 0/1 (php-src RETURN_TRUE; #6535).
      */
     public static function setAlphaBlending(ObjectEntry $image, bool $enable): bool
     {
@@ -360,7 +360,23 @@ final class VmGd
         if (null === $state) {
             return false;
         }
-        $state->alphaBlending = $enable;
+        $state->alphaBlending = $enable
+            ? GdConstants::REGISTERED['IMG_EFFECT_ALPHABLEND']
+            : GdConstants::REGISTERED['IMG_EFFECT_REPLACE'];
+
+        return true;
+    }
+
+    /**
+     * imagelayereffect() — gdImageAlphaBlending(im, effect) (php-src ext/gd/gd.c; #20429).
+     */
+    public static function setLayerEffect(ObjectEntry $image, int $effect): bool
+    {
+        $state = GdRegistry::state($image);
+        if (null === $state) {
+            return false;
+        }
+        $state->alphaBlending = $effect;
 
         return true;
     }
@@ -1384,7 +1400,7 @@ final class VmGd
         if (null !== $outState) {
             $outState->interpolationId = $state->interpolationId;
             $outState->saveAlpha = true;
-            $outState->alphaBlending = false;
+            $outState->alphaBlending = GdConstants::REGISTERED['IMG_EFFECT_REPLACE'];
         }
 
         return $out;
@@ -2693,6 +2709,11 @@ final class VmGd
                 2 => 'enable',
                 default => 'arg',
             },
+            'imagelayereffect' => match ($position) {
+                1 => 'image',
+                2 => 'effect',
+                default => 'arg',
+            },
             'imagesetthickness' => match ($position) {
                 1 => 'image',
                 2 => 'thickness',
@@ -2758,10 +2779,27 @@ final class VmGd
             return;
         }
         $index = $y * $state->width + $x;
-        if ($state->truecolor && $state->alphaBlending) {
-            $state->pixels[$index] = self::gdAlphaBlend($state->pixels[$index], $color);
-        } else {
+        if (!$state->truecolor) {
             $state->pixels[$index] = $color;
+
+            return;
+        }
+        // php-src ext/gd/libgd/gd.c gdImageSetPixel — default/unknown → replace (#20429).
+        switch ($state->alphaBlending) {
+            case GdConstants::REGISTERED['IMG_EFFECT_ALPHABLEND']:
+            case GdConstants::REGISTERED['IMG_EFFECT_NORMAL']:
+                $state->pixels[$index] = self::gdAlphaBlend($state->pixels[$index], $color);
+                break;
+            case GdConstants::REGISTERED['IMG_EFFECT_OVERLAY']:
+                $state->pixels[$index] = self::gdLayerOverlay($state->pixels[$index], $color);
+                break;
+            case GdConstants::REGISTERED['IMG_EFFECT_MULTIPLY']:
+                $state->pixels[$index] = self::gdLayerMultiply($state->pixels[$index], $color);
+                break;
+            case GdConstants::REGISTERED['IMG_EFFECT_REPLACE']:
+            default:
+                $state->pixels[$index] = $color;
+                break;
         }
     }
 
@@ -2792,6 +2830,57 @@ final class VmGd
         $alpha = 127 - (int) $weightSum;
 
         return (($alpha & 0x7F) << 24) | (($red & 0xFF) << 16) | (($green & 0xFF) << 8) | ($blue & 0xFF);
+    }
+
+    /**
+     * libgd gdLayerOverlay (php-src ext/gd/libgd/gd.c; #20429).
+     */
+    private static function gdLayerOverlay(int $dst, int $src): int
+    {
+        $a1 = 127 - (($dst >> 24) & 0x7F);
+        $a2 = 127 - (($src >> 24) & 0x7F);
+
+        return (((127 - (int) ($a1 * $a2 / 127)) & 0x7F) << 24)
+            | ((self::gdAlphaOverlayColor(($src >> 16) & 0xFF, ($dst >> 16) & 0xFF, 255) & 0xFF) << 16)
+            | ((self::gdAlphaOverlayColor(($src >> 8) & 0xFF, ($dst >> 8) & 0xFF, 255) & 0xFF) << 8)
+            | (self::gdAlphaOverlayColor($src & 0xFF, $dst & 0xFF, 255) & 0xFF);
+    }
+
+    /**
+     * libgd gdAlphaOverlayColor (php-src ext/gd/libgd/gd.c; #20429).
+     */
+    private static function gdAlphaOverlayColor(int $src, int $dst, int $max): int
+    {
+        $dst2 = $dst << 1;
+        if ($dst2 > $max) {
+            return $dst2 + ($src << 1) - (int) ($dst2 * $src / $max) - $max;
+        }
+
+        return (int) ($dst2 * $src / $max);
+    }
+
+    /**
+     * libgd gdLayerMultiply (php-src ext/gd/libgd/gd.c; #20429).
+     */
+    private static function gdLayerMultiply(int $dst, int $src): int
+    {
+        $a1 = 127 - (($src >> 24) & 0x7F);
+        $a2 = 127 - (($dst >> 24) & 0x7F);
+
+        $r1 = 255 - (int) ($a1 * (255 - (($src >> 16) & 0xFF)) / 127);
+        $r2 = 255 - (int) ($a2 * (255 - (($dst >> 16) & 0xFF)) / 127);
+        $g1 = 255 - (int) ($a1 * (255 - (($src >> 8) & 0xFF)) / 127);
+        $g2 = 255 - (int) ($a2 * (255 - (($dst >> 8) & 0xFF)) / 127);
+        $b1 = 255 - (int) ($a1 * (255 - ($src & 0xFF)) / 127);
+        $b2 = 255 - (int) ($a2 * (255 - ($dst & 0xFF)) / 127);
+
+        $a1 = 127 - $a1;
+        $a2 = 127 - $a2;
+
+        return (((int) ($a1 * $a2 / 127) & 0x7F) << 24)
+            | (((int) ($r1 * $r2 / 255) & 0xFF) << 16)
+            | (((int) ($g1 * $g2 / 255) & 0xFF) << 8)
+            | ((int) ($b1 * $b2 / 255) & 0xFF);
     }
 
     private static function hLine(GdImageState $state, int $y, int $x1, int $x2, int $color): void
