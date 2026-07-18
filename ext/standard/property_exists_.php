@@ -53,6 +53,13 @@ final class property_exists_ extends Internal
             ));
         }
         // Z_PARAM_STR property — null TypeError on 8.4 forward profile (#20360).
+        // Compile-time null must not enter JitPropertyExists (runaway LLVM on TYPE_NULL property slot).
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            self::jitPropertyNameArg($context, $args[1]);
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
+        }
         self::jitPropertyNameArg($context, $args[1]);
         if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
             self::emitJitTypeErrorAndAbort($context, \sprintf(self::OBJECT_OR_CLASS_TYPE_ERROR, 'null'));
