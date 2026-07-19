@@ -115,10 +115,16 @@ final class DomLivingBuiltinClasses
         $ctx->classes[VmDomLiving::CLASS_HTML_ELEMENT] = $htmlElement;
 
         if (CompilerVersion::supportsDomTokenList()) {
-            // Dom\TokenList is parallel to legacy DOMTokenList (php-src php_dom.stub.php; #20512).
+            // Dom\TokenList is parallel to legacy DOMTokenList (php-src php_dom.stub.php; #20512, #20884).
             $tokenList = new ClassEntry('Dom\\TokenList');
             $tokenList->isInternal = true;
             $tokenList->interfaces[] = 'countable';
+            if (isset($ctx->classes['iteratoraggregate'])) {
+                $tokenList->interfaces[] = 'iteratoraggregate';
+            }
+            if (isset($ctx->classes['traversable'])) {
+                $tokenList->interfaces[] = 'traversable';
+            }
             $tokenList->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
             $tokenList->properties[] = new ClassProperty(VmDom::PROP_VALUE, null, new Variable(Variable::TYPE_STRING));
             self::copyMethods($ctx->classes[VmDom::CLASS_TOKEN_LIST] ?? null, $tokenList);

@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\dom;
 
+use PHPCompiler\ext\spl\ArrayIteratorBuiltin;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -314,5 +316,118 @@ final class VmDomTokenList
     }
     DomRegistry::state($tokenList)->tokenListCachedClassValue = null;
     self::ensureUpToDate($tokenList);
+  }
+
+  /**
+   * Dom\TokenList::getIterator() — php-src returns InternalIterator over tokens (#20884).
+   *
+   * Expose ArrayIterator with index => token so foreach matches Zend (0=>a, 1=>b, …).
+   */
+  public static function getIterator(Context $ctx, ObjectEntry $tokenList): ObjectEntry
+  {
+    return self::iteratorOverTokens($ctx, $tokenList);
+  }
+
+  /**
+   * Dom\TokenList::values() — same token sequence as getIterator() (#20884).
+   */
+  public static function values(Context $ctx, ObjectEntry $tokenList): ObjectEntry
+  {
+    return self::iteratorOverTokens($ctx, $tokenList);
+  }
+
+  /**
+   * Dom\TokenList::keys() — iterator of token indices (#20884).
+   */
+  public static function keys(Context $ctx, ObjectEntry $tokenList): ObjectEntry
+  {
+    self::ensureUpToDate($tokenList);
+    $ht = new HashTable();
+    foreach (array_keys(DomRegistry::state($tokenList)->tokenListTokens) as $index) {
+      $v = new Variable();
+      $v->int($index);
+      $ht->append($v);
+    }
+
+    return self::arrayIteratorFromTable($ctx, $ht);
+  }
+
+  /**
+   * Dom\TokenList::entries() — iterator of [index, token] pairs (#20884).
+   */
+  public static function entries(Context $ctx, ObjectEntry $tokenList): ObjectEntry
+  {
+    self::ensureUpToDate($tokenList);
+    $ht = new HashTable();
+    foreach (DomRegistry::state($tokenList)->tokenListTokens as $index => $token) {
+      $pair = new HashTable();
+      $iVar = new Variable();
+      $iVar->int($index);
+      $pair->append($iVar);
+      $tVar = new Variable();
+      $tVar->string($token);
+      $pair->append($tVar);
+      $pairVar = new Variable();
+      $pairVar->array($pair);
+      $ht->append($pairVar);
+    }
+
+    return self::arrayIteratorFromTable($ctx, $ht);
+  }
+
+  /**
+   * Dom\TokenList::forEach($callback, $thisArg = null) (#20884).
+   *
+   * WHATWG: callback(token, index, list). $thisArg is accepted for arity parity;
+   * callbacks are invoked via {@see \PHPCompiler\ext\standard\VmCallable} (no JS this-binding).
+   */
+  public static function forEachTokens(
+    Context $ctx,
+    ObjectEntry $tokenList,
+    Variable $callback
+  ): void {
+    self::ensureUpToDate($tokenList);
+    $listVar = new Variable();
+    $listVar->object($tokenList);
+    foreach (DomRegistry::state($tokenList)->tokenListTokens as $index => $token) {
+      $tokenVar = new Variable();
+      $tokenVar->string($token);
+      $indexVar = new Variable();
+      $indexVar->int($index);
+      \PHPCompiler\ext\standard\VmCallable::invokeAs(
+        'Dom\\TokenList::forEach',
+        $ctx,
+        $callback,
+        $tokenVar,
+        $indexVar,
+        $listVar
+      );
+    }
+  }
+
+  private static function iteratorOverTokens(Context $ctx, ObjectEntry $tokenList): ObjectEntry
+  {
+    self::ensureUpToDate($tokenList);
+    $ht = new HashTable();
+    foreach (DomRegistry::state($tokenList)->tokenListTokens as $token) {
+      $v = new Variable();
+      $v->string($token);
+      $ht->append($v);
+    }
+
+    return self::arrayIteratorFromTable($ctx, $ht);
+  }
+
+  private static function arrayIteratorFromTable(Context $ctx, HashTable $ht): ObjectEntry
+  {
+    $class = $ctx->classes[ArrayIteratorBuiltin::CLASS_LC] ?? null;
+    if (null === $class) {
+      throw new \LogicException('ArrayIterator is not registered in this compiler build');
+    }
+    $entry = new ObjectEntry($class);
+    $entry->constructed = true;
+    ArrayIteratorBuiltin::init($entry, $ht);
+
+    return $entry;
   }
 }
