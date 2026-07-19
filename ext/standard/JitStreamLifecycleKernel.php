@@ -4,24 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
-use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
-use PHPCompiler\JIT\Builtin\StreamIoRuntime;
+use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
 use PHPCompiler\JIT\Builtin\StreamLibcHandleRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPLLVM\Value;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed link for stream lifecycle ABI via StreamLifecycleJitHelper PHP (#9442, #19758).
+ * JIT/AOT embed + thin standalone link for stream lifecycle via StreamLifecycleJitHelper PHP (#9442, #20966).
  *
- * Quarantined from lib/JIT/Builtin/StreamLifecycleRuntime — {@see \PHPCompiler\JIT\Builtin\StreamLifecycleRuntime}
- * stays the thin orchestrator.
- *
+ * Always NestedJIT {@see StreamLifecycleJitHelper} / {@see StreamLibcHandleJitHelper}
+ * (StreamIo #20943 / PendingHeaders #20930 shape — no constant-0 / deferred stub fork).
  * SSOT: {@see VmFs}, {@see StreamLifecycleJitHelper}
  * php-src: ext/standard/streamsfuncs.c
  */
@@ -51,6 +50,13 @@ final class JitStreamLifecycleKernel
     ];
 
     /** @var list<string> */
+    private const LIBC_HELPERS = [
+        'PHPCompiler\\ext\\standard\\StreamLibcHandleJitHelper::registerFromPtr',
+        'PHPCompiler\\ext\\standard\\StreamLibcHandleJitHelper::markPopen',
+        'PHPCompiler\\ext\\standard\\StreamLibcHandleJitHelper::resolvePtr',
+    ];
+
+    /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_is_resource',
         '__compiler_fclose',
@@ -73,23 +79,27 @@ final class JitStreamLifecycleKernel
         self::implement($context);
     }
 
-    /** Real fclose/feof bridges for user-script stream lowering (#9142). */
+    /** Real fclose/feof bridges for user-script stream lowering (#9142, #20966). */
     public static function ensureLinkedForUserScriptLowering(Context $context): void
     {
-        self::implementRealBridges($context);
+        self::implement($context);
     }
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_is_resource');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::implementStandalone($context);
+        // Thin + embed: publish sg_vm_context before NestedJIT of StreamLifecycleJitHelper (#17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+
+        $probe = $context->module->getNamedFunction('__compiler_is_resource');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
 
             return;
         }
@@ -116,78 +126,6 @@ final class JitStreamLifecycleKernel
         } else {
             $context->builder->clearInsertionPosition();
         }
-    }
-
-    private static function implementStandalone(Context $context): void
-    {
-        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
-        StreamGlobalsJit::implement($context);
-        self::implementStandaloneIsResource($context);
-        self::implementStandaloneFflush($context);
-        self::implementStandaloneI32RetZero($context, '__compiler_fclose');
-        self::implementStandaloneI32RetZero($context, '__compiler_feof');
-        self::implementStandaloneI32RetZero($context, '__compiler_pclose');
-        self::registerLinkedRuntime($context);
-        if (null !== $savedBlock) {
-            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function implementStandaloneIsResource(Context $context): void
-    {
-        $abiName = '__compiler_is_resource';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                $abiName,
-                $context->context->functionType($i32, false, $i64)
-            );
-
-        $entry = $fn->appendBasicBlock('is_resource_standalone_entry');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($i32->constInt(0, false));
-        $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementStandaloneFflush(Context $context): void
-    {
-        self::implementStandaloneI32RetZero($context, '__compiler_fflush');
-    }
-
-    private static function implementStandaloneI32RetZero(Context $context, string $abiName): void
-    {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                $abiName,
-                $context->context->functionType($i32, false, $i64)
-            );
-        $entry = $fn->appendBasicBlock('stream_lifecycle_standalone_zero');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($i32->constInt(0, false));
-        $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function implementCloseBridge(Context $context, string $abiName, string $helperLogical): void
@@ -266,7 +204,7 @@ final class JitStreamLifecycleKernel
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after StreamLifecycleJitHelper compile (#9442)');
+            throw new \LogicException($logical.' missing after StreamLifecycleJitHelper compile (#20966)');
         }
 
         return $fn;
@@ -274,37 +212,18 @@ final class JitStreamLifecycleKernel
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $root = \dirname(__DIR__, 2);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $root): void {
-            foreach ([self::LIBC_HELPER_PATH, self::HELPER_PATH] as $rel) {
-                $path = $root.$rel;
-                $base = \basename($path);
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), $base);
-                if (null === $block) {
-                    throw new \LogicException($base.' parseAndCompile failed (#9442)');
-                }
-                $jit = new JIT($context);
-                $jit->compile($block);
-            }
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT stream lifecycle (#9442)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::LIBC_HELPER_PATH,
+            self::LIBC_HELPERS,
+            '#20966'
+        );
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20966'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -312,56 +231,9 @@ final class JitStreamLifecycleKernel
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after JitStreamLifecycleKernel bridge (#9442)');
+                throw new \LogicException($name.' missing after JitStreamLifecycleKernel bridge (#20966)');
             }
             $context->registerFunction($name, $fn);
         }
-    }
-
-    /** Thin standalone AOT + Context standalone init — stubs without NestedJIT (#20553 / peer #20308). */
-    public static function shouldDeferInventoryEmitStubs(Context $context): bool
-    {
-        return $context->isThinStandaloneAotMain() || StreamIoRuntime::isStandaloneInitPhase();
-    }
-
-    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
-    {
-        if (!self::shouldDeferInventoryEmitStubs($context)) {
-            return;
-        }
-        self::implementDeferredStubs($context);
-    }
-
-    public static function implementDeferredStubs(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $zeroI32 = $i32->constInt(0, false);
-
-        foreach (self::RUNTIME_FUNCTIONS as $name) {
-            self::implementI32ParamStub($context, $name, $zeroI32);
-        }
-        self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementI32ParamStub(Context $context, string $name, Value $ret): void
-    {
-        $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
-
-            return;
-        }
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $fn = $probe ?? $context->module->addFunction(
-            $name,
-            $context->context->functionType($i32, false, $i64)
-        );
-        $entry = $fn->appendBasicBlock('stream_lifecycle_stub_entry');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($ret);
-        $context->registerFunction($name, $fn);
-        $context->builder->clearInsertionPosition();
     }
 }
