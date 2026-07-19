@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5913 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18005 |
+| Source constructs flagged (warnings) | 18011 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -859,7 +859,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmResourceBundle.php` | 0 | 28 |
 | `ext/intl/VmSpoofchecker.php` | 0 | 29 |
 | `ext/intl/VmTransliterator.php` | 0 | 27 |
-| `ext/intl/VmUConverter.php` | 0 | 40 |
+| `ext/intl/VmUConverter.php` | 0 | 46 |
 | `ext/intl/collator_asort.php` | 0 | 3 |
 | `ext/intl/collator_compare.php` | 0 | 3 |
 | `ext/intl/collator_create.php` | 0 | 3 |
@@ -12380,38 +12380,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new UConverterGetErrorMessage (line 127)
 - new UConverterGetSourceEncoding (line 128)
 - new UConverterGetDestinationEncoding (line 129)
-- new UConverterGetSourceType (line 130)
-- new UConverterGetDestinationType (line 131)
-- new UConverterGetSubstChars (line 132)
-- new UConverterSetSubstChars (line 133)
-- new UConverterReasonText (line 134)
-- new UConverterTranscode (line 135)
-- new UConverterGetAvailable (line 136)
-- new UConverterGetAliases (line 137)
-- new UConverterGetStandards (line 138)
-- new Error (line 193)
-- new Error (line 285)
-- new HashTable (line 470)
-- new Variable (line 472)
-- new Error (line 608)
-- new Error (line 612)
-- new ArgumentCountError (line 656)
-- new ArgumentCountError (line 677)
-- new ArgumentCountError (line 719)
-- new ArgumentCountError (line 744)
-- new ArgumentCountError (line 750)
-- new ArgumentCountError (line 807)
-- new ArgumentCountError (line 832)
-- new ArgumentCountError (line 863)
-- new ArgumentCountError (line 894)
-- new ArgumentCountError (line 925)
-- new ArgumentCountError (line 957)
+- new UConverterSetSourceEncoding (line 130)
+- new UConverterSetDestinationEncoding (line 131)
+- new UConverterGetSourceType (line 132)
+- new UConverterGetDestinationType (line 133)
+- new UConverterGetSubstChars (line 134)
+- new UConverterSetSubstChars (line 135)
+- new UConverterReasonText (line 136)
+- new UConverterTranscode (line 137)
+- new UConverterGetAvailable (line 138)
+- new UConverterGetAliases (line 139)
+- new UConverterGetStandards (line 140)
+- new Error (line 195)
+- new Error (line 271)
+- new Error (line 301)
+- new Error (line 346)
+- new HashTable (line 531)
+- new Variable (line 533)
+- new Error (line 669)
+- new Error (line 673)
+- new ArgumentCountError (line 717)
+- new ArgumentCountError (line 738)
+- new ArgumentCountError (line 780)
+- new ArgumentCountError (line 805)
+- new ArgumentCountError (line 811)
+- new ArgumentCountError (line 868)
+- new ArgumentCountError (line 893)
+- new ArgumentCountError (line 924)
+- new ArgumentCountError (line 955)
 - new ArgumentCountError (line 987)
-- new ArgumentCountError (line 1011)
-- new ArgumentCountError (line 1047)
-- new ArgumentCountError (line 1077)
-- new ArgumentCountError (line 1113)
-- 43 class method(s)
+- new ArgumentCountError (line 1019)
+- new ArgumentCountError (line 1050)
+- new ArgumentCountError (line 1082)
+- new ArgumentCountError (line 1112)
+- new ArgumentCountError (line 1136)
+- new ArgumentCountError (line 1172)
+- new ArgumentCountError (line 1202)
+- new ArgumentCountError (line 1238)
+- 47 class method(s)
 
 ### `ext/intl/collator_asort.php`
 
