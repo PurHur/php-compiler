@@ -103,6 +103,15 @@ class Module extends ModuleAbstract
             $functions[] = new locale_get_display_script();
             $functions[] = new locale_get_display_variant();
             $functions[] = new locale_get_all_variants();
+            if (IntlExtensionPolicy::advertisesLocaleRtlAndLikelySubtags()) {
+                $functions[] = new locale_is_right_to_left();
+                $functions[] = new locale_add_likely_subtags();
+                $functions[] = new locale_minimize_subtags();
+            }
+            if (IntlExtensionPolicy::advertisesLocaleDisplayKeyword()) {
+                $functions[] = new locale_get_display_keyword();
+                $functions[] = new locale_get_display_keyword_value();
+            }
         }
         $normalizer = IntlExtensionPolicy::advertisesNormalizer()
             ? [

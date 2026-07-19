@@ -15,6 +15,38 @@ final class VmLocale
     /** php-src INTL_MAX_LOCALE_LEN = ULOC_FULLNAME_CAPACITY - 1 */
     private const MAX_LOCALE_LEN = 156;
 
+    /** @var array<string, true> ICU RTL scripts used by uloc_isRightToLeft fallback (#20927) */
+    private const RTL_SCRIPTS = [
+        'Arab' => true,
+        'Hebr' => true,
+        'Syrc' => true,
+        'Thaa' => true,
+        'Nkoo' => true,
+        'Adlm' => true,
+        'Mand' => true,
+        'Mend' => true,
+        'Narb' => true,
+        'Rohg' => true,
+        'Samr' => true,
+    ];
+
+    /** @var array<string, true> languages that maximize to an RTL script (CLDR likely subtags) */
+    private const RTL_LANGUAGES = [
+        'ar' => true,
+        'arc' => true,
+        'ckb' => true,
+        'dv' => true,
+        'fa' => true,
+        'he' => true,
+        'iw' => true,
+        'ks' => true,
+        'ps' => true,
+        'sd' => true,
+        'ug' => true,
+        'ur' => true,
+        'yi' => true,
+    ];
+
     /** @var list<string> php-src LOC_GRANDFATHERED (hyphen form, case-insensitive match) */
     private const GRANDFATHERED = [
         'art-lojban', 'cel-gaulish', 'en-GB-oed', 'i-ami', 'i-bnn', 'i-default', 'i-enochian',
@@ -230,7 +262,11 @@ final class VmLocale
     }
 
     /**
-     * locale_filter_matches() / Locale::filterMatches() — prefix filter (php-src; #20036).
+     * locale_filter_matches() / Locale::filterMatches() — prefix filter (php-src; #20036, #20939).
+     *
+     * When {@code $canonicalize} is true, both tags are ICU-canonicalized first and a following
+     * {@code @} keyword separator is allowed (php-src locale_methods.cpp); when false, only
+     * ID separators / end-of-tag match after the prefix.
      */
     public static function filterMatches(
         string $langtag,
@@ -243,7 +279,29 @@ final class VmLocale
         if ('*' === $locale) {
             return true;
         }
-        unset($canonicalize); // ICU canonicalize path deferred; non-canonical match matches php-src |b=false
+        if ($canonicalize) {
+            IntlError::clear();
+            $canLang = self::canonicalize($langtag);
+            if (null === $canLang || '' === $canLang) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'unable to canonicalize lang_tag'
+                );
+
+                return false;
+            }
+            $canLoc = self::canonicalize($locale);
+            if (null === $canLoc || '' === $canLoc) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'unable to canonicalize loc_range'
+                );
+
+                return false;
+            }
+            $langtag = $canLang;
+            $locale = $canLoc;
+        }
         $curLang = self::strToMatch($langtag);
         $curRange = self::strToMatch($locale);
         if (null === $curLang || null === $curRange) {
@@ -257,8 +315,15 @@ final class VmLocale
             return true;
         }
         $ch = $curLang[$next];
+        if ('_' === $ch || '-' === $ch) {
+            return true;
+        }
+        // php-src: keyword separator only accepted after canonicalize branch.
+        if ($canonicalize && '@' === $ch) {
+            return true;
+        }
 
-        return '_' === $ch || '-' === $ch || '@' === $ch;
+        return false;
     }
 
     /**
@@ -450,6 +515,131 @@ final class VmLocale
         }
 
         return implode('_', $parts);
+    }
+
+    /**
+     * locale_get_display_keyword() / Locale::getDisplayKeyword() — ICU uloc_getDisplayKeyword (#20928).
+     *
+     * @return string|false
+     */
+    public static function getDisplayKeyword(string $keyword, ?string $displayLocale = null): string|false
+    {
+        IntlError::clear();
+        if (null === $displayLocale || '' === $displayLocale) {
+            $displayLocale = self::getDefault();
+        }
+        $icu = self::ulocGetDisplayKeyword($keyword, $displayLocale);
+        if (null !== $icu) {
+            return $icu;
+        }
+        $fb = self::displayKeywordFallback($keyword);
+        if (null !== $fb) {
+            return $fb;
+        }
+        IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, 'unable to get locale keyword');
+
+        return false;
+    }
+
+    /**
+     * locale_get_display_keyword_value() / Locale::getDisplayKeywordValue() (#20928).
+     *
+     * @return string|false
+     */
+    public static function getDisplayKeywordValue(
+        string $locale,
+        string $keyword,
+        ?string $displayLocale = null
+    ): string|false {
+        IntlError::clear();
+        if (\strlen($locale) > self::MAX_LOCALE_LEN) {
+            IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, 'name too long');
+
+            return false;
+        }
+        if ('' === $locale) {
+            $locale = self::getDefault();
+        }
+        if (null === $displayLocale || '' === $displayLocale) {
+            $displayLocale = self::getDefault();
+        }
+        $icu = self::ulocGetDisplayKeywordValue($locale, $keyword, $displayLocale);
+        if (null !== $icu) {
+            return $icu;
+        }
+        $fb = self::displayKeywordValueFallback($locale, $keyword);
+        if (null !== $fb) {
+            return $fb;
+        }
+        IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, 'unable to get locale keywordvalue');
+
+        return false;
+    }
+
+    /**
+     * locale_is_right_to_left() / Locale::isRightToLeft() — ICU uloc_isRightToLeft (#20927).
+     *
+     * php-src: ext/intl/locale/locale_methods.cpp (GH-18345). Empty locale → process default.
+     */
+    public static function isRightToLeft(string $locale): bool
+    {
+        if ('' === $locale) {
+            $locale = self::getDefault();
+        }
+        $icu = self::ulocIsRightToLeft($locale);
+        if (null !== $icu) {
+            return $icu;
+        }
+
+        return self::isRightToLeftFallback($locale);
+    }
+
+    /**
+     * locale_add_likely_subtags() / Locale::addLikelySubtags() — ICU uloc_addLikelySubtags (#20927).
+     *
+     * @return string|false
+     */
+    public static function addLikelySubtags(string $locale): string|false
+    {
+        IntlError::clear();
+        if ('' === $locale) {
+            $locale = self::getDefault();
+        }
+        $icu = self::ulocTransformSubtags($locale, 'addLikely');
+        if (null !== $icu) {
+            return $icu;
+        }
+        $fb = self::addLikelySubtagsFallback($locale);
+        if (null !== $fb) {
+            return $fb;
+        }
+        IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, 'invalid locale');
+
+        return false;
+    }
+
+    /**
+     * locale_minimize_subtags() / Locale::minimizeSubtags() — ICU uloc_minimizeSubtags (#20927).
+     *
+     * @return string|false
+     */
+    public static function minimizeSubtags(string $locale): string|false
+    {
+        IntlError::clear();
+        if ('' === $locale) {
+            $locale = self::getDefault();
+        }
+        $icu = self::ulocTransformSubtags($locale, 'minimize');
+        if (null !== $icu) {
+            return $icu;
+        }
+        $fb = self::minimizeSubtagsFallback($locale);
+        if (null !== $fb) {
+            return $fb;
+        }
+        IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, 'invalid locale');
+
+        return false;
     }
 
     /**
@@ -991,6 +1181,272 @@ C;
         return null;
     }
 
+    /** @return bool|null null = ICU unavailable */
+    private static function ulocIsRightToLeft(string $locale): ?bool
+    {
+        $ffi = self::ulocFfi();
+        if (null === $ffi) {
+            return null;
+        }
+        $suffix = self::$ulocSuffix ?? '';
+        $fn = 'uloc_isRightToLeft'.$suffix;
+        try {
+            return (bool) $ffi->$fn($locale);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @return string|false|null null = ICU unavailable; false = ICU error
+     */
+    private static function ulocGetDisplayKeyword(string $keyword, string $displayLocale): string|false|null
+    {
+        return self::ulocDisplayKeywordCall('uloc_getDisplayKeyword', [$keyword, $displayLocale]);
+    }
+
+    /**
+     * @return string|false|null null = ICU unavailable; false = ICU error
+     */
+    private static function ulocGetDisplayKeywordValue(
+        string $locale,
+        string $keyword,
+        string $displayLocale
+    ): string|false|null {
+        return self::ulocDisplayKeywordCall(
+            'uloc_getDisplayKeywordValue',
+            [$locale, $keyword, $displayLocale]
+        );
+    }
+
+    /**
+     * @param list<string> $args leading string args before UChar* dest
+     *
+     * @return string|false|null
+     */
+    private static function ulocDisplayKeywordCall(string $baseFn, array $args): string|false|null
+    {
+        $ffi = self::ulocFfi();
+        if (null === $ffi) {
+            return null;
+        }
+        $suffix = self::$ulocSuffix ?? '';
+        $fn = $baseFn.$suffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $buflen = 512;
+            $buf = $ffi->new('UChar['.$buflen.']');
+            $status->cdata = 0;
+            if (2 === \count($args)) {
+                $len = (int) $ffi->$fn($args[0], $args[1], $buf, $buflen, \FFI::addr($status));
+            } else {
+                $len = (int) $ffi->$fn($args[0], $args[1], $args[2], $buf, $buflen, \FFI::addr($status));
+            }
+            if (15 === (int) $status->cdata) { // U_BUFFER_OVERFLOW_ERROR
+                $buflen = $len + 1;
+                $buf = $ffi->new('UChar['.$buflen.']');
+                $status->cdata = 0;
+                if (2 === \count($args)) {
+                    $len = (int) $ffi->$fn($args[0], $args[1], $buf, $buflen, \FFI::addr($status));
+                } else {
+                    $len = (int) $ffi->$fn($args[0], $args[1], $args[2], $buf, $buflen, \FFI::addr($status));
+                }
+            }
+            // U_STRING_NOT_TERMINATED_WARNING (-124) is admissible (php-src).
+            $code = (int) $status->cdata;
+            if ($code > 0) {
+                return false;
+            }
+            if ($len < 0) {
+                return false;
+            }
+            if (0 === $len) {
+                return '';
+            }
+
+            return self::utf16BufferToUtf8($buf, $len);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param \FFI\CData $buf UChar[]
+     */
+    private static function utf16BufferToUtf8(\FFI\CData $buf, int $len): string
+    {
+        $out = '';
+        $i = 0;
+        while ($i < $len) {
+            $u = (int) $buf[$i] & 0xFFFF;
+            if ($u >= 0xD800 && $u <= 0xDBFF && ($i + 1) < $len) {
+                $u2 = (int) $buf[$i + 1] & 0xFFFF;
+                if ($u2 >= 0xDC00 && $u2 <= 0xDFFF) {
+                    $cp = 0x10000 + (($u - 0xD800) << 10) + ($u2 - 0xDC00);
+                    $out .= UnicodeCanonical::codepointToUtf8($cp);
+                    $i += 2;
+                    continue;
+                }
+            }
+            $out .= UnicodeCanonical::codepointToUtf8($u);
+            ++$i;
+        }
+
+        return $out;
+    }
+
+    private static function displayKeywordFallback(string $keyword): ?string
+    {
+        static $en = [
+            'currency' => 'Currency',
+            'collation' => 'Sort Order',
+            'calendar' => 'Calendar',
+            'numbers' => 'Numbers',
+            'hours' => 'Hour Cycle',
+        ];
+
+        return $en[strtolower($keyword)] ?? null;
+    }
+
+    private static function displayKeywordValueFallback(string $locale, string $keyword): ?string
+    {
+        $keywords = self::getKeywordsFallback($locale) ?? self::getKeywords($locale);
+        if (!\is_array($keywords)) {
+            return null;
+        }
+        $val = $keywords[strtolower($keyword)] ?? $keywords[$keyword] ?? null;
+        if (!\is_string($val) || '' === $val) {
+            return null;
+        }
+        if ('currency' === strtolower($keyword)) {
+            static $currency = [
+                'EUR' => 'Euro',
+                'USD' => 'US Dollar',
+                'GBP' => 'British Pound',
+                'JPY' => 'Japanese Yen',
+            ];
+
+            return $currency[strtoupper($val)] ?? $val;
+        }
+
+        return $val;
+    }
+
+    /**
+     * @param 'addLikely'|'minimize' $kind
+     *
+     * @return string|false|null null = ICU unavailable; false = ICU error
+     */
+    private static function ulocTransformSubtags(string $locale, string $kind): string|false|null
+    {
+        $ffi = self::ulocFfi();
+        if (null === $ffi) {
+            return null;
+        }
+        $suffix = self::$ulocSuffix ?? '';
+        $fn = ('addLikely' === $kind ? 'uloc_addLikelySubtags' : 'uloc_minimizeSubtags').$suffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $buflen = 157;
+            $buf = $ffi->new('char['.$buflen.']');
+            $len = (int) $ffi->$fn($locale, $buf, $buflen - 1, \FFI::addr($status));
+            if (15 === (int) $status->cdata) { // U_BUFFER_OVERFLOW_ERROR
+                $status->cdata = 0;
+                $buflen = $len + 1;
+                $buf = $ffi->new('char['.$buflen.']');
+                $len = (int) $ffi->$fn($locale, $buf, $buflen, \FFI::addr($status));
+            }
+            if ((int) $status->cdata > 0) {
+                IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, 'invalid locale');
+
+                return false;
+            }
+            if ($len < 0) {
+                return false;
+            }
+
+            return $len > 0 ? \FFI::string($buf, $len) : \FFI::string($buf);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function isRightToLeftFallback(string $locale): bool
+    {
+        $tags = self::parseBcp47Tags($locale);
+        if ('' !== $tags['script']) {
+            return isset(self::RTL_SCRIPTS[$tags['script']]);
+        }
+        if ('' !== $tags['language']) {
+            return isset(self::RTL_LANGUAGES[$tags['language']]);
+        }
+
+        return false;
+    }
+
+    /** @return string|null */
+    private static function addLikelySubtagsFallback(string $locale): ?string
+    {
+        static $table = [
+            'en' => 'en_Latn_US',
+            'en_US' => 'en_Latn_US',
+            'ar' => 'ar_Arab_EG',
+            'ar_EG' => 'ar_Arab_EG',
+            'zh' => 'zh_Hans_CN',
+            'zh_CN' => 'zh_Hans_CN',
+            'ja' => 'ja_Jpan_JP',
+            'he' => 'he_Hebr_IL',
+            'fa' => 'fa_Arab_IR',
+            'ur' => 'ur_Arab_PK',
+            'de' => 'de_Latn_DE',
+            'fr' => 'fr_Latn_FR',
+        ];
+        $key = str_replace('-', '_', $locale);
+        if (isset($table[$key])) {
+            return $table[$key];
+        }
+        $lower = strtolower($key);
+        foreach ($table as $k => $v) {
+            if (strtolower($k) === $lower) {
+                return $v;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return string|null */
+    private static function minimizeSubtagsFallback(string $locale): ?string
+    {
+        static $table = [
+            'en_Latn_US' => 'en',
+            'ar_Arab_EG' => 'ar',
+            'zh_Hans_CN' => 'zh',
+            'ja_Jpan_JP' => 'ja',
+            'he_Hebr_IL' => 'he',
+            'fa_Arab_IR' => 'fa',
+            'ur_Arab_PK' => 'ur',
+            'de_Latn_DE' => 'de',
+            'fr_Latn_FR' => 'fr',
+        ];
+        $key = str_replace('-', '_', $locale);
+        if (isset($table[$key])) {
+            return $table[$key];
+        }
+        $canon = self::canonicalizeFallback($locale);
+        if (isset($table[$canon])) {
+            return $table[$canon];
+        }
+        // Already minimal language-only tag.
+        $tags = self::parseBcp47Tags($locale);
+        if ('' !== $tags['language'] && '' === $tags['script'] && '' === $tags['region']) {
+            return $tags['language'];
+        }
+
+        return null;
+    }
+
     /**
      * ICU uloc_canonicalize / getLanguage / getScript / getCountry / getVariant.
      *
@@ -1138,12 +1594,19 @@ C;
             try {
                 $cdef = <<<C
 typedef int32_t UErrorCode;
+typedef int8_t UBool;
+typedef uint16_t UChar;
 typedef struct UEnumeration UEnumeration;
 int32_t uloc_canonicalize{$suffix}(const char *localeID, char *name, int32_t nameCapacity, UErrorCode *err);
 int32_t uloc_getLanguage{$suffix}(const char *localeID, char *language, int32_t languageCapacity, UErrorCode *err);
 int32_t uloc_getScript{$suffix}(const char *localeID, char *script, int32_t scriptCapacity, UErrorCode *err);
 int32_t uloc_getCountry{$suffix}(const char *localeID, char *country, int32_t countryCapacity, UErrorCode *err);
 int32_t uloc_getVariant{$suffix}(const char *localeID, char *variant, int32_t variantCapacity, UErrorCode *err);
+UBool uloc_isRightToLeft{$suffix}(const char *locale);
+int32_t uloc_addLikelySubtags{$suffix}(const char *localeID, char *maximizedLocaleID, int32_t maximizedLocaleIDCapacity, UErrorCode *err);
+int32_t uloc_minimizeSubtags{$suffix}(const char *localeID, char *minimizedLocaleID, int32_t minimizedLocaleIDCapacity, UErrorCode *err);
+int32_t uloc_getDisplayKeyword{$suffix}(const char *keyword, const char *displayLocale, UChar *dest, int32_t destCapacity, UErrorCode *status);
+int32_t uloc_getDisplayKeywordValue{$suffix}(const char *locale, const char *keyword, const char *displayLocale, UChar *dest, int32_t destCapacity, UErrorCode *status);
 UEnumeration *uloc_openKeywords{$suffix}(const char *localeID, UErrorCode *status);
 const char *uenum_next{$suffix}(UEnumeration *en, int32_t *resultLength, UErrorCode *status);
 void uenum_close{$suffix}(UEnumeration *en);

@@ -121,6 +121,26 @@ final class IntlExtensionPolicy
     }
 
     /**
+     * Locale::isRightToLeft / addLikelySubtags / minimizeSubtags — PHP 8.5+ (#20927).
+     *
+     * php-src locale.stub.php; gated on loaded intl + {@see CompilerVersion::advertisesLocaleRtlAndLikelySubtags()}.
+     */
+    public static function advertisesLocaleRtlAndLikelySubtags(): bool
+    {
+        return self::advertisesLocale()
+            && CompilerVersion::advertisesLocaleRtlAndLikelySubtags();
+    }
+
+    /**
+     * Locale::getDisplayKeyword / getDisplayKeywordValue — PHP 8.5+ (#20928, php-src #22264).
+     */
+    public static function advertisesLocaleDisplayKeyword(): bool
+    {
+        return self::advertisesLocale()
+            && CompilerVersion::advertisesLocaleDisplayKeyword();
+    }
+
+    /**
      * locale_get_primary_language/region/script — full ext/intl or forward 8.4 profile (#5125, #17072).
      */
     public static function advertisesLocaleParsers(): bool
