@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5844 |
-| Phase A inventory files (M2 ratio SSOT) | 5844 |
+| PHP files on vm.php path | 5852 |
+| Phase A inventory files (M2 ratio SSOT) | 5852 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17539 |
+| Source constructs flagged (warnings) | 17579 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -832,7 +832,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 57 |
+| `ext/intl/Module.php` | 0 | 64 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -844,6 +844,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmIntlCalendar.php` | 0 | 52 |
 | `ext/intl/VmIntlChar.php` | 0 | 53 |
 | `ext/intl/VmIntlDateFormatter.php` | 0 | 5 |
+| `ext/intl/VmIntlDatePatternGenerator.php` | 0 | 12 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 34 |
 | `ext/intl/VmLocale.php` | 0 | 2 |
 | `ext/intl/VmMessageFormatter.php` | 0 | 34 |
@@ -898,8 +899,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/numfmt_create.php` | 0 | 3 |
 | `ext/intl/numfmt_format.php` | 0 | 3 |
 | `ext/intl/numfmt_format_currency.php` | 0 | 3 |
+| `ext/intl/numfmt_get_attribute.php` | 0 | 3 |
+| `ext/intl/numfmt_get_error_code.php` | 0 | 3 |
+| `ext/intl/numfmt_get_error_message.php` | 0 | 3 |
+| `ext/intl/numfmt_get_locale.php` | 0 | 3 |
+| `ext/intl/numfmt_get_pattern.php` | 0 | 3 |
 | `ext/intl/numfmt_parse.php` | 0 | 3 |
 | `ext/intl/numfmt_parse_currency.php` | 0 | 3 |
+| `ext/intl/numfmt_set_attribute.php` | 0 | 3 |
+| `ext/intl/numfmt_set_pattern.php` | 0 | 3 |
 | `ext/intl/resourcebundle_count.php` | 0 | 3 |
 | `ext/intl/transliterator_create.php` | 0 | 3 |
 | `ext/intl/transliterator_create_from_rules.php` | 0 | 3 |
@@ -11142,41 +11150,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 81)
-- new NormalizerNormalize (line 92)
-- new NormalizerIsNormalized (line 93)
-- new NormalizerGetRawDecomposition (line 94)
-- new ClassEntry (line 110)
-- new LocaleGetDefault (line 113)
-- new LocaleSetDefault (line 114)
-- new LocaleGetPrimaryLanguage (line 115)
-- new LocaleGetRegion (line 116)
-- new LocaleGetScript (line 117)
-- new LocaleGetDisplayName (line 118)
-- new LocaleGetDisplayLanguage (line 119)
-- new LocaleGetDisplayRegion (line 120)
-- new LocaleGetDisplayScript (line 121)
-- new LocaleGetDisplayVariant (line 122)
-- new LocaleGetAllVariants (line 123)
-- new LocaleLookup (line 124)
-- new LocaleFilterMatches (line 125)
-- new LocaleAcceptFromHttp (line 126)
-- new LocaleCanonicalize (line 127)
-- new LocaleParseLocale (line 128)
-- new LocaleComposeLocale (line 129)
-- new LocaleGetKeywords (line 130)
-- new ClassEntry (line 146)
-- new IntlDateFormatterCreate (line 157)
-- new IntlDateFormatterFormat (line 160)
-- new IntlDateFormatterGetPattern (line 163)
-- new IntlDateFormatterParse (line 166)
-- new IntlDateFormatterParseToCalendar (line 169)
-- new IntlDateFormatterLocaltime (line 172)
-- new IntlDateFormatterGetTimeZone (line 175)
-- new IntlDateFormatterSetTimeZone (line 178)
-- new IntlDateFormatterGetErrorCode (line 181)
-- new IntlDateFormatterGetErrorMessage (line 184)
-- new ClassEntry (line 267)
+- new ClassEntry (line 84)
+- new NormalizerNormalize (line 95)
+- new NormalizerIsNormalized (line 96)
+- new NormalizerGetRawDecomposition (line 97)
+- new ClassEntry (line 113)
+- new LocaleGetDefault (line 116)
+- new LocaleSetDefault (line 117)
+- new LocaleGetPrimaryLanguage (line 118)
+- new LocaleGetRegion (line 119)
+- new LocaleGetScript (line 120)
+- new LocaleGetDisplayName (line 121)
+- new LocaleGetDisplayLanguage (line 122)
+- new LocaleGetDisplayRegion (line 123)
+- new LocaleGetDisplayScript (line 124)
+- new LocaleGetDisplayVariant (line 125)
+- new LocaleGetAllVariants (line 126)
+- new LocaleLookup (line 127)
+- new LocaleFilterMatches (line 128)
+- new LocaleAcceptFromHttp (line 129)
+- new LocaleCanonicalize (line 130)
+- new LocaleParseLocale (line 131)
+- new LocaleComposeLocale (line 132)
+- new LocaleGetKeywords (line 133)
+- new ClassEntry (line 149)
+- new IntlDateFormatterCreate (line 160)
+- new IntlDateFormatterFormat (line 163)
+- new IntlDateFormatterGetPattern (line 166)
+- new IntlDateFormatterParse (line 169)
+- new IntlDateFormatterParseToCalendar (line 172)
+- new IntlDateFormatterLocaltime (line 175)
+- new IntlDateFormatterGetTimeZone (line 178)
+- new IntlDateFormatterSetTimeZone (line 181)
+- new IntlDateFormatterGetErrorCode (line 184)
+- new IntlDateFormatterGetErrorMessage (line 187)
+- new ClassEntry (line 270)
 - 17 class method(s)
 
 ### `ext/intl/GraphemeStrSplitJitHelper.php`
@@ -11459,32 +11467,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new numfmt_parse (line 125)
 - new numfmt_parse_currency (line 126)
 - new numfmt_format_currency (line 127)
-- new msgfmt_create (line 133)
-- new msgfmt_format (line 134)
-- new msgfmt_format_message (line 135)
-- new transliterator_create (line 141)
-- new transliterator_create_from_rules (line 142)
-- new transliterator_create_inverse (line 143)
-- new transliterator_list_ids (line 144)
-- new transliterator_transliterate (line 145)
-- new transliterator_get_error_code (line 146)
-- new transliterator_get_error_message (line 147)
-- new resourcebundle_count (line 152)
-- new grapheme_strlen (line 178)
-- new grapheme_substr (line 179)
-- new grapheme_strpos (line 180)
-- new grapheme_str_contains (line 181)
-- new grapheme_strstr (line 182)
-- new grapheme_stristr (line 183)
-- new grapheme_stripos (line 184)
-- new grapheme_strrpos (line 185)
-- new grapheme_extract (line 186)
-- new grapheme_levenshtein (line 187)
-- new grapheme_str_split (line 188)
-- new grapheme_strimwidth (line 189)
-- new intl_get_error_code (line 190)
-- new intl_get_error_message (line 191)
-- new intl_is_failure (line 192)
+- new numfmt_get_attribute (line 128)
+- new numfmt_set_attribute (line 129)
+- new numfmt_get_pattern (line 130)
+- new numfmt_set_pattern (line 131)
+- new numfmt_get_locale (line 132)
+- new numfmt_get_error_code (line 133)
+- new numfmt_get_error_message (line 134)
+- new msgfmt_create (line 140)
+- new msgfmt_format (line 141)
+- new msgfmt_format_message (line 142)
+- new transliterator_create (line 148)
+- new transliterator_create_from_rules (line 149)
+- new transliterator_create_inverse (line 150)
+- new transliterator_list_ids (line 151)
+- new transliterator_transliterate (line 152)
+- new transliterator_get_error_code (line 153)
+- new transliterator_get_error_message (line 154)
+- new resourcebundle_count (line 159)
+- new grapheme_strlen (line 185)
+- new grapheme_substr (line 186)
+- new grapheme_strpos (line 187)
+- new grapheme_str_contains (line 188)
+- new grapheme_strstr (line 189)
+- new grapheme_stristr (line 190)
+- new grapheme_stripos (line 191)
+- new grapheme_strrpos (line 192)
+- new grapheme_extract (line 193)
+- new grapheme_levenshtein (line 194)
+- new grapheme_str_split (line 195)
+- new grapheme_strimwidth (line 196)
+- new intl_get_error_code (line 197)
+- new intl_get_error_message (line 198)
+- new intl_is_failure (line 199)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -11751,6 +11766,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 315)
 - new Variable (line 328)
 - 35 class method(s)
+
+### `ext/intl/VmIntlDatePatternGenerator.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 69)
+- new IntlDatePatternGeneratorConstruct (line 73)
+- new IntlDatePatternGeneratorCreate (line 77)
+- new IntlDatePatternGeneratorGetBestPattern (line 78)
+- new Error (line 96)
+- new ObjectEntry (line 98)
+- new ArgumentCountError (line 290)
+- new Error (line 298)
+- new ArgumentCountError (line 330)
+- new ArgumentCountError (line 366)
+- new Error (line 374)
+- 12 class method(s)
 
 ### `ext/intl/VmIntlTimeZone.php`
 
@@ -12335,6 +12366,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 52)
 - 2 class method(s)
 
+### `ext/intl/numfmt_get_attribute.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 55)
+- 2 class method(s)
+
+### `ext/intl/numfmt_get_error_code.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 44)
+- 2 class method(s)
+
+### `ext/intl/numfmt_get_error_message.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 44)
+- 2 class method(s)
+
+### `ext/intl/numfmt_get_locale.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 54)
+- 2 class method(s)
+
+### `ext/intl/numfmt_get_pattern.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 50)
+- 2 class method(s)
+
 ### `ext/intl/numfmt_parse.php`
 
 **Warnings** (review for bootstrap subset):
@@ -12347,6 +12413,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
 - new Error (line 58)
+- 2 class method(s)
+
+### `ext/intl/numfmt_set_attribute.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 47)
+- 2 class method(s)
+
+### `ext/intl/numfmt_set_pattern.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 46)
 - 2 class method(s)
 
 ### `ext/intl/resourcebundle_count.php`

@@ -11,10 +11,11 @@ use PHPCompiler\VM\Context;
 /**
  * Register intl builtin classes (php-src ext/intl/php_intl.c; issues #5774, #6696, #19549, #6151, #19670).
  *
- * Locale / IntlDateFormatter / IntlCalendar / IntlTimeZone / NumberFormatter / Normalizer / Collator /
- * MessageFormatter / Transliterator / ResourceBundle / IntlBreakIterator / IntlChar / UConverter /
- * Spoofchecker / IntlException all gate on {@see IntlExtensionPolicy} advertisement (no phantom
- * class_exists; #6366, #6171, #6139, #6188, #20035).
+ * Locale / IntlDateFormatter / IntlDatePatternGenerator / IntlCalendar / IntlTimeZone /
+ * NumberFormatter / Normalizer / Collator / MessageFormatter / Transliterator / ResourceBundle /
+ * IntlBreakIterator / IntlChar / UConverter / Spoofchecker / IntlException all gate on
+ * {@see IntlExtensionPolicy} advertisement (no phantom class_exists; #6366, #6171, #6139, #6188,
+ * #20035, #20740).
  */
 final class BuiltinClasses
 {
@@ -31,6 +32,7 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         self::registerIntlDateFormatterClass($ctx);
+        VmIntlDatePatternGenerator::registerClass($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -59,6 +61,7 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         self::registerIntlDateFormatterClass($ctx);
+        VmIntlDatePatternGenerator::registerClass($ctx);
         VmIntlTimeZone::registerClass($ctx);
         VmIntlCalendar::registerClass($ctx);
         VmNumberFormatter::registerClass($ctx);
