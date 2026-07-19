@@ -367,22 +367,29 @@ final class VmBcmath
     }
 
     /**
+     * Parse a bcmath decimal operand (php-src ext/bcmath php_str2num / libbcmath).
+     *
+     * Empty string, lone sign, and lone "." are zero (#21006 / #20973 soft-null path:
+     * null coerces to "" then becomes 0). Do not trim — whitespace is invalid.
+     *
      * @return array{sign:int,int:string,frac:string}
      */
     private static function parse(string $num): array
     {
-        $num = \trim($num);
+        // php-src treats "" / "+" / "-" / "." / "+." / "-." as 0 (not ValueError).
         if ('' === $num) {
-            throw new \ValueError('bcmath function(): Argument is not a valid number');
+            return ['sign' => 1, 'int' => '0', 'frac' => ''];
         }
 
         $sign = 1;
         if ('+' === $num[0] || '-' === $num[0]) {
             $sign = '-' === $num[0] ? -1 : 1;
             $num = \substr($num, 1);
-            if ('' === $num) {
-                throw new \ValueError('bcmath function(): Argument is not a valid number');
-            }
+        }
+
+        if ('' === $num || '.' === $num) {
+            // Signed zero collapses to +0 like Zend bcround('-', 0) → "0".
+            return ['sign' => 1, 'int' => '0', 'frac' => ''];
         }
 
         if (!\preg_match('/^(?:\d+(?:\.\d*)?|\.\d+)$/', $num)) {
@@ -400,11 +407,17 @@ final class VmBcmath
             $frac = '';
         }
 
-        return [
+        $parsed = [
             'sign' => $sign,
             'int' => self::stripLeadingZeros($int),
             'frac' => $frac,
         ];
+        // Normalize -0 / -0.0 to +0 (php-src bcround('-0', 0) → "0").
+        if (self::isZero($parsed)) {
+            $parsed['sign'] = 1;
+        }
+
+        return $parsed;
     }
 
     /**
