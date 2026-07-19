@@ -132,6 +132,11 @@ final class BuiltinClasses
             'composelocale' => [new LocaleComposeLocale(), 'composeLocale'],
             'getkeywords' => [new LocaleGetKeywords(), 'getKeywords'],
         ];
+        if (IntlExtensionPolicy::advertisesLocaleRtlAndLikelySubtags()) {
+            $methods['isrighttoleft'] = [new LocaleIsRightToLeft(), 'isRightToLeft'];
+            $methods['addlikelysubtags'] = [new LocaleAddLikelySubtags(), 'addLikelySubtags'];
+            $methods['minimizesubtags'] = [new LocaleMinimizeSubtags(), 'minimizeSubtags'];
+        }
         foreach ($methods as $lc => [$handler, $name]) {
             $entry->methods[$lc] = $handler;
             $entry->methodVisibility[$lc] = $pubStatic;
