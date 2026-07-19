@@ -1017,6 +1017,7 @@ require_once __DIR__.'/../../../ext/ldap/ldap_connect.php';
 require_once __DIR__.'/../../../ext/ldap/ldap_link_builtins.php';
 require_once __DIR__.'/../../../ext/ldap/ldap_search_builtins.php';
 require_once __DIR__.'/../../../ext/ldap/ldap_exop_builtins.php';
+require_once __DIR__.'/../../../ext/ldap/ldap_connect_wallet.php';
 require_once __DIR__.'/../../../ext/libxml/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/libxml/LibxmlConstants.php';
 require_once __DIR__.'/../../../ext/libxml/LibxmlFunction.php';

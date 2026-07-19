@@ -51,7 +51,7 @@ class Module extends ModuleAbstract
         require_once __DIR__.'/ldap_search_builtins.php';
         require_once __DIR__.'/ldap_exop_builtins.php';
 
-        return [
+        $fns = [
             new ldap_escape(),
             new ldap_connect(),
             new ldap_bind(),
@@ -74,5 +74,11 @@ class Module extends ModuleAbstract
             new ldap_parse_exop(),
             new ldap_exop_refresh(),
         ];
+        if (LdapExtensionPolicy::advertisesWalletConnect()) {
+            require_once __DIR__.'/ldap_connect_wallet.php';
+            $fns[] = new ldap_connect_wallet();
+        }
+
+        return $fns;
     }
 }

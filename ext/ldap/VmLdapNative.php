@@ -46,6 +46,52 @@ final class VmLdapNative
     }
 
     /**
+     * Oracle wallet TLS connect (php-src HAVE_ORALDAP / ldap_connect_wallet; #20638).
+     *
+     * True only when an Oracle LDAP library exports ldap_init_SSL — OpenLDAP
+     * builds withhold the symbol and must not advertise the builtin.
+     */
+    public static function walletAvailable(): bool
+    {
+        return null !== self::oracleFfi();
+    }
+
+    /**
+     * @return \FFI\CData|null LDAP*
+     */
+    public static function initializeWallet(string $uri, string $wallet, string $password, int $authMode): ?\FFI\CData
+    {
+        $ld = self::initialize($uri);
+        if (null === $ld) {
+            return null;
+        }
+        $ora = self::oracleFfi();
+        if (null === $ora) {
+            self::unbind($ld);
+
+            return null;
+        }
+        if (0 !== $authMode) {
+            // Oracle ldap_init_SSL(Sockbuf **, wallet, passwd, authmode) — ld_sb is
+            // internal; when the ABI is present the call matches php-src.
+            try {
+                $rc = (int) $ora->ldap_init_SSL(null, $wallet, $password, $authMode);
+                if (0 !== $rc) {
+                    self::unbind($ld);
+
+                    return null;
+                }
+            } catch (\Throwable) {
+                self::unbind($ld);
+
+                return null;
+            }
+        }
+
+        return $ld;
+    }
+
+    /**
      * @return \FFI\CData|null LDAP*
      */
     public static function initialize(string $uri): ?\FFI\CData
@@ -483,6 +529,45 @@ CDEF;
             }
         }
         self::$ffiUnavailable = true;
+
+        return null;
+    }
+
+    /** @var \FFI|null|false */
+    private static $oracleFfi = false;
+
+    /** @return \FFI|null */
+    private static function oracleFfi()
+    {
+        if (false !== self::$oracleFfi) {
+            return self::$oracleFfi;
+        }
+        if (!self::ffiEnabled() || !\extension_loaded('ffi')) {
+            self::$oracleFfi = null;
+
+            return null;
+        }
+        $cdef = <<<'CDEF'
+int ldap_init_SSL(void **sb, const char *wallet, const char *walletpasswd, int sslauth);
+CDEF;
+        foreach ([
+            'libclntsh.so',
+            'libclntsh.so.21.1',
+            'libclntsh.so.19.1',
+            'libclntshcore.so.21.1',
+            'libnnz21.so',
+        ] as $lib) {
+            try {
+                $ffi = \FFI::cdef($cdef, $lib);
+                // Probe: symbol must resolve; OpenLDAP loads but call is absent at link —
+                // FFI::cdef succeeds only if the symbol exists in the shared object.
+                self::$oracleFfi = $ffi;
+
+                return self::$oracleFfi;
+            } catch (\Throwable) {
+            }
+        }
+        self::$oracleFfi = null;
 
         return null;
     }

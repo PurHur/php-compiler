@@ -35,10 +35,15 @@ final class LdapConstants
     public const LDAP_EXOP_WHO_AM_I = '1.3.6.1.4.1.4203.1.11.3';
     public const LDAP_EXOP_TURN = '1.3.6.1.1.19';
 
+    /** Oracle wallet SSL auth modes (php-src HAVE_ORALDAP; #20638). */
+    public const GSLC_SSL_NO_AUTH = 1;
+    public const GSLC_SSL_ONEWAY_AUTH = 2;
+    public const GSLC_SSL_TWOWAY_AUTH = 3;
+
     /** @return array<string, int|string> */
     public static function registeredConstants(): array
     {
-        return [
+        $constants = [
             'LDAP_ESCAPE_FILTER' => self::LDAP_ESCAPE_FILTER,
             'LDAP_ESCAPE_DN' => self::LDAP_ESCAPE_DN,
             'LDAP_OPT_DEREF' => self::LDAP_OPT_DEREF,
@@ -61,5 +66,12 @@ final class LdapConstants
             'LDAP_EXOP_WHO_AM_I' => self::LDAP_EXOP_WHO_AM_I,
             'LDAP_EXOP_TURN' => self::LDAP_EXOP_TURN,
         ];
+        if (LdapExtensionPolicy::advertisesWalletConnect()) {
+            $constants['GSLC_SSL_NO_AUTH'] = self::GSLC_SSL_NO_AUTH;
+            $constants['GSLC_SSL_ONEWAY_AUTH'] = self::GSLC_SSL_ONEWAY_AUTH;
+            $constants['GSLC_SSL_TWOWAY_AUTH'] = self::GSLC_SSL_TWOWAY_AUTH;
+        }
+
+        return $constants;
     }
 }
