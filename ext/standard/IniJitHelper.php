@@ -26,6 +26,7 @@ final class IniJitHelper
         'unserialize_callback_func',
         'session.gc_maxlifetime',
         'session.save_path',
+        'session.use_strict_mode',
         'include_path',
         'short_open_tag',
         'register_argc_argv',
@@ -278,6 +279,9 @@ final class IniJitHelper
         if ('session.save_path' === $key) {
             return self::$sessionSavePath;
         }
+        if ('session.use_strict_mode' === $key) {
+            return VmSession::isUseStrictMode() ? '1' : '0';
+        }
         if ('include_path' === $key) {
             return IncludePathJitHelper::get();
         }
@@ -349,6 +353,12 @@ final class IniJitHelper
         }
         if ('session.save_path' === $key) {
             return self::setSessionSavePath($newValue);
+        }
+        if ('session.use_strict_mode' === $key) {
+            $old = VmSession::isUseStrictMode() ? '1' : '0';
+            VmSession::setUseStrictMode(VmIni::parseBoolIni($newValue));
+
+            return $old;
         }
         if ('include_path' === $key) {
             return IncludePathJitHelper::push($newValue);
@@ -436,6 +446,9 @@ final class IniJitHelper
         if ('session.save_path' === $key) {
             return self::CFG_SESSION_SAVE_PATH;
         }
+        if ('session.use_strict_mode' === $key) {
+            return '0';
+        }
         if ('max_execution_time' === $key) {
             return self::CFG_MAX_EXECUTION_TIME;
         }
@@ -502,6 +515,9 @@ final class IniJitHelper
                 break;
             case 'session.save_path':
                 self::$sessionSavePath = self::CFG_SESSION_SAVE_PATH;
+                break;
+            case 'session.use_strict_mode':
+                VmSession::setUseStrictMode(false);
                 break;
             case 'user_agent':
                 self::$userAgent = '';
@@ -750,6 +766,6 @@ final class IniJitHelper
             return false;
         }
 
-        return in_array($key, ['session.save_path', 'session.gc_maxlifetime'], true);
+        return in_array($key, ['session.save_path', 'session.gc_maxlifetime', 'session.use_strict_mode'], true);
     }
 }

@@ -527,6 +527,13 @@ final class VmSession
                 self::buildSessionSetCookieLine(self::$id),
                 false
             );
+        } elseif (self::$useStrictMode && !self::sessionIdExists(self::$id)) {
+            // php-src: PS(id) from session_id() also runs s_validate_sid under use_strict_mode (#21155).
+            self::$id = self::generateId();
+            ResponseContext::addHeader(
+                self::buildSessionSetCookieLine(self::$id),
+                false
+            );
         }
         // php-src php_session_start() marks status active before save-handler open
         // (SessionHandler::open requires php_session_active — #19246 / mod_user_class.c).
