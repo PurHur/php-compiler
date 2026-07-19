@@ -6,28 +6,49 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VmActiveContextJitHelper;
 use PHPCompiler\Web\Superglobals;
 
 /**
- * Lowered into JIT/AOT modules for unserialize() runtime (#9163, php-in-PHP).
+ * Lowered into JIT/AOT modules for unserialize() runtime (#9163, #20785, php-in-PHP).
  *
- * SSOT: {@see VmUnserializeFormat} (php-src ext/standard/var_unserializer.c).
+ * Thin AOT NestedJIT cannot yet lower full {@see VmUnserializeFormat} or Variable returns.
+ * This helper NestedJIT-decodes integer wire (`i:N;`) as a bare int (bridge boxes to
+ * `__value__*`). Other payloads return 0 here and need a follow-up NestedJIT slice.
+ * Thin standalone AOT: {@see VmActiveContextJitHelper::resolve()} → sg_vm_context (#17391).
+ * php-src: ext/standard/var_unserializer.c
  */
 final class UnserializeJitHelper
 {
-    public static function decode(string $payload): Variable
+    /**
+     * Integer wire decode for NestedJIT (#20785). Non-int payloads currently return 0.
+     */
+    public static function decode(string $payload): int
     {
-        $ctx = self::requireActiveContext();
-        $result = VmUnserializeFormat::decodeToVariableWithContext($ctx, $payload);
-        if (false === $result) {
-            $false = new Variable();
-            $false->bool(false);
-
-            return $false;
+        self::requireActiveContext();
+        $len = \strlen($payload);
+        if ($len < 4 || 'i' !== $payload[0] || ':' !== $payload[1] || ';' !== $payload[$len - 1]) {
+            return 0;
+        }
+        $digits = \substr($payload, 2, $len - 3);
+        if ('' === $digits) {
+            return 0;
+        }
+        $i = 0;
+        if ('-' === $digits[0] || '+' === $digits[0]) {
+            $i = 1;
+        }
+        if ($i >= \strlen($digits)) {
+            return 0;
+        }
+        for ($n = \strlen($digits); $i < $n; ++$i) {
+            $c = $digits[$i];
+            if ($c < '0' || $c > '9') {
+                return 0;
+            }
         }
 
-        return $result;
+        return (int) $digits;
     }
 
     /** Session wire decode: key|serialized pairs or empty hashtable on failure (#6086). */
@@ -42,7 +63,7 @@ final class UnserializeJitHelper
     {
         $ctx = Superglobals::getActiveContext();
         if (null === $ctx) {
-            throw new \LogicException('unserialize() JIT helper requires active VM context (#9163)');
+            return VmActiveContextJitHelper::resolve();
         }
 
         return $ctx;

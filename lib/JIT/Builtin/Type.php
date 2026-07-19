@@ -1323,9 +1323,10 @@ class Type extends Builtin {
             $fntypeSerializeValue
         );
         $this->context->registerFunction('__compiler_serialize_value', $fnSerializeValue);
+        // Returns __value__* (ArrayPop #12647 / #20785) — not void+out-pointer.
         $fnUnserialize = $this->context->module->addFunction(
             '__compiler_unserialize',
-            $this->context->context->functionType($void, false, $strPtr, $valuePtr)
+            $this->context->context->functionType($valuePtr, false, $strPtr)
         );
         $this->context->registerFunction('__compiler_unserialize', $fnUnserialize);
         $fntypeShellExec = $this->context->context->functionType($strPtr, false, $strPtr);

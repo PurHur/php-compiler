@@ -8,7 +8,6 @@ use PHPCompiler\JIT\Builtin\StringUnserialize;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -70,14 +69,10 @@ final class JitUnserialize
 
     public static function decodeRuntimeString(Context $context, Value $payloadString): Value
     {
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
+        // __compiler_unserialize returns __value__* (ArrayPop #12647 / #20785 ABI).
+        return $context->builder->call(
             $context->lookupFunction('__compiler_unserialize'),
-            $payloadString,
-            $ptr
+            $payloadString
         );
-
-        return $ptr;
     }
 }

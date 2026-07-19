@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5844 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17512 |
+| Source constructs flagged (warnings) | 17509 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2540,7 +2540,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/UnlinkJitHelper.php` | 0 | 1 |
 | `ext/standard/UnpackEngine.php` | 0 | 1 |
 | `ext/standard/UnpackJitHelper.php` | 0 | 1 |
-| `ext/standard/UnserializeJitHelper.php` | 0 | 3 |
+| `ext/standard/UnserializeJitHelper.php` | 0 | 2 |
 | `ext/standard/UploadTempJitHelper.php` | 0 | 1 |
 | `ext/standard/UrldecodeJitHelper.php` | 0 | 1 |
 | `ext/standard/UrlencodeJitHelper.php` | 0 | 1 |
@@ -4758,7 +4758,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringUnitEnumExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUnlink.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUnpack.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringUnserialize.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringUnserialize.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrldecode.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUrlencode.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUtf8Latin1.php` | 0 | 3 |
@@ -24447,8 +24447,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/UnserializeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 24)
-- new HashTable (line 38)
+- new HashTable (line 59)
 - 3 class method(s)
 
 ### `ext/standard/UploadTempJitHelper.php`
@@ -35655,66 +35654,66 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Type (line 10377)
 - new Variable (line 10537)
 - new Variable (line 10558)
-- new Variable (line 11665)
-- new Variable (line 11690)
-- new Variable (line 11711)
-- new CompileError (line 12447)
-- new CompileError (line 12551)
-- new Variable (line 12608)
-- new Variable (line 12991)
-- new Variable (line 13011)
-- new Variable (line 13032)
-- new Variable (line 13066)
-- new Variable (line 13100)
-- new Variable (line 13192)
-- new Variable (line 13214)
-- new Variable (line 13224)
-- new Variable (line 13376)
-- new Variable (line 13394)
-- new Variable (line 13444)
-- new Variable (line 13471)
-- new Variable (line 13496)
-- new Variable (line 13825)
-- new Variable (line 14193)
-- new Variable (line 14223)
-- new Variable (line 14242)
-- new Variable (line 14272)
-- new Variable (line 14309)
-- new Variable (line 14357)
-- new Variable (line 14400)
-- new VM\Variable (line 14745)
-- new Variable (line 14779)
-- new Variable (line 14830)
-- new Variable (line 14846)
-- new Variable (line 14865)
-- new Variable (line 14872)
-- new OpCode (line 14892)
-- new Variable (line 14893)
-- new Variable (line 15065)
+- new Variable (line 11703)
+- new Variable (line 11728)
+- new Variable (line 11749)
+- new CompileError (line 12485)
+- new CompileError (line 12589)
+- new Variable (line 12646)
+- new Variable (line 13029)
+- new Variable (line 13049)
+- new Variable (line 13070)
+- new Variable (line 13104)
+- new Variable (line 13138)
+- new Variable (line 13230)
+- new Variable (line 13252)
+- new Variable (line 13262)
+- new Variable (line 13414)
+- new Variable (line 13432)
+- new Variable (line 13482)
+- new Variable (line 13509)
+- new Variable (line 13534)
+- new Variable (line 13863)
+- new Variable (line 14231)
+- new Variable (line 14261)
+- new Variable (line 14280)
+- new Variable (line 14310)
+- new Variable (line 14347)
+- new Variable (line 14395)
+- new Variable (line 14438)
+- new VM\Variable (line 14783)
+- new Variable (line 14817)
+- new Variable (line 14868)
+- new Variable (line 14884)
+- new Variable (line 14903)
+- new Variable (line 14910)
+- new OpCode (line 14930)
+- new Variable (line 14931)
 - new Variable (line 15103)
-- new OpCode (line 15117)
-- new Variable (line 15118)
-- new Variable (line 15177)
-- new OpCode (line 15198)
-- new Variable (line 15199)
-- new Variable (line 15296)
-- new Variable (line 15318)
-- new Variable (line 15386)
-- new Operand\Literal (line 15395)
-- new Variable (line 15410)
-- new Variable (line 15592)
-- new VM\PropertyIsInitializedHandler (line 15674)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15714)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15863)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15961)
-- new JIT\Call\VmCoerceVariableToString (line 16051)
-- new JIT\Call\IncludePathResolverResolve (line 16312)
-- new Variable (line 17368)
-- new VM (line 17412)
-- new VM\Variable (line 17421)
-- new Variable (line 17442)
-- new Variable (line 17488)
-- new Variable (line 17982)
+- new Variable (line 15141)
+- new OpCode (line 15155)
+- new Variable (line 15156)
+- new Variable (line 15215)
+- new OpCode (line 15236)
+- new Variable (line 15237)
+- new Variable (line 15334)
+- new Variable (line 15356)
+- new Variable (line 15424)
+- new Operand\Literal (line 15433)
+- new Variable (line 15448)
+- new Variable (line 15630)
+- new VM\PropertyIsInitializedHandler (line 15712)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15752)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15927)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16025)
+- new JIT\Call\VmCoerceVariableToString (line 16115)
+- new JIT\Call\IncludePathResolverResolve (line 16382)
+- new Variable (line 17438)
+- new VM (line 17482)
+- new VM\Variable (line 17491)
+- new Variable (line 17512)
+- new Variable (line 17558)
+- new Variable (line 18052)
 - 369 class method(s)
 - 7 closure(s)
 
@@ -39025,9 +39024,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUnserialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 214)
-- 11 class method(s)
-- 1 closure(s)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/StringUrldecode.php`
 
