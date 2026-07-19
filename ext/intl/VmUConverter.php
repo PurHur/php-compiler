@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\intl;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\ext\iconv\CharsetEngine;
 use PHPCompiler\ext\iconv\VmIconv;
+use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
+use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\ReflectionSupport;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -123,6 +125,8 @@ final class VmUConverter
         $entry->methodVisibility['__construct'] = $pub;
         $methods = [
             'convert' => [new UConverterConvert(), 'convert', false],
+            'fromucallback' => [new UConverterFromUCallback(), 'fromUCallback', false],
+            'toucallback' => [new UConverterToUCallback(), 'toUCallback', false],
             'geterrorcode' => [new UConverterGetErrorCode(), 'getErrorCode', false],
             'geterrormessage' => [new UConverterGetErrorMessage(), 'getErrorMessage', false],
             'getsourceencoding' => [new UConverterGetSourceEncoding(), 'getSourceEncoding', false],
@@ -161,9 +165,31 @@ final class VmUConverter
         return VmIconv::iconv($fromEncoding, $toEncoding, $str);
     }
 
-    public static function isUConverterObject(?ObjectEntry $object): bool
+    public static function isUConverterObject(?ObjectEntry $object, ?Context $ctx = null): bool
     {
-        return null !== $object && self::CLASS_LC === strtolower($object->class->name);
+        if (null === $object) {
+            return false;
+        }
+        if (null !== $ctx) {
+            return VmReflection::isInstanceOf($ctx, $object->class, 'UConverter');
+        }
+        $entry = $object->class;
+        $guard = 0;
+        while ($guard++ < 64) {
+            if (self::CLASS_LC === strtolower($entry->name)) {
+                return true;
+            }
+            if (null === $entry->parentLc) {
+                return false;
+            }
+            if (self::CLASS_LC === $entry->parentLc) {
+                return true;
+            }
+            // Without Context, only direct UConverter children are recognized.
+            return false;
+        }
+
+        return false;
     }
 
     public static function construct(ObjectEntry $object, string $destination, ?string $source): void
@@ -188,7 +214,7 @@ final class VmUConverter
         $object->constructed = true;
     }
 
-    public static function convert(ObjectEntry $object, string $str, bool $reverse = false): string|false
+    public static function convert(ObjectEntry $object, string $str, bool $reverse = false, ?Context $ctx = null): string|false
     {
         $state = self::$state[$object->id] ?? null;
         if (null === $state) {
@@ -202,17 +228,432 @@ final class VmUConverter
         }
         $from = $reverse ? $state['dest'] : $state['src'];
         $to = $reverse ? $state['src'] : $state['dest'];
+        $hasUserCb = null !== $ctx && (self::hasUserCallbackOverride($object, 'fromucallback')
+            || self::hasUserCallbackOverride($object, 'toucallback'));
+        if ($hasUserCb) {
+            return self::convertWithCallbacks($ctx, $object, $str, $from, $to, $reverse);
+        }
         $result = VmIconv::iconv($from, $to, $str);
         if (false === $result) {
-            self::$state[$object->id]['errorCode'] = self::U_INVALID_CHAR_FOUND;
-            self::$state[$object->id]['errorMessage'] = 'Invalid character found: U_INVALID_CHAR_FOUND';
-
-            return false;
+            // Base UConverter short-circuits PHP callbacks (php-src php_converter_set_callbacks);
+            // ICU substitutes into the destination charset (ASCII → 0x1A).
+            return self::convertWithNativeSubst($object, $str, $from, $to);
         }
         self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
         self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
 
         return $result;
+    }
+
+    /** ICU-like substitution without PHP callback overrides (base UConverter). */
+    private static function convertWithNativeSubst(
+        ObjectEntry $object,
+        string $str,
+        string $from,
+        string $to
+    ): string {
+        if (self::isUtf8Family($from)) {
+            $out = '';
+            $len = \strlen($str);
+            $i = 0;
+            $subst = self::isUnicodeCharset($to)
+                ? (self::$state[$object->id]['substChars'] !== ''
+                    ? self::$state[$object->id]['substChars']
+                    : self::defaultSubstChars($to))
+                : "\x1a";
+            while ($i < $len) {
+                $cp = self::utf8NextCodepoint($str, $i, $next);
+                if (null === $cp) {
+                    $out .= $subst;
+                    $i = $next > $i ? $next : $i + 1;
+                    continue;
+                }
+                $i = $next;
+                $char = self::utf8Chr($cp);
+                if (null === $char) {
+                    $out .= $subst;
+                    continue;
+                }
+                $piece = VmIconv::iconv('UTF-8', $to, $char);
+                $out .= false !== $piece ? $piece : $subst;
+            }
+            self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
+            self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
+
+            return $out;
+        }
+        $subst = self::isUnicodeCharset($to)
+            ? (self::$state[$object->id]['substChars'] !== ''
+                ? self::$state[$object->id]['substChars']
+                : "\xef\xbf\xbd")
+            : "\x1a";
+        self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
+        self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
+
+        return $subst;
+    }
+
+    /**
+     * php-src php_converter_default_callback — return subst chars for unassigned/illegal/irregular (#20917).
+     *
+     * @return string|int|array|null
+     */
+    public static function defaultCallback(ObjectEntry $object, int $reason, Variable $errorVar)
+    {
+        if (self::REASON_UNASSIGNED !== $reason
+            && self::REASON_ILLEGAL !== $reason
+            && self::REASON_IRREGULAR !== $reason) {
+            $errorVar->int(IntlError::U_ZERO_ERROR);
+
+            return null;
+        }
+        $state = self::$state[$object->id] ?? null;
+        if (null === $state || !$state['srcOk']) {
+            $errorVar->int(self::U_INVALID_STATE_ERROR);
+
+            return "\x1a";
+        }
+        $chars = $state['substChars'] !== '' ? $state['substChars'] : self::defaultSubstChars($state['src']);
+        $errorVar->int(IntlError::U_ZERO_ERROR);
+
+        return $chars;
+    }
+
+    private static function hasUserCallbackOverride(ObjectEntry $object, string $methodLc): bool
+    {
+        $func = $object->class->methods[$methodLc] ?? null;
+
+        return $func instanceof PhpFunc;
+    }
+
+    /**
+     * Charset conversion with fromUCallback / toUCallback dispatch (php-src converter.c; #20917).
+     */
+    private static function convertWithCallbacks(
+        Context $ctx,
+        ObjectEntry $object,
+        string $str,
+        string $from,
+        string $to,
+        bool $reverse
+    ): string|false {
+        unset($reverse);
+        // Prefer UTF-8 source iteration (fromUCallback on unmappable dest codepoints).
+        if (self::isUtf8Family($from)) {
+            return self::convertUtf8WithFromU($ctx, $object, $str, $to);
+        }
+        // Byte-oriented source: attempt whole-string iconv; on failure invoke toUCallback once.
+        $result = VmIconv::iconv($from, $to, $str);
+        if (false !== $result) {
+            self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
+            self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
+
+            return $result;
+        }
+        $error = self::U_INVALID_CHAR_FOUND;
+        $cb = self::invokeToUCallback($ctx, $object, self::REASON_ILLEGAL, $str, $str, $error);
+        self::$state[$object->id]['errorCode'] = $error;
+        self::$state[$object->id]['errorMessage'] = IntlError::errorName($error);
+        if (null === $cb) {
+            return '';
+        }
+        if (\is_string($cb)) {
+            return $cb;
+        }
+        if (\is_int($cb)) {
+            return self::utf8Chr($cb) ?? '';
+        }
+
+        return false;
+    }
+
+    private static function convertUtf8WithFromU(
+        Context $ctx,
+        ObjectEntry $object,
+        string $str,
+        string $to
+    ): string|false {
+        $out = '';
+        $len = \strlen($str);
+        $i = 0;
+        $lastError = IntlError::U_ZERO_ERROR;
+        while ($i < $len) {
+            $cp = self::utf8NextCodepoint($str, $i, $next);
+            if (null === $cp) {
+                $chunk = $str[$i];
+                ++$i;
+                $error = self::U_INVALID_CHAR_FOUND;
+                $cb = self::invokeToUCallback($ctx, $object, self::REASON_ILLEGAL, $chunk, $chunk, $error);
+                $lastError = $error;
+                if (null === $cb) {
+                    continue;
+                }
+                if (\is_string($cb)) {
+                    $out .= $cb;
+                } elseif (\is_int($cb)) {
+                    $out .= self::utf8Chr($cb) ?? '';
+                }
+                continue;
+            }
+            $i = $next;
+            $char = self::utf8Chr($cp);
+            if (null === $char) {
+                continue;
+            }
+            $piece = VmIconv::iconv('UTF-8', $to, $char);
+            if (false !== $piece) {
+                $out .= $piece;
+                continue;
+            }
+            $error = self::U_INVALID_CHAR_FOUND;
+            $cb = self::invokeFromUCallback(
+                $ctx,
+                $object,
+                self::REASON_UNASSIGNED,
+                [$cp],
+                $cp,
+                $error
+            );
+            $lastError = $error;
+            if (null === $cb) {
+                continue;
+            }
+            if (\is_string($cb)) {
+                $out .= $cb;
+            } elseif (\is_int($cb)) {
+                $encoded = VmIconv::iconv('UTF-8', $to, self::utf8Chr($cb) ?? '');
+                $out .= false !== $encoded ? $encoded : '';
+            } elseif (\is_array($cb)) {
+                foreach ($cb as $unit) {
+                    if (\is_int($unit)) {
+                        $encoded = VmIconv::iconv('UTF-8', $to, self::utf8Chr($unit) ?? '');
+                        $out .= false !== $encoded ? $encoded : '';
+                    } elseif (\is_string($unit)) {
+                        $out .= $unit;
+                    }
+                }
+            }
+        }
+        self::$state[$object->id]['errorCode'] = $lastError;
+        self::$state[$object->id]['errorMessage'] = 0 === $lastError
+            ? 'U_ZERO_ERROR'
+            : IntlError::errorName($lastError);
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $sourceCodepoints
+     * @return string|int|array|null
+     */
+    private static function invokeFromUCallback(
+        Context $ctx,
+        ObjectEntry $object,
+        int $reason,
+        array $sourceCodepoints,
+        int $codePoint,
+        int &$error
+    ) {
+        $reasonVar = new Variable();
+        $reasonVar->int($reason);
+        $sourceHt = new HashTable();
+        foreach ($sourceCodepoints as $cp) {
+            $slot = new Variable();
+            $slot->int($cp);
+            $sourceHt->append($slot);
+        }
+        $sourceVar = new Variable();
+        $sourceVar->array($sourceHt);
+        $cpVar = new Variable();
+        $cpVar->int($codePoint);
+        $errorVar = new Variable();
+        $errorVar->int($error);
+        $result = $ctx->runtime->vm->invokeInstanceMethod(
+            $object,
+            'fromUCallback',
+            $reasonVar,
+            $sourceVar,
+            $cpVar,
+            $errorVar
+        )->resolveIndirect();
+        $error = Variable::TYPE_INTEGER === $errorVar->resolveIndirect()->type
+            ? $errorVar->resolveIndirect()->toInt()
+            : $error;
+
+        return self::exportCallbackReturn($result);
+    }
+
+    /**
+     * @return string|int|array|null
+     */
+    private static function invokeToUCallback(
+        Context $ctx,
+        ObjectEntry $object,
+        int $reason,
+        string $source,
+        string $codeUnits,
+        int &$error
+    ) {
+        $reasonVar = new Variable();
+        $reasonVar->int($reason);
+        $sourceVar = new Variable();
+        $sourceVar->string($source);
+        $unitsVar = new Variable();
+        $unitsVar->string($codeUnits);
+        $errorVar = new Variable();
+        $errorVar->int($error);
+        $result = $ctx->runtime->vm->invokeInstanceMethod(
+            $object,
+            'toUCallback',
+            $reasonVar,
+            $sourceVar,
+            $unitsVar,
+            $errorVar
+        )->resolveIndirect();
+        $error = Variable::TYPE_INTEGER === $errorVar->resolveIndirect()->type
+            ? $errorVar->resolveIndirect()->toInt()
+            : $error;
+
+        return self::exportCallbackReturn($result);
+    }
+
+    /**
+     * @return string|int|array|null
+     */
+    private static function exportCallbackReturn(Variable $result)
+    {
+        $result = $result->resolveIndirect();
+        if (Variable::TYPE_NULL === $result->type) {
+            return null;
+        }
+        if (Variable::TYPE_STRING === $result->type) {
+            return $result->toString();
+        }
+        if (Variable::TYPE_INTEGER === $result->type) {
+            return $result->toInt();
+        }
+        if (Variable::TYPE_ARRAY === $result->type) {
+            $out = [];
+            foreach ($result->toArray()->iterateKeyed(true) as [, $value]) {
+                $value = $value->resolveIndirect();
+                if (Variable::TYPE_INTEGER === $value->type) {
+                    $out[] = $value->toInt();
+                } elseif (Variable::TYPE_STRING === $value->type) {
+                    $out[] = $value->toString();
+                }
+            }
+
+            return $out;
+        }
+
+        return null;
+    }
+
+    private static function isUtf8Family(string $encoding): bool
+    {
+        $n = strtoupper(str_replace(['-', '_', ' '], '', $encoding));
+
+        return str_contains($n, 'UTF8') || 'CP1208' === $n || '' === $n;
+    }
+
+    /** @return int|null codepoint; advances $next */
+    private static function utf8NextCodepoint(string $str, int $i, ?int &$next): ?int
+    {
+        $len = \strlen($str);
+        if ($i >= $len) {
+            $next = $i;
+
+            return null;
+        }
+        $b0 = \ord($str[$i]);
+        if ($b0 < 0x80) {
+            $next = $i + 1;
+
+            return $b0;
+        }
+        if ($b0 < 0xC2 || $b0 > 0xF4) {
+            $next = $i + 1;
+
+            return null;
+        }
+        if ($b0 < 0xE0) {
+            if ($i + 1 >= $len) {
+                $next = $len;
+
+                return null;
+            }
+            $b1 = \ord($str[$i + 1]);
+            if (($b1 & 0xC0) !== 0x80) {
+                $next = $i + 1;
+
+                return null;
+            }
+            $next = $i + 2;
+
+            return (($b0 & 0x1F) << 6) | ($b1 & 0x3F);
+        }
+        if ($b0 < 0xF0) {
+            if ($i + 2 >= $len) {
+                $next = $len;
+
+                return null;
+            }
+            $b1 = \ord($str[$i + 1]);
+            $b2 = \ord($str[$i + 2]);
+            if (($b1 & 0xC0) !== 0x80 || ($b2 & 0xC0) !== 0x80) {
+                $next = $i + 1;
+
+                return null;
+            }
+            $next = $i + 3;
+
+            return (($b0 & 0x0F) << 12) | (($b1 & 0x3F) << 6) | ($b2 & 0x3F);
+        }
+        if ($i + 3 >= $len) {
+            $next = $len;
+
+            return null;
+        }
+        $b1 = \ord($str[$i + 1]);
+        $b2 = \ord($str[$i + 2]);
+        $b3 = \ord($str[$i + 3]);
+        if (($b1 & 0xC0) !== 0x80 || ($b2 & 0xC0) !== 0x80 || ($b3 & 0xC0) !== 0x80) {
+            $next = $i + 1;
+
+            return null;
+        }
+        $next = $i + 4;
+
+        return (($b0 & 0x07) << 18) | (($b1 & 0x3F) << 12) | (($b2 & 0x3F) << 6) | ($b3 & 0x3F);
+    }
+
+    private static function utf8Chr(int $cp): ?string
+    {
+        if ($cp < 0 || $cp > 0x10FFFF) {
+            return null;
+        }
+        if (\function_exists('intlchr')) {
+            $s = \intlchr($cp);
+            if (false !== $s && null !== $s) {
+                return $s;
+            }
+        }
+        if ($cp < 0x80) {
+            return \chr($cp);
+        }
+        if ($cp < 0x800) {
+            return \chr(0xC0 | ($cp >> 6)).\chr(0x80 | ($cp & 0x3F));
+        }
+        if ($cp < 0x10000) {
+            return \chr(0xE0 | ($cp >> 12))
+                .\chr(0x80 | (($cp >> 6) & 0x3F))
+                .\chr(0x80 | ($cp & 0x3F));
+        }
+
+        return \chr(0xF0 | ($cp >> 18))
+            .\chr(0x80 | (($cp >> 12) & 0x3F))
+            .\chr(0x80 | (($cp >> 6) & 0x3F))
+            .\chr(0x80 | ($cp & 0x3F));
     }
 
     public static function getErrorCode(ObjectEntry $object): int
@@ -662,10 +1103,10 @@ UConverterType ucnv_getType{$suffix}(const UConverter *converter);
 C;
     }
 
-    public static function requireReceiver(Variable $var, string $label): ObjectEntry
+    public static function requireReceiver(Variable $var, string $label, ?Context $ctx = null): ObjectEntry
     {
         $var = $var->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $var->type || !self::isUConverterObject($var->toObject())) {
+        if (Variable::TYPE_OBJECT !== $var->type || !self::isUConverterObject($var->toObject(), $ctx)) {
             throw new \Error($label.' called on incompatible object');
         }
         $object = $var->toObject();
@@ -740,7 +1181,7 @@ final class UConverterConvert extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::convert()');
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::convert()', $frame->vmContext);
         $str = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1],
             'UConverter::convert',
@@ -752,7 +1193,7 @@ final class UConverterConvert extends VmClassMethod
             $revVar = $frame->calledArgs[2]->resolveIndirect();
             $reverse = Variable::TYPE_NULL !== $revVar->type && $revVar->toBool();
         }
-        $result = VmUConverter::convert($object, $str, $reverse);
+        $result = VmUConverter::convert($object, $str, $reverse, $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }
@@ -762,6 +1203,81 @@ final class UConverterConvert extends VmClassMethod
             return;
         }
         $frame->returnVar->string($result);
+    }
+}
+
+/** UConverter::fromUCallback() — php-src converter.c default (#20917). */
+final class UConverterFromUCallback extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fromUCallback');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 5 || $argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::fromUCallback() expects exactly 4 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::fromUCallback()', $frame->vmContext);
+        $reason = (int) $frame->calledArgs[1]->resolveIndirect()->toInt();
+        // $source (array) and $codePoint accepted for signature parity; default ignores payload.
+        unset($frame->calledArgs[2], $frame->calledArgs[3]);
+        $errorVar = $frame->calledArgs[4];
+        $result = VmUConverter::defaultCallback($object, $reason, $errorVar);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (null === $result) {
+            $frame->returnVar->null();
+        } elseif (\is_string($result)) {
+            $frame->returnVar->string($result);
+        } elseif (\is_int($result)) {
+            $frame->returnVar->int($result);
+        } else {
+            $frame->returnVar->null();
+        }
+    }
+}
+
+/** UConverter::toUCallback() — php-src converter.c default (#20917). */
+final class UConverterToUCallback extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('toUCallback');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 5 || $argc > 5) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::toUCallback() expects exactly 4 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::toUCallback()', $frame->vmContext);
+        $reason = (int) $frame->calledArgs[1]->resolveIndirect()->toInt();
+        unset($frame->calledArgs[2], $frame->calledArgs[3]);
+        $errorVar = $frame->calledArgs[4];
+        $result = VmUConverter::defaultCallback($object, $reason, $errorVar);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (null === $result) {
+            $frame->returnVar->null();
+        } elseif (\is_string($result)) {
+            $frame->returnVar->string($result);
+        } elseif (\is_int($result)) {
+            $frame->returnVar->int($result);
+        } else {
+            $frame->returnVar->null();
+        }
     }
 }
 
@@ -782,7 +1298,7 @@ final class UConverterGetErrorCode extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getErrorCode()');
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getErrorCode()', $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }
@@ -870,7 +1386,7 @@ final class UConverterGetErrorMessage extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getErrorMessage()');
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getErrorMessage()', $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }
@@ -895,7 +1411,7 @@ final class UConverterGetSourceEncoding extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getSourceEncoding()');
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getSourceEncoding()', $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }
@@ -926,7 +1442,7 @@ final class UConverterGetDestinationEncoding extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getDestinationEncoding()');
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getDestinationEncoding()', $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }
@@ -957,7 +1473,7 @@ final class UConverterSetSourceEncoding extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::setSourceEncoding()');
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::setSourceEncoding()', $frame->vmContext);
         $encoding = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1],
             'UConverter::setSourceEncoding',
@@ -989,7 +1505,7 @@ final class UConverterSetDestinationEncoding extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::setDestinationEncoding()');
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::setDestinationEncoding()', $frame->vmContext);
         $encoding = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1],
             'UConverter::setDestinationEncoding',
@@ -1021,7 +1537,7 @@ final class UConverterGetSubstChars extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getSubstChars()');
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getSubstChars()', $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1052,7 +1568,7 @@ final class UConverterSetSubstChars extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::setSubstChars()');
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::setSubstChars()', $frame->vmContext);
         $chars = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[1],
             'UConverter::setSubstChars',
@@ -1204,7 +1720,7 @@ final class UConverterGetSourceType extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getSourceType()');
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getSourceType()', $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }
@@ -1240,7 +1756,7 @@ final class UConverterGetDestinationType extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getDestinationType()');
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getDestinationType()', $frame->vmContext);
         if (null === $frame->returnVar) {
             return;
         }
