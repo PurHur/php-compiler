@@ -26,16 +26,17 @@ final class XPathQuery extends DomClassMethod
         if (isset($frame->calledArgs[2])) {
             $context = $this->optionalDomNodeArg($frame->calledArgs[2], 'DOMXPath::query()', 1);
         }
-        $registerNodeNS = false;
+        // php-src: bool register_node_ns = intern->register_node_ns; optional |b overrides (#20842).
+        $registerNodeNS = DomRegistry::state($xpath)->xpathRegisterNodeNamespaces;
         if (isset($frame->calledArgs[3])) {
             $registerVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_BOOL !== $registerVar->type) {
+            if (Variable::TYPE_BOOLEAN !== $registerVar->type) {
                 throw new \TypeError(sprintf(
                     'DOMXPath::query(): Argument #3 ($registerNodeNS) must be of type bool, %s given',
                     VmDom::typeLabel($registerVar)
                 ));
             }
-            $registerNodeNS = $registerVar->bool;
+            $registerNodeNS = $registerVar->toBool();
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMXPath::query() requires VM context in this compiler build');

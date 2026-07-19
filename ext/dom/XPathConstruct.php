@@ -35,10 +35,23 @@ final class XPathConstruct extends DomClassMethod
                 $document->class->name
             ));
         }
+        // php-src: bool register_node_ns = true; zend_parse_parameters "O|b" (#20842).
+        $registerNodeNS = true;
+        if (isset($frame->calledArgs[2])) {
+            $regVar = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN !== $regVar->type) {
+                throw new \TypeError(sprintf(
+                    'DOMXPath::__construct(): Argument #2 ($registerNodeNS) must be of type bool, %s given',
+                    VmDom::typeLabel($regVar)
+                ));
+            }
+            $registerNodeNS = $regVar->toBool();
+        }
         VmDom::ensureDocument($document);
         if (DomRegistry::has($receiver)) {
             $state = DomRegistry::state($receiver);
             $state->xpathDocumentId = $document->id;
+            $state->xpathRegisterNodeNamespaces = $registerNodeNS;
 
             return;
         }
@@ -46,6 +59,7 @@ final class XPathConstruct extends DomClassMethod
         $state->nodeType = DomConstants::XML_XPATH;
         $state->nodeName = 'DOMXPath';
         $state->xpathDocumentId = $document->id;
+        $state->xpathRegisterNodeNamespaces = $registerNodeNS;
         DomRegistry::attach($receiver, $state);
     }
 }

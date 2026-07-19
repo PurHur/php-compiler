@@ -172,9 +172,20 @@ final class VmDomXPath
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode = null,
-        bool $registerNodeNS = false
+        bool $registerNodeNS = true
     ): Variable {
-        $nodeIds = self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+        try {
+            $nodeIds = self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+        } catch (\DOMException $e) {
+            // Legacy DOMXPath: libxml warning + false; Dom\XPath throws (#20842 / php-src xpath.c).
+            if ('Undefined namespace prefix' === $e->getMessage() && !VmDom::prefersDomNodeList($xpath)) {
+                $false = new Variable(Variable::TYPE_BOOLEAN);
+                $false->bool(false);
+
+                return $false;
+            }
+            throw $e;
+        }
 
         if (VmDom::prefersDomNodeList($xpath)) {
             return VmDom::createDomNodeList($ctx, $nodeIds);
@@ -188,37 +199,47 @@ final class VmDomXPath
         ObjectEntry $xpath,
         string $expression,
         ?ObjectEntry $contextNode = null,
-        bool $registerNodeNS = false
+        bool $registerNodeNS = true
     ): Variable {
         $expression = trim($expression);
-        $phpFn = self::tryEvaluatePhpFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
-        if (null !== $phpFn) {
-            return $phpFn;
-        }
-        $nsFn = self::tryEvaluateNamespacedPhpFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
-        if (null !== $nsFn) {
-            return $nsFn;
-        }
-        if (self::isBooleanExpression($expression)) {
-            $var = new Variable(Variable::TYPE_BOOLEAN);
-            $var->bool(self::evaluateBoolean($ctx, $xpath, $expression, $contextNode));
+        try {
+            $phpFn = self::tryEvaluatePhpFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+            if (null !== $phpFn) {
+                return $phpFn;
+            }
+            $nsFn = self::tryEvaluateNamespacedPhpFunction($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+            if (null !== $nsFn) {
+                return $nsFn;
+            }
+            if (self::isBooleanExpression($expression)) {
+                $var = new Variable(Variable::TYPE_BOOLEAN);
+                $var->bool(self::evaluateBoolean($ctx, $xpath, $expression, $contextNode, $registerNodeNS));
 
-            return $var;
-        }
-        if (self::isNumericExpression($expression)) {
-            $var = new Variable(Variable::TYPE_FLOAT);
-            $var->float(self::evaluateNumber($ctx, $xpath, $expression, $contextNode));
+                return $var;
+            }
+            if (self::isNumericExpression($expression)) {
+                $var = new Variable(Variable::TYPE_FLOAT);
+                $var->float(self::evaluateNumber($ctx, $xpath, $expression, $contextNode, $registerNodeNS));
 
-            return $var;
-        }
-        if (self::isStringExpression($expression)) {
-            $var = new Variable(Variable::TYPE_STRING);
-            $var->string(self::evaluateString($ctx, $xpath, $expression, $contextNode));
+                return $var;
+            }
+            if (self::isStringExpression($expression)) {
+                $var = new Variable(Variable::TYPE_STRING);
+                $var->string(self::evaluateString($ctx, $xpath, $expression, $contextNode, $registerNodeNS));
 
-            return $var;
-        }
+                return $var;
+            }
 
-        return self::query($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+            return self::query($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
+        } catch (\DOMException $e) {
+            if ('Undefined namespace prefix' === $e->getMessage() && !VmDom::prefersDomNodeList($xpath)) {
+                $false = new Variable(Variable::TYPE_BOOLEAN);
+                $false->bool(false);
+
+                return $false;
+            }
+            throw $e;
+        }
     }
 
     /**
@@ -243,14 +264,64 @@ final class VmDomXPath
             throw new \DOMException('Couldn\'t allocate a DOMXPath object');
         }
 
-        $context = $contextNode ?? $document;
+        // php-src: if (!nodep) nodep = xmlDocGetRootElement(docp) (#20842).
+        $context = self::resolveXPathContext($document, $contextNode);
         if (!VmDom::isDomNode($context)) {
             throw new \TypeError('DOMXPath::query(): Argument #2 ($context) must be of type ?DOMNode, DOMNode given');
         }
+
+        $savedNamespaces = null;
         if ($registerNodeNS) {
-            self::registerContextNodeNamespaces($xpath, $context);
+            // Temporary in-scope merge — do not permanently pollute registerNamespace() map (#20842).
+            $savedNamespaces = $state->xpathNamespaces;
+            $merged = $savedNamespaces;
+            foreach (self::collectInScopeNamespaces($context) as $prefix => $uri) {
+                if ('' === $prefix) {
+                    continue; // default NS is not an XPath prefix
+                }
+                $merged[$prefix] = $uri;
+            }
+            $state->xpathNamespaces = $merged;
+        }
+        try {
+            return self::evaluateNodeSetBody($ctx, $xpath, $expression, $context, $registerNodeNS, $state);
+        } finally {
+            if (null !== $savedNamespaces) {
+                $state->xpathNamespaces = $savedNamespaces;
+            }
+        }
+    }
+
+    /**
+     * php-src xpath.c — null context uses documentElement for both eval node and in-scope NS (#20842).
+     */
+    private static function resolveXPathContext(ObjectEntry $document, ?ObjectEntry $contextNode): ObjectEntry
+    {
+        if (null !== $contextNode) {
+            return $contextNode;
+        }
+        $rootVar = $document->getProperty(VmDom::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $rootVar->type) {
+            $root = $rootVar->toObject();
+            if (VmDom::isElement($root)) {
+                return $root;
+            }
         }
 
+        return $document;
+    }
+
+    /**
+     * @return list<int>
+     */
+    private static function evaluateNodeSetBody(
+        Context $ctx,
+        ObjectEntry $xpath,
+        string $expression,
+        ObjectEntry $context,
+        bool $registerNodeNS,
+        DomNodeState $state
+    ): array {
         // Union: a|b — document order, unique (#20257; C14N nodeset + attrs).
         if (str_contains($expression, '|')) {
             return self::evaluateUnionNodeSet($ctx, $xpath, $expression, $context, $registerNodeNS);
@@ -687,11 +758,11 @@ final class VmDomXPath
 
     private static function registerContextNodeNamespaces(ObjectEntry $xpath, ObjectEntry $context): void
     {
-        if (!VmDom::isElement($context)) {
-            return;
-        }
-        $state = DomRegistry::state($context);
-        foreach ($state->namespaceDeclarations as $prefix => $uri) {
+        // Prefer temporary merge in evaluateNodeSet (#20842). Kept for php:function paths.
+        foreach (self::collectInScopeNamespaces($context) as $prefix => $uri) {
+            if ('' === $prefix) {
+                continue;
+            }
             self::registerNamespace($xpath, $prefix, $uri);
         }
     }
@@ -1210,7 +1281,8 @@ final class VmDomXPath
         Context $ctx,
         ObjectEntry $xpath,
         string $expression,
-        ?ObjectEntry $contextNode
+        ?ObjectEntry $contextNode,
+        bool $registerNodeNS = true
     ): bool {
         if (0 === strcasecmp($expression, 'true()')) {
             return true;
@@ -1224,7 +1296,7 @@ final class VmDomXPath
                 throw new \DOMException('Invalid expression');
             }
 
-            return !self::booleanize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode));
+            return !self::booleanize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode, $registerNodeNS));
         }
         // starts-with(string, string) / contains(string, string) — XPath 1.0 (#20818).
         if (preg_match('~^starts-with\(~i', $expression)) {
@@ -1232,8 +1304,8 @@ final class VmDomXPath
             if (null === $args || 2 !== \count($args)) {
                 throw new \DOMException('Invalid expression');
             }
-            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
-            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
+            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode, $registerNodeNS));
+            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode, $registerNodeNS));
 
             return str_starts_with($haystack, $needle);
         }
@@ -1242,8 +1314,8 @@ final class VmDomXPath
             if (null === $args || 2 !== \count($args)) {
                 throw new \DOMException('Invalid expression');
             }
-            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
-            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
+            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode, $registerNodeNS));
+            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode, $registerNodeNS));
 
             return str_contains($haystack, $needle);
         }
@@ -1255,30 +1327,31 @@ final class VmDomXPath
                 $comparison['left'],
                 $comparison['op'],
                 $comparison['right'],
-                $contextNode
+                $contextNode,
+                $registerNodeNS
             );
         }
         if (preg_match('~^boolean\((.+)\)$~i', $expression, $matches)) {
             $inner = trim($matches[1]);
             if (preg_match('~^count\((.+)\)$~i', $inner)) {
-                return 0.0 !== self::evaluateNumber($ctx, $xpath, $inner, $contextNode);
+                return 0.0 !== self::evaluateNumber($ctx, $xpath, $inner, $contextNode, $registerNodeNS);
             }
             if (preg_match('~^string\((.+)\)$~i', $inner)) {
-                return '' !== self::evaluateString($ctx, $xpath, $inner, $contextNode);
+                return '' !== self::evaluateString($ctx, $xpath, $inner, $contextNode, $registerNodeNS);
             }
             if (preg_match('~^(number|sum)\((.+)\)$~i', $inner)) {
-                $number = self::evaluateNumber($ctx, $xpath, $inner, $contextNode);
+                $number = self::evaluateNumber($ctx, $xpath, $inner, $contextNode, $registerNodeNS);
 
                 return 0.0 !== $number && !is_nan($number);
             }
             try {
-                $nodeIds = self::evaluateNodeSet($ctx, $xpath, $inner, $contextNode, false);
+                $nodeIds = self::evaluateNodeSet($ctx, $xpath, $inner, $contextNode, $registerNodeNS);
 
                 return [] !== $nodeIds;
             } catch (\DOMException) {
                 // Fall through to string-value coercion for unsupported inner shapes.
             }
-            $value = self::evaluateScalar($ctx, $xpath, $inner, $contextNode);
+            $value = self::evaluateScalar($ctx, $xpath, $inner, $contextNode, $registerNodeNS);
 
             return self::booleanize($value);
         }
@@ -1290,17 +1363,18 @@ final class VmDomXPath
         Context $ctx,
         ObjectEntry $xpath,
         string $expression,
-        ?ObjectEntry $contextNode
+        ?ObjectEntry $contextNode,
+        bool $registerNodeNS = true
     ): float {
         $expression = trim($expression);
         if (self::isNumericLiteral($expression)) {
             return (float) $expression;
         }
         if (preg_match('~^count\((.+)\)$~i', $expression, $matches)) {
-            return (float) \count(self::evaluateNodeSet($ctx, $xpath, trim($matches[1]), $contextNode, false));
+            return (float) \count(self::evaluateNodeSet($ctx, $xpath, trim($matches[1]), $contextNode, $registerNodeNS));
         }
         if (preg_match('~^number\((.+)\)$~i', $expression, $matches)) {
-            $value = self::evaluateToMixed($ctx, $xpath, trim($matches[1]), $contextNode);
+            $value = self::evaluateToMixed($ctx, $xpath, trim($matches[1]), $contextNode, $registerNodeNS);
 
             return self::numberize($value);
         }
@@ -1313,7 +1387,7 @@ final class VmDomXPath
             if ([] === $args || '' === trim($args[0])) {
                 $str = self::stringify(self::contextNodeStringValue($xpath, $contextNode));
             } else {
-                $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
+                $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode, $registerNodeNS));
             }
 
             return (float) self::xpathStringLength($str);
@@ -1324,7 +1398,7 @@ final class VmDomXPath
             if (null === $inner || '' === $inner) {
                 throw new \DOMException('Invalid expression');
             }
-            $n = self::numberize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode));
+            $n = self::numberize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode, $registerNodeNS));
 
             return is_nan($n) || is_infinite($n) ? $n : floor($n);
         }
@@ -1333,7 +1407,7 @@ final class VmDomXPath
             if (null === $inner || '' === $inner) {
                 throw new \DOMException('Invalid expression');
             }
-            $n = self::numberize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode));
+            $n = self::numberize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode, $registerNodeNS));
 
             return is_nan($n) || is_infinite($n) ? $n : ceil($n);
         }
@@ -1342,7 +1416,7 @@ final class VmDomXPath
             if (null === $inner || '' === $inner) {
                 throw new \DOMException('Invalid expression');
             }
-            $n = self::numberize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode));
+            $n = self::numberize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode, $registerNodeNS));
             if (is_nan($n) || is_infinite($n)) {
                 return $n;
             }
@@ -1352,7 +1426,7 @@ final class VmDomXPath
         }
         // XPath 1.0 sum(node-set): coerce each string-value to number (#19682).
         if (preg_match('~^sum\((.+)\)$~i', $expression, $matches)) {
-            $nodeIds = self::evaluateNodeSet($ctx, $xpath, trim($matches[1]), $contextNode, false);
+            $nodeIds = self::evaluateNodeSet($ctx, $xpath, trim($matches[1]), $contextNode, $registerNodeNS);
             $sum = 0.0;
             foreach ($nodeIds as $nodeId) {
                 $node = DomRegistry::entry($nodeId);
@@ -1374,8 +1448,8 @@ final class VmDomXPath
         // Additive / multiplicative at top level (#20280).
         $additive = self::findTopLevelAdditive($expression);
         if (null !== $additive) {
-            $left = self::evaluateNumber($ctx, $xpath, $additive['left'], $contextNode);
-            $right = self::evaluateNumber($ctx, $xpath, $additive['right'], $contextNode);
+            $left = self::evaluateNumber($ctx, $xpath, $additive['left'], $contextNode, $registerNodeNS);
+            $right = self::evaluateNumber($ctx, $xpath, $additive['right'], $contextNode, $registerNodeNS);
             if ('+' === $additive['op']) {
                 return $left + $right;
             }
@@ -1384,8 +1458,8 @@ final class VmDomXPath
         }
         $multiplicative = self::findTopLevelMultiplicative($expression);
         if (null !== $multiplicative) {
-            $left = self::evaluateNumber($ctx, $xpath, $multiplicative['left'], $contextNode);
-            $right = self::evaluateNumber($ctx, $xpath, $multiplicative['right'], $contextNode);
+            $left = self::evaluateNumber($ctx, $xpath, $multiplicative['left'], $contextNode, $registerNodeNS);
+            $right = self::evaluateNumber($ctx, $xpath, $multiplicative['right'], $contextNode, $registerNodeNS);
             if ('*' === $multiplicative['op']) {
                 return $left * $right;
             }
@@ -1404,7 +1478,8 @@ final class VmDomXPath
         Context $ctx,
         ObjectEntry $xpath,
         string $expression,
-        ?ObjectEntry $contextNode
+        ?ObjectEntry $contextNode,
+        bool $registerNodeNS = true
     ): string {
         $literal = self::tryParseStringLiteral($expression);
         if (null !== $literal) {
@@ -1428,7 +1503,7 @@ final class VmDomXPath
 
                 return DomRegistry::state($node)->nodeName ?? '';
             }
-            $nodeIds = self::evaluateNodeSet($ctx, $xpath, $inner, $contextNode, false);
+            $nodeIds = self::evaluateNodeSet($ctx, $xpath, $inner, $contextNode, $registerNodeNS);
             if ([] === $nodeIds) {
                 return '';
             }
@@ -1445,7 +1520,7 @@ final class VmDomXPath
             if (null === $args || \count($args) > 1) {
                 throw new \DOMException('Invalid expression');
             }
-            $node = self::firstNodeFromOptionalArg($ctx, $xpath, $args, $contextNode);
+            $node = self::firstNodeFromOptionalArg($ctx, $xpath, $args, $contextNode, $registerNodeNS);
             if (null === $node) {
                 return '';
             }
@@ -1460,7 +1535,7 @@ final class VmDomXPath
             if (null === $args || \count($args) > 1) {
                 throw new \DOMException('Invalid expression');
             }
-            $node = self::firstNodeFromOptionalArg($ctx, $xpath, $args, $contextNode);
+            $node = self::firstNodeFromOptionalArg($ctx, $xpath, $args, $contextNode, $registerNodeNS);
             if (null === $node) {
                 return '';
             }
@@ -1475,7 +1550,7 @@ final class VmDomXPath
             }
             $out = '';
             foreach ($args as $arg) {
-                $out .= self::stringify(self::evaluateToMixed($ctx, $xpath, trim($arg), $contextNode));
+                $out .= self::stringify(self::evaluateToMixed($ctx, $xpath, trim($arg), $contextNode, $registerNodeNS));
             }
 
             return $out;
@@ -1486,8 +1561,8 @@ final class VmDomXPath
             if (null === $args || 2 !== \count($args)) {
                 throw new \DOMException('Invalid expression');
             }
-            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
-            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
+            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode, $registerNodeNS));
+            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode, $registerNodeNS));
             if ('' === $needle) {
                 return '';
             }
@@ -1500,8 +1575,8 @@ final class VmDomXPath
             if (null === $args || 2 !== \count($args)) {
                 throw new \DOMException('Invalid expression');
             }
-            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
-            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
+            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode, $registerNodeNS));
+            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode, $registerNodeNS));
             if ('' === $needle) {
                 return $haystack;
             }
@@ -1515,11 +1590,11 @@ final class VmDomXPath
             if (null === $args || \count($args) < 2 || \count($args) > 3) {
                 throw new \DOMException('Invalid expression');
             }
-            $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
-            $start = self::numberize(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
+            $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode, $registerNodeNS));
+            $start = self::numberize(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode, $registerNodeNS));
             $len = null;
             if (isset($args[2])) {
-                $len = self::numberize(self::evaluateToMixed($ctx, $xpath, trim($args[2]), $contextNode));
+                $len = self::numberize(self::evaluateToMixed($ctx, $xpath, trim($args[2]), $contextNode, $registerNodeNS));
             }
 
             return self::xpathSubstring($str, $start, $len);
@@ -1533,7 +1608,7 @@ final class VmDomXPath
             if ([] === $args || '' === trim($args[0])) {
                 $str = self::stringify(self::contextNodeStringValue($xpath, $contextNode));
             } else {
-                $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
+                $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode, $registerNodeNS));
             }
 
             return self::xpathNormalizeSpace($str);
@@ -1544,9 +1619,9 @@ final class VmDomXPath
             if (null === $args || 3 !== \count($args)) {
                 throw new \DOMException('Invalid expression');
             }
-            $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
-            $from = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
-            $to = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[2]), $contextNode));
+            $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode, $registerNodeNS));
+            $from = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode, $registerNodeNS));
+            $to = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[2]), $contextNode, $registerNodeNS));
 
             return self::xpathTranslate($str, $from, $to);
         }
@@ -1560,7 +1635,7 @@ final class VmDomXPath
         if ('' === $inner) {
             return self::stringify(self::contextNodeStringValue($xpath, $contextNode));
         }
-        $value = self::evaluateToMixed($ctx, $xpath, trim($inner), $contextNode);
+        $value = self::evaluateToMixed($ctx, $xpath, trim($inner), $contextNode, $registerNodeNS);
 
         return self::stringify($value);
     }
@@ -1574,23 +1649,24 @@ final class VmDomXPath
         Context $ctx,
         ObjectEntry $xpath,
         string $expression,
-        ?ObjectEntry $contextNode
+        ?ObjectEntry $contextNode,
+        bool $registerNodeNS = true
     ): mixed {
         $expression = trim($expression);
         if ('' === $expression) {
             throw new \DOMException('Invalid expression');
         }
         if (self::isBooleanExpression($expression)) {
-            return self::evaluateBoolean($ctx, $xpath, $expression, $contextNode);
+            return self::evaluateBoolean($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
         }
         if (self::isNumericExpression($expression)) {
-            return self::evaluateNumber($ctx, $xpath, $expression, $contextNode);
+            return self::evaluateNumber($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
         }
         if (self::isStringExpression($expression)) {
-            return self::evaluateString($ctx, $xpath, $expression, $contextNode);
+            return self::evaluateString($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
         }
 
-        return self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, false);
+        return self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
     }
 
     /**
@@ -1603,10 +1679,11 @@ final class VmDomXPath
         string $leftExpr,
         string $op,
         string $rightExpr,
-        ?ObjectEntry $contextNode
+        ?ObjectEntry $contextNode,
+        bool $registerNodeNS = true
     ): bool {
-        $left = self::evaluateToMixed($ctx, $xpath, $leftExpr, $contextNode);
-        $right = self::evaluateToMixed($ctx, $xpath, $rightExpr, $contextNode);
+        $left = self::evaluateToMixed($ctx, $xpath, $leftExpr, $contextNode, $registerNodeNS);
+        $right = self::evaluateToMixed($ctx, $xpath, $rightExpr, $contextNode, $registerNodeNS);
 
         if (is_array($left) || is_array($right)) {
             return self::compareWithNodeSet($left, $op, $right);
@@ -1846,7 +1923,8 @@ final class VmDomXPath
         Context $ctx,
         ObjectEntry $xpath,
         array $args,
-        ?ObjectEntry $contextNode
+        ?ObjectEntry $contextNode,
+        bool $registerNodeNS = true
     ): ?ObjectEntry {
         if ([] === $args || '' === trim($args[0])) {
             $node = $contextNode;
@@ -1857,7 +1935,7 @@ final class VmDomXPath
 
             return (null !== $node && DomRegistry::has($node)) ? $node : null;
         }
-        $nodeIds = self::evaluateNodeSet($ctx, $xpath, trim($args[0]), $contextNode, false);
+        $nodeIds = self::evaluateNodeSet($ctx, $xpath, trim($args[0]), $contextNode, $registerNodeNS);
         if ([] === $nodeIds) {
             return null;
         }
@@ -2174,9 +2252,10 @@ final class VmDomXPath
         Context $ctx,
         ObjectEntry $xpath,
         string $expression,
-        ?ObjectEntry $contextNode
+        ?ObjectEntry $contextNode,
+        bool $registerNodeNS = true
     ): mixed {
-        $nodeIds = self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, false);
+        $nodeIds = self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
         if ([] === $nodeIds) {
             return '';
         }
@@ -2495,25 +2574,49 @@ final class VmDomXPath
         }
         if (self::isBooleanExpression($expression)) {
             $var = new Variable(Variable::TYPE_BOOLEAN);
-            $var->bool(self::evaluateBoolean($ctx, $xpath, $expression, $contextNode));
+            $var->bool(self::evaluateBoolean(
+                $ctx,
+                $xpath,
+                $expression,
+                $contextNode,
+                DomRegistry::state($xpath)->xpathRegisterNodeNamespaces
+            ));
 
             return $var;
         }
         if (self::isNumericExpression($expression)) {
             $var = new Variable(Variable::TYPE_FLOAT);
-            $var->float(self::evaluateNumber($ctx, $xpath, $expression, $contextNode));
+            $var->float(self::evaluateNumber(
+                $ctx,
+                $xpath,
+                $expression,
+                $contextNode,
+                DomRegistry::state($xpath)->xpathRegisterNodeNamespaces
+            ));
 
             return $var;
         }
         if (self::isStringExpression($expression)) {
             $var = new Variable(Variable::TYPE_STRING);
-            $var->string(self::evaluateString($ctx, $xpath, $expression, $contextNode));
+            $var->string(self::evaluateString(
+                $ctx,
+                $xpath,
+                $expression,
+                $contextNode,
+                DomRegistry::state($xpath)->xpathRegisterNodeNamespaces
+            ));
 
             return $var;
         }
         // Node-set argument — php:function passes DOMNode[]; functionString coerces to string-value
         // of the first node (php-src xpath_callbacks.c; #19331 / #19709).
-        $nodeIds = self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, false);
+        $nodeIds = self::evaluateNodeSet(
+            $ctx,
+            $xpath,
+            $expression,
+            $contextNode,
+            DomRegistry::state($xpath)->xpathRegisterNodeNamespaces
+        );
         if ($nodesetToString) {
             $var = new Variable(Variable::TYPE_STRING);
             if ([] === $nodeIds) {

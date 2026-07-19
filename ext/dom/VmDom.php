@@ -75,6 +75,12 @@ final class VmDom
 
     public const CLASS_XPATH = 'domxpath';
 
+    /** php-src ext/dom/php_dom.stub.php — DOMXPath::$registerNodeNamespaces (#20842). */
+    public const PROP_REGISTER_NODE_NAMESPACES = 'registerNodeNamespaces';
+
+    /** php-src ext/dom/php_dom.stub.php — DOMXPath::$document (#20842). */
+    public const PROP_XPATH_DOCUMENT = 'document';
+
     public const PROP_FORMAT_OUTPUT = 'formatOutput';
 
     public const PROP_IMPLEMENTATION = 'implementation';
