@@ -7,14 +7,16 @@ namespace PHPCompiler\ext\ftp;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
 /**
  * ftp_connect() — TCP connect + FTP greeting (php-src ext/ftp/php_ftp.c; #3353).
+ *
+ * Z_PARAM_STR $hostname — null TypeError on 8.4 forward profile (#20484).
  */
 final class ftp_connect extends Internal
 {
@@ -32,11 +34,12 @@ final class ftp_connect extends Internal
                 $argc
             ));
         }
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#20484, ext/ftp/ftp.stub.php)
+        $hostname = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'ftp_connect', 0, 'hostname');
         if (null === $frame->returnVar) {
             return;
         }
 
-        $hostname = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'ftp_connect', 0, 'hostname');
         $port = 21;
         if ($argc >= 2) {
             $port = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'ftp_connect', 2, 'port');
@@ -58,6 +61,32 @@ final class ftp_connect extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException(\sprintf(
+                'ftp_connect() expects from 1 to 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $hostnameArg = $args[0];
+        // Always run Z_PARAM_STR first so null TypeError IR is emitted before the
+        // VM-only LogicException (gethostbyname / curl_escape pattern; #20484).
+        $hostname = JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $hostnameArg,
+            'ftp_connect',
+            0,
+            'hostname'
+        );
+        $nullOperand = JITVariable::TYPE_NULL === $hostnameArg->type
+            || ($hostnameArg->isNullConstant ?? false);
+        if (
+            $nullOperand
+            && ($context->callerStrictTypes || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile())
+        ) {
+            return $hostname;
+        }
+
         throw new \LogicException('ftp_connect() is not implemented for JIT in this compiler build (issue #3353)');
     }
 }
