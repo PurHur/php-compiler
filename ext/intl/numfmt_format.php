@@ -39,7 +39,11 @@ final class numfmt_format extends Internal
             ));
         }
         $num = VmNumberFormatter::coerceFloatArg($frame->calledArgs[1], 'numfmt_format', 1, 'num');
-        $result = VmNumberFormatter::format($receiver->toObject(), $num);
+        $type = VmNumberFormatter::TYPE_DEFAULT;
+        if ($argc >= 3) {
+            $type = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'numfmt_format', 2, 'type');
+        }
+        $result = VmNumberFormatter::format($receiver->toObject(), $num, $type);
         if (null === $frame->returnVar) {
             return;
         }
