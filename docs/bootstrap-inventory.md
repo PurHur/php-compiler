@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5810 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17152 |
+| Source constructs flagged (warnings) | 17186 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -819,7 +819,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
 | `ext/intl/VmBreakIterator.php` | 0 | 31 |
-| `ext/intl/VmCollator.php` | 0 | 19 |
+| `ext/intl/VmCollator.php` | 0 | 53 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
 | `ext/intl/VmIntlCalendar.php` | 0 | 22 |
@@ -11341,25 +11341,59 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmCollator.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 77)
-- new Variable (line 81)
-- new CollatorCreate (line 88)
-- new CollatorCompare (line 91)
-- new CollatorAsort (line 94)
-- new Error (line 108)
-- new ObjectEntry (line 112)
-- new Variable (line 343)
-- new Variable (line 345)
-- new HashTable (line 358)
-- new Variable (line 361)
-- new Error (line 368)
-- new ArgumentCountError (line 439)
-- new ArgumentCountError (line 464)
-- new Error (line 472)
-- new ArgumentCountError (line 501)
-- new Error (line 509)
-- 19 class method(s)
-- 1 closure(s)
+- new ClassEntry (line 118)
+- new Variable (line 122)
+- new CollatorCreate (line 130)
+- new CollatorCompare (line 131)
+- new CollatorAsort (line 132)
+- new CollatorSort (line 133)
+- new CollatorSortWithSortKeys (line 134)
+- new CollatorGetSortKey (line 135)
+- new CollatorGetStrength (line 136)
+- new CollatorSetStrength (line 137)
+- new CollatorGetAttribute (line 138)
+- new CollatorSetAttribute (line 139)
+- new CollatorGetLocale (line 140)
+- new CollatorGetErrorCode (line 141)
+- new CollatorGetErrorMessage (line 142)
+- new Error (line 160)
+- new ObjectEntry (line 164)
+- new Variable (line 255)
+- new HashTable (line 259)
+- new Variable (line 624)
+- new HashTable (line 628)
+- new Variable (line 859)
+- new Variable (line 861)
+- new HashTable (line 874)
+- new Variable (line 877)
+- new Error (line 884)
+- new ArgumentCountError (line 966)
+- new ArgumentCountError (line 991)
+- new Error (line 999)
+- new ArgumentCountError (line 1028)
+- new Error (line 1036)
+- new ArgumentCountError (line 1062)
+- new Error (line 1070)
+- new ArgumentCountError (line 1096)
+- new Error (line 1104)
+- new ArgumentCountError (line 1126)
+- new Error (line 1134)
+- new ArgumentCountError (line 1162)
+- new Error (line 1170)
+- new ArgumentCountError (line 1191)
+- new Error (line 1199)
+- new ArgumentCountError (line 1222)
+- new Error (line 1230)
+- new ArgumentCountError (line 1258)
+- new Error (line 1266)
+- new ArgumentCountError (line 1290)
+- new Error (line 1298)
+- new ArgumentCountError (line 1326)
+- new Error (line 1334)
+- new ArgumentCountError (line 1355)
+- new Error (line 1363)
+- 45 class method(s)
+- 2 closure(s)
 
 ### `ext/intl/VmGrapheme.php`
 
@@ -40917,7 +40951,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ParserFactory (line 46)
 - new CompileFatal (line 88)
 - new NodeTraverser (line 126)
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/NewDereferenceableSyntaxRejector.php`
 

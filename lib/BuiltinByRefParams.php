@@ -154,7 +154,9 @@ final class BuiltinByRefParams
             case 'uuid_generate':
                 return [0];
             case 'collator::asort':
-                // $this + &$array (+ optional flags) — php-src collator.stub.php (#5747)
+            case 'collator::sort':
+            case 'collator::sortwithsortkeys':
+                // $this + &$array (+ optional flags) — php-src collator.stub.php (#5747, #20717)
                 return [1];
             case 'redis::scan':
                 // $this + &$iterator (+ optional pattern/count) — phpredis redis.stub.php (#20682)
