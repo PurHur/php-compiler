@@ -11,28 +11,35 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** stream_set_timeout() — VM via VmFs; JIT/AOT via __compiler_stream_set_timeout (issue #3754). */
+/**
+ * stream_set_timeout() — VM via VmFs; JIT/AOT via __compiler_stream_set_timeout (issue #3754).
+ *
+ * Also registered as socket_set_timeout() via PHP_FALIAS (issue #20903).
+ *
+ * php-src: ext/standard/basic_functions.stub.php — @alias stream_set_timeout
+ */
 final class stream_set_timeout_ extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'stream_set_timeout')
     {
-        parent::__construct('stream_set_timeout');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
     {
+        $fn = $this->getName();
         $argc = \count($frame->calledArgs);
         if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('stream_set_timeout() requires two or three arguments in this compiler build');
+            throw new \LogicException($fn.'() requires two or three arguments in this compiler build');
         }
         $handle = VmStreamArg::requireStreamHandle(
             $frame->calledArgs[0]->resolveIndirect(),
-            'stream_set_timeout',
+            $fn,
             1
         );
         $seconds = VmMath::parseIntBuiltinArg(
             $frame->calledArgs[1]->resolveIndirect(),
-            'stream_set_timeout',
+            $fn,
             2,
             'seconds'
         );
@@ -40,7 +47,7 @@ final class stream_set_timeout_ extends Internal
         if (3 === $argc) {
             $microseconds = VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[2]->resolveIndirect(),
-                'stream_set_timeout',
+                $fn,
                 3,
                 'microseconds'
             );
@@ -53,22 +60,23 @@ final class stream_set_timeout_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $fn = $this->getName();
         $argc = \count($args);
         if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('stream_set_timeout() requires two or three arguments in this compiler build');
+            throw new \LogicException($fn.'() requires two or three arguments in this compiler build');
         }
         $i64 = $context->getTypeFromString('int64');
         $usec = 3 === $argc
-            ? JitSleep::zParamLong($context, $args[2], 'stream_set_timeout', 3, 'microseconds')
+            ? JitSleep::zParamLong($context, $args[2], $fn, 3, 'microseconds')
             : $i64->constInt(0, false);
 
         return JitStreamSetTimeout::invoke(
             $context,
             $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[0], 'stream_set_timeout() stream'),
+                JitLongArg::lower($context, $args[0], $fn.'() stream'),
                 $i64
             ),
-            JitSleep::zParamLong($context, $args[1], 'stream_set_timeout', 2, 'seconds'),
+            JitSleep::zParamLong($context, $args[1], $fn, 2, 'seconds'),
             $usec
         );
     }

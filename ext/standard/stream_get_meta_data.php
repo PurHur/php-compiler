@@ -14,23 +14,27 @@ use PHPLLVM\Value;
 /**
  * stream_get_meta_data() — stream resource introspection (issue #6007).
  *
+ * Also registered as socket_get_status() via PHP_FALIAS (issue #20903).
+ *
  * php-src: ext/standard/streams.c — PHP_FUNCTION(stream_get_meta_data)
+ * php-src: ext/standard/basic_functions.stub.php — @alias stream_get_meta_data
  */
 final class stream_get_meta_data extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'stream_get_meta_data')
     {
-        parent::__construct('stream_get_meta_data');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
     {
+        $fn = $this->getName();
         if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('stream_get_meta_data() requires exactly one argument in this compiler build');
+            throw new \LogicException($fn.'() requires exactly one argument in this compiler build');
         }
         $handle = VmStreamArg::requireStreamHandle(
             $frame->calledArgs[0]->resolveIndirect(),
-            'stream_get_meta_data'
+            $fn
         );
         if (null === $frame->returnVar) {
             return;
@@ -46,14 +50,15 @@ final class stream_get_meta_data extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $fn = $this->getName();
         if (1 !== \count($args)) {
-            throw new \LogicException('stream_get_meta_data() requires exactly one argument in this compiler build');
+            throw new \LogicException($fn.'() requires exactly one argument in this compiler build');
         }
 
         return JitStreamGetMetaData::invoke(
             $context,
             $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[0], 'stream_get_meta_data() stream'),
+                JitLongArg::lower($context, $args[0], $fn.'() stream'),
                 $context->getTypeFromString('int64')
             )
         );
