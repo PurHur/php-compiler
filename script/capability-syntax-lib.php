@@ -1310,6 +1310,13 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/standard/stream_supports.php',
         ],
         [
+            'names' => ['clamp'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsClamp'],
+            'since' => '8.6.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/clamp.php',
+        ],
+        [
             'names' => ['stream_last_errors', 'stream_clear_errors'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsStreamErrorApi'],
             'since' => '8.6.0',

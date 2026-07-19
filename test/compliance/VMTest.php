@@ -37,8 +37,8 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'get_object_id_phantom')) {
                 continue;
             }
-            if (!CompilerVersion::supportsClamp()
-                && str_contains($name, 'clamp')) {
+            if (CompilerVersion::supportsClamp()
+                && str_contains($name, 'clamp_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsHex2binStrict()
