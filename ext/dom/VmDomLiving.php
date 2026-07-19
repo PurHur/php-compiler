@@ -174,6 +174,12 @@ final class VmDomLiving
         return self::CLASS_ELEMENT === $lc || self::CLASS_HTML_ELEMENT === $lc;
     }
 
+    /** Dom\Attr instance (php-src php_dom.stub.php; #21083). */
+    public static function isLivingAttr(ObjectEntry $entry): bool
+    {
+        return self::CLASS_ATTR === strtolower($entry->class->name);
+    }
+
     /**
      * True when $entry is under Dom\Node (php-src dom_modern_node_class_entry; #20940).
      */
@@ -1166,6 +1172,18 @@ final class VmDomLiving
     public static function renameElement(ObjectEntry $element, ?string $namespaceUri, string $qualifiedName): void
     {
         VmDom::renameElement($element, $namespaceUri, $qualifiedName);
+    }
+
+    /**
+     * Dom\Attr::rename() — QName + namespaceURI update (php-src element.c alias; #21083).
+     */
+    public static function renameAttr(
+        Context $ctx,
+        ObjectEntry $attr,
+        ?string $namespaceUri,
+        string $qualifiedName
+    ): void {
+        VmDom::renameAttr($ctx, $attr, $namespaceUri, $qualifiedName);
     }
 
     /**

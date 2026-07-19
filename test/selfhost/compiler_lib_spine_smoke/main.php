@@ -230,6 +230,7 @@ require_once __DIR__.'/../../../ext/curl/curl_unescape.php';
 require_once __DIR__.'/../../../ext/curl/curl_upkeep.php';
 require_once __DIR__.'/../../../ext/curl/curl_version.php';
 require_once __DIR__.'/../../../ext/dom/AttrIsId.php';
+require_once __DIR__.'/../../../ext/dom/AttrRename.php';
 require_once __DIR__.'/../../../ext/dom/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/dom/CharacterDataAppendData.php';
 require_once __DIR__.'/../../../ext/dom/CharacterDataDeleteData.php';

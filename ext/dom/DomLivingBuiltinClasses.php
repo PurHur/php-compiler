@@ -197,6 +197,10 @@ final class DomLivingBuiltinClasses
         $specifiedDefault->bool(true);
         $attr->properties[] = new ClassProperty(VmDom::PROP_SPECIFIED, $specifiedDefault, new Variable(Variable::TYPE_BOOLEAN));
         self::copyMethods($ctx->classes[VmDom::CLASS_ATTR] ?? null, $attr);
+        // Dom\Attr::rename — php-src @implementation-alias Dom\Element::rename (#21083).
+        $attr->methods['rename'] = new AttrRename();
+        $attr->methodVisibility['rename'] = $pub;
+        $attr->methodNames['rename'] = 'rename';
         $ctx->classes[VmDomLiving::CLASS_ATTR] = $attr;
 
         $fragment = new ClassEntry('Dom\\DocumentFragment');

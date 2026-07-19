@@ -10171,7 +10171,7 @@ final class VmDom
     }
 
     /**
-     * Dom\Element::rename() / Dom\Attr::rename() — update QName + namespaceURI
+     * Dom\Element::rename() — update QName + namespaceURI
      * (php-src ext/dom/element.c PHP_METHOD(Dom_Element, rename); #20924).
      *
      * @throws \DOMException
@@ -10206,6 +10206,89 @@ final class VmDom
         $state->namespaceUri = $namespaceUri;
         $state->nodeName = $qualifiedName;
         self::writeElementNameSlots($element, $qualifiedName);
+    }
+
+    /**
+     * Dom\Attr::rename() — update QName + namespaceURI; remap owner attribute maps
+     * (php-src ext/dom/element.c Dom_Element::rename attribute branch; #21083).
+     *
+     * @throws \DOMException
+     */
+    public static function renameAttr(
+        Context $ctx,
+        ObjectEntry $attr,
+        ?string $namespaceUri,
+        string $qualifiedName
+    ): void {
+        if (!self::isAttr($attr)) {
+            throw new \DOMException('Not an attribute node');
+        }
+        self::assertValidElementNSName($namespaceUri, $qualifiedName);
+        [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
+
+        $attrState = DomRegistry::state($attr);
+        $oldQName = $attrState->nodeName;
+        $nsArg = (null === $namespaceUri || '' === $namespaceUri) ? null : $namespaceUri;
+
+        $owner = null;
+        $ownerElementId = $attrState->ownerElementId;
+        if (null !== $ownerElementId) {
+            $owner = DomRegistry::entry($ownerElementId);
+            if (null !== $owner && !self::isElement($owner)) {
+                $owner = null;
+            }
+        }
+
+        if (null !== $owner) {
+            $existingQName = self::findAttributeQNameByNsAndLocal($owner, $nsArg, $localName);
+            if (null !== $existingQName && $existingQName !== $oldQName) {
+                throw new \DOMException(
+                    'An attribute with the given name in the given namespace already exists',
+                    DomExceptionConstants::INVALID_MODIFICATION_ERR
+                );
+            }
+
+            $elementState = DomRegistry::state($owner);
+            $value = $elementState->attributes[$oldQName] ?? ($attrState->textContent ?? '');
+            $idBearing = self::elementAttributeIsIdBearing($owner, $oldQName);
+            $previousIdValue = $idBearing ? ($elementState->attributes[$oldQName] ?? null) : null;
+
+            if ($oldQName !== $qualifiedName) {
+                unset(
+                    $elementState->attributes[$oldQName],
+                    $elementState->attributeNamespaces[$oldQName],
+                    $elementState->attributeNodeIds[$oldQName]
+                );
+                if (null !== $elementState->idAttributeName && $oldQName === $elementState->idAttributeName) {
+                    $elementState->idAttributeName = $qualifiedName;
+                }
+                if (isset($elementState->attributeIsId[$oldQName])) {
+                    $elementState->attributeIsId[$qualifiedName] = $elementState->attributeIsId[$oldQName];
+                    unset($elementState->attributeIsId[$oldQName]);
+                }
+            }
+            $elementState->attributes[$qualifiedName] = $value;
+            $elementState->attributeNamespaces[$qualifiedName] = $namespaceUri ?? '';
+            $elementState->attributeNodeIds[$qualifiedName] = $attr->id;
+            self::rebindElementIdOnAttributeWrite($owner, $qualifiedName, $previousIdValue, true, $idBearing);
+        }
+
+        $attrState->localName = $localName;
+        $attrState->prefix = '' !== $prefix ? $prefix : null;
+        $attrState->namespaceUri = $namespaceUri;
+        $attrState->nodeName = $qualifiedName;
+        if ($attr->hasProperty(self::PROP_NODE_NAME)) {
+            $attr->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
+        }
+        // php-src Attr.name is the local name (libxml attr->name), not the QName.
+        if ($attr->hasProperty(self::PROP_NAME)) {
+            $attr->getProperty(self::PROP_NAME)->string($localName);
+        }
+
+        if (null !== $owner) {
+            self::ensureNamespaceDeclarationForPrefixedAttribute($owner, $attrState->prefix, $attrState->namespaceUri);
+            self::syncElementAttributes($ctx, $owner);
+        }
     }
 
     /**
