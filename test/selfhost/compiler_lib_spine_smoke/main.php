@@ -6111,4 +6111,15 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/dom/DocumentImportLegacyNode.php';
+require_once __DIR__.'/../../../ext/intl/LocaleAddLikelySubtags.php';
+require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayKeyword.php';
+require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayKeywordValue.php';
+require_once __DIR__.'/../../../ext/intl/LocaleIsRightToLeft.php';
+require_once __DIR__.'/../../../ext/intl/LocaleMinimizeSubtags.php';
+require_once __DIR__.'/../../../ext/intl/locale_add_likely_subtags.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_display_keyword.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_display_keyword_value.php';
+require_once __DIR__.'/../../../ext/intl/locale_is_right_to_left.php';
+require_once __DIR__.'/../../../ext/intl/locale_minimize_subtags.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
