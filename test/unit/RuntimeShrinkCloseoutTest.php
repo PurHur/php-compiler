@@ -85,6 +85,7 @@ final class RuntimeShrinkCloseoutTest extends TestCase
             'lib/JIT/Builtin/StringFsDirJit.php' => 'StringFsDirJit',
             'ext/standard/stripcslashes.php' => 'VmString',
             'lib/JIT/Builtin/OpensslSignRuntime.php' => 'OpensslSignJitHelper',
+            'lib/JIT/Builtin/OpensslEncryptRuntime.php' => 'OpensslEncryptJitHelper',
             'lib/JIT/Builtin/LibcryptRuntime.php' => 'LibcryptJitHelper',
             'ext/standard/LibcryptJitHelper.php' => 'cryptArgv',
         ];
