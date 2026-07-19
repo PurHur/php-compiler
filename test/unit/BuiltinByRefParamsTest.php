@@ -254,4 +254,12 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([2, 3], BuiltinByRefParams::forFunction('NumberFormatter::parseCurrency'));
         $this->assertSame([2, 3], BuiltinByRefParams::forFunction('numberformatter::parsecurrency'));
     }
+
+    public function testNumfmtParseOffsetByRef(): void
+    {
+        // optional &$offset after $type — php-src formatter.stub.php (#21139)
+        $this->assertSame([3], BuiltinByRefParams::forFunction('numfmt_parse'));
+        $this->assertSame([3], BuiltinByRefParams::forFunction('NumberFormatter::parse'));
+        $this->assertSame([3], BuiltinByRefParams::forFunction('numberformatter::parse'));
+    }
 }

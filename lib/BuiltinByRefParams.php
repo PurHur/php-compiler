@@ -170,6 +170,12 @@ final class BuiltinByRefParams
             case 'collator_sort_with_sort_keys':
                 // $object + &$array (+ optional flags) — php-src collator.stub.php (#20838)
                 return [1];
+            case 'numberformatter::parse':
+                // $this + $string + optional $type + optional &$offset — php-src formatter.stub.php (#21139)
+                return [3];
+            case 'numfmt_parse':
+                // $formatter + $string + optional $type + optional &$offset — php-src formatter.stub.php (#21139)
+                return [3];
             case 'numberformatter::parsecurrency':
                 // $this + $string + &$currency + optional &$offset — php-src formatter.stub.php (#20728, #21127)
                 return [2, 3];

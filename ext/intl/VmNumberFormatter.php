@@ -375,10 +375,20 @@ final class VmNumberFormatter
     }
 
     /**
+     * numfmt_parse / NumberFormatter::parse — php-src formatter_main.c (#20728, #21139).
+     *
+     * Optional by-ref $offset is both parse start (bytes) and end (bytes consumed) like ICU.
+     *
+     * @param-out int|null $offset
+     *
      * @return int|float|false
      */
-    public static function parse(ObjectEntry $formatter, string $value, int $type = self::TYPE_DOUBLE)
-    {
+    public static function parse(
+        ObjectEntry $formatter,
+        string $value,
+        int $type = self::TYPE_DOUBLE,
+        ?int &$offset = null
+    ) {
         $state = self::$state[$formatter->id] ?? null;
         if (null === $state) {
             self::fail($formatter, 'numfmt_parse: bad formatter: U_ILLEGAL_ARGUMENT_ERROR');
@@ -395,11 +405,41 @@ final class VmNumberFormatter
                 'NumberFormatter::parse(): Argument #2 ($type) must be a NumberFormatter::TYPE_* constant'
             );
         }
-        $num = self::parseNumberString($value, $state['locale']);
-        if (null === $num) {
-            self::fail($formatter, 'numfmt_parse: Number parsing failed: U_PARSE_ERROR');
+        $hasOffset = null !== $offset;
+        $start = 0;
+        if ($hasOffset) {
+            $start = $offset ?? 0;
+            if ($start < 0) {
+                $start = 0;
+            }
+            if ($start > \strlen($value)) {
+                self::fail($formatter, 'numfmt_parse: Number parsing failed: U_PARSE_ERROR');
 
-            return false;
+                return false;
+            }
+            $slice = \substr($value, $start);
+            $prefix = self::matchNumberPrefix($slice, $state['locale']);
+            if (null === $prefix) {
+                self::fail($formatter, 'numfmt_parse: Number parsing failed: U_PARSE_ERROR');
+
+                return false;
+            }
+            [$num, $consumed] = $prefix;
+            $offset = $start + $consumed;
+        } else {
+            // Without $offset, ICU still parses a numeric prefix (stops before trailing junk).
+            $prefix = self::matchNumberPrefix($value, $state['locale']);
+            if (null === $prefix) {
+                // Fallback: historic full-string sanitize for whitespace / odd separators.
+                $num = self::parseNumberString($value, $state['locale']);
+                if (null === $num) {
+                    self::fail($formatter, 'numfmt_parse: Number parsing failed: U_PARSE_ERROR');
+
+                    return false;
+                }
+            } else {
+                $num = $prefix[0];
+            }
         }
         self::clearObjectError($formatter);
         IntlError::clear();
@@ -1090,7 +1130,7 @@ final class NumberFormatterFormatCurrency extends VmClassMethod
     }
 }
 
-/** NumberFormatter::parse() — php-src numfmt_parse (#20728). */
+/** NumberFormatter::parse() — php-src numfmt_parse (#20728, #21139). */
 final class NumberFormatterParse extends VmClassMethod
 {
     public function __construct()
@@ -1117,15 +1157,24 @@ final class NumberFormatterParse extends VmClassMethod
         if ($argc >= 3) {
             $type = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'NumberFormatter::parse', 2, 'type');
         }
-        $result = VmNumberFormatter::parse($receiver->toObject(), $value, $type);
-        if ($argc >= 4) {
-            // php-src updates &$offset to bytes consumed; subset advances to strlen on success (#20993).
+        $hasOffset = $argc >= 4;
+        $offset = null;
+        if ($hasOffset) {
             $offsetVar = $frame->calledArgs[3]->resolveIndirect();
-            if (false === $result) {
-                // leave offset unchanged on failure (Zend keeps prior value)
-            } else {
-                $offsetVar->int(\strlen($value));
-            }
+            $offset = Variable::TYPE_NULL === $offsetVar->type
+                ? 0
+                : VmIntlDateFormatter::coerceIntArg(
+                    $offsetVar,
+                    'NumberFormatter::parse',
+                    3,
+                    'offset'
+                );
+        }
+        if ($hasOffset) {
+            $result = VmNumberFormatter::parse($receiver->toObject(), $value, $type, $offset);
+            $frame->calledArgs[3]->byRefTarget()->int($offset);
+        } else {
+            $result = VmNumberFormatter::parse($receiver->toObject(), $value, $type);
         }
         if (null === $frame->returnVar) {
             return;
