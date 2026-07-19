@@ -3,11 +3,12 @@
 declare(strict_types=1);
 
 /**
- * JIT/AOT helpers for getenv() and putenv() via GetenvJitHelper PHP (#9092, #8992, #20499).
+ * JIT/AOT helpers for getenv() and putenv() via GetenvJitHelper PHP (#9092, #8992, #20499, #21023).
  *
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20443 / #20156 shape): libc setenv only —
- * Nested GetenvJitHelper::putenv aborts on concat/slot temps (#17316). Embed / non-thin:
- * helper overlay + libc mirror.
+ * Embed + thin standalone AOT: syntax guard + {@see GetenvJitHelper::putenv} overlay +
+ * libc setenv mirror (getenv #20644 / rename #20603 shape — no thin libc-only fork).
+ * Bool results are bare {@see int1} so Internal::call type inference succeeds (#21023).
+ * php-src: ext/standard/basic_functions.c — zif_putenv
  */
 
 namespace PHPCompiler\ext\standard;
@@ -62,44 +63,38 @@ final class JitEnv
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'putenv_emit_cont');
 
-        // Thin standalone AOT: libc setenv only (#17316 / #20499). putenv_.php materializes
-        // via __string__separate so the setenv mirror sees a NUL-terminated buffer.
-        // Skip syntax guard here: first-byte/length GEPs on some concat temps still
-        // misfire under thin AOT even after separate (seen as SIGABRT in guard abort).
-        if ($context->isThinStandaloneAotMain()) {
-            self::emitLibcPutenvMirror($context, $assignmentStr);
-            $i8 = $context->getTypeFromString('int8');
-
-            return $i8->constInt(1, false);
-        }
-
+        // Always NestedJIT GetenvJitHelper overlay + libc mirror (#21023).
+        // putenv_.php materializes via __string__separate so the setenv mirror sees a
+        // NUL-terminated buffer.
         self::emitPutenvSyntaxGuard($context, $assignmentStr);
         StringGetenv::ensurePutenvLinked($context);
         $result = JitNestedHelperCoerce::callHelper(
             $context,
             StringGetenv::helperFunction(
                 $context,
-                'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv'
+                'PHPCompiler\ext\standard\GetenvJitHelper::putenv'
             ),
             [$assignmentStr]
         );
         self::emitLibcPutenvMirror($context, $assignmentStr);
 
-        return $result;
+        // Prefer bare i1 for Internal::call inference; value-box bools also work via extract.
+        return JitNestedHelperCoerce::extractBoolFromHelperResult($context, $result);
     }
 
     /**
      * putenv from a compile-time "NAME=value" literal — avoid __string__ GEPs (#5965).
      *
      * Uses the same malloc+NUL+setenv path as {@see emitLibcPutenvMirror} so long values
-     * with CR/LF (multipart REQUEST_BODY) round-trip under thin user-script AOT.
+     * with CR/LF (multipart REQUEST_BODY) round-trip under user-script AOT.
      * Direct setenv(nameConst, valueConst) left REQUEST_BODY empty after getenv (#5965).
-     * Non-thin: also NestedJIT {@see GetenvJitHelper::putenv} overlay (#20499).
+     * Always NestedJIT {@see GetenvJitHelper::putenv} overlay (#21023 / #20499).
      */
     public static function putenvFromCStringLiteral(Context $context, string $assignment): Value
     {
         BasicBlockHelper::ensureOpenInsertBlock($context, 'putenv_lit_emit_cont');
         LibcExtern::register($context);
+        $i1 = $context->getTypeFromString('int1');
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');
@@ -107,7 +102,7 @@ final class JitEnv
         $sizeT = $context->getTypeFromString('size_t');
         $eqPos = strpos($assignment, '=');
         if (false === $eqPos || 0 === $eqPos) {
-            return $i8->constInt(0, false);
+            return $i1->constInt(0, false);
         }
 
         $len = strlen($assignment);
@@ -146,20 +141,18 @@ final class JitEnv
         $context->builder->positionAtEnd($skip);
         $context->builder->call($context->lookupFunction('free'), $cStr);
 
-        if (!$context->isThinStandaloneAotMain()) {
-            $str = $context->builder->load($context->constantStringFromString($assignment));
-            StringGetenv::ensurePutenvLinked($context);
-            JitNestedHelperCoerce::callHelper(
+        $str = $context->builder->load($context->constantStringFromString($assignment));
+        StringGetenv::ensurePutenvLinked($context);
+        JitNestedHelperCoerce::callHelper(
+            $context,
+            StringGetenv::helperFunction(
                 $context,
-                StringGetenv::helperFunction(
-                    $context,
-                    'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv'
-                ),
-                [$str]
-            );
-        }
+                'PHPCompiler\ext\standard\GetenvJitHelper::putenv'
+            ),
+            [$str]
+        );
 
-        return $i8->constInt(1, false);
+        return $i1->constInt(1, false);
     }
 
     public static function apacheSetenv(Context $context, Value $variableStr, Value $valueStr): Value
