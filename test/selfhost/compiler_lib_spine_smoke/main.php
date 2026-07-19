@@ -6025,6 +6025,12 @@ require_once __DIR__.'/../../../ext/intl/intlcal_set_skipped_wall_time_option.ph
 require_once __DIR__.'/../../../ext/intl/intlcal_set_time.php';
 require_once __DIR__.'/../../../ext/intl/intlcal_set_time_zone.php';
 require_once __DIR__.'/../../../ext/intl/intlcal_to_date_time.php';
+require_once __DIR__.'/../../../ext/intl/intlgregcal_create_from_date.php';
+require_once __DIR__.'/../../../ext/intl/intlgregcal_create_from_date_time.php';
+require_once __DIR__.'/../../../ext/intl/intlgregcal_create_instance.php';
+require_once __DIR__.'/../../../ext/intl/intlgregcal_get_gregorian_change.php';
+require_once __DIR__.'/../../../ext/intl/intlgregcal_is_leap_year.php';
+require_once __DIR__.'/../../../ext/intl/intlgregcal_set_gregorian_change.php';
 require_once __DIR__.'/../../../ext/intl/intltz_create_default.php';
 require_once __DIR__.'/../../../ext/intl/intltz_create_time_zone.php';
 require_once __DIR__.'/../../../ext/intl/intltz_from_date_time_zone.php';
