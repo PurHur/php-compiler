@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5880 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17776 |
+| Source constructs flagged (warnings) | 17781 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -852,7 +852,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/VmNumberFormatter.php` | 0 | 56 |
 | `ext/intl/VmResourceBundle.php` | 0 | 28 |
-| `ext/intl/VmSpoofchecker.php` | 0 | 24 |
+| `ext/intl/VmSpoofchecker.php` | 0 | 29 |
 | `ext/intl/VmTransliterator.php` | 0 | 27 |
 | `ext/intl/VmUConverter.php` | 0 | 40 |
 | `ext/intl/collator_asort.php` | 0 | 3 |
@@ -12111,30 +12111,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmSpoofchecker.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 92)
-- new Variable (line 96)
-- new SpoofcheckerConstruct (line 102)
-- new SpoofcheckerIsSuspicious (line 106)
-- new SpoofcheckerAreConfusable (line 107)
-- new SpoofcheckerSetAllowedLocales (line 108)
-- new SpoofcheckerSetChecks (line 109)
-- new SpoofcheckerSetRestrictionLevel (line 110)
-- new Error (line 147)
-- new Error (line 186)
-- new Error (line 229)
-- new Error (line 258)
+- new ClassEntry (line 104)
+- new Variable (line 108)
+- new SpoofcheckerConstruct (line 114)
+- new SpoofcheckerIsSuspicious (line 118)
+- new SpoofcheckerAreConfusable (line 119)
+- new SpoofcheckerSetAllowedLocales (line 120)
+- new SpoofcheckerSetChecks (line 121)
+- new SpoofcheckerSetRestrictionLevel (line 122)
+- new SpoofcheckerSetAllowedChars (line 123)
+- new Variable (line 144)
+- new Error (line 178)
+- new Error (line 222)
+- new Error (line 265)
 - new Error (line 294)
-- new Error (line 355)
-- new Error (line 359)
-- new ArgumentCountError (line 606)
-- new ArgumentCountError (line 631)
-- new ArgumentCountError (line 637)
-- new ArgumentCountError (line 666)
-- new ArgumentCountError (line 672)
-- new ArgumentCountError (line 702)
-- new ArgumentCountError (line 725)
-- new ArgumentCountError (line 748)
-- 27 class method(s)
+- new Error (line 330)
+- new Error (line 368)
+- new Error (line 491)
+- new Error (line 495)
+- new ArgumentCountError (line 848)
+- new ArgumentCountError (line 873)
+- new ArgumentCountError (line 879)
+- new ArgumentCountError (line 908)
+- new ArgumentCountError (line 914)
+- new ArgumentCountError (line 944)
+- new ArgumentCountError (line 967)
+- new ArgumentCountError (line 990)
+- new ArgumentCountError (line 1014)
+- new ArgumentCountError (line 1020)
+- 36 class method(s)
 
 ### `ext/intl/VmTransliterator.php`
 
