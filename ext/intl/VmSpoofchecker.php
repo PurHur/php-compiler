@@ -49,7 +49,14 @@ final class VmSpoofchecker
     /** Default after construct on ICU ≥58 (php-src spoofchecker_create.c). */
     public const DEFAULT_RESTRICTION_LEVEL = self::HIGHLY_RESTRICTIVE;
 
-    /** @var array<int, array{handle: object|null}> */
+    /** @see unicode/uset.h USET_* — Spoofchecker::setAllowedChars patternOptions (#20823). */
+    public const IGNORE_SPACE = 1;
+    public const CASE_INSENSITIVE = 2;
+    public const ADD_CASE_MAPPINGS = 4;
+    /** ICU ≥73 only (php-src stub gated on U_ICU_VERSION_MAJOR_NUM >= 73). */
+    public const SIMPLE_CASE_INSENSITIVE = 6;
+
+    /** @var array<int, array{handle: object|null, allowed_pattern?: string, allowed_options?: int}> */
     private static array $state = [];
 
     private static ?\FFI $ffi = null;
@@ -61,6 +68,8 @@ final class VmSpoofchecker
     /** @return array<string, int> */
     public static function classConstants(): array
     {
+        // Do not probe ICU/FFI here — Spoofchecker::class during JIT parse would
+        // load libicu before WeakRef NestedJIT helpers and abort (#20823).
         return [
             'SINGLE_SCRIPT_CONFUSABLE' => self::SINGLE_SCRIPT_CONFUSABLE,
             'MIXED_SCRIPT_CONFUSABLE' => self::MIXED_SCRIPT_CONFUSABLE,
@@ -80,6 +89,9 @@ final class VmSpoofchecker
             'MODERATELY_RESTRICTIVE' => self::MODERATELY_RESTRICTIVE,
             'MINIMALLY_RESTRICTIVE' => self::MINIMALLY_RESTRICTIVE,
             'UNRESTRICTIVE' => self::UNRESTRICTIVE,
+            'IGNORE_SPACE' => self::IGNORE_SPACE,
+            'CASE_INSENSITIVE' => self::CASE_INSENSITIVE,
+            'ADD_CASE_MAPPINGS' => self::ADD_CASE_MAPPINGS,
         ];
     }
 
@@ -108,6 +120,7 @@ final class VmSpoofchecker
             'setallowedlocales' => [new SpoofcheckerSetAllowedLocales(), 'setAllowedLocales'],
             'setchecks' => [new SpoofcheckerSetChecks(), 'setChecks'],
             'setrestrictionlevel' => [new SpoofcheckerSetRestrictionLevel(), 'setRestrictionLevel'],
+            'setallowedchars' => [new SpoofcheckerSetAllowedChars(), 'setAllowedChars'],
         ];
         foreach ($methods as $lc => [$handler, $name]) {
             $entry->methods[$lc] = $handler;
@@ -115,6 +128,23 @@ final class VmSpoofchecker
             $entry->methodNames[$lc] = $name;
         }
         $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    /** Advertise SIMPLE_CASE_INSENSITIVE once ICU ≥73 is confirmed (php-src stub gate). */
+    private static function maybeAdvertiseSimpleCaseInsensitive(ObjectEntry $object): void
+    {
+        if (self::icuMajorVersion() < 73) {
+            return;
+        }
+        $entry = $object->class;
+        $lc = 'simple_case_insensitive';
+        if (isset($entry->constants[$lc])) {
+            return;
+        }
+        $const = new Variable(Variable::TYPE_INTEGER);
+        $const->int(self::SIMPLE_CASE_INSENSITIVE);
+        $entry->constants[$lc] = $const;
+        $entry->constNames[$lc] = 'SIMPLE_CASE_INSENSITIVE';
     }
 
     public static function isSpoofcheckerObject(?ObjectEntry $object): bool
@@ -127,6 +157,7 @@ final class VmSpoofchecker
         $handle = self::openSpoof();
         self::$state[$object->id] = ['handle' => $handle];
         $object->constructed = true;
+        self::maybeAdvertiseSimpleCaseInsensitive($object);
         if (null === $handle) {
             IntlError::set(
                 IntlError::U_USING_FALLBACK_WARNING,
@@ -171,6 +202,11 @@ final class VmSpoofchecker
         }
 
         $ret = self::fallbackCheckBits($string);
+        $state = self::$state[$object->id] ?? null;
+        if (null !== $state && isset($state['allowed_pattern'])
+            && self::fallbackOutsideAllowedSet($string, $state['allowed_pattern'])) {
+            $ret |= self::CHAR_LIMIT;
+        }
         IntlError::clear();
 
         return [$ret !== 0, $ret];
@@ -310,6 +346,106 @@ final class VmSpoofchecker
         }
     }
 
+    /**
+     * Spoofchecker::setAllowedChars() — php-src spoofchecker_main.cpp (#20823).
+     */
+    public static function setAllowedChars(ObjectEntry $object, string $pattern, int $patternOptions = 0): void
+    {
+        if (\strlen($pattern) > 2147483647) {
+            throw new \ValueError(
+                'Spoofchecker::setAllowedChars(): Argument #1 ($pattern) must be less than or equal to 2147483647 bytes long'
+            );
+        }
+        // uset_applyPattern requires a regex-range character class.
+        if ('' === $pattern || '[' !== $pattern[0] || ']' !== $pattern[\strlen($pattern) - 1]) {
+            throw new \ValueError(
+                'Spoofchecker::setAllowedChars(): Argument #1 ($pattern) must be a valid regular expression character set pattern'
+            );
+        }
+
+        $state = self::$state[$object->id] ?? null;
+        if (null === $state) {
+            throw new \Error('Spoofchecker::setAllowedChars() called on uninitialized Spoofchecker');
+        }
+
+        $utf16 = self::utf8ToUtf16Le($pattern);
+        if (null === $utf16) {
+            throw new \ValueError(
+                'Spoofchecker::setAllowedChars(): Argument #1 ($pattern) string conversion to unicode encoding failed'
+            );
+        }
+
+        if (!self::isAllowedCharsPatternOption($patternOptions)) {
+            throw new \ValueError(
+                'Spoofchecker::setAllowedChars(): Argument #2 ($patternOptions) '
+                .self::allowedCharsPatternOptionErrorMessage()
+            );
+        }
+
+        self::$state[$object->id]['allowed_pattern'] = $pattern;
+        self::$state[$object->id]['allowed_options'] = $patternOptions;
+
+        $handle = $state['handle'];
+        if (null === $handle) {
+            return;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+
+        $openEmpty = 'uset_openEmpty'.self::$symSuffix;
+        $applyPattern = 'uset_applyPattern'.self::$symSuffix;
+        $compact = 'uset_compact'.self::$symSuffix;
+        $close = 'uset_close'.self::$symSuffix;
+        $setAllowed = 'uspoof_setAllowedChars'.self::$symSuffix;
+
+        try {
+            $ulen = \intdiv(\strlen($utf16), 2);
+            $chars = $ffi->new('uint16_t['.max(1, $ulen).']');
+            if ($ulen > 0) {
+                \FFI::memcpy($chars, $utf16, \strlen($utf16));
+            }
+
+            $set = $ffi->$openEmpty();
+            if (null === $set) {
+                return;
+            }
+
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $ffi->$applyPattern($set, $chars, $ulen, $patternOptions & 0xFFFFFFFF, \FFI::addr($status));
+            if ((int) $status->cdata > 0) {
+                $code = (int) $status->cdata;
+                $ffi->$close($set);
+                throw new \ValueError(\sprintf(
+                    'Spoofchecker::setAllowedChars(): Argument #1 ($pattern) must be a valid regular expression character set pattern (%d)',
+                    $code
+                ));
+            }
+
+            try {
+                $ffi->$compact($set);
+            } catch (\Throwable) {
+                // uset_compact optional
+            }
+
+            $status->cdata = 0;
+            $ffi->$setAllowed($handle, $set, \FFI::addr($status));
+            $ffi->$close($set);
+
+            if ((int) $status->cdata > 0) {
+                IntlError::set((int) $status->cdata, 'Spoofchecker::setAllowedChars(): U_FAILURE');
+            } else {
+                IntlError::clear();
+            }
+        } catch (\ValueError $e) {
+            throw $e;
+        } catch (\Throwable) {
+            // Symbol missing — keep PHP-side allowed_pattern for fallback checks.
+        }
+    }
+
     public static function coerceStringArg(Variable $var, string $function, int $position, string $name): string
     {
         return VmString::coerceStringBuiltinArg($var, $function, $position, $name);
@@ -370,6 +506,105 @@ final class VmSpoofchecker
             || self::MODERATELY_RESTRICTIVE === $level
             || self::MINIMALLY_RESTRICTIVE === $level
             || self::UNRESTRICTIVE === $level;
+    }
+
+    /** php-src intl_icu_compat_uspoof_is_allowed_chars_pattern_option. */
+    private static function isAllowedCharsPatternOption(int $patternOption): bool
+    {
+        if (0 === $patternOption || self::IGNORE_SPACE === $patternOption) {
+            return true;
+        }
+        if ((self::IGNORE_SPACE | self::CASE_INSENSITIVE) === $patternOption) {
+            return true;
+        }
+        if ((self::IGNORE_SPACE | self::ADD_CASE_MAPPINGS) === $patternOption) {
+            return true;
+        }
+        if (self::icuMajorVersion() >= 73
+            && (self::IGNORE_SPACE | self::SIMPLE_CASE_INSENSITIVE) === $patternOption) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** php-src intl_icu_compat_uspoof_allowed_chars_pattern_option_error_message. */
+    private static function allowedCharsPatternOptionErrorMessage(): string
+    {
+        if (self::icuMajorVersion() >= 73) {
+            return 'must be a valid pattern option, 0 or (SpoofChecker::IGNORE_SPACE|(<none> or SpoofChecker::CASE_INSENSITIVE or SpoofChecker::ADD_CASE_MAPPINGS or SpoofChecker::SIMPLE_CASE_INSENSITIVE))';
+        }
+
+        return 'must be a valid pattern option, 0 or (SpoofChecker::IGNORE_SPACE|(<none> or SpoofChecker::CASE_INSENSITIVE or SpoofChecker::ADD_CASE_MAPPINGS))';
+    }
+
+    private static function icuMajorVersion(): int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            // No ICU — omit SIMPLE_CASE_INSENSITIVE (php-src gates on ICU ≥73).
+            return 70;
+        }
+        if ('' === self::$symSuffix) {
+            // Unversioned dylib — assume modern ICU with SIMPLE_CASE_INSENSITIVE.
+            return 74;
+        }
+        if (preg_match('/_(\d+)$/', self::$symSuffix, $m)) {
+            return (int) $m[1];
+        }
+
+        return 70;
+    }
+
+    private static function utf8ToUtf16Le(string $utf8): ?string
+    {
+        if (!\function_exists('mb_convert_encoding')) {
+            return null;
+        }
+        $out = @\mb_convert_encoding($utf8, 'UTF-16LE', 'UTF-8');
+
+        return false === $out ? null : $out;
+    }
+
+    /** Best-effort CHAR_LIMIT when ICU FFI is absent. */
+    private static function fallbackOutsideAllowedSet(string $string, string $pattern): bool
+    {
+        $len = \strlen($string);
+        $i = 0;
+        while ($i < $len) {
+            $cp = self::utf8CodepointAt($string, $i, $i);
+            if (null === $cp) {
+                break;
+            }
+            $ch = self::utf8EncodeCodepoint($cp);
+            // UnicodeSet patterns for simple ranges resemble PCRE character classes.
+            $ok = @\preg_match('/^'.$pattern.'$/u', $ch);
+            if (1 !== $ok) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function utf8EncodeCodepoint(int $cp): string
+    {
+        if ($cp < 0x80) {
+            return \chr($cp);
+        }
+        if ($cp < 0x800) {
+            return \chr(0xC0 | ($cp >> 6)).\chr(0x80 | ($cp & 0x3F));
+        }
+        if ($cp < 0x10000) {
+            return \chr(0xE0 | ($cp >> 12))
+                .\chr(0x80 | (($cp >> 6) & 0x3F))
+                .\chr(0x80 | ($cp & 0x3F));
+        }
+
+        return \chr(0xF0 | ($cp >> 18))
+            .\chr(0x80 | (($cp >> 12) & 0x3F))
+            .\chr(0x80 | (($cp >> 6) & 0x3F))
+            .\chr(0x80 | ($cp & 0x3F));
     }
 
     /** @return object|null FFI CData USpoofChecker* */
@@ -575,7 +810,9 @@ final class VmSpoofchecker
     {
         return <<<C
 typedef int32_t UErrorCode;
+typedef uint16_t UChar;
 typedef struct USpoofChecker USpoofChecker;
+typedef struct USet USet;
 typedef int32_t URestrictionLevel;
 USpoofChecker *uspoof_open{$suffix}(UErrorCode *status);
 void uspoof_close{$suffix}(USpoofChecker *sc);
@@ -584,6 +821,11 @@ int32_t uspoof_areConfusableUTF8{$suffix}(const USpoofChecker *sc, const char *i
 void uspoof_setChecks{$suffix}(USpoofChecker *sc, int32_t checks, UErrorCode *status);
 void uspoof_setAllowedLocales{$suffix}(USpoofChecker *sc, const char *localesList, UErrorCode *status);
 void uspoof_setRestrictionLevel{$suffix}(USpoofChecker *sc, URestrictionLevel restrictionLevel);
+void uspoof_setAllowedChars{$suffix}(USpoofChecker *sc, const USet *chars, UErrorCode *status);
+USet *uset_openEmpty{$suffix}(void);
+void uset_close{$suffix}(USet *set);
+void uset_compact{$suffix}(USet *set);
+int32_t uset_applyPattern{$suffix}(USet *set, const UChar *pattern, int32_t patternLength, uint32_t options, UErrorCode *status);
 C;
     }
 }
@@ -753,5 +995,39 @@ final class SpoofcheckerSetRestrictionLevel extends VmClassMethod
         $object = VmSpoofchecker::requireReceiver($frame->calledArgs[0], 'Spoofchecker::setRestrictionLevel()');
         $level = VmSpoofchecker::coerceIntArg($frame->calledArgs[1], 'Spoofchecker::setRestrictionLevel', 0, 'level');
         VmSpoofchecker::setRestrictionLevel($object, $level);
+    }
+}
+
+/** Spoofchecker::setAllowedChars() — php-src spoofchecker_main.cpp (#20823). */
+final class SpoofcheckerSetAllowedChars extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setAllowedChars');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        $userArgc = max(0, $argc - 1);
+        if ($userArgc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'Spoofchecker::setAllowedChars() expects at least 1 argument, %d given',
+                $userArgc
+            ));
+        }
+        if ($userArgc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'Spoofchecker::setAllowedChars() expects at most 2 arguments, %d given',
+                $userArgc
+            ));
+        }
+        $object = VmSpoofchecker::requireReceiver($frame->calledArgs[0], 'Spoofchecker::setAllowedChars()');
+        $pattern = VmSpoofchecker::coerceStringArg($frame->calledArgs[1], 'Spoofchecker::setAllowedChars', 0, 'pattern');
+        $options = 0;
+        if ($userArgc >= 2) {
+            $options = VmSpoofchecker::coerceIntArg($frame->calledArgs[2], 'Spoofchecker::setAllowedChars', 1, 'patternOptions');
+        }
+        VmSpoofchecker::setAllowedChars($object, $pattern, $options);
     }
 }
