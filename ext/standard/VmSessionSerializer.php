@@ -53,7 +53,7 @@ final class VmSessionSerializer
             if (str_contains($key, '|')) {
                 return false;
             }
-            $serialized = SerializeJitHelper::serializeSessionWireValue($valueVar);
+            $serialized = self::serializeSessionWireValue($valueVar);
             if (null === $serialized) {
                 return false;
             }
@@ -61,6 +61,50 @@ final class VmSessionSerializer
         }
 
         return $out;
+    }
+
+    /**
+     * JIT session wire encode for one value — NestedJIT-safe (no iterateKeyed in SerializeJitHelper, #20773).
+     */
+    public static function serializeSessionWireValue(Variable $value): ?string
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $value->type) {
+            return null;
+        }
+        try {
+            return VmSerializeFormat::encodeExported(self::exportJitSessionValue($value));
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @return array<mixed>|bool|float|int|null|string
+     */
+    private static function exportJitSessionValue(Variable $value): mixed
+    {
+        $value = $value->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $value->type) {
+            $out = [];
+            // NestedJIT-safe: exportKeyValuePairs, not iterateKeyed (#12908 / #20773).
+            foreach ($value->toArray()->exportKeyValuePairs(true) as [$key, $elem]) {
+                $k = $key->resolveIndirect();
+                if (Variable::TYPE_STRING === $k->type) {
+                    $out[$k->toString()] = self::exportJitSessionValue($elem);
+                } elseif (Variable::TYPE_INTEGER === $k->type) {
+                    $out[$k->toInt()] = self::exportJitSessionValue($elem);
+                } else {
+                    throw new \LogicException(
+                        'serialize() only supports string or integer keys in this compiler build'
+                    );
+                }
+            }
+
+            return $out;
+        }
+
+        return VmJson::export($value);
     }
 
     public static function decodePhp(Context $ctx, string $payload): bool
