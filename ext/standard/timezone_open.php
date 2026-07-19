@@ -11,7 +11,6 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\NativeDateInvalidTimeZoneException;
 use PHPLLVM\Value;
 
@@ -37,10 +36,12 @@ final class timezone_open extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('timezone_open() requires VM context in this compiler build');
         }
-        $timezone = InternalStrictArg::resolveCoercibleStringArg(
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (php_date.stub.php; #20959 / re-#18763)
+        $timezone = VmString::zparamStrBuiltinArgForFrame(
             $frame,
             0,
             'timezone_open',
+            0,
             'timezone'
         );
         try {
