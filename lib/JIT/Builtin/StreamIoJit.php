@@ -5,15 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
-use PHPCompiler\ext\standard\JitStreamIoKernel;
 
 /**
- * Stream I/O dispatch — JIT embed + AOT standalone via StreamIoRuntime PHP (#5343, #10326, #12956, #20229).
+ * Stream I/O dispatch — embed + thin standalone AOT via StreamIoRuntime NestedJIT (#5343, #20943).
  *
- * Thin standalone AOT (`isThinStandaloneAotMain`): {@see JitStreamIoKernel} libc + handle-table
- * (VmFs nested helpers skip __init__, #16075 / #19462 / peer #20214).
- * Context init + M3 inventory: deferred stubs via {@see StreamIoRuntime::isStandaloneInitPhase}
- * / {@see StreamIoRuntime::shouldDeferHeavyStreamIoEmitters} (#20576 / #20553).
+ * Always {@see StreamIoRuntime::ensureLinked} / {@see StreamIoJitHelper} PHP
+ * (IncludePath #20877 / PendingHeaders #20930 shape — no libc kernel or void stub fork).
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */
 final class StreamIoJit
@@ -37,23 +34,6 @@ final class StreamIoJit
 
         self::ensureStreamGlobals($context);
         StreamFilter::ensureLinked($context);
-
-        // Thin/user-script AOT: libc + handle-table kernels (#16075 / #19462 / #20229).
-        if ($context->isThinStandaloneAotMain()) {
-            JitStreamIoKernel::implementForUserScriptLowering($context);
-
-            return;
-        }
-
-        // Context standalone init + M3 inventory: deferred stubs (not NestedJIT) (#20576 / #20553).
-        if (StreamIoRuntime::isStandaloneInitPhase()
-            || StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)
-        ) {
-            StreamIoRuntime::implementDeferredStreamIoStubs($context);
-
-            return;
-        }
-
         StreamIoRuntime::ensureLinked($context);
     }
 

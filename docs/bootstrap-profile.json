@@ -2492,7 +2492,6 @@
         "ext/standard/JitStreamGetMetaData.php",
         "ext/standard/JitStreamGetTransports.php",
         "ext/standard/JitStreamGetWrappers.php",
-        "ext/standard/JitStreamIoKernel.php",
         "ext/standard/JitStreamIsLocal.php",
         "ext/standard/JitStreamIsatty.php",
         "ext/standard/JitStreamLibcHandleKernel.php",

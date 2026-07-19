@@ -99,10 +99,10 @@ final class StreamLifecycleRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamLifecycleStandaloneLlvm.php');
     }
 
-    public function testStreamIoStandaloneLlvmRestoredForUserScriptAot(): void
+    public function testStreamIoStandaloneLlvmDeletedForUserScriptAot(): void
     {
-        // Nested StreamIoJitHelper skips __init__ under user-script AOT (#16075); libc kernel in ext (#19462, #19530).
-        $this->assertFileExists(__DIR__.'/../../ext/standard/JitStreamIoKernel.php');
+        // NestedJIT StreamIoJitHelper for user-script AOT (#20943) — libc kernel deleted.
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitStreamIoKernel.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php');
     }
 }

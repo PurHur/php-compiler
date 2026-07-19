@@ -9,16 +9,18 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\LibcExtern;
-use PHPCompiler\ext\standard\JitStreamIoKernel;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT stream I/O ABI via StreamIoJitHelper PHP (#10326, #12956, #20229).
+ * JIT/AOT stream I/O ABI via StreamIoJitHelper PHP (#10326, #20943).
  *
- * Embed / non-thin: NestedJIT helper via {@see JitVmHelperLink}.
- * Thin standalone AOT (`isThinStandaloneAotMain`): {@see JitStreamIoKernel} libc path (#16075).
+ * Embed + thin standalone AOT: NestedJIT {@see StreamIoJitHelper} via {@see JitVmHelperLink}
+ * (IncludePath #20877 / PendingHeaders #20930 shape — no libc kernel or void stub fork).
  * SSOT: {@see \PHPCompiler\ext\standard\StreamIoJitHelper}
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */
@@ -90,19 +92,10 @@ final class StreamIoRuntime
     }
 
     /**
-     * Thin/user-script standalone must link real stream I/O when fopen/tmpfile appear in lowering (#9142, #19462, #20229).
-     *
-     * Inventory init defers heavy emitters; thin AOT cannot nested-JIT VmFs (#16075) —
-     * upgrade via {@see JitStreamIoKernel} libc + handle-table bridges instead.
+     * User-script / fopen lowering: NestedJIT StreamIoJitHelper bridges (#9142, #20943).
      */
     public static function ensureLinkedForUserScriptLowering(Context $context): void
     {
-        if ($context->isThinStandaloneAotMain()) {
-            JitStreamIoKernel::implementForUserScriptLowering($context);
-
-            return;
-        }
-
         if (self::allIoRuntimeFunctionsLinked($context)) {
             self::registerIoRuntime($context);
             self::ensureSupportsBridgeLinked($context);
@@ -110,11 +103,21 @@ final class StreamIoRuntime
             return;
         }
 
-        self::implementBridges($context);
+        self::implement($context);
     }
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        // Thin + embed: publish sg_vm_context before NestedJIT of StreamIoJitHelper (#17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+
         if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
 
@@ -561,98 +564,6 @@ final class StreamIoRuntime
         }
     }
 
-    /**
-     * M3 inventory / bootstrap-aot-link — defer NestedJIT stream emitters (#20576).
-     * Context standalone init uses {@see isStandaloneInitPhase()} at call sites (not this bag).
-     * Thin user-script AOT uses {@see Context::isThinStandaloneAotMain()} (#20229, #20553).
-     */
-    public static function shouldDeferHeavyStreamIoEmitters(Context $context): bool
-    {
-        unset($context);
-        foreach (
-            [
-                'PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER',
-                'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER',
-                'PHP_COMPILER_BOOTSTRAP_AOT_LINK',
-            ] as $key
-        ) {
-            $flag = getenv($key);
-            if ('1' === $flag || 'true' === strtolower((string) $flag)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    public static function implementDeferredStreamIoStubs(Context $context): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $minusOne = $i64->constInt(-1, true);
-        $nullStr = $strPtr->constNull();
-
-        self::implementNullaryI64Stub($context, '__compiler_tmpfile', $minusOne);
-        self::implementFwriteStub($context, '__compiler_fwrite', $minusOne);
-        self::implementBinaryI64Stub($context, '__compiler_fopen', $minusOne);
-        self::implementBinaryI64Stub($context, '__compiler_popen', $minusOne);
-        self::implementBinaryStrStub($context, '__compiler_fread', $nullStr);
-        self::implementSupportsStub($context);
-    }
-
-    private static function implementSupportsStub(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        self::implementStub(
-            $context,
-            '__compiler_stream_supports',
-            $context->context->functionType($i32, false, $i64, $i64),
-            $i32->constInt(0, false)
-        );
-    }
-
-    private static function implementNullaryI64Stub(Context $context, string $name, Value $ret): void
-    {
-        self::implementStub($context, $name, $context->context->functionType($context->getTypeFromString('int64'), false), $ret);
-    }
-
-    private static function implementBinaryI64Stub(Context $context, string $name, Value $ret): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        self::implementStub(
-            $context,
-            $name,
-            $context->context->functionType($i64, false, $strPtr, $strPtr),
-            $ret
-        );
-    }
-
-    private static function implementFwriteStub(Context $context, string $name, Value $ret): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        self::implementStub(
-            $context,
-            $name,
-            $context->context->functionType($i64, false, $i64, $strPtr, $i64),
-            $ret
-        );
-    }
-
-    private static function implementBinaryStrStub(Context $context, string $name, Value $ret): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        self::implementStub(
-            $context,
-            $name,
-            $context->context->functionType($strPtr, false, $i64, $i64),
-            $ret
-        );
-    }
-
     /** Forward-declare stream I/O ABI for nested helper compile (#13000). */
     private static function ensureRuntimeAbiDeclared(Context $context): void
     {
@@ -677,28 +588,5 @@ final class StreamIoRuntime
         $context->registerFunction($name, $fn);
 
         return $fn;
-    }
-
-    private static function implementStub(Context $context, string $name, $ft, Value $ret): void
-    {
-        $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
-
-            return;
-        }
-        if (null === $probe) {
-            try {
-                $probe = $context->lookupFunction($name);
-            } catch (\Throwable) {
-                $probe = null;
-            }
-        }
-        $fn = $probe ?? $context->module->addFunction($name, $ft);
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($ret);
-        $context->registerFunction($name, $fn);
-        $context->builder->clearInsertionPosition();
     }
 }

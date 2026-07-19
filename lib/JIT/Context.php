@@ -1145,7 +1145,7 @@ class Context {
             Builtin\StreamIoRuntime::endStandaloneInitPhase();
         }
         // After init-phase: NestedJIT GetenvJitHelper (always-helper, #20156) — skipped during
-        // standaloneInitPhase so stream inventory stubs stay thin (#20576 / #20553).
+        // standaloneInitPhase so peer stream kernels keep thin inventory stubs (#20576 / #20553).
         Builtin\StringGetenv::ensureStandaloneBodies($this);
         Builtin\StringGetenvAll::ensureStandaloneBodies($this);
     }
