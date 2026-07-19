@@ -70,13 +70,20 @@ final class DomLivingBuiltinClasses
         // Dom\AdjacentPosition — insertAdjacent* where (php-src php_dom.stub.php; #20782).
         DomAdjacentPositionEnum::register($ctx);
 
-        // Dom\Implementation — Document::$implementation (php-src php_dom.stub.php; #20898).
+        // Dom\Implementation — Document::$implementation (php-src php_dom.stub.php; #20898, #20910).
         $impl = new ClassEntry('Dom\\Implementation');
         $impl->isInternal = true;
         self::copyMethods($ctx->classes[VmDom::CLASS_IMPLEMENTATION] ?? null, $impl);
         $impl->methods['createhtmldocument'] = new ImplementationCreateHTMLDocument();
         $impl->methodVisibility['createhtmldocument'] = $pub;
         $impl->methodNames['createhtmldocument'] = 'createHTMLDocument';
+        // Override copied legacy factories with living return types (#20910).
+        $impl->methods['createdocument'] = new LivingImplementationCreateDocument();
+        $impl->methodVisibility['createdocument'] = $pub;
+        $impl->methodNames['createdocument'] = 'createDocument';
+        $impl->methods['createdocumenttype'] = new LivingImplementationCreateDocumentType();
+        $impl->methodVisibility['createdocumenttype'] = $pub;
+        $impl->methodNames['createdocumenttype'] = 'createDocumentType';
         $ctx->classes[VmDomLiving::CLASS_IMPLEMENTATION] = $impl;
         VmDomLiving::bindImplementationClass($impl);
 
@@ -87,6 +94,19 @@ final class DomLivingBuiltinClasses
         }
         self::copyMethods($ctx->classes[VmDom::CLASS_NODE] ?? null, $node);
         $ctx->classes[VmDomLiving::CLASS_NODE] = $node;
+
+        // Dom\DocumentType — living doctype nodes (php-src php_dom.stub.php; #20910).
+        $documentType = new ClassEntry('Dom\\DocumentType');
+        $documentType->isInternal = true;
+        $documentType->parentLc = VmDomLiving::CLASS_NODE;
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $documentType->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
+        $documentType->properties[] = new ClassProperty(VmDom::PROP_NAME, null, $strProto);
+        $documentType->properties[] = new ClassProperty(VmDom::PROP_PUBLIC_ID, null, $strProto);
+        $documentType->properties[] = new ClassProperty(VmDom::PROP_SYSTEM_ID, null, $strProto);
+        $documentType->properties[] = new ClassProperty(VmDom::PROP_ENTITIES, $nullProto, $objProto);
+        $documentType->properties[] = new ClassProperty(VmDom::PROP_NOTATIONS, $nullProto, $objProto);
+        $ctx->classes[VmDomLiving::CLASS_DOCUMENT_TYPE] = $documentType;
 
         $element = new ClassEntry('Dom\\Element');
         $element->isInternal = true;
