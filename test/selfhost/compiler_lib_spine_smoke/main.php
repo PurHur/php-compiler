@@ -6079,6 +6079,7 @@ require_once __DIR__.'/../../../ext/ffi/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/ffi/FfiExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/ffi/Module.php';
 require_once __DIR__.'/../../../ext/ffi/VmFFI.php';
+require_once __DIR__.'/../../../ext/dom/DocumentImportLegacyNode.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
