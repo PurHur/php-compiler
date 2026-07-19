@@ -17,7 +17,7 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** trigger_error() — user-level error/warning/notice (issue #1221). */
+/** trigger_error() — user-level error/warning/notice (issue #1221); Z_PARAM_STR null on 8.4 (#21035). */
 final class trigger_error_ extends Internal
 {
     public function __construct()
@@ -34,7 +34,8 @@ final class trigger_error_ extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('trigger_error() requires VM context');
         }
-        $message = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'trigger_error', 0, 'message');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21035, Zend/zend_builtin_functions.stub.php).
+        $message = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'trigger_error', 0, 'message');
         $level = ErrorReporter::E_USER_NOTICE;
         if (2 === $argc) {
             $level = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'trigger_error', 2, 'error_level');
@@ -72,7 +73,7 @@ final class trigger_error_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('trigger_error() requires one or two arguments');
         }
-        $msgStr = JitStringBuiltinArg::lower($context, $args[0], 'trigger_error', 0, 'message');
+        $msgStr = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'trigger_error', 0, 'message');
         $levelVal = 2 === $argc
             ? $this->jitLowerUserErrorLevel($context, $args[1])
             : $context->getTypeFromString('int32')->constInt(ErrorReporter::E_USER_NOTICE, false);

@@ -20,9 +20,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * user_error() — PHP 8.4 procedural E_USER_NOTICE helper (ext/standard/basic_functions.c, #6183).
+ * user_error() — alias of trigger_error() (Zend/zend_builtin_functions.stub.php, #6183 / #21035).
  *
- * @see https://github.com/php/php-src/blob/master/ext/standard/basic_functions.c PHP_FUNCTION(user_error)
+ * Z_PARAM_STR $message — null TypeError on PHP 8.4 forward profile.
  */
 final class user_error extends Internal
 {
@@ -42,7 +42,8 @@ final class user_error extends Internal
         if (null === $frame->vmContext) {
             throw new \LogicException('user_error() requires VM context');
         }
-        $message = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'user_error', 0, 'message');
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21035, Zend/zend_builtin_functions.stub.php).
+        $message = VmString::coerceZparamStrBuiltinArg($frame->calledArgs[0], 'user_error', 0, 'message');
         $level = ErrorReporter::E_USER_NOTICE;
         if (2 === $argc) {
             $levelVar = $frame->calledArgs[1]->resolveIndirect();
@@ -86,7 +87,7 @@ final class user_error extends Internal
                 \sprintf('user_error() expects at least 1 argument, %d given', $argc)
             );
         }
-        $msgStr = JitStringBuiltinArg::lower($context, $args[0], 'user_error', 0, 'message');
+        $msgStr = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'user_error', 0, 'message');
         $levelVal = 2 === $argc
             ? self::jitLowerUserErrorLevel($context, $args[1])
             : $context->getTypeFromString('int32')->constInt(ErrorReporter::E_USER_NOTICE, false);
