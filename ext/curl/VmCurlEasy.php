@@ -382,6 +382,25 @@ final class VmCurlEasy
     }
 
     /**
+     * curl_upkeep() — curl_easy_upkeep + SAVE_CURL_ERROR → bool (php-src interface.c; #20977).
+     */
+    public static function upkeep(ObjectEntry $easy): bool
+    {
+        self::ensureLive($easy, 'curl_upkeep');
+        if (!isset(self::$state[$easy->id])) {
+            return true;
+        }
+        $native = self::$state[$easy->id]['native'];
+        if (null === $native) {
+            return true;
+        }
+        $rc = VmCurlNative::easyUpkeep($native);
+        self::setEasyResult($easy, $rc);
+
+        return CurlConstants::CURLE_OK === $rc;
+    }
+
+    /**
      * curl_copy_handle() — curl_easy_duphandle + PHP option clone
      * (php-src ext/curl/interface.c; #20495).
      */
