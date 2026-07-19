@@ -168,11 +168,11 @@ final class BuiltinByRefParams
                 // $object + &$array (+ optional flags) — php-src collator.stub.php (#20838)
                 return [1];
             case 'numberformatter::parsecurrency':
-                // $this + $string + &$currency — php-src formatter.stub.php (#20728)
-                return [2];
+                // $this + $string + &$currency + optional &$offset — php-src formatter.stub.php (#20728, #21127)
+                return [2, 3];
             case 'numfmt_parse_currency':
-                // $formatter + $string + &$currency — php-src formatter.stub.php (#20780)
-                return [2];
+                // $formatter + $string + &$currency + optional &$offset — php-src formatter.stub.php (#20780, #21127)
+                return [2, 3];
             case 'intldateformatter::parse':
             case 'intldateformatter::localtime':
                 // $this + $string + &$offset — php-src dateformat.stub.php (#20729)

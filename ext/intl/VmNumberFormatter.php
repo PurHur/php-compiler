@@ -411,12 +411,22 @@ final class VmNumberFormatter
     }
 
     /**
+     * Parse currency amount (php-src unum_parseDoubleCurrency; #20728, #21127).
+     *
+     * Optional &$offset is both start position (bytes) and end position out-param,
+     * matching formatter.stub.php `parseCurrency(..., &$currency, &$offset = null)`.
+     *
      * @param-out string|null $currencyOut
+     * @param-out int|null    $offset
      *
      * @return float|false
      */
-    public static function parseCurrency(ObjectEntry $formatter, string $value, ?string &$currencyOut)
-    {
+    public static function parseCurrency(
+        ObjectEntry $formatter,
+        string $value,
+        ?string &$currencyOut,
+        ?int &$offset = null
+    ) {
         $state = self::$state[$formatter->id] ?? null;
         if (null === $state) {
             self::fail($formatter, 'numfmt_parse_currency: bad formatter: U_ILLEGAL_ARGUMENT_ERROR');
@@ -424,7 +434,18 @@ final class VmNumberFormatter
 
             return false;
         }
-        $trimmed = trim($value);
+        $start = 0;
+        if (null !== $offset) {
+            $start = $offset;
+            if ($start < 0) {
+                $start = 0;
+            }
+            if ($start > \strlen($value)) {
+                $start = \strlen($value);
+            }
+        }
+        $slice = $start > 0 ? substr($value, $start) : $value;
+        $trimmed = trim($slice);
         $currency = null;
         $numeric = $trimmed;
         if (preg_match('/^([A-Z]{3})\s*(.+)$/i', $trimmed, $m)) {
@@ -453,10 +474,15 @@ final class VmNumberFormatter
         if (null === $num || null === $currency) {
             self::fail($formatter, 'numfmt_parse_currency: Currency parsing failed: U_PARSE_ERROR');
             $currencyOut = null;
+            // Leave &$offset unchanged on failure (matches NumberFormatter::parse subset #20993).
 
             return false;
         }
         $currencyOut = $currency;
+        if (null !== $offset) {
+            // Subset: advance to end of input on success (ICU updates parse end index).
+            $offset = \strlen($value);
+        }
         self::clearObjectError($formatter);
         IntlError::clear();
 
@@ -1056,7 +1082,7 @@ final class NumberFormatterParse extends VmClassMethod
     }
 }
 
-/** NumberFormatter::parseCurrency() — php-src numfmt_parse_currency (#20728). */
+/** NumberFormatter::parseCurrency() — php-src numfmt_parse_currency (#20728, #21127). */
 final class NumberFormatterParseCurrency extends VmClassMethod
 {
     public function __construct()
@@ -1067,9 +1093,9 @@ final class NumberFormatterParseCurrency extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if (3 !== $argc) {
+        if ($argc < 3 || $argc > 4) {
             throw new \ArgumentCountError(\sprintf(
-                'NumberFormatter::parseCurrency() expects exactly 2 arguments, %d given',
+                'NumberFormatter::parseCurrency() expects between 2 and 3 arguments, %d given',
                 max(0, $argc - 1)
             ));
         }
@@ -1079,8 +1105,26 @@ final class NumberFormatterParseCurrency extends VmClassMethod
             throw new \Error('NumberFormatter::parseCurrency() called on incompatible object');
         }
         $value = VmNumberFormatter::coerceStringArg($frame->calledArgs[1], 'NumberFormatter::parseCurrency', 1, 'string');
+        $hasOffset = $argc >= 4;
+        $offset = null;
+        if ($hasOffset) {
+            $offsetVar = $frame->calledArgs[3]->resolveIndirect();
+            $offset = Variable::TYPE_NULL === $offsetVar->type
+                ? 0
+                : VmIntlDateFormatter::coerceIntArg(
+                    $offsetVar,
+                    'NumberFormatter::parseCurrency',
+                    3,
+                    'offset'
+                );
+        }
         $currencyOut = null;
-        $result = VmNumberFormatter::parseCurrency($receiver->toObject(), $value, $currencyOut);
+        if ($hasOffset) {
+            $result = VmNumberFormatter::parseCurrency($receiver->toObject(), $value, $currencyOut, $offset);
+            $frame->calledArgs[3]->byRefTarget()->int($offset);
+        } else {
+            $result = VmNumberFormatter::parseCurrency($receiver->toObject(), $value, $currencyOut);
+        }
         $currencyVar = $frame->calledArgs[2]->resolveIndirect();
         if (null === $currencyOut) {
             $currencyVar->null();
