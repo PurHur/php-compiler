@@ -15,6 +15,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential clang llvm-14-dev libjansson4 libpcre2-dev zlib1g-dev \
     libfreetype6 fonts-dejavu-core \
     libpq5 \
+    libodbc2 \
+    unixodbc \
     libenchant-2-2 \
     enchant-2 \
     hunspell-en-us \
