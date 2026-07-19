@@ -13132,6 +13132,7 @@ class JIT {
             && Variable::TYPE_VALUE === $result->type
             && Variable::KIND_VARIABLE !== $result->kind
             && null === $result->objectPropertySlot
+            && null === $result->staticPropertyGlobal
             && !$result->functionStaticGlobal
         ) {
             $slot = JIT\JitValueBox::alloc($this->context);
@@ -13220,10 +13221,12 @@ class JIT {
             )
             && !$value->isJitGenerator
             && null === $result->objectPropertySlot
+            && null === $result->staticPropertyGlobal
             && !$result->functionStaticGlobal
         ) {
             // ?? left branch fetch binds a superglobal lvalue; force-assign needs a stack slot (#866).
             // Property lvalues keep objectPropertySlot so ReadonlyClassGuard runs on inc/dec (#3149).
+            // Class static property lvalues keep staticPropertyGlobal (#20877).
             $slot = JIT\JitValueBox::alloc($this->context);
             $this->context->setVariableOp(
                 $resultOp,
@@ -13240,12 +13243,14 @@ class JIT {
             ($resultOp instanceof \PHPCfg\Operand\Temporary || $resultOp instanceof \PHPCfg\Operand\Literal)
             && Variable::KIND_VALUE === $result->kind
             && null === $result->objectPropertySlot
+            && null === $result->staticPropertyGlobal
             && (
                 Variable::TYPE_STRING !== $result->type
                 || !JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)
             )
         ) {
             // Temporaries/literals can start life as rvalues; promote to a boxed stack slot on first assignment.
+            // Skip class static property lvalues — they must store via staticPropertyGlobal (#20877).
             $slot = JIT\JitValueBox::alloc($this->context);
             $this->context->setVariableOp(
                 $resultOp,
@@ -13525,6 +13530,7 @@ class JIT {
         if (
             $branchMergeTarget
             && null === $result->objectPropertySlot
+            && null === $result->staticPropertyGlobal
             && !$result->functionStaticGlobal
         ) {
             if (Variable::TYPE_VALUE !== $result->type || Variable::KIND_VARIABLE !== $result->kind) {

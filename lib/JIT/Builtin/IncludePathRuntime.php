@@ -4,19 +4,22 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin as JitBuiltin;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPLLVM\BasicBlock;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for include_path builtins via IncludePathJitHelper PHP (#9245, #20308).
+ * JIT/AOT link for include_path builtins via IncludePathJitHelper PHP (#9245, #20877).
  *
- * Embed / non-thin: NestedJIT {@see IncludePathJitHelper} / {@see IncludePathResolveJitHelper}.
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20229 / #20132 shape): thin stubs without nested JIT (#13571, #13678).
+ * Embed + thin standalone AOT: NestedJIT {@see IncludePathJitHelper} /
+ * {@see IncludePathResolveJitHelper} via {@see JitVmHelperLink}
+ * (Serialize #20773 / getenv #20644 shape — no thin stub fork).
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmIncludePath} / {@see \PHPCompiler\ext\standard\VmFs}
  * php-src: ext/standard/basic_functions.c — php_get_include_path / php_set_include_path
  * php-src: ext/standard/streams.c — php_stream_resolve_include_path
@@ -34,6 +37,16 @@ final class IncludePathRuntime
     private const RESTORE_HELPER = 'PHPCompiler\\ext\\standard\\IncludePathJitHelper::restore';
 
     private const RESOLVE_HELPER = 'PHPCompiler\\ext\\standard\\IncludePathResolveJitHelper::resolveJit';
+
+    private const GET_BRIDGE_ENTRY = 'include_path_get_bridge_entry';
+
+    private const SET_BRIDGE_ENTRY = 'include_path_set_bridge_entry';
+
+    private const RESTORE_BRIDGE_ENTRY = 'include_path_restore_bridge_entry';
+
+    private const RESOLVE_BRIDGE_ENTRY = 'include_path_resolve_bridge_entry';
+
+    private const INIT_ENTRY = 'include_path_init_noop';
 
     /** @var list<string> */
     private const STACK_HELPERS = [
@@ -68,154 +81,38 @@ final class IncludePathRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_get_include_path');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        // Thin + embed: publish sg_vm_context before NestedJIT of IncludePathJitHelper (#17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+
+        $getProbe = $context->module->getNamedFunction('__compiler_get_include_path');
+        if (JitVmHelperLink::hasNamedBridgeEntry($getProbe, self::GET_BRIDGE_ENTRY)) {
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+        if (null !== $getProbe && $getProbe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
         }
 
-        $savedBlock = self::captureInsertBlock($context);
-
-        if ($context->isThinStandaloneAotMain()) {
-            self::implementThinStandaloneStubs($context);
-        } else {
-            self::ensureStackHelperCompiled($context);
-            self::implementInitNoop($context);
-            self::implementGetBridge($context);
-            self::implementSetBridge($context);
-            self::implementRestoreBridge($context);
-            self::ensureResolveHelperCompiled($context);
-            self::implementResolveBridge($context);
-        }
-        self::registerLinkedRuntime($context);
-        self::restoreInsertBlock($context, $savedBlock);
-    }
-
-    /** Thin standalone AOT: LLVM stubs without nested IncludePathJitHelper (#13678, #20308). */
-    public static function implementThinStandaloneStubs(Context $context): void
-    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        self::ensureStackHelperCompiled($context);
         self::implementInitNoop($context);
-        self::implementThinGetStub($context);
-        self::implementThinSetStub($context);
-        self::implementThinRestoreStub($context);
-        self::implementThinResolveStub($context);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementThinGetStub(Context $context): void
-    {
-        $abiName = '__compiler_get_include_path';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $valPtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $valPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('include_path_get_standalone');
-        $context->builder->positionAtEnd($entry);
-        $i64 = $context->getTypeFromString('int64');
-        $dot = $context->constantFromString('.');
-        $str = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(1, false),
-            $context->builder->pointerCast($dot, $context->getTypeFromString('char*'))
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $fn->getParam(0),
-            $str
-        );
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementThinSetStub(Context $context): void
-    {
-        $abiName = '__compiler_set_include_path';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valPtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $strPtr, $valPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('include_path_set_standalone');
-        $context->builder->positionAtEnd($entry);
-        $i64 = $context->getTypeFromString('int64');
-        $dot = $context->constantFromString('.');
-        $oldStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(1, false),
-            $context->builder->pointerCast($dot, $context->getTypeFromString('char*'))
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $fn->getParam(1),
-            $oldStr
-        );
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementThinRestoreStub(Context $context): void
-    {
-        $abiName = '__compiler_restore_include_path';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('include_path_restore_standalone');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementThinResolveStub(Context $context): void
-    {
-        $abiName = '__compiler_stream_resolve_include_path';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('include_path_resolve_standalone');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($strPtr->constNull());
-        $context->registerFunction($abiName, $fn);
+        self::implementGetBridge($context);
+        self::implementSetBridge($context);
+        self::implementRestoreBridge($context);
+        self::ensureResolveHelperCompiled($context);
+        self::implementResolveBridge($context);
+        self::registerLinkedRuntime($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 
     public static function implementInitNoop(Context $context): void
@@ -234,7 +131,7 @@ final class IncludePathRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('include_path_init_noop');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::INIT_ENTRY);
         $context->builder->positionAtEnd($entry);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
@@ -244,6 +141,11 @@ final class IncludePathRuntime
     {
         $abiName = '__compiler_get_include_path';
         $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::GET_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
 
@@ -257,7 +159,7 @@ final class IncludePathRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('include_path_get_bridge');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::GET_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $strRaw = JitNestedHelperCoerce::callHelper(
             $context,
@@ -278,6 +180,11 @@ final class IncludePathRuntime
     {
         $abiName = '__compiler_set_include_path';
         $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::SET_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
 
@@ -292,7 +199,7 @@ final class IncludePathRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('include_path_set_bridge');
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::SET_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $oldStrRaw = JitNestedHelperCoerce::callHelper(
             $context,
@@ -311,123 +218,61 @@ final class IncludePathRuntime
 
     private static function implementRestoreBridge(Context $context): void
     {
-        $abiName = '__compiler_restore_include_path';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('include_path_restore_bridge');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->call(self::stackHelperFunction($context, self::RESTORE_HELPER));
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_restore_include_path',
+            self::RESTORE_BRIDGE_ENTRY,
+            [],
+            $context->getTypeFromString('void'),
+            self::RESTORE_HELPER,
+            self::STACK_HELPER_PATH,
+            self::STACK_HELPERS,
+            '#20877'
+        );
     }
 
     private static function implementResolveBridge(Context $context): void
     {
-        $abiName = '__compiler_stream_resolve_include_path';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
         $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('include_path_resolve_bridge');
-        $context->builder->positionAtEnd($entry);
-        $resultRaw = JitNestedHelperCoerce::callHelper(
+        JitVmHelperLink::ensureBridge(
             $context,
-            self::resolveHelperFunction($context, self::RESOLVE_HELPER),
-            [$fn->getParam(0)]
+            '__compiler_stream_resolve_include_path',
+            self::RESOLVE_BRIDGE_ENTRY,
+            [$strPtr],
+            $strPtr,
+            self::RESOLVE_HELPER,
+            self::RESOLVE_HELPER_PATH,
+            self::RESOLVE_HELPERS,
+            '#20877'
         );
-        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
     }
 
     private static function stackHelperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureStackHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after IncludePathJitHelper compile (#9245)');
-        }
 
-        return $fn;
-    }
-
-    private static function resolveHelperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureResolveHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after IncludePathResolveJitHelper compile (#9245)');
-        }
-
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#20877');
     }
 
     private static function ensureStackHelperCompiled(Context $context): void
     {
-        self::ensureHelpersCompiled($context, self::STACK_HELPER_PATH, self::STACK_HELPERS);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::STACK_HELPER_PATH,
+            self::STACK_HELPERS,
+            '#20877'
+        );
     }
 
     private static function ensureResolveHelperCompiled(Context $context): void
     {
         self::ensureStackHelperCompiled($context);
-        self::ensureHelpersCompiled($context, self::RESOLVE_HELPER_PATH, self::RESOLVE_HELPERS);
-    }
-
-    /**
-     * @param list<string> $compiledHelpers
-     */
-    private static function ensureHelpersCompiled(Context $context, string $relativePath, array $compiledHelpers): void
-    {
-        $missing = false;
-        foreach ($compiledHelpers as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).$relativePath;
-        $basename = \basename($path);
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
-            if (null === $block) {
-                throw new \LogicException($basename.' parseAndCompile failed (#9245)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach ($compiledHelpers as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9245)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::RESOLVE_HELPER_PATH,
+            self::RESOLVE_HELPERS,
+            '#20877'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -435,27 +280,9 @@ final class IncludePathRuntime
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after IncludePathRuntime bridge (#9245)');
+                throw new \LogicException($name.' missing after IncludePathRuntime bridge (#20877)');
             }
             $context->registerFunction($name, $fn);
-        }
-    }
-
-    private static function captureInsertBlock(Context $context): ?BasicBlock
-    {
-        try {
-            return $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
-    {
-        if (null !== $block) {
-            $context->builder->positionAtEnd($block);
-        } else {
-            $context->builder->clearInsertionPosition();
         }
     }
 }
