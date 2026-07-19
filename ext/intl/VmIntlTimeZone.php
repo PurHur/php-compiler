@@ -79,7 +79,18 @@ final class VmIntlTimeZone
         $methods = [
             'createtimezone' => [new IntlTimeZoneCreateTimeZone(), 'createTimeZone', $pubStatic],
             'createdefault' => [new IntlTimeZoneCreateDefault(), 'createDefault', $pubStatic],
+            'fromdatetimezone' => [new IntlTimeZoneFromDateTimeZone(), 'fromDateTimeZone', $pubStatic],
+            'getcanonicalid' => [new IntlTimeZoneGetCanonicalID(), 'getCanonicalID', $pubStatic],
+            'getregion' => [new IntlTimeZoneGetRegion(), 'getRegion', $pubStatic],
+            'getgmt' => [new IntlTimeZoneGetGMT(), 'getGMT', $pubStatic],
             'getid' => [new IntlTimeZoneGetID(), 'getID', $pub],
+            'getrawoffset' => [new IntlTimeZoneGetRawOffset(), 'getRawOffset', $pub],
+            'getdstsavings' => [new IntlTimeZoneGetDSTSavings(), 'getDSTSavings', $pub],
+            'usedaylighttime' => [new IntlTimeZoneUseDaylightTime(), 'useDaylightTime', $pub],
+            'getdisplayname' => [new IntlTimeZoneGetDisplayName(), 'getDisplayName', $pub],
+            'getoffset' => [new IntlTimeZoneGetOffset(), 'getOffset', $pub],
+            'todatetimezone' => [new IntlTimeZoneToDateTimeZone(), 'toDateTimeZone', $pub],
+            'hassamerules' => [new IntlTimeZoneHasSameRules(), 'hasSameRules', $pub],
         ];
         foreach ($methods as $lc => [$handler, $name, $vis]) {
             $entry->methods[$lc] = $handler;
@@ -166,6 +177,241 @@ final class VmIntlTimeZone
             return 'GMT';
         }
     }
+
+    /**
+     * Zoneinfo offset meta — raw/DST in milliseconds (php-src TimeZone::getRawOffset / getDSTSavings).
+     *
+     * @return array{rawMs: int, dstMs: int, useDst: bool, abbrStd: string, abbrDst: string}
+     */
+    public static function offsetMeta(string $id): array
+    {
+        $id = self::resolveTimezoneId($id);
+        // 2000-01-01 .. 2030-01-01 covers modern DST rules for Olson zones.
+        $transitions = VmDateTimeNative::exportTimezoneTransitions($id, 946684800, 1893456000);
+        $rawSec = null;
+        $dstSav = 0;
+        $useDst = false;
+        $abbrStd = $id;
+        $abbrDst = $id;
+        if (\is_array($transitions)) {
+            foreach ($transitions as $t) {
+                if (!$t['isdst']) {
+                    $rawSec = $t['offset'];
+                    if ('' !== $t['abbr']) {
+                        $abbrStd = $t['abbr'];
+                    }
+                } else {
+                    $useDst = true;
+                    if ('' !== $t['abbr']) {
+                        $abbrDst = $t['abbr'];
+                    }
+                    if (null !== $rawSec) {
+                        $dstSav = max($dstSav, $t['offset'] - $rawSec);
+                    }
+                }
+            }
+            if (null === $rawSec && isset($transitions[0])) {
+                $rawSec = $transitions[0]['offset'];
+                if ('' !== $transitions[0]['abbr']) {
+                    $abbrStd = $transitions[0]['abbr'];
+                }
+            }
+        }
+        if (null === $rawSec) {
+            $rawSec = VmDateTimeNative::timezoneOffsetSeconds($id, 1705312800); // 2024-01-15 12:00 UTC
+        }
+        if ($useDst && $dstSav <= 0) {
+            $dstSav = 3600;
+        }
+        if (!$useDst) {
+            $dstSav = 0;
+            $abbrDst = $abbrStd;
+        }
+
+        return [
+            'rawMs' => $rawSec * 1000,
+            'dstMs' => $dstSav * 1000,
+            'useDst' => $useDst,
+            'abbrStd' => $abbrStd,
+            'abbrDst' => $abbrDst,
+        ];
+    }
+
+    public static function getRawOffset(ObjectEntry $object): int
+    {
+        return self::offsetMeta(self::idOf($object))['rawMs'];
+    }
+
+    public static function getDSTSavings(ObjectEntry $object): int
+    {
+        return self::offsetMeta(self::idOf($object))['dstMs'];
+    }
+
+    public static function useDaylightTime(ObjectEntry $object): bool
+    {
+        return self::offsetMeta(self::idOf($object))['useDst'];
+    }
+
+    /**
+     * php-src intltz_get_display_name — zoneinfo abbr / GMT forms (#20769).
+     */
+    public static function getDisplayName(
+        ObjectEntry $object,
+        bool $dst = false,
+        int $style = self::DISPLAY_LONG,
+        ?string $locale = null
+    ): string|false {
+        unset($locale); // locale-sensitive ICU names deferred; zoneinfo forms are locale-agnostic.
+        $id = self::idOf($object);
+        $meta = self::offsetMeta($id);
+        $offsetMs = $meta['rawMs'] + ($dst ? $meta['dstMs'] : 0);
+        $abbr = $dst ? $meta['abbrDst'] : $meta['abbrStd'];
+
+        return match ($style) {
+            self::DISPLAY_SHORT,
+            self::DISPLAY_SHORT_GENERIC,
+            self::DISPLAY_SHORT_COMMONLY_USED => '' !== $abbr ? $abbr : $id,
+            self::DISPLAY_SHORT_GMT => self::formatGmtOffset($offsetMs, false),
+            self::DISPLAY_LONG_GMT => self::formatGmtOffset($offsetMs, true),
+            self::DISPLAY_LONG,
+            self::DISPLAY_LONG_GENERIC,
+            self::DISPLAY_GENERIC_LOCATION => '' !== $abbr ? $abbr : $id,
+            default => false,
+        };
+    }
+
+    public static function toDateTimeZone(Context $ctx, ObjectEntry $object): ObjectEntry|false
+    {
+        try {
+            $var = DateTimeSupport::newDateTimeZoneVariable($ctx, self::idOf($object));
+
+            return $var->toObject();
+        } catch (\Throwable) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intltz_to_date_time_zone: DateTimeZone create failed: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+    }
+
+    public static function fromDateTimeZone(Context $ctx, ObjectEntry $zone): ObjectEntry
+    {
+        return self::createFromId($ctx, DateTimeSupport::timezoneName($zone));
+    }
+
+    public static function getRegion(string $timezoneId): string|false
+    {
+        try {
+            $id = VmDateTimeNative::validateTimezoneId($timezoneId);
+        } catch (\Throwable) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intltz_get_region: No such time zone: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $loc = VmDateTimeNative::timezoneLocation($id);
+        if (false === $loc) {
+            // Etc/UTC and fixed offsets — ICU uses "001" (world).
+            return '001';
+        }
+        $cc = $loc['country_code'];
+        if ('??' === $cc || '' === $cc) {
+            return '001';
+        }
+
+        return $cc;
+    }
+
+    /**
+     * @param-out bool|null $isSystemId
+     */
+    public static function getCanonicalID(string $timezoneId, ?bool &$isSystemId = null): string|false
+    {
+        try {
+            $id = VmDateTimeNative::validateTimezoneId($timezoneId);
+            $isSystemId = true;
+            IntlError::clear();
+
+            return $id;
+        } catch (\Throwable) {
+            $isSystemId = null;
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intltz_get_canonical_id: No such time zone: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+    }
+
+    /**
+     * php-src intltz_get_offset — fills raw/dst offset by-ref in milliseconds.
+     *
+     * @param-out int $rawOffset
+     * @param-out int $dstOffset
+     */
+    public static function getOffset(
+        ObjectEntry $object,
+        float $timestamp,
+        bool $local,
+        int &$rawOffset,
+        int &$dstOffset
+    ): bool {
+        unset($local); // local wall-time form deferred; dateMs treated as UTC epoch ms.
+        $id = self::idOf($object);
+        $meta = self::offsetMeta($id);
+        $rawOffset = $meta['rawMs'];
+        $ts = (int) floor($timestamp / 1000.0);
+        $totalSec = VmDateTimeNative::timezoneOffsetSeconds($id, $ts);
+        $dstOffset = ($totalSec * 1000) - $rawOffset;
+        if ($dstOffset < 0) {
+            $dstOffset = 0;
+        }
+        IntlError::clear();
+
+        return true;
+    }
+
+    public static function hasSameRules(ObjectEntry $a, ObjectEntry $b): bool
+    {
+        $ma = self::offsetMeta(self::idOf($a));
+        $mb = self::offsetMeta(self::idOf($b));
+
+        return $ma['rawMs'] === $mb['rawMs']
+            && $ma['dstMs'] === $mb['dstMs']
+            && $ma['useDst'] === $mb['useDst'];
+    }
+
+    public static function requireTimeZoneReceiver(Variable $receiver, string $method): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !self::isTimeZoneObject($receiver->toObject())) {
+            throw new \Error($method.'() called on incompatible object');
+        }
+
+        return $receiver->toObject();
+    }
+
+    private static function formatGmtOffset(int $offsetMs, bool $long): string
+    {
+        $sign = $offsetMs >= 0 ? '+' : '-';
+        $abs = abs($offsetMs);
+        $hours = intdiv($abs, 3600000);
+        $mins = intdiv($abs % 3600000, 60000);
+        if ($long) {
+            return \sprintf('GMT%s%02d:%02d', $sign, $hours, $mins);
+        }
+        if (0 === $mins) {
+            return \sprintf('GMT%s%d', $sign, $hours);
+        }
+
+        return \sprintf('GMT%s%d:%02d', $sign, $hours, $mins);
+    }
 }
 
 /** IntlTimeZone::createTimeZone() — php-src intltz_create_time_zone (#6151). */
@@ -239,14 +485,396 @@ final class IntlTimeZoneGetID extends VmClassMethod
                 max(0, $argc - 1)
             ));
         }
-        $receiver = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $receiver->type
-            || !VmIntlTimeZone::isTimeZoneObject($receiver->toObject())) {
-            throw new \Error('IntlTimeZone::getID() called on incompatible object');
+        $object = VmIntlTimeZone::requireTimeZoneReceiver($frame->calledArgs[0], 'IntlTimeZone::getID');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(VmIntlTimeZone::idOf($object));
+    }
+}
+
+/** IntlTimeZone::getRawOffset() — php-src intltz_get_raw_offset (#20769). */
+final class IntlTimeZoneGetRawOffset extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getRawOffset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::getRawOffset() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmIntlTimeZone::requireTimeZoneReceiver($frame->calledArgs[0], 'IntlTimeZone::getRawOffset');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlTimeZone::getRawOffset($object));
+    }
+}
+
+/** IntlTimeZone::getDSTSavings() — php-src intltz_get_dst_savings (#20769). */
+final class IntlTimeZoneGetDSTSavings extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getDSTSavings');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::getDSTSavings() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmIntlTimeZone::requireTimeZoneReceiver($frame->calledArgs[0], 'IntlTimeZone::getDSTSavings');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlTimeZone::getDSTSavings($object));
+    }
+}
+
+/** IntlTimeZone::useDaylightTime() — php-src intltz_use_daylight_time (#20769). */
+final class IntlTimeZoneUseDaylightTime extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('useDaylightTime');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::useDaylightTime() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmIntlTimeZone::requireTimeZoneReceiver($frame->calledArgs[0], 'IntlTimeZone::useDaylightTime');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlTimeZone::useDaylightTime($object));
+    }
+}
+
+/** IntlTimeZone::getDisplayName() — php-src intltz_get_display_name (#20769). */
+final class IntlTimeZoneGetDisplayName extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getDisplayName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::getDisplayName() expects between 0 and 3 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmIntlTimeZone::requireTimeZoneReceiver($frame->calledArgs[0], 'IntlTimeZone::getDisplayName');
+        $dst = false;
+        if ($argc >= 2) {
+            $dst = LocaleLookup::coerceBool(
+                $frame->calledArgs[1],
+                'IntlTimeZone::getDisplayName',
+                1,
+                'dst'
+            );
+        }
+        $style = VmIntlTimeZone::DISPLAY_LONG;
+        if ($argc >= 3) {
+            $style = VmIntlDateFormatter::coerceIntArg(
+                $frame->calledArgs[2],
+                'IntlTimeZone::getDisplayName',
+                2,
+                'style'
+            );
+        }
+        $locale = null;
+        if ($argc >= 4) {
+            $localeVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $localeVar->type) {
+                $locale = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[3],
+                    'IntlTimeZone::getDisplayName',
+                    3,
+                    'locale'
+                );
+            }
+        }
+        $name = VmIntlTimeZone::getDisplayName($object, $dst, $style, $locale);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $name) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($name);
+    }
+}
+
+/** IntlTimeZone::toDateTimeZone() — php-src intltz_to_date_time_zone (#20769). */
+final class IntlTimeZoneToDateTimeZone extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('toDateTimeZone');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::toDateTimeZone() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmIntlTimeZone::requireTimeZoneReceiver($frame->calledArgs[0], 'IntlTimeZone::toDateTimeZone');
+        $zone = VmIntlTimeZone::toDateTimeZone($frame->vmContext, $object);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $zone) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->object($zone);
+    }
+}
+
+/** IntlTimeZone::getOffset() — php-src intltz_get_offset (#20769). */
+final class IntlTimeZoneGetOffset extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getOffset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (5 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::getOffset() expects exactly 4 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmIntlTimeZone::requireTimeZoneReceiver($frame->calledArgs[0], 'IntlTimeZone::getOffset');
+        $tsVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_FLOAT === $tsVar->type) {
+            $timestamp = $tsVar->toFloat();
+        } elseif (Variable::TYPE_INTEGER === $tsVar->type) {
+            $timestamp = (float) $tsVar->toInt();
+        } else {
+            throw new \TypeError(\sprintf(
+                'IntlTimeZone::getOffset(): Argument #1 ($date) must be of type float, %s given',
+                \PHPCompiler\VM\ReflectionSupport::valueTypeLabelPublic($tsVar)
+            ));
+        }
+        $local = LocaleLookup::coerceBool(
+            $frame->calledArgs[2],
+            'IntlTimeZone::getOffset',
+            2,
+            'local'
+        );
+        $raw = 0;
+        $dst = 0;
+        $ok = VmIntlTimeZone::getOffset($object, $timestamp, $local, $raw, $dst);
+        $frame->calledArgs[3]->resolveIndirect()->int($raw);
+        $frame->calledArgs[4]->resolveIndirect()->int($dst);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlTimeZone::hasSameRules() — php-src intltz_has_same_rules (#20769). */
+final class IntlTimeZoneHasSameRules extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('hasSameRules');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::hasSameRules() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmIntlTimeZone::requireTimeZoneReceiver($frame->calledArgs[0], 'IntlTimeZone::hasSameRules');
+        $otherVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $otherVar->type
+            || !VmIntlTimeZone::isTimeZoneObject($otherVar->toObject())) {
+            throw new \TypeError(\sprintf(
+                'IntlTimeZone::hasSameRules(): Argument #1 ($otherTimeZone) must be of type IntlTimeZone, %s given',
+                \PHPCompiler\VM\ReflectionSupport::valueTypeLabelPublic($otherVar)
+            ));
         }
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->string(VmIntlTimeZone::idOf($receiver->toObject()));
+        $frame->returnVar->bool(VmIntlTimeZone::hasSameRules($object, $otherVar->toObject()));
+    }
+}
+
+/** IntlTimeZone::getRegion() — php-src intltz_get_region (#20769). */
+final class IntlTimeZoneGetRegion extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getRegion');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::getRegion() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $id = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'IntlTimeZone::getRegion',
+            0,
+            'zoneId'
+        );
+        $region = VmIntlTimeZone::getRegion($id);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $region) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($region);
+    }
+}
+
+/** IntlTimeZone::getCanonicalID() — php-src intltz_get_canonical_id (#20769). */
+final class IntlTimeZoneGetCanonicalID extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getCanonicalID');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::getCanonicalID() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $id = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'IntlTimeZone::getCanonicalID',
+            0,
+            'zoneId'
+        );
+        $isSystemId = null;
+        $canonical = VmIntlTimeZone::getCanonicalID($id, $isSystemId);
+        if ($argc >= 2) {
+            $out = $frame->calledArgs[1]->resolveIndirect();
+            if (null === $isSystemId) {
+                $out->null();
+            } else {
+                $out->bool($isSystemId);
+            }
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $canonical) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($canonical);
+    }
+}
+
+/** IntlTimeZone::fromDateTimeZone() — php-src intltz_from_date_time_zone (#20769). */
+final class IntlTimeZoneFromDateTimeZone extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fromDateTimeZone');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::fromDateTimeZone() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $zoneVar = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $zoneVar->type
+            || 'datetimezone' !== strtolower($zoneVar->toObject()->class->name)) {
+            throw new \TypeError(\sprintf(
+                'IntlTimeZone::fromDateTimeZone(): Argument #1 ($timezone) must be of type DateTimeZone, %s given',
+                \PHPCompiler\VM\ReflectionSupport::valueTypeLabelPublic($zoneVar)
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->object(
+            VmIntlTimeZone::fromDateTimeZone($frame->vmContext, $zoneVar->toObject())
+        );
+    }
+}
+
+/** IntlTimeZone::getGMT() — php-src intltz_get_gmt (#20769). */
+final class IntlTimeZoneGetGMT extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getGMT');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::getGMT() expects exactly 0 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->object(VmIntlTimeZone::createFromId($frame->vmContext, 'GMT'));
     }
 }
