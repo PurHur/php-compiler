@@ -32,7 +32,8 @@ final class AttributeRegistryLookupRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/AttributeRegistryLookupRuntime.php');
         $this->assertStringContainsString('AttributeRegistryJitHelper', $source);
         $this->assertStringContainsString('AttributeRegistryArgsJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('implementThinStandaloneStubs', $source);
@@ -42,6 +43,8 @@ final class AttributeRegistryLookupRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('implementDeferredUserScriptStubs', $source);
         $this->assertStringNotContainsString('emitCstrEqualsLiteral', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+        $this->assertStringNotContainsString('new JIT(', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
     }
 
     public function testAttributeRegistryJitHelperIsNestedJitSafe(): void

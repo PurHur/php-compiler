@@ -4,10 +4,16 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
+use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -16,7 +22,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for __compiler_attr_* lookup via AttributeRegistryJitHelper PHP (#10086, #20901).
  *
  * Embed + thin standalone AOT: NestedJIT {@see AttributeRegistryJitHelper} /
- * {@see AttributeRegistryArgsJitHelper} (IncludePath #20877 / Serialize #20773 shape — no thin stubs).
+ * {@see AttributeRegistryArgsJitHelper} via {@see JitVmHelperLink}
+ * (IncludePath #20877 / Serialize #20773 shape — no thin stubs).
  * Args hashtable: {@see AttributeRegistryArgsJitHelper} when ctor args exist; null bridge otherwise.
  */
 final class AttributeRegistryLookupRuntime
@@ -63,13 +70,23 @@ final class AttributeRegistryLookupRuntime
             return;
         }
 
+        // Save before active-context / NestedJIT work — those can detach the builder
+        // (peer Unserialize #20785 / IncludePath #20877).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
+        // Thin + embed: publish sg_vm_context before NestedJIT of AttributeRegistryJitHelper (#17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+
         self::ensureJitHelperCompiled($context);
         self::implementClassCountBridge($context, $classNamesJson);
         self::implementClassNameAtBridge($context, $classNamesJson);
         self::implementMethodCountBridge($context, $methodNamesJson);
         self::implementMethodNameAtBridge($context, $methodNamesJson);
         self::implementClassArgsHashtableBridge($context, $classEntriesJson);
-        $context->builder->clearInsertionPosition();
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 
     private static function implementClassCountBridge(Context $context, string $classNamesJson): void
@@ -274,86 +291,41 @@ final class AttributeRegistryLookupRuntime
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after AttributeRegistryJitHelper compile (#10086)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#20901');
     }
 
     private static function argsHelperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureArgsJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after AttributeRegistryArgsJitHelper compile (#10086)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#20901');
     }
 
     private static function ensureArgsJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::ARGS_COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
+        // Variable / HashTable mutators used by AttributeRegistryArgsJitHelper NestedJIT.
+        foreach (['null', 'bool', 'int', 'string', 'float', 'array'] as $varMethod) {
+            NestedVmVariableMethodLlvm::ensureMethod($context, $varMethod);
         }
-        if (!$missing) {
-            return;
+        foreach (['add', 'append'] as $htMethod) {
+            NestedVmHashTableMethodLlvm::ensureMethod($context, $htMethod);
         }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::ARGS_HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'AttributeRegistryArgsJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('AttributeRegistryArgsJitHelper.php parseAndCompile failed (#10086)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::ARGS_COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#10086)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::ARGS_HELPER_PATH,
+            self::ARGS_COMPILED_HELPERS,
+            '#20901'
+        );
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'AttributeRegistryJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('AttributeRegistryJitHelper.php parseAndCompile failed (#10086)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#10086)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20901'
+        );
     }
 }

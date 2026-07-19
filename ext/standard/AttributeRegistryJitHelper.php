@@ -9,24 +9,20 @@ namespace PHPCompiler\ext\standard;
  *
  * SSOT over per-module JSON tables embedded at link time; replaces LLVM branch chains
  * in {@see \PHPCompiler\JIT\Builtin\AttributeRegistryLowering}.
- * NestedJIT-safe under thin AOT: string-scan JSON lists — no host decode builtin / foreach-array
- * (IncludePath #20877 / Serialize #20773 shape).
+ * NestedJIT-safe under thin AOT: string-scan JSON lists — no host decode builtin, no by-ref,
+ * no nullable returns (IncludePath #20877 / Serialize #20773 shape).
  * php-src: Zend/zend_attributes.c — compile-time attribute tables (semantics only)
  */
 final class AttributeRegistryJitHelper
 {
     public static function classCount(string $classLc, string $classNamesJson): int
     {
-        $list = self::findTopLevelStringList($classNamesJson, $classLc);
-
-        return self::countJsonStringList($list);
+        return self::countJsonStringList(self::findTopLevelStringList($classNamesJson, $classLc));
     }
 
     public static function classNameAt(string $classLc, int $idx, string $classNamesJson): string
     {
-        $list = self::findTopLevelStringList($classNamesJson, $classLc);
-
-        return self::jsonStringAt($list, $idx);
+        return self::jsonStringAt(self::findTopLevelStringList($classNamesJson, $classLc), $idx);
     }
 
     public static function methodCount(string $classLc, string $methodLc, string $methodNamesJson): int
@@ -35,9 +31,8 @@ final class AttributeRegistryJitHelper
         if ('' === $classObj) {
             return 0;
         }
-        $list = self::findTopLevelStringList('{'.$classObj.'}', $methodLc);
 
-        return self::countJsonStringList($list);
+        return self::countJsonStringList(self::findTopLevelStringList('{'.$classObj.'}', $methodLc));
     }
 
     public static function methodNameAt(
@@ -50,9 +45,8 @@ final class AttributeRegistryJitHelper
         if ('' === $classObj) {
             return '';
         }
-        $list = self::findTopLevelStringList('{'.$classObj.'}', $methodLc);
 
-        return self::jsonStringAt($list, $idx);
+        return self::jsonStringAt(self::findTopLevelStringList('{'.$classObj.'}', $methodLc), $idx);
     }
 
     /** Inner of `[...]` for a top-level object key, or empty string when missing. */
@@ -64,16 +58,23 @@ final class AttributeRegistryJitHelper
         $len = \strlen($json);
         $i = 0;
         while ($i < $len) {
-            $key = self::scanJsonString($json, $i, $len);
-            if (null === $key) {
-                ++$i;
+            $parsed = self::tryParseJsonString($json, $i, $len);
+            if ('' === $parsed) {
+                $i = $i + 1;
                 continue;
             }
+            $pipe = \strpos($parsed, '|');
+            if (false === $pipe) {
+                $i = $i + 1;
+                continue;
+            }
+            $key = \substr($parsed, 0, $pipe);
+            $i = (int) \substr($parsed, $pipe + 1);
             $i = self::skipWs($json, $i, $len);
             if ($i >= $len || ':' !== $json[$i]) {
                 continue;
             }
-            ++$i;
+            $i = $i + 1;
             $i = self::skipWs($json, $i, $len);
             if ($i >= $len || '[' !== $json[$i]) {
                 if ($i < $len && '{' === $json[$i]) {
@@ -81,29 +82,37 @@ final class AttributeRegistryJitHelper
                 }
                 continue;
             }
-            ++$i;
+            $i = $i + 1;
             $start = $i;
             $depth = 1;
             while ($i < $len && $depth > 0) {
                 $c = $json[$i];
                 if ('"' === $c) {
-                    self::scanJsonString($json, $i, $len);
+                    $skip = self::tryParseJsonString($json, $i, $len);
+                    if ('' !== $skip) {
+                        $pipe2 = \strpos($skip, '|');
+                        if (false !== $pipe2) {
+                            $i = (int) \substr($skip, $pipe2 + 1);
+                            continue;
+                        }
+                    }
+                    $i = $i + 1;
                     continue;
                 }
                 if ('[' === $c) {
-                    ++$depth;
+                    $depth = $depth + 1;
                 } elseif (']' === $c) {
-                    --$depth;
+                    $depth = $depth - 1;
                     if (0 === $depth) {
                         $inner = \substr($json, $start, $i - $start);
-                        ++$i;
+                        $i = $i + 1;
                         if (0 === \strcasecmp($keyLc, $key)) {
                             return $inner;
                         }
                         break;
                     }
                 }
-                ++$i;
+                $i = $i + 1;
             }
         }
 
@@ -119,16 +128,23 @@ final class AttributeRegistryJitHelper
         $len = \strlen($json);
         $i = 0;
         while ($i < $len) {
-            $key = self::scanJsonString($json, $i, $len);
-            if (null === $key) {
-                ++$i;
+            $parsed = self::tryParseJsonString($json, $i, $len);
+            if ('' === $parsed) {
+                $i = $i + 1;
                 continue;
             }
+            $pipe = \strpos($parsed, '|');
+            if (false === $pipe) {
+                $i = $i + 1;
+                continue;
+            }
+            $key = \substr($parsed, 0, $pipe);
+            $i = (int) \substr($parsed, $pipe + 1);
             $i = self::skipWs($json, $i, $len);
             if ($i >= $len || ':' !== $json[$i]) {
                 continue;
             }
-            ++$i;
+            $i = $i + 1;
             $i = self::skipWs($json, $i, $len);
             if ($i >= $len || '{' !== $json[$i]) {
                 if ($i < $len && '[' === $json[$i]) {
@@ -136,29 +152,37 @@ final class AttributeRegistryJitHelper
                 }
                 continue;
             }
-            ++$i;
+            $i = $i + 1;
             $start = $i;
             $depth = 1;
             while ($i < $len && $depth > 0) {
                 $c = $json[$i];
                 if ('"' === $c) {
-                    self::scanJsonString($json, $i, $len);
+                    $skip = self::tryParseJsonString($json, $i, $len);
+                    if ('' !== $skip) {
+                        $pipe2 = \strpos($skip, '|');
+                        if (false !== $pipe2) {
+                            $i = (int) \substr($skip, $pipe2 + 1);
+                            continue;
+                        }
+                    }
+                    $i = $i + 1;
                     continue;
                 }
                 if ('{' === $c) {
-                    ++$depth;
+                    $depth = $depth + 1;
                 } elseif ('}' === $c) {
-                    --$depth;
+                    $depth = $depth - 1;
                     if (0 === $depth) {
                         $inner = \substr($json, $start, $i - $start);
-                        ++$i;
+                        $i = $i + 1;
                         if (0 === \strcasecmp($keyLc, $key)) {
                             return $inner;
                         }
                         break;
                     }
                 }
-                ++$i;
+                $i = $i + 1;
             }
         }
 
@@ -174,12 +198,16 @@ final class AttributeRegistryJitHelper
         $i = 0;
         $n = 0;
         while ($i < $len) {
-            $s = self::scanJsonString($listInner, $i, $len);
-            if (null !== $s) {
-                ++$n;
-                continue;
+            $parsed = self::tryParseJsonString($listInner, $i, $len);
+            if ('' !== $parsed) {
+                $pipe = \strpos($parsed, '|');
+                if (false !== $pipe) {
+                    $n = $n + 1;
+                    $i = (int) \substr($parsed, $pipe + 1);
+                    continue;
+                }
             }
-            ++$i;
+            $i = $i + 1;
         }
 
         return $n;
@@ -194,60 +222,63 @@ final class AttributeRegistryJitHelper
         $i = 0;
         $n = 0;
         while ($i < $len) {
-            $s = self::scanJsonString($listInner, $i, $len);
-            if (null !== $s) {
-                if ($n === $idx) {
-                    return $s;
+            $parsed = self::tryParseJsonString($listInner, $i, $len);
+            if ('' !== $parsed) {
+                $pipe = \strpos($parsed, '|');
+                if (false !== $pipe) {
+                    $s = \substr($parsed, 0, $pipe);
+                    $i = (int) \substr($parsed, $pipe + 1);
+                    if ($n === $idx) {
+                        return $s;
+                    }
+                    $n = $n + 1;
+                    continue;
                 }
-                ++$n;
-                continue;
             }
-            ++$i;
+            $i = $i + 1;
         }
 
         return '';
     }
 
     /**
-     * If $json[$i] is `"`, advance $i past the string and return decoded content.
-     * Otherwise leave $i unchanged and return null.
-     *
-     * @param-out int $i
+     * When $json[$pos] is `"`, return "content|newPos"; otherwise return "" (pos unchanged).
+     * Pipe separator avoids by-ref / nullable NestedJIT hazards (#20901).
      */
-    private static function scanJsonString(string $json, int &$i, int $len): ?string
+    private static function tryParseJsonString(string $json, int $pos, int $len): string
     {
-        $i = self::skipWs($json, $i, $len);
+        $i = self::skipWs($json, $pos, $len);
         if ($i >= $len || '"' !== $json[$i]) {
-            return null;
+            return '';
         }
-        ++$i;
+        $i = $i + 1;
         $out = '';
         while ($i < $len) {
             $c = $json[$i];
             if ('"' === $c) {
-                ++$i;
+                $i = $i + 1;
 
-                return $out;
+                return $out.'|'.$i;
             }
             if ('\\' === $c && $i + 1 < $len) {
                 $n = $json[$i + 1];
                 if ('"' === $n || '\\' === $n || '/' === $n) {
-                    $out .= $n;
+                    $out = $out.$n;
                 } elseif ('n' === $n) {
-                    $out .= "\n";
+                    $out = $out."\n";
                 } elseif ('t' === $n) {
-                    $out .= "\t";
+                    $out = $out."\t";
                 } else {
-                    $out .= $n;
+                    $out = $out.$n;
                 }
-                $i += 2;
+                $i = $i + 2;
                 continue;
             }
-            $out .= $c;
-            ++$i;
+            $out = $out.$c;
+            $i = $i + 1;
         }
 
-        return $out;
+        return $out.'|'.$i;
     }
 
     private static function skipWs(string $json, int $i, int $len): int
@@ -257,7 +288,7 @@ final class AttributeRegistryJitHelper
             if (' ' !== $c && "\t" !== $c && "\n" !== $c && "\r" !== $c) {
                 break;
             }
-            ++$i;
+            $i = $i + 1;
         }
 
         return $i;
@@ -271,27 +302,41 @@ final class AttributeRegistryJitHelper
         }
         $c = $json[$i];
         if ('"' === $c) {
-            self::scanJsonString($json, $i, $len);
+            $parsed = self::tryParseJsonString($json, $i, $len);
+            if ('' !== $parsed) {
+                $pipe = \strpos($parsed, '|');
+                if (false !== $pipe) {
+                    return (int) \substr($parsed, $pipe + 1);
+                }
+            }
 
-            return $i;
+            return $i + 1;
         }
         if ('{' === $c || '[' === $c) {
             $open = $c;
             $close = '{' === $c ? '}' : ']';
-            ++$i;
+            $i = $i + 1;
             $depth = 1;
             while ($i < $len && $depth > 0) {
                 $ch = $json[$i];
                 if ('"' === $ch) {
-                    self::scanJsonString($json, $i, $len);
+                    $parsed = self::tryParseJsonString($json, $i, $len);
+                    if ('' !== $parsed) {
+                        $pipe = \strpos($parsed, '|');
+                        if (false !== $pipe) {
+                            $i = (int) \substr($parsed, $pipe + 1);
+                            continue;
+                        }
+                    }
+                    $i = $i + 1;
                     continue;
                 }
                 if ($ch === $open) {
-                    ++$depth;
+                    $depth = $depth + 1;
                 } elseif ($ch === $close) {
-                    --$depth;
+                    $depth = $depth - 1;
                 }
-                ++$i;
+                $i = $i + 1;
             }
 
             return $i;
@@ -301,7 +346,7 @@ final class AttributeRegistryJitHelper
             if (',' === $ch || '}' === $ch || ']' === $ch) {
                 break;
             }
-            ++$i;
+            $i = $i + 1;
         }
 
         return $i;
