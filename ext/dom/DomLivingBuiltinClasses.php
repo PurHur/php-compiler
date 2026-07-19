@@ -230,6 +230,9 @@ final class DomLivingBuiltinClasses
         $xmlDocument->methods['createfromstring'] = new XmlDocumentCreateFromString();
         $xmlDocument->methodVisibility['createfromstring'] = $pubStatic;
         $xmlDocument->methodNames['createfromstring'] = 'createFromString';
+        $xmlDocument->methods['createfromfile'] = new XmlDocumentCreateFromFile();
+        $xmlDocument->methodVisibility['createfromfile'] = $pubStatic;
+        $xmlDocument->methodNames['createfromfile'] = 'createFromFile';
         $xmlDocument->methods['createempty'] = new XmlDocumentCreateEmpty();
         $xmlDocument->methodVisibility['createempty'] = $pubStatic;
         $xmlDocument->methodNames['createempty'] = 'createEmpty';
