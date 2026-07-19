@@ -852,6 +852,7 @@ require_once __DIR__.'/../../../ext/intl/GraphemeStrSplitJitHelper.php';
 require_once __DIR__.'/../../../ext/intl/IdnFunction.php';
 require_once __DIR__.'/../../../ext/intl/IntlClassMethod.php';
 require_once __DIR__.'/../../../ext/intl/IntlConstants.php';
+require_once __DIR__.'/../../../ext/intl/IntlDateFormatterConstruct.php';
 require_once __DIR__.'/../../../ext/intl/IntlDateFormatterCreate.php';
 require_once __DIR__.'/../../../ext/intl/IntlDateFormatterFormat.php';
 require_once __DIR__.'/../../../ext/intl/IntlDateFormatterFormatObject.php';

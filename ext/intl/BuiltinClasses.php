@@ -168,6 +168,12 @@ final class BuiltinClasses
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
+        // php-src dateformat_class.c — __construct shares init with create (#21097)
+        $construct = new IntlDateFormatterConstruct();
+        $entry->constructor = $construct;
+        $entry->methods['__construct'] = $construct;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methodNames['__construct'] = '__construct';
         $entry->methods['create'] = new IntlDateFormatterCreate();
         $entry->methodVisibility['create'] = $pubStatic;
         $entry->methodNames['create'] = 'create';
