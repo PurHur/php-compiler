@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5873 |
-| Phase A inventory files (M2 ratio SSOT) | 5873 |
+| PHP files on vm.php path | 5877 |
+| Phase A inventory files (M2 ratio SSOT) | 5877 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17718 |
+| Source constructs flagged (warnings) | 17734 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -833,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 85 |
+| `ext/intl/Module.php` | 0 | 89 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -923,10 +923,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/numfmt_get_error_message.php` | 0 | 3 |
 | `ext/intl/numfmt_get_locale.php` | 0 | 3 |
 | `ext/intl/numfmt_get_pattern.php` | 0 | 3 |
+| `ext/intl/numfmt_get_symbol.php` | 0 | 3 |
+| `ext/intl/numfmt_get_text_attribute.php` | 0 | 3 |
 | `ext/intl/numfmt_parse.php` | 0 | 3 |
 | `ext/intl/numfmt_parse_currency.php` | 0 | 3 |
 | `ext/intl/numfmt_set_attribute.php` | 0 | 3 |
 | `ext/intl/numfmt_set_pattern.php` | 0 | 3 |
+| `ext/intl/numfmt_set_symbol.php` | 0 | 3 |
+| `ext/intl/numfmt_set_text_attribute.php` | 0 | 3 |
 | `ext/intl/resourcebundle_count.php` | 0 | 3 |
 | `ext/intl/resourcebundle_create.php` | 0 | 3 |
 | `ext/intl/resourcebundle_get.php` | 0 | 3 |
@@ -11525,49 +11529,53 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new numfmt_format_currency (line 139)
 - new numfmt_get_attribute (line 140)
 - new numfmt_set_attribute (line 141)
-- new numfmt_get_pattern (line 142)
-- new numfmt_set_pattern (line 143)
-- new numfmt_get_locale (line 144)
-- new numfmt_get_error_code (line 145)
-- new numfmt_get_error_message (line 146)
-- new msgfmt_create (line 152)
-- new msgfmt_format (line 153)
-- new msgfmt_format_message (line 154)
-- new msgfmt_parse (line 155)
-- new msgfmt_parse_message (line 156)
-- new msgfmt_get_locale (line 157)
-- new msgfmt_get_pattern (line 158)
-- new msgfmt_set_pattern (line 159)
-- new msgfmt_get_error_code (line 160)
-- new msgfmt_get_error_message (line 161)
-- new transliterator_create (line 167)
-- new transliterator_create_from_rules (line 168)
-- new transliterator_create_inverse (line 169)
-- new transliterator_list_ids (line 170)
-- new transliterator_transliterate (line 171)
-- new transliterator_get_error_code (line 172)
-- new transliterator_get_error_message (line 173)
-- new resourcebundle_create (line 179)
-- new resourcebundle_get (line 180)
-- new resourcebundle_locales (line 181)
-- new resourcebundle_count (line 182)
-- new datefmt_format_object (line 187)
-- new grapheme_strlen (line 215)
-- new grapheme_substr (line 216)
-- new grapheme_strpos (line 217)
-- new grapheme_str_contains (line 218)
-- new grapheme_strstr (line 219)
-- new grapheme_stristr (line 220)
-- new grapheme_stripos (line 221)
-- new grapheme_strrpos (line 222)
-- new grapheme_strripos (line 223)
-- new grapheme_extract (line 224)
-- new grapheme_levenshtein (line 225)
-- new grapheme_str_split (line 226)
-- new grapheme_strimwidth (line 227)
-- new intl_get_error_code (line 228)
-- new intl_get_error_message (line 229)
-- new intl_is_failure (line 230)
+- new numfmt_get_symbol (line 142)
+- new numfmt_set_symbol (line 143)
+- new numfmt_get_text_attribute (line 144)
+- new numfmt_set_text_attribute (line 145)
+- new numfmt_get_pattern (line 146)
+- new numfmt_set_pattern (line 147)
+- new numfmt_get_locale (line 148)
+- new numfmt_get_error_code (line 149)
+- new numfmt_get_error_message (line 150)
+- new msgfmt_create (line 156)
+- new msgfmt_format (line 157)
+- new msgfmt_format_message (line 158)
+- new msgfmt_parse (line 159)
+- new msgfmt_parse_message (line 160)
+- new msgfmt_get_locale (line 161)
+- new msgfmt_get_pattern (line 162)
+- new msgfmt_set_pattern (line 163)
+- new msgfmt_get_error_code (line 164)
+- new msgfmt_get_error_message (line 165)
+- new transliterator_create (line 171)
+- new transliterator_create_from_rules (line 172)
+- new transliterator_create_inverse (line 173)
+- new transliterator_list_ids (line 174)
+- new transliterator_transliterate (line 175)
+- new transliterator_get_error_code (line 176)
+- new transliterator_get_error_message (line 177)
+- new resourcebundle_create (line 183)
+- new resourcebundle_get (line 184)
+- new resourcebundle_locales (line 185)
+- new resourcebundle_count (line 186)
+- new datefmt_format_object (line 191)
+- new grapheme_strlen (line 219)
+- new grapheme_substr (line 220)
+- new grapheme_strpos (line 221)
+- new grapheme_str_contains (line 222)
+- new grapheme_strstr (line 223)
+- new grapheme_stristr (line 224)
+- new grapheme_stripos (line 225)
+- new grapheme_strrpos (line 226)
+- new grapheme_strripos (line 227)
+- new grapheme_extract (line 228)
+- new grapheme_levenshtein (line 229)
+- new grapheme_str_split (line 230)
+- new grapheme_strimwidth (line 231)
+- new intl_get_error_code (line 232)
+- new intl_get_error_message (line 233)
+- new intl_is_failure (line 234)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12630,6 +12638,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 50)
 - 2 class method(s)
 
+### `ext/intl/numfmt_get_symbol.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 51)
+- 2 class method(s)
+
+### `ext/intl/numfmt_get_text_attribute.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 51)
+- 2 class method(s)
+
 ### `ext/intl/numfmt_parse.php`
 
 **Warnings** (review for bootstrap subset):
@@ -12656,6 +12678,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
 - new Error (line 46)
+- 2 class method(s)
+
+### `ext/intl/numfmt_set_symbol.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 47)
+- 2 class method(s)
+
+### `ext/intl/numfmt_set_text_attribute.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 47)
 - 2 class method(s)
 
 ### `ext/intl/resourcebundle_count.php`
