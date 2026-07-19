@@ -151,6 +151,13 @@ class Module extends ModuleAbstract
                 new msgfmt_create(),
                 new msgfmt_format(),
                 new msgfmt_format_message(),
+                new msgfmt_parse(),
+                new msgfmt_parse_message(),
+                new msgfmt_get_locale(),
+                new msgfmt_get_pattern(),
+                new msgfmt_set_pattern(),
+                new msgfmt_get_error_code(),
+                new msgfmt_get_error_message(),
             ]
             : [];
 
