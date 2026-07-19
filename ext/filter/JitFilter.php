@@ -86,6 +86,46 @@ final class JitFilter
         return $ptr;
     }
 
+    /**
+     * FILTER_DEFAULT / FILTER_UNSAFE_RAW: coerce scalar to string without linking
+     * validate/sanitize mega-CFG helpers (#20988 AOT one-arg default).
+     */
+    public static function boxFilterDefault(Context $context, JITVariable $value): Value
+    {
+        if (JITVariable::TYPE_VALUE === $value->type) {
+            $ptrType = $context->getTypeFromString('__value__*');
+            $ptr = JITVariable::KIND_VALUE === $value->kind
+                ? $value->value
+                : $context->builder->pointerCast($value->value, $ptrType);
+            $str = $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                $ptr
+            );
+            $slot = JitValueBox::alloc($context);
+            $out = JitValueBox::pointer($context, $slot);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeString'),
+                $out,
+                $str
+            );
+
+            return $out;
+        }
+        $str = self::jitScalarToString($context, $value);
+        if (null === $str) {
+            return self::boxedFalse($context);
+        }
+        $slot = JitValueBox::alloc($context);
+        $out = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $out,
+            $str
+        );
+
+        return $out;
+    }
+
     /** FILTER_VALIDATE_BOOLEAN failure: null when FILTER_NULL_ON_FAILURE, else false. */
     private static function booleanFailureBox(Context $context, ?Value $nullOnFailure): Value
     {

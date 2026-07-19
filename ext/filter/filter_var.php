@@ -20,14 +20,22 @@ final class filter_var extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('filter_var() requires two or three arguments in this compiler build');
+        if ($argc < 1) {
+            throw new \ArgumentCountError('filter_var() expects at least 1 argument, '.$argc.' given');
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError('filter_var() expects at most 3 arguments, '.$argc.' given');
         }
         if (null === $frame->returnVar) {
             return;
         }
         $value = $frame->calledArgs[0]->resolveIndirect();
-        $filterId = VmFilter::parseFilterIdArg($frame, 1, 'filter_var', 'filter', 2);
+        // php-src filter.stub.php: filter_var(mixed $value, int $filter = FILTER_DEFAULT, …)
+        if ($argc >= 2) {
+            $filterId = VmFilter::parseFilterIdArg($frame, 1, 'filter_var', 'filter', 2);
+        } else {
+            $filterId = VmFilter::FILTER_DEFAULT;
+        }
         $options = null;
         if (3 === $argc) {
             $options = $frame->calledArgs[2]->resolveIndirect();
@@ -60,10 +68,14 @@ final class filter_var extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 2 || \count($args) > 3) {
-            throw new \LogicException('filter_var() requires two or three arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError('filter_var() expects at least 1 argument, '.$argc.' given');
         }
-        $optionsArg = \count($args) > 2 ? $args[2] : null;
+        if ($argc > 3) {
+            throw new \ArgumentCountError('filter_var() expects at most 3 arguments, '.$argc.' given');
+        }
+        $optionsArg = $argc > 2 ? $args[2] : null;
         if (null !== $optionsArg
             && JITVariable::TYPE_NULL !== $optionsArg->type
             && JITVariable::TYPE_NATIVE_LONG !== $optionsArg->type
@@ -79,7 +91,24 @@ final class filter_var extends Internal
         }
 
         $value = JitFilter::asValueVar($context, $args[0]);
-        $filterVal = JitFilter::loadFilterId($context, $args[1]);
+        if ($argc >= 2) {
+            $filterArg = $args[1];
+        } else {
+            $i64Default = $context->getTypeFromString('int64');
+            $defaultFilter = $i64Default->constInt(VmFilter::FILTER_DEFAULT, false);
+            $filterArg = new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VALUE,
+                $defaultFilter
+            );
+        }
+        // One-arg defaults to FILTER_DEFAULT (php-src stub). Skip the validate/sanitize
+        // mega-CFG so AOT does not pull broken helper ABIs for this passthrough (#20988).
+        if (1 === $argc) {
+            return JitFilter::boxFilterDefault($context, $value);
+        }
+        $filterVal = JitFilter::loadFilterId($context, $filterArg);
         $nullOnFailure = JitFilter::loadNullOnFailureFlag($context, $optionsArg);
         $i64 = $context->getTypeFromString('int64');
         $isInt = $context->builder->icmp(
