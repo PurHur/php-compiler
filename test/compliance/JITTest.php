@@ -701,12 +701,13 @@ class JITTest extends BaseTest {
                 continue;
             }
             if (!\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
-                && str_contains($name, 'ldap_escape')
-                && !str_contains($name, 'ldap_escape_phantom')) {
+                && str_contains($name, 'ldap_')
+                && !str_contains($name, 'phantom')) {
                 continue;
             }
             if (\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins()
-                && str_contains($name, 'ldap_escape_phantom')) {
+                && (str_contains($name, 'phantom_ldap')
+                    || (str_contains($name, 'ldap_') && str_contains($name, 'phantom')))) {
                 continue;
             }
             if (!\PHPCompiler\ext\pgsql\PgsqlExtensionPolicy::advertisesBuiltins()

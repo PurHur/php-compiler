@@ -182,7 +182,25 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['yaml_parse', 'yaml_parse_file', 'yaml_emit', 'yaml_emit_file'], true)) {
             return \PHPCompiler\ext\yaml\YamlExtensionPolicy::advertisesExtension();
         }
-        if ('ldap_escape' === $lc) {
+        if (\in_array($lc, [
+            'ldap_escape',
+            'ldap_connect',
+            'ldap_bind',
+            'ldap_unbind',
+            'ldap_close',
+            'ldap_errno',
+            'ldap_error',
+            'ldap_err2str',
+            'ldap_set_option',
+            'ldap_search',
+            'ldap_list',
+            'ldap_read',
+            'ldap_count_entries',
+            'ldap_get_entries',
+            'ldap_first_entry',
+            'ldap_next_entry',
+            'ldap_free_result',
+        ], true)) {
             return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins();
         }
         if ('fastcgi_finish_request' === $lc) {
