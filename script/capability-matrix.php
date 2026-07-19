@@ -39,6 +39,7 @@ function collectCapabilities(string $root): array
         'openssl' => new PHPCompiler\ext\openssl\Module(),
         'sodium' => new PHPCompiler\ext\sodium\Module(),
         'sockets' => new PHPCompiler\ext\sockets\Module(),
+        'zmq' => new PHPCompiler\ext\zmq\Module(),
         'curl' => new PHPCompiler\ext\curl\Module(),
         'zip' => new PHPCompiler\ext\zip\Module(),
         'inotify' => new PHPCompiler\ext\inotify\Module(),

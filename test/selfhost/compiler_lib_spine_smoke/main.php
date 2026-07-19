@@ -66,6 +66,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -6135,6 +6136,40 @@ require_once __DIR__.'/../../../ext/ffi/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/ffi/FfiExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/ffi/Module.php';
 require_once __DIR__.'/../../../ext/ffi/VmFFI.php';
+require_once __DIR__.'/../../../ext/zmq/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/zmq/Module.php';
+require_once __DIR__.'/../../../ext/zmq/VmZmq.php';
+require_once __DIR__.'/../../../ext/zmq/ZmqConstants.php';
+require_once __DIR__.'/../../../ext/zmq/ZmqFunction.php';
+require_once __DIR__.'/../../../ext/zmq/bootstrap_zmqexception.php';
+require_once __DIR__.'/../../../ext/zmq/zmq_bind.php';
+require_once __DIR__.'/../../../ext/zmq/zmq_connect.php';
+require_once __DIR__.'/../../../ext/zmq/zmq_context.php';
+require_once __DIR__.'/../../../ext/zmq/zmq_msg_read.php';
+require_once __DIR__.'/../../../ext/zmq/zmq_poll.php';
+require_once __DIR__.'/../../../ext/zmq/zmq_recv.php';
+require_once __DIR__.'/../../../ext/zmq/zmq_send.php';
+require_once __DIR__.'/../../../ext/zmq/zmq_socket.php';
+require_once __DIR__.'/../../../ext/dom/DocumentImportLegacyNode.php';
+require_once __DIR__.'/../../../ext/intl/LocaleAddLikelySubtags.php';
+require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayKeyword.php';
+require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayKeywordValue.php';
+require_once __DIR__.'/../../../ext/intl/LocaleIsRightToLeft.php';
+require_once __DIR__.'/../../../ext/intl/LocaleMinimizeSubtags.php';
+require_once __DIR__.'/../../../ext/intl/locale_add_likely_subtags.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_display_keyword.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_display_keyword_value.php';
+require_once __DIR__.'/../../../ext/intl/locale_is_right_to_left.php';
+require_once __DIR__.'/../../../ext/intl/locale_minimize_subtags.php';
+require_once __DIR__.'/../../../ext/mailparse/MailparseExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/mailparse/MailparseFunction.php';
+require_once __DIR__.'/../../../ext/mailparse/Module.php';
+require_once __DIR__.'/../../../ext/mailparse/VmMailparse.php';
+require_once __DIR__.'/../../../ext/mailparse/mailparse_msg_create.php';
+require_once __DIR__.'/../../../ext/mailparse/mailparse_msg_free.php';
+require_once __DIR__.'/../../../ext/mailparse/mailparse_msg_get_part_data.php';
+require_once __DIR__.'/../../../ext/mailparse/mailparse_msg_parse.php';
+require_once __DIR__.'/../../../ext/mailparse/mailparse_rfc822_parse_addresses.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -6167,24 +6202,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../ext/dom/DocumentImportLegacyNode.php';
-require_once __DIR__.'/../../../ext/intl/LocaleAddLikelySubtags.php';
-require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayKeyword.php';
-require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayKeywordValue.php';
-require_once __DIR__.'/../../../ext/intl/LocaleIsRightToLeft.php';
-require_once __DIR__.'/../../../ext/intl/LocaleMinimizeSubtags.php';
-require_once __DIR__.'/../../../ext/intl/locale_add_likely_subtags.php';
-require_once __DIR__.'/../../../ext/intl/locale_get_display_keyword.php';
-require_once __DIR__.'/../../../ext/intl/locale_get_display_keyword_value.php';
-require_once __DIR__.'/../../../ext/intl/locale_is_right_to_left.php';
-require_once __DIR__.'/../../../ext/intl/locale_minimize_subtags.php';
-require_once __DIR__.'/../../../ext/mailparse/MailparseExtensionPolicy.php';
-require_once __DIR__.'/../../../ext/mailparse/MailparseFunction.php';
-require_once __DIR__.'/../../../ext/mailparse/Module.php';
-require_once __DIR__.'/../../../ext/mailparse/VmMailparse.php';
-require_once __DIR__.'/../../../ext/mailparse/mailparse_msg_create.php';
-require_once __DIR__.'/../../../ext/mailparse/mailparse_msg_free.php';
-require_once __DIR__.'/../../../ext/mailparse/mailparse_msg_get_part_data.php';
-require_once __DIR__.'/../../../ext/mailparse/mailparse_msg_parse.php';
-require_once __DIR__.'/../../../ext/mailparse/mailparse_rfc822_parse_addresses.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

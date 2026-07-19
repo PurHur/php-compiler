@@ -256,6 +256,7 @@ class Runtime {
         $this->load(new ext\inotify\Module);
         $this->load(new ext\pcntl\Module);
         $this->load(new ext\sockets\Module);
+        $this->load(new ext\zmq\Module);
         $this->load(new ext\ftp\Module);
         $this->load(new ext\soap\Module);
         $this->load(new ext\ffi\Module);
