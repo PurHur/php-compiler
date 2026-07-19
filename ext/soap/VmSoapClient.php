@@ -29,6 +29,7 @@ use PHPCompiler\ext\standard\VmUserCall;
  * WSDL xsd:element[@type] bindings also drive classmap when xsi:type is absent (#21088).
  * Document/literal operation→output message parts + complexType fields scope nested SDL types (#21091).
  * Document/literal operation→input sequence names positional __soapCall args (#21131).
+ * WSDL soap:binding style / soap:body use applied when ctor omits style/use (#21132).
  * options['typemap'] from_xml/to_xml string callbacks (#21046).
  */
 final class VmSoapClient
@@ -98,6 +99,8 @@ final class VmSoapClient
         $state->soapVersion = isset($options['soap_version'])
             ? (int) $options['soap_version']
             : SoapConstants::SOAP_1_1;
+        $state->styleFromOptions = \array_key_exists('style', $options);
+        $state->useFromOptions = \array_key_exists('use', $options);
         $state->style = isset($options['style']) ? (int) $options['style'] : SoapConstants::SOAP_RPC;
         $state->use = isset($options['use']) ? (int) $options['use'] : SoapConstants::SOAP_ENCODED;
         // php-src: exceptions false when IS_FALSE or long 0 (#20293).
@@ -1097,6 +1100,37 @@ final class VmSoapClient
                 }
             }
         }
+        // WSDL soap:binding style + soap:body use when ctor did not set them (#21132).
+        if (!$state->styleFromOptions || !$state->useFromOptions) {
+            foreach ($xpath->query('//soap:binding') ?: [] as $binding) {
+                if (!$binding instanceof \DOMElement) {
+                    continue;
+                }
+                if (!$state->styleFromOptions) {
+                    $styleAttr = \strtolower($binding->getAttribute('style'));
+                    if ('document' === $styleAttr) {
+                        $state->style = SoapConstants::SOAP_DOCUMENT;
+                    } elseif ('rpc' === $styleAttr) {
+                        $state->style = SoapConstants::SOAP_RPC;
+                    }
+                }
+                break;
+            }
+            if (!$state->useFromOptions) {
+                foreach ($xpath->query('//soap:body') ?: [] as $body) {
+                    if (!$body instanceof \DOMElement) {
+                        continue;
+                    }
+                    $useAttr = \strtolower($body->getAttribute('use'));
+                    if ('literal' === $useAttr) {
+                        $state->use = SoapConstants::SOAP_LITERAL;
+                    } elseif ('encoded' === $useAttr) {
+                        $state->use = SoapConstants::SOAP_ENCODED;
+                    }
+                    break;
+                }
+            }
+        }
     }
 
     /**
@@ -1348,13 +1382,18 @@ final class VmSoapClient
             $headerXml .= '  </'.$prefix.':Header>'."\n";
         }
 
+        $encodingStyleAttr = '';
+        if (SoapConstants::SOAP_ENCODED === $state->use) {
+            $encodingStyleAttr = ' SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/"';
+        }
+
         return '<?xml version="1.0" encoding="UTF-8"?>'."\n".
             '<'.$prefix.':Envelope xmlns:'.$prefix.'="'.$envelopeNs.'"'.
             ' xmlns:ns1="'.\htmlspecialchars($ns, \ENT_XML1).'"'.
             ' xmlns:xsd="http://www.w3.org/2001/XMLSchema"'.
             ' xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"'.
             ' xmlns:SOAP-ENC="http://schemas.xmlsoap.org/soap/encoding/"'.
-            ' SOAP-ENV:encodingStyle="http://schemas.xmlsoap.org/soap/encoding/">'."\n".
+            $encodingStyleAttr.'>'."\n".
             $headerXml.
             '  <'.$prefix.':Body>'."\n".
             '    <ns1:'.$name.'>'.$paramsXml.'</ns1:'.$name.'>'."\n".
@@ -1447,13 +1486,26 @@ final class VmSoapClient
         if (null === $value) {
             return '<'.$tag.' xsi:nil="true"/>';
         }
+        $literal = null !== $state && SoapConstants::SOAP_LITERAL === $state->use;
         if (\is_bool($value)) {
+            if ($literal) {
+                return '<'.$tag.'>'.($value ? 'true' : 'false').'</'.$tag.'>';
+            }
+
             return '<'.$tag.' xsi:type="xsd:boolean">'.($value ? 'true' : 'false').'</'.$tag.'>';
         }
         if (\is_int($value)) {
+            if ($literal) {
+                return '<'.$tag.'>'.$value.'</'.$tag.'>';
+            }
+
             return '<'.$tag.' xsi:type="xsd:int">'.$value.'</'.$tag.'>';
         }
         if (\is_float($value)) {
+            if ($literal) {
+                return '<'.$tag.'>'.$value.'</'.$tag.'>';
+            }
+
             return '<'.$tag.' xsi:type="xsd:float">'.$value.'</'.$tag.'>';
         }
         if (\is_array($value)) {
@@ -1463,6 +1515,9 @@ final class VmSoapClient
             }
 
             return '<'.$tag.'>'.$inner.'</'.$tag.'>';
+        }
+        if ($literal) {
+            return '<'.$tag.'>'.\htmlspecialchars((string) $value, \ENT_XML1).'</'.$tag.'>';
         }
 
         return '<'.$tag.' xsi:type="xsd:string">'.\htmlspecialchars((string) $value, \ENT_XML1).'</'.$tag.'>';
@@ -2218,6 +2273,12 @@ final class SoapClientState
     public int $style = SoapConstants::SOAP_RPC;
 
     public int $use = SoapConstants::SOAP_ENCODED;
+
+    /** True when ctor options supplied style (#21132). */
+    public bool $styleFromOptions = false;
+
+    /** True when ctor options supplied use (#21132). */
+    public bool $useFromOptions = false;
 
     /** @var list<string> */
     public array $functions = [];
