@@ -6,12 +6,14 @@ namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\ext\standard\VmDate;
 use PHPCompiler\ext\standard\VmDateTimeNative;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\DateTimeSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
@@ -89,6 +91,10 @@ final class VmIntlCalendar
     public const DOW_TYPE_WEEKEND_ONSET = 2;
     public const DOW_TYPE_WEEKEND_CEASE = 3;
 
+    /** ULOC_ACTUAL_LOCALE / ULOC_VALID_LOCALE — php-src Locale::* / intlcal_get_locale */
+    public const ULOC_ACTUAL_LOCALE = 0;
+    public const ULOC_VALID_LOCALE = 1;
+
     /**
      * @var array<int, array{
      *   timezone: string,
@@ -97,7 +103,10 @@ final class VmIntlCalendar
      *   millisecond: int,
      *   unsetFields: array<int, true>,
      *   repeatedWallTimeOption: int,
-     *   skippedWallTimeOption: int
+     *   skippedWallTimeOption: int,
+     *   lenient: bool,
+     *   firstDayOfWeek: int,
+     *   minimalDaysInFirstWeek: int
      * }>
      */
     private static array $state = [];
@@ -206,6 +215,18 @@ final class VmIntlCalendar
             'isweekend' => [new IntlCalendarIsWeekend(), 'isWeekend', $pub],
             'isequivalentto' => [new IntlCalendarIsEquivalentTo(), 'isEquivalentTo', $pub],
             'getdayofweektype' => [new IntlCalendarGetDayOfWeekType(), 'getDayOfWeekType', $pub],
+            'indaylighttime' => [new IntlCalendarInDaylightTime(), 'inDaylightTime', $pub],
+            'getlocale' => [new IntlCalendarGetLocale(), 'getLocale', $pub],
+            'islenient' => [new IntlCalendarIsLenient(), 'isLenient', $pub],
+            'setlenient' => [new IntlCalendarSetLenient(), 'setLenient', $pub],
+            'getfirstdayofweek' => [new IntlCalendarGetFirstDayOfWeek(), 'getFirstDayOfWeek', $pub],
+            'setfirstdayofweek' => [new IntlCalendarSetFirstDayOfWeek(), 'setFirstDayOfWeek', $pub],
+            'getminimaldaysinfirstweek' => [new IntlCalendarGetMinimalDaysInFirstWeek(), 'getMinimalDaysInFirstWeek', $pub],
+            'setminimaldaysinfirstweek' => [new IntlCalendarSetMinimalDaysInFirstWeek(), 'setMinimalDaysInFirstWeek', $pub],
+            'getweekendtransition' => [new IntlCalendarGetWeekendTransition(), 'getWeekendTransition', $pub],
+            'getleastmaximum' => [new IntlCalendarGetLeastMaximum(), 'getLeastMaximum', $pub],
+            'getgreatestminimum' => [new IntlCalendarGetGreatestMinimum(), 'getGreatestMinimum', $pub],
+            'getkeywordvaluesforlocale' => [new IntlCalendarGetKeywordValuesForLocale(), 'getKeywordValuesForLocale', $pubStatic],
             'geterrorcode' => [new IntlCalendarGetErrorCode(), 'getErrorCode', $pub],
             'geterrormessage' => [new IntlCalendarGetErrorMessage(), 'getErrorMessage', $pub],
             'getrepeatedwalltimeoption' => [new IntlCalendarGetRepeatedWallTimeOption(), 'getRepeatedWallTimeOption', $pub],
@@ -238,6 +259,7 @@ final class VmIntlCalendar
         VmIntlTimeZone::registerClass($ctx);
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
+        [$firstDow, $minDays] = self::localeWeekDefaults($locale);
         self::$state[$object->id] = [
             'timezone' => $timezoneId,
             'locale' => $locale,
@@ -246,10 +268,27 @@ final class VmIntlCalendar
             'unsetFields' => [],
             'repeatedWallTimeOption' => self::WALLTIME_LAST,
             'skippedWallTimeOption' => self::WALLTIME_LAST,
+            'lenient' => true,
+            'firstDayOfWeek' => $firstDow,
+            'minimalDaysInFirstWeek' => $minDays,
         ];
         IntlError::clear();
 
         return $object;
+    }
+
+    /** @return array{0: int, 1: int} firstDayOfWeek, minimalDaysInFirstWeek */
+    private static function localeWeekDefaults(string $locale): array
+    {
+        $lc = strtolower(str_replace('-', '_', $locale));
+        // ICU/CLDR: en_US (and similar) Sunday + 1; most European locales Monday + 4.
+        if (str_starts_with($lc, 'en_us') || str_starts_with($lc, 'en_ca')
+            || str_starts_with($lc, 'en_il') || str_starts_with($lc, 'ja')
+            || str_starts_with($lc, 'ko') || str_starts_with($lc, 'zh_tw')) {
+            return [self::DOW_SUNDAY, 1];
+        }
+
+        return [self::DOW_MONDAY, 4];
     }
 
     public static function getType(ObjectEntry $cal): string|false
@@ -1126,6 +1165,253 @@ final class VmIntlCalendar
         }
 
         return self::DOW_TYPE_WEEKDAY;
+    }
+
+    public static function inDaylightTime(ObjectEntry $cal): bool
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_in_daylight_time: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+        $ts = (int) $state['timestamp'];
+        $tz = (string) $state['timezone'];
+        $offset = VmDateTimeNative::timezoneOffsetSeconds($tz, $ts);
+        $year = (int) gmdate('Y', $ts);
+        // Infer DST: offset strictly greater than the lesser of Jan/Jul reference offsets.
+        $jan = VmDateTimeNative::timezoneOffsetSeconds($tz, gmmktime(12, 0, 0, 1, 15, $year));
+        $jul = VmDateTimeNative::timezoneOffsetSeconds($tz, gmmktime(12, 0, 0, 7, 15, $year));
+        $standard = min($jan, $jul);
+
+        return $offset > $standard;
+    }
+
+    /** @return string|false */
+    public static function getLocale(ObjectEntry $cal, int $type)
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_get_locale: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        if (self::ULOC_ACTUAL_LOCALE !== $type && self::ULOC_VALID_LOCALE !== $type) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_get_locale: invalid locale type: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+        $locale = (string) $state['locale'];
+        if (self::ULOC_VALID_LOCALE === $type) {
+            return $locale;
+        }
+        // ACTUAL_LOCALE — ICU often returns the language subtag only (Zend: fr_FR → "fr").
+        $parts = explode('_', str_replace('-', '_', $locale));
+
+        return $parts[0] !== '' ? $parts[0] : $locale;
+    }
+
+    public static function isLenient(ObjectEntry $cal): bool
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            return true;
+        }
+
+        return (bool) $state['lenient'];
+    }
+
+    public static function setLenient(ObjectEntry $cal, bool $lenient): bool
+    {
+        $state = &self::$state[$cal->id];
+        if (!isset($state)) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_set_lenient: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $state['lenient'] = $lenient;
+        IntlError::clear();
+
+        return true;
+    }
+
+    /** @return int|false */
+    public static function getFirstDayOfWeek(ObjectEntry $cal)
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        IntlError::clear();
+
+        return (int) $state['firstDayOfWeek'];
+    }
+
+    public static function setFirstDayOfWeek(ObjectEntry $cal, int $dayOfWeek): bool
+    {
+        $state = &self::$state[$cal->id];
+        if (!isset($state)) {
+            return false;
+        }
+        if ($dayOfWeek < self::DOW_SUNDAY || $dayOfWeek > self::DOW_SATURDAY) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_set_first_day_of_week: invalid day of week: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $state['firstDayOfWeek'] = $dayOfWeek;
+        IntlError::clear();
+
+        return true;
+    }
+
+    /** @return int|false */
+    public static function getMinimalDaysInFirstWeek(ObjectEntry $cal)
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        IntlError::clear();
+
+        return (int) $state['minimalDaysInFirstWeek'];
+    }
+
+    public static function setMinimalDaysInFirstWeek(ObjectEntry $cal, int $days): bool
+    {
+        $state = &self::$state[$cal->id];
+        if (!isset($state)) {
+            return false;
+        }
+        if ($days < 1 || $days > 7) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_set_minimal_days_in_first_week: invalid days: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $state['minimalDaysInFirstWeek'] = $days;
+        IntlError::clear();
+
+        return true;
+    }
+
+    /**
+     * Milliseconds into the day when weekend onset/cease occurs for $dayOfWeek (ICU ucal_getWeekendTransition).
+     *
+     * @return int|false
+     */
+    public static function getWeekendTransition(ObjectEntry $cal, int $dayOfWeek)
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if ($dayOfWeek < self::DOW_SUNDAY || $dayOfWeek > self::DOW_SATURDAY) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_get_weekend_transition: invalid day of week: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $type = self::getDayOfWeekType($cal, $dayOfWeek);
+        if (self::DOW_TYPE_WEEKDAY === $type) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_get_weekend_transition: day is not a weekend transition day: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+        // Gregorian Sat/Sun weekend: Saturday onset at midnight (0), Sunday cease at end of day.
+        if (self::DOW_SATURDAY === $dayOfWeek) {
+            return 0;
+        }
+
+        return 86400000;
+    }
+
+    /** @return int|false */
+    public static function getLeastMaximum(ObjectEntry $cal, int $field)
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if ($field < 0 || $field >= self::FIELD_FIELD_COUNT) {
+            return false;
+        }
+        IntlError::clear();
+        // Shortest absolute maximum (e.g. Feb → 28 for day-of-month).
+        return match ($field) {
+            self::FIELD_DATE, self::FIELD_DAY_OF_MONTH => 28,
+            self::FIELD_DAY_OF_YEAR => 365,
+            self::FIELD_WEEK_OF_YEAR => 52,
+            self::FIELD_WEEK_OF_MONTH, self::FIELD_DAY_OF_WEEK_IN_MONTH => 4,
+            default => self::getMaximum($cal, $field),
+        };
+    }
+
+    /** @return int|false */
+    public static function getGreatestMinimum(ObjectEntry $cal, int $field)
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if ($field < 0 || $field >= self::FIELD_FIELD_COUNT) {
+            return false;
+        }
+        IntlError::clear();
+
+        return self::getMinimum($cal, $field);
+    }
+
+    /**
+     * IntlCalendar::getKeywordValuesForLocale() — ICU calendar keyword catalog subset (#20873).
+     *
+     * @return HashTable|false
+     */
+    public static function getKeywordValuesForLocale(string $keyword, string $locale, bool $onlyCommon): HashTable|false
+    {
+        unset($locale);
+        if ('calendar' !== strtolower($keyword)) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_get_keyword_values_for_locale: unsupported keyword: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+        $common = ['gregorian'];
+        if ($onlyCommon) {
+            return VmFs::stringListToArray($common);
+        }
+
+        return VmFs::stringListToArray([
+            'gregorian', 'japanese', 'buddhist', 'roc', 'persian', 'islamic', 'islamic-civil',
+            'islamic-umalqura', 'hebrew', 'chinese', 'indian', 'coptic', 'ethiopic', 'ethiopic-amete-alem',
+        ]);
     }
 
     public static function getErrorCode(ObjectEntry $cal): int|false
@@ -2200,5 +2486,258 @@ final class IntlCalendarSetSkippedWallTimeOption extends VmClassMethod
         $ok = VmIntlCalendar::setSkippedWallTimeOption($receiver->toObject(), $option);
         if (null === $frame->returnVar) { return; }
         $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlCalendar::inDaylightTime() — php-src intlcal_in_daylight_time (#20873). */
+final class IntlCalendarInDaylightTime extends VmClassMethod
+{
+    public function __construct() { parent::__construct('inDaylightTime'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::inDaylightTime() expects exactly 0 arguments, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::inDaylightTime() called on incompatible object');
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool(VmIntlCalendar::inDaylightTime($receiver->toObject()));
+    }
+}
+
+/** IntlCalendar::getLocale() — php-src intlcal_get_locale (#20873). */
+final class IntlCalendarGetLocale extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getLocale'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getLocale() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getLocale() called on incompatible object');
+        }
+        $type = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::getLocale', 1, 'localeType');
+        $result = VmIntlCalendar::getLocale($receiver->toObject(), $type);
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->string($result);
+    }
+}
+
+/** IntlCalendar::isLenient() — php-src intlcal_is_lenient (#20873). */
+final class IntlCalendarIsLenient extends VmClassMethod
+{
+    public function __construct() { parent::__construct('isLenient'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::isLenient() expects exactly 0 arguments, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::isLenient() called on incompatible object');
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool(VmIntlCalendar::isLenient($receiver->toObject()));
+    }
+}
+
+/** IntlCalendar::setLenient() — php-src intlcal_set_lenient (#20873). */
+final class IntlCalendarSetLenient extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setLenient'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::setLenient() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::setLenient() called on incompatible object');
+        }
+        $lenientVar = $frame->calledArgs[1]->resolveIndirect();
+        $lenient = Variable::TYPE_NULL !== $lenientVar->type && $lenientVar->toBool();
+        $ok = VmIntlCalendar::setLenient($receiver->toObject(), $lenient);
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlCalendar::getFirstDayOfWeek() — php-src intlcal_get_first_day_of_week (#20873). */
+final class IntlCalendarGetFirstDayOfWeek extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getFirstDayOfWeek'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getFirstDayOfWeek() expects exactly 0 arguments, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getFirstDayOfWeek() called on incompatible object');
+        }
+        $result = VmIntlCalendar::getFirstDayOfWeek($receiver->toObject());
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlCalendar::setFirstDayOfWeek() — php-src intlcal_set_first_day_of_week (#20873). */
+final class IntlCalendarSetFirstDayOfWeek extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setFirstDayOfWeek'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::setFirstDayOfWeek() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::setFirstDayOfWeek() called on incompatible object');
+        }
+        $day = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::setFirstDayOfWeek', 1, 'dayOfWeek');
+        $ok = VmIntlCalendar::setFirstDayOfWeek($receiver->toObject(), $day);
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlCalendar::getMinimalDaysInFirstWeek() — php-src intlcal_get_minimal_days_in_first_week (#20873). */
+final class IntlCalendarGetMinimalDaysInFirstWeek extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getMinimalDaysInFirstWeek'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getMinimalDaysInFirstWeek() expects exactly 0 arguments, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getMinimalDaysInFirstWeek() called on incompatible object');
+        }
+        $result = VmIntlCalendar::getMinimalDaysInFirstWeek($receiver->toObject());
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlCalendar::setMinimalDaysInFirstWeek() — php-src intlcal_set_minimal_days_in_first_week (#20873). */
+final class IntlCalendarSetMinimalDaysInFirstWeek extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setMinimalDaysInFirstWeek'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::setMinimalDaysInFirstWeek() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::setMinimalDaysInFirstWeek() called on incompatible object');
+        }
+        $days = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::setMinimalDaysInFirstWeek', 1, 'minimalDays');
+        $ok = VmIntlCalendar::setMinimalDaysInFirstWeek($receiver->toObject(), $days);
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlCalendar::getWeekendTransition() — php-src intlcal_get_weekend_transition (#20873). */
+final class IntlCalendarGetWeekendTransition extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getWeekendTransition'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getWeekendTransition() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getWeekendTransition() called on incompatible object');
+        }
+        $day = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::getWeekendTransition', 1, 'dayOfWeek');
+        $result = VmIntlCalendar::getWeekendTransition($receiver->toObject(), $day);
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlCalendar::getLeastMaximum() — php-src intlcal_get_least_maximum (#20873). */
+final class IntlCalendarGetLeastMaximum extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getLeastMaximum'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getLeastMaximum() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getLeastMaximum() called on incompatible object');
+        }
+        $field = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::getLeastMaximum', 1, 'field');
+        $result = VmIntlCalendar::getLeastMaximum($receiver->toObject(), $field);
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlCalendar::getGreatestMinimum() — php-src intlcal_get_greatest_minimum (#20873). */
+final class IntlCalendarGetGreatestMinimum extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getGreatestMinimum'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getGreatestMinimum() expects exactly 1 argument, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getGreatestMinimum() called on incompatible object');
+        }
+        $field = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::getGreatestMinimum', 1, 'field');
+        $result = VmIntlCalendar::getGreatestMinimum($receiver->toObject(), $field);
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlCalendar::getKeywordValuesForLocale() — php-src intlcal_get_keyword_values_for_locale (#20873). */
+final class IntlCalendarGetKeywordValuesForLocale extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getKeywordValuesForLocale'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getKeywordValuesForLocale() expects exactly 3 arguments, %d given', $argc));
+        }
+        $keyword = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'IntlCalendar::getKeywordValuesForLocale', 1, 'key');
+        $locale = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'IntlCalendar::getKeywordValuesForLocale', 2, 'locale');
+        $onlyCommonVar = $frame->calledArgs[2]->resolveIndirect();
+        $onlyCommon = Variable::TYPE_NULL !== $onlyCommonVar->type && $onlyCommonVar->toBool();
+        $result = VmIntlCalendar::getKeywordValuesForLocale($keyword, $locale, $onlyCommon);
+        if (null === $frame->returnVar) { return; }
+        if (false === $result) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->array($result);
     }
 }
