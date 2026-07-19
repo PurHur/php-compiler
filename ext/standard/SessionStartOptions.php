@@ -96,6 +96,10 @@ final class SessionStartOptions
                 VmSession::setUseStrictMode(self::coerceOptionBool($value));
 
                 return true;
+            case 'lazy_write':
+                VmSession::setLazyWrite(self::coerceOptionBool($value));
+
+                return true;
             case 'gc_maxlifetime':
                 return false !== VmIni::set(
                     $ctx,

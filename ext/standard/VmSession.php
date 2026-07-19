@@ -98,6 +98,12 @@ final class VmSession
 
     private static bool $useStrictMode = false;
 
+    /** php-src session.lazy_write — default On (ext/session/session.c; #21156). */
+    private static bool $lazyWrite = true;
+
+    /** Encoded payload from last load/save — dirty detection for lazy_write. */
+    private static ?string $loadedPayload = null;
+
     public static function reset(): void
     {
         self::$active = false;
@@ -108,6 +114,8 @@ final class VmSession
         self::$cacheLimiter = self::DEFAULT_CACHE_LIMITER;
         self::resetCookieParams();
         self::$useStrictMode = false;
+        self::$lazyWrite = true;
+        self::$loadedPayload = null;
         SessionUserHandler::reset();
         SessionHandlerBuiltin::reset();
     }
@@ -498,6 +506,16 @@ final class VmSession
         return self::$useStrictMode;
     }
 
+    public static function setLazyWrite(bool $enabled): void
+    {
+        self::$lazyWrite = $enabled;
+    }
+
+    public static function isLazyWrite(): bool
+    {
+        return self::$lazyWrite;
+    }
+
     /** php-src session_start read_and_close — close without persisting after read (#18457). */
     public static function readClose(): void
     {
@@ -580,6 +598,7 @@ final class VmSession
         $ctx->ensureSuperglobal('_SESSION')->array(new HashTable());
         self::$active = false;
         self::$id = '';
+        self::$loadedPayload = null;
 
         return true;
     }
@@ -816,6 +835,7 @@ final class VmSession
         $sessionVar = $ctx->ensureSuperglobal('_SESSION');
         if ('' === self::$id) {
             $sessionVar->array(new HashTable());
+            self::$loadedPayload = '';
 
             return;
         }
@@ -823,25 +843,35 @@ final class VmSession
             $raw = SessionUserHandler::read($ctx, self::$id);
             if ('' === $raw || !VmSessionSerializer::decodePhp($ctx, $raw)) {
                 $sessionVar->array(new HashTable());
+                self::$loadedPayload = '';
+
+                return;
             }
+            self::$loadedPayload = $raw;
 
             return;
         }
         $path = SessionFileStorage::storagePath(self::$id);
         if (!VmStatPath::isFile($path)) {
             $sessionVar->array(new HashTable());
+            self::$loadedPayload = '';
 
             return;
         }
         $raw = VmFsReadNative::read($path);
         if (false === $raw || '' === $raw) {
             $sessionVar->array(new HashTable());
+            self::$loadedPayload = '';
 
             return;
         }
         if (!VmSessionSerializer::decodePhp($ctx, $raw)) {
             $sessionVar->array(new HashTable());
+            self::$loadedPayload = '';
+
+            return;
         }
+        self::$loadedPayload = $raw;
     }
 
     private static function saveSession(Context $ctx): void
@@ -858,7 +888,17 @@ final class VmSession
             return;
         }
         if (SessionUserHandler::isActiveModule()) {
-            SessionUserHandler::write($ctx, self::$id, $payload);
+            // php-src PS(lazy_write): unchanged payload → update_timestamp when implemented (#21156).
+            if (self::$lazyWrite
+                && SessionUserHandler::hasUpdateTimestamp()
+                && null !== self::$loadedPayload
+                && $payload === self::$loadedPayload
+            ) {
+                SessionUserHandler::updateTimestamp($ctx, self::$id, $payload);
+            } else {
+                SessionUserHandler::write($ctx, self::$id, $payload);
+            }
+            self::$loadedPayload = $payload;
 
             return;
         }
@@ -867,6 +907,7 @@ final class VmSession
             VmFs::mkdir($dir, 0700, true);
         }
         VmFs::filePutContents(SessionFileStorage::storagePath(self::$id), $payload, \LOCK_EX);
+        self::$loadedPayload = $payload;
     }
 
     private static function generateId(): string
