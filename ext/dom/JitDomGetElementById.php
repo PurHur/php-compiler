@@ -41,7 +41,12 @@ final class JitDomGetElementById
 
         self::ensureDocumentPropertyLayout($context);
 
-        if (JitDomDocumentMethodKernel::shouldUse($context)) {
+        // After a compile-time getElementById hit (typical: source loadHTML), further lookups
+        // must use the runtime id map so importNode materialize on a *different* document is
+        // visible (HTML→XML; #20830). Pairing again would fabricate an element on the wrong doc.
+        $alreadyPaired = null !== JitDomLoadHTMLUserScript::lastGetElementByIdHit();
+
+        if (!$alreadyPaired && JitDomDocumentMethodKernel::shouldUse($context)) {
             $compileTime = self::tryUserScriptCompileTimeLookup($context, $args[0], $args[1]);
             if (null !== $compileTime) {
                 return $compileTime;
@@ -49,7 +54,7 @@ final class JitDomGetElementById
         }
 
         $parsed = JitDomLoadHTMLUserScript::lastCompileTimeParsed();
-        if (JitDomDocumentMethodKernel::shouldUse($context) && null !== $parsed) {
+        if (!$alreadyPaired && JitDomDocumentMethodKernel::shouldUse($context) && null !== $parsed) {
             // Pair only on id match — otherwise consult the runtime id map (importNode; #19212).
             $idLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
             if (null === $idLit) {
