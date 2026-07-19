@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_serialize_* via SerializeJitHelper PHP (#9180, #20336).
+ * JIT/AOT link for __compiler_serialize_* via SerializeJitHelper PHP (#9180, #20773).
  *
- * Embed / non-thin: NestedJIT {@see SerializeJitHelper} (#13311).
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20327 / #20308 shape): thin stubs without nested JIT (#13322).
+ * Embed + thin standalone AOT: {@see SerializeJitHelper} via {@see JitVmHelperLink}
+ * (VarExport #20589 / Htmlspecialchars #20487 shape — no thin null stubs).
  * php-src: ext/standard/var.c — php_var_serialize
  */
 final class StringSerialize
@@ -23,6 +26,10 @@ final class StringSerialize
     private const ENCODE_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\SerializeJitHelper::encodeValue';
 
     private const ENCODE_HT_HELPER = 'PHPCompiler\\ext\\standard\\SerializeJitHelper::encodeHashtable';
+
+    private const VALUE_BRIDGE_ENTRY = 'serialize_value_bridge_entry';
+
+    private const HT_BRIDGE_ENTRY = 'serialize_ht_bridge_entry';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -46,46 +53,29 @@ final class StringSerialize
         self::implement($context);
     }
 
-    /** Thin standalone AOT: linkable serialize ABI without nested SerializeJitHelper (#13322, #20336). */
-    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
-    {
-        if (!$context->isThinStandaloneAotMain()) {
-            return;
-        }
-        self::implementThinStandaloneStubs($context);
-    }
-
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_serialize_value');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        // Thin + embed: publish sg_vm_context before NestedJIT of SerializeJitHelper (#17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+
+        $valueProbe = $context->module->getNamedFunction('__compiler_serialize_value');
+        $htProbe = $context->module->getNamedFunction('__compiler_serialize_hashtable');
+        if (JitVmHelperLink::hasNamedBridgeEntry($valueProbe, self::VALUE_BRIDGE_ENTRY)
+            && JitVmHelperLink::hasNamedBridgeEntry($htProbe, self::HT_BRIDGE_ENTRY)) {
             self::registerLinkedRuntime($context);
 
             return;
         }
-
-        if ($context->isThinStandaloneAotMain()) {
-            self::implementThinStandaloneStubs($context);
-
-            return;
-        }
-
-        self::ensureJitHelperCompiled($context);
-        self::implementBridge($context, '__compiler_serialize_value', self::ENCODE_VALUE_HELPER, 1);
-        self::implementBridge($context, '__compiler_serialize_hashtable', self::ENCODE_HT_HELPER, 1);
-        self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementBridge(
-        Context $context,
-        string $abiName,
-        string $helperLogical,
-        int $paramCount
-    ): void {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
+        if (null !== $valueProbe && $valueProbe->countBasicBlocks() > 0
+            && null !== $htProbe && $htProbe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
 
             return;
         }
@@ -93,62 +83,51 @@ final class StringSerialize
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        $paramTy = '__compiler_serialize_hashtable' === $abiName ? $htPtr : $valuePtr;
-        $ft = $context->context->functionType($strPtr, false, $paramTy);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('serialize_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
-            self::helperFunction($context, $helperLogical),
-            $fn->getParam(0)
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_serialize_value',
+            self::VALUE_BRIDGE_ENTRY,
+            [$valuePtr],
+            $strPtr,
+            self::ENCODE_VALUE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20773'
         );
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_serialize_hashtable',
+            self::HT_BRIDGE_ENTRY,
+            [$htPtr],
+            $strPtr,
+            self::ENCODE_HT_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20773'
+        );
+        self::registerLinkedRuntime($context);
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    public static function ensureJitHelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20773'
+        );
+    }
+
+    public static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after SerializeJitHelper compile (#9180)');
+            throw new \LogicException($logical.' missing after SerializeJitHelper compile (#20773)');
         }
 
         return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'SerializeJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('SerializeJitHelper.php parseAndCompile failed (#9180)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9180)');
-            }
-        }
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -156,39 +135,9 @@ final class StringSerialize
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringSerialize bridge (#9180)');
+                throw new \LogicException($name.' missing after StringSerialize bridge (#20773)');
             }
             $context->registerFunction($name, $fn);
         }
-    }
-
-    /** Return null __string__* — thin standalone only needs linkable ABI symbols (#13322, #20336). */
-    private static function implementThinStandaloneStubs(Context $context): void
-    {
-        $strPtr = $context->getTypeFromString('__string__*');
-        $nullStr = $strPtr->constNull();
-
-        foreach (self::ABI_FUNCTIONS as $abiName) {
-            $probe = $context->module->getNamedFunction($abiName);
-            if (null !== $probe && $probe->countBasicBlocks() > 0) {
-                $context->registerFunction($abiName, $probe);
-                continue;
-            }
-
-            $valuePtr = $context->getTypeFromString('__value__*');
-            $htPtr = $context->getTypeFromString('__hashtable__*');
-            $firstParam = '__compiler_serialize_hashtable' === $abiName ? $htPtr : $valuePtr;
-            $ft = $context->context->functionType($strPtr, false, $firstParam);
-            $fn = null !== $probe
-                ? $probe
-                : $context->module->addFunction($abiName, $ft);
-
-            $entry = $fn->appendBasicBlock('serialize_thin_stub');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($nullStr);
-            $context->registerFunction($abiName, $fn);
-        }
-
-        $context->builder->clearInsertionPosition();
     }
 }

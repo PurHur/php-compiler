@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\StringSerialize;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -22,7 +23,8 @@ final class JitSerialize
             );
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            $boxed = $context->helper->loadValue($arg);
+            // ABI wants __value__* (peer JitVarExport / #20773) — not a loaded __value__ struct.
+            $boxed = JitValueBox::valuePtrFromVariable($context, $arg);
             $ht = $context->builder->call(
                 $context->lookupFunction('__value__readHashtable'),
                 $boxed

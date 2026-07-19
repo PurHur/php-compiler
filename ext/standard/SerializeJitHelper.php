@@ -10,9 +10,11 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
 /**
- * serialize() wire helpers for compiled JIT/AOT modules (#9440, #9180, php-in-PHP).
+ * serialize() wire helpers for compiled JIT/AOT modules (#9440, #9180, #20773, php-in-PHP).
  *
- * SSOT: {@see VmSerialize} via active VM context; session wire uses scalar/array subset.
+ * Keep this file NestedJIT-safe: no HashTable keyed iterators (object method gap, #12908).
+ * Session wire lives in {@see VmSessionSerializer} (#20773).
+ * SSOT: {@see VmSerialize} via active VM context.
  * php-src: ext/standard/var.c — php_var_serialize
  */
 final class SerializeJitHelper
@@ -20,6 +22,7 @@ final class SerializeJitHelper
     public static function encodeValue(Variable $value): string
     {
         $ctx = self::requireActiveContext();
+
         return VmSerialize::serializeValue($ctx, $value->resolveIndirect());
     }
 
@@ -29,46 +32,6 @@ final class SerializeJitHelper
         $var->array($ht);
 
         return self::encodeValue($var);
-    }
-
-    public static function serializeSessionWireValue(Variable $value): ?string
-    {
-        $value = $value->resolveIndirect();
-        if (Variable::TYPE_OBJECT === $value->type) {
-            return null;
-        }
-        try {
-            return VmSerializeFormat::encodeExported(self::exportJit($value));
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    /**
-     * @return array<mixed>|bool|float|int|null|string
-     */
-    private static function exportJit(Variable $value): mixed
-    {
-        $value = $value->resolveIndirect();
-        if (Variable::TYPE_ARRAY === $value->type) {
-            $out = [];
-            foreach ($value->toArray()->iterateKeyed(true) as [$key, $elem]) {
-                $k = $key->resolveIndirect();
-                if (Variable::TYPE_STRING === $k->type) {
-                    $out[$k->toString()] = self::exportJit($elem);
-                } elseif (Variable::TYPE_INTEGER === $k->type) {
-                    $out[$k->toInt()] = self::exportJit($elem);
-                } else {
-                    throw new \LogicException(
-                        'serialize() only supports string or integer keys in this compiler build'
-                    );
-                }
-            }
-
-            return $out;
-        }
-
-        return VmJson::export($value);
     }
 
     private static function requireActiveContext(): Context
