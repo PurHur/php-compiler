@@ -49,6 +49,36 @@ final class VmNumberFormatter
     public const GROUPING_SIZE = 10;
     public const ROUNDING_MODE = 11;
 
+    /** ICU UNumberFormatSymbol (unicode/unum.h; #20789). */
+    public const DECIMAL_SEPARATOR_SYMBOL = 0;
+    public const GROUPING_SEPARATOR_SYMBOL = 1;
+    public const PATTERN_SEPARATOR_SYMBOL = 2;
+    public const PERCENT_SYMBOL = 3;
+    public const ZERO_DIGIT_SYMBOL = 4;
+    public const DIGIT_SYMBOL = 5;
+    public const MINUS_SIGN_SYMBOL = 6;
+    public const PLUS_SIGN_SYMBOL = 7;
+    public const CURRENCY_SYMBOL = 8;
+    public const INTL_CURRENCY_SYMBOL = 9;
+    public const MONETARY_SEPARATOR_SYMBOL = 10;
+    public const EXPONENTIAL_SYMBOL = 11;
+    public const PERMILL_SYMBOL = 12;
+    public const PAD_ESCAPE_SYMBOL = 13;
+    public const INFINITY_SYMBOL = 14;
+    public const NAN_SYMBOL = 15;
+    public const SIGNIFICANT_DIGIT_SYMBOL = 16;
+    public const MONETARY_GROUPING_SEPARATOR_SYMBOL = 17;
+
+    /** ICU UNumberFormatTextAttribute (unicode/unum.h; #20789). */
+    public const POSITIVE_PREFIX = 0;
+    public const POSITIVE_SUFFIX = 1;
+    public const NEGATIVE_PREFIX = 2;
+    public const NEGATIVE_SUFFIX = 3;
+    public const PADDING_CHARACTER = 4;
+    public const CURRENCY_CODE = 5;
+    public const DEFAULT_RULESET = 6;
+    public const PUBLIC_RULESETS = 7;
+
     /** ICU UNumberFormatRoundingMode (unicode/unum.h; #20710). */
     public const ROUND_CEILING = 0;
     public const ROUND_FLOOR = 1;
@@ -68,6 +98,8 @@ final class VmNumberFormatter
      *   style: int,
      *   pattern: ?string,
      *   attributes: array<int, int|float>,
+     *   symbols: array<int, string>,
+     *   textAttributes: array<int, string>,
      *   errorCode: int,
      *   errorMessage: string
      * }>
@@ -100,6 +132,32 @@ final class VmNumberFormatter
             'FRACTION_DIGITS' => self::FRACTION_DIGITS,
             'GROUPING_SIZE' => self::GROUPING_SIZE,
             'ROUNDING_MODE' => self::ROUNDING_MODE,
+            'DECIMAL_SEPARATOR_SYMBOL' => self::DECIMAL_SEPARATOR_SYMBOL,
+            'GROUPING_SEPARATOR_SYMBOL' => self::GROUPING_SEPARATOR_SYMBOL,
+            'PATTERN_SEPARATOR_SYMBOL' => self::PATTERN_SEPARATOR_SYMBOL,
+            'PERCENT_SYMBOL' => self::PERCENT_SYMBOL,
+            'ZERO_DIGIT_SYMBOL' => self::ZERO_DIGIT_SYMBOL,
+            'DIGIT_SYMBOL' => self::DIGIT_SYMBOL,
+            'MINUS_SIGN_SYMBOL' => self::MINUS_SIGN_SYMBOL,
+            'PLUS_SIGN_SYMBOL' => self::PLUS_SIGN_SYMBOL,
+            'CURRENCY_SYMBOL' => self::CURRENCY_SYMBOL,
+            'INTL_CURRENCY_SYMBOL' => self::INTL_CURRENCY_SYMBOL,
+            'MONETARY_SEPARATOR_SYMBOL' => self::MONETARY_SEPARATOR_SYMBOL,
+            'EXPONENTIAL_SYMBOL' => self::EXPONENTIAL_SYMBOL,
+            'PERMILL_SYMBOL' => self::PERMILL_SYMBOL,
+            'PAD_ESCAPE_SYMBOL' => self::PAD_ESCAPE_SYMBOL,
+            'INFINITY_SYMBOL' => self::INFINITY_SYMBOL,
+            'NAN_SYMBOL' => self::NAN_SYMBOL,
+            'SIGNIFICANT_DIGIT_SYMBOL' => self::SIGNIFICANT_DIGIT_SYMBOL,
+            'MONETARY_GROUPING_SEPARATOR_SYMBOL' => self::MONETARY_GROUPING_SEPARATOR_SYMBOL,
+            'POSITIVE_PREFIX' => self::POSITIVE_PREFIX,
+            'POSITIVE_SUFFIX' => self::POSITIVE_SUFFIX,
+            'NEGATIVE_PREFIX' => self::NEGATIVE_PREFIX,
+            'NEGATIVE_SUFFIX' => self::NEGATIVE_SUFFIX,
+            'PADDING_CHARACTER' => self::PADDING_CHARACTER,
+            'CURRENCY_CODE' => self::CURRENCY_CODE,
+            'DEFAULT_RULESET' => self::DEFAULT_RULESET,
+            'PUBLIC_RULESETS' => self::PUBLIC_RULESETS,
             'ROUND_CEILING' => self::ROUND_CEILING,
             'ROUND_FLOOR' => self::ROUND_FLOOR,
             'ROUND_DOWN' => self::ROUND_DOWN,
@@ -142,6 +200,10 @@ final class VmNumberFormatter
             'parsecurrency' => [new NumberFormatterParseCurrency(), $pub, 'parseCurrency'],
             'getattribute' => [new NumberFormatterGetAttribute(), $pub, 'getAttribute'],
             'setattribute' => [new NumberFormatterSetAttribute(), $pub, 'setAttribute'],
+            'getsymbol' => [new NumberFormatterGetSymbol(), $pub, 'getSymbol'],
+            'setsymbol' => [new NumberFormatterSetSymbol(), $pub, 'setSymbol'],
+            'gettextattribute' => [new NumberFormatterGetTextAttribute(), $pub, 'getTextAttribute'],
+            'settextattribute' => [new NumberFormatterSetTextAttribute(), $pub, 'setTextAttribute'],
             'getpattern' => [new NumberFormatterGetPattern(), $pub, 'getPattern'],
             'setpattern' => [new NumberFormatterSetPattern(), $pub, 'setPattern'],
             'getlocale' => [new NumberFormatterGetLocale(), $pub, 'getLocale'],
@@ -178,8 +240,9 @@ final class VmNumberFormatter
     public static function initObject(ObjectEntry $object, string $locale, int $style, ?string $pattern): void
     {
         $object->constructed = true;
+        $resolvedLocale = '' !== $locale ? $locale : VmLocale::getDefault();
         self::$state[$object->id] = [
-            'locale' => '' !== $locale ? $locale : VmLocale::getDefault(),
+            'locale' => $resolvedLocale,
             'style' => $style,
             'pattern' => $pattern,
             'attributes' => [
@@ -187,6 +250,8 @@ final class VmNumberFormatter
                 self::FRACTION_DIGITS => self::CURRENCY === $style || self::CURRENCY_ACCOUNTING === $style ? 2 : -1,
                 self::ROUNDING_MODE => self::ROUND_HALFEVEN,
             ],
+            'symbols' => self::defaultSymbolsForLocale($resolvedLocale),
+            'textAttributes' => self::defaultTextAttributes(),
             'errorCode' => IntlError::U_ZERO_ERROR,
             'errorMessage' => 'U_ZERO_ERROR',
         ];
@@ -355,6 +420,110 @@ final class VmNumberFormatter
             return false;
         }
         self::$state[$formatter->id]['attributes'][$attribute] = $value;
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return true;
+    }
+
+    /**
+     * NumberFormatter::getSymbol() — php-src numfmt_get_symbol (#20789).
+     *
+     * @return string|false
+     */
+    public static function getSymbol(ObjectEntry $formatter, int $symbol)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'numfmt_get_symbol: bad formatter: U_ILLEGAL_ARGUMENT_ERROR');
+
+            return false;
+        }
+        if ($symbol < self::DECIMAL_SEPARATOR_SYMBOL || $symbol > self::MONETARY_GROUPING_SEPARATOR_SYMBOL) {
+            self::fail($formatter, 'numfmt_get_symbol: invalid symbol value: U_ILLEGAL_ARGUMENT_ERROR');
+
+            return false;
+        }
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return $state['symbols'][$symbol] ?? '';
+    }
+
+    /**
+     * NumberFormatter::setSymbol() — php-src numfmt_set_symbol (#20789).
+     */
+    public static function setSymbol(ObjectEntry $formatter, int $symbol, string $value): bool
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'numfmt_set_symbol: bad formatter: U_ILLEGAL_ARGUMENT_ERROR');
+
+            return false;
+        }
+        if ($symbol < self::DECIMAL_SEPARATOR_SYMBOL || $symbol > self::MONETARY_GROUPING_SEPARATOR_SYMBOL) {
+            self::fail($formatter, 'numfmt_set_symbol: invalid symbol value: U_ILLEGAL_ARGUMENT_ERROR');
+
+            return false;
+        }
+        self::$state[$formatter->id]['symbols'][$symbol] = $value;
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return true;
+    }
+
+    /**
+     * NumberFormatter::getTextAttribute() — php-src numfmt_get_text_attribute (#20789).
+     *
+     * @return string|false
+     */
+    public static function getTextAttribute(ObjectEntry $formatter, int $attribute)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'numfmt_get_text_attribute: bad formatter: U_ILLEGAL_ARGUMENT_ERROR');
+
+            return false;
+        }
+        if ($attribute < self::POSITIVE_PREFIX || $attribute > self::PUBLIC_RULESETS) {
+            self::fail($formatter, 'Error getting attribute value: U_ILLEGAL_ARGUMENT_ERROR');
+
+            return false;
+        }
+        if ($attribute === self::DEFAULT_RULESET || $attribute === self::PUBLIC_RULESETS) {
+            self::fail($formatter, 'Error getting attribute value: U_UNSUPPORTED_ERROR');
+
+            return false;
+        }
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return $state['textAttributes'][$attribute] ?? '';
+    }
+
+    /**
+     * NumberFormatter::setTextAttribute() — php-src numfmt_set_text_attribute (#20789).
+     */
+    public static function setTextAttribute(ObjectEntry $formatter, int $attribute, string $value): bool
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'numfmt_set_text_attribute: bad formatter: U_ILLEGAL_ARGUMENT_ERROR');
+
+            return false;
+        }
+        if ($attribute < self::POSITIVE_PREFIX || $attribute > self::PUBLIC_RULESETS) {
+            self::fail($formatter, 'Error setting text attribute: U_ILLEGAL_ARGUMENT_ERROR');
+
+            return false;
+        }
+        if ($attribute === self::DEFAULT_RULESET || $attribute === self::PUBLIC_RULESETS) {
+            self::fail($formatter, 'Error setting text attribute: U_UNSUPPORTED_ERROR');
+
+            return false;
+        }
+        self::$state[$formatter->id]['textAttributes'][$attribute] = $value;
         self::clearObjectError($formatter);
         IntlError::clear();
 
@@ -565,6 +734,46 @@ final class VmNumberFormatter
             'fr', 'pt', 'vi' => [' ', ','],
             default => [',', '.'],
         };
+    }
+
+    /** @return array<int, string> */
+    private static function defaultSymbolsForLocale(string $locale): array
+    {
+        [$grouping, $decimal] = self::separatorsForLocale($locale);
+
+        return [
+            self::DECIMAL_SEPARATOR_SYMBOL => $decimal,
+            self::GROUPING_SEPARATOR_SYMBOL => $grouping,
+            self::PATTERN_SEPARATOR_SYMBOL => ';',
+            self::PERCENT_SYMBOL => '%',
+            self::ZERO_DIGIT_SYMBOL => '0',
+            self::DIGIT_SYMBOL => '#',
+            self::MINUS_SIGN_SYMBOL => '-',
+            self::PLUS_SIGN_SYMBOL => '+',
+            self::CURRENCY_SYMBOL => '$',
+            self::INTL_CURRENCY_SYMBOL => 'USD',
+            self::MONETARY_SEPARATOR_SYMBOL => $decimal,
+            self::EXPONENTIAL_SYMBOL => 'E',
+            self::PERMILL_SYMBOL => "\u{2030}",
+            self::PAD_ESCAPE_SYMBOL => '*',
+            self::INFINITY_SYMBOL => "\u{221E}",
+            self::NAN_SYMBOL => 'NaN',
+            self::SIGNIFICANT_DIGIT_SYMBOL => '@',
+            self::MONETARY_GROUPING_SEPARATOR_SYMBOL => $grouping,
+        ];
+    }
+
+    /** @return array<int, string> */
+    private static function defaultTextAttributes(): array
+    {
+        return [
+            self::POSITIVE_PREFIX => '',
+            self::POSITIVE_SUFFIX => '',
+            self::NEGATIVE_PREFIX => '-',
+            self::NEGATIVE_SUFFIX => '',
+            self::PADDING_CHARACTER => ' ',
+            self::CURRENCY_CODE => 'USD',
+        ];
     }
 
     private static function groupDigits(string $digits, string $sep): string
@@ -864,6 +1073,142 @@ final class NumberFormatterSetAttribute extends VmClassMethod
         $attr = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'NumberFormatter::setAttribute', 1, 'attribute');
         $value = VmNumberFormatter::coerceFloatArg($frame->calledArgs[2], 'NumberFormatter::setAttribute', 2, 'value');
         $ok = VmNumberFormatter::setAttribute($receiver->toObject(), $attr, $value);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** NumberFormatter::getSymbol() — php-src numfmt_get_symbol (#20789). */
+final class NumberFormatterGetSymbol extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSymbol');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'NumberFormatter::getSymbol() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmNumberFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('NumberFormatter::getSymbol() called on incompatible object');
+        }
+        $symbol = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'NumberFormatter::getSymbol', 1, 'symbol');
+        $result = VmNumberFormatter::getSymbol($receiver->toObject(), $symbol);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+}
+
+/** NumberFormatter::setSymbol() — php-src numfmt_set_symbol (#20789). */
+final class NumberFormatterSetSymbol extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setSymbol');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'NumberFormatter::setSymbol() expects exactly 2 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmNumberFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('NumberFormatter::setSymbol() called on incompatible object');
+        }
+        $symbol = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'NumberFormatter::setSymbol', 1, 'symbol');
+        $value = VmNumberFormatter::coerceStringArg($frame->calledArgs[2], 'NumberFormatter::setSymbol', 2, 'value');
+        $ok = VmNumberFormatter::setSymbol($receiver->toObject(), $symbol, $value);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** NumberFormatter::getTextAttribute() — php-src numfmt_get_text_attribute (#20789). */
+final class NumberFormatterGetTextAttribute extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getTextAttribute');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'NumberFormatter::getTextAttribute() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmNumberFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('NumberFormatter::getTextAttribute() called on incompatible object');
+        }
+        $attr = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'NumberFormatter::getTextAttribute', 1, 'attribute');
+        $result = VmNumberFormatter::getTextAttribute($receiver->toObject(), $attr);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+}
+
+/** NumberFormatter::setTextAttribute() — php-src numfmt_set_text_attribute (#20789). */
+final class NumberFormatterSetTextAttribute extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setTextAttribute');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'NumberFormatter::setTextAttribute() expects exactly 2 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmNumberFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('NumberFormatter::setTextAttribute() called on incompatible object');
+        }
+        $attr = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'NumberFormatter::setTextAttribute', 1, 'attribute');
+        $value = VmNumberFormatter::coerceStringArg($frame->calledArgs[2], 'NumberFormatter::setTextAttribute', 2, 'value');
+        $ok = VmNumberFormatter::setTextAttribute($receiver->toObject(), $attr, $value);
         if (null === $frame->returnVar) {
             return;
         }
