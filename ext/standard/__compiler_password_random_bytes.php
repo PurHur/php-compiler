@@ -15,7 +15,8 @@ use PHPLLVM\Value;
 /**
  * __compiler_password_random_bytes() — CSPRNG for password_hash() nested JIT (#9275).
  *
- * Bypasses user-script __compiler_random_bytes thin stub during AOT password crypto.
+ * Dedicated ABI so password NestedJIT does not re-enter __compiler_random_bytes
+ * while RandomBytesJitHelper is compiling (#21186 keeps user-script random_bytes honest).
  * php-src: ext/standard/random.c
  */
 final class __compiler_password_random_bytes extends Internal
