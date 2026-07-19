@@ -24,6 +24,9 @@ final class IntlExtensionPolicy
 {
     private static ?bool $icuAvailable = null;
 
+    /** libicuuc major from the successfully opened FFI library (null if only disk fallback). */
+    private static ?int $icuMajorVersion = null;
+
     /**
      * extension_loaded('intl') / CREDITS_MODULES — true once ICU libs are present (#20630).
      *
@@ -33,6 +36,26 @@ final class IntlExtensionPolicy
     public static function advertisesExtension(): bool
     {
         return self::icuAvailable();
+    }
+
+    /**
+     * ICU major version from the loaded libicuuc soname (php-src U_ICU_VERSION_MAJOR_NUM).
+     * Returns 0 when ICU is unavailable.
+     */
+    public static function icuMajorVersion(): int
+    {
+        self::icuAvailable();
+
+        return self::$icuMajorVersion ?? 0;
+    }
+
+    /**
+     * IntlTimeZone::getIanaID / intltz_get_iana_id — php-src timezone.stub.php
+     * `#if U_ICU_VERSION_MAJOR_NUM >= 74` (#20926).
+     */
+    public static function advertisesIanaTimeZoneId(): bool
+    {
+        return self::advertisesBuiltins() && self::icuMajorVersion() >= 74;
     }
 
     /** libicuuc present — gate for claiming ext/intl (#20630). */
@@ -47,18 +70,19 @@ final class IntlExtensionPolicy
         }
 
         $candidates = [
-            ['libicuuc.so.74', '_74'],
-            ['libicuuc.so.72', '_72'],
-            ['libicuuc.so.71', '_71'],
-            ['libicuuc.so.70', '_70'],
-            ['libicuuc.so', '_70'],
-            ['libicuuc.dylib', ''],
+            ['libicuuc.so.74', '_74', 74],
+            ['libicuuc.so.72', '_72', 72],
+            ['libicuuc.so.71', '_71', 71],
+            ['libicuuc.so.70', '_70', 70],
+            ['libicuuc.so', '_70', 70],
+            ['libicuuc.dylib', '', 74],
         ];
-        foreach ($candidates as [$lib, $suffix]) {
+        foreach ($candidates as [$lib, $suffix, $major]) {
             try {
                 $sym = 'u_errorName'.$suffix;
                 $ffi = \FFI::cdef('const char *'.$sym.'(int code);', $lib);
                 $ffi->$sym(0);
+                self::$icuMajorVersion = $major;
 
                 return self::$icuAvailable = true;
             } catch (\Throwable) {
@@ -68,14 +92,16 @@ final class IntlExtensionPolicy
 
         // Fallback: shared object on disk (CI images ship libicu without php-intl).
         foreach ([
-            '/lib/x86_64-linux-gnu/libicuuc.so.70',
-            '/lib/x86_64-linux-gnu/libicuuc.so.74',
-            '/usr/lib/x86_64-linux-gnu/libicuuc.so.70',
-            '/usr/lib/x86_64-linux-gnu/libicuuc.so.74',
-            '/usr/lib/libicuuc.so',
-            '/opt/homebrew/lib/libicuuc.dylib',
-        ] as $path) {
+            ['/lib/x86_64-linux-gnu/libicuuc.so.74', 74],
+            ['/usr/lib/x86_64-linux-gnu/libicuuc.so.74', 74],
+            ['/lib/x86_64-linux-gnu/libicuuc.so.70', 70],
+            ['/usr/lib/x86_64-linux-gnu/libicuuc.so.70', 70],
+            ['/usr/lib/libicuuc.so', 70],
+            ['/opt/homebrew/lib/libicuuc.dylib', 74],
+        ] as [$path, $major]) {
             if (\is_file($path)) {
+                self::$icuMajorVersion = $major;
+
                 return self::$icuAvailable = true;
             }
         }

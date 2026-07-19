@@ -300,9 +300,12 @@ class Module extends ModuleAbstract
                 new intltz_get_error_code(),
                 new intltz_get_error_message(),
                 new intltz_get_offset(),
-                new intltz_get_iana_id(),
             ]
             : [];
+        // php-src timezone.stub.php — intltz_get_iana_id when ICU ≥74 (#20926)
+        if (IntlExtensionPolicy::advertisesIanaTimeZoneId()) {
+            $intlcal[] = new intltz_get_iana_id();
+        }
 
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
             return [
