@@ -47,7 +47,10 @@ final class VmMessageFormatter
         $entry->isInternal = true;
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
+        $construct = new MessageFormatterConstruct();
+        $entry->constructor = $construct;
         $methods = [
+            '__construct' => [$construct, $pub, '__construct'],
             'create' => [new MessageFormatterCreate(), $pubStatic, 'create'],
             'format' => [new MessageFormatterFormat(), $pub, 'format'],
             'setpattern' => [new MessageFormatterSetPattern(), $pub, 'setPattern'],
@@ -73,22 +76,20 @@ final class VmMessageFormatter
     }
 
     /**
-     * @return ObjectEntry|null null + intl error when pattern is empty (php-src returns false)
+     * Shared init for create() / __construct() (#20809).
+     *
+     * @return bool false + intl error when pattern is empty
      */
-    public static function create(Context $ctx, string $locale, string $pattern): ?ObjectEntry
+    public static function initObject(ObjectEntry $object, string $locale, string $pattern): bool
     {
-        if (!isset($ctx->classes[self::CLASS_LC])) {
-            throw new \Error('Class "MessageFormatter" not found');
-        }
         if ('' === $pattern) {
             IntlError::set(
                 IntlError::U_ILLEGAL_ARGUMENT_ERROR,
                 'msgfmt_create: pattern is empty: U_ILLEGAL_ARGUMENT_ERROR'
             );
 
-            return null;
+            return false;
         }
-        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
         self::$state[$object->id] = [
             'locale' => '' !== $locale ? $locale : VmLocale::getDefault(),
@@ -97,6 +98,22 @@ final class VmMessageFormatter
             'errorMessage' => 'U_ZERO_ERROR',
         ];
         IntlError::clear();
+
+        return true;
+    }
+
+    /**
+     * @return ObjectEntry|null null + intl error when pattern is empty (php-src returns false)
+     */
+    public static function create(Context $ctx, string $locale, string $pattern): ?ObjectEntry
+    {
+        if (!isset($ctx->classes[self::CLASS_LC])) {
+            throw new \Error('Class "MessageFormatter" not found');
+        }
+        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        if (!self::initObject($object, $locale, $pattern)) {
+            return null;
+        }
 
         return $object;
     }
@@ -558,6 +575,34 @@ final class VmMessageFormatter
         }
 
         return (string) $num;
+    }
+}
+
+/** MessageFormatter::__construct() — same init as create() (#20809). */
+final class MessageFormatterConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'MessageFormatter::__construct() expects exactly 2 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmMessageFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('MessageFormatter::__construct() called on incompatible object');
+        }
+        $locale = VmMessageFormatter::coerceLocaleArg($frame->calledArgs[1], 'MessageFormatter::__construct', 1);
+        $pattern = VmMessageFormatter::coercePatternArg($frame->calledArgs[2], 'MessageFormatter::__construct', 2);
+        VmMessageFormatter::initObject($receiver->toObject(), $locale, $pattern);
     }
 }
 
