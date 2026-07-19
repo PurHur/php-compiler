@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5844 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17509 |
+| Source constructs flagged (warnings) | 17539 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -841,7 +841,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmCollator.php` | 0 | 55 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
-| `ext/intl/VmIntlCalendar.php` | 0 | 22 |
+| `ext/intl/VmIntlCalendar.php` | 0 | 52 |
 | `ext/intl/VmIntlChar.php` | 0 | 53 |
 | `ext/intl/VmIntlDateFormatter.php` | 0 | 5 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 34 |
@@ -11633,28 +11633,58 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmIntlCalendar.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 139)
-- new Variable (line 143)
-- new IntlCalendarCreateInstance (line 151)
-- new IntlCalendarGet (line 152)
-- new IntlCalendarSet (line 153)
-- new IntlCalendarGetTimeZone (line 154)
-- new IntlCalendarGetTime (line 155)
-- new IntlCalendarSetTime (line 156)
-- new Error (line 177)
-- new ObjectEntry (line 181)
-- new ArgumentCountError (line 439)
-- new ArgumentCountError (line 484)
-- new Error (line 492)
-- new ArgumentCountError (line 526)
-- new Error (line 534)
-- new ArgumentCountError (line 577)
-- new Error (line 585)
-- new ArgumentCountError (line 612)
-- new Error (line 620)
-- new ArgumentCountError (line 647)
-- new Error (line 655)
-- 17 class method(s)
+- new ClassEntry (line 149)
+- new Variable (line 153)
+- new IntlCalendarCreateInstance (line 161)
+- new IntlCalendarGetNow (line 162)
+- new IntlCalendarFromDateTime (line 163)
+- new IntlCalendarGet (line 164)
+- new IntlCalendarSet (line 165)
+- new IntlCalendarGetTimeZone (line 166)
+- new IntlCalendarGetTime (line 167)
+- new IntlCalendarSetTime (line 168)
+- new IntlCalendarGetType (line 169)
+- new IntlCalendarAdd (line 170)
+- new IntlCalendarRoll (line 171)
+- new IntlCalendarClear (line 172)
+- new IntlCalendarIsSet (line 173)
+- new IntlCalendarEquals (line 174)
+- new IntlCalendarToDateTime (line 175)
+- new IntlCalendarFieldDifference (line 176)
+- new Error (line 197)
+- new ObjectEntry (line 201)
+- new ObjectEntry (line 498)
+- new ObjectEntry (line 526)
+- new ArgumentCountError (line 926)
+- new ArgumentCountError (line 971)
+- new Error (line 979)
+- new ArgumentCountError (line 1013)
+- new Error (line 1021)
+- new ArgumentCountError (line 1064)
+- new Error (line 1072)
+- new ArgumentCountError (line 1099)
+- new Error (line 1107)
+- new ArgumentCountError (line 1134)
+- new Error (line 1142)
+- new ArgumentCountError (line 1177)
+- new Error (line 1185)
+- new ArgumentCountError (line 1212)
+- new ArgumentCountError (line 1236)
+- new Error (line 1244)
+- new ArgumentCountError (line 1268)
+- new Error (line 1276)
+- new ArgumentCountError (line 1301)
+- new Error (line 1309)
+- new ArgumentCountError (line 1335)
+- new Error (line 1343)
+- new ArgumentCountError (line 1365)
+- new Error (line 1373)
+- new ArgumentCountError (line 1400)
+- new Error (line 1408)
+- new ArgumentCountError (line 1435)
+- new ArgumentCountError (line 1497)
+- new Error (line 1505)
+- 45 class method(s)
 
 ### `ext/intl/VmIntlChar.php`
 

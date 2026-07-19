@@ -11,14 +11,16 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * IntlCalendar — Gregorian field get/set via zoneinfo (php-src calendar_*; #6151).
+ * IntlCalendar — Gregorian field get/set via zoneinfo (php-src calendar_*; #6151, #20756).
  *
- * v1 subset: createInstance, get/set (field + Y/M/D forms), getTimeZone, getTime/setTime.
+ * Subset: createInstance, get/set, getTimeZone, getTime/setTime, getType, getNow,
+ * add/roll/clear/isSet/equals, toDateTime/fromDateTime, fieldDifference.
  * ICU field constants match UCalendarDateFields (unicode/ucal.h).
  */
 final class VmIntlCalendar
@@ -75,7 +77,15 @@ final class VmIntlCalendar
     public const DECEMBER = 11;
     public const UNDECIMBER = 12;
 
-    /** @var array<int, array{timezone: string, locale: string, timestamp: int, millisecond: int}> */
+    /**
+     * @var array<int, array{
+     *   timezone: string,
+     *   locale: string,
+     *   timestamp: int,
+     *   millisecond: int,
+     *   unsetFields: array<int, true>
+     * }>
+     */
     private static array $state = [];
 
     /** @return array<string, int> */
@@ -149,11 +159,21 @@ final class VmIntlCalendar
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $methods = [
             'createinstance' => [new IntlCalendarCreateInstance(), 'createInstance', $pubStatic],
+            'getnow' => [new IntlCalendarGetNow(), 'getNow', $pubStatic],
+            'fromdatetime' => [new IntlCalendarFromDateTime(), 'fromDateTime', $pubStatic],
             'get' => [new IntlCalendarGet(), 'get', $pub],
             'set' => [new IntlCalendarSet(), 'set', $pub],
             'gettimezone' => [new IntlCalendarGetTimeZone(), 'getTimeZone', $pub],
             'gettime' => [new IntlCalendarGetTime(), 'getTime', $pub],
             'settime' => [new IntlCalendarSetTime(), 'setTime', $pub],
+            'gettype' => [new IntlCalendarGetType(), 'getType', $pub],
+            'add' => [new IntlCalendarAdd(), 'add', $pub],
+            'roll' => [new IntlCalendarRoll(), 'roll', $pub],
+            'clear' => [new IntlCalendarClear(), 'clear', $pub],
+            'isset' => [new IntlCalendarIsSet(), 'isSet', $pub],
+            'equals' => [new IntlCalendarEquals(), 'equals', $pub],
+            'todatetime' => [new IntlCalendarToDateTime(), 'toDateTime', $pub],
+            'fielddifference' => [new IntlCalendarFieldDifference(), 'fieldDifference', $pub],
         ];
         foreach ($methods as $lc => [$handler, $name, $vis]) {
             $entry->methods[$lc] = $handler;
@@ -185,10 +205,474 @@ final class VmIntlCalendar
             'locale' => $locale,
             'timestamp' => VmDate::time(),
             'millisecond' => 0,
+            'unsetFields' => [],
         ];
         IntlError::clear();
 
         return $object;
+    }
+
+    public static function getType(ObjectEntry $cal): string|false
+    {
+        if (!isset(self::$state[$cal->id])) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_get_type: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+
+        return 'gregorian';
+    }
+
+    public static function getNow(): float
+    {
+        IntlError::clear();
+
+        return ((float) VmDate::time()) * 1000.0;
+    }
+
+    public static function equals(ObjectEntry $a, ObjectEntry $b): bool
+    {
+        $ta = self::getTime($a);
+        $tb = self::getTime($b);
+        if (false === $ta || false === $tb) {
+            return false;
+        }
+
+        return $ta === $tb;
+    }
+
+    public static function isSet(ObjectEntry $cal, int $field): bool
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            return false;
+        }
+        if ($field < 0 || $field >= self::FIELD_FIELD_COUNT) {
+            return false;
+        }
+
+        return !isset($state['unsetFields'][$field]);
+    }
+
+    public static function clear(ObjectEntry $cal, ?int $field): bool
+    {
+        $state = &self::$state[$cal->id];
+        if (!isset($state)) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_clear: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        if (null === $field) {
+            $state['timestamp'] = 0;
+            $state['millisecond'] = 0;
+            $state['unsetFields'] = [];
+            for ($i = 0; $i < self::FIELD_FIELD_COUNT; ++$i) {
+                // php-src/ICU: after clear(), YEAR is unset; month/day/hour remain set at epoch defaults.
+                if (self::FIELD_YEAR === $i || self::FIELD_EXTENDED_YEAR === $i || self::FIELD_ERA === $i) {
+                    $state['unsetFields'][$i] = true;
+                }
+            }
+            IntlError::clear();
+
+            return true;
+        }
+        if ($field < 0 || $field >= self::FIELD_FIELD_COUNT) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_clear: invalid field: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $state['unsetFields'][$field] = true;
+        IntlError::clear();
+
+        return true;
+    }
+
+    public static function add(ObjectEntry $cal, int $field, int $amount): bool
+    {
+        $state = &self::$state[$cal->id];
+        if (!isset($state)) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_add: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        if (0 === $amount) {
+            unset($state['unsetFields'][$field]);
+            IntlError::clear();
+
+            return true;
+        }
+        $tz = $state['timezone'];
+        $parts = self::parts($tz, $state['timestamp'], $state['millisecond']);
+        switch ($field) {
+            case self::FIELD_YEAR:
+            case self::FIELD_EXTENDED_YEAR:
+                $parts['year'] += $amount;
+                self::applyParts($state, $parts);
+                break;
+            case self::FIELD_MONTH:
+                self::addMonths($parts, $amount);
+                self::applyParts($state, $parts);
+                break;
+            case self::FIELD_DATE:
+            case self::FIELD_DAY_OF_MONTH:
+                $state['timestamp'] = self::addSecondsInZone($tz, $state['timestamp'], $amount * 86400);
+                break;
+            case self::FIELD_DAY_OF_YEAR:
+            case self::FIELD_WEEK_OF_YEAR:
+                $mult = self::FIELD_WEEK_OF_YEAR === $field ? 7 : 1;
+                $state['timestamp'] = self::addSecondsInZone($tz, $state['timestamp'], $amount * $mult * 86400);
+                break;
+            case self::FIELD_HOUR:
+            case self::FIELD_HOUR_OF_DAY:
+                $state['timestamp'] = self::addSecondsInZone($tz, $state['timestamp'], $amount * 3600);
+                break;
+            case self::FIELD_MINUTE:
+                $state['timestamp'] = self::addSecondsInZone($tz, $state['timestamp'], $amount * 60);
+                break;
+            case self::FIELD_SECOND:
+                $state['timestamp'] = self::addSecondsInZone($tz, $state['timestamp'], $amount);
+                break;
+            case self::FIELD_MILLISECOND:
+                self::addMilliseconds($state, $amount);
+                break;
+            default:
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'intlcal_add: unsupported field in this compiler build: U_ILLEGAL_ARGUMENT_ERROR'
+                );
+
+                return false;
+        }
+        unset($state['unsetFields'][$field]);
+        IntlError::clear();
+
+        return true;
+    }
+
+    public static function roll(ObjectEntry $cal, int $field, int $amount): bool
+    {
+        $state = &self::$state[$cal->id];
+        if (!isset($state)) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_roll: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        if (0 === $amount) {
+            unset($state['unsetFields'][$field]);
+            IntlError::clear();
+
+            return true;
+        }
+        $tz = $state['timezone'];
+        $parts = self::parts($tz, $state['timestamp'], $state['millisecond']);
+        switch ($field) {
+            case self::FIELD_YEAR:
+            case self::FIELD_EXTENDED_YEAR:
+                $parts['year'] += $amount;
+                self::applyParts($state, $parts);
+                break;
+            case self::FIELD_MONTH:
+                $parts['month'] = self::modRange($parts['month'] - 1 + $amount, 12) + 1;
+                $dim = self::daysInMonth($parts['year'], $parts['month']);
+                if ($parts['day'] > $dim) {
+                    $parts['day'] = $dim;
+                }
+                self::applyParts($state, $parts);
+                break;
+            case self::FIELD_DATE:
+            case self::FIELD_DAY_OF_MONTH:
+                $dim = self::daysInMonth($parts['year'], $parts['month']);
+                $parts['day'] = self::modRange($parts['day'] - 1 + $amount, $dim) + 1;
+                self::applyParts($state, $parts);
+                break;
+            case self::FIELD_HOUR_OF_DAY:
+                $parts['hour'] = self::modRange($parts['hour'] + $amount, 24);
+                self::applyParts($state, $parts);
+                break;
+            case self::FIELD_HOUR:
+                $h12 = $parts['hour'] % 12;
+                $h12 = self::modRange($h12 + $amount, 12);
+                $parts['hour'] = ($parts['hour'] >= 12 ? 12 : 0) + ($h12 % 12);
+                if (24 === $parts['hour']) {
+                    $parts['hour'] = 12;
+                }
+                self::applyParts($state, $parts);
+                break;
+            case self::FIELD_MINUTE:
+                $parts['minute'] = self::modRange($parts['minute'] + $amount, 60);
+                self::applyParts($state, $parts);
+                break;
+            case self::FIELD_SECOND:
+                $parts['second'] = self::modRange($parts['second'] + $amount, 60);
+                self::applyParts($state, $parts);
+                break;
+            case self::FIELD_MILLISECOND:
+                $parts['millisecond'] = self::modRange($parts['millisecond'] + $amount, 1000);
+                self::applyParts($state, $parts);
+                break;
+            default:
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'intlcal_roll: unsupported field in this compiler build: U_ILLEGAL_ARGUMENT_ERROR'
+                );
+
+                return false;
+        }
+        unset($state['unsetFields'][$field]);
+        IntlError::clear();
+
+        return true;
+    }
+
+    /**
+     * php-src intlcal_field_difference — advances calendar by the difference amount.
+     *
+     * @return int|false
+     */
+    public static function fieldDifference(ObjectEntry $cal, float $targetMs, int $field)
+    {
+        $before = self::getTime($cal);
+        if (false === $before) {
+            return false;
+        }
+        $deltaMs = $targetMs - $before;
+        $amount = match ($field) {
+            self::FIELD_MILLISECOND => (int) round($deltaMs),
+            self::FIELD_SECOND => (int) round($deltaMs / 1000.0),
+            self::FIELD_MINUTE => (int) round($deltaMs / 60000.0),
+            self::FIELD_HOUR, self::FIELD_HOUR_OF_DAY => (int) round($deltaMs / 3600000.0),
+            self::FIELD_DATE, self::FIELD_DAY_OF_MONTH, self::FIELD_DAY_OF_YEAR => (int) round($deltaMs / 86400000.0),
+            self::FIELD_WEEK_OF_YEAR, self::FIELD_WEEK_OF_MONTH => (int) round($deltaMs / (7 * 86400000.0)),
+            self::FIELD_MONTH => self::approxMonthDiff($cal, $targetMs),
+            self::FIELD_YEAR, self::FIELD_EXTENDED_YEAR => self::approxYearDiff($cal, $targetMs),
+            default => null,
+        };
+        if (null === $amount) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_field_difference: unsupported field in this compiler build: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        if (!self::add($cal, $field, $amount)) {
+            return false;
+        }
+        IntlError::clear();
+
+        return $amount;
+    }
+
+    public static function toDateTime(ObjectEntry $cal, Context $ctx): ObjectEntry|false
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_to_date_time: bad calendar object: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        $class = $ctx->classes[DateTimeSupport::CLASS_DATETIME] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DateTime is not registered in this compiler build');
+        }
+        try {
+            $entry = new ObjectEntry($class);
+            DateTimeSupport::initDateTimeFromTimestamp($entry, $state['timestamp']);
+            $zone = DateTimeSupport::newDateTimeZoneVariable($ctx, $state['timezone'])->toObject();
+            DateTimeSupport::setTimezone($entry, $zone);
+            IntlError::clear();
+
+            return $entry;
+        } catch (\Throwable) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intlcal_to_date_time: DateTime create failed: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+    }
+
+    public static function fromDateTime(
+        Context $ctx,
+        ObjectEntry|string $datetime,
+        ?string $locale
+    ): ObjectEntry|false {
+        if (\is_string($datetime)) {
+            $class = $ctx->classes[DateTimeSupport::CLASS_DATETIME] ?? null;
+            if (null === $class) {
+                throw new \LogicException('DateTime is not registered in this compiler build');
+            }
+            try {
+                $entry = new ObjectEntry($class);
+                DateTimeSupport::initDateTime($entry, $datetime);
+                $datetime = $entry;
+            } catch (\Throwable) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'intlcal_from_date_time: bad datetime string: U_ILLEGAL_ARGUMENT_ERROR'
+                );
+
+                return false;
+            }
+        }
+        $ts = DateTimeSupport::getTimestamp($datetime);
+        $ms = intdiv(DateTimeSupport::getMicrosecond($datetime), 1000);
+        $tz = DateTimeSupport::timezoneName(
+            DateTimeSupport::getTimezoneObject($datetime, $ctx)
+        );
+        $cal = self::createInstance($ctx, $tz, $locale ?? '');
+        self::$state[$cal->id]['timestamp'] = $ts;
+        self::$state[$cal->id]['millisecond'] = $ms;
+        IntlError::clear();
+
+        return $cal;
+    }
+
+    /**
+     * @param array{timezone: string, locale: string, timestamp: int, millisecond: int, unsetFields: array<int, true>} $state
+     * @param array{year: int, month: int, day: int, hour: int, minute: int, second: int, millisecond: int} $parts
+     */
+    private static function applyParts(array &$state, array $parts): void
+    {
+        $dim = self::daysInMonth($parts['year'], $parts['month']);
+        if ($parts['day'] > $dim) {
+            $parts['day'] = $dim;
+        }
+        $parsed = VmDateTimeNative::parseDateTime(
+            \sprintf(
+                '%04d-%02d-%02d %02d:%02d:%02d',
+                $parts['year'],
+                $parts['month'],
+                $parts['day'],
+                $parts['hour'],
+                $parts['minute'],
+                $parts['second']
+            ),
+            $state['timezone']
+        );
+        $state['timestamp'] = $parsed['timestamp'];
+        $state['millisecond'] = max(0, min(999, $parts['millisecond']));
+    }
+
+    /**
+     * @param array{year: int, month: int, day: int, hour: int, minute: int, second: int, millisecond: int} $parts
+     */
+    private static function addMonths(array &$parts, int $amount): void
+    {
+        $idx = ($parts['year'] * 12) + ($parts['month'] - 1) + $amount;
+        $parts['year'] = intdiv($idx, 12);
+        $parts['month'] = ($idx % 12) + 1;
+        if ($parts['month'] <= 0) {
+            $parts['month'] += 12;
+            --$parts['year'];
+        }
+        $dim = self::daysInMonth($parts['year'], $parts['month']);
+        if ($parts['day'] > $dim) {
+            $parts['day'] = $dim;
+        }
+    }
+
+    /**
+     * @param array{timezone: string, locale: string, timestamp: int, millisecond: int, unsetFields: array<int, true>} $state
+     */
+    private static function addMilliseconds(array &$state, int $amount): void
+    {
+        $total = ($state['timestamp'] * 1000) + $state['millisecond'] + $amount;
+        if ($total >= 0) {
+            $state['timestamp'] = intdiv($total, 1000);
+            $state['millisecond'] = $total % 1000;
+        } else {
+            $sec = (int) floor($total / 1000);
+            $ms = $total - ($sec * 1000);
+            $state['timestamp'] = $sec;
+            $state['millisecond'] = $ms;
+        }
+    }
+
+    private static function addSecondsInZone(string $tz, int $timestamp, int $seconds): int
+    {
+        unset($tz); // Gregorian civil arithmetic via UTC epoch is sufficient for v1 zoneinfo calendars.
+
+        return $timestamp + $seconds;
+    }
+
+    private static function daysInMonth(int $year, int $month): int
+    {
+        if ($month < 1 || $month > 12) {
+            return 31;
+        }
+        if (\function_exists('cal_days_in_month')) {
+            return (int) \cal_days_in_month(\CAL_GREGORIAN, $month, $year);
+        }
+        $parsed = VmDateTimeNative::parseDateTime(
+            \sprintf('%04d-%02d-01 00:00:00', $year, $month),
+            'UTC'
+        );
+        $nextMonth = $month + 1;
+        $nextYear = $year;
+        if ($nextMonth > 12) {
+            $nextMonth = 1;
+            ++$nextYear;
+        }
+        $next = VmDateTimeNative::parseDateTime(
+            \sprintf('%04d-%02d-01 00:00:00', $nextYear, $nextMonth),
+            'UTC'
+        );
+
+        return (int) (($next['timestamp'] - $parsed['timestamp']) / 86400);
+    }
+
+    private static function modRange(int $value, int $modulus): int
+    {
+        if ($modulus <= 0) {
+            return 0;
+        }
+        $r = $value % $modulus;
+        if ($r < 0) {
+            $r += $modulus;
+        }
+
+        return $r;
+    }
+
+    private static function approxMonthDiff(ObjectEntry $cal, float $targetMs): int
+    {
+        $state = self::$state[$cal->id];
+        $parts = self::parts($state['timezone'], $state['timestamp'], $state['millisecond']);
+        $targetSec = (int) floor($targetMs / 1000.0);
+        $tp = self::parts($state['timezone'], $targetSec, 0);
+
+        return (($tp['year'] * 12) + $tp['month']) - (($parts['year'] * 12) + $parts['month']);
+    }
+
+    private static function approxYearDiff(ObjectEntry $cal, float $targetMs): int
+    {
+        $state = self::$state[$cal->id];
+        $parts = self::parts($state['timezone'], $state['timestamp'], $state['millisecond']);
+        $targetSec = (int) floor($targetMs / 1000.0);
+        $tp = self::parts($state['timezone'], $targetSec, 0);
+
+        return $tp['year'] - $parts['year'];
     }
 
     /**
@@ -308,6 +792,7 @@ final class VmIntlCalendar
         );
         $state['timestamp'] = $parsed['timestamp'];
         $state['millisecond'] = $parts['millisecond'];
+        unset($state['unsetFields'][$field]);
         IntlError::clear();
 
         return true;
@@ -354,6 +839,7 @@ final class VmIntlCalendar
             $state['timezone']
         );
         $state['timestamp'] = $parsed['timestamp'];
+        $state['unsetFields'] = [];
         IntlError::clear();
 
         return true;
@@ -402,6 +888,7 @@ final class VmIntlCalendar
         }
         $state['timestamp'] = $sec;
         $state['millisecond'] = $ms;
+        $state['unsetFields'] = [];
         IntlError::clear();
 
         return true;
@@ -672,5 +1159,379 @@ final class IntlCalendarSetTime extends VmClassMethod
             return;
         }
         $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlCalendar::getType() — php-src intlcal_get_type (#20756). */
+final class IntlCalendarGetType extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlCalendar::getType() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::getType() called on incompatible object');
+        }
+        $type = VmIntlCalendar::getType($receiver->toObject());
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $type) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($type);
+    }
+}
+
+/** IntlCalendar::getNow() — php-src intlcal_get_now (#20756). */
+final class IntlCalendarGetNow extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getNow');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlCalendar::getNow() expects exactly 0 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->float(VmIntlCalendar::getNow());
+    }
+}
+
+/** IntlCalendar::add() — php-src intlcal_add (#20756). */
+final class IntlCalendarAdd extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('add');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlCalendar::add() expects exactly 2 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::add() called on incompatible object');
+        }
+        $field = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::add', 1, 'field');
+        $amount = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'IntlCalendar::add', 2, 'value');
+        $ok = VmIntlCalendar::add($receiver->toObject(), $field, $amount);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlCalendar::roll() — php-src intlcal_roll (#20756). */
+final class IntlCalendarRoll extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('roll');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlCalendar::roll() expects exactly 2 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::roll() called on incompatible object');
+        }
+        $field = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::roll', 1, 'field');
+        $amount = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'IntlCalendar::roll', 2, 'value');
+        $ok = VmIntlCalendar::roll($receiver->toObject(), $field, $amount);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlCalendar::clear() — php-src intlcal_clear (#20756). */
+final class IntlCalendarClear extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('clear');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        $userArgc = max(0, $argc - 1);
+        if ($userArgc > 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlCalendar::clear() expects at most 1 argument, %d given',
+                $userArgc
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::clear() called on incompatible object');
+        }
+        $field = null;
+        if (2 === $argc) {
+            $field = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::clear', 1, 'field');
+        }
+        $ok = VmIntlCalendar::clear($receiver->toObject(), $field);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlCalendar::isSet() — php-src intlcal_is_set (#20756). */
+final class IntlCalendarIsSet extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isSet');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlCalendar::isSet() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::isSet() called on incompatible object');
+        }
+        $field = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::isSet', 1, 'field');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlCalendar::isSet($receiver->toObject(), $field));
+    }
+}
+
+/** IntlCalendar::equals() — php-src intlcal_equals (#20756). */
+final class IntlCalendarEquals extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('equals');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlCalendar::equals() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::equals() called on incompatible object');
+        }
+        $other = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $other->type
+            || !VmIntlCalendar::isCalendarObject($other->toObject())) {
+            throw new \TypeError('IntlCalendar::equals(): Argument #1 ($other) must be of type IntlCalendar, '
+                .\PHPCompiler\VM\ReflectionSupport::valueTypeLabelPublic($other).' given');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlCalendar::equals($receiver->toObject(), $other->toObject()));
+    }
+}
+
+/** IntlCalendar::toDateTime() — php-src intlcal_to_date_time (#20756). */
+final class IntlCalendarToDateTime extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('toDateTime');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlCalendar::toDateTime() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::toDateTime() called on incompatible object');
+        }
+        $dt = VmIntlCalendar::toDateTime($receiver->toObject(), $frame->vmContext);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $dt) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->object($dt);
+    }
+}
+
+/** IntlCalendar::fromDateTime() — php-src intlcal_from_date_time (#20756). */
+final class IntlCalendarFromDateTime extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fromDateTime');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlCalendar::fromDateTime() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $arg0 = $frame->calledArgs[0]->resolveIndirect();
+        $datetime = null;
+        if (Variable::TYPE_OBJECT === $arg0->type) {
+            $datetime = DateTimeSupport::requireDateTime(
+                $arg0,
+                'IntlCalendar::fromDateTime',
+                1,
+                'datetime',
+                $frame->vmContext
+            );
+        } elseif (Variable::TYPE_STRING === $arg0->type) {
+            $datetime = $arg0->toString();
+        } else {
+            $datetime = VmString::coerceStringBuiltinArg(
+                $arg0,
+                'IntlCalendar::fromDateTime',
+                1,
+                'datetime'
+            );
+        }
+        $locale = null;
+        if ($argc >= 2) {
+            $localeVar = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $localeVar->type) {
+                $locale = VmString::coerceStringBuiltinArg(
+                    $localeVar,
+                    'IntlCalendar::fromDateTime',
+                    2,
+                    'locale'
+                );
+            }
+        }
+        $cal = VmIntlCalendar::fromDateTime($frame->vmContext, $datetime, $locale);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $cal) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->object($cal);
+    }
+}
+
+/** IntlCalendar::fieldDifference() — php-src intlcal_field_difference (#20756). */
+final class IntlCalendarFieldDifference extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fieldDifference');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlCalendar::fieldDifference() expects exactly 2 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::fieldDifference() called on incompatible object');
+        }
+        $tsArg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $tsArg->type) {
+            $targetMs = (float) $tsArg->toInt();
+        } elseif (Variable::TYPE_FLOAT === $tsArg->type) {
+            $targetMs = $tsArg->toFloat();
+        } else {
+            $targetMs = (float) VmIntlDateFormatter::coerceIntArg(
+                $tsArg,
+                'IntlCalendar::fieldDifference',
+                1,
+                'timestamp'
+            );
+        }
+        $field = VmIntlDateFormatter::coerceIntArg(
+            $frame->calledArgs[2],
+            'IntlCalendar::fieldDifference',
+            2,
+            'field'
+        );
+        $result = VmIntlCalendar::fieldDifference($receiver->toObject(), $targetMs, $field);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($result);
     }
 }
