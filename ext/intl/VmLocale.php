@@ -203,7 +203,7 @@ final class VmLocale
     }
 
     /**
-     * locale_lookup() / Locale::lookup() — RFC 4647 lookup (php-src locale_methods.c; #20036).
+     * locale_lookup() / Locale::lookup() — RFC 4647 lookup (php-src locale_methods.c; #20036, #20936).
      *
      * @param list<string> $langtag
      */
@@ -502,12 +502,32 @@ final class VmLocale
                 return null;
             }
             if ($canonicalize) {
-                $norm = self::lightweightCanonicalize($norm);
+                // php-src: uloc_canonicalize(strToMatch(tag)) then strToMatch again (#20936 / bug #72809).
+                $can = self::canonicalize($norm);
+                if (null === $can || '' === $can) {
+                    IntlError::set(
+                        IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                        'lookup_loc_range: unable to canonicalize lang_tag'
+                    );
+
+                    return null;
+                }
+                $norm = self::strToMatch($can) ?? $can;
             }
             $cur[] = [$norm, $tag];
         }
         if ($canonicalize) {
-            $locRange = self::lightweightCanonicalize(self::strToMatch($locRange) ?? $locRange);
+            // php-src canonicalizes the original loc_range (not the strToMatch form first).
+            $can = self::canonicalize($locRange);
+            if (null === $can || '' === $can) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'lookup_loc_range: unable to canonicalize loc_range'
+                );
+
+                return null;
+            }
+            $locRange = $can;
         }
         $curLoc = self::strToMatch($locRange);
         if (null === $curLoc) {
@@ -571,24 +591,6 @@ final class VmLocale
         }
 
         return $result;
-    }
-
-    /** Approximate ICU canonicalize when FFI unavailable (underscore form, lower language). */
-    private static function lightweightCanonicalize(string $normalized): string
-    {
-        $tags = self::parseBcp47Tags(str_replace('_', '-', $normalized));
-        $parts = [];
-        if ('' !== $tags['language']) {
-            $parts[] = $tags['language'];
-        }
-        if ('' !== $tags['script']) {
-            $parts[] = $tags['script'];
-        }
-        if ('' !== $tags['region']) {
-            $parts[] = $tags['region'];
-        }
-
-        return strtolower(implode('_', $parts));
     }
 
     private static function httpAcceptFragmentTooLong(string $header): bool
