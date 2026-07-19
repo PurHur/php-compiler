@@ -378,11 +378,17 @@ final class VmDomXPath
             return $nsPredIds;
         }
 
-        // //… — descendant axis (node tests + multi-segment //a/b, //a/text(); #20456).
-        // Must run before absolute `/…` — otherwise `//text()` is eaten as `/` + `/text()`.
+        // //… — absolute descendant axis from the document root (libxml/php-src xpath.c; #21125).
+        // Leading `//` ignores the context node (unlike `.//…`). Must run before `/…`
+        // — otherwise `//text()` is eaten as `/` + `/text()`.
         if (str_starts_with($expression, '//')) {
+            $document = self::ownerDocumentOrSelf($context);
+            if (null === $document) {
+                return [];
+            }
+
             return self::evaluateDescendantPath(
-                $context,
+                $document,
                 substr($expression, 2),
                 $state->xpathNamespaces
             );
@@ -662,17 +668,20 @@ final class VmDomXPath
         string $expression,
         array $namespaces
     ): ?array {
-        // //@attr — every attribute with that name under context
+        // //@attr — every attribute with that name in the document (absolute //; #21125).
         if (preg_match('~^//@([\w.-]+)$~', $expression, $matches)) {
-            return self::collectDescendantAttributeNodes($ctx, $context, $matches[1], $namespaces, null, null);
+            $document = self::ownerDocumentOrSelf($context) ?? $context;
+
+            return self::collectDescendantAttributeNodes($ctx, $document, $matches[1], $namespaces, null, null);
         }
-        // //tag/@attr or //tag[n]/@attr
+        // //tag/@attr or //tag[n]/@attr — document-scoped (#21125).
         if (preg_match('~^//([*\w][\w:-]*)(?:\[(\d+)\])?/@([\w.-]+)$~', $expression, $matches)) {
             $position = isset($matches[2]) && '' !== $matches[2] ? (int) $matches[2] : null;
+            $document = self::ownerDocumentOrSelf($context) ?? $context;
 
             return self::collectDescendantAttributeNodes(
                 $ctx,
-                $context,
+                $document,
                 $matches[3],
                 $namespaces,
                 $matches[1],
@@ -781,8 +790,22 @@ final class VmDomXPath
         if (null !== $namespaceUri) {
             return VmDom::collectElementsByTagNameNS($context, $namespaceUri, $localName);
         }
+        // Wildcard `*` — every element (DOM getElementsByTagName semantics).
+        if ('*' === $localName) {
+            return VmDom::collectElementsByTagName($context, '*');
+        }
+        // Unprefixed name test: null namespace URI only (XPath 1.0; #21125).
+        // DOM getElementsByTagName matches local name across namespaces — too broad.
+        $ids = VmDom::collectElementsByTagName($context, $localName);
 
-        return VmDom::collectElementsByTagName($context, $localName);
+        return array_values(array_filter(
+            $ids,
+            static fn (int $id): bool => self::elementMatchesTag(
+                DomRegistry::entry($id),
+                $localName,
+                null
+            )
+        ));
     }
 
     /**
@@ -937,14 +960,39 @@ final class VmDomXPath
             return true;
         }
 
-        return (bool) preg_match('~^[*\w][\w:-]*(?:\[(?:@[^\]]+|[\d]+)\])?$~', $expression);
+        return (bool) preg_match(
+            '~^[*\w][\w:-]*(?:\[(?:@[^\]]+|[\d]+|(?:local-name|name|namespace-uri)\(\)\s*=\s*["\'][^"\']*["\'])\])?$~i',
+            $expression
+        );
     }
 
     /**
-     * @return array{test: string, attr: ?string, attrValue: string, position: ?int}
+     * @return array{
+     *     test: string,
+     *     attr: ?string,
+     *     attrValue: string,
+     *     position: ?int,
+     *     fnPred: ?string,
+     *     fnPredValue: string
+     * }
      */
     private static function parsePathSegment(string $segment): array
     {
+        // [local-name()="x"] / [name()='a:x'] / [namespace-uri()="urn:a"] (#21125).
+        if (preg_match(
+            '~^(.+?)\[(local-name|name|namespace-uri)\(\)\s*=\s*(["\'])(.*?)\3\]$~i',
+            $segment,
+            $matches
+        )) {
+            return [
+                'test' => $matches[1],
+                'attr' => null,
+                'attrValue' => '',
+                'position' => null,
+                'fnPred' => strtolower($matches[2]),
+                'fnPredValue' => $matches[4],
+            ];
+        }
         if (preg_match(
             '~^(.+?)(?:\[(?:@([^\]=]+)=["\']([^"\']*)["\']|(\d+))\])?$~',
             $segment,
@@ -955,6 +1003,8 @@ final class VmDomXPath
                 'attr' => isset($matches[2]) && '' !== $matches[2] ? $matches[2] : null,
                 'attrValue' => $matches[3] ?? '',
                 'position' => isset($matches[4]) && '' !== $matches[4] ? (int) $matches[4] : null,
+                'fnPred' => null,
+                'fnPredValue' => '',
             ];
         }
 
@@ -963,6 +1013,8 @@ final class VmDomXPath
             'attr' => null,
             'attrValue' => '',
             'position' => null,
+            'fnPred' => null,
+            'fnPredValue' => '',
         ];
     }
 
@@ -1020,7 +1072,7 @@ final class VmDomXPath
     }
 
     /**
-     * Apply optional [@attr='v'] / [n] predicates to a node-id list (#19456, #20456).
+     * Apply optional [@attr='v'] / [n] / [local-name()="…"] predicates (#19456, #20456, #21125).
      *
      * @param list<int>             $nodeIds
      * @param array<string, string> $namespaces
@@ -1032,7 +1084,9 @@ final class VmDomXPath
         ?string $attr,
         string $attrValue,
         ?int $position,
-        array $namespaces
+        array $namespaces,
+        ?string $fnPred = null,
+        string $fnPredValue = ''
     ): array {
         if (null !== $attr) {
             $nodeIds = array_values(array_filter(
@@ -1045,6 +1099,16 @@ final class VmDomXPath
                 )
             ));
         }
+        if (null !== $fnPred) {
+            $nodeIds = array_values(array_filter(
+                $nodeIds,
+                static fn (int $id): bool => self::elementMatchesNameFunctionPredicate(
+                    DomRegistry::entry($id),
+                    $fnPred,
+                    $fnPredValue
+                )
+            ));
+        }
         if (null !== $position) {
             if ($position < 1 || $position > \count($nodeIds)) {
                 return [];
@@ -1054,6 +1118,30 @@ final class VmDomXPath
         }
 
         return $nodeIds;
+    }
+
+    /**
+     * XPath 1.0 name()/local-name()/namespace-uri() equality against a candidate node (#21125).
+     */
+    private static function elementMatchesNameFunctionPredicate(
+        ?ObjectEntry $node,
+        string $fnPred,
+        string $expected
+    ): bool {
+        if (null === $node || !DomRegistry::has($node)) {
+            return false;
+        }
+        if ('local-name' === $fnPred) {
+            return VmDom::readLocalName($node) === $expected;
+        }
+        if ('name' === $fnPred) {
+            return (DomRegistry::state($node)->nodeName ?? '') === $expected;
+        }
+        if ('namespace-uri' === $fnPred) {
+            return (VmDom::readNamespaceUri($node) ?? '') === $expected;
+        }
+
+        return false;
     }
 
     /**
@@ -1088,12 +1176,15 @@ final class VmDomXPath
             $parsed['attr'],
             $parsed['attrValue'],
             $parsed['position'],
-            $namespaces
+            $namespaces,
+            $parsed['fnPred'],
+            $parsed['fnPredValue']
         );
     }
 
     /**
      * Descendant axis for the first `//` segment (excludes context element self; #20377/#20456).
+     * Absolute `//` callers pass the document so the document element is included (#21125).
      *
      * @param array<string, string> $namespaces
      *
@@ -1115,7 +1206,9 @@ final class VmDomXPath
                 $parsed['attr'],
                 $parsed['attrValue'],
                 $parsed['position'],
-                $namespaces
+                $namespaces,
+                $parsed['fnPred'],
+                $parsed['fnPredValue']
             );
         }
         $ids = [];
@@ -1126,7 +1219,9 @@ final class VmDomXPath
             $parsed['attr'],
             $parsed['attrValue'],
             $parsed['position'],
-            $namespaces
+            $namespaces,
+            $parsed['fnPred'],
+            $parsed['fnPredValue']
         );
     }
 
@@ -1187,11 +1282,11 @@ final class VmDomXPath
     }
 
     private static function elementMatchesTag(
-        ObjectEntry $element,
+        ?ObjectEntry $element,
         string $localName,
         ?string $namespaceUri
     ): bool {
-        if (!VmDom::isElement($element)) {
+        if (null === $element || !VmDom::isElement($element)) {
             return false;
         }
         $name = VmDom::readLocalName($element);
@@ -1199,12 +1294,31 @@ final class VmDomXPath
         if (!$nameMatch) {
             return false;
         }
-        if (null === $namespaceUri) {
+        $ns = VmDom::readNamespaceUri($element) ?? '';
+        // Prefixed QName — match expanded namespace URI.
+        if (null !== $namespaceUri) {
+            return '*' === $namespaceUri || $ns === $namespaceUri;
+        }
+        // Unprefixed `*` — any namespace (XPath principal node type wildcard).
+        if ('*' === $localName) {
             return true;
         }
-        $ns = VmDom::readNamespaceUri($element) ?? '';
+        // Unprefixed name test — null namespace URI only (XPath 1.0; #21125).
+        if ('' === $ns) {
+            return true;
+        }
+        // Dom\HTMLDocument: elements live in the XHTML namespace, but php-src/libxml
+        // still matches unprefixed name tests against them (#20757 / #21125).
+        if (VmDomLiving::HTML_NS === $ns) {
+            $document = VmDom::ownerDocumentEntry($element);
+            if (null !== $document && DomRegistry::has($document)
+                && DomRegistry::state($document)->isHtmlDocument
+            ) {
+                return true;
+            }
+        }
 
-        return '*' === $namespaceUri || $ns === $namespaceUri;
+        return false;
     }
 
     /**
@@ -2433,7 +2547,9 @@ final class VmDomXPath
             return [];
         }
 
-        $nodeIds = self::collectDescendantElements($context, $tag, $state->xpathNamespaces);
+        // Absolute `//tag[…]` is document-scoped (libxml; #21125).
+        $document = self::ownerDocumentOrSelf($context) ?? $context;
+        $nodeIds = self::collectDescendantElements($document, $tag, $state->xpathNamespaces);
         $filtered = [];
         foreach ($nodeIds as $nodeId) {
             $element = DomRegistry::entry($nodeId);
