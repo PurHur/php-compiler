@@ -11524,7 +11524,14 @@ class JIT {
                 $callback = '__string__*';
                 break;
             case Type::TYPE_OBJECT:
-                $callback = '__object__*';
+                // NestedJIT: VM Variable returns match param ABI (#16565 / #20785).
+                // Without this, UnserializeJitHelper::decode lowers as __object__* and
+                // thin-AOT always-helper bridges fail module verify (peer Serialize #20773).
+                if (JIT\NestedJitCompileScope::isActive() && $this->isCfgVmVariableParamType($type)) {
+                    $callback = '__value__*';
+                } else {
+                    $callback = '__object__*';
+                }
                 break;
             case Type::TYPE_ARRAY:
                 $callback = '__hashtable__*';

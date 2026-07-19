@@ -4,18 +4,25 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_unserialize via UnserializeJitHelper PHP (#9163, #20355).
+ * JIT/AOT link for __compiler_unserialize via UnserializeJitHelper PHP (#9163, #20785).
  *
- * Embed / non-thin: NestedJIT {@see UnserializeJitHelper} (#13312).
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20336 / #20308 shape): thin stubs without nested JIT (#13322).
+ * Embed + thin standalone AOT: {@see UnserializeJitHelper} NestedJIT
+ * (Serialize #20773 / VarExport #20589 shape — no thin null/empty stubs).
+ * `__compiler_unserialize` keeps a void+`__value__*` out-pointer bridge
+ * ({@see JitValueBox::copyIntoPointer}); not {@see JitVmHelperLink::ensureBridge} shape.
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -26,10 +33,20 @@ final class StringUnserialize
 
     private const DECODE_SESSION_HELPER = 'PHPCompiler\\ext\\standard\\UnserializeJitHelper::decodeSession';
 
+    private const UNSER_BRIDGE_ENTRY = 'unser_bridge_entry';
+
+    private const SESSION_BRIDGE_ENTRY = 'session_unser_entry';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::DECODE_HELPER,
         self::DECODE_SESSION_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        '__compiler_unserialize',
+        'phpc_session_decode_payload',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -42,26 +59,35 @@ final class StringUnserialize
         self::implement($context);
     }
 
-    /** Thin standalone AOT: linkable unserialize ABI without nested UnserializeJitHelper (#13322, #20355). */
-    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
-    {
-        if (!$context->isThinStandaloneAotMain()) {
-            return;
-        }
-        self::implementThinStandaloneStubs($context);
-    }
-
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_unserialize');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
-        if ($context->isThinStandaloneAotMain()) {
-            self::implementThinStandaloneStubs($context);
+        // Save before active-context / NestedJIT work — those can detach the builder
+        // ("Current basic block has no parent function", peer StrRepeat #19998).
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+
+        // Thin + embed: publish sg_vm_context before NestedJIT of UnserializeJitHelper (#17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+
+        $unserProbe = $context->module->getNamedFunction('__compiler_unserialize');
+        $sessionProbe = $context->module->getNamedFunction('phpc_session_decode_payload');
+        if (JitVmHelperLink::hasNamedBridgeEntry($unserProbe, self::UNSER_BRIDGE_ENTRY)
+            && JitVmHelperLink::hasNamedBridgeEntry($sessionProbe, self::SESSION_BRIDGE_ENTRY)) {
+            self::registerLinkedRuntime($context);
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+
+            return;
+        }
+        if (null !== $unserProbe && $unserProbe->countBasicBlocks() > 0
+            && null !== $sessionProbe && $sessionProbe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
 
             return;
         }
@@ -71,13 +97,40 @@ final class StringUnserialize
         self::implementUnserializeBridge($context);
         self::implementSessionDecodeBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+    }
+
+    public static function ensureJitHelperCompiled(Context $context): void
+    {
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20785'
+        );
+    }
+
+    public static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after UnserializeJitHelper compile (#20785)');
+        }
+
+        return $fn;
     }
 
     private static function implementUnserializeBridge(Context $context): void
     {
         $abiName = '__compiler_unserialize';
         $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::UNSER_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
 
@@ -92,7 +145,7 @@ final class StringUnserialize
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('unser_bridge_entry');
+        $entry = $fn->appendBasicBlock(self::UNSER_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
         $payload = $fn->getParam(0);
         $out = $fn->getParam(1);
@@ -109,6 +162,11 @@ final class StringUnserialize
     {
         $abiName = 'phpc_session_decode_payload';
         $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::SESSION_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
 
@@ -117,7 +175,6 @@ final class StringUnserialize
 
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
-        $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
         $ft = $context->context->functionType($htPtr, false, $i8p, $sizeT);
@@ -125,7 +182,7 @@ final class StringUnserialize
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('session_unser_entry');
+        $entry = $fn->appendBasicBlock(self::SESSION_BRIDGE_ENTRY);
         $empty = $fn->appendBasicBlock('session_unser_empty');
         $decode = $fn->appendBasicBlock('session_unser_decode');
 
@@ -146,10 +203,11 @@ final class StringUnserialize
             $context->builder->zExt($len, $i64),
             $body
         );
-        $ht = $context->builder->call(
+        $htRaw = $context->builder->call(
             self::helperFunction($context, self::DECODE_SESSION_HELPER),
             $payloadStr
         );
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         $context->builder->returnValue($ht);
         $context->registerFunction($abiName, $fn);
     }
@@ -179,99 +237,14 @@ final class StringUnserialize
         }
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after UnserializeJitHelper compile (#9163)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'UnserializeJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('UnserializeJitHelper.php parseAndCompile failed (#9163)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9163)');
-            }
-        }
-    }
-
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__compiler_unserialize', 'phpc_session_decode_payload'] as $name) {
+        foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringUnserialize bridge (#9163)');
+                throw new \LogicException($name.' missing after StringUnserialize bridge (#20785)');
             }
             $context->registerFunction($name, $fn);
         }
-    }
-
-    /** No-op / empty hashtable — thin standalone AOT only needs linkable ABI symbols (#13322, #20355). */
-    private static function implementThinStandaloneStubs(Context $context): void
-    {
-        self::ensureRuntimeHelpers($context);
-
-        $voidTy = $context->getTypeFromString('void');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-
-        $unserProbe = $context->module->getNamedFunction('__compiler_unserialize');
-        if (null === $unserProbe || 0 === $unserProbe->countBasicBlocks()) {
-            $ft = $context->context->functionType($voidTy, false, $strPtr, $valuePtr);
-            $fn = null !== $unserProbe
-                ? $unserProbe
-                : $context->module->addFunction('__compiler_unserialize', $ft);
-            $entry = $fn->appendBasicBlock('unser_thin_stub');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnVoid();
-            $context->registerFunction('__compiler_unserialize', $fn);
-        } else {
-            $context->registerFunction('__compiler_unserialize', $unserProbe);
-        }
-
-        $sessionProbe = $context->module->getNamedFunction('phpc_session_decode_payload');
-        if (null === $sessionProbe || 0 === $sessionProbe->countBasicBlocks()) {
-            $i8p = $context->getTypeFromString('int8*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $ft = $context->context->functionType($htPtr, false, $i8p, $sizeT);
-            $fn = null !== $sessionProbe
-                ? $sessionProbe
-                : $context->module->addFunction('phpc_session_decode_payload', $ft);
-            $entry = $fn->appendBasicBlock('session_unser_thin_stub');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($context->builder->call($context->lookupFunction('__hashtable__alloc')));
-            $context->registerFunction('phpc_session_decode_payload', $fn);
-        } else {
-            $context->registerFunction('phpc_session_decode_payload', $sessionProbe);
-        }
-
-        $context->builder->clearInsertionPosition();
     }
 }
