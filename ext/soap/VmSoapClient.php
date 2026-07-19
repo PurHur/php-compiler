@@ -28,6 +28,7 @@ use PHPCompiler\ext\standard\VmUserCall;
  * options['classmap'] maps SOAP type names (xsi:type local name) to PHP classes (#21044).
  * WSDL xsd:element[@type] bindings also drive classmap when xsi:type is absent (#21088).
  * Document/literal operation→output message parts + complexType fields scope nested SDL types (#21091).
+ * Document/literal operation→input sequence names positional __soapCall args (#21131).
  * options['typemap'] from_xml/to_xml string callbacks (#21046).
  */
 final class VmSoapClient
@@ -1070,51 +1071,67 @@ final class VmSoapClient
             if ('' === $opName) {
                 continue;
             }
-            $output = null;
-            foreach ($op->childNodes as $child) {
-                if ($child instanceof \DOMElement && 'output' === ($child->localName ?? $child->nodeName)) {
-                    $output = $child;
-                    break;
-                }
-            }
-            if (!$output instanceof \DOMElement) {
-                continue;
-            }
-            $msgRef = $output->getAttribute('message');
-            if ('' === $msgRef) {
-                continue;
-            }
-            $msg = $messages[self::xsdLocalName($msgRef)] ?? null;
-            if (!$msg instanceof \DOMElement) {
-                continue;
-            }
-            $parts = [];
-            foreach ($msg->childNodes as $part) {
-                if (!$part instanceof \DOMElement || 'part' !== ($part->localName ?? $part->nodeName)) {
-                    continue;
-                }
-                $elRef = $part->getAttribute('element');
-                if ('' === $elRef) {
-                    $partType = $part->getAttribute('type');
-                    $partName = $part->getAttribute('name');
-                    if ('' !== $partName && '' !== $partType) {
-                        $parts[$partName] = self::xsdLocalName($partType);
+            $opKey = \strtolower($opName);
+            foreach (['output' => 'operationOutputParts', 'input' => 'operationInputParts'] as $io => $prop) {
+                $ioEl = null;
+                foreach ($op->childNodes as $child) {
+                    if ($child instanceof \DOMElement && $io === ($child->localName ?? $child->nodeName)) {
+                        $ioEl = $child;
+                        break;
                     }
+                }
+                if (!$ioEl instanceof \DOMElement) {
                     continue;
                 }
-                $elDef = $schemaElements[self::xsdLocalName($elRef)] ?? null;
-                if (!$elDef instanceof \DOMElement) {
+                $msgRef = $ioEl->getAttribute('message');
+                if ('' === $msgRef) {
                     continue;
                 }
-                // Document/literal: unwrap response element sequence into part child → type.
-                foreach (self::wsdlElementSequenceFields($elDef) as $childName => $childType) {
-                    $parts[$childName] = $childType;
+                $msg = $messages[self::xsdLocalName($msgRef)] ?? null;
+                if (!$msg instanceof \DOMElement) {
+                    continue;
                 }
-            }
-            if ([] !== $parts) {
-                $state->operationOutputParts[\strtolower($opName)] = $parts;
+                $parts = self::wsdlMessagePartFields($msg, $schemaElements);
+                if ([] !== $parts) {
+                    $state->{$prop}[$opKey] = $parts;
+                }
             }
         }
+    }
+
+    /**
+     * Resolve wsdl:message parts to child element/name → type map (#21091 / #21131).
+     *
+     * @param array<string, \DOMElement> $schemaElements
+     * @return array<string, string>
+     */
+    private static function wsdlMessagePartFields(\DOMElement $msg, array $schemaElements): array
+    {
+        $parts = [];
+        foreach ($msg->childNodes as $part) {
+            if (!$part instanceof \DOMElement || 'part' !== ($part->localName ?? $part->nodeName)) {
+                continue;
+            }
+            $elRef = $part->getAttribute('element');
+            if ('' === $elRef) {
+                $partType = $part->getAttribute('type');
+                $partName = $part->getAttribute('name');
+                if ('' !== $partName && '' !== $partType) {
+                    $parts[$partName] = self::xsdLocalName($partType);
+                }
+                continue;
+            }
+            $elDef = $schemaElements[self::xsdLocalName($elRef)] ?? null;
+            if (!$elDef instanceof \DOMElement) {
+                continue;
+            }
+            // Document/literal: unwrap element sequence into part child → type.
+            foreach (self::wsdlElementSequenceFields($elDef) as $childName => $childType) {
+                $parts[$childName] = $childType;
+            }
+        }
+
+        return $parts;
     }
 
     /**
@@ -1295,6 +1312,20 @@ final class VmSoapClient
             && null === self::soapVarShape($args[0])
         ) {
             $args = $args[0];
+        }
+        // Map positional args onto WSDL input element sequence names (#21131).
+        $inputNames = \array_keys($state->operationInputParts[\strtolower($name)] ?? []);
+        if (
+            [] !== $inputNames
+            && \is_array($args)
+            && \array_is_list($args)
+        ) {
+            $named = [];
+            foreach ($args as $i => $value) {
+                $paramName = $inputNames[$i] ?? ('param'.$i);
+                $named[$paramName] = $value;
+            }
+            $args = $named;
         }
         if (\is_array($args) && !\array_is_list($args)) {
             foreach ($args as $key => $value) {
@@ -2210,6 +2241,13 @@ final class SoapClientState
      * @var array<string, array<string, string>>
      */
     public array $operationOutputParts = [];
+
+    /**
+     * Operation (lowercase) → document/literal input part child → type local-name (#21131).
+     *
+     * @var array<string, array<string, string>>
+     */
+    public array $operationInputParts = [];
 
     /**
      * Named complexType → field local-name → type local-name (#21091).
