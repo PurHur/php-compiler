@@ -357,6 +357,7 @@ require_once __DIR__.'/../../../ext/dom/HtmlDocumentQuerySelectorAll.php';
 require_once __DIR__.'/../../../ext/dom/HtmlDocumentSaveHtml.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationCreateDocument.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationCreateDocumentType.php';
+require_once __DIR__.'/../../../ext/dom/ImplementationCreateHTMLDocument.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationGetFeature.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationHasFeature.php';
 require_once __DIR__.'/../../../ext/dom/JitDomAppendChild.php';

@@ -3353,7 +3353,8 @@ final class VmDom
         self::syncSubtree($ctx, $document);
         self::reindexDocumentIds($document, $root);
         self::syncElementIdMapProperty($document);
-        $state->documentUri = self::defaultDocumentUri();
+        // Living Dom\* docs: unset URL → about:blank (php-src follow_spec; #20898).
+        $state->documentUri = VmDomLiving::isLivingDocument($document) ? null : self::defaultDocumentUri();
         $state->loadedViaXml = true;
         $state->sourceXml = $trimmed;
 
@@ -5991,7 +5992,10 @@ final class VmDom
         $state->idAttrByElement = [];
         $state->elementIds = [];
         $state->xmlVersion = '1.0';
-        $state->encoding = null;
+        // Living Dom\* may set overrideEncoding before loadHTML (#20898); legacy resets.
+        if (!VmDomLiving::isLivingDocument($document)) {
+            $state->encoding = null;
+        }
         $state->xmlStandalone = false;
         $state->documentElementName = DomRegistry::state($root)->nodeName;
         if (!$deferDocumentSlotSync) {
@@ -6006,7 +6010,8 @@ final class VmDom
         if (!$deferDocumentSlotSync) {
             self::syncElementIdMapProperty($document);
         }
-        $state->documentUri = self::defaultDocumentUri();
+        // Living Dom\* docs: unset URL → about:blank (php-src follow_spec; #20898).
+        $state->documentUri = VmDomLiving::isLivingDocument($document) ? null : self::defaultDocumentUri();
 
         return true;
     }
@@ -9110,6 +9115,15 @@ final class VmDom
             && DomConstants::XML_DOCUMENT_NODE === DomRegistry::state($entry)->nodeType;
     }
 
+    /** DOMImplementation or Dom\Implementation (#20898). */
+    public static function isImplementation(ObjectEntry $entry): bool
+    {
+        $lc = strtolower($entry->class->name);
+
+        return self::CLASS_IMPLEMENTATION === $lc
+            || VmDomLiving::CLASS_IMPLEMENTATION === $lc;
+    }
+
     public static function isDocumentFragment(ObjectEntry $entry): bool
     {
         return DomRegistry::has($entry)
@@ -9807,6 +9821,10 @@ final class VmDom
             if (VmDomLiving::CLASS_XPATH === $classLc && self::isXPath($object)) {
                 return $object;
             }
+            // Dom\Implementation shares DOMImplementation method handlers (#20898).
+            if (self::CLASS_IMPLEMENTATION === $classLc && self::isImplementation($object)) {
+                return $object;
+            }
             throw new \TypeError(sprintf('%s must be called on a %s instance', $label, self::classNameFromLc($classLc)));
         }
 
@@ -9847,6 +9865,7 @@ final class VmDom
     {
         return match ($lc) {
             self::CLASS_IMPLEMENTATION => 'DOMImplementation',
+            VmDomLiving::CLASS_IMPLEMENTATION => 'Dom\\Implementation',
             self::CLASS_DOCUMENT => 'DOMDocument',
             self::CLASS_DOCUMENT_TYPE => 'DOMDocumentType',
             self::CLASS_PROCESSING_INSTRUCTION => 'DOMProcessingInstruction',
