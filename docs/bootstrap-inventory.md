@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5852 |
-| Phase A inventory files (M2 ratio SSOT) | 5852 |
+| PHP files on vm.php path | 5854 |
+| Phase A inventory files (M2 ratio SSOT) | 5854 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17594 |
+| Source constructs flagged (warnings) | 17601 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -793,13 +793,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_init.php` | 0 | 2 |
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
-| `ext/intl/BuiltinClasses.php` | 0 | 36 |
+| `ext/intl/BuiltinClasses.php` | 0 | 37 |
 | `ext/intl/GraphemeStrSplitJitHelper.php` | 0 | 3 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
 | `ext/intl/IntlConstants.php` | 0 | 1 |
 | `ext/intl/IntlDateFormatterCreate.php` | 0 | 2 |
 | `ext/intl/IntlDateFormatterFormat.php` | 0 | 2 |
+| `ext/intl/IntlDateFormatterFormatObject.php` | 0 | 2 |
 | `ext/intl/IntlDateFormatterGetErrorCode.php` | 0 | 3 |
 | `ext/intl/IntlDateFormatterGetErrorMessage.php` | 0 | 3 |
 | `ext/intl/IntlDateFormatterGetPattern.php` | 0 | 2 |
@@ -832,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 64 |
+| `ext/intl/Module.php` | 0 | 65 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -856,6 +857,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmUConverter.php` | 0 | 40 |
 | `ext/intl/collator_compare.php` | 0 | 3 |
 | `ext/intl/collator_create.php` | 0 | 3 |
+| `ext/intl/datefmt_format_object.php` | 0 | 3 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
 | `ext/intl/grapheme_levenshtein.php` | 0 | 2 |
 | `ext/intl/grapheme_str_contains.php` | 0 | 2 |
@@ -11191,15 +11193,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 149)
 - new IntlDateFormatterCreate (line 160)
 - new IntlDateFormatterFormat (line 163)
-- new IntlDateFormatterGetPattern (line 166)
-- new IntlDateFormatterParse (line 169)
-- new IntlDateFormatterParseToCalendar (line 172)
-- new IntlDateFormatterLocaltime (line 175)
-- new IntlDateFormatterGetTimeZone (line 178)
-- new IntlDateFormatterSetTimeZone (line 181)
-- new IntlDateFormatterGetErrorCode (line 184)
-- new IntlDateFormatterGetErrorMessage (line 187)
-- new ClassEntry (line 270)
+- new IntlDateFormatterFormatObject (line 166)
+- new IntlDateFormatterGetPattern (line 169)
+- new IntlDateFormatterParse (line 172)
+- new IntlDateFormatterParseToCalendar (line 175)
+- new IntlDateFormatterLocaltime (line 178)
+- new IntlDateFormatterGetTimeZone (line 181)
+- new IntlDateFormatterSetTimeZone (line 184)
+- new IntlDateFormatterGetErrorCode (line 187)
+- new IntlDateFormatterGetErrorMessage (line 190)
+- new ClassEntry (line 273)
 - 17 class method(s)
 
 ### `ext/intl/GraphemeStrSplitJitHelper.php`
@@ -11239,6 +11242,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
 - 1 class method(s)
+
+### `ext/intl/IntlDateFormatterFormatObject.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
 
 ### `ext/intl/IntlDateFormatterGetErrorCode.php`
 
@@ -11500,21 +11509,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new transliterator_get_error_code (line 153)
 - new transliterator_get_error_message (line 154)
 - new resourcebundle_count (line 159)
-- new grapheme_strlen (line 185)
-- new grapheme_substr (line 186)
-- new grapheme_strpos (line 187)
-- new grapheme_str_contains (line 188)
-- new grapheme_strstr (line 189)
-- new grapheme_stristr (line 190)
-- new grapheme_stripos (line 191)
-- new grapheme_strrpos (line 192)
-- new grapheme_extract (line 193)
-- new grapheme_levenshtein (line 194)
-- new grapheme_str_split (line 195)
-- new grapheme_strimwidth (line 196)
-- new intl_get_error_code (line 197)
-- new intl_get_error_message (line 198)
-- new intl_is_failure (line 199)
+- new datefmt_format_object (line 163)
+- new grapheme_strlen (line 191)
+- new grapheme_substr (line 192)
+- new grapheme_strpos (line 193)
+- new grapheme_str_contains (line 194)
+- new grapheme_strstr (line 195)
+- new grapheme_stristr (line 196)
+- new grapheme_stripos (line 197)
+- new grapheme_strrpos (line 198)
+- new grapheme_extract (line 199)
+- new grapheme_levenshtein (line 200)
+- new grapheme_str_split (line 201)
+- new grapheme_strimwidth (line 202)
+- new intl_get_error_code (line 203)
+- new intl_get_error_message (line 204)
+- new intl_is_failure (line 205)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -11780,7 +11790,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 97)
 - new HashTable (line 315)
 - new Variable (line 328)
-- 35 class method(s)
+- 37 class method(s)
 
 ### `ext/intl/VmIntlDatePatternGenerator.php`
 
@@ -12092,6 +12102,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
 - new Error (line 41)
+- 2 class method(s)
+
+### `ext/intl/datefmt_format_object.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Error (line 75)
 - 2 class method(s)
 
 ### `ext/intl/grapheme_extract.php`

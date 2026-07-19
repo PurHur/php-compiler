@@ -163,6 +163,9 @@ final class BuiltinClasses
         $entry->methods['format'] = new IntlDateFormatterFormat();
         $entry->methodVisibility['format'] = $pub;
         $entry->methodNames['format'] = 'format';
+        $entry->methods['formatobject'] = new IntlDateFormatterFormatObject();
+        $entry->methodVisibility['formatobject'] = $pubStatic;
+        $entry->methodNames['formatobject'] = 'formatObject';
         $entry->methods['getpattern'] = new IntlDateFormatterGetPattern();
         $entry->methodVisibility['getpattern'] = $pub;
         $entry->methodNames['getpattern'] = 'getPattern';
