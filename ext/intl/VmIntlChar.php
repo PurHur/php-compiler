@@ -250,6 +250,14 @@ final class VmIntlChar
             'chardirection' => [new IntlCharCharDirection(), 'charDirection'],
             'charmirror' => [new IntlCharCharMirror(), 'charMirror'],
             'getbidipairedbracket' => [new IntlCharGetBidiPairedBracket(), 'getBidiPairedBracket'],
+            'isidstart' => [new IntlCharIsIDStart(), 'isIDStart'],
+            'isidpart' => [new IntlCharIsIDPart(), 'isIDPart'],
+            'isidignorable' => [new IntlCharIsIDIgnorable(), 'isIDIgnorable'],
+            'isisocontrol' => [new IntlCharIsISOControl(), 'isISOControl'],
+            'isjavaidstart' => [new IntlCharIsJavaIDStart(), 'isJavaIDStart'],
+            'isjavaidpart' => [new IntlCharIsJavaIDPart(), 'isJavaIDPart'],
+            'isjavaspacechar' => [new IntlCharIsJavaSpaceChar(), 'isJavaSpaceChar'],
+            'getfc_nfkc_closure' => [new IntlCharGetFCNFKCClosure(), 'getFC_NFKC_Closure'],
         ];
         foreach ($methods as $lc => [$handler, $name]) {
             $entry->methods[$lc] = $handler;
@@ -694,6 +702,160 @@ final class VmIntlChar
             $codepoint,
             static fn (int $cp): bool => \in_array($cp, [0x09, 0x0A, 0x0B, 0x0C, 0x0D, 0x20], true)
         );
+    }
+
+    /** IntlChar::isIDStart() — php-src / ICU u_isIDStart (#20938). */
+    public static function isIDStart(string|int $codepoint): bool
+    {
+        return self::unaryBoolIcu(
+            'u_isIDStart',
+            $codepoint,
+            static fn (int $cp): bool => self::isalpha($cp)
+        );
+    }
+
+    /** IntlChar::isIDPart() — php-src / ICU u_isIDPart (#20938). */
+    public static function isIDPart(string|int $codepoint): bool
+    {
+        return self::unaryBoolIcu(
+            'u_isIDPart',
+            $codepoint,
+            static function (int $cp): bool {
+                return self::isalpha($cp)
+                    || self::isdigit($cp)
+                    || 0x5F === $cp
+                    || self::isIDIgnorable($cp);
+            }
+        );
+    }
+
+    /** IntlChar::isIDIgnorable() — php-src / ICU u_isIDIgnorable (#20938). */
+    public static function isIDIgnorable(string|int $codepoint): bool
+    {
+        return self::unaryBoolIcu(
+            'u_isIDIgnorable',
+            $codepoint,
+            static function (int $cp): bool {
+                // ISO controls excluding ASCII whitespace controls (tab/LF/VT/FF/CR).
+                if ($cp <= 0x9F) {
+                    return self::isISOControl($cp)
+                        && !\in_array($cp, [0x09, 0x0A, 0x0B, 0x0C, 0x0D], true);
+                }
+
+                return false;
+            }
+        );
+    }
+
+    /** IntlChar::isISOControl() — php-src / ICU u_isISOControl (#20938). */
+    public static function isISOControl(string|int $codepoint): bool
+    {
+        return self::unaryBoolIcu(
+            'u_isISOControl',
+            $codepoint,
+            static fn (int $cp): bool => ($cp >= 0x00 && $cp <= 0x1F) || ($cp >= 0x7F && $cp <= 0x9F)
+        );
+    }
+
+    /** IntlChar::isJavaIDStart() — php-src / ICU u_isJavaIDStart (#20938). */
+    public static function isJavaIDStart(string|int $codepoint): bool
+    {
+        return self::unaryBoolIcu(
+            'u_isJavaIDStart',
+            $codepoint,
+            static function (int $cp): bool {
+                // Letters + currency ($=Sc) + connector (_=Pc) for ASCII fallback.
+                return self::isalpha($cp) || 0x24 === $cp || 0x5F === $cp;
+            }
+        );
+    }
+
+    /** IntlChar::isJavaIDPart() — php-src / ICU u_isJavaIDPart (#20938). */
+    public static function isJavaIDPart(string|int $codepoint): bool
+    {
+        return self::unaryBoolIcu(
+            'u_isJavaIDPart',
+            $codepoint,
+            static function (int $cp): bool {
+                return self::isJavaIDStart($cp)
+                    || self::isdigit($cp)
+                    || self::isIDIgnorable($cp);
+            }
+        );
+    }
+
+    /** IntlChar::isJavaSpaceChar() — php-src / ICU u_isJavaSpaceChar (#20938). */
+    public static function isJavaSpaceChar(string|int $codepoint): bool
+    {
+        return self::unaryBoolIcu(
+            'u_isJavaSpaceChar',
+            $codepoint,
+            // Java Character.isSpaceChar — Zs/Zl/Zp only (ASCII: U+0020).
+            static fn (int $cp): bool => 0x20 === $cp
+        );
+    }
+
+    /**
+     * IntlChar::getFC_NFKC_Closure() — php-src / ICU u_getFC_NFKC_Closure (#20938).
+     *
+     * Returns empty string when the property is empty; null on invalid code point.
+     */
+    public static function getFC_NFKC_Closure(string|int $codepoint): ?string
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return null;
+        }
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_getFC_NFKC_Closure'.self::$symSuffix;
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $len = (int) $ffi->$fn($cp, null, 0, \FFI::addr($status));
+            if ($len <= 0) {
+                return '';
+            }
+            $buf = $ffi->new('UChar['.($len + 1).']');
+            $status->cdata = 0;
+            $len = (int) $ffi->$fn($cp, $buf, $len + 1, \FFI::addr($status));
+            if ((int) $status->cdata > 0 || $len < 0) {
+                return '';
+            }
+            if (0 === $len) {
+                return '';
+            }
+
+            return self::utf16BufferToUtf8($buf, $len);
+        }
+
+        return '';
+    }
+
+    /**
+     * Convert a length-prefixed ICU UChar (UTF-16) buffer to UTF-8.
+     *
+     * @param \FFI\CData $buf UChar[]
+     */
+    private static function utf16BufferToUtf8(\FFI\CData $buf, int $len): string
+    {
+        $out = '';
+        $i = 0;
+        while ($i < $len) {
+            $u = (int) $buf[$i] & 0xFFFF;
+            if ($u >= 0xD800 && $u <= 0xDBFF && ($i + 1) < $len) {
+                $u2 = (int) $buf[$i + 1] & 0xFFFF;
+                if ($u2 >= 0xDC00 && $u2 <= 0xDFFF) {
+                    $cp = 0x10000 + (($u - 0xD800) << 10) + ($u2 - 0xDC00);
+                    $out .= UnicodeCanonical::codepointToUtf8($cp);
+                    $i += 2;
+                    continue;
+                }
+            }
+            $out .= UnicodeCanonical::codepointToUtf8($u);
+            ++$i;
+        }
+
+        return $out;
     }
 
     /** IntlChar::islower() — php-src / ICU u_islower (#20821). */
@@ -1373,12 +1535,14 @@ final class VmIntlChar
     {
         return <<<C
 typedef int32_t UChar32;
+typedef uint16_t UChar;
 typedef int32_t UProperty;
 typedef int32_t UCharNameChoice;
 typedef int32_t UPropertyNameChoice;
 typedef int8_t UBool;
 typedef int32_t UErrorCode;
 typedef uint32_t uint32_t;
+typedef uint16_t uint16_t;
 typedef uint8_t uint8_t;
 UBool u_isalpha{$suffix}(UChar32 c);
 UBool u_isdigit{$suffix}(UChar32 c);
@@ -1399,6 +1563,14 @@ UBool u_isUAlphabetic{$suffix}(UChar32 c);
 UBool u_isULowercase{$suffix}(UChar32 c);
 UBool u_isUUppercase{$suffix}(UChar32 c);
 UBool u_isUWhiteSpace{$suffix}(UChar32 c);
+UBool u_isIDStart{$suffix}(UChar32 c);
+UBool u_isIDPart{$suffix}(UChar32 c);
+UBool u_isIDIgnorable{$suffix}(UChar32 c);
+UBool u_isISOControl{$suffix}(UChar32 c);
+UBool u_isJavaIDStart{$suffix}(UChar32 c);
+UBool u_isJavaIDPart{$suffix}(UChar32 c);
+UBool u_isJavaSpaceChar{$suffix}(UChar32 c);
+int32_t u_getFC_NFKC_Closure{$suffix}(UChar32 c, UChar *dest, int32_t destCapacity, UErrorCode *pErrorCode);
 int8_t u_charType{$suffix}(UChar32 c);
 int8_t u_charDirection{$suffix}(UChar32 c);
 UChar32 u_charMirror{$suffix}(UChar32 c);
@@ -2813,5 +2985,210 @@ final class IntlCharEnumCharNames extends VmClassMethod
             return;
         }
         $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlChar::isIDStart() — php-src / ICU u_isIDStart (#20938). */
+final class IntlCharIsIDStart extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isIDStart');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isIDStart() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isIDStart', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isIDStart($codepoint));
+    }
+}
+
+/** IntlChar::isIDPart() — php-src / ICU u_isIDPart (#20938). */
+final class IntlCharIsIDPart extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isIDPart');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isIDPart() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isIDPart', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isIDPart($codepoint));
+    }
+}
+
+/** IntlChar::isIDIgnorable() — php-src / ICU u_isIDIgnorable (#20938). */
+final class IntlCharIsIDIgnorable extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isIDIgnorable');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isIDIgnorable() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isIDIgnorable', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isIDIgnorable($codepoint));
+    }
+}
+
+/** IntlChar::isISOControl() — php-src / ICU u_isISOControl (#20938). */
+final class IntlCharIsISOControl extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isISOControl');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isISOControl() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isISOControl', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isISOControl($codepoint));
+    }
+}
+
+/** IntlChar::isJavaIDStart() — php-src / ICU u_isJavaIDStart (#20938). */
+final class IntlCharIsJavaIDStart extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isJavaIDStart');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isJavaIDStart() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isJavaIDStart', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isJavaIDStart($codepoint));
+    }
+}
+
+/** IntlChar::isJavaIDPart() — php-src / ICU u_isJavaIDPart (#20938). */
+final class IntlCharIsJavaIDPart extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isJavaIDPart');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isJavaIDPart() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isJavaIDPart', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isJavaIDPart($codepoint));
+    }
+}
+
+/** IntlChar::isJavaSpaceChar() — php-src / ICU u_isJavaSpaceChar (#20938). */
+final class IntlCharIsJavaSpaceChar extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isJavaSpaceChar');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isJavaSpaceChar() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isJavaSpaceChar', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isJavaSpaceChar($codepoint));
+    }
+}
+
+/** IntlChar::getFC_NFKC_Closure() — php-src / ICU u_getFC_NFKC_Closure (#20938). */
+final class IntlCharGetFCNFKCClosure extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getFC_NFKC_Closure');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getFC_NFKC_Closure() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::getFC_NFKC_Closure', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::getFC_NFKC_Closure($codepoint);
+        if (null === $result) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->string($result);
+        }
     }
 }
