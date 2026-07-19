@@ -5946,4 +5946,7 @@ require_once __DIR__.'/../../../ext/intl/locale_get_display_region.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_display_script.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_display_variant.php';
 require_once __DIR__.'/../../../ext/intl/resourcebundle_count.php';
+require_once __DIR__.'/../../../ext/intl/IntlDateFormatterFormatObject.php';
+require_once __DIR__.'/../../../ext/intl/VmIntlDatePatternGenerator.php';
+require_once __DIR__.'/../../../ext/intl/datefmt_format_object.php';
 echo "compiler_lib_spine_smoke bundle OK\n";
