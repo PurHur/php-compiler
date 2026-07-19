@@ -255,6 +255,17 @@ class Module extends ModuleAbstract
                 new intlcal_set_skipped_wall_time_option(),
                 new intlcal_get_error_code(),
                 new intlcal_get_error_message(),
+                // IntlCalendar week/locale/daylight/lenient/keyword procedurals (#20896)
+                new intlcal_get_locale(),
+                new intlcal_is_lenient(),
+                new intlcal_set_lenient(),
+                new intlcal_in_daylight_time(),
+                new intlcal_get_first_day_of_week(),
+                new intlcal_set_first_day_of_week(),
+                new intlcal_get_minimal_days_in_first_week(),
+                new intlcal_set_minimal_days_in_first_week(),
+                new intlcal_get_keyword_values_for_locale(),
+                new intlcal_is_equivalent_to(),
                 // IntlTimeZone procedural aliases (php-src timezone.stub.php @alias; #20859)
                 new intltz_get_gmt(),
                 new intltz_create_time_zone(),
