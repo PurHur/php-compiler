@@ -10,7 +10,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Inventory / user-script AOT must link stream lifecycle via NestedJIT (#13137, #20966).
+ * Inventory / user-script AOT must link stream lifecycle+read via NestedJIT (#13137, #20966, #20982).
  *
  * @group aot-lint
  */
@@ -29,10 +29,11 @@ final class StandaloneDefineBuiltinsStreamAbiTest extends TestCase
         $context = (string) file_get_contents(\dirname(__DIR__, 3).'/lib/JIT/Context.php');
         $this->assertStringContainsString('StreamLifecycleRuntime::ensureLinked', $context);
         $this->assertStringNotContainsString('StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit', $context);
-        $this->assertStringContainsString('StreamReadRuntime::ensureDeferredStubsForInventoryEmit', $context);
+        $this->assertStringContainsString('StreamReadRuntime::ensureLinked', $context);
+        $this->assertStringNotContainsString('StreamReadRuntime::ensureDeferredStubsForInventoryEmit', $context);
     }
 
-    public function testUserScriptAotStreamLifecycleNestedJitLinks(): void
+    public function testUserScriptAotStreamReadNestedJitLinks(): void
     {
         $prev = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
@@ -43,7 +44,7 @@ final class StandaloneDefineBuiltinsStreamAbiTest extends TestCase
             $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
 
             StreamLifecycleRuntime::ensureLinked($ctx);
-            StreamReadRuntime::ensureDeferredStubsForInventoryEmit($ctx);
+            StreamReadRuntime::ensureLinked($ctx);
 
             foreach ([
                 '__compiler_is_resource',
