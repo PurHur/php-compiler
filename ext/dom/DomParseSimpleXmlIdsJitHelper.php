@@ -69,7 +69,11 @@ final class DomParseSimpleXmlIdsJitHelper
     private static function parseDoctypeIdAttributes(string $xml): array
     {
         $idAttrs = [];
-        if (!preg_match('/<!DOCTYPE\s+\S+\s*\[(.*)\]\s*>/s', $xml, $doctype)) {
+        if (!preg_match(
+            '/<!DOCTYPE\s+\S+(?:\s+PUBLIC\s+"[^"]*"\s+"[^"]*"|\s+SYSTEM\s+"[^"]*")?\s*\[(.*)\]\s*>/is',
+            $xml,
+            $doctype
+        )) {
             return $idAttrs;
         }
         if (!preg_match_all('/<!ATTLIST\s+(\S+)\s+(\S+)\s+ID\b/', $doctype[1], $matches, PREG_SET_ORDER)) {
