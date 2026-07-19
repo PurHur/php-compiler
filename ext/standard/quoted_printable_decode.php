@@ -24,7 +24,7 @@ final class quoted_printable_decode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('quoted_printable_decode() requires exactly one argument in this compiler build');
         }
-        $data = VmString::zparamStrBuiltinArgForFrame($frame, 0, 'quoted_printable_decode', 0, 'string');
+        $data = VmString::trimFamilyStringArgForFrame($frame, 0, 'quoted_printable_decode', 0, 'string');
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,7 +44,7 @@ final class quoted_printable_decode extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19283, ext/standard/quot_print.c). */
+    /** Soft-null — coerce+deprecate on forward profile (#21180, ext/standard/quot_print.c). */
     private static function jitStringArg(Context $context, JITVariable $arg): Value
     {
         if ($context->callerStrictTypes) {
@@ -57,7 +57,7 @@ final class quoted_printable_decode extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'quoted_printable_decode',
