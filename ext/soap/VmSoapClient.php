@@ -26,6 +26,7 @@ use PHPCompiler\ext\standard\VmUserCall;
  * With options['trace'], __getLastRequestHeaders / __getLastResponseHeaders capture HTTP header blocks.
  * options['exceptions']=false returns SoapFault objects instead of throwing (#20293).
  * options['classmap'] maps SOAP type names (xsi:type local name) to PHP classes (#21044).
+ * WSDL xsd:element[@type] bindings also drive classmap when xsi:type is absent (#21088).
  * options['typemap'] from_xml/to_xml string callbacks (#21046).
  */
 final class VmSoapClient
@@ -272,7 +273,8 @@ final class VmSoapClient
                 $name,
                 $state->features,
                 $state->classmap,
-                $state->typemap
+                $state->typemap,
+                $state->elementTypes
             );
 
             return self::importValue($decoded, $ctx);
@@ -1004,6 +1006,22 @@ final class VmSoapClient
                 }
             }
         }
+        // php-src SDL element → type_str bindings for classmap without xsi:type (#21088).
+        foreach ($xpath->query('//xsd:element') ?: [] as $el) {
+            if (!$el instanceof \DOMElement) {
+                continue;
+            }
+            $elName = $el->getAttribute('name');
+            $elType = $el->getAttribute('type');
+            if ('' === $elName || '' === $elType) {
+                continue;
+            }
+            $pos = \strrpos($elType, ':');
+            $typeLocal = false !== $pos ? \substr($elType, $pos + 1) : $elType;
+            if ('' !== $typeLocal) {
+                $state->elementTypes[$elName] = $typeLocal;
+            }
+        }
     }
 
     /**
@@ -1308,13 +1326,15 @@ final class VmSoapClient
     /**
      * @param array<string, string>                                                                 $classmap
      * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
+     * @param array<string, string>                                                                 $elementTypes WSDL element local-name → type local-name (#21088)
      */
     private static function decodeResponse(
         string $response,
         string $name,
         int $features = 0,
         array $classmap = [],
-        array $typemap = []
+        array $typemap = [],
+        array $elementTypes = []
     ): mixed {
         $dom = new \DOMDocument();
         if (!@$dom->loadXML($response)) {
@@ -1359,11 +1379,15 @@ final class VmSoapClient
         $children = [];
         foreach ($responseEl->childNodes as $child) {
             if ($child instanceof \DOMElement) {
-                $children[$child->localName ?? $child->nodeName] = self::domElementToValue(
+                $childName = $child->localName ?? $child->nodeName;
+                $hint = $elementTypes[$childName] ?? null;
+                $children[$childName] = self::domElementToValue(
                     $child,
                     $singleElementArrays,
                     $classmap,
-                    $typemap
+                    $typemap,
+                    $elementTypes,
+                    $hint
                 );
             }
         }
@@ -1374,21 +1398,24 @@ final class VmSoapClient
             return \reset($children);
         }
 
-        return self::maybeMappedObject($responseEl, $children, $classmap, $typemap);
+        return self::maybeMappedObject($responseEl, $children, $classmap, $typemap, $elementTypes, null);
     }
 
     /**
      * @param array<string, string>                                                                 $classmap
      * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
+     * @param array<string, string>                                                                 $elementTypes
      */
     private static function domElementToValue(
         \DOMElement $el,
         bool $singleElementArrays = false,
         array $classmap = [],
-        array $typemap = []
+        array $typemap = [],
+        array $elementTypes = [],
+        ?string $hintType = null
     ): mixed {
         // typemap from_xml wins over structural decode (#21046; to_zval_user).
-        $typemapHit = self::matchTypemapFromXml($el, $typemap);
+        $typemapHit = self::matchTypemapFromXml($el, $typemap, $elementTypes, $hintType);
         if (null !== $typemapHit) {
             return $typemapHit;
         }
@@ -1411,13 +1438,28 @@ final class VmSoapClient
         $list = true;
         foreach ($childElements as $child) {
             $key = $child->localName ?? $child->nodeName;
+            $childHint = $elementTypes[$key] ?? null;
             if (isset($map[$key])) {
                 if (!\is_array($map[$key]) || !\array_is_list($map[$key])) {
                     $map[$key] = [$map[$key]];
                 }
-                $map[$key][] = self::domElementToValue($child, $singleElementArrays, $classmap, $typemap);
+                $map[$key][] = self::domElementToValue(
+                    $child,
+                    $singleElementArrays,
+                    $classmap,
+                    $typemap,
+                    $elementTypes,
+                    $childHint
+                );
             } else {
-                $map[$key] = self::domElementToValue($child, $singleElementArrays, $classmap, $typemap);
+                $map[$key] = self::domElementToValue(
+                    $child,
+                    $singleElementArrays,
+                    $classmap,
+                    $typemap,
+                    $elementTypes,
+                    $childHint
+                );
             }
             if ('item' !== $key) {
                 $list = false;
@@ -1435,18 +1477,27 @@ final class VmSoapClient
             }
         }
 
-        return self::maybeMappedObject($el, $map, $classmap, $typemap);
+        return self::maybeMappedObject($el, $map, $classmap, $typemap, $elementTypes, $hintType);
     }
 
     /**
      * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
+     * @param array<string, string>                                                                 $elementTypes
      */
-    private static function matchTypemapFromXml(\DOMElement $el, array $typemap): ?SoapTypemapFromXml
-    {
+    private static function matchTypemapFromXml(
+        \DOMElement $el,
+        array $typemap,
+        array $elementTypes = [],
+        ?string $hintType = null
+    ): ?SoapTypemapFromXml {
         if ([] === $typemap) {
             return null;
         }
         [$typeName, $typeNs] = self::xsiTypeNameAndNs($el);
+        if (null === $typeName) {
+            $typeName = self::resolveTypeLocalName($el, $elementTypes, $hintType);
+            $typeNs = '';
+        }
         if (null === $typeName) {
             return null;
         }
@@ -1463,29 +1514,58 @@ final class VmSoapClient
 
     /**
      * php-src to_zval_object_ex: classmap keyed by type_str / xsi:type local name (#21044).
+     * Without xsi:type, WSDL element→type (SDL type_str) still applies (#21088).
      *
      * @param array<string, mixed>                                                                  $props
      * @param array<string, string>                                                                 $classmap
      * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
+     * @param array<string, string>                                                                 $elementTypes
      */
     private static function maybeMappedObject(
         \DOMElement $el,
         array $props,
         array $classmap,
-        array $typemap = []
+        array $typemap = [],
+        array $elementTypes = [],
+        ?string $hintType = null
     ): mixed {
-        $typemapHit = self::matchTypemapFromXml($el, $typemap);
+        $typemapHit = self::matchTypemapFromXml($el, $typemap, $elementTypes, $hintType);
         if (null !== $typemapHit) {
             return $typemapHit;
         }
         if ([] !== $classmap) {
-            $typeName = self::xsiTypeLocalName($el);
+            $typeName = self::resolveTypeLocalName($el, $elementTypes, $hintType);
             if (null !== $typeName && isset($classmap[$typeName])) {
                 return new SoapMappedObject($classmap[$typeName], $props);
             }
         }
 
         return (object) $props;
+    }
+
+    /**
+     * Resolve SOAP type local-name: xsi:type wins, else WSDL/SDL hint, else elementTypes[localName].
+     *
+     * @param array<string, string> $elementTypes
+     */
+    private static function resolveTypeLocalName(
+        \DOMElement $el,
+        array $elementTypes,
+        ?string $hintType
+    ): ?string {
+        $xsi = self::xsiTypeLocalName($el);
+        if (null !== $xsi) {
+            return $xsi;
+        }
+        if (null !== $hintType && '' !== $hintType) {
+            return $hintType;
+        }
+        $local = $el->localName ?? $el->nodeName;
+        if (isset($elementTypes[$local])) {
+            return $elementTypes[$local];
+        }
+
+        return null;
     }
 
     /**
@@ -1847,6 +1927,13 @@ final class SoapClientState
 
     /** @var list<string> */
     public array $types = [];
+
+    /**
+     * WSDL xsd:element name → type local-name (php-src SDL type_str for classmap) (#21088).
+     *
+     * @var array<string, string>
+     */
+    public array $elementTypes = [];
 
     public string $lastRequest = '';
 

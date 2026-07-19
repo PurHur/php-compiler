@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions name="BookService"
+  targetNamespace="urn:book"
+  xmlns="http://schemas.xmlsoap.org/wsdl/"
+  xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"
+  xmlns:tns="urn:book"
+  xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <types>
+    <xsd:schema targetNamespace="urn:book">
+      <xsd:complexType name="Book">
+        <xsd:sequence>
+          <xsd:element name="title" type="xsd:string"/>
+          <xsd:element name="author" type="xsd:string"/>
+        </xsd:sequence>
+      </xsd:complexType>
+      <xsd:element name="getBook">
+        <xsd:complexType><xsd:sequence/></xsd:complexType>
+      </xsd:element>
+      <xsd:element name="getBookResponse">
+        <xsd:complexType>
+          <xsd:sequence>
+            <xsd:element name="return" type="tns:Book"/>
+          </xsd:sequence>
+        </xsd:complexType>
+      </xsd:element>
+    </xsd:schema>
+  </types>
+  <message name="getBookRequest"><part name="parameters" element="tns:getBook"/></message>
+  <message name="getBookResponse"><part name="parameters" element="tns:getBookResponse"/></message>
+  <portType name="BookPortType">
+    <operation name="getBook">
+      <input message="tns:getBookRequest"/>
+      <output message="tns:getBookResponse"/>
+    </operation>
+  </portType>
+  <binding name="BookBinding" type="tns:BookPortType">
+    <soap:binding transport="http://schemas.xmlsoap.org/soap/http" style="document"/>
+    <operation name="getBook">
+      <soap:operation soapAction="urn:book#getBook"/>
+      <input><soap:body use="literal"/></input>
+      <output><soap:body use="literal"/></output>
+    </operation>
+  </binding>
+  <service name="BookService">
+    <port name="BookPort" binding="tns:BookBinding">
+      <soap:address location="PLACEHOLDER"/>
+    </port>
+  </service>
+</definitions>
