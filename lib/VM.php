@@ -846,6 +846,11 @@ class VM {
         if (null !== $domHtmlElIsset) {
             return $domHtmlElIsset;
         }
+        // Dom\* ParentNode::$children (#21033).
+        $domChildrenIsset = ext\dom\DomNodePropertySupport::propertyIsSet($object, $propName);
+        if (null !== $domChildrenIsset) {
+            return $domChildrenIsset;
+        }
         $props = $object->getRawProperties();
         if (isset($props[$propName])) {
             return VmIsset::storedPropertyIsSet($props[$propName]);
@@ -1229,6 +1234,13 @@ class VM {
         $domHtmlElEmpty = ext\dom\DomHtmlElementPropertySupport::propertyIsEmpty($object, $propName);
         if (null !== $domHtmlElEmpty) {
             $dst->bool($domHtmlElEmpty);
+
+            return null;
+        }
+        // Dom\* ParentNode::$children (#21033).
+        $domChildrenEmpty = ext\dom\DomNodePropertySupport::propertyIsEmpty($object, $propName);
+        if (null !== $domChildrenEmpty) {
+            $dst->bool($domChildrenEmpty);
 
             return null;
         }

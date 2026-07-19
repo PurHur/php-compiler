@@ -122,6 +122,11 @@ final class DomNodeState
     /** Persistent childNodes list object id for element/document nodes. */
     public ?int $childNodesListId = null;
 
+    /**
+     * Persistent Dom\HTMLCollection id for ParentNode::$children (element children only; #21033).
+     */
+    public ?int $childrenListId = null;
+
     /** Persistent attributes map object id for element nodes (php-src ext/dom/namednodemap.c). */
     public ?int $attributesListId = null;
 

@@ -161,6 +161,12 @@ final class VmDom
     /** ParentNode element-only child count (php-src ext/dom/parentnode.c; #19431). */
     public const PROP_CHILD_ELEMENT_COUNT = 'childElementCount';
 
+    /**
+     * Dom\* ParentNode::$children — live Dom\HTMLCollection of element children
+     * (php-src ext/dom/php_dom.stub.php / html_collection.c; #21033).
+     */
+    public const PROP_CHILDREN = 'children';
+
     /** NonDocumentTypeChildNode next element sibling (php-src ext/dom/nodelist.c; #19431). */
     public const PROP_NEXT_ELEMENT_SIBLING = 'nextElementSibling';
 
@@ -8044,6 +8050,13 @@ final class VmDom
             if (!$entry->hasProperty(self::PROP_CHILD_ELEMENT_COUNT)) {
                 $entry->allocateProperty(self::PROP_CHILD_ELEMENT_COUNT)->int(0);
             }
+            // Dom\* ParentNode::$children (php-src php_dom.stub.php; #21033).
+            $props = $entry->propertiesWithNames();
+            if (str_starts_with(strtolower($entry->class->name), 'dom\\')
+                && !isset($props[self::PROP_CHILDREN])
+            ) {
+                $entry->allocateProperty(self::PROP_CHILDREN)->null();
+            }
         }
         // NonDocumentTypeChildNode: Element + CharacterData (Text/Comment/CDATA) (#19431).
         if (self::isElement($entry) || self::isCharacterData($entry)) {
@@ -8352,9 +8365,60 @@ final class VmDom
         self::initNodePropertySlots($node);
         $childNodesVar = $node->getProperty(self::PROP_CHILD_NODES)->resolveIndirect();
         if (Variable::TYPE_OBJECT === $childNodesVar->type && self::isNodeList($childNodesVar->toObject())) {
+            self::ensureChildrenCollection($ctx, $node);
+
             return;
         }
         self::syncNodeLinks($ctx, $node);
+    }
+
+    /**
+     * Dom\* ParentNode::$children — empty HTMLCollection before first mutation
+     * (php-src ext/dom/html_collection.c / parentnode; #21033).
+     */
+    public static function ensureChildrenCollection(Context $ctx, ObjectEntry $node): void
+    {
+        if (!self::isLivingParentNodeForChildren($node)) {
+            return;
+        }
+        self::initNodePropertySlots($node);
+        $props = $node->propertiesWithNames();
+        if (!isset($props[self::PROP_CHILDREN])) {
+            $node->allocateProperty(self::PROP_CHILDREN)->null();
+            $props = $node->propertiesWithNames();
+        }
+        $childrenVar = $props[self::PROP_CHILDREN]->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $childrenVar->type && self::isHtmlCollection($childrenVar->toObject())) {
+            return;
+        }
+        self::syncParentNodeChildrenCollection($ctx, $node, DomRegistry::state($node)->childIds);
+    }
+
+    /** Read ParentNode::$children without re-entering managed-property dispatch (#21033). */
+    public static function parentNodeChildrenVariable(ObjectEntry $node): Variable
+    {
+        $props = $node->propertiesWithNames();
+        if (!isset($props[self::PROP_CHILDREN])) {
+            throw new \LogicException('ParentNode children property slot is missing');
+        }
+        $var = new Variable();
+        $var->copyFrom($props[self::PROP_CHILDREN]);
+
+        return $var;
+    }
+
+    /** True for Dom\Element / Document / DocumentFragment ParentNode::$children (#21033). */
+    public static function isLivingParentNodeForChildren(ObjectEntry $node): bool
+    {
+        if (!DomRegistry::has($node)) {
+            return false;
+        }
+        if (!self::isElement($node) && !self::isDocument($node) && !self::isDocumentFragment($node)) {
+            return false;
+        }
+        $lc = strtolower($node->class->name);
+
+        return str_starts_with($lc, 'dom\\');
     }
 
     private static function syncSubtree(Context $ctx, ObjectEntry $node): void
@@ -8444,6 +8508,7 @@ final class VmDom
         }
 
         self::syncParentNodeElementProperties($node, $state->childIds);
+        self::syncParentNodeChildrenCollection($ctx, $node, $state->childIds);
 
         $childNodesVar = $node->getProperty(self::PROP_CHILD_NODES);
         if (null !== $state->childNodesListId) {
@@ -8574,6 +8639,70 @@ final class VmDom
             $lastVar->null();
         }
         $countVar->int($count);
+    }
+
+    /**
+     * Dom\* ParentNode::$children live HTMLCollection (php-src html_collection.c; #21033).
+     *
+     * @param list<int> $childIds
+     */
+    private static function syncParentNodeChildrenCollection(Context $ctx, ObjectEntry $node, array $childIds): void
+    {
+        if (!self::isLivingParentNodeForChildren($node)) {
+            return;
+        }
+        $props = $node->propertiesWithNames();
+        if (!isset($props[self::PROP_CHILDREN])) {
+            $node->allocateProperty(self::PROP_CHILDREN)->null();
+            $props = $node->propertiesWithNames();
+        }
+        $elementIds = self::collectDirectElementChildIds($childIds);
+        $state = DomRegistry::state($node);
+        $childrenVar = $props[self::PROP_CHILDREN];
+
+        if (null !== $state->childrenListId) {
+            $list = DomRegistry::entry($state->childrenListId);
+            if (null !== $list && self::isHtmlCollection($list)) {
+                self::updateNodeListMembers($list, $elementIds);
+                $childrenVar->object($list);
+
+                return;
+            }
+        }
+        if (null === $state->childrenListId && Variable::TYPE_OBJECT === $childrenVar->resolveIndirect()->type) {
+            $existing = $childrenVar->resolveIndirect()->toObject();
+            if (self::isHtmlCollection($existing)) {
+                $state->childrenListId = $existing->id;
+                self::updateNodeListMembers($existing, $elementIds);
+                $childrenVar->object($existing);
+
+                return;
+            }
+        }
+        $listVar = self::createHtmlCollection($ctx, $elementIds);
+        $list = $listVar->toObject();
+        $state->childrenListId = $list->id;
+        $childrenVar->copyFrom($listVar);
+    }
+
+    /**
+     * Direct element child object ids (ParentNode::$children; #21033).
+     *
+     * @param list<int> $childIds
+     *
+     * @return list<int>
+     */
+    private static function collectDirectElementChildIds(array $childIds): array
+    {
+        $ids = [];
+        foreach ($childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child && self::isElement($child)) {
+                $ids[] = $childId;
+            }
+        }
+
+        return $ids;
     }
 
     /**

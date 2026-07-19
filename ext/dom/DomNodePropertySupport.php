@@ -17,12 +17,20 @@ final class DomNodePropertySupport
 {
     /**
      * php-src ext/dom/php_dom.c — DOMAttr::$specified is read-only (#20605).
+     * Dom\* ParentNode::$children is private(set) (#21033).
      */
     public static function rejectReadOnlyPropertyWrite(ObjectEntry $owner, string $name): void
     {
         if (VmDom::isXPath($owner) && strtolower(VmDom::PROP_XPATH_DOCUMENT) === strtolower($name)) {
             throw new \Error(
                 'Cannot write read-only property '.$owner->class->name.'::$document'
+            );
+        }
+        if (VmDom::isLivingParentNodeForChildren($owner)
+            && strtolower(VmDom::PROP_CHILDREN) === strtolower($name)
+        ) {
+            throw new \Error(
+                'Cannot write read-only property '.$owner->class->name.'::$children'
             );
         }
         if (!VmDom::isAttr($owner)) {
@@ -48,6 +56,13 @@ final class DomNodePropertySupport
                 || strtolower(VmDom::PROP_XPATH_DOCUMENT) === $lc;
         }
 
+        // Dom\* ParentNode::$children (php-src php_dom.stub.php; #21033).
+        if (VmDom::isLivingParentNodeForChildren($object)
+            && strtolower(VmDom::PROP_CHILDREN) === $lc
+        ) {
+            return true;
+        }
+
         return strtolower(VmDom::PROP_NODE_TYPE) === $lc
             || strtolower(VmDom::PROP_NODE_NAME) === $lc
             || (VmDom::isElement($object) && strtolower(VmDom::PROP_TAG_NAME) === $lc)
@@ -69,6 +84,43 @@ final class DomNodePropertySupport
             || (VmDom::isNodeList($object) && strtolower(VmDom::PROP_LENGTH) === $lc)
             || (\PHPCompiler\CompilerVersion::supportsDomNodeIsConnected()
                 && strtolower(VmDom::PROP_IS_CONNECTED) === $lc);
+    }
+
+    /**
+     * isset($node->children) — HTMLCollection always present (php-src private(set); #21033).
+     *
+     * @return bool|null null when this support does not own the property
+     */
+    public static function propertyIsSet(ObjectEntry $object, string $name): ?bool
+    {
+        if (!VmDom::isLivingParentNodeForChildren($object)
+            || strtolower(VmDom::PROP_CHILDREN) !== strtolower($name)
+        ) {
+            return null;
+        }
+        $ctx = \PHPCompiler\VM\VmActiveContextJitHelper::resolve();
+        VmDom::ensureChildrenCollection($ctx, $object);
+
+        return true;
+    }
+
+    /**
+     * empty($node->children) — object is truthy (#21033).
+     *
+     * @return bool|null null when this support does not own the property
+     */
+    public static function propertyIsEmpty(ObjectEntry $object, string $name): ?bool
+    {
+        if (!VmDom::isLivingParentNodeForChildren($object)
+            || strtolower(VmDom::PROP_CHILDREN) !== strtolower($name)
+        ) {
+            return null;
+        }
+        $ctx = \PHPCompiler\VM\VmActiveContextJitHelper::resolve();
+        VmDom::ensureChildrenCollection($ctx, $object);
+        $var = VmDom::parentNodeChildrenVariable($object);
+
+        return !\PHPCompiler\ext\standard\boolval::isTruthy($var);
     }
 
     public static function getProperty(ObjectEntry $object, string $name, ?Context $ctx = null): Variable
@@ -95,6 +147,18 @@ final class DomNodePropertySupport
 
                 return $var;
             }
+        }
+
+        // Dom\* ParentNode::$children (php-src html_collection.c; #21033).
+        if (VmDom::isLivingParentNodeForChildren($object)
+            && strtolower(VmDom::PROP_CHILDREN) === $lc
+        ) {
+            if (null === $ctx) {
+                $ctx = \PHPCompiler\VM\VmActiveContextJitHelper::resolve();
+            }
+            VmDom::ensureChildrenCollection($ctx, $object);
+
+            return VmDom::parentNodeChildrenVariable($object);
         }
 
         if (strtolower(VmDom::PROP_NODE_TYPE) === $lc) {

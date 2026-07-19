@@ -238,7 +238,7 @@ class ObjectEntry {
 
     public function issetProperty(string $name): bool
     {
-        // Computed Dom\HTMLDocument props (body/title/…) ignore the null ClassProperty slot (#20540).
+        // Dom\HTMLDocument computed props (body/title/…) ignore the null ClassProperty slot (#20540).
         $domHtmlIsset = \PHPCompiler\ext\dom\DomHtmlDocumentPropertySupport::propertyIsSet($this, $name);
         if (null !== $domHtmlIsset) {
             return $domHtmlIsset;
@@ -247,6 +247,11 @@ class ObjectEntry {
         $domHtmlElIsset = \PHPCompiler\ext\dom\DomHtmlElementPropertySupport::propertyIsSet($this, $name);
         if (null !== $domHtmlElIsset) {
             return $domHtmlElIsset;
+        }
+        // Dom\* ParentNode::$children (#21033).
+        $domChildrenIsset = \PHPCompiler\ext\dom\DomNodePropertySupport::propertyIsSet($this, $name);
+        if (null !== $domChildrenIsset) {
+            return $domChildrenIsset;
         }
         if (!isset($this->properties[$name])) {
             return false;
