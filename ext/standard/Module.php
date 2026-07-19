@@ -565,6 +565,7 @@ class Module extends ModuleAbstract
             new stream_socket_get_name(),
             new stream_socket_shutdown(),
             new stream_socket_recvfrom(),
+            new stream_socket_sendto(),
             new stream_socket_enable_crypto(),
             new fsockopen(),
             new pfsockopen(),
