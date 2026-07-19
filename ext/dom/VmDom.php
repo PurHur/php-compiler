@@ -475,9 +475,16 @@ final class VmDom
         $ctx->classes[self::CLASS_NAMED_NODE_MAP] = $namedNodeMap;
 
         if (CompilerVersion::supportsDomTokenList()) {
+            // IteratorAggregate + Countable (php-src Dom\TokenList / token_list.c; #20884).
             $tokenList = new ClassEntry('DOMTokenList');
             $tokenList->isInternal = true;
             $tokenList->interfaces[] = 'countable';
+            if (isset($ctx->classes['iteratoraggregate'])) {
+                $tokenList->interfaces[] = 'iteratoraggregate';
+            }
+            if (isset($ctx->classes['traversable'])) {
+                $tokenList->interfaces[] = 'traversable';
+            }
             $tokenList->properties[] = new ClassProperty(self::PROP_LENGTH, null, $intProto);
             $tokenList->properties[] = new ClassProperty(self::PROP_VALUE, null, $strProto);
             $tokenList->methods['add'] = new TokenListAdd();
@@ -496,6 +503,19 @@ final class VmDom
             $tokenList->methodVisibility['supports'] = $pub;
             $tokenList->methods['count'] = new TokenListCount();
             $tokenList->methodVisibility['count'] = $pub;
+            $tokenList->methods['getiterator'] = new TokenListGetIterator();
+            $tokenList->methodVisibility['getiterator'] = $pub;
+            $tokenList->methodNames['getiterator'] = 'getIterator';
+            // Iterable helpers (issue #20884 done-when; complements getIterator).
+            $tokenList->methods['entries'] = new TokenListEntries();
+            $tokenList->methodVisibility['entries'] = $pub;
+            $tokenList->methods['keys'] = new TokenListKeys();
+            $tokenList->methodVisibility['keys'] = $pub;
+            $tokenList->methods['values'] = new TokenListValues();
+            $tokenList->methodVisibility['values'] = $pub;
+            $tokenList->methods['foreach'] = new TokenListForEach();
+            $tokenList->methodVisibility['foreach'] = $pub;
+            $tokenList->methodNames['foreach'] = 'forEach';
             $ctx->classes[self::CLASS_TOKEN_LIST] = $tokenList;
         }
 
