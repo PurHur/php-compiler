@@ -17,6 +17,8 @@ use PHPLLVM\BasicBlock;
  *
  * Quarantined from {@see ObOutputJitBridge} to keep bridge LOC under shrink guard (#12999).
  * Housed in ext/standard (not lib/JIT/Builtin) — same kernel-move pattern as #19389 / #19399.
+ * Full NestedJIT {@see ObOutputJitHelper} under user-script AOT regresses echo/HelloWorld (#21066);
+ * missing ABI after ExecCapture/Echo is padded in {@see ObOutputJitBridge::finishUserScriptEmit}.
  * php-src: ext/standard/output.c — ob_* / output buffering
  */
 final class JitObOutputKernel

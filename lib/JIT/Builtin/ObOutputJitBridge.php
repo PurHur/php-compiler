@@ -19,11 +19,12 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed + standalone link for ob_* stack via ObOutputJitHelper PHP (#9268, #12951, #19422, #20443).
+ * JIT/AOT embed + standalone link for ob_* stack via ObOutputJitHelper PHP (#9268, #12951, #19422, #20443, #21066).
  *
- * Embed / non-thin: honest NestedJIT bridges via compiled {@see \PHPCompiler\ext\standard\ObOutputJitHelper}.
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20420 / #20401 shape): {@see implementDeferredInventoryStubs}
- * without nested JIT (#13301 / #13571). User-script / bootstrap-aot: {@see JitObOutputKernel} (ext/standard).
+ * Embed + thin inventory (non-user-script): NestedJIT {@see ObOutputJitHelper} bridges — no constant-0
+ * inventory stub fork (peer StreamFilter #21041).
+ * User-script / bootstrap-aot: {@see JitObOutputKernel} (ExecCapture + Echo); missing ABI padded via
+ * {@see finishUserScriptEmit} (NestedJIT ObOutputJitHelper under user-script AOT regresses echo).
  * SSOT: {@see \PHPCompiler\ext\standard\ObOutputJitHelper}.
  * php-src: ext/standard/output.c
  */
@@ -104,23 +105,16 @@ final class ObOutputJitBridge
     }
 
     /**
-     * Full ob_* LLVM stack (ObOutputJitHelper nested JIT). $forceFull skips inventory defer stubs (#10492).
+     * Full ob_* LLVM stack (ObOutputJitHelper nested JIT). $forceFull kept for call-site API (#10492).
      */
     public static function implementObStack(Context $context, bool $forceFull): void
     {
+        unset($forceFull);
         $restore = self::captureInsertBlock($context);
 
         $probe = $context->module->getNamedFunction('__phpc_ob_start');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-            self::restoreInsertBlock($context, $restore);
-
-            return;
-        }
-
-        if (!$forceFull && $context->isThinStandaloneAotMain()) {
-            self::ensureExtraGlobals($context);
-            self::implementDeferredInventoryStubs($context);
+            self::registerLinkedRuntime($context, false);
             self::restoreInsertBlock($context, $restore);
 
             return;
@@ -600,7 +594,11 @@ final class ObOutputJitBridge
         }
     }
 
-    private static function registerLinkedRuntime(Context $context): void
+    /**
+     * @param bool $requireAll When false (user-script ExecCapture partial stack), register only
+     *                         ABI bodies that already exist — do not invent constant-0 stubs (#21066).
+     */
+    private static function registerLinkedRuntime(Context $context, bool $requireAll = true): void
     {
         foreach (
             [
@@ -630,7 +628,11 @@ final class ObOutputJitBridge
         ) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after ObOutputJitBridge bridge (#9268)');
+                if ($requireAll) {
+                    throw new \LogicException($name.' missing after ObOutputJitBridge bridge (#9268)');
+                }
+
+                continue;
             }
             $context->registerFunction($name, $fn);
         }
@@ -643,15 +645,20 @@ final class ObOutputJitBridge
         self::ensureLibc($context);
     }
 
-    /** @internal User-script AOT epilogue shared with {@see JitObOutputKernel} (#13822, #19422). */
+    /** @internal User-script AOT epilogue shared with {@see JitObOutputKernel} (#13822, #19422, #21066). */
     public static function finishUserScriptEmit(Context $context): void
     {
-        self::implementDeferredInventoryStubs($context);
+        // Pad unused ABI for link completeness. NestedJIT ObOutputJitHelper here regresses echo
+        // under user-script AOT; do not replace with helper bridges until that is fixed.
+        self::implementMissingUserScriptAbiPads($context);
         self::registerLinkedRuntime($context);
     }
 
-    /** Inventory emit only needs linkable ABI symbols — skip nested STDOUT JIT (#13301). */
-    private static function implementDeferredInventoryStubs(Context $context): void
+    /**
+     * Link-only pads for ABI not covered by ExecCapture/Echo under user-script AOT (#13301, #21066).
+     * Not used for thin inventory — that path NestedJITs ObOutputJitHelper.
+     */
+    private static function implementMissingUserScriptAbiPads(Context $context): void
     {
         ObOutputEchoJitEmit::ensureEchoAbiDeclared($context);
 
@@ -676,7 +683,7 @@ final class ObOutputJitBridge
         ];
         foreach ($voidNames as $name) {
             self::implementIfMissing($context, $name, static function (Context $context, LlvmFunction $fn): void {
-                $entry = $fn->appendBasicBlock('ob_inv_void');
+                $entry = $fn->appendBasicBlock('ob_us_pad_void');
                 $context->builder->positionAtEnd($entry);
                 $context->builder->returnVoid();
             });
@@ -696,19 +703,18 @@ final class ObOutputJitBridge
             ] as $name
         ) {
             self::implementIfMissing($context, $name, static function (Context $context, LlvmFunction $fn) use ($zero32): void {
-                $entry = $fn->appendBasicBlock('ob_inv_i32');
+                $entry = $fn->appendBasicBlock('ob_us_pad_i32');
                 $context->builder->positionAtEnd($entry);
                 $context->builder->returnValue($zero32);
             });
         }
 
         self::implementIfMissing($context, '__phpc_ob_buffer_used_at', static function (Context $context, LlvmFunction $fn) use ($zero64): void {
-            $entry = $fn->appendBasicBlock('ob_inv_i64');
+            $entry = $fn->appendBasicBlock('ob_us_pad_i64');
             $context->builder->positionAtEnd($entry);
             $context->builder->returnValue($zero64);
         });
 
-        self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
     }
 
