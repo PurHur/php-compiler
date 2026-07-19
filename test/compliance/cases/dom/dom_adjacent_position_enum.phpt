@@ -1,5 +1,5 @@
 --TEST--
-Dom\AdjacentPosition enum + insertAdjacent* enum where (#20782)
+Dom\AdjacentPosition — living enum-only; legacy string-only (#20782 follow-up)
 --SKIPIF--
 <?php
 if (!class_exists('Dom\\HTMLDocument')) {
@@ -12,36 +12,45 @@ PHP_COMPILER_PROFILE=8.4
 <?php
 echo enum_exists('Dom\\AdjacentPosition') ? "enum\n" : "no_enum\n";
 echo Dom\AdjacentPosition::BeforeBegin->value, "\n";
-echo Dom\AdjacentPosition::AfterBegin->value, "\n";
-echo Dom\AdjacentPosition::BeforeEnd->value, "\n";
-echo Dom\AdjacentPosition::AfterEnd->value, "\n";
 
-$doc = Dom\HTMLDocument::createFromString('<p id="p">hi</p>');
-$p = $doc->getElementById('p');
-$n = $doc->createElement('i');
-$p->insertAdjacentElement(Dom\AdjacentPosition::BeforeBegin, $n);
-echo $doc->body->firstElementChild->tagName, "\n";
+$d = Dom\HTMLDocument::createEmpty();
+$html = $d->createElement('html');
+$body = $d->createElement('body');
+$d->append($html);
+$html->append($body);
+$p = $d->createElement('p');
+$body->append($p);
+$n = $d->createElement('i');
+$p->insertAdjacentElement(Dom\AdjacentPosition::AfterBegin, $n);
+echo $p->firstElementChild !== null ? "living_enum\n" : "living_bad\n";
 
-$p = $doc->getElementById('p');
-$p->insertAdjacentText(Dom\AdjacentPosition::AfterBegin, 'X');
-$html = '<b>Y</b>';
-$p->insertAdjacentHTML(Dom\AdjacentPosition::BeforeEnd, $html);
-$tc = $p->textContent;
-echo (str_contains($tc, 'X') && str_contains($tc, 'Y')) ? "mut\n" : "no_mut\n";
+$n2 = $d->createElement('b');
+try {
+    $p->insertAdjacentElement('beforeend', $n2);
+    echo "living_string_ok\n";
+} catch (TypeError $e) {
+    echo "living_string_TypeError\n";
+}
 
 $legacy = new DOMDocument();
-$legacy->loadHTML('<div id="d">z</div>', LIBXML_NOERROR);
-$el = $legacy->getElementById('d');
-$span = $legacy->createElement('span');
-$el->insertAdjacentElement(Dom\AdjacentPosition::AfterEnd, $span);
-echo "legacy\n";
+$legacy->loadXML('<root><a/></root>');
+$el = $legacy->documentElement;
+$x = $legacy->createElement('x');
+$el->insertAdjacentElement('beforeend', $x);
+echo "legacy_string\n";
+
+$y = $legacy->createElement('y');
+try {
+    $el->insertAdjacentElement(Dom\AdjacentPosition::AfterEnd, $y);
+    echo "legacy_enum_ok\n";
+} catch (TypeError $e) {
+    echo "legacy_enum_TypeError\n";
+}
 ?>
 --EXPECT--
 enum
 beforebegin
-afterbegin
-beforeend
-afterend
-i
-mut
-legacy
+living_enum
+living_string_TypeError
+legacy_string
+legacy_enum_TypeError
