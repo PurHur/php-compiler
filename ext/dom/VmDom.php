@@ -2149,6 +2149,10 @@ final class VmDom
         if (null !== $nodeState->idAttributeName && $qName === $nodeState->idAttributeName) {
             return true;
         }
+        // libxml XML_ATTRIBUTE_ID stamped on the attr (survives importNode; #20830).
+        if (isset($nodeState->attributeIsId[$qName])) {
+            return true;
+        }
         if ($docState->isHtmlDocument && 'id' === $qName) {
             return true;
         }
@@ -2170,6 +2174,32 @@ final class VmDom
         }
 
         return false;
+    }
+
+    /**
+     * Stamp libxml-style ID atype for HTML id / xml:id so importNode preserves getElementById (#20830).
+     */
+    private static function stampCopyableIdAttributeType(
+        ObjectEntry $document,
+        DomNodeState $docState,
+        DomNodeState $nodeState,
+        string $qName
+    ): void {
+        if ($docState->isHtmlDocument && 'id' === $qName) {
+            $nodeState->attributeIsId['id'] = true;
+
+            return;
+        }
+        if ('xml:id' === $qName) {
+            $nodeState->attributeIsId['xml:id'] = true;
+
+            return;
+        }
+        if ('id' === $qName
+            && self::XML_NAMESPACE_URI === ($nodeState->attributeNamespaces['id'] ?? '')
+        ) {
+            $nodeState->attributeIsId['id'] = true;
+        }
     }
 
     private static function elementAttributeIsIdBearing(ObjectEntry $element, string $qName): bool
@@ -2232,11 +2262,16 @@ final class VmDom
             return;
         }
         $nodeState = DomRegistry::state($element);
+        $docState = DomRegistry::state($document);
         self::unregisterElementId($document, $element, $previousValue);
         if ($registerNext) {
+            // Stamp copyable atype for HTML id / xml:id (not setIdAttribute; #20830).
+            self::stampCopyableIdAttributeType($document, $docState, $nodeState, $qName);
             self::registerElementId($document, $element);
         } elseif (null !== $nodeState->idAttributeName && $qName === $nodeState->idAttributeName) {
             $nodeState->idAttributeName = null;
+        } else {
+            unset($nodeState->attributeIsId[$qName]);
         }
         self::syncElementIdMapProperty($document);
     }
@@ -3610,15 +3645,27 @@ final class VmDom
         if (null === $idAttr && null !== $nodeState->idAttributeName) {
             $idAttr = $nodeState->idAttributeName;
         }
+        // Copied libxml XML_ATTRIBUTE_ID markers (HTML→XML importNode; #20830).
+        if (null === $idAttr) {
+            foreach ($nodeState->attributeIsId as $qName => $_) {
+                if (isset($nodeState->attributes[$qName]) && '' !== $nodeState->attributes[$qName]) {
+                    $idAttr = $qName;
+                    break;
+                }
+            }
+        }
         if (null === $idAttr && $docState->isHtmlDocument && isset($nodeState->attributes['id'])) {
             $idAttr = 'id';
+            $nodeState->attributeIsId['id'] = true;
         }
         if (null === $idAttr && !$docState->isHtmlDocument) {
             if (isset($nodeState->attributes['xml:id'])) {
                 $idAttr = 'xml:id';
+                $nodeState->attributeIsId['xml:id'] = true;
             } elseif (isset($nodeState->attributes['id'])
                 && self::XML_NAMESPACE_URI === ($nodeState->attributeNamespaces['id'] ?? '')) {
                 $idAttr = 'id';
+                $nodeState->attributeIsId['id'] = true;
             }
         }
 
@@ -9315,7 +9362,10 @@ final class VmDom
             $importedState->localName = $sourceState->localName;
             $importedState->prefix = $sourceState->prefix;
             $importedState->namespaceUri = $sourceState->namespaceUri;
-            $importedState->idAttributeName = $sourceState->idAttributeName;
+            // libxml xmlCopyProp copies XML_ATTRIBUTE_ID (HTML id / xml:id); setIdAttribute
+            // does not survive importNode on Zend (#20830, re-#19212).
+            $importedState->attributeIsId = $sourceState->attributeIsId;
+            $importedState->idAttributeName = null;
             if ($deep) {
                 foreach ($sourceState->childIds as $childId) {
                     $child = DomRegistry::entry($childId);
@@ -9431,6 +9481,7 @@ final class VmDom
             $clonedState->localName = $sourceState->localName;
             $clonedState->prefix = $sourceState->prefix;
             $clonedState->namespaceUri = $sourceState->namespaceUri;
+            $clonedState->attributeIsId = $sourceState->attributeIsId;
             $clonedState->idAttributeName = $sourceState->idAttributeName;
         }
         if ($deep) {

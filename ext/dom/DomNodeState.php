@@ -173,6 +173,16 @@ final class DomNodeState
     public ?string $idAttributeName = null;
 
     /**
+     * libxml attr->atype == XML_ATTRIBUTE_ID markers (HTML id / xml:id).
+     *
+     * Copied by importNode/cloneNode like xmlCopyProp; distinct from {@see $idAttributeName}
+     * which is setIdAttribute()-only and does not survive importNode (php-src / Zend).
+     *
+     * @var array<string, true>
+     */
+    public array $attributeIsId = [];
+
+    /**
      * Live DOMAttr object ids per attribute qName (php-src ext/dom/attr.c; #14455).
      *
      * @var array<string, int>
