@@ -5,11 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\ldap;
 
 /**
- * ext/ldap advertisement — php-src ext/ldap/php_ldap.c (#6352, #18173, #18211).
+ * ext/ldap advertisement — php-src ext/ldap/php_ldap.c (#6352, #18211, #3369).
  *
- * ldap_escape() compiles in-tree but is withheld from extension_loaded(),
- * function_exists(), and get_defined_constants() module buckets until Zend ships
- * ext/ldap on the host (php-src-strict parity on reference profile).
+ * Gate on libldap FFI so extension_loaded('ldap') matches builds that can
+ * initialize a session handle (same honesty pattern as PgsqlExtensionPolicy).
  */
 final class LdapExtensionPolicy
 {
@@ -20,6 +19,11 @@ final class LdapExtensionPolicy
 
     public static function advertisesExtension(): bool
     {
-        return false;
+        return VmLdapNative::available();
+    }
+
+    public static function advertisesClasses(): bool
+    {
+        return self::advertisesExtension();
     }
 }

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6053 |
-| Phase A inventory files (M2 ratio SSOT) | 6053 |
+| PHP files on vm.php path | 6062 |
+| Phase A inventory files (M2 ratio SSOT) | 6062 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18811 |
+| Source constructs flagged (warnings) | 18861 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -244,7 +244,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomLoadXMLJitHelper.php` | 0 | 1 |
 | `ext/dom/DomNodeChildPropertyJitHelper.php` | 0 | 1 |
 | `ext/dom/DomNodeListItemJitHelper.php` | 0 | 1 |
-| `ext/dom/DomNodePropertySupport.php` | 0 | 6 |
+| `ext/dom/DomNodePropertySupport.php` | 0 | 7 |
 | `ext/dom/DomNormalizeJitHelper.php` | 0 | 1 |
 | `ext/dom/DomParseSimpleHtmlJitHelper.php` | 0 | 1 |
 | `ext/dom/DomParseSimpleXmlIdsJitHelper.php` | 0 | 1 |
@@ -1077,13 +1077,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/transliterator_get_error_message.php` | 0 | 3 |
 | `ext/intl/transliterator_list_ids.php` | 0 | 3 |
 | `ext/intl/transliterator_transliterate.php` | 0 | 3 |
+| `ext/ldap/BuiltinClasses.php` | 0 | 1 |
 | `ext/ldap/JitLdapEscape.php` | 0 | 2 |
 | `ext/ldap/LdapConstants.php` | 0 | 1 |
 | `ext/ldap/LdapEscapeJitHelper.php` | 0 | 1 |
 | `ext/ldap/LdapExtensionPolicy.php` | 0 | 1 |
-| `ext/ldap/Module.php` | 0 | 3 |
+| `ext/ldap/Module.php` | 0 | 19 |
+| `ext/ldap/VmLdapArg.php` | 0 | 1 |
+| `ext/ldap/VmLdapConnection.php` | 0 | 4 |
+| `ext/ldap/VmLdapCore.php` | 0 | 4 |
 | `ext/ldap/VmLdapEscape.php` | 0 | 1 |
+| `ext/ldap/VmLdapNative.php` | 0 | 1 |
+| `ext/ldap/VmLdapResult.php` | 0 | 7 |
+| `ext/ldap/ldap_connect.php` | 0 | 2 |
 | `ext/ldap/ldap_escape.php` | 0 | 2 |
+| `ext/ldap/ldap_link_builtins.php` | 0 | 8 |
+| `ext/ldap/ldap_search_builtins.php` | 0 | 7 |
 | `ext/libxml/BuiltinClasses.php` | 0 | 1 |
 | `ext/libxml/LibxmlConstants.php` | 0 | 1 |
 | `ext/libxml/LibxmlFunction.php` | 0 | 1 |
@@ -2460,7 +2469,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamCopyToString.php` | 0 | 1 |
 | `ext/standard/JitStreamEnableCrypto.php` | 0 | 1 |
 | `ext/standard/JitStreamFilter.php` | 0 | 1 |
-| `ext/standard/JitStreamFilterKernel.php` | 0 | 3 |
+| `ext/standard/JitStreamFilterKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamGetContents.php` | 0 | 1 |
 | `ext/standard/JitStreamGetFilters.php` | 0 | 2 |
 | `ext/standard/JitStreamGetLine.php` | 0 | 1 |
@@ -7512,9 +7521,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 25)
 - new Error (line 32)
-- new Error (line 40)
-- new Variable (line 129)
-- new Error (line 334)
+- new Error (line 44)
+- new Error (line 52)
+- new Variable (line 135)
+- new Error (line 340)
 - 6 class method(s)
 
 ### `ext/dom/DomNormalizeJitHelper.php`
@@ -8794,103 +8804,103 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 2291)
 - new DOMException (line 2304)
 - new DOMException (line 2314)
-- new DOMException (line 3127)
-- new DOMException (line 3143)
-- new ObjectEntry (line 3230)
-- new DomNodeState (line 3235)
-- new ObjectEntry (line 3251)
-- new DomNodeState (line 3256)
-- new ObjectEntry (line 3272)
-- new DomNodeState (line 3277)
-- new DOMException (line 3316)
+- new DOMException (line 3137)
+- new DOMException (line 3153)
+- new ObjectEntry (line 3240)
+- new DomNodeState (line 3245)
+- new ObjectEntry (line 3261)
+- new DomNodeState (line 3266)
+- new ObjectEntry (line 3282)
+- new DomNodeState (line 3287)
 - new DOMException (line 3326)
-- new DOMException (line 3339)
-- new DOMException (line 3358)
-- new ObjectEntry (line 3446)
-- new DomNodeState (line 3451)
-- new Variable (line 3460)
-- new ObjectEntry (line 3470)
-- new DomNodeState (line 3475)
-- new Variable (line 3485)
-- new ObjectEntry (line 4338)
-- new DomNodeState (line 4340)
-- new ObjectEntry (line 4686)
-- new DomNodeState (line 4688)
-- new ObjectEntry (line 4716)
-- new DomNodeState (line 4718)
-- new ObjectEntry (line 4951)
-- new DomNodeState (line 4956)
-- new DOMException (line 5355)
-- new DOMException (line 5371)
-- new Variable (line 5389)
-- new DOMException (line 5403)
-- new DOMException (line 5406)
+- new DOMException (line 3336)
+- new DOMException (line 3349)
+- new DOMException (line 3368)
+- new ObjectEntry (line 3456)
+- new DomNodeState (line 3461)
+- new Variable (line 3470)
+- new ObjectEntry (line 3480)
+- new DomNodeState (line 3485)
+- new Variable (line 3495)
+- new ObjectEntry (line 4348)
+- new DomNodeState (line 4350)
+- new ObjectEntry (line 4696)
+- new DomNodeState (line 4698)
+- new ObjectEntry (line 4726)
+- new DomNodeState (line 4728)
+- new ObjectEntry (line 4961)
+- new DomNodeState (line 4966)
+- new DOMException (line 5365)
+- new DOMException (line 5381)
+- new Variable (line 5399)
+- new DOMException (line 5413)
 - new DOMException (line 5416)
-- new Error (line 5446)
-- new DOMException (line 5452)
-- new DOMException (line 5466)
-- new DOMException (line 5671)
-- new DOMException (line 5868)
-- new DOMException (line 5872)
-- new DOMException (line 5961)
-- new DOMException (line 5965)
-- new DOMException (line 6023)
-- new DOMException (line 6040)
-- new DOMException (line 6072)
-- new DOMException (line 6114)
-- new DOMException (line 6141)
-- new DOMException (line 7034)
-- new Variable (line 7064)
-- new DOMException (line 7345)
-- new DOMException (line 7463)
-- new DOMException (line 7508)
-- new ObjectEntry (line 7593)
-- new DomNodeState (line 7597)
-- new Variable (line 7604)
-- new ObjectEntry (line 7622)
-- new DomNodeState (line 7626)
-- new Variable (line 7633)
-- new ObjectEntry (line 7651)
-- new DomNodeState (line 7655)
-- new Variable (line 7662)
-- new DOMException (line 7745)
-- new ObjectEntry (line 8038)
-- new DomNodeState (line 8042)
-- new Variable (line 8051)
-- new ObjectEntry (line 8101)
-- new DomNodeState (line 8104)
-- new Variable (line 8112)
-- new Variable (line 8316)
-- new DOMException (line 8453)
-- new DOMException (line 8460)
-- new DOMException (line 8467)
-- new DOMException (line 8471)
-- new DOMException (line 8474)
-- new DOMException (line 8483)
-- new DOMException (line 8495)
-- new Variable (line 8605)
-- new DOMException (line 9688)
-- new Variable (line 9747)
-- new Variable (line 9768)
-- new Variable (line 9796)
-- new Variable (line 9834)
-- new DOMException (line 9845)
-- new Variable (line 9847)
-- new DOMException (line 10013)
-- new DOMException (line 10040)
-- new DOMException (line 10076)
-- new DOMException (line 10142)
-- new DOMException (line 10150)
-- new DOMException (line 10163)
-- new DOMException (line 10174)
-- new DOMException (line 10179)
-- new DOMException (line 10201)
-- new DOMException (line 10206)
-- new DOMException (line 10209)
-- new DOMException (line 10212)
-- new DOMException (line 10241)
-- new Error (line 11282)
-- new Error (line 11286)
+- new DOMException (line 5426)
+- new Error (line 5456)
+- new DOMException (line 5462)
+- new DOMException (line 5476)
+- new DOMException (line 5681)
+- new DOMException (line 5878)
+- new DOMException (line 5882)
+- new DOMException (line 5971)
+- new DOMException (line 5975)
+- new DOMException (line 6033)
+- new DOMException (line 6050)
+- new DOMException (line 6082)
+- new DOMException (line 6124)
+- new DOMException (line 6151)
+- new DOMException (line 7044)
+- new Variable (line 7074)
+- new DOMException (line 7355)
+- new DOMException (line 7473)
+- new DOMException (line 7518)
+- new ObjectEntry (line 7603)
+- new DomNodeState (line 7607)
+- new Variable (line 7614)
+- new ObjectEntry (line 7632)
+- new DomNodeState (line 7636)
+- new Variable (line 7643)
+- new ObjectEntry (line 7661)
+- new DomNodeState (line 7665)
+- new Variable (line 7672)
+- new DOMException (line 7755)
+- new ObjectEntry (line 8048)
+- new DomNodeState (line 8052)
+- new Variable (line 8061)
+- new ObjectEntry (line 8111)
+- new DomNodeState (line 8114)
+- new Variable (line 8122)
+- new Variable (line 8326)
+- new DOMException (line 8463)
+- new DOMException (line 8470)
+- new DOMException (line 8477)
+- new DOMException (line 8481)
+- new DOMException (line 8484)
+- new DOMException (line 8493)
+- new DOMException (line 8505)
+- new Variable (line 8615)
+- new DOMException (line 9707)
+- new Variable (line 9766)
+- new Variable (line 9787)
+- new Variable (line 9815)
+- new Variable (line 9853)
+- new DOMException (line 9864)
+- new Variable (line 9866)
+- new DOMException (line 10032)
+- new DOMException (line 10059)
+- new DOMException (line 10095)
+- new DOMException (line 10161)
+- new DOMException (line 10169)
+- new DOMException (line 10182)
+- new DOMException (line 10193)
+- new DOMException (line 10198)
+- new DOMException (line 10220)
+- new DOMException (line 10225)
+- new DOMException (line 10228)
+- new DOMException (line 10231)
+- new DOMException (line 10260)
+- new Error (line 11301)
+- new Error (line 11305)
 - 448 class method(s)
 - 3 closure(s)
 
@@ -14394,6 +14404,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 63)
 - 2 class method(s)
 
+### `ext/ldap/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/ldap/JitLdapEscape.php`
 
 **Warnings** (review for bootstrap subset):
@@ -14413,25 +14428,107 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ldap/LdapExtensionPolicy.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/ldap/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 22)
-- new ldap_escape (line 31)
-- 2 class method(s)
+- new VM\Variable (line 31)
+- new ldap_escape (line 50)
+- new ldap_connect (line 51)
+- new ldap_bind (line 52)
+- new ldap_unbind (line 53)
+- new ldap_close (line 54)
+- new ldap_errno (line 55)
+- new ldap_error (line 56)
+- new ldap_err2str (line 57)
+- new ldap_set_option (line 58)
+- new ldap_search (line 59)
+- new ldap_list (line 60)
+- new ldap_read (line 61)
+- new ldap_count_entries (line 62)
+- new ldap_get_entries (line 63)
+- new ldap_first_entry (line 64)
+- new ldap_next_entry (line 65)
+- new ldap_free_result (line 66)
+- 3 class method(s)
+
+### `ext/ldap/VmLdapArg.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `ext/ldap/VmLdapConnection.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 29)
+- new ObjectEntry (line 37)
+- new Variable (line 45)
+- 7 class method(s)
+
+### `ext/ldap/VmLdapCore.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 126)
+- new Variable (line 138)
+- new Variable (line 149)
+- 7 class method(s)
 
 ### `ext/ldap/VmLdapEscape.php`
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/ldap/VmLdapNative.php`
+
+**Warnings** (review for bootstrap subset):
+- 19 class method(s)
+
+### `ext/ldap/VmLdapResult.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 34)
+- new ClassEntry (line 39)
+- new ObjectEntry (line 48)
+- new Variable (line 55)
+- new ObjectEntry (line 64)
+- new Variable (line 71)
+- 9 class method(s)
+
+### `ext/ldap/ldap_connect.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 2 class method(s)
+
 ### `ext/ldap/ldap_escape.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
 - 4 class method(s)
+
+### `ext/ldap/ldap_link_builtins.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 67)
+- new ArgumentCountError (line 96)
+- new ArgumentCountError (line 125)
+- new ArgumentCountError (line 153)
+- new ArgumentCountError (line 181)
+- new ArgumentCountError (line 212)
+- 14 class method(s)
+
+### `ext/ldap/ldap_search_builtins.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 161)
+- new ArgumentCountError (line 194)
+- new ArgumentCountError (line 230)
+- new ArgumentCountError (line 273)
+- new ArgumentCountError (line 318)
+- 20 class method(s)
 
 ### `ext/libxml/BuiltinClasses.php`
 
@@ -24286,9 +24383,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamFilterKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 283)
-- 20 class method(s)
-- 1 closure(s)
+- 18 class method(s)
 
 ### `ext/standard/JitStreamGetContents.php`
 
@@ -32674,7 +32769,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/putenv_.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/quoted_printable_decode.php`
 
@@ -42678,19 +42773,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 963)
 - new Call\DateTimeFormat (line 966)
 - new Call\DateTimeFormat (line 967)
-- new Result (line 1307)
-- new Result (line 1328)
-- new Variable (line 1929)
-- new Variable (line 2066)
-- new Variable (line 2292)
-- new Variable (line 2350)
-- new VMVariable (line 2488)
-- new VMVariable (line 2504)
-- new VMVariable (line 2510)
-- new VMVariable (line 2516)
-- new VMVariable (line 2527)
-- new Variable (line 2557)
-- new Variable (line 2597)
+- new Result (line 1308)
+- new Result (line 1329)
+- new Variable (line 1930)
+- new Variable (line 2067)
+- new Variable (line 2293)
+- new Variable (line 2351)
+- new VMVariable (line 2489)
+- new VMVariable (line 2505)
+- new VMVariable (line 2511)
+- new VMVariable (line 2517)
+- new VMVariable (line 2528)
+- new Variable (line 2558)
+- new Variable (line 2598)
 - 102 class method(s)
 - 28 closure(s)
 
@@ -43123,7 +43218,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitOperandTypeLabel.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 92)
+- new Variable (line 97)
 - 6 class method(s)
 
 ### `lib/JIT/JitPowNumericOperandGuard.php`
