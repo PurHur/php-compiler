@@ -243,10 +243,11 @@ final class VmDomLiving
     }
 
     /**
-     * ParentNode::querySelector() — minimal CSS subset for living DOM (#19580, #20689).
+     * ParentNode::querySelector() — minimal CSS subset for living DOM (#19580, #20689, #20866).
      *
-     * Supports: `*`, tag, `#id`, `.class`, space-separated descendants, and comma
-     * selector lists (CSS Selectors Level 3 / php-src Dom\* lexbor).
+     * Supports: `*`, tag, `#id`, `.class`, `:first-child`, `:last-child`,
+     * space-separated descendants, and comma selector lists (CSS Selectors Level 3 /
+     * php-src Dom\* lexbor).
      */
     public static function querySelector(ObjectEntry $root, string $selectors): ?ObjectEntry
     {
@@ -634,7 +635,7 @@ final class VmDomLiving
     }
 
     /**
-     * @return array{tag: ?string, id: ?string, classes: list<string>}|null
+     * @return array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>}|null
      */
     private static function parseSimpleSelector(string $selector): ?array
     {
@@ -642,31 +643,44 @@ final class VmDomLiving
         if ('' === $selector) {
             return null;
         }
-        if ('*' === $selector) {
-            return ['tag' => null, 'id' => null, 'classes' => []];
-        }
-        if (!preg_match('/^([a-zA-Z][\w:-]*|)?(#[\w:-]+)?((?:\.[\w:-]+)*)$/', $selector, $m)) {
+        // Type selector must not absorb `:` (pseudos); colon in tags was a silent misparse (#20866).
+        // Optional trailing :first-child / :last-child only — other :foo → SyntaxError via null.
+        if (!preg_match(
+            '/^(\*|([a-zA-Z][\w-]*))?(#[\w-]+)?((?:\.[\w-]+)*)((?::(?:first-child|last-child))*)$/',
+            $selector,
+            $m
+        )) {
             return null;
         }
-        $tag = isset($m[1]) && '' !== $m[1] ? strtolower($m[1]) : null;
-        $id = isset($m[2]) && '' !== $m[2] ? substr($m[2], 1) : null;
+        $tagPart = $m[1] ?? '';
+        $universal = '*' === $tagPart;
+        $tag = ($universal || '' === $tagPart) ? null : strtolower($tagPart);
+        $id = isset($m[3]) && '' !== $m[3] ? substr($m[3], 1) : null;
         $classes = [];
-        if (isset($m[3]) && '' !== $m[3]) {
-            foreach (explode('.', ltrim($m[3], '.')) as $class) {
+        if (isset($m[4]) && '' !== $m[4]) {
+            foreach (explode('.', ltrim($m[4], '.')) as $class) {
                 if ('' !== $class) {
                     $classes[] = $class;
                 }
             }
         }
-        if (null === $tag && null === $id && [] === $classes) {
+        $pseudos = [];
+        if (isset($m[5]) && '' !== $m[5]) {
+            if (preg_match_all('/:(first-child|last-child)/', $m[5], $pm) > 0) {
+                foreach ($pm[1] as $pseudo) {
+                    $pseudos[] = $pseudo;
+                }
+            }
+        }
+        if (!$universal && null === $tag && null === $id && [] === $classes && [] === $pseudos) {
             return null;
         }
 
-        return ['tag' => $tag, 'id' => $id, 'classes' => $classes];
+        return ['tag' => $tag, 'id' => $id, 'classes' => $classes, 'pseudos' => $pseudos];
     }
 
     /**
-     * @param array{tag: ?string, id: ?string, classes: list<string>} $simple
+     * @param array{tag: ?string, id: ?string, classes: list<string>, pseudos: list<string>} $simple
      */
     private static function elementMatchesSimple(ObjectEntry $element, array $simple): bool
     {
@@ -695,8 +709,47 @@ final class VmDomLiving
                 }
             }
         }
+        foreach ($simple['pseudos'] as $pseudo) {
+            if ('first-child' === $pseudo) {
+                if (!self::elementIsNthChildEdge($element, true)) {
+                    return false;
+                }
+            } elseif ('last-child' === $pseudo) {
+                if (!self::elementIsNthChildEdge($element, false)) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
+        }
 
         return true;
+    }
+
+    /**
+     * CSS :first-child / :last-child — element must be the first/last child node of its parent
+     * (any node type; leading/trailing text or comment disqualifies) — Selectors Level 3 / #20866.
+     */
+    private static function elementIsNthChildEdge(ObjectEntry $element, bool $first): bool
+    {
+        if (!DomRegistry::has($element)) {
+            return false;
+        }
+        $parentId = DomRegistry::state($element)->parentId;
+        if (null === $parentId) {
+            return false;
+        }
+        $parent = DomRegistry::entry($parentId);
+        if (null === $parent || !DomRegistry::has($parent)) {
+            return false;
+        }
+        $childIds = DomRegistry::state($parent)->childIds;
+        if ([] === $childIds) {
+            return false;
+        }
+        $edgeId = $first ? $childIds[0] : $childIds[\count($childIds) - 1];
+
+        return $edgeId === $element->id;
     }
 
     private static function applyLivingElementClassMap(DomNodeState $state): void
