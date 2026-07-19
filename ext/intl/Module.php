@@ -113,6 +113,15 @@ class Module extends ModuleAbstract
             ? [new collator_create(), new collator_compare()]
             : [];
 
+        $numfmt = IntlExtensionPolicy::advertisesNumberFormatter()
+            ? [
+                new numfmt_create(),
+                new numfmt_format(),
+                new numfmt_parse(),
+                new numfmt_format_currency(),
+            ]
+            : [];
+
         $msgfmt = IntlExtensionPolicy::advertisesMessageFormatter()
             ? [
                 new msgfmt_create(),
@@ -139,6 +148,7 @@ class Module extends ModuleAbstract
                 ...$normalizer,
                 ...$idn,
                 ...$collator,
+                ...$numfmt,
                 ...$msgfmt,
                 ...$transliterator,
                 ...IntlExtensionPolicy::profileLocaleParserFunctions(),
@@ -150,6 +160,7 @@ class Module extends ModuleAbstract
             ...$normalizer,
             ...$idn,
             ...$collator,
+            ...$numfmt,
             ...$msgfmt,
             ...$transliterator,
             new grapheme_strlen(),
