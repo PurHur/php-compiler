@@ -17,31 +17,35 @@ use PHPLLVM\Value;
 /**
  * stream_set_blocking() — toggle blocking mode on stream resources (issue #6007).
  *
+ * Also registered as socket_set_blocking() via PHP_FALIAS (issue #20903).
+ *
  * php-src: ext/standard/streams.c — PHP_FUNCTION(stream_set_blocking)
+ * php-src: ext/standard/basic_functions.stub.php — @alias stream_set_blocking
  */
 final class stream_set_blocking extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'stream_set_blocking')
     {
-        parent::__construct('stream_set_blocking');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
     {
+        $fn = $this->getName();
         if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('stream_set_blocking() requires exactly two arguments in this compiler build');
+            throw new \LogicException($fn.'() requires exactly two arguments in this compiler build');
         }
         $handle = VmStreamArg::requireStreamHandle(
             $frame->calledArgs[0]->resolveIndirect(),
-            'stream_set_blocking',
+            $fn,
             1
         );
         if (InternalStrictArg::isCallerStrict($frame)) {
-            $mode = InternalStrictArg::requireBool($frame, 1, 'stream_set_blocking', 'mode')->toBool();
+            $mode = InternalStrictArg::requireBool($frame, 1, $fn, 'mode')->toBool();
         } else {
             $mode = VmMath::parseBoolBuiltinArg(
                 $frame->calledArgs[1]->resolveIndirect(),
-                'stream_set_blocking',
+                $fn,
                 2,
                 'mode'
             );
@@ -54,20 +58,21 @@ final class stream_set_blocking extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $fn = $this->getName();
         if (2 !== \count($args)) {
-            throw new \LogicException('stream_set_blocking() requires exactly two arguments in this compiler build');
+            throw new \LogicException($fn.'() requires exactly two arguments in this compiler build');
         }
         $i64 = $context->getTypeFromString('int64');
-        JitInternalStrictArg::requireBool($context, $args[1], 'stream_set_blocking', 'mode', 2);
+        JitInternalStrictArg::requireBool($context, $args[1], $fn, 'mode', 2);
         $mode = $context->builder->zExt(
-            JitBoolArg::lower($context, $args[1], 'stream_set_blocking(): Argument #2 ($mode)'),
+            JitBoolArg::lower($context, $args[1], $fn.'(): Argument #2 ($mode)'),
             $i64
         );
 
         return JitStreamSetBlocking::invoke(
             $context,
             $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[0], 'stream_set_blocking() stream'),
+                JitLongArg::lower($context, $args[0], $fn.'() stream'),
                 $i64
             ),
             $mode

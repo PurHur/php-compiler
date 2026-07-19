@@ -569,6 +569,7 @@ class Module extends ModuleAbstract
             new pfsockopen(),
             new stream_set_chunk_size_(),
             new stream_set_timeout_(),
+            new stream_set_timeout_('socket_set_timeout'), // PHP_FALIAS (#20903)
             new stream_set_write_buffer_(),
             new stream_set_read_buffer_(),
             new set_file_buffer(),
@@ -577,7 +578,9 @@ class Module extends ModuleAbstract
             new stream_is_local(),
             new stream_isatty(),
             new stream_get_meta_data(),
+            new stream_get_meta_data('socket_get_status'), // PHP_FALIAS (#20903)
             new stream_set_blocking(),
+            new stream_set_blocking('socket_set_blocking'), // PHP_FALIAS (#20903)
             new fopen(),
             new fread(),
             new stream_get_contents(),
