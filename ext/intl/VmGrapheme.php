@@ -143,6 +143,20 @@ final class VmGrapheme
     }
 
     /**
+     * grapheme_strripos() — case-insensitive reverse grapheme index search (php-src ext/intl/grapheme; #20810).
+     *
+     * @return int|false grapheme index of last match
+     */
+    public static function strripos(string $haystack, string $needle, int $offset = 0): int|false
+    {
+        if ('' === $needle) {
+            return false;
+        }
+
+        return self::graphemePosSearch($haystack, $needle, $offset, true, true);
+    }
+
+    /**
      * grapheme_stristr() — case-insensitive grapheme strstr (php-src ext/intl/grapheme; #7221).
      *
      * @return string|false

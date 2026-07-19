@@ -225,6 +225,14 @@ final class JitGrapheme
 
     /**
      * @param JITVariable[] $args
+     */
+    public static function tryStrriposFold(Context $context, array $args): ?Value
+    {
+        return self::tryPosFoldInternal($context, $args, static fn (string $h, string $n, int $o): int|false => VmGrapheme::strripos($h, $n, $o));
+    }
+
+    /**
+     * @param JITVariable[] $args
      * @param callable(string, string, int): (int|false) $search
      */
     private static function tryPosFoldInternal(Context $context, array $args, callable $search): ?Value

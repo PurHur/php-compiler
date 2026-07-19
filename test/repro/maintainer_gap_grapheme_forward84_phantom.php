@@ -26,7 +26,7 @@ foreach ([
     }
 }
 
-foreach (['grapheme_stripos', 'grapheme_stristr', 'grapheme_strrpos'] as $name) {
+foreach (['grapheme_stripos', 'grapheme_stristr', 'grapheme_strrpos', 'grapheme_strripos'] as $name) {
     if (function_exists($name)) {
         echo "fail: {$name} must stay absent without full ext/intl\n";
         exit(1);

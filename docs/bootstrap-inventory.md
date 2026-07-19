@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5871 |
-| Phase A inventory files (M2 ratio SSOT) | 5871 |
+| PHP files on vm.php path | 5872 |
+| Phase A inventory files (M2 ratio SSOT) | 5872 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17709 |
+| Source constructs flagged (warnings) | 17714 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -833,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 83 |
+| `ext/intl/Module.php` | 0 | 84 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -875,6 +875,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/grapheme_stristr.php` | 0 | 4 |
 | `ext/intl/grapheme_strlen.php` | 0 | 2 |
 | `ext/intl/grapheme_strpos.php` | 0 | 4 |
+| `ext/intl/grapheme_strripos.php` | 0 | 4 |
 | `ext/intl/grapheme_strrpos.php` | 0 | 4 |
 | `ext/intl/grapheme_strstr.php` | 0 | 4 |
 | `ext/intl/grapheme_substr.php` | 0 | 4 |
@@ -11339,10 +11340,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/JitGrapheme.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 354)
-- new Variable (line 356)
-- 17 class method(s)
-- 3 closure(s)
+- new HashTable (line 362)
+- new Variable (line 364)
+- 18 class method(s)
+- 4 closure(s)
 
 ### `ext/intl/JitGraphemeStrSplit.php`
 
@@ -11557,13 +11558,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new grapheme_stristr (line 219)
 - new grapheme_stripos (line 220)
 - new grapheme_strrpos (line 221)
-- new grapheme_extract (line 222)
-- new grapheme_levenshtein (line 223)
-- new grapheme_str_split (line 224)
-- new grapheme_strimwidth (line 225)
-- new intl_get_error_code (line 226)
-- new intl_get_error_message (line 227)
-- new intl_is_failure (line 228)
+- new grapheme_strripos (line 222)
+- new grapheme_extract (line 223)
+- new grapheme_levenshtein (line 224)
+- new grapheme_str_split (line 225)
+- new grapheme_strimwidth (line 226)
+- new intl_get_error_code (line 227)
+- new intl_get_error_message (line 228)
+- new intl_is_failure (line 229)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -11698,7 +11700,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmGrapheme.php`
 
 **Warnings** (review for bootstrap subset):
-- 34 class method(s)
+- 35 class method(s)
 
 ### `ext/intl/VmIdn.php`
 
@@ -12301,6 +12303,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 35)
 - new ArgumentCountError (line 68)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/intl/grapheme_strripos.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 76)
 - 2 class method(s)
 - 1 closure(s)
 

@@ -219,6 +219,7 @@ class Module extends ModuleAbstract
             new grapheme_stristr(),
             new grapheme_stripos(),
             new grapheme_strrpos(),
+            new grapheme_strripos(),
             new grapheme_extract(),
             new grapheme_levenshtein(),
             new grapheme_str_split(),
