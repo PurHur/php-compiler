@@ -55,8 +55,8 @@ final class str_starts_with extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'str_starts_with', $paramName)->toString();
         }
 
-        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#19273, string.c).
-        return VmString::coerceZparamStrBuiltinArg(
+        // Soft-null on forward profile — Zend 8.4 deprecate+coerce (#21187; reverts #19273 TypeError).
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'str_starts_with',
             $argIndex,
@@ -80,7 +80,7 @@ final class str_starts_with extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'str_starts_with',
