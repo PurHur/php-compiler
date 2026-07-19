@@ -27,8 +27,10 @@ final class date_default_timezone_set extends Internal
                 'date_default_timezone_set() expects exactly 1 argument, '.\count($frame->calledArgs).' given'
             );
         }
-        $timezone = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — null TypeError on PROFILE=8.4 (php_date.stub.php; #20959)
+        $timezone = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
             'date_default_timezone_set',
             0,
             'timezoneId'
