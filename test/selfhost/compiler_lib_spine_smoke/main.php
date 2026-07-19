@@ -5948,6 +5948,22 @@ require_once __DIR__.'/../../../ext/intl/resourcebundle_count.php';
 require_once __DIR__.'/../../../ext/intl/resourcebundle_create.php';
 require_once __DIR__.'/../../../ext/intl/resourcebundle_get.php';
 require_once __DIR__.'/../../../ext/intl/resourcebundle_locales.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_add.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_clear.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_create_instance.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_equals.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_field_difference.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_from_date_time.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_get.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_get_now.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_get_time.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_get_time_zone.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_get_type.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_is_set.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_roll.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_set.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_set_time.php';
+require_once __DIR__.'/../../../ext/intl/intlcal_to_date_time.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5883 |
-| Phase A inventory files (M2 ratio SSOT) | 5883 |
+| PHP files on vm.php path | 5896 |
+| Phase A inventory files (M2 ratio SSOT) | 5896 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17792 |
+| Source constructs flagged (warnings) | 17810 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -793,7 +793,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_init.php` | 0 | 2 |
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
-| `ext/intl/BuiltinClasses.php` | 0 | 47 |
+| `ext/intl/BuiltinClasses.php` | 0 | 37 |
 | `ext/intl/GraphemeStrSplitJitHelper.php` | 0 | 3 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
@@ -833,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 96 |
+| `ext/intl/Module.php` | 0 | 108 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -844,7 +844,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmIdn.php` | 0 | 5 |
 | `ext/intl/VmIntlCalendar.php` | 0 | 52 |
 | `ext/intl/VmIntlChar.php` | 0 | 84 |
-| `ext/intl/VmIntlDateFormatter.php` | 0 | 25 |
+| `ext/intl/VmIntlDateFormatter.php` | 0 | 5 |
 | `ext/intl/VmIntlDatePatternGenerator.php` | 0 | 12 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 34 |
 | `ext/intl/VmLocale.php` | 0 | 2 |
@@ -852,7 +852,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/VmNumberFormatter.php` | 0 | 56 |
 | `ext/intl/VmResourceBundle.php` | 0 | 28 |
-| `ext/intl/VmSpoofchecker.php` | 0 | 29 |
+| `ext/intl/VmSpoofchecker.php` | 0 | 24 |
 | `ext/intl/VmTransliterator.php` | 0 | 27 |
 | `ext/intl/VmUConverter.php` | 0 | 40 |
 | `ext/intl/collator_asort.php` | 0 | 3 |
@@ -869,10 +869,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/collator_sort.php` | 0 | 3 |
 | `ext/intl/collator_sort_with_sort_keys.php` | 0 | 3 |
 | `ext/intl/datefmt_format_object.php` | 0 | 3 |
-| `ext/intl/datefmt_get_error_code.php` | 0 | 3 |
-| `ext/intl/datefmt_get_error_message.php` | 0 | 3 |
-| `ext/intl/datefmt_localtime.php` | 0 | 3 |
-| `ext/intl/datefmt_parse.php` | 0 | 3 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
 | `ext/intl/grapheme_levenshtein.php` | 0 | 2 |
 | `ext/intl/grapheme_str_contains.php` | 0 | 2 |
@@ -891,6 +887,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/intl_get_error_code.php` | 0 | 1 |
 | `ext/intl/intl_get_error_message.php` | 0 | 1 |
 | `ext/intl/intl_is_failure.php` | 0 | 1 |
+| `ext/intl/intlcal_add.php` | 0 | 3 |
+| `ext/intl/intlcal_clear.php` | 0 | 3 |
+| `ext/intl/intlcal_create_instance.php` | 0 | 3 |
+| `ext/intl/intlcal_equals.php` | 0 | 3 |
+| `ext/intl/intlcal_field_difference.php` | 0 | 3 |
+| `ext/intl/intlcal_from_date_time.php` | 0 | 3 |
+| `ext/intl/intlcal_get.php` | 0 | 3 |
+| `ext/intl/intlcal_get_now.php` | 0 | 3 |
+| `ext/intl/intlcal_get_time.php` | 0 | 3 |
+| `ext/intl/intlcal_get_time_zone.php` | 0 | 3 |
+| `ext/intl/intlcal_get_type.php` | 0 | 3 |
+| `ext/intl/intlcal_is_set.php` | 0 | 3 |
+| `ext/intl/intlcal_roll.php` | 0 | 3 |
+| `ext/intl/intlcal_set.php` | 0 | 3 |
+| `ext/intl/intlcal_set_time.php` | 0 | 3 |
+| `ext/intl/intlcal_to_date_time.php` | 0 | 3 |
 | `ext/intl/locale_accept_from_http.php` | 0 | 2 |
 | `ext/intl/locale_canonicalize.php` | 0 | 3 |
 | `ext/intl/locale_compose.php` | 0 | 2 |
@@ -2508,7 +2520,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/SplAutoloadDefaultJitHelper.php` | 0 | 1 |
 | `ext/standard/SplAutoloadJitHelper.php` | 0 | 1 |
 | `ext/standard/SpnJitLowering.php` | 0 | 1 |
-| `ext/standard/SprintfJitHelper.php` | 0 | 1 |
+| `ext/standard/SprintfJitHelper.php` | 0 | 3 |
 | `ext/standard/SqrtJitHelper.php` | 0 | 1 |
 | `ext/standard/SscanfJitHelper.php` | 0 | 2 |
 | `ext/standard/StatArrayJitHelper.php` | 0 | 4 |
@@ -4659,7 +4671,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFilterSanitize.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterUrl.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFindSubstr.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringFormat.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringFormat.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringFormatInventoryStubs.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsDir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsDirJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsGlob.php` | 0 | 1 |
@@ -8472,80 +8485,80 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 3185)
 - new DomNodeState (line 3190)
 - new Variable (line 3200)
-- new ObjectEntry (line 4008)
-- new DomNodeState (line 4010)
-- new ObjectEntry (line 4315)
-- new DomNodeState (line 4317)
-- new ObjectEntry (line 4345)
-- new DomNodeState (line 4347)
-- new ObjectEntry (line 4580)
-- new DomNodeState (line 4585)
-- new DOMException (line 4984)
-- new DOMException (line 5000)
-- new Variable (line 5018)
-- new DOMException (line 5032)
-- new DOMException (line 5035)
-- new DOMException (line 5045)
-- new Error (line 5075)
-- new DOMException (line 5081)
-- new DOMException (line 5095)
-- new DOMException (line 5300)
-- new DOMException (line 5497)
-- new DOMException (line 5501)
-- new DOMException (line 5590)
-- new DOMException (line 5594)
-- new DOMException (line 5652)
-- new DOMException (line 5669)
-- new DOMException (line 5701)
-- new DOMException (line 5743)
-- new DOMException (line 5770)
-- new DOMException (line 6659)
-- new Variable (line 6689)
-- new DOMException (line 6970)
-- new DOMException (line 7088)
-- new DOMException (line 7133)
-- new ObjectEntry (line 7218)
-- new DomNodeState (line 7222)
-- new Variable (line 7229)
-- new ObjectEntry (line 7247)
-- new DomNodeState (line 7251)
-- new Variable (line 7258)
-- new ObjectEntry (line 7276)
-- new DomNodeState (line 7280)
-- new Variable (line 7287)
-- new DOMException (line 7370)
-- new ObjectEntry (line 7648)
-- new DomNodeState (line 7652)
-- new Variable (line 7659)
-- new ObjectEntry (line 7686)
-- new DomNodeState (line 7689)
-- new Variable (line 7697)
-- new Variable (line 7892)
-- new DOMException (line 8029)
-- new DOMException (line 8036)
-- new DOMException (line 8043)
-- new DOMException (line 8047)
-- new DOMException (line 8050)
-- new DOMException (line 8059)
-- new DOMException (line 8071)
-- new DOMException (line 9132)
-- new Variable (line 9191)
-- new Variable (line 9204)
-- new Variable (line 9242)
-- new DOMException (line 9253)
-- new Variable (line 9255)
-- new DOMException (line 9419)
-- new DOMException (line 9446)
-- new DOMException (line 9482)
-- new DOMException (line 9547)
-- new DOMException (line 9555)
+- new ObjectEntry (line 4006)
+- new DomNodeState (line 4008)
+- new ObjectEntry (line 4313)
+- new DomNodeState (line 4315)
+- new ObjectEntry (line 4343)
+- new DomNodeState (line 4345)
+- new ObjectEntry (line 4578)
+- new DomNodeState (line 4583)
+- new DOMException (line 4982)
+- new DOMException (line 4998)
+- new Variable (line 5016)
+- new DOMException (line 5030)
+- new DOMException (line 5033)
+- new DOMException (line 5043)
+- new Error (line 5073)
+- new DOMException (line 5079)
+- new DOMException (line 5093)
+- new DOMException (line 5298)
+- new DOMException (line 5495)
+- new DOMException (line 5499)
+- new DOMException (line 5588)
+- new DOMException (line 5592)
+- new DOMException (line 5650)
+- new DOMException (line 5667)
+- new DOMException (line 5699)
+- new DOMException (line 5741)
+- new DOMException (line 5768)
+- new DOMException (line 6657)
+- new Variable (line 6687)
+- new DOMException (line 6965)
+- new DOMException (line 7083)
+- new DOMException (line 7128)
+- new ObjectEntry (line 7213)
+- new DomNodeState (line 7217)
+- new Variable (line 7224)
+- new ObjectEntry (line 7242)
+- new DomNodeState (line 7246)
+- new Variable (line 7253)
+- new ObjectEntry (line 7271)
+- new DomNodeState (line 7275)
+- new Variable (line 7282)
+- new DOMException (line 7365)
+- new ObjectEntry (line 7643)
+- new DomNodeState (line 7647)
+- new Variable (line 7654)
+- new ObjectEntry (line 7681)
+- new DomNodeState (line 7684)
+- new Variable (line 7692)
+- new Variable (line 7887)
+- new DOMException (line 8024)
+- new DOMException (line 8031)
+- new DOMException (line 8038)
+- new DOMException (line 8042)
+- new DOMException (line 8045)
+- new DOMException (line 8054)
+- new DOMException (line 8066)
+- new DOMException (line 9127)
+- new Variable (line 9186)
+- new Variable (line 9199)
+- new Variable (line 9237)
+- new DOMException (line 9248)
+- new Variable (line 9250)
+- new DOMException (line 9414)
+- new DOMException (line 9441)
+- new DOMException (line 9477)
+- new DOMException (line 9542)
+- new DOMException (line 9550)
+- new DOMException (line 9563)
 - new DOMException (line 9568)
-- new DOMException (line 9573)
-- new DOMException (line 9576)
-- new DOMException (line 9579)
-- new DOMException (line 9608)
-- new Error (line 10576)
-- new Error (line 10580)
+- new DOMException (line 9571)
+- new DOMException (line 9574)
+- new DOMException (line 9603)
+- new Error (line 10571)
+- new Error (line 10575)
 - 429 class method(s)
 - 2 closure(s)
 
@@ -11228,24 +11241,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new IntlDateFormatterFormat (line 163)
 - new IntlDateFormatterFormatObject (line 166)
 - new IntlDateFormatterGetPattern (line 169)
-- new IntlDateFormatterSetPattern (line 172)
-- new IntlDateFormatterGetLocale (line 175)
-- new IntlDateFormatterGetDateType (line 178)
-- new IntlDateFormatterGetTimeType (line 181)
-- new IntlDateFormatterIsLenient (line 184)
-- new IntlDateFormatterSetLenient (line 187)
-- new IntlDateFormatterGetCalendar (line 190)
-- new IntlDateFormatterSetCalendar (line 193)
-- new IntlDateFormatterGetTimeZoneId (line 196)
-- new IntlDateFormatterGetCalendarObject (line 199)
-- new IntlDateFormatterParse (line 202)
-- new IntlDateFormatterParseToCalendar (line 205)
-- new IntlDateFormatterLocaltime (line 208)
-- new IntlDateFormatterGetTimeZone (line 211)
-- new IntlDateFormatterSetTimeZone (line 214)
-- new IntlDateFormatterGetErrorCode (line 217)
-- new IntlDateFormatterGetErrorMessage (line 220)
-- new ClassEntry (line 303)
+- new IntlDateFormatterParse (line 172)
+- new IntlDateFormatterParseToCalendar (line 175)
+- new IntlDateFormatterLocaltime (line 178)
+- new IntlDateFormatterGetTimeZone (line 181)
+- new IntlDateFormatterSetTimeZone (line 184)
+- new IntlDateFormatterGetErrorCode (line 187)
+- new IntlDateFormatterGetErrorMessage (line 190)
+- new ClassEntry (line 273)
 - 17 class method(s)
 
 ### `ext/intl/GraphemeStrSplitJitHelper.php`
@@ -11578,27 +11581,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new resourcebundle_get (line 187)
 - new resourcebundle_locales (line 188)
 - new resourcebundle_count (line 189)
-- new datefmt_format_object (line 195)
-- new datefmt_parse (line 196)
-- new datefmt_localtime (line 197)
-- new datefmt_get_error_code (line 198)
-- new datefmt_get_error_message (line 199)
-- new grapheme_strlen (line 228)
-- new grapheme_substr (line 229)
-- new grapheme_strpos (line 230)
-- new grapheme_str_contains (line 231)
-- new grapheme_strstr (line 232)
-- new grapheme_stristr (line 233)
-- new grapheme_stripos (line 234)
-- new grapheme_strrpos (line 235)
-- new grapheme_strripos (line 236)
-- new grapheme_extract (line 237)
-- new grapheme_levenshtein (line 238)
-- new grapheme_str_split (line 239)
-- new grapheme_strimwidth (line 240)
-- new intl_get_error_code (line 241)
-- new intl_get_error_message (line 242)
-- new intl_is_failure (line 243)
+- new datefmt_format_object (line 194)
+- new intlcal_create_instance (line 199)
+- new intlcal_get_now (line 200)
+- new intlcal_from_date_time (line 201)
+- new intlcal_get (line 202)
+- new intlcal_set (line 203)
+- new intlcal_get_type (line 204)
+- new intlcal_add (line 205)
+- new intlcal_roll (line 206)
+- new intlcal_clear (line 207)
+- new intlcal_is_set (line 208)
+- new intlcal_equals (line 209)
+- new intlcal_get_time (line 210)
+- new intlcal_set_time (line 211)
+- new intlcal_get_time_zone (line 212)
+- new intlcal_to_date_time (line 213)
+- new intlcal_field_difference (line 214)
+- new grapheme_strlen (line 245)
+- new grapheme_substr (line 246)
+- new grapheme_strpos (line 247)
+- new grapheme_str_contains (line 248)
+- new grapheme_strstr (line 249)
+- new grapheme_stristr (line 250)
+- new grapheme_stripos (line 251)
+- new grapheme_strrpos (line 252)
+- new grapheme_strripos (line 253)
+- new grapheme_extract (line 254)
+- new grapheme_levenshtein (line 255)
+- new grapheme_str_split (line 256)
+- new grapheme_strimwidth (line 257)
+- new intl_get_error_code (line 258)
+- new intl_get_error_message (line 259)
+- new intl_is_failure (line 260)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -11891,31 +11906,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmIntlDateFormatter.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 104)
-- new ObjectEntry (line 109)
-- new HashTable (line 549)
-- new Variable (line 562)
-- new ArgumentCountError (line 1473)
-- new Error (line 1481)
-- new ArgumentCountError (line 1509)
-- new Error (line 1517)
-- new ArgumentCountError (line 1547)
-- new Error (line 1555)
-- new ArgumentCountError (line 1582)
-- new Error (line 1590)
-- new ArgumentCountError (line 1617)
-- new Error (line 1625)
-- new ArgumentCountError (line 1646)
-- new Error (line 1654)
-- new ArgumentCountError (line 1676)
-- new Error (line 1684)
-- new ArgumentCountError (line 1711)
-- new Error (line 1719)
-- new ArgumentCountError (line 1741)
-- new Error (line 1749)
-- new ArgumentCountError (line 1776)
-- new Error (line 1784)
-- 58 class method(s)
+- new Error (line 92)
+- new ObjectEntry (line 97)
+- new HashTable (line 315)
+- new Variable (line 328)
+- 37 class method(s)
 
 ### `ext/intl/VmIntlDatePatternGenerator.php`
 
@@ -12118,35 +12113,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmSpoofchecker.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 104)
-- new Variable (line 108)
-- new SpoofcheckerConstruct (line 114)
-- new SpoofcheckerIsSuspicious (line 118)
-- new SpoofcheckerAreConfusable (line 119)
-- new SpoofcheckerSetAllowedLocales (line 120)
-- new SpoofcheckerSetChecks (line 121)
-- new SpoofcheckerSetRestrictionLevel (line 122)
-- new SpoofcheckerSetAllowedChars (line 123)
-- new Variable (line 144)
-- new Error (line 178)
-- new Error (line 222)
-- new Error (line 265)
+- new ClassEntry (line 92)
+- new Variable (line 96)
+- new SpoofcheckerConstruct (line 102)
+- new SpoofcheckerIsSuspicious (line 106)
+- new SpoofcheckerAreConfusable (line 107)
+- new SpoofcheckerSetAllowedLocales (line 108)
+- new SpoofcheckerSetChecks (line 109)
+- new SpoofcheckerSetRestrictionLevel (line 110)
+- new Error (line 147)
+- new Error (line 186)
+- new Error (line 229)
+- new Error (line 258)
 - new Error (line 294)
-- new Error (line 330)
-- new Error (line 368)
-- new Error (line 491)
-- new Error (line 495)
-- new ArgumentCountError (line 848)
-- new ArgumentCountError (line 873)
-- new ArgumentCountError (line 879)
-- new ArgumentCountError (line 908)
-- new ArgumentCountError (line 914)
-- new ArgumentCountError (line 944)
-- new ArgumentCountError (line 967)
-- new ArgumentCountError (line 990)
-- new ArgumentCountError (line 1014)
-- new ArgumentCountError (line 1020)
-- 36 class method(s)
+- new Error (line 355)
+- new Error (line 359)
+- new ArgumentCountError (line 606)
+- new ArgumentCountError (line 631)
+- new ArgumentCountError (line 637)
+- new ArgumentCountError (line 666)
+- new ArgumentCountError (line 672)
+- new ArgumentCountError (line 702)
+- new ArgumentCountError (line 725)
+- new ArgumentCountError (line 748)
+- 27 class method(s)
 
 ### `ext/intl/VmTransliterator.php`
 
@@ -12321,34 +12311,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 75)
 - 2 class method(s)
 
-### `ext/intl/datefmt_get_error_code.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
-- new Error (line 51)
-- 2 class method(s)
-
-### `ext/intl/datefmt_get_error_message.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
-- new Error (line 51)
-- 2 class method(s)
-
-### `ext/intl/datefmt_localtime.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
-- new Error (line 72)
-- 2 class method(s)
-
-### `ext/intl/datefmt_parse.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
-- new Error (line 74)
-- 2 class method(s)
-
 ### `ext/intl/grapheme_extract.php`
 
 **Warnings** (review for bootstrap subset):
@@ -12468,6 +12430,118 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/intl_is_failure.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/intl/intlcal_add.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 57)
+- 2 class method(s)
+
+### `ext/intl/intlcal_clear.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 59)
+- 2 class method(s)
+
+### `ext/intl/intlcal_create_instance.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new Error (line 65)
+- 2 class method(s)
+
+### `ext/intl/intlcal_equals.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 64)
+- 2 class method(s)
+
+### `ext/intl/intlcal_field_difference.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 79)
+- 2 class method(s)
+
+### `ext/intl/intlcal_from_date_time.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new Error (line 81)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 61)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get_now.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Error (line 41)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get_time.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 60)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get_time_zone.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 60)
+- 2 class method(s)
+
+### `ext/intl/intlcal_get_type.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 60)
+- 2 class method(s)
+
+### `ext/intl/intlcal_is_set.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 55)
+- 2 class method(s)
+
+### `ext/intl/intlcal_roll.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 57)
+- 2 class method(s)
+
+### `ext/intl/intlcal_set.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 74)
+- 2 class method(s)
+
+### `ext/intl/intlcal_set_time.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 68)
+- 2 class method(s)
+
+### `ext/intl/intlcal_to_date_time.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 60)
 - 2 class method(s)
 
 ### `ext/intl/locale_accept_from_http.php`
@@ -24546,7 +24620,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/SprintfJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- new Variable (line 49)
+- new HashTable (line 61)
+- 3 class method(s)
 
 ### `ext/standard/SqrtJitHelper.php`
 
@@ -38714,7 +38790,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFormat.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- new JIT (line 345)
+- 12 class method(s)
+- 2 closure(s)
+
+### `lib/JIT/Builtin/StringFormatInventoryStubs.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringFsDir.php`
 
@@ -40809,19 +40892,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 958)
 - new Call\DateTimeFormat (line 961)
 - new Call\DateTimeFormat (line 962)
-- new Result (line 1293)
-- new Result (line 1314)
-- new Variable (line 1915)
-- new Variable (line 2052)
-- new Variable (line 2278)
-- new Variable (line 2336)
-- new VMVariable (line 2474)
-- new VMVariable (line 2490)
-- new VMVariable (line 2496)
-- new VMVariable (line 2502)
-- new VMVariable (line 2513)
-- new Variable (line 2543)
-- new Variable (line 2583)
+- new Result (line 1294)
+- new Result (line 1315)
+- new Variable (line 1916)
+- new Variable (line 2053)
+- new Variable (line 2279)
+- new Variable (line 2337)
+- new VMVariable (line 2475)
+- new VMVariable (line 2491)
+- new VMVariable (line 2497)
+- new VMVariable (line 2503)
+- new VMVariable (line 2514)
+- new Variable (line 2544)
+- new Variable (line 2584)
 - 102 class method(s)
 - 28 closure(s)
 
