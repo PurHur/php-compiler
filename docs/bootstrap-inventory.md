@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6087 |
-| Phase A inventory files (M2 ratio SSOT) | 6087 |
+| PHP files on vm.php path | 6101 |
+| Phase A inventory files (M2 ratio SSOT) | 6101 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18922 |
+| Source constructs flagged (warnings) | 18979 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -4283,6 +4283,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/zip_entry_read.php` | 0 | 2 |
 | `ext/zip/zip_open.php` | 0 | 1 |
 | `ext/zip/zip_read.php` | 0 | 1 |
+| `ext/zmq/BuiltinClasses.php` | 0 | 1 |
+| `ext/zmq/Module.php` | 0 | 9 |
+| `ext/zmq/VmZmq.php` | 0 | 16 |
+| `ext/zmq/ZmqFunction.php` | 0 | 1 |
+| `ext/zmq/zmq_bind.php` | 0 | 3 |
+| `ext/zmq/zmq_connect.php` | 0 | 3 |
+| `ext/zmq/zmq_context.php` | 0 | 3 |
+| `ext/zmq/zmq_msg_read.php` | 0 | 3 |
+| `ext/zmq/zmq_poll.php` | 0 | 8 |
+| `ext/zmq/zmq_recv.php` | 0 | 3 |
+| `ext/zmq/zmq_send.php` | 0 | 3 |
+| `ext/zmq/zmq_socket.php` | 0 | 3 |
 | `ext/zstd/JitZstd.php` | 0 | 1 |
 | `ext/zstd/Module.php` | 0 | 4 |
 | `ext/zstd/VmZstdCore.php` | 0 | 1 |
@@ -5395,7 +5407,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 103 |
+| `lib/Runtime.php` | 0 | 104 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -7578,7 +7590,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomParseSimpleXmlJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/dom/DomRegistry.php`
 
@@ -9074,49 +9086,49 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 264)
 - new DOMException (line 412)
 - new DOMException (line 463)
-- new DOMException (line 882)
-- new DOMException (line 1278)
-- new DOMException (line 1410)
-- new DOMException (line 1419)
-- new DOMException (line 1429)
+- new DOMException (line 936)
+- new DOMException (line 1332)
+- new DOMException (line 1464)
 - new DOMException (line 1473)
-- new DOMException (line 1499)
-- new DOMException (line 1513)
-- new DOMException (line 1522)
-- new DOMException (line 1531)
-- new DOMException (line 1588)
-- new DOMException (line 1605)
-- new DOMException (line 1635)
-- new DOMException (line 1650)
-- new DOMException (line 1663)
-- new DOMException (line 1676)
-- new DOMException (line 1690)
-- new DOMException (line 1705)
-- new DOMException (line 1720)
-- new DOMException (line 1734)
-- new DOMException (line 1743)
-- new DOMException (line 1747)
-- new DOMException (line 1771)
-- new Variable (line 2429)
-- new DOMException (line 2435)
-- new Error (line 2448)
-- new Variable (line 2452)
-- new Variable (line 2462)
-- new Variable (line 2590)
-- new DOMException (line 2597)
-- new Error (line 2651)
-- new Variable (line 2686)
-- new Variable (line 2692)
-- new Variable (line 2704)
-- new Variable (line 2716)
-- new Variable (line 2737)
-- new HashTable (line 2748)
-- new Variable (line 2754)
-- new Variable (line 2758)
-- new Variable (line 2775)
-- new Variable (line 2784)
-- 86 class method(s)
-- 3 closure(s)
+- new DOMException (line 1483)
+- new DOMException (line 1527)
+- new DOMException (line 1553)
+- new DOMException (line 1567)
+- new DOMException (line 1576)
+- new DOMException (line 1585)
+- new DOMException (line 1642)
+- new DOMException (line 1659)
+- new DOMException (line 1689)
+- new DOMException (line 1704)
+- new DOMException (line 1717)
+- new DOMException (line 1730)
+- new DOMException (line 1744)
+- new DOMException (line 1759)
+- new DOMException (line 1774)
+- new DOMException (line 1788)
+- new DOMException (line 1797)
+- new DOMException (line 1801)
+- new DOMException (line 1825)
+- new Variable (line 2484)
+- new DOMException (line 2490)
+- new Error (line 2503)
+- new Variable (line 2507)
+- new Variable (line 2517)
+- new Variable (line 2645)
+- new DOMException (line 2652)
+- new Error (line 2706)
+- new Variable (line 2741)
+- new Variable (line 2747)
+- new Variable (line 2759)
+- new Variable (line 2771)
+- new Variable (line 2792)
+- new HashTable (line 2803)
+- new Variable (line 2809)
+- new Variable (line 2813)
+- new Variable (line 2830)
+- new Variable (line 2839)
+- 87 class method(s)
+- 4 closure(s)
 
 ### `ext/dom/XPathConstruct.php`
 
@@ -36850,6 +36862,110 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/zmq/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zmq/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new zmq_context (line 41)
+- new zmq_socket (line 42)
+- new zmq_bind (line 43)
+- new zmq_connect (line 44)
+- new zmq_send (line 45)
+- new zmq_recv (line 46)
+- new zmq_poll (line 47)
+- new zmq_msg_read (line 48)
+- 4 class method(s)
+
+### `ext/zmq/VmZmq.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 47)
+- new ClassEntry (line 62)
+- new Variable (line 65)
+- new ClassEntry (line 78)
+- new ClassEntry (line 88)
+- new ObjectEntry (line 96)
+- new ZMQException (line 111)
+- new ObjectEntry (line 114)
+- new ZMQException (line 148)
+- new ZMQException (line 152)
+- new ZMQException (line 156)
+- new ZMQException (line 173)
+- new ZMQException (line 177)
+- new ZMQException (line 181)
+- new ZMQException (line 212)
+- 17 class method(s)
+
+### `ext/zmq/ZmqFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/zmq/zmq_bind.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/zmq/zmq_connect.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/zmq/zmq_context.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/zmq/zmq_msg_read.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/zmq/zmq_poll.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new HashTable (line 69)
+- new HashTable (line 72)
+- new Variable (line 73)
+- new Variable (line 76)
+- new Variable (line 79)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/zmq/zmq_recv.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/zmq/zmq_send.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/zmq/zmq_socket.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 1 class method(s)
+- 1 closure(s)
+
 ### `ext/zstd/JitZstd.php`
 
 **Warnings** (review for bootstrap subset):
@@ -44204,47 +44320,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\inotify\Module (line 256)
 - new ext\pcntl\Module (line 257)
 - new ext\sockets\Module (line 258)
-- new ext\ftp\Module (line 259)
-- new ext\soap\Module (line 260)
-- new ext\ffi\Module (line 261)
-- new ext\ctype\Module (line 262)
-- new ext\tokenizer\Module (line 263)
-- new ext\random\Module (line 264)
-- new ext\igbinary\Module (line 265)
-- new ext\msgpack\Module (line 266)
-- new ext\yaml\Module (line 267)
-- new ext\redis\Module (line 268)
-- new ext\zstd\Module (line 269)
-- new ext\lzf\Module (line 270)
-- new ext\bz2\Module (line 271)
-- new ext\brotli\Module (line 272)
-- new ext\sodium\Module (line 273)
-- new ext\sqlite3\Module (line 274)
-- new ext\pgsql\Module (line 275)
-- new ext\odbc\Module (line 276)
-- new ext\mailparse\Module (line 277)
-- new ext\enchant\Module (line 278)
-- new ext\pdo\Module (line 279)
-- new ext\phar\Module (line 280)
-- new ext\uri\Module (line 281)
-- new ext\uuid\Module (line 282)
-- new ext\uploadprogress\Module (line 283)
-- new ext\apcu\Module (line 284)
-- new ext\sysvshm\Module (line 285)
-- new ext\sysvsem\Module (line 286)
-- new ext\sysvmsg\Module (line 287)
-- new ext\reflection\Module (line 288)
-- new ext\standard\Module (line 289)
-- new JIT (line 365)
-- new JITContext (line 379)
-- new SealedClassPreprocessor (line 445)
-- new StaticClassPreprocessor (line 448)
-- new SourcePreprocessor\PropertyHooks (line 451)
-- new State (line 592)
-- new ReflectionProperty (line 619)
-- new ReflectionProperty (line 622)
-- new LintCompiler (line 1033)
-- new Variable (line 1163)
+- new ext\zmq\Module (line 259)
+- new ext\ftp\Module (line 260)
+- new ext\soap\Module (line 261)
+- new ext\ffi\Module (line 262)
+- new ext\ctype\Module (line 263)
+- new ext\tokenizer\Module (line 264)
+- new ext\random\Module (line 265)
+- new ext\igbinary\Module (line 266)
+- new ext\msgpack\Module (line 267)
+- new ext\yaml\Module (line 268)
+- new ext\redis\Module (line 269)
+- new ext\zstd\Module (line 270)
+- new ext\lzf\Module (line 271)
+- new ext\bz2\Module (line 272)
+- new ext\brotli\Module (line 273)
+- new ext\sodium\Module (line 274)
+- new ext\sqlite3\Module (line 275)
+- new ext\pgsql\Module (line 276)
+- new ext\odbc\Module (line 277)
+- new ext\mailparse\Module (line 278)
+- new ext\enchant\Module (line 279)
+- new ext\pdo\Module (line 280)
+- new ext\phar\Module (line 281)
+- new ext\uri\Module (line 282)
+- new ext\uuid\Module (line 283)
+- new ext\uploadprogress\Module (line 284)
+- new ext\apcu\Module (line 285)
+- new ext\sysvshm\Module (line 286)
+- new ext\sysvsem\Module (line 287)
+- new ext\sysvmsg\Module (line 288)
+- new ext\reflection\Module (line 289)
+- new ext\standard\Module (line 290)
+- new JIT (line 366)
+- new JITContext (line 380)
+- new SealedClassPreprocessor (line 446)
+- new StaticClassPreprocessor (line 449)
+- new SourcePreprocessor\PropertyHooks (line 452)
+- new State (line 593)
+- new ReflectionProperty (line 620)
+- new ReflectionProperty (line 623)
+- new LintCompiler (line 1034)
+- new Variable (line 1164)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
