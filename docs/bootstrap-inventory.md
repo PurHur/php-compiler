@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6030 |
-| Phase A inventory files (M2 ratio SSOT) | 6030 |
+| PHP files on vm.php path | 6021 |
+| Phase A inventory files (M2 ratio SSOT) | 6021 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18692 |
+| Source constructs flagged (warnings) | 18666 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -174,6 +174,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/curl/curl_share_strerror.php` | 0 | 2 |
 | `ext/curl/curl_strerror.php` | 0 | 2 |
 | `ext/curl/curl_unescape.php` | 0 | 3 |
+| `ext/curl/curl_upkeep.php` | 0 | 2 |
 | `ext/curl/curl_version.php` | 0 | 2 |
 | `ext/dom/AttrIsId.php` | 0 | 2 |
 | `ext/dom/BuiltinClasses.php` | 0 | 1 |
@@ -859,7 +860,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
-| `ext/intl/VmBreakIterator.php` | 0 | 61 |
+| `ext/intl/VmBreakIterator.php` | 0 | 56 |
 | `ext/intl/VmCollator.php` | 0 | 55 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
@@ -1097,15 +1098,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/lzf/VmLzfCore.php` | 0 | 1 |
 | `ext/lzf/lzf_compress.php` | 0 | 1 |
 | `ext/lzf/lzf_decompress.php` | 0 | 1 |
-| `ext/mailparse/MailparseExtensionPolicy.php` | 0 | 1 |
-| `ext/mailparse/MailparseFunction.php` | 0 | 1 |
-| `ext/mailparse/Module.php` | 0 | 6 |
-| `ext/mailparse/VmMailparse.php` | 0 | 4 |
-| `ext/mailparse/mailparse_msg_create.php` | 0 | 2 |
-| `ext/mailparse/mailparse_msg_free.php` | 0 | 2 |
-| `ext/mailparse/mailparse_msg_get_part_data.php` | 0 | 2 |
-| `ext/mailparse/mailparse_msg_parse.php` | 0 | 2 |
-| `ext/mailparse/mailparse_rfc822_parse_addresses.php` | 0 | 2 |
 | `ext/mbstring/EastAsianWidthTable.php` | 0 | 1 |
 | `ext/mbstring/JitMbCheckEncoding.php` | 0 | 1 |
 | `ext/mbstring/JitMbConvertCase.php` | 0 | 1 |
@@ -5339,7 +5331,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 103 |
+| `lib/Runtime.php` | 0 | 102 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -6721,9 +6713,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 54)
 - new Variable (line 66)
 - new ObjectEntry (line 67)
-- new Variable (line 406)
-- new ObjectEntry (line 407)
-- 30 class method(s)
+- new Variable (line 425)
+- new ObjectEntry (line 426)
+- 31 class method(s)
 
 ### `ext/curl/VmCurlEscape.php`
 
@@ -6741,8 +6733,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/VmCurlNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 182)
-- 36 class method(s)
+- new Error (line 192)
+- 37 class method(s)
 
 ### `ext/curl/VmCurlShare.php`
 
@@ -6969,6 +6961,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
 - new ArgumentCountError (line 53)
+- 2 class method(s)
+
+### `ext/curl/curl_upkeep.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/curl/curl_version.php`
@@ -12118,62 +12116,57 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 103)
 - new ClassEntry (line 108)
 - new ClassProperty (line 112)
-- new RuleBasedBreakIteratorConstruct (line 115)
-- new RuleBasedBreakIteratorGetRules (line 120)
-- new RuleBasedBreakIteratorGetBinaryRules (line 123)
-- new BreakIteratorGetRuleStatus (line 126)
-- new BreakIteratorGetRuleStatusVec (line 129)
-- new ClassEntry (line 134)
-- new ClassProperty (line 138)
-- new BreakIteratorGetLastCodePoint (line 141)
-- new ClassEntry (line 146)
-- new ClassProperty (line 148)
-- new Variable (line 151)
-- new PartsIteratorCurrent (line 157)
-- new PartsIteratorKey (line 158)
-- new PartsIteratorNext (line 159)
-- new PartsIteratorRewind (line 160)
-- new PartsIteratorValid (line 161)
-- new PartsIteratorGetBreakIterator (line 162)
-- new PartsIteratorGetRuleStatus (line 163)
-- new Variable (line 176)
-- new BreakIteratorCreateWordInstance (line 186)
-- new BreakIteratorCreateCharacterInstance (line 187)
-- new BreakIteratorCreateCodePointInstance (line 188)
-- new BreakIteratorCreateLineInstance (line 189)
-- new BreakIteratorCreateSentenceInstance (line 190)
-- new BreakIteratorCreateTitleInstance (line 191)
-- new BreakIteratorSetText (line 203)
-- new BreakIteratorGetText (line 204)
-- new BreakIteratorFirst (line 205)
-- new BreakIteratorLast (line 206)
-- new BreakIteratorNext (line 207)
-- new BreakIteratorPrevious (line 208)
-- new BreakIteratorCurrent (line 209)
-- new BreakIteratorPreceding (line 210)
-- new BreakIteratorFollowing (line 211)
-- new BreakIteratorIsBoundary (line 212)
-- new BreakIteratorGetLocale (line 213)
-- new BreakIteratorGetErrorCode (line 214)
-- new BreakIteratorGetErrorMessage (line 215)
-- new BreakIteratorGetPartsIterator (line 216)
-- new ObjectEntry (line 232)
-- new ObjectEntry (line 588)
-- new ArgumentCountError (line 1055)
-- new ArgumentCountError (line 1060)
-- new ArgumentCountError (line 1145)
-- new ArgumentCountError (line 1186)
-- new ArgumentCountError (line 1226)
-- new ArgumentCountError (line 1265)
-- new ArgumentCountError (line 1349)
-- new ArgumentCountError (line 1369)
-- new ArgumentCountError (line 1389)
-- new ArgumentCountError (line 1409)
-- new ArgumentCountError (line 1430)
-- new ArgumentCountError (line 1449)
-- new HashTable (line 1625)
-- new Variable (line 1627)
-- 93 class method(s)
+- new BreakIteratorGetRuleStatus (line 115)
+- new BreakIteratorGetRuleStatusVec (line 118)
+- new ClassEntry (line 123)
+- new ClassProperty (line 127)
+- new BreakIteratorGetLastCodePoint (line 130)
+- new ClassEntry (line 135)
+- new ClassProperty (line 137)
+- new Variable (line 140)
+- new PartsIteratorCurrent (line 146)
+- new PartsIteratorKey (line 147)
+- new PartsIteratorNext (line 148)
+- new PartsIteratorRewind (line 149)
+- new PartsIteratorValid (line 150)
+- new PartsIteratorGetBreakIterator (line 151)
+- new PartsIteratorGetRuleStatus (line 152)
+- new Variable (line 165)
+- new BreakIteratorCreateWordInstance (line 175)
+- new BreakIteratorCreateCharacterInstance (line 176)
+- new BreakIteratorCreateCodePointInstance (line 177)
+- new BreakIteratorCreateLineInstance (line 178)
+- new BreakIteratorCreateSentenceInstance (line 179)
+- new BreakIteratorCreateTitleInstance (line 180)
+- new BreakIteratorSetText (line 192)
+- new BreakIteratorGetText (line 193)
+- new BreakIteratorFirst (line 194)
+- new BreakIteratorLast (line 195)
+- new BreakIteratorNext (line 196)
+- new BreakIteratorPrevious (line 197)
+- new BreakIteratorCurrent (line 198)
+- new BreakIteratorPreceding (line 199)
+- new BreakIteratorFollowing (line 200)
+- new BreakIteratorIsBoundary (line 201)
+- new BreakIteratorGetLocale (line 202)
+- new BreakIteratorGetErrorCode (line 203)
+- new BreakIteratorGetErrorMessage (line 204)
+- new BreakIteratorGetPartsIterator (line 205)
+- new ObjectEntry (line 221)
+- new ObjectEntry (line 522)
+- new ArgumentCountError (line 984)
+- new ArgumentCountError (line 1025)
+- new ArgumentCountError (line 1065)
+- new ArgumentCountError (line 1104)
+- new ArgumentCountError (line 1188)
+- new ArgumentCountError (line 1208)
+- new ArgumentCountError (line 1228)
+- new ArgumentCountError (line 1248)
+- new ArgumentCountError (line 1269)
+- new ArgumentCountError (line 1288)
+- new HashTable (line 1464)
+- new Variable (line 1466)
+- 87 class method(s)
 
 ### `ext/intl/VmCollator.php`
 
@@ -14451,64 +14444,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
-
-### `ext/mailparse/MailparseExtensionPolicy.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
-
-### `ext/mailparse/MailparseFunction.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/mailparse/Module.php`
-
-**Warnings** (review for bootstrap subset):
-- new mailparse_msg_create (line 32)
-- new mailparse_msg_parse (line 33)
-- new mailparse_msg_get_part_data (line 34)
-- new mailparse_msg_free (line 35)
-- new mailparse_rfc822_parse_addresses (line 36)
-- 2 class method(s)
-
-### `ext/mailparse/VmMailparse.php`
-
-**Warnings** (review for bootstrap subset):
-- new ClassEntry (line 40)
-- new ObjectEntry (line 48)
-- new Variable (line 57)
-- 17 class method(s)
-
-### `ext/mailparse/mailparse_msg_create.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 20)
-- 1 class method(s)
-
-### `ext/mailparse/mailparse_msg_free.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- 1 class method(s)
-
-### `ext/mailparse/mailparse_msg_get_part_data.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- 1 class method(s)
-
-### `ext/mailparse/mailparse_msg_parse.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
-- 1 class method(s)
-
-### `ext/mailparse/mailparse_rfc822_parse_addresses.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
-- 1 class method(s)
 
 ### `ext/mbstring/EastAsianWidthTable.php`
 
@@ -43716,29 +43651,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\sqlite3\Module (line 274)
 - new ext\pgsql\Module (line 275)
 - new ext\odbc\Module (line 276)
-- new ext\mailparse\Module (line 277)
-- new ext\enchant\Module (line 278)
-- new ext\pdo\Module (line 279)
-- new ext\phar\Module (line 280)
-- new ext\uri\Module (line 281)
-- new ext\uuid\Module (line 282)
-- new ext\uploadprogress\Module (line 283)
-- new ext\apcu\Module (line 284)
-- new ext\sysvshm\Module (line 285)
-- new ext\sysvsem\Module (line 286)
-- new ext\sysvmsg\Module (line 287)
-- new ext\reflection\Module (line 288)
-- new ext\standard\Module (line 289)
-- new JIT (line 365)
-- new JITContext (line 379)
-- new SealedClassPreprocessor (line 445)
-- new StaticClassPreprocessor (line 448)
-- new SourcePreprocessor\PropertyHooks (line 451)
-- new State (line 592)
-- new ReflectionProperty (line 619)
-- new ReflectionProperty (line 622)
-- new LintCompiler (line 1033)
-- new Variable (line 1163)
+- new ext\enchant\Module (line 277)
+- new ext\pdo\Module (line 278)
+- new ext\phar\Module (line 279)
+- new ext\uri\Module (line 280)
+- new ext\uuid\Module (line 281)
+- new ext\uploadprogress\Module (line 282)
+- new ext\apcu\Module (line 283)
+- new ext\sysvshm\Module (line 284)
+- new ext\sysvsem\Module (line 285)
+- new ext\sysvmsg\Module (line 286)
+- new ext\reflection\Module (line 287)
+- new ext\standard\Module (line 288)
+- new JIT (line 364)
+- new JITContext (line 378)
+- new SealedClassPreprocessor (line 444)
+- new StaticClassPreprocessor (line 447)
+- new SourcePreprocessor\PropertyHooks (line 450)
+- new State (line 591)
+- new ReflectionProperty (line 618)
+- new ReflectionProperty (line 621)
+- new LintCompiler (line 1032)
+- new Variable (line 1162)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

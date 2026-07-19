@@ -65,6 +65,16 @@ final class VmCurlNative
     }
 
     /**
+     * curl_easy_upkeep() — connection keepalive (libcurl ≥7.62; php-src curl_upkeep; #20977).
+     *
+     * @param \FFI\CData $ch CURL*
+     */
+    public static function easyUpkeep(\FFI\CData $ch): int
+    {
+        return (int) self::requireCurl()->curl_easy_upkeep($ch);
+    }
+
+    /**
      * @param \FFI\CData $ch CURL*
      *
      * @return \FFI\CData|null duplicated CURL* (null on failure)
@@ -418,6 +428,7 @@ CURL *curl_easy_init(void);
 void curl_easy_cleanup(CURL *curl);
 void curl_easy_reset(CURL *curl);
 int curl_easy_pause(CURL *curl, int bitmask);
+int curl_easy_upkeep(CURL *curl);
 CURL *curl_easy_duphandle(CURL *curl);
 int curl_easy_setopt(CURL *curl, int option, ...);
 int curl_easy_perform(CURL *curl);
