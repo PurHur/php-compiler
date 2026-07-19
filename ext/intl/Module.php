@@ -205,6 +205,15 @@ class Module extends ModuleAbstract
                 new datefmt_set_pattern(),
                 new datefmt_get_timezone(),
                 new datefmt_set_timezone(),
+                new datefmt_get_locale(),
+                new datefmt_get_datetype(),
+                new datefmt_get_timetype(),
+                new datefmt_is_lenient(),
+                new datefmt_set_lenient(),
+                new datefmt_get_calendar(),
+                new datefmt_set_calendar(),
+                new datefmt_get_timezone_id(),
+                new datefmt_get_calendar_object(),
             ]
             : [];
 

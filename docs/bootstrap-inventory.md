@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5931 |
-| Phase A inventory files (M2 ratio SSOT) | 5931 |
+| PHP files on vm.php path | 5940 |
+| Phase A inventory files (M2 ratio SSOT) | 5940 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18117 |
+| Source constructs flagged (warnings) | 18151 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -838,7 +838,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 121 |
+| `ext/intl/Module.php` | 0 | 130 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -876,12 +876,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/datefmt_create.php` | 0 | 3 |
 | `ext/intl/datefmt_format.php` | 0 | 3 |
 | `ext/intl/datefmt_format_object.php` | 0 | 3 |
+| `ext/intl/datefmt_get_calendar.php` | 0 | 3 |
+| `ext/intl/datefmt_get_calendar_object.php` | 0 | 3 |
+| `ext/intl/datefmt_get_datetype.php` | 0 | 3 |
 | `ext/intl/datefmt_get_error_code.php` | 0 | 3 |
 | `ext/intl/datefmt_get_error_message.php` | 0 | 3 |
+| `ext/intl/datefmt_get_locale.php` | 0 | 3 |
 | `ext/intl/datefmt_get_pattern.php` | 0 | 3 |
+| `ext/intl/datefmt_get_timetype.php` | 0 | 3 |
 | `ext/intl/datefmt_get_timezone.php` | 0 | 3 |
+| `ext/intl/datefmt_get_timezone_id.php` | 0 | 3 |
+| `ext/intl/datefmt_is_lenient.php` | 0 | 3 |
 | `ext/intl/datefmt_localtime.php` | 0 | 3 |
 | `ext/intl/datefmt_parse.php` | 0 | 3 |
+| `ext/intl/datefmt_set_calendar.php` | 0 | 3 |
+| `ext/intl/datefmt_set_lenient.php` | 0 | 3 |
 | `ext/intl/datefmt_set_pattern.php` | 0 | 3 |
 | `ext/intl/datefmt_set_timezone.php` | 0 | 3 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
@@ -4452,7 +4461,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/IconvRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ImageTypeToMimeType.php` | 0 | 1 |
 | `lib/JIT/Builtin/InArrayRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/IncludePathRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/IncludePathRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/InetRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/IniGet.php` | 0 | 1 |
 | `lib/JIT/Builtin/IniIntrospectionRuntime.php` | 0 | 3 |
@@ -11683,39 +11692,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new datefmt_set_pattern (line 205)
 - new datefmt_get_timezone (line 206)
 - new datefmt_set_timezone (line 207)
-- new intlcal_create_instance (line 213)
-- new intlcal_get_now (line 214)
-- new intlcal_from_date_time (line 215)
-- new intlcal_get (line 216)
-- new intlcal_set (line 217)
-- new intlcal_get_type (line 218)
-- new intlcal_add (line 219)
-- new intlcal_roll (line 220)
-- new intlcal_clear (line 221)
-- new intlcal_is_set (line 222)
-- new intlcal_equals (line 223)
-- new intlcal_get_time (line 224)
-- new intlcal_set_time (line 225)
-- new intlcal_get_time_zone (line 226)
-- new intlcal_to_date_time (line 227)
-- new intlcal_field_difference (line 228)
-- new grapheme_strlen (line 259)
-- new grapheme_substr (line 260)
-- new grapheme_strpos (line 261)
-- new grapheme_str_contains (line 262)
-- new grapheme_strstr (line 263)
-- new grapheme_stristr (line 264)
-- new grapheme_stripos (line 265)
-- new grapheme_strrpos (line 266)
-- new grapheme_strripos (line 267)
-- new grapheme_extract (line 268)
-- new grapheme_levenshtein (line 269)
-- new grapheme_str_split (line 270)
-- new grapheme_strimwidth (line 271)
-- new intl_get_error_code (line 272)
-- new intl_get_error_message (line 273)
-- new intl_is_failure (line 274)
-- new intl_error_name (line 275)
+- new datefmt_get_locale (line 208)
+- new datefmt_get_datetype (line 209)
+- new datefmt_get_timetype (line 210)
+- new datefmt_is_lenient (line 211)
+- new datefmt_set_lenient (line 212)
+- new datefmt_get_calendar (line 213)
+- new datefmt_set_calendar (line 214)
+- new datefmt_get_timezone_id (line 215)
+- new datefmt_get_calendar_object (line 216)
+- new intlcal_create_instance (line 222)
+- new intlcal_get_now (line 223)
+- new intlcal_from_date_time (line 224)
+- new intlcal_get (line 225)
+- new intlcal_set (line 226)
+- new intlcal_get_type (line 227)
+- new intlcal_add (line 228)
+- new intlcal_roll (line 229)
+- new intlcal_clear (line 230)
+- new intlcal_is_set (line 231)
+- new intlcal_equals (line 232)
+- new intlcal_get_time (line 233)
+- new intlcal_set_time (line 234)
+- new intlcal_get_time_zone (line 235)
+- new intlcal_to_date_time (line 236)
+- new intlcal_field_difference (line 237)
+- new grapheme_strlen (line 268)
+- new grapheme_substr (line 269)
+- new grapheme_strpos (line 270)
+- new grapheme_str_contains (line 271)
+- new grapheme_strstr (line 272)
+- new grapheme_stristr (line 273)
+- new grapheme_stripos (line 274)
+- new grapheme_strrpos (line 275)
+- new grapheme_strripos (line 276)
+- new grapheme_extract (line 277)
+- new grapheme_levenshtein (line 278)
+- new grapheme_str_split (line 279)
+- new grapheme_strimwidth (line 280)
+- new intl_get_error_code (line 281)
+- new intl_get_error_message (line 282)
+- new intl_is_failure (line 283)
+- new intl_error_name (line 284)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12609,6 +12627,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 75)
 - 2 class method(s)
 
+### `ext/intl/datefmt_get_calendar.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
+### `ext/intl/datefmt_get_calendar_object.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 61)
+- 2 class method(s)
+
+### `ext/intl/datefmt_get_datetype.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
 ### `ext/intl/datefmt_get_error_code.php`
 
 **Warnings** (review for bootstrap subset):
@@ -12623,7 +12662,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 51)
 - 2 class method(s)
 
+### `ext/intl/datefmt_get_locale.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 59)
+- 2 class method(s)
+
 ### `ext/intl/datefmt_get_pattern.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
+### `ext/intl/datefmt_get_timetype.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
@@ -12635,6 +12688,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
 - new Error (line 56)
+- 2 class method(s)
+
+### `ext/intl/datefmt_get_timezone_id.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
+### `ext/intl/datefmt_is_lenient.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 50)
 - 2 class method(s)
 
 ### `ext/intl/datefmt_localtime.php`
@@ -12649,6 +12716,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
 - new Error (line 74)
+- 2 class method(s)
+
+### `ext/intl/datefmt_set_calendar.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 51)
+- 2 class method(s)
+
+### `ext/intl/datefmt_set_lenient.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 52)
 - 2 class method(s)
 
 ### `ext/intl/datefmt_set_pattern.php`
@@ -36727,56 +36808,56 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 13049)
 - new Variable (line 13070)
 - new Variable (line 13104)
-- new Variable (line 13138)
-- new Variable (line 13230)
-- new Variable (line 13252)
-- new Variable (line 13262)
-- new Variable (line 13414)
-- new Variable (line 13432)
-- new Variable (line 13482)
-- new Variable (line 13509)
-- new Variable (line 13534)
-- new Variable (line 13863)
-- new Variable (line 14231)
-- new Variable (line 14261)
-- new Variable (line 14280)
-- new Variable (line 14310)
-- new Variable (line 14347)
-- new Variable (line 14395)
-- new Variable (line 14438)
-- new VM\Variable (line 14783)
-- new Variable (line 14817)
-- new Variable (line 14868)
-- new Variable (line 14884)
-- new Variable (line 14903)
-- new Variable (line 14910)
-- new OpCode (line 14930)
-- new Variable (line 14931)
-- new Variable (line 15103)
-- new Variable (line 15141)
-- new OpCode (line 15155)
-- new Variable (line 15156)
-- new Variable (line 15215)
-- new OpCode (line 15236)
-- new Variable (line 15237)
-- new Variable (line 15334)
-- new Variable (line 15356)
-- new Variable (line 15424)
-- new Operand\Literal (line 15433)
-- new Variable (line 15448)
-- new Variable (line 15630)
-- new VM\PropertyIsInitializedHandler (line 15712)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15752)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15927)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16025)
-- new JIT\Call\VmCoerceVariableToString (line 16115)
-- new JIT\Call\IncludePathResolverResolve (line 16382)
-- new Variable (line 17438)
-- new VM (line 17482)
-- new VM\Variable (line 17491)
-- new Variable (line 17512)
-- new Variable (line 17558)
-- new Variable (line 18052)
+- new Variable (line 13139)
+- new Variable (line 13233)
+- new Variable (line 13257)
+- new Variable (line 13267)
+- new Variable (line 13419)
+- new Variable (line 13437)
+- new Variable (line 13487)
+- new Variable (line 13514)
+- new Variable (line 13540)
+- new Variable (line 13869)
+- new Variable (line 14237)
+- new Variable (line 14267)
+- new Variable (line 14286)
+- new Variable (line 14316)
+- new Variable (line 14353)
+- new Variable (line 14401)
+- new Variable (line 14444)
+- new VM\Variable (line 14789)
+- new Variable (line 14823)
+- new Variable (line 14874)
+- new Variable (line 14890)
+- new Variable (line 14909)
+- new Variable (line 14916)
+- new OpCode (line 14936)
+- new Variable (line 14937)
+- new Variable (line 15109)
+- new Variable (line 15147)
+- new OpCode (line 15161)
+- new Variable (line 15162)
+- new Variable (line 15221)
+- new OpCode (line 15242)
+- new Variable (line 15243)
+- new Variable (line 15340)
+- new Variable (line 15362)
+- new Variable (line 15430)
+- new Operand\Literal (line 15439)
+- new Variable (line 15454)
+- new Variable (line 15636)
+- new VM\PropertyIsInitializedHandler (line 15718)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15758)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15933)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16031)
+- new JIT\Call\VmCoerceVariableToString (line 16121)
+- new JIT\Call\IncludePathResolverResolve (line 16388)
+- new Variable (line 17444)
+- new VM (line 17488)
+- new VM\Variable (line 17497)
+- new Variable (line 17518)
+- new Variable (line 17564)
+- new Variable (line 18058)
 - 369 class method(s)
 - 7 closure(s)
 
@@ -37838,9 +37919,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/IncludePathRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 422)
-- 21 class method(s)
-- 1 closure(s)
+- 12 class method(s)
 
 ### `lib/JIT/Builtin/InetRuntime.php`
 
