@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 
-/** Locale::filterMatches() — php-src locale_methods.c (#20036). */
+/** Locale::filterMatches() — php-src locale_methods.c (#20036, #20939). */
 final class LocaleFilterMatches extends VmClassMethod
 {
     public function __construct()

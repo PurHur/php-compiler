@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** locale_filter_matches() — language tag prefix filter (#20036). */
+/** locale_filter_matches() — language tag prefix filter (#20036, #20939). */
 final class locale_filter_matches extends Internal
 {
     public function execute(Frame $frame): void

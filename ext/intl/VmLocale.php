@@ -230,35 +230,71 @@ final class VmLocale
     }
 
     /**
-     * locale_filter_matches() / Locale::filterMatches() — prefix filter (php-src; #20036).
+     * locale_filter_matches() / Locale::filterMatches() — prefix filter (php-src; #20036, #20939).
+     *
+     * php-src locale_methods.c: when $canonicalize is false, only ID separators (`_`/`-`) or
+     * end-of-tag may follow a prefix match — `@` keywords do not match. With $canonicalize true,
+     * both operands are ICU-canonicalized first and `@` is accepted (isKeywordSeparator).
      */
     public static function filterMatches(
         string $langtag,
         string $locale,
         bool $canonicalize = false
     ): bool {
+        IntlError::clear();
         if ('' === $locale) {
             $locale = self::getDefault();
         }
         if ('*' === $locale) {
             return true;
         }
-        unset($canonicalize); // ICU canonicalize path deferred; non-canonical match matches php-src |b=false
+        if ($canonicalize) {
+            // php-src: canonicalize loc_range then lang_tag (locale_methods.c).
+            $canRange = self::canonicalize($locale);
+            if (null === $canRange || '' === $canRange) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'locale_filter_matches : unable to canonicalize loc_range'
+                );
+
+                return false;
+            }
+            $canLang = self::canonicalize($langtag);
+            if (null === $canLang || '' === $canLang) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'locale_filter_matches : unable to canonicalize lang_tag'
+                );
+
+                return false;
+            }
+            $langtag = $canLang;
+            $locale = $canRange;
+        }
         $curLang = self::strToMatch($langtag);
         $curRange = self::strToMatch($locale);
         if (null === $curLang || null === $curRange) {
             return false;
         }
+        // php-src: strstr(lang, range) must be at offset 0 (prefix).
         if (!str_starts_with($curLang, $curRange)) {
             return false;
         }
         $next = \strlen($curRange);
         if ($next >= \strlen($curLang)) {
-            return true;
+            return true; // isEndOfTag
         }
         $ch = $curLang[$next];
+        // isIDSeparator
+        if ('_' === $ch || '-' === $ch) {
+            return true;
+        }
+        // isKeywordSeparator — only on the canonicalize=true path in php-src.
+        if ($canonicalize && '@' === $ch) {
+            return true;
+        }
 
-        return '_' === $ch || '-' === $ch || '@' === $ch;
+        return false;
     }
 
     /**
