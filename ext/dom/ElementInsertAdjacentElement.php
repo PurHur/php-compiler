@@ -21,7 +21,7 @@ final class ElementInsertAdjacentElement extends DomClassMethod
         if (\count($frame->calledArgs) < 3) {
             throw new \LogicException('DOMElement::insertAdjacentElement() expects at least 2 arguments');
         }
-        $position = $this->stringArg($frame->calledArgs[1], 'DOMElement::insertAdjacentElement()', 0, $frame, 'where');
+        $position = $this->adjacentWhereArg($receiver, $frame->calledArgs[1], 'insertAdjacentElement');
         $elementArg = $frame->calledArgs[2]->resolveIndirect();
         if (Variable::TYPE_NULL === $elementArg->type) {
             if (null !== $frame->returnVar) {

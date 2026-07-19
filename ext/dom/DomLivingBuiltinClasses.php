@@ -9,6 +9,8 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\Variable;
 
 /** Register PHP 8.4 Dom\ living-standard classes (php-src ext/dom/php_dom.stub.php; #6506). */
@@ -58,6 +60,7 @@ final class DomLivingBuiltinClasses
         if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
             return;
         }
+        self::registerAdjacentPositionEnum($ctx);
         if (isset($ctx->classes[VmDomLiving::CLASS_HTML_DOCUMENT])) {
             return;
         }
@@ -241,6 +244,43 @@ final class DomLivingBuiltinClasses
             $xmlDocument->methodNames['savexmlfile'] = 'saveXmlFile';
         }
         $ctx->classes[VmDomLiving::CLASS_XML_DOCUMENT] = $xmlDocument;
+    }
+
+    /**
+     * Dom\AdjacentPosition — string-backed insertAdjacent* positions (php_dom.stub.php; #20782).
+     */
+    private static function registerAdjacentPositionEnum(Context $ctx): void
+    {
+        $lc = VmDomLiving::CLASS_ADJACENT_POSITION;
+        if (isset($ctx->classes[$lc])) {
+            return;
+        }
+
+        $entry = new ClassEntry('Dom\\AdjacentPosition');
+        $entry->isEnum = true;
+        $entry->isInternal = true;
+        $entry->backedType = 'string';
+        foreach ([
+            'BeforeBegin' => 'beforebegin',
+            'AfterBegin' => 'afterbegin',
+            'BeforeEnd' => 'beforeend',
+            'AfterEnd' => 'afterend',
+        ] as $name => $value) {
+            $backing = new Variable();
+            $backing->string($value);
+            $caseLc = strtolower($name);
+            $case = EnumCaseSupport::createCase($entry, $name, $backing);
+            $entry->constants[$caseLc] = $case;
+            $entry->enumCaseCanonicalNames[$caseLc] = $name;
+            $entry->enumCases[] = [
+                'name' => $name,
+                'value' => $backing,
+            ];
+        }
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
     }
 
     /** Share classic DOM* method handlers with living Dom\* types (#20418). */

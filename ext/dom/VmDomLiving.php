@@ -24,6 +24,9 @@ final class VmDomLiving
 
     public const CLASS_HTML_ELEMENT = 'dom\\htmlelement';
 
+    /** php-src Dom\AdjacentPosition (php_dom.stub.php; #20782). */
+    public const CLASS_ADJACENT_POSITION = 'dom\\adjacentposition';
+
     /** php-src Dom\TokenList (ext/dom/token_list.c / php_dom.stub.php; #20512). */
     public const CLASS_TOKEN_LIST = 'dom\\tokenlist';
 

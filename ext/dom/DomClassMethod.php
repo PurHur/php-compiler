@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -38,6 +39,71 @@ abstract class DomClassMethod extends VmClassMethod
                 '%s expects argument #%d to be of type string, %s given',
                 $label,
                 $index + 1,
+                VmDom::typeLabel($var)
+            ));
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            return '';
+        }
+
+        return $var->toString();
+    }
+
+    /**
+     * insertAdjacent* $where — string on DOMElement; Dom\AdjacentPosition on living Dom\Element (#20782).
+     *
+     * php-src: ext/dom/php_dom.stub.php — DOMElement string vs Dom\Element AdjacentPosition
+     */
+    protected function adjacentWhereArg(ObjectEntry $receiver, Variable $var, string $method): string
+    {
+        $var = $var->resolveIndirect();
+        $living = VmDomLiving::isLivingElement($receiver);
+        $label = $living
+            ? 'Dom\\Element::'.$method
+            : 'DOMElement::'.$method;
+
+        if ($living) {
+            if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+                $given = Variable::TYPE_OBJECT === $var->type
+                    ? $var->toObject()->class->name
+                    : VmDom::typeLabel($var);
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #1 ($where) must be of type Dom\\AdjacentPosition, %s given',
+                    $label,
+                    $given
+                ));
+            }
+            $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
+            if (null === $entry || VmDomLiving::CLASS_ADJACENT_POSITION !== strtolower($entry->enumClass->name)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #1 ($where) must be of type Dom\\AdjacentPosition, %s given',
+                    $label,
+                    EnumCaseSupport::typeNameForVariable($var)
+                ));
+            }
+            $backing = $entry->backingValue->resolveIndirect();
+            if (Variable::TYPE_STRING !== $backing->type) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #1 ($where) must be of type Dom\\AdjacentPosition, %s given',
+                    $label,
+                    EnumCaseSupport::typeNameForVariable($var)
+                ));
+            }
+
+            return $backing->toString();
+        }
+
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($where) must be of type string, %s given',
+                $label,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_STRING !== $var->type && Variable::TYPE_NULL !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($where) must be of type string, %s given',
+                $label,
                 VmDom::typeLabel($var)
             ));
         }
