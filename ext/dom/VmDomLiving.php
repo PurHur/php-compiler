@@ -55,6 +55,30 @@ final class VmDomLiving
     /** php-src Dom\DocumentType (php_dom.stub.php; #20910). */
     public const CLASS_DOCUMENT_TYPE = 'dom\\documenttype';
 
+    /** php-src Dom\CharacterData (php_dom.stub.php; #20948). */
+    public const CLASS_CHARACTER_DATA = 'dom\\characterdata';
+
+    /** php-src Dom\Text (php_dom.stub.php; #20948). */
+    public const CLASS_TEXT = 'dom\\text';
+
+    /** php-src Dom\Comment (php_dom.stub.php; #20948). */
+    public const CLASS_COMMENT = 'dom\\comment';
+
+    /** php-src Dom\CDATASection (php_dom.stub.php; #20948). */
+    public const CLASS_CDATA = 'dom\\cdatasection';
+
+    /** php-src Dom\ProcessingInstruction (php_dom.stub.php; #20948). */
+    public const CLASS_PROCESSING_INSTRUCTION = 'dom\\processinginstruction';
+
+    /** php-src Dom\Attr (php_dom.stub.php; #20948). */
+    public const CLASS_ATTR = 'dom\\attr';
+
+    /** php-src Dom\DocumentFragment (php_dom.stub.php; #20948). */
+    public const CLASS_DOCUMENT_FRAGMENT = 'dom\\documentfragment';
+
+    /** php-src Dom\NamedNodeMap (php_dom.stub.php; #20948). */
+    public const CLASS_NAMED_NODE_MAP = 'dom\\namednodemap';
+
     /** php-src Dom\NamespaceInfo (php_dom.stub.php; #20924). */
     public const CLASS_NAMESPACE_INFO = 'dom\\namespaceinfo';
 
@@ -437,7 +461,12 @@ final class VmDomLiving
 
     public static function querySelectorAll(Context $ctx, ObjectEntry $root, string $selectors): Variable
     {
-        return VmDom::createNodeList($ctx, self::querySelectorAllIds($root, $selectors));
+        $ids = self::querySelectorAllIds($root, $selectors);
+        if (VmDomLiving::prefersLivingCollections($root)) {
+            return VmDom::createDomNodeList($ctx, $ids);
+        }
+
+        return VmDom::createNodeList($ctx, $ids);
     }
 
     /**
@@ -870,18 +899,71 @@ final class VmDomLiving
 
     private static function applyLivingElementClassMap(DomNodeState $state): void
     {
-        if (isset($state->nodeClassMap[VmDom::CLASS_ELEMENT])) {
-            return;
-        }
-        $state->nodeClassMap[VmDom::CLASS_ELEMENT] = self::CLASS_HTML_ELEMENT;
+        self::applyLivingLeafClassMap($state, self::CLASS_HTML_ELEMENT);
     }
 
     private static function applyLivingXmlElementClassMap(DomNodeState $state): void
     {
-        if (isset($state->nodeClassMap[VmDom::CLASS_ELEMENT])) {
-            return;
+        self::applyLivingLeafClassMap($state, self::CLASS_ELEMENT);
+    }
+
+    /**
+     * Living documents remap legacy DOM* bases → Dom\* (php-src nodeClassMap / #20948).
+     *
+     * @param string $elementLc Dom\HTMLElement or Dom\Element class lc
+     */
+    private static function applyLivingLeafClassMap(DomNodeState $state, string $elementLc): void
+    {
+        $map = [
+            VmDom::CLASS_ELEMENT => $elementLc,
+            VmDom::CLASS_CHARACTER_DATA => self::CLASS_CHARACTER_DATA,
+            VmDom::CLASS_TEXT => self::CLASS_TEXT,
+            VmDom::CLASS_COMMENT => self::CLASS_COMMENT,
+            VmDom::CLASS_CDATA => self::CLASS_CDATA,
+            VmDom::CLASS_PROCESSING_INSTRUCTION => self::CLASS_PROCESSING_INSTRUCTION,
+            VmDom::CLASS_ATTR => self::CLASS_ATTR,
+            VmDom::CLASS_DOCUMENT_FRAGMENT => self::CLASS_DOCUMENT_FRAGMENT,
+            VmDom::CLASS_DOCUMENT_TYPE => self::CLASS_DOCUMENT_TYPE,
+            VmDom::CLASS_NODE_LIST => self::CLASS_NODE_LIST,
+            VmDom::CLASS_NAMED_NODE_MAP => self::CLASS_NAMED_NODE_MAP,
+        ];
+        foreach ($map as $baseLc => $livingLc) {
+            if (!isset($state->nodeClassMap[$baseLc])) {
+                $state->nodeClassMap[$baseLc] = $livingLc;
+            }
         }
-        $state->nodeClassMap[VmDom::CLASS_ELEMENT] = self::CLASS_ELEMENT;
+    }
+
+    /** True when $node belongs to a living Dom\* document tree (#20948). */
+    public static function prefersLivingCollections(ObjectEntry $node): bool
+    {
+        if (self::isLivingDocument($node) || self::isLivingElement($node)) {
+            return true;
+        }
+        $lc = strtolower($node->class->name);
+        if (self::CLASS_DOCUMENT === $lc
+            || self::CLASS_DOCUMENT_FRAGMENT === $lc
+            || self::CLASS_DOCUMENT_TYPE === $lc
+        ) {
+            return true;
+        }
+        // Leaf Dom\* nodes (Text/Attr/…) use Dom\NodeList / Dom\NamedNodeMap.
+        if (str_starts_with($lc, 'dom\\')
+            && (
+                self::CLASS_TEXT === $lc
+                || self::CLASS_COMMENT === $lc
+                || self::CLASS_CDATA === $lc
+                || self::CLASS_ATTR === $lc
+                || self::CLASS_CHARACTER_DATA === $lc
+                || self::CLASS_PROCESSING_INSTRUCTION === $lc
+                || self::CLASS_NODE === $lc
+            )
+        ) {
+            return true;
+        }
+        $owner = VmDom::ownerDocumentEntry($node);
+
+        return null !== $owner && self::isLivingDocument($owner);
     }
 
     private static function assertValidHtmlParseOptions(int $options): void

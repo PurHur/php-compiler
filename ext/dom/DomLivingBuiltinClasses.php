@@ -117,6 +117,93 @@ final class DomLivingBuiltinClasses
         $documentType->properties[] = new ClassProperty(VmDom::PROP_NOTATIONS, $nullProto, $objProto);
         $ctx->classes[VmDomLiving::CLASS_DOCUMENT_TYPE] = $documentType;
 
+        // Dom\CharacterData / Text / Comment / CDATA / PI / Attr / DocumentFragment / NamedNodeMap (#20948).
+        $characterData = new ClassEntry('Dom\\CharacterData');
+        $characterData->isInternal = true;
+        $characterData->parentLc = VmDomLiving::CLASS_NODE;
+        $characterData->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
+        $characterData->properties[] = new ClassProperty(VmDom::PROP_DATA, null, $strProto);
+        $characterData->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
+        $characterData->properties[] = new ClassProperty(VmDom::PROP_NEXT_ELEMENT_SIBLING, $nullProto, $objProto);
+        $characterData->properties[] = new ClassProperty(VmDom::PROP_PREVIOUS_ELEMENT_SIBLING, $nullProto, $objProto);
+        self::copyMethods($ctx->classes[VmDom::CLASS_CHARACTER_DATA] ?? null, $characterData);
+        $ctx->classes[VmDomLiving::CLASS_CHARACTER_DATA] = $characterData;
+
+        $text = new ClassEntry('Dom\\Text');
+        $text->isInternal = true;
+        $text->parentLc = VmDomLiving::CLASS_CHARACTER_DATA;
+        $text->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
+        $text->properties[] = new ClassProperty(VmDom::PROP_WHOLE_TEXT, null, $strProto);
+        self::copyMethods($ctx->classes[VmDom::CLASS_TEXT] ?? null, $text);
+        $ctx->classes[VmDomLiving::CLASS_TEXT] = $text;
+
+        $cdata = new ClassEntry('Dom\\CDATASection');
+        $cdata->isInternal = true;
+        $cdata->parentLc = VmDomLiving::CLASS_TEXT;
+        $cdata->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
+        self::copyMethods($ctx->classes[VmDom::CLASS_CDATA] ?? null, $cdata);
+        $ctx->classes[VmDomLiving::CLASS_CDATA] = $cdata;
+
+        $comment = new ClassEntry('Dom\\Comment');
+        $comment->isInternal = true;
+        $comment->parentLc = VmDomLiving::CLASS_CHARACTER_DATA;
+        $comment->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
+        self::copyMethods($ctx->classes[VmDom::CLASS_COMMENT] ?? null, $comment);
+        $ctx->classes[VmDomLiving::CLASS_COMMENT] = $comment;
+
+        $pi = new ClassEntry('Dom\\ProcessingInstruction');
+        $pi->isInternal = true;
+        $pi->parentLc = VmDomLiving::CLASS_CHARACTER_DATA;
+        $pi->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
+        $pi->properties[] = new ClassProperty(VmDom::PROP_NODE_VALUE, $nullProto, $strProto);
+        $pi->properties[] = new ClassProperty(VmDom::PROP_TARGET, null, $strProto);
+        $pi->properties[] = new ClassProperty(VmDom::PROP_DATA, null, $strProto);
+        self::copyMethods($ctx->classes[VmDom::CLASS_PROCESSING_INSTRUCTION] ?? null, $pi);
+        $ctx->classes[VmDomLiving::CLASS_PROCESSING_INSTRUCTION] = $pi;
+
+        $attr = new ClassEntry('Dom\\Attr');
+        $attr->isInternal = true;
+        $attr->parentLc = VmDomLiving::CLASS_NODE;
+        $attr->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
+        $attr->properties[] = new ClassProperty(VmDom::PROP_NAME, null, $strProto);
+        $attr->properties[] = new ClassProperty(VmDom::PROP_VALUE, null, $strProto);
+        $attr->properties[] = new ClassProperty(VmDom::PROP_OWNER_ELEMENT, $nullProto, $objProto);
+        $specifiedDefault = new Variable(Variable::TYPE_BOOLEAN);
+        $specifiedDefault->bool(true);
+        $attr->properties[] = new ClassProperty(VmDom::PROP_SPECIFIED, $specifiedDefault, new Variable(Variable::TYPE_BOOLEAN));
+        self::copyMethods($ctx->classes[VmDom::CLASS_ATTR] ?? null, $attr);
+        $ctx->classes[VmDomLiving::CLASS_ATTR] = $attr;
+
+        $fragment = new ClassEntry('Dom\\DocumentFragment');
+        $fragment->isInternal = true;
+        $fragment->parentLc = VmDomLiving::CLASS_NODE;
+        $fragment->properties[] = new ClassProperty(VmDom::PROP_NODE_NAME, null, $strProto);
+        $fragment->properties[] = new ClassProperty(VmDom::PROP_FIRST_ELEMENT_CHILD, $nullProto, $objProto);
+        $fragment->properties[] = new ClassProperty(VmDom::PROP_LAST_ELEMENT_CHILD, $nullProto, $objProto);
+        $fragment->properties[] = new ClassProperty(VmDom::PROP_CHILD_ELEMENT_COUNT, null, new Variable(Variable::TYPE_INTEGER));
+        self::copyMethods($ctx->classes[VmDom::CLASS_DOCUMENT_FRAGMENT] ?? null, $fragment);
+        // Living fragment also exposes Element querySelector* (#20948 / php_dom.stub.php).
+        $fragment->methods['queryselector'] = new ElementQuerySelector();
+        $fragment->methodVisibility['queryselector'] = $pub;
+        $fragment->methodNames['queryselector'] = 'querySelector';
+        $fragment->methods['queryselectorall'] = new ElementQuerySelectorAll();
+        $fragment->methodVisibility['queryselectorall'] = $pub;
+        $fragment->methodNames['queryselectorall'] = 'querySelectorAll';
+        $ctx->classes[VmDomLiving::CLASS_DOCUMENT_FRAGMENT] = $fragment;
+
+        $namedNodeMap = new ClassEntry('Dom\\NamedNodeMap');
+        $namedNodeMap->isInternal = true;
+        $namedNodeMap->interfaces[] = 'countable';
+        if (isset($ctx->classes['iterator'])) {
+            $namedNodeMap->interfaces[] = 'iterator';
+        }
+        if (isset($ctx->classes['traversable'])) {
+            $namedNodeMap->interfaces[] = 'traversable';
+        }
+        $namedNodeMap->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
+        self::copyMethods($ctx->classes[VmDom::CLASS_NAMED_NODE_MAP] ?? null, $namedNodeMap);
+        $ctx->classes[VmDomLiving::CLASS_NAMED_NODE_MAP] = $namedNodeMap;
+
         $element = new ClassEntry('Dom\\Element');
         $element->isInternal = true;
         $element->parentLc = VmDomLiving::CLASS_NODE;

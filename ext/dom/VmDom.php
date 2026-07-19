@@ -829,8 +829,8 @@ final class VmDom
         $state->systemId = $systemId;
         DomRegistry::attach($entry, $state);
         self::initDocumentTypePropertySlots($entry, $qualifiedName, $publicId, $systemId);
-        $entitiesMap = self::createNamedNodeMap($ctx, []);
-        $notationsMap = self::createNamedNodeMap($ctx, []);
+        $entitiesMap = self::createNamedNodeMap($ctx, [], $entry);
+        $notationsMap = self::createNamedNodeMap($ctx, [], $entry);
         $state->entitiesMapId = $entitiesMap->toObject()->id;
         $state->notationsMapId = $notationsMap->toObject()->id;
         $entry->getProperty(self::PROP_ENTITIES)->copyFrom($entitiesMap);
@@ -1039,7 +1039,10 @@ final class VmDom
     public static function ensureDocumentFragment(ObjectEntry $fragment): DomNodeState
     {
         if (!DomRegistry::has($fragment)) {
-            if (self::CLASS_DOCUMENT_FRAGMENT !== strtolower($fragment->class->name)) {
+            $fragLc = strtolower($fragment->class->name);
+            if (self::CLASS_DOCUMENT_FRAGMENT !== $fragLc
+                && VmDomLiving::CLASS_DOCUMENT_FRAGMENT !== $fragLc
+            ) {
                 throw new \LogicException('ensureDocumentFragment() expects a DOMDocumentFragment in this compiler build');
             }
             if ($fragment->hasProperty(self::PROP_NODE_NAME)) {
@@ -1068,17 +1071,26 @@ final class VmDom
         }
 
         $classLc = strtolower($entry->class->name);
-        if (self::CLASS_DOCUMENT === $classLc) {
+        if (self::CLASS_DOCUMENT === $classLc
+            || VmDomLiving::CLASS_HTML_DOCUMENT === $classLc
+            || VmDomLiving::CLASS_XML_DOCUMENT === $classLc
+            || VmDomLiving::CLASS_DOCUMENT === $classLc
+        ) {
             self::ensureDocument($entry);
 
             return;
         }
-        if (self::CLASS_DOCUMENT_FRAGMENT === $classLc) {
+        if (self::CLASS_DOCUMENT_FRAGMENT === $classLc
+            || VmDomLiving::CLASS_DOCUMENT_FRAGMENT === $classLc
+        ) {
             self::ensureDocumentFragment($entry);
 
             return;
         }
-        if (self::CLASS_ELEMENT !== $classLc) {
+        if (self::CLASS_ELEMENT !== $classLc
+            && VmDomLiving::CLASS_ELEMENT !== $classLc
+            && VmDomLiving::CLASS_HTML_ELEMENT !== $classLc
+        ) {
             throw new \LogicException('DOM object has no registered node state in this compiler build');
         }
 
@@ -4372,11 +4384,11 @@ final class VmDom
         }
 
         $doctypeState = DomRegistry::state($doctype);
-        $entitiesMap = self::createNamedNodeMap($ctx, $entityIds);
+        $entitiesMap = self::createNamedNodeMap($ctx, $entityIds, $doctype);
         $doctypeState->entitiesMapId = $entitiesMap->toObject()->id;
         $doctype->getProperty(self::PROP_ENTITIES)->copyFrom($entitiesMap);
 
-        $notationsMap = self::createNamedNodeMap($ctx, $notationIds);
+        $notationsMap = self::createNamedNodeMap($ctx, $notationIds, $doctype);
         $doctypeState->notationsMapId = $notationsMap->toObject()->id;
         $doctype->getProperty(self::PROP_NOTATIONS)->copyFrom($notationsMap);
     }
@@ -7735,10 +7747,17 @@ final class VmDom
 
     /**
      * @param list<int> $nodeIds
+     * @param ObjectEntry|null $livingOwner When set on a living Dom\* node, allocate Dom\NamedNodeMap (#20948).
      */
-    public static function createNamedNodeMap(Context $ctx, array $nodeIds): Variable
+    public static function createNamedNodeMap(Context $ctx, array $nodeIds, ?ObjectEntry $livingOwner = null): Variable
     {
-        $class = $ctx->classes[self::CLASS_NAMED_NODE_MAP] ?? null;
+        $classLc = self::CLASS_NAMED_NODE_MAP;
+        if (null !== $livingOwner && VmDomLiving::prefersLivingCollections($livingOwner)) {
+            if (isset($ctx->classes[VmDomLiving::CLASS_NAMED_NODE_MAP])) {
+                $classLc = VmDomLiving::CLASS_NAMED_NODE_MAP;
+            }
+        }
+        $class = $ctx->classes[$classLc] ?? null;
         if (null === $class) {
             throw new \LogicException('DOMNamedNodeMap is not registered in this compiler build');
         }
@@ -7762,8 +7781,12 @@ final class VmDom
 
     public static function isNamedNodeMap(ObjectEntry $entry): bool
     {
-        return self::CLASS_NAMED_NODE_MAP === strtolower($entry->class->name)
-            && DomRegistry::has($entry)
+        $lc = strtolower($entry->class->name);
+        if (self::CLASS_NAMED_NODE_MAP !== $lc && VmDomLiving::CLASS_NAMED_NODE_MAP !== $lc) {
+            return false;
+        }
+
+        return DomRegistry::has($entry)
             && DomConstants::XML_NAMEDNODEMAP === DomRegistry::state($entry)->nodeType;
     }
 
@@ -8037,7 +8060,7 @@ final class VmDom
                 return;
             }
         }
-        $mapVar = self::createNamedNodeMap($ctx, $attrIds);
+        $mapVar = self::createNamedNodeMap($ctx, $attrIds, $element);
         $map = $mapVar->toObject();
         $state->attributesListId = $map->id;
         $attrsVar->copyFrom($mapVar);
@@ -8368,7 +8391,9 @@ final class VmDom
         ) {
             return;
         }
-        $listVar = self::createNodeList($ctx, $state->childIds);
+        $listVar = VmDomLiving::prefersLivingCollections($node)
+            ? self::createDomNodeList($ctx, $state->childIds)
+            : self::createNodeList($ctx, $state->childIds);
         $list = $listVar->toObject();
         $state->childNodesListId = $list->id;
         $childNodesVar->copyFrom($listVar);
@@ -9946,6 +9971,34 @@ final class VmDom
             }
             // Dom\HTMLDocument / Dom\XMLDocument share DOMDocument method handlers (#20556).
             if (self::CLASS_DOCUMENT === $classLc && self::isDocument($object)) {
+                return $object;
+            }
+            // Living leaf Dom\* nodes share classic DOM* method handlers (#20948).
+            if (self::CLASS_ATTR === $classLc && self::isAttr($object)) {
+                return $object;
+            }
+            if (self::CLASS_TEXT === $classLc && self::isTextNode($object)) {
+                return $object;
+            }
+            if (self::CLASS_COMMENT === $classLc && self::isCommentNode($object)) {
+                return $object;
+            }
+            if (self::CLASS_CDATA === $classLc && self::isCdataNode($object)) {
+                return $object;
+            }
+            if (self::CLASS_CHARACTER_DATA === $classLc && self::isCharacterData($object)) {
+                return $object;
+            }
+            if (self::CLASS_PROCESSING_INSTRUCTION === $classLc && self::isProcessingInstruction($object)) {
+                return $object;
+            }
+            if (self::CLASS_DOCUMENT_FRAGMENT === $classLc && self::isDocumentFragment($object)) {
+                return $object;
+            }
+            if (self::CLASS_NAMED_NODE_MAP === $classLc && self::isNamedNodeMap($object)) {
+                return $object;
+            }
+            if (VmDomLiving::CLASS_NAMED_NODE_MAP === $classLc && self::isNamedNodeMap($object)) {
                 return $object;
             }
             // Dom\TokenList shares DOMTokenList method handlers (#20512).
