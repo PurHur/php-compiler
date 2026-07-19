@@ -43,9 +43,10 @@ final class crc32 extends Internal
         if (\count($args) < 1 || \count($args) > 2) {
             throw new \LogicException('crc32() requires one or two arguments in this compiler build');
         }
+        // Non-strict null → E_DEPRECATED + '' (php-src crc32.c / #21181); strict_types TypeErrors.
         $subject = $context->callerStrictTypes
             ? JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'crc32', 0, 'string')
-            : JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'crc32', 0, 'string');
+            : JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'crc32', 0, 'string');
         $seed = $context->getTypeFromString('int64')->constInt(0, false);
         if (isset($args[1])) {
             $seed = JitLongArg::lower($context, $args[1], 'crc32() seed');
@@ -60,7 +61,7 @@ final class crc32 extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'crc32', 'string')->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'crc32',
             $argIndex,

@@ -108,7 +108,7 @@ final class JitStringBuiltinArg
      * Soft-null string args — coerce+deprecate on forward profile (not Z_PARAM_STR TypeError).
      *
      * trim/ltrim/rtrim/chop (#19983), str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
-     * and strlen/strtolower/strtoupper/strrev (#20007). bin2hex uses {@see lowerZparamStr} (#20154).
+     * strlen/strtolower/strtoupper/strrev (#20007), and md5/sha1/crc32/bin2hex/hash($data) (#21181).
      */
     public static function lowerTrimFamilyString(
         Context $context,

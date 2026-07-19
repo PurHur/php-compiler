@@ -54,14 +54,17 @@ final class bin2hex extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#20154, ext/standard/string.c). */
+    /**
+     * Z_PARAM_STR $string — non-strict null is E_DEPRECATED + '' on 8.4 (php-src string.c / #21181).
+     * Reverts mistaken #20154 forward-profile TypeError; strict_types still TypeErrors.
+     */
     private static function vmStringArg(Frame $frame): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, 0, 'bin2hex', 'string')->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'bin2hex',
             0,
@@ -81,7 +84,7 @@ final class bin2hex extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'bin2hex',
