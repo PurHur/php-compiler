@@ -6,7 +6,12 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 
-/** DOMDocument::createCDATASection() — VM (#17526, php-src ext/dom/php_dom.c). */
+/**
+ * DOMDocument / Dom\Document::createCDATASection() — VM (#17526, #21064).
+ *
+ * php-src: ext/dom/document.c PHP_METHOD(DOMDocument, createCDATASection)
+ * (follow_spec + HTML document → NOT_SUPPORTED_ERR).
+ */
 final class DocumentCreateCDATASection extends DomClassMethod
 {
     public function __construct()
@@ -23,6 +28,13 @@ final class DocumentCreateCDATASection extends DomClassMethod
         $data = $this->stringArg($frame->calledArgs[1], 'DOMDocument::createCDATASection()', 0);
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createCDATASection() requires VM context in this compiler build');
+        }
+        // Living Dom\* only (php_dom_follow_spec_intern): HTML docs cannot create CDATA (#21064).
+        if (VmDomLiving::isLivingDocument($document) && DomRegistry::state($document)->isHtmlDocument) {
+            throw new \DOMException(
+                'This operation is not supported for HTML documents',
+                DomExceptionConstants::NOT_SUPPORTED_ERR
+            );
         }
         $section = VmDom::createCdataSection($frame->vmContext, $data, $document);
         if (null !== $frame->returnVar) {
