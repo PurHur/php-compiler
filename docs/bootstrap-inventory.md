@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5931 |
-| Phase A inventory files (M2 ratio SSOT) | 5931 |
+| PHP files on vm.php path | 5913 |
+| Phase A inventory files (M2 ratio SSOT) | 5913 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18044 |
+| Source constructs flagged (warnings) | 18036 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -843,12 +843,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
-| `ext/intl/VmBreakIterator.php` | 0 | 49 |
+| `ext/intl/VmBreakIterator.php` | 0 | 56 |
 | `ext/intl/VmCollator.php` | 0 | 55 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
 | `ext/intl/VmIntlCalendar.php` | 0 | 103 |
-| `ext/intl/VmIntlChar.php` | 0 | 84 |
+| `ext/intl/VmIntlChar.php` | 0 | 109 |
 | `ext/intl/VmIntlDateFormatter.php` | 0 | 25 |
 | `ext/intl/VmIntlDatePatternGenerator.php` | 0 | 12 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 61 |
@@ -859,7 +859,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmResourceBundle.php` | 0 | 28 |
 | `ext/intl/VmSpoofchecker.php` | 0 | 29 |
 | `ext/intl/VmTransliterator.php` | 0 | 27 |
-| `ext/intl/VmUConverter.php` | 0 | 40 |
+| `ext/intl/VmUConverter.php` | 0 | 46 |
 | `ext/intl/collator_asort.php` | 0 | 3 |
 | `ext/intl/collator_compare.php` | 0 | 3 |
 | `ext/intl/collator_create.php` | 0 | 3 |
@@ -1104,24 +1104,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/msgpack/VmMsgpack.php` | 0 | 11 |
 | `ext/msgpack/msgpack_pack.php` | 0 | 3 |
 | `ext/msgpack/msgpack_unpack.php` | 0 | 2 |
-| `ext/odbc/BuiltinClasses.php` | 0 | 1 |
-| `ext/odbc/Module.php` | 0 | 12 |
-| `ext/odbc/OdbcConstants.php` | 0 | 1 |
-| `ext/odbc/OdbcExtensionPolicy.php` | 0 | 1 |
-| `ext/odbc/VmOdbcConnection.php` | 0 | 4 |
-| `ext/odbc/VmOdbcCore.php` | 0 | 1 |
-| `ext/odbc/VmOdbcNative.php` | 0 | 1 |
-| `ext/odbc/VmOdbcResult.php` | 0 | 4 |
-| `ext/odbc/odbc_close.php` | 0 | 2 |
-| `ext/odbc/odbc_close_all.php` | 0 | 2 |
-| `ext/odbc/odbc_connect.php` | 0 | 2 |
-| `ext/odbc/odbc_error.php` | 0 | 2 |
-| `ext/odbc/odbc_errormsg.php` | 0 | 2 |
-| `ext/odbc/odbc_exec.php` | 0 | 2 |
-| `ext/odbc/odbc_fetch_row.php` | 0 | 2 |
-| `ext/odbc/odbc_num_rows.php` | 0 | 2 |
-| `ext/odbc/odbc_pconnect.php` | 0 | 2 |
-| `ext/odbc/odbc_result.php` | 0 | 2 |
 | `ext/opcache/Module.php` | 0 | 4 |
 | `ext/opcache/OpcacheFunction.php` | 0 | 1 |
 | `ext/opcache/VmOpcache.php` | 0 | 16 |
@@ -5240,7 +5222,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 101 |
+| `lib/Runtime.php` | 0 | 100 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -11744,55 +11726,62 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmBreakIterator.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 85)
-- new ClassEntry (line 88)
-- new ClassProperty (line 92)
-- new ClassEntry (line 97)
-- new ClassProperty (line 101)
-- new ClassEntry (line 106)
-- new ClassProperty (line 110)
-- new BreakIteratorGetLastCodePoint (line 113)
-- new ClassEntry (line 118)
-- new ClassProperty (line 120)
-- new PartsIteratorCurrent (line 122)
-- new PartsIteratorKey (line 123)
-- new PartsIteratorNext (line 124)
-- new PartsIteratorRewind (line 125)
-- new PartsIteratorValid (line 126)
-- new Variable (line 139)
-- new BreakIteratorCreateWordInstance (line 149)
-- new BreakIteratorCreateCharacterInstance (line 150)
-- new BreakIteratorCreateCodePointInstance (line 151)
-- new BreakIteratorCreateLineInstance (line 152)
-- new BreakIteratorCreateSentenceInstance (line 153)
-- new BreakIteratorCreateTitleInstance (line 154)
-- new BreakIteratorSetText (line 166)
-- new BreakIteratorGetText (line 167)
-- new BreakIteratorFirst (line 168)
-- new BreakIteratorLast (line 169)
-- new BreakIteratorNext (line 170)
-- new BreakIteratorPrevious (line 171)
-- new BreakIteratorCurrent (line 172)
-- new BreakIteratorPreceding (line 173)
-- new BreakIteratorFollowing (line 174)
-- new BreakIteratorIsBoundary (line 175)
-- new BreakIteratorGetLocale (line 176)
-- new BreakIteratorGetErrorCode (line 177)
-- new BreakIteratorGetErrorMessage (line 178)
-- new BreakIteratorGetPartsIterator (line 179)
-- new ObjectEntry (line 195)
-- new ObjectEntry (line 493)
-- new ArgumentCountError (line 820)
-- new ArgumentCountError (line 861)
-- new ArgumentCountError (line 901)
-- new ArgumentCountError (line 940)
-- new ArgumentCountError (line 1024)
-- new ArgumentCountError (line 1044)
-- new ArgumentCountError (line 1064)
-- new ArgumentCountError (line 1084)
-- new ArgumentCountError (line 1105)
-- new ArgumentCountError (line 1124)
-- 73 class method(s)
+- new Variable (line 96)
+- new ClassEntry (line 99)
+- new ClassProperty (line 103)
+- new ClassEntry (line 108)
+- new ClassProperty (line 112)
+- new BreakIteratorGetRuleStatus (line 115)
+- new BreakIteratorGetRuleStatusVec (line 118)
+- new ClassEntry (line 123)
+- new ClassProperty (line 127)
+- new BreakIteratorGetLastCodePoint (line 130)
+- new ClassEntry (line 135)
+- new ClassProperty (line 137)
+- new Variable (line 140)
+- new PartsIteratorCurrent (line 146)
+- new PartsIteratorKey (line 147)
+- new PartsIteratorNext (line 148)
+- new PartsIteratorRewind (line 149)
+- new PartsIteratorValid (line 150)
+- new PartsIteratorGetBreakIterator (line 151)
+- new PartsIteratorGetRuleStatus (line 152)
+- new Variable (line 165)
+- new BreakIteratorCreateWordInstance (line 175)
+- new BreakIteratorCreateCharacterInstance (line 176)
+- new BreakIteratorCreateCodePointInstance (line 177)
+- new BreakIteratorCreateLineInstance (line 178)
+- new BreakIteratorCreateSentenceInstance (line 179)
+- new BreakIteratorCreateTitleInstance (line 180)
+- new BreakIteratorSetText (line 192)
+- new BreakIteratorGetText (line 193)
+- new BreakIteratorFirst (line 194)
+- new BreakIteratorLast (line 195)
+- new BreakIteratorNext (line 196)
+- new BreakIteratorPrevious (line 197)
+- new BreakIteratorCurrent (line 198)
+- new BreakIteratorPreceding (line 199)
+- new BreakIteratorFollowing (line 200)
+- new BreakIteratorIsBoundary (line 201)
+- new BreakIteratorGetLocale (line 202)
+- new BreakIteratorGetErrorCode (line 203)
+- new BreakIteratorGetErrorMessage (line 204)
+- new BreakIteratorGetPartsIterator (line 205)
+- new ObjectEntry (line 221)
+- new ObjectEntry (line 522)
+- new ArgumentCountError (line 984)
+- new ArgumentCountError (line 1025)
+- new ArgumentCountError (line 1065)
+- new ArgumentCountError (line 1104)
+- new ArgumentCountError (line 1188)
+- new ArgumentCountError (line 1208)
+- new ArgumentCountError (line 1228)
+- new ArgumentCountError (line 1248)
+- new ArgumentCountError (line 1269)
+- new ArgumentCountError (line 1288)
+- new HashTable (line 1464)
+- new Variable (line 1466)
+- 87 class method(s)
 
 ### `ext/intl/VmCollator.php`
 
@@ -11977,90 +11966,115 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmIntlChar.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 192)
-- new Variable (line 196)
-- new IntlCharOrd (line 203)
-- new IntlCharChr (line 204)
-- new IntlCharCharName (line 205)
-- new IntlCharHasBinaryProperty (line 206)
-- new IntlCharIsAlpha (line 207)
-- new IntlCharIsDigit (line 208)
-- new IntlCharIsAlnum (line 209)
-- new IntlCharIsSpace (line 210)
-- new IntlCharIsLower (line 211)
-- new IntlCharIsUpper (line 212)
-- new IntlCharIsBlank (line 213)
-- new IntlCharIsCntrl (line 214)
-- new IntlCharIsGraph (line 215)
-- new IntlCharIsPrint (line 216)
-- new IntlCharIsPunct (line 217)
-- new IntlCharIsXdigit (line 218)
-- new IntlCharIsBase (line 219)
-- new IntlCharIsMirrored (line 220)
-- new IntlCharCharType (line 221)
-- new IntlCharGetBlockCode (line 222)
-- new IntlCharGetCombiningClass (line 223)
-- new IntlCharToUpper (line 224)
-- new IntlCharToLower (line 225)
-- new IntlCharToTitle (line 226)
-- new IntlCharFoldCase (line 227)
-- new IntlCharDigit (line 228)
-- new IntlCharForDigit (line 229)
-- new IntlCharIsTitle (line 230)
-- new IntlCharCharFromName (line 231)
-- new IntlCharGetPropertyName (line 232)
-- new IntlCharGetPropertyEnum (line 233)
-- new IntlCharGetPropertyValueName (line 234)
-- new IntlCharGetPropertyValueEnum (line 235)
-- new IntlCharGetIntPropertyValue (line 236)
-- new IntlCharGetIntPropertyMinValue (line 237)
-- new IntlCharGetIntPropertyMaxValue (line 238)
-- new IntlCharGetUnicodeVersion (line 239)
-- new IntlCharGetNumericValue (line 240)
-- new IntlCharCharDigitValue (line 241)
-- new HashTable (line 987)
-- new Variable (line 989)
-- new ArgumentCountError (line 1195)
-- new ArgumentCountError (line 1226)
-- new ArgumentCountError (line 1262)
-- new ArgumentCountError (line 1296)
-- new ArgumentCountError (line 1327)
-- new ArgumentCountError (line 1352)
-- new ArgumentCountError (line 1378)
-- new ArgumentCountError (line 1403)
-- new ArgumentCountError (line 1428)
-- new ArgumentCountError (line 1453)
-- new ArgumentCountError (line 1478)
-- new ArgumentCountError (line 1503)
-- new ArgumentCountError (line 1528)
-- new ArgumentCountError (line 1553)
-- new ArgumentCountError (line 1578)
-- new ArgumentCountError (line 1603)
+- new ClassEntry (line 193)
+- new Variable (line 197)
+- new IntlCharOrd (line 204)
+- new IntlCharChr (line 205)
+- new IntlCharCharName (line 206)
+- new IntlCharHasBinaryProperty (line 207)
+- new IntlCharIsAlpha (line 208)
+- new IntlCharIsDigit (line 209)
+- new IntlCharIsAlnum (line 210)
+- new IntlCharIsSpace (line 211)
+- new IntlCharIsLower (line 212)
+- new IntlCharIsUpper (line 213)
+- new IntlCharIsBlank (line 214)
+- new IntlCharIsCntrl (line 215)
+- new IntlCharIsGraph (line 216)
+- new IntlCharIsPrint (line 217)
+- new IntlCharIsPunct (line 218)
+- new IntlCharIsXdigit (line 219)
+- new IntlCharIsBase (line 220)
+- new IntlCharIsMirrored (line 221)
+- new IntlCharCharType (line 222)
+- new IntlCharGetBlockCode (line 223)
+- new IntlCharGetCombiningClass (line 224)
+- new IntlCharToUpper (line 225)
+- new IntlCharToLower (line 226)
+- new IntlCharToTitle (line 227)
+- new IntlCharFoldCase (line 228)
+- new IntlCharDigit (line 229)
+- new IntlCharForDigit (line 230)
+- new IntlCharIsTitle (line 231)
+- new IntlCharCharFromName (line 232)
+- new IntlCharGetPropertyName (line 233)
+- new IntlCharGetPropertyEnum (line 234)
+- new IntlCharGetPropertyValueName (line 235)
+- new IntlCharGetPropertyValueEnum (line 236)
+- new IntlCharGetIntPropertyValue (line 237)
+- new IntlCharGetIntPropertyMinValue (line 238)
+- new IntlCharGetIntPropertyMaxValue (line 239)
+- new IntlCharGetUnicodeVersion (line 240)
+- new IntlCharGetNumericValue (line 241)
+- new IntlCharCharDigitValue (line 242)
+- new IntlCharEnumCharNames (line 243)
+- new IntlCharCharAge (line 244)
+- new IntlCharIsDefined (line 245)
+- new IntlCharIsUAlphabetic (line 246)
+- new IntlCharIsULowercase (line 247)
+- new IntlCharIsUUppercase (line 248)
+- new IntlCharIsUWhiteSpace (line 249)
+- new IntlCharCharDirection (line 250)
+- new IntlCharCharMirror (line 251)
+- new IntlCharGetBidiPairedBracket (line 252)
+- new HashTable (line 639)
+- new Variable (line 641)
+- new Variable (line 671)
+- new Variable (line 673)
+- new Variable (line 675)
+- new HashTable (line 1228)
+- new Variable (line 1230)
+- new ArgumentCountError (line 1445)
+- new ArgumentCountError (line 1476)
+- new ArgumentCountError (line 1512)
+- new ArgumentCountError (line 1546)
+- new ArgumentCountError (line 1577)
+- new ArgumentCountError (line 1602)
 - new ArgumentCountError (line 1628)
 - new ArgumentCountError (line 1653)
 - new ArgumentCountError (line 1678)
 - new ArgumentCountError (line 1703)
 - new ArgumentCountError (line 1728)
 - new ArgumentCountError (line 1753)
-- new ArgumentCountError (line 1783)
-- new ArgumentCountError (line 1813)
-- new ArgumentCountError (line 1843)
-- new ArgumentCountError (line 1876)
-- new ArgumentCountError (line 1910)
-- new ArgumentCountError (line 1938)
-- new ArgumentCountError (line 1963)
-- new ArgumentCountError (line 1997)
-- new ArgumentCountError (line 2031)
-- new ArgumentCountError (line 2056)
-- new ArgumentCountError (line 2091)
-- new ArgumentCountError (line 2117)
-- new ArgumentCountError (line 2143)
-- new ArgumentCountError (line 2168)
-- new ArgumentCountError (line 2193)
-- new ArgumentCountError (line 2217)
-- new ArgumentCountError (line 2242)
-- 90 class method(s)
-- 15 closure(s)
+- new ArgumentCountError (line 1778)
+- new ArgumentCountError (line 1803)
+- new ArgumentCountError (line 1828)
+- new ArgumentCountError (line 1853)
+- new ArgumentCountError (line 1878)
+- new ArgumentCountError (line 1903)
+- new ArgumentCountError (line 1928)
+- new ArgumentCountError (line 1953)
+- new ArgumentCountError (line 1978)
+- new ArgumentCountError (line 2003)
+- new ArgumentCountError (line 2033)
+- new ArgumentCountError (line 2063)
+- new ArgumentCountError (line 2093)
+- new ArgumentCountError (line 2126)
+- new ArgumentCountError (line 2160)
+- new ArgumentCountError (line 2188)
+- new ArgumentCountError (line 2213)
+- new ArgumentCountError (line 2247)
+- new ArgumentCountError (line 2281)
+- new ArgumentCountError (line 2306)
+- new ArgumentCountError (line 2341)
+- new ArgumentCountError (line 2367)
+- new ArgumentCountError (line 2393)
+- new ArgumentCountError (line 2418)
+- new ArgumentCountError (line 2443)
+- new ArgumentCountError (line 2467)
+- new ArgumentCountError (line 2492)
+- new ArgumentCountError (line 2517)
+- new ArgumentCountError (line 2547)
+- new ArgumentCountError (line 2577)
+- new ArgumentCountError (line 2607)
+- new ArgumentCountError (line 2637)
+- new ArgumentCountError (line 2667)
+- new ArgumentCountError (line 2697)
+- new ArgumentCountError (line 2729)
+- new ArgumentCountError (line 2761)
+- new ArgumentCountError (line 2791)
+- 111 class method(s)
+- 21 closure(s)
 
 ### `ext/intl/VmIntlDateFormatter.php`
 
@@ -12391,38 +12405,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new UConverterGetErrorMessage (line 127)
 - new UConverterGetSourceEncoding (line 128)
 - new UConverterGetDestinationEncoding (line 129)
-- new UConverterGetSourceType (line 130)
-- new UConverterGetDestinationType (line 131)
-- new UConverterGetSubstChars (line 132)
-- new UConverterSetSubstChars (line 133)
-- new UConverterReasonText (line 134)
-- new UConverterTranscode (line 135)
-- new UConverterGetAvailable (line 136)
-- new UConverterGetAliases (line 137)
-- new UConverterGetStandards (line 138)
-- new Error (line 193)
-- new Error (line 285)
-- new HashTable (line 470)
-- new Variable (line 472)
-- new Error (line 608)
-- new Error (line 612)
-- new ArgumentCountError (line 656)
-- new ArgumentCountError (line 677)
-- new ArgumentCountError (line 719)
-- new ArgumentCountError (line 744)
-- new ArgumentCountError (line 750)
-- new ArgumentCountError (line 807)
-- new ArgumentCountError (line 832)
-- new ArgumentCountError (line 863)
-- new ArgumentCountError (line 894)
-- new ArgumentCountError (line 925)
-- new ArgumentCountError (line 957)
+- new UConverterSetSourceEncoding (line 130)
+- new UConverterSetDestinationEncoding (line 131)
+- new UConverterGetSourceType (line 132)
+- new UConverterGetDestinationType (line 133)
+- new UConverterGetSubstChars (line 134)
+- new UConverterSetSubstChars (line 135)
+- new UConverterReasonText (line 136)
+- new UConverterTranscode (line 137)
+- new UConverterGetAvailable (line 138)
+- new UConverterGetAliases (line 139)
+- new UConverterGetStandards (line 140)
+- new Error (line 195)
+- new Error (line 271)
+- new Error (line 301)
+- new Error (line 346)
+- new HashTable (line 531)
+- new Variable (line 533)
+- new Error (line 669)
+- new Error (line 673)
+- new ArgumentCountError (line 717)
+- new ArgumentCountError (line 738)
+- new ArgumentCountError (line 780)
+- new ArgumentCountError (line 805)
+- new ArgumentCountError (line 811)
+- new ArgumentCountError (line 868)
+- new ArgumentCountError (line 893)
+- new ArgumentCountError (line 924)
+- new ArgumentCountError (line 955)
 - new ArgumentCountError (line 987)
-- new ArgumentCountError (line 1011)
-- new ArgumentCountError (line 1047)
-- new ArgumentCountError (line 1077)
-- new ArgumentCountError (line 1113)
-- 43 class method(s)
+- new ArgumentCountError (line 1019)
+- new ArgumentCountError (line 1050)
+- new ArgumentCountError (line 1082)
+- new ArgumentCountError (line 1112)
+- new ArgumentCountError (line 1136)
+- new ArgumentCountError (line 1172)
+- new ArgumentCountError (line 1202)
+- new ArgumentCountError (line 1238)
+- 47 class method(s)
 
 ### `ext/intl/collator_asort.php`
 
@@ -14118,123 +14138,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 58)
-- 2 class method(s)
-
-### `ext/odbc/BuiltinClasses.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/odbc/Module.php`
-
-**Warnings** (review for bootstrap subset):
-- new VM\Variable (line 31)
-- new odbc_connect (line 47)
-- new odbc_pconnect (line 48)
-- new odbc_close (line 49)
-- new odbc_close_all (line 50)
-- new odbc_exec (line 51)
-- new odbc_fetch_row (line 52)
-- new odbc_result (line 53)
-- new odbc_num_rows (line 54)
-- new odbc_error (line 55)
-- new odbc_errormsg (line 56)
-- 3 class method(s)
-
-### `ext/odbc/OdbcConstants.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/odbc/OdbcExtensionPolicy.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
-### `ext/odbc/VmOdbcConnection.php`
-
-**Warnings** (review for bootstrap subset):
-- new ClassEntry (line 33)
-- new ObjectEntry (line 60)
-- new Variable (line 68)
-- 9 class method(s)
-
-### `ext/odbc/VmOdbcCore.php`
-
-**Warnings** (review for bootstrap subset):
-- 5 class method(s)
-
-### `ext/odbc/VmOdbcNative.php`
-
-**Warnings** (review for bootstrap subset):
-- 5 class method(s)
-
-### `ext/odbc/VmOdbcResult.php`
-
-**Warnings** (review for bootstrap subset):
-- new ClassEntry (line 29)
-- new ObjectEntry (line 40)
-- new Variable (line 48)
-- 8 class method(s)
-
-### `ext/odbc/odbc_close.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- 2 class method(s)
-
-### `ext/odbc/odbc_close_all.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
-- 2 class method(s)
-
-### `ext/odbc/odbc_connect.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
-- 4 class method(s)
-
-### `ext/odbc/odbc_error.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- 2 class method(s)
-
-### `ext/odbc/odbc_errormsg.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- 2 class method(s)
-
-### `ext/odbc/odbc_exec.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 27)
-- 2 class method(s)
-
-### `ext/odbc/odbc_fetch_row.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- 2 class method(s)
-
-### `ext/odbc/odbc_num_rows.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- 2 class method(s)
-
-### `ext/odbc/odbc_pconnect.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
-- 3 class method(s)
-
-### `ext/odbc/odbc_result.php`
-
-**Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/opcache/Module.php`
@@ -42573,29 +42476,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\sodium\Module (line 272)
 - new ext\sqlite3\Module (line 273)
 - new ext\pgsql\Module (line 274)
-- new ext\odbc\Module (line 275)
-- new ext\enchant\Module (line 276)
-- new ext\pdo\Module (line 277)
-- new ext\phar\Module (line 278)
-- new ext\uri\Module (line 279)
-- new ext\uuid\Module (line 280)
-- new ext\uploadprogress\Module (line 281)
-- new ext\apcu\Module (line 282)
-- new ext\sysvshm\Module (line 283)
-- new ext\sysvsem\Module (line 284)
-- new ext\sysvmsg\Module (line 285)
-- new ext\reflection\Module (line 286)
-- new ext\standard\Module (line 287)
-- new JIT (line 363)
-- new JITContext (line 377)
-- new SealedClassPreprocessor (line 443)
-- new StaticClassPreprocessor (line 446)
-- new SourcePreprocessor\PropertyHooks (line 449)
-- new State (line 590)
-- new ReflectionProperty (line 617)
-- new ReflectionProperty (line 620)
-- new LintCompiler (line 1031)
-- new Variable (line 1161)
+- new ext\enchant\Module (line 275)
+- new ext\pdo\Module (line 276)
+- new ext\phar\Module (line 277)
+- new ext\uri\Module (line 278)
+- new ext\uuid\Module (line 279)
+- new ext\uploadprogress\Module (line 280)
+- new ext\apcu\Module (line 281)
+- new ext\sysvshm\Module (line 282)
+- new ext\sysvsem\Module (line 283)
+- new ext\sysvmsg\Module (line 284)
+- new ext\reflection\Module (line 285)
+- new ext\standard\Module (line 286)
+- new JIT (line 362)
+- new JITContext (line 376)
+- new SealedClassPreprocessor (line 442)
+- new StaticClassPreprocessor (line 445)
+- new SourcePreprocessor\PropertyHooks (line 448)
+- new State (line 589)
+- new ReflectionProperty (line 616)
+- new ReflectionProperty (line 619)
+- new LintCompiler (line 1030)
+- new Variable (line 1160)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
