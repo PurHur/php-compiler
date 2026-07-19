@@ -52,7 +52,7 @@ final class quotemeta extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'quotemeta', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'quotemeta',
             $argIndex,
@@ -76,7 +76,7 @@ final class quotemeta extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'quotemeta',

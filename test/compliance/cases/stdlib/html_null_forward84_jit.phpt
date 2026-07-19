@@ -1,9 +1,17 @@
 --TEST--
-JIT: htmlspecialchars/htmlentities decode family null TypeError on 8.4 forward profile (#19296)
+JIT: htmlspecialchars/htmlentities decode family soft-null on 8.4 (#21180, ext/standard/html.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
+--JIT--
 --FILE--
 <?php
+set_error_handler(static function (int $no, string $msg): bool {
+    if (E_DEPRECATED === $no) {
+        echo "DEP\n";
+        return true;
+    }
+    return false;
+});
 foreach ([
     'htmlspecialchars' => static fn () => htmlspecialchars(null),
     'htmlentities' => static fn () => htmlentities(null),
@@ -11,14 +19,18 @@ foreach ([
     'html_entity_decode' => static fn () => html_entity_decode(null),
 ] as $label => $factory) {
     try {
-        $factory();
-        echo "$label: uncaught\n";
+        $r = $factory();
+        echo "$label: uncaught ", var_export($r, true), "\n";
     } catch (TypeError $e) {
         echo $label.': '.$e->getMessage()."\n";
     }
 }
 --EXPECT--
-htmlspecialchars: htmlspecialchars(): Argument #1 ($string) must be of type string, null given
-htmlentities: htmlentities(): Argument #1 ($string) must be of type string, null given
-htmlspecialchars_decode: htmlspecialchars_decode(): Argument #1 ($string) must be of type string, null given
-html_entity_decode: html_entity_decode(): Argument #1 ($string) must be of type string, null given
+DEP
+htmlspecialchars: uncaught ''
+DEP
+htmlentities: uncaught ''
+DEP
+htmlspecialchars_decode: uncaught ''
+DEP
+html_entity_decode: uncaught ''

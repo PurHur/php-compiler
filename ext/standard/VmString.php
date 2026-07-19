@@ -96,7 +96,8 @@ final class VmString
      * String builtins that coerce null with deprecation (not Z_PARAM_STR TypeError on 8.4).
      *
      * Used by trim/ltrim/rtrim/chop (#19983), str_repeat/str_shuffle/ucfirst/lcfirst/ucwords (#19998),
-     * and strlen/strtolower/strtoupper/strrev (#20007). bin2hex uses {@see coerceZparamStrBuiltinArg} (#20154).
+     * strlen/strtolower/strtoupper/strrev (#20007), and HTML/escape htmlspecialchars/htmlentities/
+     * addslashes/stripslashes/nl2br/quotemeta (+ decode siblings) (#21180).
      */
     public static function coerceTrimFamilyStringArg(
         Variable $var,

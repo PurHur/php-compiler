@@ -64,7 +64,7 @@ final class html_entity_decode extends Internal
         if ($effectiveArgc >= 3) {
             return JitHtmlEntityDecode::decodeWithEncoding(
                 $context,
-                JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'html_entity_decode', 0, 'string'),
+                JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'html_entity_decode', 0, 'string'),
                 $argc >= 2
                     ? JitLongArg::lower($context, $args[1], 'html_entity_decode() flags')
                     : $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false),
@@ -90,7 +90,7 @@ final class html_entity_decode extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'html_entity_decode', 0, 'string');
+        $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'html_entity_decode', 0, 'string');
         $i64 = $context->getTypeFromString('int64');
         $flagsVal = $i64->constInt($flags, false);
         if ($argc >= 2 && !$flagsKnown) {
@@ -100,14 +100,14 @@ final class html_entity_decode extends Internal
         return JitHtmlEntityDecode::decode($context, $str, $flagsVal);
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19296, ext/standard/html.c). */
+    /** Soft-null — coerce+deprecate on forward profile (#21180, ext/standard/html.c). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'html_entity_decode', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'html_entity_decode',
             $argIndex,

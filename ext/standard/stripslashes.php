@@ -52,7 +52,7 @@ final class stripslashes extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'stripslashes', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'stripslashes',
             $argIndex,
@@ -76,7 +76,7 @@ final class stripslashes extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'stripslashes',
