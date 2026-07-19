@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6064 |
-| Phase A inventory files (M2 ratio SSOT) | 6064 |
+| PHP files on vm.php path | 6068 |
+| Phase A inventory files (M2 ratio SSOT) | 6068 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18873 |
+| Source constructs flagged (warnings) | 18881 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1249,10 +1249,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/BuiltinClasses.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherIvLength.php` | 0 | 1 |
 | `ext/openssl/JitOpensslCipherKeyLength.php` | 0 | 1 |
+| `ext/openssl/JitOpensslEncrypt.php` | 0 | 1 |
 | `ext/openssl/JitOpensslSign.php` | 0 | 1 |
 | `ext/openssl/Module.php` | 0 | 65 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
+| `ext/openssl/OpensslEncryptJitHelper.php` | 0 | 1 |
 | `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
 | `ext/openssl/OpensslFunction.php` | 0 | 1 |
 | `ext/openssl/OpensslSignJitHelper.php` | 0 | 1 |
@@ -1284,10 +1286,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_csr_get_subject.php` | 0 | 2 |
 | `ext/openssl/openssl_csr_new.php` | 0 | 2 |
 | `ext/openssl/openssl_csr_sign.php` | 0 | 2 |
-| `ext/openssl/openssl_decrypt.php` | 0 | 2 |
+| `ext/openssl/openssl_decrypt.php` | 0 | 3 |
 | `ext/openssl/openssl_dh_compute_key.php` | 0 | 2 |
 | `ext/openssl/openssl_digest.php` | 0 | 2 |
-| `ext/openssl/openssl_encrypt.php` | 0 | 2 |
+| `ext/openssl/openssl_encrypt.php` | 0 | 3 |
 | `ext/openssl/openssl_error_string.php` | 0 | 2 |
 | `ext/openssl/openssl_free_key.php` | 0 | 2 |
 | `ext/openssl/openssl_get_cert_locations.php` | 0 | 2 |
@@ -4672,6 +4674,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ObOutputRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObStatusRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ObStorageGlobals.php` | 0 | 1 |
+| `lib/JIT/Builtin/OpensslEncryptCrypto.php` | 0 | 1 |
+| `lib/JIT/Builtin/OpensslEncryptRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/OpensslSignCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/OpensslSignRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/Output.php` | 0 | 1 |
@@ -15630,6 +15634,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/openssl/JitOpensslEncrypt.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/openssl/JitOpensslSign.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15713,6 +15722,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/openssl/OpensslEncryptJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/openssl/OpensslExtensionPolicy.php`
 
@@ -15916,6 +15930,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
+- new ArgumentCountError (line 76)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_dh_compute_key.php`
@@ -15934,6 +15949,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
+- new ArgumentCountError (line 68)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_error_string.php`
@@ -39741,6 +39757,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `lib/JIT/Builtin/OpensslEncryptCrypto.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/JIT/Builtin/OpensslEncryptRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 178)
+- 10 class method(s)
+- 4 closure(s)
 
 ### `lib/JIT/Builtin/OpensslSignCrypto.php`
 

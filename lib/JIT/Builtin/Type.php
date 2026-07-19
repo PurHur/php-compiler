@@ -671,6 +671,20 @@ class Type extends Builtin {
         $fntypeOpensslVerify = $this->context->context->functionType($i32, false, $strPtr, $strPtr, $strPtr, $i64);
         $fnOpensslVerify = $this->context->module->addFunction('__compiler_openssl_verify', $fntypeOpensslVerify);
         $this->context->registerFunction('__compiler_openssl_verify', $fnOpensslVerify);
+        // openssl_encrypt/decrypt — NestedJIT OpensslEncryptJitHelper (#21065)
+        $fntypeOpensslEncrypt = $this->context->context->functionType(
+            $strPtr,
+            false,
+            $strPtr,
+            $strPtr,
+            $strPtr,
+            $i64,
+            $strPtr
+        );
+        $fnOpensslEncrypt = $this->context->module->addFunction('__compiler_openssl_encrypt', $fntypeOpensslEncrypt);
+        $this->context->registerFunction('__compiler_openssl_encrypt', $fnOpensslEncrypt);
+        $fnOpensslDecrypt = $this->context->module->addFunction('__compiler_openssl_decrypt', $fntypeOpensslEncrypt);
+        $this->context->registerFunction('__compiler_openssl_decrypt', $fnOpensslDecrypt);
         $double = $this->context->getTypeFromString('double');
         $fntypeMicrotimeStr = $this->context->context->functionType($strPtr, false);
         $fnMicrotimeStr = $this->context->module->addFunction('__compiler_microtime_string', $fntypeMicrotimeStr);

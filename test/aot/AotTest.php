@@ -6,6 +6,7 @@ namespace PHPCompiler;
 
 require_once __DIR__ . '/../BaseTest.php';
 
+use PHPCompiler\JIT\Builtin\OpensslEncryptRuntime;
 use PHPCompiler\JIT\Builtin\OpensslSignRuntime;
 
 /**
@@ -401,6 +402,11 @@ class AotTest extends BaseTest
             if (str_contains($name, 'openssl_sign_verify')
                 && (!OpensslSignRuntime::opensslEvRuntimeAvailable()
                     || !\PHPCompiler\ext\openssl\VmOpensslSignNative::available())) {
+                continue;
+            }
+            if (str_contains($name, 'openssl_encrypt_decrypt')
+                && (!OpensslEncryptRuntime::opensslCipherRuntimeAvailable()
+                    || !\PHPCompiler\ext\openssl\VmOpensslCipherNative::available())) {
                 continue;
             }
             if (!CompilerVersion::supportsTryCatchElse()

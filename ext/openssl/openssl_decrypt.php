@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_decrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594).
+ * openssl_decrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594, JIT/AOT #21065).
  */
 final class openssl_decrypt extends Internal
 {
@@ -71,8 +71,21 @@ final class openssl_decrypt extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_decrypt() is not implemented for JIT in this compiler build (issue #18594)'
+        $argc = \count($args);
+        if ($argc < 3 || $argc > 8) {
+            throw new \ArgumentCountError(
+                'openssl_decrypt() expects at least 3 arguments, '.$argc.' given'
+            );
+        }
+
+        // Args 6–8 (tag / tag_length / aad) accepted for arity parity; VM ignores them today (#18594).
+        return JitOpensslEncrypt::decrypt(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2],
+            $args[3] ?? null,
+            $args[4] ?? null
         );
     }
 }
