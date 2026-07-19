@@ -1127,6 +1127,7 @@ final class BuiltinClasses
         \PHPCompiler\ext\standard\VmReflection::registerReflectionClassConstantClassConstants($rcc);
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS_CONSTANT] = $rcc;
 
+        \PHPCompiler\ext\standard\VmReflection::registerReflectionClassClassConstants($rc);
         $ctx->classes[ReflectionSupport::REFLECTION_CLASS] = $rc;
 
         $objProto = new Variable(Variable::TYPE_OBJECT);

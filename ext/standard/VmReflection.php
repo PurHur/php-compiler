@@ -2499,6 +2499,25 @@ final class VmReflection
         }
     }
 
+    /** Register ReflectionClass::SKIP_* lazy-object class constants (#21126, ext/reflection/php_reflection.c). */
+    public static function registerReflectionClassClassConstants(ClassEntry $entry): void
+    {
+        if (!\PHPCompiler\CompilerVersion::supportsLazyObjectFactories()) {
+            return;
+        }
+        foreach (
+            [
+                'skip_initialization_on_serialize' => \PHPCompiler\VM\LazyObjectSupport::SKIP_INITIALIZATION_ON_SERIALIZE,
+                'skip_destructor' => \PHPCompiler\VM\LazyObjectSupport::SKIP_DESTRUCTOR,
+            ] as $name => $value
+        ) {
+            $const = new Variable();
+            $const->int($value);
+            $entry->constants[$name] = $const;
+            $entry->constNames[$name] = strtoupper($name);
+        }
+    }
+
     /** Register ReflectionClassConstant::IS_* class constants (#17360, ext/reflection/php_reflection.c). */
     public static function registerReflectionClassConstantClassConstants(ClassEntry $entry): void
     {

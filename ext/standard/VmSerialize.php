@@ -21,6 +21,7 @@ use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\LazyObjectSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
@@ -459,6 +460,15 @@ final class VmSerialize
     ): string {
         if (0 === strcasecmp($entry->class->name, 'Closure')) {
             throw new \Exception("Serialization of 'Closure' is not allowed");
+        }
+        // Zend ZEND_PROP_PURPOSE_SERIALIZE — initialize lazy objects unless SKIP_INITIALIZATION_ON_SERIALIZE (#21126).
+        if ($entry->lazyPending && LazyObjectSupport::shouldInitializeOnSerialize($entry)) {
+            $vm = $ctx->runtime->vm ?? null;
+            if (null === $vm) {
+                throw new \LogicException('serialize() of lazy objects requires VM');
+            }
+            LazyObjectSupport::ensureInitialized($vm, $entry);
+            $entry = LazyObjectSupport::getLazyInstance($entry);
         }
         SplFileIteratorSerializeDeny::rejectSerialization($entry->class->name);
         self::rejectAnonymousClassSerialization($entry);

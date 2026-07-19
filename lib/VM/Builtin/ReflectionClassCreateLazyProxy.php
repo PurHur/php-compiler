@@ -40,16 +40,18 @@ final class ReflectionClassCreateLazyProxy extends VmClassMethod
             2,
             'factory'
         );
+        $options = 0;
         if (3 === $argc) {
             $optionsVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_LONG !== $optionsVar->type) {
+            if (Variable::TYPE_INTEGER !== $optionsVar->type) {
                 throw new \TypeError(
                     'createLazyProxy(): Argument #3 ($options) must be of type int, '
                     .EnumCaseSupport::typeNameForVariable($optionsVar).' given'
                 );
             }
+            $options = $optionsVar->toInt();
         }
-        $lazy = LazyObjectSupport::createProxy($entry, $factory);
+        $lazy = LazyObjectSupport::createProxy($entry, $factory, $options);
         if (null !== $frame->returnVar) {
             $out = new Variable(Variable::TYPE_OBJECT);
             $out->object($lazy);

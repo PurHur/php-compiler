@@ -66,6 +66,11 @@ class ObjectEntry {
     /** True for ghost lazy objects (in-place init); false for proxy strategy (#4026). */
     public bool $lazyGhost = false;
 
+    /**
+     * User lazy flags (SKIP_INITIALIZATION_ON_SERIALIZE / SKIP_DESTRUCTOR) — php-src zend_lazy_object_info.flags (#21126).
+     */
+    public int $lazyUserFlags = 0;
+
     /** Archived initializer for ReflectionClass::resetAsLazyObject() (#6125). */
     public ?ClosureState $lazyResetInitializer = null;
 
@@ -164,6 +169,7 @@ class ObjectEntry {
         $this->lazyInitializer = null;
         $this->lazyPending = false;
         $this->lazyGhost = false;
+        $this->lazyUserFlags = 0;
         $this->lazyResetInitializer = null;
         $this->lazyInterfaceProxyTarget = null;
         $this->lazyRawInitializedProperties = [];
@@ -385,6 +391,7 @@ class ObjectEntry {
         $clone->lazyInitializer = $this->lazyInitializer;
         $clone->lazyPending = $this->lazyPending;
         $clone->lazyGhost = $this->lazyGhost;
+        $clone->lazyUserFlags = $this->lazyUserFlags;
         $clone->lazyResetInitializer = $this->lazyResetInitializer;
         $clone->lazyInitException = $this->lazyInitException;
         $clone->lazyRawInitializedProperties = $this->lazyRawInitializedProperties;
