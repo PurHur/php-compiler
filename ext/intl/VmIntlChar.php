@@ -88,6 +88,10 @@ final class VmIntlChar
     public const PROPERTY_CHANGES_WHEN_CASEMAPPED = 55;
     public const PROPERTY_CHANGES_WHEN_NFKC_CASEFOLDED = 56;
 
+    /** php-src IntlChar::FOLD_CASE_* (icu/uchar.h U_FOLD_CASE_*). */
+    public const FOLD_CASE_DEFAULT = 0;
+    public const FOLD_CASE_EXCLUDE_SPECIAL_I = 1;
+
     private static ?\FFI $ffi = null;
 
     private static bool $ffiUnavailable = false;
@@ -159,6 +163,8 @@ final class VmIntlChar
             'PROPERTY_CHANGES_WHEN_CASEFOLDED' => self::PROPERTY_CHANGES_WHEN_CASEFOLDED,
             'PROPERTY_CHANGES_WHEN_CASEMAPPED' => self::PROPERTY_CHANGES_WHEN_CASEMAPPED,
             'PROPERTY_CHANGES_WHEN_NFKC_CASEFOLDED' => self::PROPERTY_CHANGES_WHEN_NFKC_CASEFOLDED,
+            'FOLD_CASE_DEFAULT' => self::FOLD_CASE_DEFAULT,
+            'FOLD_CASE_EXCLUDE_SPECIAL_I' => self::FOLD_CASE_EXCLUDE_SPECIAL_I,
         ];
     }
 
@@ -187,6 +193,11 @@ final class VmIntlChar
             'isdigit' => [new IntlCharIsDigit(), 'isdigit'],
             'toupper' => [new IntlCharToUpper(), 'toupper'],
             'tolower' => [new IntlCharToLower(), 'tolower'],
+            'totitle' => [new IntlCharToTitle(), 'totitle'],
+            'foldcase' => [new IntlCharFoldCase(), 'foldCase'],
+            'digit' => [new IntlCharDigit(), 'digit'],
+            'fordigit' => [new IntlCharForDigit(), 'forDigit'],
+            'istitle' => [new IntlCharIsTitle(), 'istitle'],
         ];
         foreach ($methods as $lc => [$handler, $name]) {
             $entry->methods[$lc] = $handler;
@@ -380,7 +391,7 @@ final class VmIntlChar
         if (null === $cp) {
             return $asString ? '' : 0;
         }
-        $out = self::caseMap($cp, true);
+        $out = self::caseMap($cp, 'upper');
 
         return $asString ? (self::chr($out) ?? '') : $out;
     }
@@ -397,27 +408,161 @@ final class VmIntlChar
         if (null === $cp) {
             return $asString ? '' : 0;
         }
-        $out = self::caseMap($cp, false);
+        $out = self::caseMap($cp, 'lower');
 
         return $asString ? (self::chr($out) ?? '') : $out;
     }
 
-    private static function caseMap(int $cp, bool $upper): int
+    /**
+     * IntlChar::totitle() — php-src / ICU u_totitle (#20786).
+     *
+     * @return int|string
+     */
+    public static function totitle(string|int $codepoint)
+    {
+        $asString = \is_string($codepoint);
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return $asString ? '' : 0;
+        }
+        $out = self::caseMap($cp, 'title');
+
+        return $asString ? (self::chr($out) ?? '') : $out;
+    }
+
+    /**
+     * IntlChar::foldCase() — php-src / ICU u_foldCase (#20786).
+     *
+     * @return int|string
+     */
+    public static function foldCase(string|int $codepoint, int $options = self::FOLD_CASE_DEFAULT)
+    {
+        $asString = \is_string($codepoint);
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return $asString ? '' : 0;
+        }
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_foldCase'.self::$symSuffix;
+            $out = (int) $ffi->$fn($cp, $options);
+        } else {
+            // ASCII fold ≈ lowercase; options ignored without ICU.
+            $out = self::caseMap($cp, 'lower');
+        }
+
+        return $asString ? (self::chr($out) ?? '') : $out;
+    }
+
+    /**
+     * IntlChar::digit() — php-src / ICU u_digit (#20786).
+     *
+     * @return int|false
+     */
+    public static function digit(string|int $codepoint, int $base = 10): int|false
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return false;
+        }
+        if ($base < 2 || $base > 36) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_digit'.self::$symSuffix;
+            $v = (int) $ffi->$fn($cp, $base);
+
+            return $v < 0 ? false : $v;
+        }
+
+        return self::asciiDigitValue($cp, $base);
+    }
+
+    /**
+     * IntlChar::forDigit() — php-src / ICU u_forDigit (#20786).
+     * Returns the code point for $digit in $base, or 0 on failure.
+     */
+    public static function forDigit(int $digit, int $base = 10): int
+    {
+        if ($base < 2 || $base > 36 || $digit < 0 || $digit >= $base) {
+            return 0;
+        }
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_forDigit'.self::$symSuffix;
+
+            return (int) $ffi->$fn($digit, $base);
+        }
+        if ($digit < 10) {
+            return 0x30 + $digit;
+        }
+
+        return 0x61 + ($digit - 10);
+    }
+
+    /** IntlChar::istitle() — php-src / ICU u_istitle (#20786). */
+    public static function istitle(string|int $codepoint): bool
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_istitle'.self::$symSuffix;
+
+            return 0 !== (int) $ffi->$fn($cp);
+        }
+        // No ASCII titlecase letters; Lt category needs ICU.
+        return false;
+    }
+
+    /** @param 'upper'|'lower'|'title' $kind */
+    private static function caseMap(int $cp, string $kind): int
     {
         $ffi = self::ffi();
         if (null !== $ffi) {
-            $fn = ($upper ? 'u_toupper' : 'u_tolower').self::$symSuffix;
+            $fn = match ($kind) {
+                'upper' => 'u_toupper',
+                'lower' => 'u_tolower',
+                'title' => 'u_totitle',
+            };
+            $fn .= self::$symSuffix;
 
             return (int) $ffi->$fn($cp);
         }
-        if ($upper && $cp >= 0x61 && $cp <= 0x7A) {
-            return $cp - 0x20;
+        if ('lower' === $kind) {
+            if ($cp >= 0x41 && $cp <= 0x5A) {
+                return $cp + 0x20;
+            }
+
+            return $cp;
         }
-        if (!$upper && $cp >= 0x41 && $cp <= 0x5A) {
-            return $cp + 0x20;
+        // upper + title share ASCII mapping without ICU.
+        if ($cp >= 0x61 && $cp <= 0x7A) {
+            return $cp - 0x20;
         }
 
         return $cp;
+    }
+
+    /** @return int|false */
+    private static function asciiDigitValue(int $cp, int $base): int|false
+    {
+        $v = null;
+        if ($cp >= 0x30 && $cp <= 0x39) {
+            $v = $cp - 0x30;
+        } elseif ($cp >= 0x41 && $cp <= 0x5A) {
+            $v = 10 + ($cp - 0x41);
+        } elseif ($cp >= 0x61 && $cp <= 0x7A) {
+            $v = 10 + ($cp - 0x61);
+        }
+        if (null === $v || $v >= $base) {
+            return false;
+        }
+
+        return $v;
     }
 
     private static function ffi(): ?\FFI
@@ -465,10 +610,16 @@ typedef int32_t UProperty;
 typedef int32_t UCharNameChoice;
 typedef int8_t UBool;
 typedef int32_t UErrorCode;
+typedef uint32_t uint32_t;
 UBool u_isalpha{$suffix}(UChar32 c);
 UBool u_isdigit{$suffix}(UChar32 c);
+UBool u_istitle{$suffix}(UChar32 c);
 UChar32 u_toupper{$suffix}(UChar32 c);
 UChar32 u_tolower{$suffix}(UChar32 c);
+UChar32 u_totitle{$suffix}(UChar32 c);
+UChar32 u_foldCase{$suffix}(UChar32 c, uint32_t options);
+int8_t u_digit{$suffix}(UChar32 ch, int8_t radix);
+UChar32 u_forDigit{$suffix}(int32_t digit, int8_t radix);
 UBool u_hasBinaryProperty{$suffix}(UChar32 c, UProperty which);
 int32_t u_charName{$suffix}(UChar32 code, UCharNameChoice nameChoice, char *buffer, int32_t bufferLength, UErrorCode *pErrorCode);
 C;
@@ -714,5 +865,155 @@ final class IntlCharToLower extends VmClassMethod
         } else {
             $frame->returnVar->int($result);
         }
+    }
+}
+
+/** IntlChar::totitle() — php-src / ICU u_totitle (#20786). */
+final class IntlCharToTitle extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('totitle');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::totitle() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::totitle', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::totitle($codepoint);
+        if (\is_string($result)) {
+            $frame->returnVar->string($result);
+        } else {
+            $frame->returnVar->int($result);
+        }
+    }
+}
+
+/** IntlChar::foldCase() — php-src / ICU u_foldCase (#20786). */
+final class IntlCharFoldCase extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('foldCase');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::foldCase() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::foldCase', 0);
+        $options = $argc >= 2
+            ? VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'IntlChar::foldCase', 2, 'options')
+            : VmIntlChar::FOLD_CASE_DEFAULT;
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::foldCase($codepoint, $options);
+        if (\is_string($result)) {
+            $frame->returnVar->string($result);
+        } else {
+            $frame->returnVar->int($result);
+        }
+    }
+}
+
+/** IntlChar::digit() — php-src / ICU u_digit (#20786). */
+final class IntlCharDigit extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('digit');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::digit() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::digit', 0);
+        $base = $argc >= 2
+            ? VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'IntlChar::digit', 2, 'base')
+            : 10;
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::digit($codepoint, $base);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlChar::forDigit() — php-src / ICU u_forDigit (#20786). */
+final class IntlCharForDigit extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('forDigit');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::forDigit() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $digit = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'IntlChar::forDigit', 1, 'digit');
+        $base = $argc >= 2
+            ? VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'IntlChar::forDigit', 2, 'base')
+            : 10;
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlChar::forDigit($digit, $base));
+    }
+}
+
+/** IntlChar::istitle() — php-src / ICU u_istitle (#20786). */
+final class IntlCharIsTitle extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('istitle');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::istitle() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::istitle', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::istitle($codepoint));
     }
 }
