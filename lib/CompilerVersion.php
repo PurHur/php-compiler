@@ -1495,6 +1495,28 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.6+ stream_socket_get_crypto_status() (ext/standard/streamsfuncs.c; #21021).
+     *
+     * Withheld on ≤8.5 profiles (matches Zend phantom gate). Enable via stable 8.6.0+ or
+     * explicit `PHP_COMPILER_PROFILE=8.6` forward profile.
+     * php-src: PHP_FUNCTION(stream_socket_get_crypto_status) → php_stream_xport_crypto_get_status
+     */
+    public static function supportsStreamSocketGetCryptoStatus(): bool
+    {
+        if (version_compare(self::VERSION, '8.6.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.6.0', '>=');
+    }
+
+    /** stream_socket_get_crypto_status() visible to function_exists() — profile ≥ 8.6 (#21021). */
+    public static function advertisesStreamSocketGetCryptoStatus(): bool
+    {
+        return self::supportsStreamSocketGetCryptoStatus();
+    }
+
+    /**
      * PHP 8.4+ STREAM_SUPPORT_READ/WRITE constants (ext/standard/streams.c, issue #16846).
      *
      * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile

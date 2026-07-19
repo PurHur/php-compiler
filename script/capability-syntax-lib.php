@@ -1317,6 +1317,13 @@ function withheldBuiltinGateDefinitions(): array
             'relPath' => 'ext/standard/stream_last_errors.php',
         ],
         [
+            'names' => ['stream_socket_get_crypto_status'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsStreamSocketGetCryptoStatus'],
+            'since' => '8.6.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/stream_socket_get_crypto_status.php',
+        ],
+        [
             'names' => ['zend_thread_id'],
             'gate' => [PHPCompiler\CompilerVersion::class, 'supportsZendThreadId'],
             'since' => '8.4.0',

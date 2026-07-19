@@ -62,6 +62,9 @@ final class BuiltinIntrospectionPolicy
         if (\in_array($lc, ['stream_last_errors', 'stream_clear_errors'], true)) {
             return CompilerVersion::advertisesStreamErrorApi();
         }
+        if ('stream_socket_get_crypto_status' === $lc) {
+            return CompilerVersion::advertisesStreamSocketGetCryptoStatus();
+        }
         if ('nextafter' === $lc) {
             return CompilerVersion::advertisesNextafter();
         }
