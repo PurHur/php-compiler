@@ -85,6 +85,18 @@ final class VmDomLiving
     /** php-src Dom\NamedNodeMap (php_dom.stub.php; #20948). */
     public const CLASS_NAMED_NODE_MAP = 'dom\\namednodemap';
 
+    /** php-src Dom\Entity (php_dom.stub.php; #20983). */
+    public const CLASS_ENTITY = 'dom\\entity';
+
+    /** php-src Dom\EntityReference (php_dom.stub.php; #20983). */
+    public const CLASS_ENTITY_REFERENCE = 'dom\\entityreference';
+
+    /** php-src Dom\Notation (php_dom.stub.php; #20983). */
+    public const CLASS_NOTATION = 'dom\\notation';
+
+    /** php-src Dom\DOMException — canonical; legacy DOMException is @alias (php_dom.stub.php; #20983). */
+    public const CLASS_DOM_EXCEPTION = 'dom\\domexception';
+
     /** php-src Dom\NamespaceInfo (php_dom.stub.php; #20924). */
     public const CLASS_NAMESPACE_INFO = 'dom\\namespaceinfo';
 
@@ -932,6 +944,10 @@ final class VmDomLiving
             VmDom::CLASS_DOCUMENT_TYPE => self::CLASS_DOCUMENT_TYPE,
             VmDom::CLASS_NODE_LIST => self::CLASS_NODE_LIST,
             VmDom::CLASS_NAMED_NODE_MAP => self::CLASS_NAMED_NODE_MAP,
+            // DTD leaf types (#20983).
+            VmDom::CLASS_ENTITY => self::CLASS_ENTITY,
+            VmDom::CLASS_ENTITY_REFERENCE => self::CLASS_ENTITY_REFERENCE,
+            VmDom::CLASS_NOTATION => self::CLASS_NOTATION,
         ];
         foreach ($map as $baseLc => $livingLc) {
             if (!isset($state->nodeClassMap[$baseLc])) {
@@ -962,6 +978,9 @@ final class VmDomLiving
                 || self::CLASS_ATTR === $lc
                 || self::CLASS_CHARACTER_DATA === $lc
                 || self::CLASS_PROCESSING_INSTRUCTION === $lc
+                || self::CLASS_ENTITY === $lc
+                || self::CLASS_ENTITY_REFERENCE === $lc
+                || self::CLASS_NOTATION === $lc
                 || self::CLASS_NODE === $lc
             )
         ) {
