@@ -731,21 +731,17 @@ final class VmMath
         throw new \TypeError($message);
     }
 
+    /**
+     * php-src convert_to_boolean / zend_is_true for IS_STRING (Z_PARAM_BOOL).
+     * Empty string and exact "0" are false; every other string is true (#4293).
+     */
     private static function coerceBoolStringLiteral(
         string $literal,
         string $function,
         int $argIndex,
         string $paramName
     ): bool {
-        $lower = strtolower($literal);
-        if (\in_array($lower, ['1', 'true', 'on', 'yes'], true)) {
-            return true;
-        }
-        if (\in_array($lower, ['0', 'false', 'off', 'no', ''], true)) {
-            return false;
-        }
-
-        throw new \TypeError(self::boolBuiltinTypeError($function, $argIndex, $paramName, 'string'));
+        return '' !== $literal && '0' !== $literal;
     }
 
     private static function boolBuiltinTypeError(
