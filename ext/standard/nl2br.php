@@ -68,7 +68,7 @@ final class nl2br extends Internal
             );
         }
 
-        $str = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'nl2br', 0, 'string');
+        $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'nl2br', 0, 'string');
         $i8 = $context->getTypeFromString('int8');
         $useXhtmlI8 = $i8->constInt(1, false);
         if (2 === $argc) {
@@ -87,14 +87,14 @@ final class nl2br extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19284, ext/standard/string.c). */
+    /** Soft-null — coerce+deprecate on forward profile (#21180, ext/standard/string.c). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, $argIndex, 'nl2br', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'nl2br',
             $argIndex,

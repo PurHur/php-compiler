@@ -1,5 +1,5 @@
 --TEST--
-stdlib Z_PARAM_STR null — TypeError on 8.4 forward profile (#19309, ext/standard/string.c)
+stdlib Z_PARAM_STR null — mixed soft-null/TypeError on 8.4 (#19309/#21180, ext/standard/string.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -18,8 +18,8 @@ $cases = [
 ];
 foreach ($cases as $name => $fn) {
     try {
-        $fn();
-        echo "{$name}: uncaught\n";
+        $r = $fn();
+        echo "{$name}: uncaught ", var_export($r, true), "\n";
     } catch (TypeError $e) {
         echo $e->getMessage(), "\n";
     }
@@ -29,12 +29,12 @@ echo var_export(addslashes(''), true), "\n";
 --EXPECT--
 chunk_split(): Argument #1 ($string) must be of type string, null given
 explode(): Argument #2 ($string) must be of type string, null given
-addslashes(): Argument #1 ($string) must be of type string, null given
+addslashes: uncaught ''
 str_rot13(): Argument #1 ($string) must be of type string, null given
 count_chars(): Argument #1 ($string) must be of type string, null given
 str_word_count(): Argument #1 ($string) must be of type string, null given
 crc32: uncaught
 base_convert(): Argument #1 ($num) must be of type string, null given
 convert_uuencode(): Argument #1 ($string) must be of type string, null given
-quotemeta(): Argument #1 ($string) must be of type string, null given
+quotemeta: uncaught ''
 ''

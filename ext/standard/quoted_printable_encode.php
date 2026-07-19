@@ -45,7 +45,7 @@ final class quoted_printable_encode extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19283, ext/standard/quot_print.c). */
+    /** Soft-null — coerce+deprecate on forward profile (#21180, ext/standard/quot_print.c). */
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
@@ -57,7 +57,7 @@ final class quoted_printable_encode extends Internal
             )->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'quoted_printable_encode',
             $argIndex,
@@ -77,7 +77,7 @@ final class quoted_printable_encode extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'quoted_printable_encode',

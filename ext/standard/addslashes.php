@@ -54,7 +54,7 @@ final class addslashes extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'addslashes', $paramName)->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[$argIndex],
             'addslashes',
             $argIndex,
@@ -78,7 +78,7 @@ final class addslashes extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'addslashes',
