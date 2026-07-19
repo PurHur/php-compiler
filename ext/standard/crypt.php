@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -22,9 +23,8 @@ final class crypt extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('crypt() requires exactly two arguments');
-        }
+        // php-src: crypt(string $string, string $salt) — ArgumentCountError (#20975).
+        $this->requireExactArgCount($frame, 'crypt', 2);
         if (null === $frame->returnVar) {
             return;
         }
@@ -46,8 +46,10 @@ final class crypt extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('crypt() requires exactly two arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'crypt', 2)) {
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
 
         return JitPassword::crypt(
