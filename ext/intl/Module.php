@@ -159,6 +159,10 @@ class Module extends ModuleAbstract
             ? [new resourcebundle_count()]
             : [];
 
+        $datefmt = IntlExtensionPolicy::advertisesIntlDateFormatter()
+            ? [new datefmt_format_object()]
+            : [];
+
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
             return [
                 ...$functions,
@@ -169,6 +173,7 @@ class Module extends ModuleAbstract
                 ...$msgfmt,
                 ...$transliterator,
                 ...$resourcebundle,
+                ...$datefmt,
                 ...IntlExtensionPolicy::profileLocaleParserFunctions(),
             ];
         }
@@ -182,6 +187,7 @@ class Module extends ModuleAbstract
             ...$msgfmt,
             ...$transliterator,
             ...$resourcebundle,
+            ...$datefmt,
             new grapheme_strlen(),
             new grapheme_substr(),
             new grapheme_strpos(),

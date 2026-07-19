@@ -692,6 +692,22 @@ final class VmIntlDateFormatter
             return [(int) $var->toFloat(), 0];
         }
         if (Variable::TYPE_OBJECT === $var->type && null !== $ctx) {
+            $obj = $var->toObject();
+            if (VmIntlCalendar::isCalendarObject($obj)) {
+                $ms = VmIntlCalendar::getTime($obj);
+                if (false === $ms) {
+                    IntlError::set(
+                        IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                        'datefmt_format: invalid object type for date/time (only IntlCalendar and DateTimeInterface permitted): U_ILLEGAL_ARGUMENT_ERROR'
+                    );
+
+                    return null;
+                }
+                $sec = (int) floor($ms / 1000.0);
+                $usec = ((int) round($ms - ($sec * 1000.0))) * 1000;
+
+                return [$sec, $usec];
+            }
             try {
                 $dt = DateTimeSupport::requireDateTimeInterface(
                     $var,
@@ -715,6 +731,98 @@ final class VmIntlDateFormatter
         );
 
         return null;
+    }
+
+    /**
+     * IntlDateFormatter::formatObject() / datefmt_format_object() — php-src dateformat_format_object.cpp (#20813).
+     *
+     * @param array{0: int, 1: int}|int|string|null $format dateStyle, [dateStyle, timeStyle], pattern, or null=MEDIUM/MEDIUM
+     *
+     * @return string|false
+     */
+    public static function formatObject(
+        Context $ctx,
+        Variable $datetimeArg,
+        array|int|string|null $format,
+        ?string $locale
+    ) {
+        $resolved = self::resolveFormatInstant($datetimeArg, $ctx);
+        if (null === $resolved) {
+            return false;
+        }
+        [$timestamp, $microsecond] = $resolved;
+        $locale = null !== $locale && '' !== $locale ? $locale : VmLocale::getDefault();
+        $timezone = self::timezoneFromDatetimeArg($datetimeArg, $ctx) ?? VmDate::defaultTimezoneGet();
+        $dateType = self::MEDIUM;
+        $timeType = self::MEDIUM;
+        $pattern = null;
+        if (null === $format) {
+            // defaults
+        } elseif (\is_int($format)) {
+            $dateType = $format;
+            $timeType = $format;
+        } elseif (\is_string($format)) {
+            $pattern = $format;
+            $dateType = self::NONE;
+            $timeType = self::NONE;
+        } else {
+            if (2 !== \count($format)) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'datefmt_format_object: bad format; if array, it must have two elements: U_ILLEGAL_ARGUMENT_ERROR'
+                );
+
+                return false;
+            }
+            $vals = array_values($format);
+            $dateType = (int) $vals[0];
+            $timeType = (int) $vals[1];
+        }
+        $state = [
+            'locale' => $locale,
+            'dateType' => $dateType,
+            'timeType' => $timeType,
+            'timezone' => $timezone,
+            'calendar' => self::GREGORIAN,
+            'pattern' => $pattern,
+        ];
+        $effective = self::effectivePattern($state);
+        if (null === $effective || '' === $effective) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'datefmt_format_object: no date/time pattern available for locale/styles: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+        $phpFormat = self::icuPatternToPhpFormat($effective);
+
+        return VmDateTimeNative::format($timestamp, $microsecond, $timezone, $phpFormat);
+    }
+
+    private static function timezoneFromDatetimeArg(Variable $var, Context $ctx): ?string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return null;
+        }
+        $obj = $var->toObject();
+        if (VmIntlCalendar::isCalendarObject($obj)) {
+            $tz = VmIntlCalendar::getTimeZoneObject($obj, $ctx);
+            if (false === $tz) {
+                return null;
+            }
+
+            return VmIntlTimeZone::idOf($tz);
+        }
+        try {
+            $dt = DateTimeSupport::requireDateTimeInterface($var, 'IntlDateFormatter::formatObject()', $ctx);
+
+            return DateTimeSupport::timezoneName(DateTimeSupport::getTimezoneObject($dt, $ctx));
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
