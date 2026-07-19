@@ -5234,6 +5234,7 @@ require_once __DIR__.'/../../../lib/JIT/ListUnpackHelper.php';
 require_once __DIR__.'/../../../lib/JIT/M3EmitTuTrivialEchoAot.php';
 require_once __DIR__.'/../../../lib/JIT/MagicMethodDispatch.php';
 require_once __DIR__.'/../../../lib/JIT/MagicMethodLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/McjitEmbedHostEcho.php';
 require_once __DIR__.'/../../../lib/JIT/McjitEmbedRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/NamedArgs.php';
 require_once __DIR__.'/../../../lib/JIT/NamedOptionalCallArgs.php';

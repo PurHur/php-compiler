@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-llvm/lib/LLVM7/Intrinsic.php
 +++ vendor/ircmaxell/php-llvm/lib/LLVM7/Intrinsic.php
-@@ -2,103 +2,12 @@
+@@ -2,103 +2,13 @@
  
  namespace PHPLLVM\LLVM7;
  
@@ -26,7 +26,7 @@
 + * llvm.memset/memcpy declares that MCJIT left as call-through-null.
 + */
  class Intrinsic extends AbstractIntrinsic {
--
+ 
 -    public function memcpy(CoreValue $dest, CoreValue $src, CoreValue $size, bool $isVolatile): void {
 -        $int1 = $this->context->int1Type();
 -        $is32Bit = $size->typeOf()->getWidth() === 32;
@@ -107,4 +107,8 @@
 -            $int1->constInt($isVolatile ? 1 : 0, false)
 -        );
 -    }
- }
+-
+-}
+\ No newline at end of file
++}
+
