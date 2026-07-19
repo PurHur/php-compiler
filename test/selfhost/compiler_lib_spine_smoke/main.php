@@ -5918,6 +5918,9 @@ require_once __DIR__.'/../../../ext/intl/locale_get_display_region.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_display_script.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_display_variant.php';
 require_once __DIR__.'/../../../ext/intl/resourcebundle_count.php';
+require_once __DIR__.'/../../../ext/intl/resourcebundle_create.php';
+require_once __DIR__.'/../../../ext/intl/resourcebundle_get.php';
+require_once __DIR__.'/../../../ext/intl/resourcebundle_locales.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
