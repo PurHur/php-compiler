@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** chdir() — VM via VmChdirNative (libc); JIT/AOT via JitChdir (#8180). */
+/** chdir() — VM via VmChdirNative; JIT/AOT via ChdirJitHelper (#8180, #21147). */
 final class chdir_ extends Internal
 {
     public function __construct()
