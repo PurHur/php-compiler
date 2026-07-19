@@ -99,7 +99,6 @@ final class VmIntlTimeZone
             'createdefault' => [new IntlTimeZoneCreateDefault(), 'createDefault', $pubStatic],
             'fromdatetimezone' => [new IntlTimeZoneFromDateTimeZone(), 'fromDateTimeZone', $pubStatic],
             'getcanonicalid' => [new IntlTimeZoneGetCanonicalID(), 'getCanonicalID', $pubStatic],
-            'getianaid' => [new IntlTimeZoneGetIanaID(), 'getIanaID', $pubStatic],
             'getregion' => [new IntlTimeZoneGetRegion(), 'getRegion', $pubStatic],
             'getgmt' => [new IntlTimeZoneGetGMT(), 'getGMT', $pubStatic],
             'getunknown' => [new IntlTimeZoneGetUnknown(), 'getUnknown', $pubStatic],
@@ -122,6 +121,10 @@ final class VmIntlTimeZone
             'todatetimezone' => [new IntlTimeZoneToDateTimeZone(), 'toDateTimeZone', $pub],
             'hassamerules' => [new IntlTimeZoneHasSameRules(), 'hasSameRules', $pub],
         ];
+        // php-src timezone.stub.php — getIanaID only when U_ICU_VERSION_MAJOR_NUM >= 74 (#20926).
+        if (IntlExtensionPolicy::advertisesIanaTimeZoneId()) {
+            $methods['getianaid'] = [new IntlTimeZoneGetIanaID(), 'getIanaID', $pubStatic];
+        }
         foreach ($methods as $lc => [$handler, $name, $vis]) {
             $entry->methods[$lc] = $handler;
             $entry->methodVisibility[$lc] = $vis;

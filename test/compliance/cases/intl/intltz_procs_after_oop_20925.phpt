@@ -1,5 +1,5 @@
 --TEST--
-intltz_* procedurals after OOP count/windows/enum/iana/DST (#20925)
+intltz_* procedurals after OOP count/windows/enum/DST (#20925)
 --SKIPIF--
 <?php
 if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::runsIntlOopCompliance(basename(__FILE__))) {
@@ -23,7 +23,6 @@ $names = [
     'intltz_get_error_code',
     'intltz_get_error_message',
     'intltz_get_offset',
-    'intltz_get_iana_id',
 ];
 foreach ($names as $name) {
     echo $name, '=', function_exists($name) ? 'yes' : 'no', "\n";
@@ -65,9 +64,6 @@ $ok = intltz_get_offset($paris, 1719835200000.0, false, $raw, $dstOff);
 echo 'offset_ok=', $ok ? 'yes' : 'no', "\n";
 echo 'raw_ms=', $raw, "\n";
 echo 'dst_ms=', $dstOff, "\n";
-
-echo 'iana=', intltz_get_iana_id('US/Pacific'), "\n";
-echo 'oop_iana=', IntlTimeZone::getIanaID('US/Pacific'), "\n";
 ?>
 --EXPECT--
 intltz_count_equivalent_ids=yes
@@ -84,7 +80,6 @@ intltz_has_same_rules=yes
 intltz_get_error_code=yes
 intltz_get_error_message=yes
 intltz_get_offset=yes
-intltz_get_iana_id=yes
 dst=yes
 oop_dst=yes
 equiv_count=1
@@ -104,5 +99,3 @@ errmsg=U_ZERO_ERROR
 offset_ok=yes
 raw_ms=3600000
 dst_ms=3600000
-iana=America/Los_Angeles
-oop_iana=America/Los_Angeles
