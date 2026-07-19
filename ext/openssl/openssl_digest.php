@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_digest() — one-shot digest (#6228, ext/openssl/openssl.c).
+ * openssl_digest() — one-shot digest (#6228 VM, #21081 JIT/AOT NestedJIT; ext/openssl/openssl.c).
  */
 final class openssl_digest extends Internal
 {
@@ -56,8 +56,18 @@ final class openssl_digest extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'openssl_digest() is not implemented for JIT in this compiler build (issue #6228)'
+        $argc = \count($args);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(
+                'openssl_digest() expects 2 or 3 arguments, '.$argc.' given'
+            );
+        }
+
+        return JitOpensslDigest::digest(
+            $context,
+            $args[0],
+            $args[1],
+            $args[2] ?? null
         );
     }
 }
