@@ -246,4 +246,16 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([2], BuiltinByRefParams::forFunction('pdostatement::bindparam'));
         $this->assertSame([2], BuiltinByRefParams::forFunction('SQLite3Stmt::bindParam'));
     }
+
+    /** Issue #21127 — numfmt_parse_currency() / NumberFormatter::parseCurrency() optional &$offset. */
+    public function testNumfmtParseCurrencyOffsetByRef(): void
+    {
+        $this->assertSame([2, 3], BuiltinByRefParams::forFunction('numfmt_parse_currency'));
+        $this->assertSame([2, 3], BuiltinByRefParams::forFunction('NumberFormatter::parseCurrency'));
+        $this->assertSame([2, 3], BuiltinByRefParams::forFunction('numberformatter::parsecurrency'));
+        $this->assertTrue(BuiltinByRefParams::isByRefArg('numfmt_parse_currency', 2));
+        $this->assertTrue(BuiltinByRefParams::isByRefArg('numfmt_parse_currency', 3));
+        $this->assertFalse(BuiltinByRefParams::isByRefArg('numfmt_parse_currency', 1));
+        $this->assertSame([3], BuiltinByRefParams::forFunction('NumberFormatter::parse'));
+    }
 }

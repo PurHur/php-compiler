@@ -411,12 +411,22 @@ final class VmNumberFormatter
     }
 
     /**
+     * numfmt_parse_currency / NumberFormatter::parseCurrency — php-src formatter_main.c (#20728, #21127).
+     *
+     * Optional by-ref $offset is both parse start (bytes) and end (bytes consumed) like ICU.
+     *
      * @param-out string|null $currencyOut
+     * @param-out int|null    $offset
      *
      * @return float|false
      */
-    public static function parseCurrency(ObjectEntry $formatter, string $value, ?string &$currencyOut)
-    {
+    public static function parseCurrency(
+        ObjectEntry $formatter,
+        string $value,
+        ?string &$currencyOut,
+        ?int &$offset = null,
+        bool $hasOffset = false
+    ) {
         $state = self::$state[$formatter->id] ?? null;
         if (null === $state) {
             self::fail($formatter, 'numfmt_parse_currency: bad formatter: U_ILLEGAL_ARGUMENT_ERROR');
@@ -424,43 +434,126 @@ final class VmNumberFormatter
 
             return false;
         }
-        $trimmed = trim($value);
-        $currency = null;
-        $numeric = $trimmed;
-        if (preg_match('/^([A-Z]{3})\s*(.+)$/i', $trimmed, $m)) {
-            $currency = strtoupper($m[1]);
-            $numeric = $m[2];
-        } elseif (preg_match('/^(.+?)\s*([A-Z]{3})$/i', $trimmed, $m)) {
-            $numeric = $m[1];
-            $currency = strtoupper($m[2]);
-        } elseif (str_starts_with($trimmed, '$')) {
-            $currency = 'USD';
-            $numeric = substr($trimmed, 1);
-        } elseif (str_starts_with($trimmed, '€')) {
-            $currency = 'EUR';
-            $numeric = substr($trimmed, strlen('€'));
-        } elseif (str_starts_with($trimmed, '£')) {
-            $currency = 'GBP';
-            $numeric = substr($trimmed, strlen('£'));
-        } elseif (str_starts_with($trimmed, '¥')) {
-            $currency = 'JPY';
-            $numeric = substr($trimmed, strlen('¥'));
-        } elseif (str_starts_with($trimmed, '-$')) {
-            $currency = 'USD';
-            $numeric = '-'.substr($trimmed, 2);
+        $start = 0;
+        if ($hasOffset) {
+            $start = $offset ?? 0;
+            if ($start < 0 || $start > \strlen($value)) {
+                self::fail($formatter, 'numfmt_parse_currency: Currency parsing failed: U_PARSE_ERROR');
+                $currencyOut = null;
+
+                return false;
+            }
         }
-        $num = self::parseNumberString(trim($numeric), $state['locale']);
-        if (null === $num || null === $currency) {
+        $slice = $hasOffset ? \substr($value, $start) : $value;
+        $parsed = self::parseCurrencySlice($slice, $state['locale']);
+        if (null === $parsed) {
             self::fail($formatter, 'numfmt_parse_currency: Currency parsing failed: U_PARSE_ERROR');
             $currencyOut = null;
 
             return false;
         }
+        [$num, $currency, $consumed] = $parsed;
         $currencyOut = $currency;
+        if ($hasOffset) {
+            $offset = $start + $consumed;
+        }
         self::clearObjectError($formatter);
         IntlError::clear();
 
         return $num;
+    }
+
+    /**
+     * Parse a currency amount prefix; return [amount, currency, bytesConsumed] or null.
+     *
+     * @return array{0: float, 1: string, 2: int}|null
+     */
+    private static function parseCurrencySlice(string $slice, string $locale): ?array
+    {
+        if ('' === $slice) {
+            return null;
+        }
+        $currency = null;
+        $numericStart = 0;
+        if (str_starts_with($slice, '-$')) {
+            $currency = 'USD';
+            $numericStart = 2;
+            $negative = true;
+        } elseif (str_starts_with($slice, '$')) {
+            $currency = 'USD';
+            $numericStart = 1;
+            $negative = false;
+        } elseif (str_starts_with($slice, '€')) {
+            $currency = 'EUR';
+            $numericStart = \strlen('€');
+            $negative = false;
+        } elseif (str_starts_with($slice, '£')) {
+            $currency = 'GBP';
+            $numericStart = \strlen('£');
+            $negative = false;
+        } elseif (str_starts_with($slice, '¥')) {
+            $currency = 'JPY';
+            $numericStart = \strlen('¥');
+            $negative = false;
+        } elseif (preg_match('/^([A-Z]{3})\s*/i', $slice, $m)) {
+            $currency = strtoupper($m[1]);
+            $numericStart = \strlen($m[0]);
+            $negative = false;
+        } elseif (preg_match('/^(.+?)\s*([A-Z]{3})/i', $slice, $m)) {
+            // Trailing ISO code — consume through the code (legacy subset; ICU locale patterns differ).
+            $numeric = $m[1];
+            $currency = strtoupper($m[2]);
+            $num = self::parseNumberString(trim($numeric), $locale);
+            if (null === $num) {
+                return null;
+            }
+
+            return [$num, $currency, \strlen($m[0])];
+        } else {
+            return null;
+        }
+
+        $numericSlice = \substr($slice, $numericStart);
+        if ($negative) {
+            $numericSlice = '-'.$numericSlice;
+        }
+        $prefix = self::matchNumberPrefix($numericSlice, $locale);
+        if (null === $prefix) {
+            return null;
+        }
+        [$num, $numBytes] = $prefix;
+        // Leading '-$' already counted the sign in numericStart via '-'+rest; adjust bytes.
+        $consumed = $numericStart + ($negative ? $numBytes - 1 : $numBytes);
+
+        return [$num, $currency, $consumed];
+    }
+
+    /**
+     * Longest locale-aware numeric prefix (stops before trailing junk — e.g. "$12abc" → "12").
+     *
+     * @return array{0: float, 1: int}|null
+     */
+    private static function matchNumberPrefix(string $value, string $locale): ?array
+    {
+        [$grouping, $decimal] = self::separatorsForLocale($locale);
+        $g = preg_quote($grouping, '/');
+        $d = preg_quote($decimal, '/');
+        // Optional sign, digits with optional grouping, optional decimal fraction.
+        $pattern = '/^(-)?(?:\d{1,3}(?:'.$g.'\d{3})*|\d+)(?:'.$d.'\d+)?/';
+        if (!preg_match($pattern, $value, $m)) {
+            // Allow leading decimal: ".5"
+            $pattern = '/^(-)?('.$d.'\d+)/';
+            if (!preg_match($pattern, $value, $m)) {
+                return null;
+            }
+        }
+        $matched = $m[0];
+        $num = self::parseNumberString($matched, $locale);
+        if (null === $num) {
+            return null;
+        }
+
+        return [$num, \strlen($matched)];
     }
 
     /**
@@ -1056,7 +1149,7 @@ final class NumberFormatterParse extends VmClassMethod
     }
 }
 
-/** NumberFormatter::parseCurrency() — php-src numfmt_parse_currency (#20728). */
+/** NumberFormatter::parseCurrency() — php-src numfmt_parse_currency (#20728, #21127). */
 final class NumberFormatterParseCurrency extends VmClassMethod
 {
     public function __construct()
@@ -1067,10 +1160,18 @@ final class NumberFormatterParseCurrency extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if (3 !== $argc) {
+        // Method: string $string, &$currency, &$offset = null — 2..3 user args.
+        $userArgc = max(0, $argc - 1);
+        if ($userArgc < 2) {
             throw new \ArgumentCountError(\sprintf(
-                'NumberFormatter::parseCurrency() expects exactly 2 arguments, %d given',
-                max(0, $argc - 1)
+                'NumberFormatter::parseCurrency() expects at least 2 arguments, %d given',
+                $userArgc
+            ));
+        }
+        if ($userArgc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'NumberFormatter::parseCurrency() expects at most 3 arguments, %d given',
+                $userArgc
             ));
         }
         $receiver = $frame->calledArgs[0]->resolveIndirect();
@@ -1080,12 +1181,34 @@ final class NumberFormatterParseCurrency extends VmClassMethod
         }
         $value = VmNumberFormatter::coerceStringArg($frame->calledArgs[1], 'NumberFormatter::parseCurrency', 1, 'string');
         $currencyOut = null;
-        $result = VmNumberFormatter::parseCurrency($receiver->toObject(), $value, $currencyOut);
+        $offset = null;
+        $hasOffset = $argc >= 4;
+        if ($hasOffset) {
+            $offsetVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $offsetVar->type) {
+                $offset = VmIntlDateFormatter::coerceIntArg(
+                    $offsetVar,
+                    'NumberFormatter::parseCurrency',
+                    2,
+                    'offset'
+                );
+            }
+        }
+        $result = VmNumberFormatter::parseCurrency(
+            $receiver->toObject(),
+            $value,
+            $currencyOut,
+            $offset,
+            $hasOffset
+        );
         $currencyVar = $frame->calledArgs[2]->resolveIndirect();
         if (null === $currencyOut) {
             $currencyVar->null();
         } else {
             $currencyVar->string($currencyOut);
+        }
+        if ($hasOffset && null !== $offset) {
+            $frame->calledArgs[3]->byRefTarget()->int($offset);
         }
         if (null === $frame->returnVar) {
             return;
