@@ -860,6 +860,7 @@ class Context {
         // Stale sg_* from a prior JITContext in the same PHP process breaks SessionDestroy::implement (#4415).
         SuperglobalInit::$globals = [];
         LibcExtern::register($this);
+        LibcExtern::implementMcjitMemBodies($this);
         foreach ($this->builtins as $builtin) {
             // this is a separate loop, since implementation may
             // depend on global variables set during init()

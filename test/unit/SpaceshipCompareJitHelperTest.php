@@ -6,42 +6,38 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** Spaceship scalar JIT routes through CompareJitHelper PHP, not hand-written LLVM (#9381). */
+/** Spaceship scalar JIT routes through CompareJitHelperScalars NestedJIT; object/ht via LLVM (#9381, #21109). */
 final class SpaceshipCompareJitHelperTest extends TestCase
 {
     public function testCompareJitHelperDelegatesScalarSemantics(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/VM/CompareJitHelper.php');
-        $this->assertStringContainsString('spaceshipNumeric', $source);
+        $this->assertStringContainsString('CompareJitHelperScalars', $source);
         $this->assertStringContainsString('objectSpaceship', $source);
         $this->assertStringContainsString('hashtableSpaceship', $source);
     }
 
-    public function testSpaceshipRuntimeCompilesCompareJitHelper(): void
+    public function testSpaceshipRuntimeCompilesScalarHelpersOnly(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SpaceshipRuntime.php');
-        $this->assertStringContainsString('CompareJitHelper', $source);
-        $this->assertStringContainsString('OBJECT_HELPER', $source);
-        $this->assertStringContainsString('HASHTABLE_HELPER', $source);
+        $this->assertStringContainsString('CompareJitHelperScalars', $source);
+        $this->assertStringNotContainsString('OBJECT_HELPER', $source);
+        $this->assertStringNotContainsString('HASHTABLE_HELPER', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
     }
 
     public function testSpaceshipCompareKernelRoutesScalarsThroughHelper(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/JitSpaceshipCompareKernel.php');
-        $this->assertStringContainsString('CompareJitHelper::longSpaceship', $source);
-        $this->assertStringContainsString('CompareJitHelper::stringSpaceship', $source);
-        $this->assertStringContainsString('CompareJitHelper::objectSpaceship', $source);
-        $this->assertStringContainsString('CompareJitHelper::hashtableSpaceship', $source);
-        $this->assertStringContainsString('emitObjectCompareSpaceshipBridge', $source);
-        $this->assertStringContainsString('emitHashtableCompareSpaceshipBridge', $source);
-        $this->assertStringNotContainsString('emitObjectCompareSpaceship(', $source);
-        $this->assertStringNotContainsString('emitHashtableCompareSpaceship(', $source);
-        $this->assertStringNotContainsString('__object__prop_count', $source);
+        $this->assertStringContainsString('CompareJitHelperScalars::longSpaceship', $source);
+        $this->assertStringContainsString('CompareJitHelperScalars::stringSpaceship', $source);
+        $this->assertStringContainsString('emitObjectCompareSpaceship(', $source);
+        $this->assertStringContainsString('emitHashtableCompareSpaceship(', $source);
+        $this->assertStringNotContainsString('emitObjectCompareSpaceshipBridge', $source);
+        $this->assertStringNotContainsString('emitHashtableCompareSpaceshipBridge', $source);
+        $this->assertStringContainsString('__object__prop_count', $source);
         $this->assertStringNotContainsString('JitFloatCompare', $source);
         $this->assertStringNotContainsString('stringIsNumeric', $source);
-        $loc = substr_count($source, "\n") + 1;
-        $this->assertLessThan(950, $loc, 'JitSpaceshipCompareKernel.php LOC after standalone LLVM deletion (#12981)');
     }
 
     public function testCompareJitHelperObjectAndHashtableSemantics(): void
@@ -74,5 +70,6 @@ final class SpaceshipCompareJitHelperTest extends TestCase
         $this->assertSame(-1, \PHPCompiler\VM\CompareJitHelper::stringSpaceship('a', 'b'));
         $this->assertSame(-1, \PHPCompiler\VM\CompareJitHelper::spaceshipNumberString(1.0, 'b', 1));
         $this->assertSame(0, \PHPCompiler\VM\CompareJitHelper::spaceshipNumberString(1.0, '1', 1));
+        $this->assertSame(-1, \PHPCompiler\VM\CompareJitHelperScalars::longSpaceship(1, 2));
     }
 }

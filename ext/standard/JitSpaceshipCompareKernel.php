@@ -17,10 +17,10 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * LLVM spaceship (<=>) dispatch for boxed values, objects, and hashtables (#5185, #9381, #19623).
  *
  * Quarantined from lib/JIT/Builtin/SpaceshipCompareJit — {@see \PHPCompiler\JIT\Builtin\SpaceshipRuntime}
- * stays the thin orchestrator (CompareJitHelper PHP SSOT unchanged).
+ * stays the thin orchestrator.
  *
- * Scalar compare semantics route through compiled {@see \PHPCompiler\VM\CompareJitHelper};
- * object/hashtable walks route through CompareJitHelper on JIT embed and standalone AOT (#9476, #12981).
+ * Scalar compare semantics route through NestedJIT {@see \PHPCompiler\VM\CompareJitHelperScalars};
+ * object/hashtable walks use LLVM emitters (NestedJIT ObjectEntry/HashTable IR is unsafe — #21109).
  *
  * php-src: Zend/zend_operators.c — compare_function / spaceship
  */
@@ -49,7 +49,7 @@ final class JitSpaceshipCompareKernel
     private static int $blockSuffix = 0;
 
     /**
-     * Forward-declare spaceship ABI symbols before CompareJitHelper nested compile (#19048).
+     * Forward-declare spaceship ABI symbols before CompareJitHelperScalars nested compile (#19048/#21109).
      *
      * @return array{0: LlvmFunction, 1: LlvmFunction, 2: LlvmFunction}
      */
@@ -103,8 +103,8 @@ final class JitSpaceshipCompareKernel
 
         [$valueFn, $objectFn, $htFn] = self::declareAbiFunctions($context);
 
-        self::emitHashtableCompareSpaceshipBridge($context, $htFn);
-        self::emitObjectCompareSpaceshipBridge($context, $objectFn);
+        self::emitHashtableCompareSpaceship($context, $htFn);
+        self::emitObjectCompareSpaceship($context, $objectFn);
         self::emitValueSpaceship($context, $valueFn);
 
         self::registerFunctions($context);
@@ -129,11 +129,13 @@ final class JitSpaceshipCompareKernel
         $voidPtr = $context->getTypeFromString('void*');
         $dbl = $context->getTypeFromString('double');
         $dblPtr = $context->getTypeFromString('double*');
+        $objPtr = $context->getTypeFromString('__object__*');
 
         self::declareExternal($context, 'strcmp', $i32, [$i8p, $i8p]);
         self::declareExternal($context, 'strncasecmp', $i32, [$i8p, $i8p, $sizeT]);
         self::declareExternal($context, 'strtod', $dbl, [$i8p, $i8p->pointerType(0)]);
         self::declareExternal($context, 'isnan', $i32, [$dbl]);
+        self::declareExternal($context, '__object__prop_count', $i32, [$objPtr]);
     }
 
     /**
@@ -558,11 +560,9 @@ final class JitSpaceshipCompareKernel
         );
     }
 
-    private static function emitObjectCompareSpaceshipBridge(Context $context, LlvmFunction $fn): void
+    private static function emitObjectCompareSpaceship(Context $context, LlvmFunction $fn): void
     {
-        SpaceshipRuntime::ensureCompareJitHelperCompiled($context);
-
-        $entry = $fn->appendBasicBlock('ss_obj_bridge_entry');
+        $entry = $fn->appendBasicBlock('ss_obj_entry');
         $context->builder->positionAtEnd($entry);
 
         $left = $fn->getParam(0);
@@ -573,8 +573,8 @@ final class JitSpaceshipCompareKernel
         $nullObj = $objPtr->constNull();
 
         $samePtr = $context->builder->icmp(Builder::INT_EQ, $left, $right);
-        $sameRet = $fn->appendBasicBlock('ss_obj_bridge_same');
-        $notSame = $fn->appendBasicBlock('ss_obj_bridge_not_same');
+        $sameRet = $fn->appendBasicBlock('ss_obj_same');
+        $notSame = $fn->appendBasicBlock('ss_obj_not_same');
         $context->builder->branchIf($samePtr, $sameRet, $notSame);
 
         $context->builder->positionAtEnd($sameRet);
@@ -584,9 +584,9 @@ final class JitSpaceshipCompareKernel
         $leftNull = $context->builder->icmp(Builder::INT_EQ, $left, $nullObj);
         $rightNull = $context->builder->icmp(Builder::INT_EQ, $right, $nullObj);
         $eitherNull = $context->builder->or($leftNull, $rightNull);
-        $nullCmp = $fn->appendBasicBlock('ss_obj_bridge_null_cmp');
-        $callHelper = $fn->appendBasicBlock('ss_obj_bridge_call');
-        $context->builder->branchIf($eitherNull, $nullCmp, $callHelper);
+        $nullCmp = $fn->appendBasicBlock('ss_obj_null_cmp');
+        $enumTry = $fn->appendBasicBlock('ss_obj_enum_try');
+        $context->builder->branchIf($eitherNull, $nullCmp, $enumTry);
 
         $context->builder->positionAtEnd($nullCmp);
         $leftKind = $context->builder->select(
@@ -599,23 +599,166 @@ final class JitSpaceshipCompareKernel
             $i64->constInt(self::TYPE_NULL, false),
             $i64->constInt(self::TYPE_OBJECT, false)
         );
-        $context->builder->returnValue(self::kindSpaceship($context, $leftKind, $rightKind));
+        $context->builder->returnValue(self::longSpaceship($context, $leftKind, $rightKind));
 
-        $context->builder->positionAtEnd($callHelper);
-        $helperFn = SpaceshipRuntime::compareHelper(
-            $context,
-            'PHPCompiler\\VM\\CompareJitHelper::objectSpaceship'
+        $context->builder->positionAtEnd($enumTry);
+        $propCmp = $fn->appendBasicBlock('ss_obj_prop_cmp');
+        self::emitEnumCaseTry($context, $fn, $left, $right, $propCmp);
+
+        $context->builder->positionAtEnd($propCmp);
+        $objMap = $context->structFieldMap['__object__'];
+        $leftClass = $context->builder->load($context->builder->structGep($left, $objMap['class_id']));
+        $rightClass = $context->builder->load($context->builder->structGep($right, $objMap['class_id']));
+        $classDiff = $context->builder->icmp(Builder::INT_NE, $leftClass, $rightClass);
+        $classRet = $fn->appendBasicBlock('ss_obj_class_diff');
+        $propLoopInit = $fn->appendBasicBlock('ss_obj_prop_init');
+        $context->builder->branchIf($classDiff, $classRet, $propLoopInit);
+
+        $context->builder->positionAtEnd($classRet);
+        $context->builder->returnValue($i64->constInt(1, true));
+
+        $context->builder->positionAtEnd($propLoopInit);
+        $propCount = $context->builder->call(
+            $context->lookupFunction('__object__prop_count'),
+            $left
         );
-        $result = $context->builder->call($helperFn, $left, $right);
-        $context->builder->returnValue($result);
+        $slotSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int32'));
+        $context->builder->store($propCount, $slotSlot);
+        $headerSize = self::objectHeaderSize($context);
+
+        $loopHead = $fn->appendBasicBlock('ss_obj_prop_head');
+        $loopDone = $fn->appendBasicBlock('ss_obj_prop_done');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $slot = $context->builder->load($slotSlot);
+        $slotDone = $context->builder->icmp(Builder::INT_SGE, $slot, $propCount);
+        $loopBody = $fn->appendBasicBlock('ss_obj_prop_body');
+        $context->builder->branchIf($slotDone, $loopDone, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $slotIdx = $context->builder->zExt($slot, $context->getTypeFromString('size_t'));
+        $slotBytes = $context->builder->mul(
+            $slotIdx,
+            $context->getTypeFromString('size_t')->constInt(8, false)
+        );
+        $lSlotPtr = self::propertySlotPtr($context, $left, $headerSize, $slotBytes);
+        $rSlotPtr = self::propertySlotPtr($context, $right, $headerSize, $slotBytes);
+        $lval = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        $rval = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        self::slotContentToValue($context, $context->builder->load($lSlotPtr), $lval);
+        self::slotContentToValue($context, $context->builder->load($rSlotPtr), $rval);
+        $cmp = $context->builder->call(
+            $context->lookupFunction('__value__spaceship'),
+            $lval,
+            $rval
+        );
+        $nonZero = $context->builder->icmp(Builder::INT_NE, $cmp, $zero64);
+        $retCmp = $fn->appendBasicBlock('ss_obj_prop_ret');
+        $advance = $fn->appendBasicBlock('ss_obj_prop_advance');
+        $context->builder->branchIf($nonZero, $retCmp, $advance);
+
+        $context->builder->positionAtEnd($retCmp);
+        $context->builder->returnValue($cmp);
+
+        $context->builder->positionAtEnd($advance);
+        $context->builder->store(
+            $context->builder->add($slot, $context->getTypeFromString('int32')->constInt(1, false)),
+            $slotSlot
+        );
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopDone);
+        $context->builder->returnValue($zero64);
         $context->builder->clearInsertionPosition();
     }
 
-    private static function emitHashtableCompareSpaceshipBridge(Context $context, LlvmFunction $fn): void
-    {
-        SpaceshipRuntime::ensureCompareJitHelperCompiled($context);
+    private static function emitEnumCaseTry(
+        Context $context,
+        LlvmFunction $fn,
+        Value $left,
+        Value $right,
+        BasicBlock $propCmp
+    ): void {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $one = $i64->constInt(1, true);
+        $zero = $i64->constInt(0, false);
 
-        $entry = $fn->appendBasicBlock('ss_ht_bridge_entry');
+        $lprops = $context->builder->call(
+            $context->lookupFunction('__object__prop_count'),
+            $left
+        );
+        $rprops = $context->builder->call(
+            $context->lookupFunction('__object__prop_count'),
+            $right
+        );
+        $propsMatch = $context->builder->icmp(Builder::INT_EQ, $lprops, $rprops);
+        $propsZeroOrTwo = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $lprops, $i32->constInt(0, false)),
+            $context->builder->icmp(Builder::INT_EQ, $lprops, $i32->constInt(2, false))
+        );
+        $validProps = $context->builder->and($propsMatch, $propsZeroOrTwo);
+        $nameCheck = $fn->appendBasicBlock('ss_enum_name_check');
+        $context->builder->branchIf($validProps, $nameCheck, $propCmp);
+
+        $context->builder->positionAtEnd($nameCheck);
+        $lname = self::objectCaseNameSlot($context, $left, 0);
+        $rname = self::objectCaseNameSlot($context, $right, 0);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $namesOk = $context->builder->and(
+            $context->builder->icmp(Builder::INT_NE, $lname, $nullStr),
+            $context->builder->icmp(Builder::INT_NE, $rname, $nullStr)
+        );
+        $classCheck = $fn->appendBasicBlock('ss_enum_class_check');
+        $context->builder->branchIf($namesOk, $classCheck, $propCmp);
+
+        $context->builder->positionAtEnd($classCheck);
+        $objMap = $context->structFieldMap['__object__'];
+        $lClass = $context->builder->load($context->builder->structGep($left, $objMap['class_id']));
+        $rClass = $context->builder->load($context->builder->structGep($right, $objMap['class_id']));
+        $classDiff = $fn->appendBasicBlock('ss_enum_class_diff');
+        $nameCmp = $fn->appendBasicBlock('ss_enum_name_cmp');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $lClass, $rClass),
+            $nameCmp,
+            $classDiff
+        );
+
+        $context->builder->positionAtEnd($classDiff);
+        $context->builder->returnValue($one);
+
+        $context->builder->positionAtEnd($nameCmp);
+        $llen = self::stringLen($context, $lname);
+        $rlen = self::stringLen($context, $rname);
+        $lenDiff = $fn->appendBasicBlock('ss_enum_len_diff');
+        $caseCmp = $fn->appendBasicBlock('ss_enum_case_cmp');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $llen, $rlen),
+            $caseCmp,
+            $lenDiff
+        );
+
+        $context->builder->positionAtEnd($lenDiff);
+        $context->builder->returnValue($one);
+
+        $context->builder->positionAtEnd($caseCmp);
+        $ldata = self::stringData($context, $lname);
+        $rdata = self::stringData($context, $rname);
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strncasecmp'),
+            $ldata,
+            $rdata,
+            $llen
+        );
+        $isEqual = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+        $context->builder->returnValue($context->builder->select($isEqual, $zero, $one));
+    }
+
+    private static function emitHashtableCompareSpaceship(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ss_ht_entry');
         $context->builder->positionAtEnd($entry);
 
         $left = $fn->getParam(0);
@@ -628,21 +771,205 @@ final class JitSpaceshipCompareKernel
         $leftNull = $context->builder->icmp(Builder::INT_EQ, $left, $nullHt);
         $rightNull = $context->builder->icmp(Builder::INT_EQ, $right, $nullHt);
         $eitherNull = $context->builder->or($leftNull, $rightNull);
-        $nullRet = $fn->appendBasicBlock('ss_ht_bridge_null_ret');
-        $callHelper = $fn->appendBasicBlock('ss_ht_bridge_call');
-        $context->builder->branchIf($eitherNull, $nullRet, $callHelper);
+        $nullRet = $fn->appendBasicBlock('ss_ht_null_ret');
+        $work = $fn->appendBasicBlock('ss_ht_work');
+        $context->builder->branchIf($eitherNull, $nullRet, $work);
 
         $context->builder->positionAtEnd($nullRet);
         $context->builder->returnValue($zero64);
 
-        $context->builder->positionAtEnd($callHelper);
-        $helperFn = SpaceshipRuntime::compareHelper(
-            $context,
-            'PHPCompiler\\VM\\CompareJitHelper::hashtableSpaceship'
+        $context->builder->positionAtEnd($work);
+        $htMap = $context->structFieldMap['__hashtable__'];
+        $leftCount = $context->builder->load($context->builder->structGep($left, $htMap['numElements']));
+        $rightCount = $context->builder->load($context->builder->structGep($right, $htMap['numElements']));
+        $gt = $context->builder->icmp(Builder::INT_UGT, $leftCount, $rightCount);
+        $lt = $context->builder->icmp(Builder::INT_ULT, $leftCount, $rightCount);
+        $gtRet = $fn->appendBasicBlock('ss_ht_gt');
+        $ltRet = $fn->appendBasicBlock('ss_ht_lt');
+        $ltCheck = $fn->appendBasicBlock('ss_ht_count_lt_check');
+        $idxInit = $fn->appendBasicBlock('ss_ht_idx_init');
+        $context->builder->branchIf($gt, $gtRet, $ltCheck);
+
+        $context->builder->positionAtEnd($ltCheck);
+        $context->builder->branchIf($lt, $ltRet, $idxInit);
+
+        $context->builder->positionAtEnd($gtRet);
+        $context->builder->returnValue($i64->constInt(1, true));
+
+        $context->builder->positionAtEnd($ltRet);
+        $context->builder->returnValue($i64->constInt(-1, true));
+
+        $context->builder->positionAtEnd($idxInit);
+        $leftNext = $context->builder->load($context->builder->structGep($left, $htMap['nextFreeElement']));
+        $rightNext = $context->builder->load($context->builder->structGep($right, $htMap['nextFreeElement']));
+        $idxSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('size_t'));
+        $context->builder->store($context->getTypeFromString('size_t')->constInt(0, false), $idxSlot);
+
+        $idxHead = $fn->appendBasicBlock('ss_ht_idx_head');
+        $strInit = $fn->appendBasicBlock('ss_ht_str_init');
+        $context->builder->branch($idxHead);
+
+        $context->builder->positionAtEnd($idxHead);
+        $index = $context->builder->load($idxSlot);
+        $leftBound = $context->builder->icmp(Builder::INT_ULT, $index, $leftNext);
+        $rightBound = $context->builder->icmp(Builder::INT_ULT, $index, $rightNext);
+        $inBounds = $context->builder->and($leftBound, $rightBound);
+        $idxBody = $fn->appendBasicBlock('ss_ht_idx_body');
+        $context->builder->branchIf($inBounds, $idxBody, $strInit);
+
+        $context->builder->positionAtEnd($idxBody);
+        $leftValues = $context->builder->load($context->builder->structGep($left, $htMap['values']));
+        $rightValues = $context->builder->load($context->builder->structGep($right, $htMap['values']));
+        $lval = $context->builder->gep($leftValues, $index);
+        $rval = $context->builder->gep($rightValues, $index);
+        $bothNull = $context->builder->and(self::valueIsNull($context, $lval), self::valueIsNull($context, $rval));
+        $skipNull = $fn->appendBasicBlock('ss_ht_skip_null');
+        $doCmp = $fn->appendBasicBlock('ss_ht_do_cmp');
+        $context->builder->branchIf($bothNull, $skipNull, $doCmp);
+
+        $context->builder->positionAtEnd($doCmp);
+        $cmp = $context->builder->call($context->lookupFunction('__value__spaceship'), $lval, $rval);
+        $nonZero = $context->builder->icmp(Builder::INT_NE, $cmp, $zero64);
+        $retCmp = $fn->appendBasicBlock('ss_ht_idx_ret');
+        $context->builder->branchIf($nonZero, $retCmp, $skipNull);
+
+        $context->builder->positionAtEnd($retCmp);
+        $context->builder->returnValue($cmp);
+
+        $context->builder->positionAtEnd($skipNull);
+        $context->builder->store(
+            $context->builder->add($index, $context->getTypeFromString('size_t')->constInt(1, false)),
+            $idxSlot
         );
-        $result = $context->builder->call($helperFn, $left, $right);
-        $context->builder->returnValue($result);
+        $context->builder->branch($idxHead);
+
+        $context->builder->positionAtEnd($strInit);
+        $nodePtr = $context->getTypeFromString('__strkey_node__*');
+        $nullNode = $nodePtr->constNull();
+        $lnodeSlot = BasicBlockHelper::entryAlloca($context, $nodePtr);
+        $rnodeSlot = BasicBlockHelper::entryAlloca($context, $nodePtr);
+        $nodeMap = $context->structFieldMap['__strkey_node__'];
+        $context->builder->store(
+            $context->builder->load($context->builder->structGep($left, $htMap['strKeys'])),
+            $lnodeSlot
+        );
+        $context->builder->store(
+            $context->builder->load($context->builder->structGep($right, $htMap['strKeys'])),
+            $rnodeSlot
+        );
+
+        $strHead = $fn->appendBasicBlock('ss_ht_str_head');
+        $strDone = $fn->appendBasicBlock('ss_ht_str_done');
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strHead);
+        $lnode = $context->builder->load($lnodeSlot);
+        $rnode = $context->builder->load($rnodeSlot);
+        $lNull = $context->builder->icmp(Builder::INT_EQ, $lnode, $nullNode);
+        $rNull = $context->builder->icmp(Builder::INT_EQ, $rnode, $nullNode);
+        $bothNodes = $context->builder->and(
+            $context->builder->icmp(Builder::INT_EQ, $lNull, $context->getTypeFromString('int1')->constInt(0, false)),
+            $context->builder->icmp(Builder::INT_EQ, $rNull, $context->getTypeFromString('int1')->constInt(0, false))
+        );
+        $strBody = $fn->appendBasicBlock('ss_ht_str_body');
+        $context->builder->branchIf($bothNodes, $strBody, $strDone);
+
+        $context->builder->positionAtEnd($strBody);
+        $lkey = $context->builder->load($context->builder->structGep($lnode, $nodeMap['key']));
+        $rkey = $context->builder->load($context->builder->structGep($rnode, $nodeMap['key']));
+        $keyCmp = self::i64FromI32($context, self::stringSpaceship($context, $lkey, $rkey));
+        $keyNonZero = $context->builder->icmp(Builder::INT_NE, $keyCmp, $zero64);
+        $keyRet = $fn->appendBasicBlock('ss_ht_key_ret');
+        $valCmpBlock = $fn->appendBasicBlock('ss_ht_val_cmp');
+        $context->builder->branchIf($keyNonZero, $keyRet, $valCmpBlock);
+
+        $context->builder->positionAtEnd($keyRet);
+        $context->builder->returnValue($keyCmp);
+
+        $context->builder->positionAtEnd($valCmpBlock);
+        $lvalPtr = $context->builder->structGep($lnode, $nodeMap['value']);
+        $rvalPtr = $context->builder->structGep($rnode, $nodeMap['value']);
+        $valCmp = $context->builder->call($context->lookupFunction('__value__spaceship'), $lvalPtr, $rvalPtr);
+        $valNonZero = $context->builder->icmp(Builder::INT_NE, $valCmp, $zero64);
+        $valRet = $fn->appendBasicBlock('ss_ht_val_ret');
+        $strAdvance = $fn->appendBasicBlock('ss_ht_str_advance');
+        $context->builder->branchIf($valNonZero, $valRet, $strAdvance);
+
+        $context->builder->positionAtEnd($valRet);
+        $context->builder->returnValue($valCmp);
+
+        $context->builder->positionAtEnd($strAdvance);
+        $context->builder->store(
+            $context->builder->load($context->builder->structGep($lnode, $nodeMap['next'])),
+            $lnodeSlot
+        );
+        $context->builder->store(
+            $context->builder->load($context->builder->structGep($rnode, $nodeMap['next'])),
+            $rnodeSlot
+        );
+        $context->builder->branch($strHead);
+
+        $context->builder->positionAtEnd($strDone);
+        $context->builder->returnValue($zero64);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function slotContentToValue(Context $context, Value $content, Value $dest): void
+    {
+        $voidPtr = $context->getTypeFromString('void*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $content, $voidPtr->constNull());
+        $nullBlock = BasicBlockHelper::append($context, self::blockName('ss_slot_null'));
+        $checkObj = BasicBlockHelper::append($context, self::blockName('ss_slot_check_obj'));
+        $objBlock = BasicBlockHelper::append($context, self::blockName('ss_slot_obj'));
+        $loadBlock = BasicBlockHelper::append($context, self::blockName('ss_slot_load'));
+        $done = BasicBlockHelper::append($context, self::blockName('ss_slot_done'));
+        $context->builder->branchIf($isNull, $nullBlock, $checkObj);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $dest);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($checkObj);
+        $isObject = self::slotIsObject($context, $content);
+        $context->builder->branchIf($isObject, $objBlock, $loadBlock);
+
+        $context->builder->positionAtEnd($objBlock);
+        $valueMap = $context->structFieldMap['__value__'];
+        $objPtr = $context->getTypeFromString('__object__*');
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_OBJECT, false),
+            $context->builder->structGep($dest, $valueMap['type'])
+        );
+        $objSlot = $context->builder->pointerCast(
+            $context->builder->structGep($dest, $valueMap['value']),
+            $objPtr->pointerType(0)
+        );
+        $context->builder->store(
+            $context->builder->pointerCast($content, $objPtr),
+            $objSlot
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($loadBlock);
+        $valPtr = $context->builder->pointerCast($content, $context->getTypeFromString('__value__*'));
+        $context->builder->store($context->builder->load($valPtr), $dest);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    private static function slotIsObject(Context $context, Value $slot): Value
+    {
+        $refMap = $context->structFieldMap['__ref__'];
+        $i32 = $context->getTypeFromString('int32');
+        $voidPtr = $context->getTypeFromString('void*');
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $slot, $voidPtr->constNull());
+        $head = $context->builder->pointerCast($slot, $context->getTypeFromString('__ref__*'));
+        $typeinfo = $context->builder->load($context->builder->structGep($head, $refMap['typeinfo']));
+        $masked = $context->builder->and($typeinfo, $i32->constInt(self::TYPEINFO_TYPEMASK, false));
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $masked, $i32->constInt(self::TYPEINFO_TYPE_OBJECT, false));
+
+        return $context->builder->select($isNull, $context->getTypeFromString('int1')->constInt(0, false), $isObject);
     }
 
     private static function valueKind(Context $context, Value $valuePtr): Value
@@ -668,16 +995,17 @@ final class JitSpaceshipCompareKernel
     private static function readBoolAsLong(Context $context, Value $valuePtr): Value
     {
         $map = $context->structFieldMap['__value__'];
-        $firstByte = $context->builder->load(
-            $context->builder->gep(
-                $context->builder->structGep($valuePtr, $map['value']),
-                $context->getTypeFromString('int32')->constInt(0, false)
-            )
+        $i8 = $context->getTypeFromString('int8');
+        // __value__.value is int8[8]; single-index gep keeps [8 x i8]* and load fails icmp (#21109).
+        $bytePtr = $context->builder->pointerCast(
+            $context->builder->structGep($valuePtr, $map['value']),
+            $i8->pointerType(0)
         );
+        $firstByte = $context->builder->load($bytePtr);
         $truthy = $context->builder->icmp(
             Builder::INT_NE,
             $firstByte,
-            $context->getTypeFromString('int8')->constInt(0, false)
+            $i8->constInt(0, false)
         );
 
         return $context->builder->zExt($truthy, $context->getTypeFromString('int64'));
@@ -711,7 +1039,7 @@ final class JitSpaceshipCompareKernel
     {
         $fn = SpaceshipRuntime::compareHelper(
             $context,
-            'PHPCompiler\\VM\\CompareJitHelper::stringSpaceship'
+            'PHPCompiler\\VM\\CompareJitHelperScalars::stringSpaceship'
         );
         $cmp = $context->builder->call($fn, $left, $right);
 
@@ -743,9 +1071,8 @@ final class JitSpaceshipCompareKernel
     ): Value {
         $fn = SpaceshipRuntime::compareHelper(
             $context,
-            'PHPCompiler\\VM\\CompareJitHelper::spaceshipNumberString'
+            'PHPCompiler\\VM\\CompareJitHelperScalars::spaceshipNumberString'
         );
-        // NestedJIT lowers PHP int params as i64 (#21109); i32 literals fail module verify.
         $cmp = $context->builder->call(
             $fn,
             $num,
@@ -753,37 +1080,40 @@ final class JitSpaceshipCompareKernel
             $context->getTypeFromString('int64')->constInt($numOnLeft ? 1 : 0, false)
         );
 
-        return $cmp;
+        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
     }
 
     private static function longSpaceship(Context $context, Value $left, Value $right): Value
     {
         $fn = SpaceshipRuntime::compareHelper(
             $context,
-            'PHPCompiler\\VM\\CompareJitHelper::longSpaceship'
+            'PHPCompiler\\VM\\CompareJitHelperScalars::longSpaceship'
         );
-        // NestedJIT int return is already i64 (#21109).
-        return $context->builder->call($fn, $left, $right);
+        $cmp = $context->builder->call($fn, $left, $right);
+
+        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
     }
 
     private static function kindSpaceship(Context $context, Value $left, Value $right): Value
     {
         $fn = SpaceshipRuntime::compareHelper(
             $context,
-            'PHPCompiler\\VM\\CompareJitHelper::kindSpaceship'
+            'PHPCompiler\\VM\\CompareJitHelperScalars::kindSpaceship'
         );
+        $cmp = $context->builder->call($fn, $left, $right);
 
-        return $context->builder->call($fn, $left, $right);
+        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
     }
 
     private static function doubleSpaceship(Context $context, Value $left, Value $right): Value
     {
         $fn = SpaceshipRuntime::compareHelper(
             $context,
-            'PHPCompiler\\VM\\CompareJitHelper::doubleSpaceship'
+            'PHPCompiler\\VM\\CompareJitHelperScalars::doubleSpaceship'
         );
+        $cmp = $context->builder->call($fn, $left, $right);
 
-        return $context->builder->call($fn, $left, $right);
+        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
     }
 
     private static function doubleToLong(Context $context, Value $num): Value

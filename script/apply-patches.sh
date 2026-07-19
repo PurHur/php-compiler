@@ -28,6 +28,12 @@ patch_already_applied() {
     php-llvm-chooser.patch)
       grep -q 'PHP_COMPILER_LLVM_PATH' "$ROOT/vendor/ircmaxell/php-llvm/lib/Chooser.php" 2>/dev/null
       ;;
+    php-llvm-mcjit-libc-mem.patch)
+      grep -q 'Emit libc memset' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Intrinsic.php" 2>/dev/null
+      ;;
+    php-llvm-mcjit-libc-mem-llvm7.patch)
+      grep -q 'mem\* helpers use libc via' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVM7/Intrinsic.php" 2>/dev/null
+      ;;
     php-types-binaryop-coalesce.patch)
       grep -q "case 'Expr_BinaryOp_Coalesce':" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/TypeReconstructor.php" 2>/dev/null
       ;;
@@ -6195,6 +6201,8 @@ PY
 
 if [[ "${1:-}" != "--verify-only" ]]; then
 apply_patch "$PATCH_DIR/php-llvm-chooser.patch"
+apply_patch "$PATCH_DIR/php-llvm-mcjit-libc-mem.patch"
+apply_patch "$PATCH_DIR/php-llvm-mcjit-libc-mem-llvm7.patch"
 apply_patch "$PATCH_DIR/php-llvm-no-closures-array-map.patch"
 apply_patch "$PATCH_DIR/php-llvm-context-empty-arrays.patch"
 apply_patch "$PATCH_DIR/php-llvm-makearray-empty.patch"

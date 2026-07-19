@@ -148,8 +148,6 @@ final class BackedEnumFromRuntime
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($afterBool);
-        // Dominate both null and type-error phi incomings (#21109).
-        $zeroStrShared = $context->builder->load($context->constantStringFromString('0'));
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(Variable::TYPE_NULL, false)),
             $nullBlock,
@@ -157,12 +155,14 @@ final class BackedEnumFromRuntime
         );
         $context->builder->positionAtEnd($nullBlock);
         // Zend: null→"0" (same as false), not convert_to_string empty (#20072).
-        $nullStr = $zeroStrShared;
+        $nullStr = $context->builder->load($context->constantStringFromString('0'));
         $nullEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($typeErrorEmit);
         ExceptionBridge::emitTypeError($context, 'Argument #1 ($value) must be of type string given');
+        // Fresh load in this block — $nullStr from nullBlock does not dominate (#21109).
+        $typeErrorStr = $context->builder->load($context->constantStringFromString('0'));
         $typeErrorEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -174,7 +174,7 @@ final class BackedEnumFromRuntime
         $phi->addIncoming($floatStr, $floatEnd);
         $phi->addIncoming($boolStr, $boolEnd);
         $phi->addIncoming($nullStr, $nullEnd);
-        $phi->addIncoming($zeroStrShared, $typeErrorEnd);
+        $phi->addIncoming($typeErrorStr, $typeErrorEnd);
 
         return $phi;
     }

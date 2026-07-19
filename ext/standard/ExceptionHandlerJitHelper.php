@@ -8,7 +8,9 @@ namespace PHPCompiler\ext\standard;
  * Exception-handler stack for compiled JIT/AOT modules (#9473, php-in-PHP).
  *
  * Scalar slot stack for nested JIT compile compatibility (mirrors ErrorHandlerJitHelper).
- * Empty string = no handler name — nullable string ABI breaks NestedJIT module verify (#17671, #21109).
+ * NestedJIT types `?string` as `__value__*`; bridges pass `__string__*` — use empty string
+ * for "no name" so ABI stays `__string__*` (#21109).
+ *
  * VM SSOT remains {@see VmExceptionHandler}.
  * php-src: ext/standard/basic_functions.c — set_exception_handler
  */
@@ -48,8 +50,8 @@ final class ExceptionHandlerJitHelper
         return self::fnAt($index);
     }
 
-    /** @return string previous handler name, or empty when none */
-    public static function setApply(int $fnAddr, string $handlerName): string
+    /** @return string previous handler name (empty when none) */
+    public static function setApply(int $fnAddr, string $handlerName = ''): string
     {
         if (0 === $fnAddr) {
             return self::popReturningName();

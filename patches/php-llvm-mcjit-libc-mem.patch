@@ -1,0 +1,134 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Intrinsic.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Intrinsic.php
+@@ -76,91 +76,65 @@
+         $this->builder->call($func, $arglist);
+     }
+ 
++    /**
++     * Emit libc memcpy — llvm.memcpy.* intrinsics lower to unresolved null
++     * calls under MCJIT on php-compiler:22.04-dev (#98, #2055, #21109).
++     */
+     public function memcpy(CoreValue $dest, CoreValue $src, CoreValue $size, bool $isVolatile): void {
+-        $int1 = $this->context->int1Type();
+-        $is32Bit = $size->typeOf()->getWidth() === 32;
+-        $funcName = $is32Bit ? 'llvm.memcpy.p0i8.p0i8.i32' : 'llvm.memcpy.p0i8.p0i8.i64';
+-        $func = $this->module->getNamedFunction($funcName);
++        unset($isVolatile);
++        $i8p = $this->context->int8Type()->pointerType(0);
++        $sizeTy = $size->typeOf();
++        $func = $this->module->getNamedFunction('memcpy');
+         if ($func === null) {
+             $func = $this->module->addFunction(
+-                $funcName,
+-                $this->context->functionType(
+-                    $this->context->voidType(),
+-                    false,
+-                    $this->context->int8Type()->pointerType(0),
+-                    $this->context->int8Type()->pointerType(0),
+-                    $is32Bit ? $this->context->int32Type() : $this->context->int64Type(),
+-                    $this->context->int32Type(),
+-                    $int1
+-                )
++                'memcpy',
++                $this->context->functionType($i8p, false, $i8p, $i8p, $sizeTy)
+             );
+         }
+-        $this->builder->call(
+-            $func,
+-            $dest,
+-            $src,
+-            $size,
+-            $this->context->int32Type()->constInt(0, false), // alignment
+-            $int1->constInt($isVolatile ? 1 : 0, false)
+-        );
++        $this->builder->call($func, $dest, $src, $size);
+     }
+ 
++    /**
++     * Emit libc memmove — see memcpy() (#98, #2055, #21109).
++     */
+     public function memmove(CoreValue $dest, CoreValue $src, CoreValue $size, bool $isVolatile): void {
+-        $int1 = $this->context->int1Type();
+-        $is32Bit = $size->typeOf()->getWidth() === 32;
+-        $funcName = $is32Bit ? 'llvm.memmove.p0i8.p0i8.i32' : 'llvm.memmove.p0i8.p0i8.i64';
+-        $func = $this->module->getNamedFunction($funcName);
++        unset($isVolatile);
++        $i8p = $this->context->int8Type()->pointerType(0);
++        $sizeTy = $size->typeOf();
++        $func = $this->module->getNamedFunction('memmove');
+         if ($func === null) {
+             $func = $this->module->addFunction(
+-                $funcName,
+-                $this->context->functionType(
+-                    $this->context->voidType(),
+-                    false,
+-                    $this->context->int8Type()->pointerType(0),
+-                    $this->context->int8Type()->pointerType(0),
+-                    $is32Bit ? $this->context->int32Type() : $this->context->int64Type(),
+-                    $this->context->int32Type(),
+-                    $int1
+-                )
++                'memmove',
++                $this->context->functionType($i8p, false, $i8p, $i8p, $sizeTy)
+             );
+         }
+-        $this->builder->call(
+-            $func,
+-            $dest,
+-            $src,
+-            $size,
+-            $this->context->int32Type()->constInt(0, false), // alignment
+-            $int1->constInt($isVolatile ? 1 : 0, false)
+-        );
++        $this->builder->call($func, $dest, $src, $size);
+     }
+ 
++    /**
++     * Emit libc memset — see memcpy() (#98, #2055, #21109).
++     *
++     * @param CoreValue $src Fill byte (i8) — name kept for Intrinsic interface.
++     */
+     public function memset(CoreValue $dest, CoreValue $src, CoreValue $size, bool $isVolatile): void {
+-        $int1 = $this->context->int1Type();
+-        $is32Bit = $size->typeOf()->getWidth() === 32;
+-        $funcName = $is32Bit ? 'llvm.memset.p0i8.i32' : 'llvm.memset.p0i8.i64';
+-        $func = $this->module->getNamedFunction($funcName);
++        unset($isVolatile);
++        $i8p = $this->context->int8Type()->pointerType(0);
++        $i32 = $this->context->int32Type();
++        $sizeTy = $size->typeOf();
++        $func = $this->module->getNamedFunction('memset');
+         if ($func === null) {
+             $func = $this->module->addFunction(
+-                $funcName,
+-                $this->context->functionType(
+-                    $this->context->voidType(),
+-                    false,
+-                    $this->context->int8Type()->pointerType(0),
+-                    $this->context->int8Type(),
+-                    $is32Bit ? $this->context->int32Type() : $this->context->int64Type(),
+-                    $this->context->int32Type(),
+-                    $int1
+-                )
++                'memset',
++                $this->context->functionType($i8p, false, $i8p, $i32, $sizeTy)
+             );
+         }
+-        $this->builder->call(
+-            $func,
+-            $dest,
+-            $src,
+-            $size,
+-            $this->context->int32Type()->constInt(0, false), // alignment
+-            $int1->constInt($isVolatile ? 1 : 0, false)
+-        );
++        $fill = $src;
++        if ($fill->typeOf()->getWidth() < 32) {
++            $fill = $this->builder->intCast($fill, $i32);
++        } elseif ($fill->typeOf()->getWidth() > 32) {
++            $fill = $this->builder->truncOrBitCast($fill, $i32);
++        }
++        $this->builder->call($func, $dest, $fill, $size);
+     }
+ 
+     public function bitreverse(CoreValue $value): CoreValue {

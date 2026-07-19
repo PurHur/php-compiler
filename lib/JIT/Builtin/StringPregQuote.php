@@ -86,10 +86,18 @@ final class StringPregQuote
 
         $entry = $fn->appendBasicBlock('preg_quote_bridge_entry');
         $context->builder->positionAtEnd($entry);
+        $delimParam = $fn->getParam(1);
+        $delimIsNull = $context->builder->icmp(
+            \PHPLLVM\Builder::INT_EQ,
+            $delimParam,
+            $strPtr->constNull()
+        );
+        $emptyDelim = $context->builder->load($context->constantStringFromString(''));
+        $delimArg = $context->builder->select($delimIsNull, $emptyDelim, $delimParam);
         $result = $context->builder->call(
             self::helperFunction($context, self::PREG_QUOTE_HELPER),
             $fn->getParam(0),
-            $fn->getParam(1)
+            $delimArg
         );
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);

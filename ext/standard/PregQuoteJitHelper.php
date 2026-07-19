@@ -12,8 +12,12 @@ namespace PHPCompiler\ext\standard;
  */
 final class PregQuoteJitHelper
 {
-    public static function pregQuoteArgv(string $string, ?string $delimiter = null): string
+    /**
+     * NestedJIT types nullable string as __value__*; ABI bridge passes __string__*.
+     * Use empty string for "no delimiter" so both sides stay __string__* (#21109).
+     */
+    public static function pregQuoteArgv(string $string, string $delimiter = ''): string
     {
-        return VmString::pregQuote($string, $delimiter);
+        return VmString::pregQuote($string, '' === $delimiter ? null : $delimiter);
     }
 }
