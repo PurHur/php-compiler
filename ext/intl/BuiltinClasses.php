@@ -41,6 +41,7 @@ final class BuiltinClasses
     public static function registerIntlCalendar(Context $ctx): void
     {
         $before = array_keys($ctx->classes);
+        VmIntlIterator::registerClass($ctx);
         VmIntlTimeZone::registerClass($ctx);
         VmIntlCalendar::registerClass($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
@@ -62,6 +63,7 @@ final class BuiltinClasses
         $before = array_keys($ctx->classes);
         self::registerIntlDateFormatterClass($ctx);
         VmIntlDatePatternGenerator::registerClass($ctx);
+        VmIntlIterator::registerClass($ctx);
         VmIntlTimeZone::registerClass($ctx);
         VmIntlCalendar::registerClass($ctx);
         VmNumberFormatter::registerClass($ctx);

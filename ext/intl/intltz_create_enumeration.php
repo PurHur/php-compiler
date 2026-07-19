@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * intltz_create_enumeration() — procedural IntlTimeZone::createEnumeration
  * (php-src timezone_methods.cpp / timezone.stub.php; #20925).
- * Returns array in v1 (IntlIterator tracked under #20909).
+ * Returns IntlIterator (php-src timezone.stub.php; #20909).
  */
 final class intltz_create_enumeration extends Internal
 {
@@ -50,7 +50,7 @@ final class intltz_create_enumeration extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->array(VmIntlTimeZone::createEnumeration($countryOrZone));
+        $frame->returnVar->object(VmIntlTimeZone::createEnumeration($frame->vmContext, $countryOrZone));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

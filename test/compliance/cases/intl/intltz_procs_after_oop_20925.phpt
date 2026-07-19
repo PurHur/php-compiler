@@ -47,11 +47,12 @@ echo 'unknown=', intltz_get_id($unknown), "\n";
 echo 'tzdata_len=', strlen(intltz_get_tz_data_version()) > 0 ? 'gt0' : '0', "\n";
 
 $enum = intltz_create_enumeration();
-echo 'enum_array=', (int) is_array($enum), "\n";
-echo 'enum_gt100=', (int) (count($enum) > 100), "\n";
+echo 'enum_iter=', (int) ($enum instanceof IntlIterator), "\n";
+$ids = iterator_to_array($enum);
+echo 'enum_gt100=', (int) (count($ids) > 100), "\n";
 
 $idEnum = intltz_create_time_zone_id_enumeration(IntlTimeZone::TYPE_ANY);
-echo 'idenum_array=', (int) is_array($idEnum), "\n";
+echo 'idenum_iter=', (int) ($idEnum instanceof IntlIterator), "\n";
 
 $same = intltz_has_same_rules($paris, intltz_create_time_zone('Europe/Paris'));
 echo 'same_rules=', $same ? 'yes' : 'no', "\n";
@@ -90,9 +91,9 @@ windows_round=Europe/Paris
 utc=UTC
 unknown=Etc/Unknown
 tzdata_len=gt0
-enum_array=1
+enum_iter=1
 enum_gt100=1
-idenum_array=1
+idenum_iter=1
 same_rules=yes
 err=0
 errmsg=U_ZERO_ERROR

@@ -1461,11 +1461,16 @@ final class VmIntlCalendar
 
     /**
      * IntlCalendar::getKeywordValuesForLocale() — ICU calendar keyword catalog subset (#20873).
+     * Returns IntlIterator|false (php-src calendar.stub.php / common_enum.cpp; #20909).
      *
-     * @return HashTable|false
+     * @return ObjectEntry|false
      */
-    public static function getKeywordValuesForLocale(string $keyword, string $locale, bool $onlyCommon): HashTable|false
-    {
+    public static function getKeywordValuesForLocale(
+        Context $ctx,
+        string $keyword,
+        string $locale,
+        bool $onlyCommon
+    ): ObjectEntry|false {
         unset($locale);
         if ('calendar' !== strtolower($keyword)) {
             IntlError::set(
@@ -1478,10 +1483,10 @@ final class VmIntlCalendar
         IntlError::clear();
         $common = ['gregorian'];
         if ($onlyCommon) {
-            return VmFs::stringListToArray($common);
+            return VmIntlIterator::fromStringList($ctx, $common);
         }
 
-        return VmFs::stringListToArray([
+        return VmIntlIterator::fromStringList($ctx, [
             'gregorian', 'japanese', 'buddhist', 'roc', 'persian', 'islamic', 'islamic-civil',
             'islamic-umalqura', 'hebrew', 'chinese', 'indian', 'coptic', 'ethiopic', 'ethiopic-amete-alem',
         ]);
@@ -2976,10 +2981,10 @@ final class IntlCalendarGetKeywordValuesForLocale extends VmClassMethod
         $locale = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'IntlCalendar::getKeywordValuesForLocale', 2, 'locale');
         $onlyCommonVar = $frame->calledArgs[2]->resolveIndirect();
         $onlyCommon = Variable::TYPE_NULL !== $onlyCommonVar->type && $onlyCommonVar->toBool();
-        $result = VmIntlCalendar::getKeywordValuesForLocale($keyword, $locale, $onlyCommon);
+        $result = VmIntlCalendar::getKeywordValuesForLocale($frame->vmContext, $keyword, $locale, $onlyCommon);
         if (null === $frame->returnVar) { return; }
         if (false === $result) { $frame->returnVar->bool(false); return; }
-        $frame->returnVar->array($result);
+        $frame->returnVar->object($result);
     }
 }
 

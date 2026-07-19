@@ -12,9 +12,10 @@ $utc = IntlTimeZone::getUTC();
 echo 'utc=', $utc->getID(), "\n";
 
 $enum = IntlTimeZone::createEnumeration();
-echo 'enum_array=', (int) is_array($enum), "\n";
-echo 'enum_count_gt100=', (int) (count($enum) > 100), "\n";
-echo 'enum_has_utc=', (int) in_array('UTC', $enum, true), "\n";
+echo 'enum_iter=', (int) ($enum instanceof IntlIterator), "\n";
+$ids = iterator_to_array($enum);
+echo 'enum_count_gt100=', (int) (count($ids) > 100), "\n";
+echo 'enum_has_utc=', (int) in_array('UTC', $ids, true), "\n";
 
 $ny = IntlTimeZone::getIDForWindowsID('Eastern Standard Time');
 echo 'windows_est=', $ny, "\n";
@@ -32,7 +33,7 @@ getErrorCode=yes
 getErrorMessage=yes
 unknown=Etc/Unknown
 utc=UTC
-enum_array=1
+enum_iter=1
 enum_count_gt100=1
 enum_has_utc=1
 windows_est=America/New_York
