@@ -8,10 +8,10 @@ use PHPCompiler\ext\standard\JitStatPathKernel;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT link for file predicates + stat fields via PHP helpers (#9112, #19849).
+ * JIT/AOT link for file predicates + stat fields via PHP helpers (#9112, #19849, #20742).
  *
  * Thin orchestrator — NestedJIT bridges live in {@see JitStatPathKernel}.
- * Thin libc mode/access leaf stays in {@see \PHPCompiler\ext\standard\JitStatKernel}.
+ * Nested leaf mode/access stays in {@see \PHPCompiler\ext\standard\JitStatKernel}.
  * php-src: ext/standard/filestat.c
  */
 final class StatPathRuntime

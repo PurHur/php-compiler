@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * StatPath NestedJIT ABI bridges quarantined in ext/standard (#9112, #19849).
+ * StatPath NestedJIT ABI bridges quarantined in ext/standard (#9112, #19849, #20742).
  */
 final class StatPathRuntimeShrinkTest extends TestCase
 {
@@ -43,7 +43,7 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $this->assertLessThan(60, \substr_count($orchestrator, "\n") + 1);
     }
 
-    public function testKernelPresent(): void
+    public function testKernelAlwaysUsesHelperBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStatPathKernel.php');
         $this->assertStringContainsString('namespace PHPCompiler\\ext\\standard;', $source);
@@ -53,11 +53,22 @@ final class StatPathRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('dirname(__DIR__, 2)', $source);
         $this->assertStringContainsString('StatPathJitHelper', $source);
         $this->assertStringContainsString('StatFieldsJitHelper', $source);
-        $this->assertStringContainsString('JitStatKernel', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringContainsString('helperFunction', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('kernelPathBool', $source);
+        $this->assertStringNotContainsString('kernelModeType', $source);
+        $this->assertStringNotContainsString('LibcExtern', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('dirname(__DIR__, 3)', $source);
-        $this->assertLessThan(420, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(360, \substr_count($source, "\n") + 1);
+    }
+
+    public function testContextAllowlistsStatPathKernelsForNestedJit(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Context.php');
+        $this->assertStringContainsString('phpc_stat_mode_kernel', $source);
+        $this->assertStringContainsString('phpc_access_kernel', $source);
+        $this->assertStringContainsString('isPreRegisterModuleNestedJitKernel', $source);
     }
 
     public function testSpineBundleIncludesKernelAndOrchestrator(): void

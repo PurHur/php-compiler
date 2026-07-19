@@ -7,18 +7,17 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\StatCacheRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT NestedJIT bridges for path predicates + stat fields (#9112, #19849, #20086).
+ * JIT/AOT NestedJIT bridges for path predicates + stat fields (#9112, #19849, #20086, #20742).
  *
  * Quarantined from lib/JIT/Builtin/StatPathRuntime — {@see \PHPCompiler\JIT\Builtin\StatPathRuntime}
- * stays the thin orchestrator. Thin standalone AOT (`isThinStandaloneAotMain`) uses
- * {@see JitStatKernel} libc; embed keeps NestedJIT → {@see StatPathJitHelper}.
+ * stays the thin orchestrator. Embed + thin standalone AOT: NestedJIT → {@see StatPathJitHelper}
+ * (Rename #20603 shape — no thin libc ABI fork). Nested leaf: {@see JitStatKernel} via
+ * {@see phpc_stat_mode_kernel} / {@see phpc_access_kernel}.
  *
  * SSOT: {@see StatPathJitHelper}, {@see StatFieldsJitHelper}
  * php-src: ext/standard/filestat.c
@@ -163,59 +162,14 @@ final class JitStatPathKernel
         $context->builder->branchIf($nullPath, $fail, $run);
 
         $context->builder->positionAtEnd($run);
-        // Thin standalone AOT: nested StatPathJitHelper sees VmStatPath /
-        // phpc_stat_mode_kernel as external stubs (always 0). Emit thin libc here
-        // instead (#20086, mirrors StringRename isThinStandaloneAotMain + JitRenameKernel).
-        if ($context->isThinStandaloneAotMain()) {
-            LibcExtern::register($context);
-            $hit = self::kernelPathBool($context, $abiName, $path);
-        } else {
-            $hit = $context->builder->call(self::helperFunction($context, $helper), $path);
-        }
+        // Always NestedJIT StatPathJitHelper — NestedJIT clears thin user-script env
+        // so phpc_stat_mode_kernel / phpc_access_kernel lower via JitStatKernel (#20742 / #20603).
+        $hit = $context->builder->call(self::helperFunction($context, $helper), $path);
         $context->builder->returnValue($hit);
 
         $context->builder->positionAtEnd($fail);
         $context->builder->returnValue($i1->constInt(0, false));
         $context->registerFunction($abiName, $fn);
-    }
-
-    /** @return Value i1 */
-    private static function kernelPathBool(Context $context, string $abiName, Value $path): Value
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i1 = $context->getTypeFromString('int1');
-        switch ($abiName) {
-            case self::FN_EXISTS:
-                $mode = JitStatKernel::mode($context, $path, false);
-
-                return $context->builder->icmp(Builder::INT_SGE, $mode, $i32->constInt(0, true));
-            case self::FN_IS_FILE:
-                return self::kernelModeType($context, $path, 0x8000, false);
-            case self::FN_IS_DIR:
-                return self::kernelModeType($context, $path, 0x4000, false);
-            case self::FN_IS_LINK:
-                return self::kernelModeType($context, $path, 0xA000, true);
-            case self::FN_IS_READABLE:
-                return JitStatKernel::accessOk($context, $path, 4);
-            case self::FN_IS_WRITABLE:
-                return JitStatKernel::accessOk($context, $path, 2);
-            case self::FN_IS_EXECUTABLE:
-                return JitStatKernel::accessOk($context, $path, 1);
-            default:
-                return $i1->constInt(0, false);
-        }
-    }
-
-    /** @return Value i1 */
-    private static function kernelModeType(Context $context, Value $path, int $expected, bool $lstat): Value
-    {
-        $mode = JitStatKernel::mode($context, $path, $lstat);
-        $i32 = $context->getTypeFromString('int32');
-        $okStat = $context->builder->icmp(Builder::INT_SGE, $mode, $i32->constInt(0, true));
-        $masked = $context->builder->and($mode, $i32->constInt(0xF000, false));
-        $match = $context->builder->icmp(Builder::INT_EQ, $masked, $i32->constInt($expected, false));
-
-        return $context->builder->and($okStat, $match);
     }
 
     private static function implementLongFieldBridge(Context $context): void
