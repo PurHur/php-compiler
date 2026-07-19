@@ -11,13 +11,14 @@ use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
  * hash_pbkdf2() — sha256, sha1, md5 (VM + JIT/AOT via __compiler_hash_pbkdf2, issue #3773).
  *
- * php-src: ext/hash/hash_pbkdf2.c
+ * php-src: ext/hash/hash.c / hash.stub.php — Z_PARAM_STR algo/password/salt (#20659).
  */
 final class hash_pbkdf2 extends Internal
 {
@@ -27,9 +28,10 @@ final class hash_pbkdf2 extends Internal
         if ($argc < 4 || $argc > 6) {
             throw new \LogicException('hash_pbkdf2() requires four to six arguments in this compiler build');
         }
-        $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash_pbkdf2', 0, 'algo');
-        $password = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash_pbkdf2', 1, 'password');
-        $salt = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'hash_pbkdf2', 2, 'salt');
+        // Z_PARAM_STR $algo / $password / $salt — null TypeError on 8.4 forward (#20659).
+        $algo = self::vmZparamStrArg($frame, 0, 'algo');
+        $password = self::vmZparamStrArg($frame, 1, 'password');
+        $salt = self::vmZparamStrArg($frame, 2, 'salt');
         $iterations = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'hash_pbkdf2', 4, 'iterations');
         $length = 0;
         if ($argc >= 5) {
@@ -84,12 +86,56 @@ final class hash_pbkdf2 extends Internal
 
         return JitHash::hashPbkdf2(
             $context,
-            JitStringBuiltinArg::lower($context, $args[0], 'hash_pbkdf2', 0, 'algo'),
-            JitStringBuiltinArg::lower($context, $args[1], 'hash_pbkdf2', 1, 'password'),
-            JitStringBuiltinArg::lower($context, $args[2], 'hash_pbkdf2', 2, 'salt'),
+            self::jitZparamStrArg($context, $args[0], 0, 'algo'),
+            self::jitZparamStrArg($context, $args[1], 1, 'password'),
+            self::jitZparamStrArg($context, $args[2], 2, 'salt'),
             JitLongArg::lower($context, $args[3], 'hash_pbkdf2() iterations'),
             $length,
             $raw
+        );
+    }
+
+    /**
+     * Z_PARAM_STR $algo / $password / $salt — null TypeError on 8.4 forward (#20659, ext/hash/hash.c).
+     */
+    private static function vmZparamStrArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, $argIndex, 'hash_pbkdf2', $paramName);
+
+            return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'hash_pbkdf2',
+            $argIndex,
+            $paramName
+        );
+    }
+
+    private static function jitZparamStrArg(
+        Context $context,
+        JITVariable $arg,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'hash_pbkdf2',
+                $argIndex,
+                $paramName
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'hash_pbkdf2',
+            $argIndex,
+            $paramName
         );
     }
 }
