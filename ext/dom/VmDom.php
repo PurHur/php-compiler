@@ -10073,9 +10073,15 @@ final class VmDom
                 $schemaPath = getcwd() . '/' . $schemaPath;
             }
             if ('' !== $schemaPath) {
-                // Mirror libxml's missing-schema diagnostics closely enough for php-src parity.
-                self::triggerDomWarning($frame, sprintf('I/O warning : failed to load external entity "%s"', $schemaPath));
-                self::triggerDomWarning($frame, sprintf("Failed to locate the main schema resource at '%s'.", $schemaPath));
+                // php-src/libxml2: I/O diagnostics → libxml ring under use_internal_errors (#20776).
+                self::reportDomMissingValidationResource(
+                    $ctx,
+                    $frame,
+                    $schemaPath,
+                    1757,
+                    sprintf("Failed to locate the main schema resource at '%s'.\n", $schemaPath),
+                    sprintf("Failed to locate the main schema resource at '%s'.", $schemaPath)
+                );
             }
             self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): Invalid Schema');
 
@@ -10116,9 +10122,15 @@ final class VmDom
                 $rngPath = getcwd() . '/' . $rngPath;
             }
             if ('' !== $rngPath) {
-                // Mirror libxml's missing-RNG diagnostics closely enough for php-src parity.
-                self::triggerDomWarning($frame, sprintf('I/O warning : failed to load external entity "%s"', $rngPath));
-                self::triggerDomWarning($frame, sprintf('xmlRelaxNGParse: could not load %s', $rngPath));
+                // php-src/libxml2: I/O diagnostics → libxml ring under use_internal_errors (#20776).
+                self::reportDomMissingValidationResource(
+                    $ctx,
+                    $frame,
+                    $rngPath,
+                    1065,
+                    sprintf("xmlRelaxNGParse: could not load %s\n", $rngPath),
+                    sprintf('xmlRelaxNGParse: could not load %s', $rngPath)
+                );
             }
             self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): Invalid RelaxNG');
 
@@ -10226,6 +10238,51 @@ final class VmDom
         }
 
         return $ok;
+    }
+
+    /**
+     * Missing XSD/RNG path — two libxml I/O records + PHP Invalid* warning (#20776, re-#17453/#20181).
+     *
+     * Under libxml_use_internal_errors(true): codes 1549 + $secondCode land in libxml_get_errors();
+     * otherwise both messages are PHP warnings (I/O warning prefix on the first).
+     */
+    private static function reportDomMissingValidationResource(
+        Context $ctx,
+        ?Frame $frame,
+        string $path,
+        int $secondCode,
+        string $secondMessage,
+        string $secondWarningMessage
+    ): void {
+        $ioMessage = sprintf("failed to load external entity \"%s\"\n", $path);
+        VmLibxml::handleError(
+            $ctx,
+            [
+                'level' => LibxmlConstants::LIBXML_ERR_WARNING,
+                'code' => 1549,
+                'column' => 0,
+                'message' => $ioMessage,
+                'file' => '',
+                'line' => 0,
+            ],
+            $frame,
+            null,
+            sprintf('I/O warning : failed to load external entity "%s"', $path)
+        );
+        VmLibxml::handleError(
+            $ctx,
+            [
+                'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+                'code' => $secondCode,
+                'column' => 0,
+                'message' => $secondMessage,
+                'file' => '',
+                'line' => 0,
+            ],
+            $frame,
+            null,
+            $secondWarningMessage
+        );
     }
 
     /**
