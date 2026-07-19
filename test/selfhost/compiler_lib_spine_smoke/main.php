@@ -65,6 +65,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -359,6 +360,7 @@ require_once __DIR__.'/../../../ext/dom/HtmlDocumentQuerySelectorAll.php';
 require_once __DIR__.'/../../../ext/dom/HtmlDocumentSaveHtml.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationCreateDocument.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationCreateDocumentType.php';
+require_once __DIR__.'/../../../ext/dom/ImplementationCreateHTMLDocument.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationGetFeature.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationHasFeature.php';
 require_once __DIR__.'/../../../ext/dom/JitDomAppendChild.php';
@@ -903,12 +905,21 @@ require_once __DIR__.'/../../../ext/intl/collator_sort_with_sort_keys.php';
 require_once __DIR__.'/../../../ext/intl/datefmt_create.php';
 require_once __DIR__.'/../../../ext/intl/datefmt_format.php';
 require_once __DIR__.'/../../../ext/intl/datefmt_format_object.php';
+require_once __DIR__.'/../../../ext/intl/datefmt_get_calendar.php';
+require_once __DIR__.'/../../../ext/intl/datefmt_get_calendar_object.php';
+require_once __DIR__.'/../../../ext/intl/datefmt_get_datetype.php';
 require_once __DIR__.'/../../../ext/intl/datefmt_get_error_code.php';
 require_once __DIR__.'/../../../ext/intl/datefmt_get_error_message.php';
+require_once __DIR__.'/../../../ext/intl/datefmt_get_locale.php';
 require_once __DIR__.'/../../../ext/intl/datefmt_get_pattern.php';
 require_once __DIR__.'/../../../ext/intl/datefmt_get_timezone.php';
+require_once __DIR__.'/../../../ext/intl/datefmt_get_timezone_id.php';
+require_once __DIR__.'/../../../ext/intl/datefmt_get_timetype.php';
+require_once __DIR__.'/../../../ext/intl/datefmt_is_lenient.php';
 require_once __DIR__.'/../../../ext/intl/datefmt_localtime.php';
 require_once __DIR__.'/../../../ext/intl/datefmt_parse.php';
+require_once __DIR__.'/../../../ext/intl/datefmt_set_calendar.php';
+require_once __DIR__.'/../../../ext/intl/datefmt_set_lenient.php';
 require_once __DIR__.'/../../../ext/intl/datefmt_set_pattern.php';
 require_once __DIR__.'/../../../ext/intl/datefmt_set_timezone.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_extract.php';
@@ -5980,15 +5991,6 @@ require_once __DIR__.'/../../../ext/intl/intlcal_roll.php';
 require_once __DIR__.'/../../../ext/intl/intlcal_set.php';
 require_once __DIR__.'/../../../ext/intl/intlcal_set_time.php';
 require_once __DIR__.'/../../../ext/intl/intlcal_to_date_time.php';
-require_once __DIR__.'/../../../ext/intl/datefmt_get_calendar.php';
-require_once __DIR__.'/../../../ext/intl/datefmt_get_calendar_object.php';
-require_once __DIR__.'/../../../ext/intl/datefmt_get_datetype.php';
-require_once __DIR__.'/../../../ext/intl/datefmt_get_locale.php';
-require_once __DIR__.'/../../../ext/intl/datefmt_get_timetype.php';
-require_once __DIR__.'/../../../ext/intl/datefmt_get_timezone_id.php';
-require_once __DIR__.'/../../../ext/intl/datefmt_is_lenient.php';
-require_once __DIR__.'/../../../ext/intl/datefmt_set_calendar.php';
-require_once __DIR__.'/../../../ext/intl/datefmt_set_lenient.php';
 require_once __DIR__.'/../../../ext/odbc/BuiltinClasses.php';
 require_once __DIR__.'/../../../ext/odbc/Module.php';
 require_once __DIR__.'/../../../ext/odbc/OdbcConstants.php';
@@ -6007,6 +6009,10 @@ require_once __DIR__.'/../../../ext/odbc/odbc_fetch_row.php';
 require_once __DIR__.'/../../../ext/odbc/odbc_num_rows.php';
 require_once __DIR__.'/../../../ext/odbc/odbc_pconnect.php';
 require_once __DIR__.'/../../../ext/odbc/odbc_result.php';
+require_once __DIR__.'/../../../ext/ffi/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/ffi/FfiExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/ffi/Module.php';
+require_once __DIR__.'/../../../ext/ffi/VmFFI.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
@@ -6039,8 +6045,4 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
-require_once __DIR__.'/../../../ext/ffi/BuiltinClasses.php';
-require_once __DIR__.'/../../../ext/ffi/FfiExtensionPolicy.php';
-require_once __DIR__.'/../../../ext/ffi/Module.php';
-require_once __DIR__.'/../../../ext/ffi/VmFFI.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

@@ -23,6 +23,9 @@ final class IntlError
     /** php-src / ICU U_PARSE_ERROR */
     public const U_PARSE_ERROR = 9;
 
+    /** php-src / ICU U_INTERNAL_PROGRAM_ERROR */
+    public const U_INTERNAL_PROGRAM_ERROR = 5;
+
     /** php-src U_USING_FALLBACK_WARNING — not a failure for intl_is_failure() */
     public const U_USING_FALLBACK_WARNING = -128;
 

@@ -48,6 +48,9 @@ final class VmDomLiving
 
     public const CLASS_XML_DOCUMENT = 'dom\\xmldocument';
 
+    /** php-src Dom\Implementation (php_dom.stub.php; #20898). */
+    public const CLASS_IMPLEMENTATION = 'dom\\implementation';
+
     public const PROP_BODY = 'body';
 
     public const PROP_HEAD = 'head';
@@ -57,11 +60,39 @@ final class VmDomLiving
     /** https://html.spec.whatwg.org/#document.title — php-src ext/dom/html_document.c (#19580). */
     public const PROP_TITLE = 'title';
 
+    /** @var array<int, ObjectEntry> */
+    private static array $implementationSingletons = [];
+
+    private static ?ClassEntry $implementationClassEntry = null;
+
     public static function isLivingDocument(ObjectEntry $entry): bool
     {
         $lc = strtolower($entry->class->name);
 
         return self::CLASS_HTML_DOCUMENT === $lc || self::CLASS_XML_DOCUMENT === $lc;
+    }
+
+    /**
+     * Dom\Implementation singleton for living Document::$implementation (php-src php_dom.c; #20898).
+     */
+    public static function implementationSingleton(): ObjectEntry
+    {
+        if (null === self::$implementationClassEntry) {
+            throw new \LogicException('Dom\\Implementation is not registered in this compiler build');
+        }
+        $key = spl_object_id(self::$implementationClassEntry);
+        if (!isset(self::$implementationSingletons[$key])) {
+            $entry = new ObjectEntry(self::$implementationClassEntry);
+            $entry->constructed = true;
+            self::$implementationSingletons[$key] = $entry;
+        }
+
+        return self::$implementationSingletons[$key];
+    }
+
+    public static function bindImplementationClass(ClassEntry $entry): void
+    {
+        self::$implementationClassEntry = $entry;
     }
 
     public static function isLivingDocumentClass(string $classLc): bool
@@ -187,7 +218,11 @@ final class VmDomLiving
             );
         }
 
-        return self::createFromString($ctx, $contents, $options, $overrideEncoding, $frame);
+        $docVar = self::createFromString($ctx, $contents, $options, $overrideEncoding, $frame);
+        // php-src sets document URL from the loaded path (#20898).
+        DomRegistry::state($docVar->toObject())->documentUri = $path;
+
+        return $docVar;
     }
 
     /**
@@ -466,7 +501,11 @@ final class VmDomLiving
             throw new \Exception("Cannot open file '".$path."'");
         }
 
-        return self::loadXmlDocumentFromSource($ctx, $contents, $options, $overrideEncoding, $frame);
+        $docVar = self::loadXmlDocumentFromSource($ctx, $contents, $options, $overrideEncoding, $frame);
+        // php-src sets document URL from the loaded path (#20898).
+        DomRegistry::state($docVar->toObject())->documentUri = $path;
+
+        return $docVar;
     }
 
     /**

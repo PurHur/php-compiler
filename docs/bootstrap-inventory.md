@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5935 |
-| Phase A inventory files (M2 ratio SSOT) | 5935 |
+| PHP files on vm.php path | 5945 |
+| Phase A inventory files (M2 ratio SSOT) | 5945 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18122 |
+| Source constructs flagged (warnings) | 18187 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -235,7 +235,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomImportNodeJitHelper.php` | 0 | 3 |
 | `ext/dom/DomIsConnectedJitHelper.php` | 0 | 1 |
 | `ext/dom/DomIsEqualNodeJitHelper.php` | 0 | 1 |
-| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 54 |
+| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 58 |
 | `ext/dom/DomLoadHTMLFileJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadHTMLJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadJitHelper.php` | 0 | 1 |
@@ -304,6 +304,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/HtmlDocumentSaveHtml.php` | 0 | 2 |
 | `ext/dom/ImplementationCreateDocument.php` | 0 | 1 |
 | `ext/dom/ImplementationCreateDocumentType.php` | 0 | 3 |
+| `ext/dom/ImplementationCreateHTMLDocument.php` | 0 | 1 |
 | `ext/dom/ImplementationGetFeature.php` | 0 | 2 |
 | `ext/dom/ImplementationHasFeature.php` | 0 | 1 |
 | `ext/dom/JitDomAppendChild.php` | 0 | 1 |
@@ -417,7 +418,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 42 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
-| `ext/dom/VmDomLiving.php` | 0 | 16 |
+| `ext/dom/VmDomLiving.php` | 0 | 17 |
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
 | `ext/dom/VmDomTokenList.php` | 0 | 17 |
 | `ext/dom/VmDomValidationNative.php` | 0 | 2 |
@@ -842,7 +843,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 121 |
+| `ext/intl/Module.php` | 0 | 130 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -852,7 +853,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
 | `ext/intl/VmIntlCalendar.php` | 0 | 138 |
-| `ext/intl/VmIntlChar.php` | 0 | 84 |
+| `ext/intl/VmIntlChar.php` | 0 | 109 |
 | `ext/intl/VmIntlDateFormatter.php` | 0 | 25 |
 | `ext/intl/VmIntlDatePatternGenerator.php` | 0 | 12 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 61 |
@@ -880,12 +881,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/datefmt_create.php` | 0 | 3 |
 | `ext/intl/datefmt_format.php` | 0 | 3 |
 | `ext/intl/datefmt_format_object.php` | 0 | 3 |
+| `ext/intl/datefmt_get_calendar.php` | 0 | 3 |
+| `ext/intl/datefmt_get_calendar_object.php` | 0 | 3 |
+| `ext/intl/datefmt_get_datetype.php` | 0 | 3 |
 | `ext/intl/datefmt_get_error_code.php` | 0 | 3 |
 | `ext/intl/datefmt_get_error_message.php` | 0 | 3 |
+| `ext/intl/datefmt_get_locale.php` | 0 | 3 |
 | `ext/intl/datefmt_get_pattern.php` | 0 | 3 |
+| `ext/intl/datefmt_get_timetype.php` | 0 | 3 |
 | `ext/intl/datefmt_get_timezone.php` | 0 | 3 |
+| `ext/intl/datefmt_get_timezone_id.php` | 0 | 3 |
+| `ext/intl/datefmt_is_lenient.php` | 0 | 3 |
 | `ext/intl/datefmt_localtime.php` | 0 | 3 |
 | `ext/intl/datefmt_parse.php` | 0 | 3 |
+| `ext/intl/datefmt_set_calendar.php` | 0 | 3 |
+| `ext/intl/datefmt_set_lenient.php` | 0 | 3 |
 | `ext/intl/datefmt_set_pattern.php` | 0 | 3 |
 | `ext/intl/datefmt_set_timezone.php` | 0 | 3 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
@@ -4456,7 +4466,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/IconvRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ImageTypeToMimeType.php` | 0 | 1 |
 | `lib/JIT/Builtin/InArrayRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/IncludePathRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/IncludePathRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/InetRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/IniGet.php` | 0 | 1 |
 | `lib/JIT/Builtin/IniIntrospectionRuntime.php` | 0 | 3 |
@@ -7176,7 +7186,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomHtmlDocumentPropertySupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 67)
+- new Variable (line 98)
 - 5 class method(s)
 
 ### `ext/dom/DomHtmlElementPropertySupport.php`
@@ -7205,59 +7215,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomLivingBuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 68)
-- new Variable (line 69)
-- new ClassEntry (line 73)
-- new ClassProperty (line 76)
-- new Variable (line 76)
-- new ClassEntry (line 81)
-- new ClassProperty (line 84)
-- new Variable (line 84)
+- new Variable (line 65)
+- new Variable (line 66)
+- new ClassEntry (line 74)
+- new ImplementationCreateHTMLDocument (line 77)
+- new ClassEntry (line 83)
+- new ClassProperty (line 86)
 - new Variable (line 86)
-- new ClassProperty (line 87)
-- new ClassProperty (line 88)
-- new ClassProperty (line 89)
-- new ClassProperty (line 90)
-- new ClassProperty (line 92)
-- new ElementClosest (line 95)
-- new ElementMatches (line 98)
-- new ElementQuerySelector (line 101)
-- new ElementQuerySelectorAll (line 104)
-- new ElementGetElementsByClassName (line 107)
-- new ClassEntry (line 112)
-- new ClassEntry (line 119)
-- new ClassProperty (line 128)
-- new Variable (line 128)
-- new ClassProperty (line 129)
-- new Variable (line 129)
-- new ClassEntry (line 135)
-- new ClassProperty (line 144)
-- new Variable (line 144)
-- new HtmlCollectionNamedItem (line 146)
-- new ClassEntry (line 152)
-- new ClassProperty (line 161)
-- new Variable (line 161)
-- new ClassEntry (line 166)
-- new LivingXPathConstruct (line 168)
-- new ClassEntry (line 175)
-- new ClassProperty (line 178)
-- new DocumentGetElementsByClassName (line 186)
-- new ClassEntry (line 191)
-- new ClassProperty (line 194)
-- new ClassProperty (line 195)
-- new ClassProperty (line 196)
-- new HtmlDocumentCreateFromString (line 197)
-- new HtmlDocumentCreateEmpty (line 200)
-- new HtmlDocumentCreateFromFile (line 203)
-- new HtmlDocumentGetElementById (line 206)
-- new HtmlDocumentQuerySelector (line 209)
-- new HtmlDocumentQuerySelectorAll (line 212)
-- new HtmlDocumentSaveHtml (line 215)
-- new ClassEntry (line 232)
-- new ClassProperty (line 235)
-- new XmlDocumentCreateFromString (line 236)
-- new XmlDocumentCreateFromFile (line 239)
-- new XmlDocumentCreateEmpty (line 242)
+- new ClassEntry (line 91)
+- new ClassProperty (line 94)
+- new Variable (line 94)
+- new Variable (line 96)
+- new ClassProperty (line 97)
+- new ClassProperty (line 98)
+- new ClassProperty (line 99)
+- new ClassProperty (line 100)
+- new ClassProperty (line 102)
+- new ElementClosest (line 105)
+- new ElementMatches (line 108)
+- new ElementQuerySelector (line 111)
+- new ElementQuerySelectorAll (line 114)
+- new ElementGetElementsByClassName (line 117)
+- new ClassEntry (line 122)
+- new ClassEntry (line 129)
+- new ClassProperty (line 138)
+- new Variable (line 138)
+- new ClassProperty (line 139)
+- new Variable (line 139)
+- new ClassEntry (line 145)
+- new ClassProperty (line 154)
+- new Variable (line 154)
+- new HtmlCollectionNamedItem (line 156)
+- new ClassEntry (line 162)
+- new ClassProperty (line 171)
+- new Variable (line 171)
+- new ClassEntry (line 176)
+- new LivingXPathConstruct (line 178)
+- new ClassEntry (line 185)
+- new ClassProperty (line 188)
+- new DocumentGetElementsByClassName (line 196)
+- new ClassEntry (line 201)
+- new ClassProperty (line 204)
+- new ClassProperty (line 205)
+- new ClassProperty (line 206)
+- new HtmlDocumentCreateFromString (line 207)
+- new HtmlDocumentCreateEmpty (line 210)
+- new HtmlDocumentCreateFromFile (line 213)
+- new HtmlDocumentGetElementById (line 216)
+- new HtmlDocumentQuerySelector (line 219)
+- new HtmlDocumentQuerySelectorAll (line 222)
+- new HtmlDocumentSaveHtml (line 225)
+- new ClassEntry (line 242)
+- new ClassProperty (line 245)
+- new ClassProperty (line 246)
+- new Variable (line 249)
+- new XmlDocumentCreateFromString (line 251)
+- new XmlDocumentCreateFromFile (line 254)
+- new XmlDocumentCreateEmpty (line 257)
 - 3 class method(s)
 
 ### `ext/dom/DomLoadHTMLFileJitHelper.php`
@@ -7630,6 +7644,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
 - new ArgumentCountError (line 31)
+- 1 class method(s)
+
+### `ext/dom/ImplementationCreateHTMLDocument.php`
+
+**Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
 ### `ext/dom/ImplementationGetFeature.php`
@@ -8555,81 +8574,81 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 3205)
 - new DomNodeState (line 3210)
 - new Variable (line 3220)
-- new ObjectEntry (line 4028)
-- new DomNodeState (line 4030)
-- new ObjectEntry (line 4335)
-- new DomNodeState (line 4337)
-- new ObjectEntry (line 4365)
-- new DomNodeState (line 4367)
-- new ObjectEntry (line 4600)
-- new DomNodeState (line 4605)
-- new DOMException (line 5004)
-- new DOMException (line 5020)
-- new Variable (line 5038)
-- new DOMException (line 5052)
-- new DOMException (line 5055)
-- new DOMException (line 5065)
-- new Error (line 5095)
-- new DOMException (line 5101)
-- new DOMException (line 5115)
-- new DOMException (line 5320)
-- new DOMException (line 5517)
-- new DOMException (line 5521)
-- new DOMException (line 5610)
-- new DOMException (line 5614)
-- new DOMException (line 5672)
-- new DOMException (line 5689)
-- new DOMException (line 5721)
-- new DOMException (line 5763)
-- new DOMException (line 5790)
-- new DOMException (line 6679)
-- new Variable (line 6709)
-- new DOMException (line 6990)
-- new DOMException (line 7108)
-- new DOMException (line 7153)
-- new ObjectEntry (line 7238)
-- new DomNodeState (line 7242)
-- new Variable (line 7249)
-- new ObjectEntry (line 7267)
-- new DomNodeState (line 7271)
-- new Variable (line 7278)
-- new ObjectEntry (line 7296)
-- new DomNodeState (line 7300)
-- new Variable (line 7307)
-- new DOMException (line 7390)
-- new ObjectEntry (line 7668)
-- new DomNodeState (line 7672)
-- new Variable (line 7679)
-- new ObjectEntry (line 7706)
-- new DomNodeState (line 7709)
-- new Variable (line 7717)
-- new Variable (line 7912)
-- new DOMException (line 8049)
-- new DOMException (line 8056)
-- new DOMException (line 8063)
-- new DOMException (line 8067)
-- new DOMException (line 8070)
-- new DOMException (line 8079)
-- new DOMException (line 8091)
-- new DOMException (line 9152)
-- new Variable (line 9211)
-- new Variable (line 9224)
-- new Variable (line 9262)
-- new DOMException (line 9273)
-- new Variable (line 9275)
-- new DOMException (line 9439)
-- new DOMException (line 9466)
-- new DOMException (line 9502)
-- new DOMException (line 9567)
-- new DOMException (line 9575)
-- new DOMException (line 9588)
-- new DOMException (line 9593)
-- new DOMException (line 9596)
-- new DOMException (line 9599)
-- new DOMException (line 9628)
-- new Error (line 10596)
-- new Error (line 10600)
-- 429 class method(s)
+- new ObjectEntry (line 4029)
+- new DomNodeState (line 4031)
+- new ObjectEntry (line 4336)
+- new DomNodeState (line 4338)
+- new ObjectEntry (line 4366)
+- new DomNodeState (line 4368)
+- new ObjectEntry (line 4601)
+- new DomNodeState (line 4606)
+- new DOMException (line 5005)
+- new DOMException (line 5021)
+- new Variable (line 5039)
+- new DOMException (line 5053)
+- new DOMException (line 5056)
+- new DOMException (line 5066)
+- new Error (line 5096)
+- new DOMException (line 5102)
+- new DOMException (line 5116)
+- new DOMException (line 5321)
+- new DOMException (line 5518)
+- new DOMException (line 5522)
+- new DOMException (line 5611)
+- new DOMException (line 5615)
+- new DOMException (line 5673)
+- new DOMException (line 5690)
+- new DOMException (line 5722)
+- new DOMException (line 5764)
+- new DOMException (line 5791)
+- new DOMException (line 6684)
+- new Variable (line 6714)
+- new DOMException (line 6995)
+- new DOMException (line 7113)
+- new DOMException (line 7158)
+- new ObjectEntry (line 7243)
+- new DomNodeState (line 7247)
+- new Variable (line 7254)
+- new ObjectEntry (line 7272)
+- new DomNodeState (line 7276)
+- new Variable (line 7283)
+- new ObjectEntry (line 7301)
+- new DomNodeState (line 7305)
+- new Variable (line 7312)
+- new DOMException (line 7395)
+- new ObjectEntry (line 7673)
+- new DomNodeState (line 7677)
+- new Variable (line 7684)
+- new ObjectEntry (line 7711)
+- new DomNodeState (line 7714)
+- new Variable (line 7722)
+- new Variable (line 7917)
+- new DOMException (line 8054)
+- new DOMException (line 8061)
+- new DOMException (line 8068)
+- new DOMException (line 8072)
+- new DOMException (line 8075)
+- new DOMException (line 8084)
+- new DOMException (line 8096)
+- new DOMException (line 9166)
+- new Variable (line 9225)
+- new Variable (line 9238)
+- new Variable (line 9276)
+- new DOMException (line 9287)
+- new Variable (line 9289)
+- new DOMException (line 9453)
+- new DOMException (line 9480)
+- new DOMException (line 9516)
+- new DOMException (line 9581)
+- new DOMException (line 9589)
+- new DOMException (line 9602)
+- new DOMException (line 9607)
+- new DOMException (line 9610)
+- new DOMException (line 9613)
+- new DOMException (line 9642)
+- new Error (line 10615)
+- new Error (line 10619)
+- 430 class method(s)
 - 2 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -8697,21 +8716,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomLiving.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 95)
-- new ObjectEntry (line 113)
-- new DOMException (line 142)
-- new Variable (line 145)
-- new DOMException (line 185)
-- new DOMException (line 269)
-- new DOMException (line 274)
-- new DOMException (line 281)
-- new DOMException (line 312)
-- new DOMException (line 324)
-- new Exception (line 466)
-- new DOMException (line 488)
-- new Variable (line 494)
-- new Variable (line 528)
-- 39 class method(s)
+- new ObjectEntry (line 85)
+- new ObjectEntry (line 126)
+- new ObjectEntry (line 144)
+- new DOMException (line 173)
+- new Variable (line 176)
+- new DOMException (line 216)
+- new DOMException (line 304)
+- new DOMException (line 309)
+- new DOMException (line 316)
+- new DOMException (line 347)
+- new DOMException (line 359)
+- new Exception (line 501)
+- new DOMException (line 527)
+- new Variable (line 533)
+- new Variable (line 567)
+- 41 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`
@@ -11732,39 +11752,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new datefmt_set_pattern (line 205)
 - new datefmt_get_timezone (line 206)
 - new datefmt_set_timezone (line 207)
-- new intlcal_create_instance (line 213)
-- new intlcal_get_now (line 214)
-- new intlcal_from_date_time (line 215)
-- new intlcal_get (line 216)
-- new intlcal_set (line 217)
-- new intlcal_get_type (line 218)
-- new intlcal_add (line 219)
-- new intlcal_roll (line 220)
-- new intlcal_clear (line 221)
-- new intlcal_is_set (line 222)
-- new intlcal_equals (line 223)
-- new intlcal_get_time (line 224)
-- new intlcal_set_time (line 225)
-- new intlcal_get_time_zone (line 226)
-- new intlcal_to_date_time (line 227)
-- new intlcal_field_difference (line 228)
-- new grapheme_strlen (line 259)
-- new grapheme_substr (line 260)
-- new grapheme_strpos (line 261)
-- new grapheme_str_contains (line 262)
-- new grapheme_strstr (line 263)
-- new grapheme_stristr (line 264)
-- new grapheme_stripos (line 265)
-- new grapheme_strrpos (line 266)
-- new grapheme_strripos (line 267)
-- new grapheme_extract (line 268)
-- new grapheme_levenshtein (line 269)
-- new grapheme_str_split (line 270)
-- new grapheme_strimwidth (line 271)
-- new intl_get_error_code (line 272)
-- new intl_get_error_message (line 273)
-- new intl_is_failure (line 274)
-- new intl_error_name (line 275)
+- new datefmt_get_locale (line 208)
+- new datefmt_get_datetype (line 209)
+- new datefmt_get_timetype (line 210)
+- new datefmt_is_lenient (line 211)
+- new datefmt_set_lenient (line 212)
+- new datefmt_get_calendar (line 213)
+- new datefmt_set_calendar (line 214)
+- new datefmt_get_timezone_id (line 215)
+- new datefmt_get_calendar_object (line 216)
+- new intlcal_create_instance (line 222)
+- new intlcal_get_now (line 223)
+- new intlcal_from_date_time (line 224)
+- new intlcal_get (line 225)
+- new intlcal_set (line 226)
+- new intlcal_get_type (line 227)
+- new intlcal_add (line 228)
+- new intlcal_roll (line 229)
+- new intlcal_clear (line 230)
+- new intlcal_is_set (line 231)
+- new intlcal_equals (line 232)
+- new intlcal_get_time (line 233)
+- new intlcal_set_time (line 234)
+- new intlcal_get_time_zone (line 235)
+- new intlcal_to_date_time (line 236)
+- new intlcal_field_difference (line 237)
+- new grapheme_strlen (line 268)
+- new grapheme_substr (line 269)
+- new grapheme_strpos (line 270)
+- new grapheme_str_contains (line 271)
+- new grapheme_strstr (line 272)
+- new grapheme_stristr (line 273)
+- new grapheme_stripos (line 274)
+- new grapheme_strrpos (line 275)
+- new grapheme_strripos (line 276)
+- new grapheme_extract (line 277)
+- new grapheme_levenshtein (line 278)
+- new grapheme_str_split (line 279)
+- new grapheme_strimwidth (line 280)
+- new intl_get_error_code (line 281)
+- new intl_get_error_message (line 282)
+- new intl_is_failure (line 283)
+- new intl_error_name (line 284)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12068,90 +12097,115 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmIntlChar.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 192)
-- new Variable (line 196)
-- new IntlCharOrd (line 203)
-- new IntlCharChr (line 204)
-- new IntlCharCharName (line 205)
-- new IntlCharHasBinaryProperty (line 206)
-- new IntlCharIsAlpha (line 207)
-- new IntlCharIsDigit (line 208)
-- new IntlCharIsAlnum (line 209)
-- new IntlCharIsSpace (line 210)
-- new IntlCharIsLower (line 211)
-- new IntlCharIsUpper (line 212)
-- new IntlCharIsBlank (line 213)
-- new IntlCharIsCntrl (line 214)
-- new IntlCharIsGraph (line 215)
-- new IntlCharIsPrint (line 216)
-- new IntlCharIsPunct (line 217)
-- new IntlCharIsXdigit (line 218)
-- new IntlCharIsBase (line 219)
-- new IntlCharIsMirrored (line 220)
-- new IntlCharCharType (line 221)
-- new IntlCharGetBlockCode (line 222)
-- new IntlCharGetCombiningClass (line 223)
-- new IntlCharToUpper (line 224)
-- new IntlCharToLower (line 225)
-- new IntlCharToTitle (line 226)
-- new IntlCharFoldCase (line 227)
-- new IntlCharDigit (line 228)
-- new IntlCharForDigit (line 229)
-- new IntlCharIsTitle (line 230)
-- new IntlCharCharFromName (line 231)
-- new IntlCharGetPropertyName (line 232)
-- new IntlCharGetPropertyEnum (line 233)
-- new IntlCharGetPropertyValueName (line 234)
-- new IntlCharGetPropertyValueEnum (line 235)
-- new IntlCharGetIntPropertyValue (line 236)
-- new IntlCharGetIntPropertyMinValue (line 237)
-- new IntlCharGetIntPropertyMaxValue (line 238)
-- new IntlCharGetUnicodeVersion (line 239)
-- new IntlCharGetNumericValue (line 240)
-- new IntlCharCharDigitValue (line 241)
-- new HashTable (line 987)
-- new Variable (line 989)
-- new ArgumentCountError (line 1195)
-- new ArgumentCountError (line 1226)
-- new ArgumentCountError (line 1262)
-- new ArgumentCountError (line 1296)
-- new ArgumentCountError (line 1327)
-- new ArgumentCountError (line 1352)
-- new ArgumentCountError (line 1378)
-- new ArgumentCountError (line 1403)
-- new ArgumentCountError (line 1428)
-- new ArgumentCountError (line 1453)
-- new ArgumentCountError (line 1478)
-- new ArgumentCountError (line 1503)
-- new ArgumentCountError (line 1528)
-- new ArgumentCountError (line 1553)
-- new ArgumentCountError (line 1578)
-- new ArgumentCountError (line 1603)
+- new ClassEntry (line 193)
+- new Variable (line 197)
+- new IntlCharOrd (line 204)
+- new IntlCharChr (line 205)
+- new IntlCharCharName (line 206)
+- new IntlCharHasBinaryProperty (line 207)
+- new IntlCharIsAlpha (line 208)
+- new IntlCharIsDigit (line 209)
+- new IntlCharIsAlnum (line 210)
+- new IntlCharIsSpace (line 211)
+- new IntlCharIsLower (line 212)
+- new IntlCharIsUpper (line 213)
+- new IntlCharIsBlank (line 214)
+- new IntlCharIsCntrl (line 215)
+- new IntlCharIsGraph (line 216)
+- new IntlCharIsPrint (line 217)
+- new IntlCharIsPunct (line 218)
+- new IntlCharIsXdigit (line 219)
+- new IntlCharIsBase (line 220)
+- new IntlCharIsMirrored (line 221)
+- new IntlCharCharType (line 222)
+- new IntlCharGetBlockCode (line 223)
+- new IntlCharGetCombiningClass (line 224)
+- new IntlCharToUpper (line 225)
+- new IntlCharToLower (line 226)
+- new IntlCharToTitle (line 227)
+- new IntlCharFoldCase (line 228)
+- new IntlCharDigit (line 229)
+- new IntlCharForDigit (line 230)
+- new IntlCharIsTitle (line 231)
+- new IntlCharCharFromName (line 232)
+- new IntlCharGetPropertyName (line 233)
+- new IntlCharGetPropertyEnum (line 234)
+- new IntlCharGetPropertyValueName (line 235)
+- new IntlCharGetPropertyValueEnum (line 236)
+- new IntlCharGetIntPropertyValue (line 237)
+- new IntlCharGetIntPropertyMinValue (line 238)
+- new IntlCharGetIntPropertyMaxValue (line 239)
+- new IntlCharGetUnicodeVersion (line 240)
+- new IntlCharGetNumericValue (line 241)
+- new IntlCharCharDigitValue (line 242)
+- new IntlCharEnumCharNames (line 243)
+- new IntlCharCharAge (line 244)
+- new IntlCharIsDefined (line 245)
+- new IntlCharIsUAlphabetic (line 246)
+- new IntlCharIsULowercase (line 247)
+- new IntlCharIsUUppercase (line 248)
+- new IntlCharIsUWhiteSpace (line 249)
+- new IntlCharCharDirection (line 250)
+- new IntlCharCharMirror (line 251)
+- new IntlCharGetBidiPairedBracket (line 252)
+- new HashTable (line 639)
+- new Variable (line 641)
+- new Variable (line 671)
+- new Variable (line 673)
+- new Variable (line 675)
+- new HashTable (line 1228)
+- new Variable (line 1230)
+- new ArgumentCountError (line 1445)
+- new ArgumentCountError (line 1476)
+- new ArgumentCountError (line 1512)
+- new ArgumentCountError (line 1546)
+- new ArgumentCountError (line 1577)
+- new ArgumentCountError (line 1602)
 - new ArgumentCountError (line 1628)
 - new ArgumentCountError (line 1653)
 - new ArgumentCountError (line 1678)
 - new ArgumentCountError (line 1703)
 - new ArgumentCountError (line 1728)
 - new ArgumentCountError (line 1753)
-- new ArgumentCountError (line 1783)
-- new ArgumentCountError (line 1813)
-- new ArgumentCountError (line 1843)
-- new ArgumentCountError (line 1876)
-- new ArgumentCountError (line 1910)
-- new ArgumentCountError (line 1938)
-- new ArgumentCountError (line 1963)
-- new ArgumentCountError (line 1997)
-- new ArgumentCountError (line 2031)
-- new ArgumentCountError (line 2056)
-- new ArgumentCountError (line 2091)
-- new ArgumentCountError (line 2117)
-- new ArgumentCountError (line 2143)
-- new ArgumentCountError (line 2168)
-- new ArgumentCountError (line 2193)
-- new ArgumentCountError (line 2217)
-- new ArgumentCountError (line 2242)
-- 90 class method(s)
-- 15 closure(s)
+- new ArgumentCountError (line 1778)
+- new ArgumentCountError (line 1803)
+- new ArgumentCountError (line 1828)
+- new ArgumentCountError (line 1853)
+- new ArgumentCountError (line 1878)
+- new ArgumentCountError (line 1903)
+- new ArgumentCountError (line 1928)
+- new ArgumentCountError (line 1953)
+- new ArgumentCountError (line 1978)
+- new ArgumentCountError (line 2003)
+- new ArgumentCountError (line 2033)
+- new ArgumentCountError (line 2063)
+- new ArgumentCountError (line 2093)
+- new ArgumentCountError (line 2126)
+- new ArgumentCountError (line 2160)
+- new ArgumentCountError (line 2188)
+- new ArgumentCountError (line 2213)
+- new ArgumentCountError (line 2247)
+- new ArgumentCountError (line 2281)
+- new ArgumentCountError (line 2306)
+- new ArgumentCountError (line 2341)
+- new ArgumentCountError (line 2367)
+- new ArgumentCountError (line 2393)
+- new ArgumentCountError (line 2418)
+- new ArgumentCountError (line 2443)
+- new ArgumentCountError (line 2467)
+- new ArgumentCountError (line 2492)
+- new ArgumentCountError (line 2517)
+- new ArgumentCountError (line 2547)
+- new ArgumentCountError (line 2577)
+- new ArgumentCountError (line 2607)
+- new ArgumentCountError (line 2637)
+- new ArgumentCountError (line 2667)
+- new ArgumentCountError (line 2697)
+- new ArgumentCountError (line 2729)
+- new ArgumentCountError (line 2761)
+- new ArgumentCountError (line 2791)
+- 111 class method(s)
+- 21 closure(s)
 
 ### `ext/intl/VmIntlDateFormatter.php`
 
@@ -12633,6 +12687,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 75)
 - 2 class method(s)
 
+### `ext/intl/datefmt_get_calendar.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
+### `ext/intl/datefmt_get_calendar_object.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 61)
+- 2 class method(s)
+
+### `ext/intl/datefmt_get_datetype.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
 ### `ext/intl/datefmt_get_error_code.php`
 
 **Warnings** (review for bootstrap subset):
@@ -12647,7 +12722,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 51)
 - 2 class method(s)
 
+### `ext/intl/datefmt_get_locale.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 59)
+- 2 class method(s)
+
 ### `ext/intl/datefmt_get_pattern.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
+### `ext/intl/datefmt_get_timetype.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
@@ -12659,6 +12748,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
 - new Error (line 56)
+- 2 class method(s)
+
+### `ext/intl/datefmt_get_timezone_id.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
+### `ext/intl/datefmt_is_lenient.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 50)
 - 2 class method(s)
 
 ### `ext/intl/datefmt_localtime.php`
@@ -12673,6 +12776,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
 - new Error (line 74)
+- 2 class method(s)
+
+### `ext/intl/datefmt_set_calendar.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 51)
+- 2 class method(s)
+
+### `ext/intl/datefmt_set_lenient.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 52)
 - 2 class method(s)
 
 ### `ext/intl/datefmt_set_pattern.php`
@@ -36751,56 +36868,56 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 13049)
 - new Variable (line 13070)
 - new Variable (line 13104)
-- new Variable (line 13138)
-- new Variable (line 13230)
-- new Variable (line 13252)
-- new Variable (line 13262)
-- new Variable (line 13414)
-- new Variable (line 13432)
-- new Variable (line 13482)
-- new Variable (line 13509)
-- new Variable (line 13534)
-- new Variable (line 13863)
-- new Variable (line 14231)
-- new Variable (line 14261)
-- new Variable (line 14280)
-- new Variable (line 14310)
-- new Variable (line 14347)
-- new Variable (line 14395)
-- new Variable (line 14438)
-- new VM\Variable (line 14783)
-- new Variable (line 14817)
-- new Variable (line 14868)
-- new Variable (line 14884)
-- new Variable (line 14903)
-- new Variable (line 14910)
-- new OpCode (line 14930)
-- new Variable (line 14931)
-- new Variable (line 15103)
-- new Variable (line 15141)
-- new OpCode (line 15155)
-- new Variable (line 15156)
-- new Variable (line 15215)
-- new OpCode (line 15236)
-- new Variable (line 15237)
-- new Variable (line 15334)
-- new Variable (line 15356)
-- new Variable (line 15424)
-- new Operand\Literal (line 15433)
-- new Variable (line 15448)
-- new Variable (line 15630)
-- new VM\PropertyIsInitializedHandler (line 15712)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15752)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15927)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16025)
-- new JIT\Call\VmCoerceVariableToString (line 16115)
-- new JIT\Call\IncludePathResolverResolve (line 16382)
-- new Variable (line 17438)
-- new VM (line 17482)
-- new VM\Variable (line 17491)
-- new Variable (line 17512)
-- new Variable (line 17558)
-- new Variable (line 18052)
+- new Variable (line 13139)
+- new Variable (line 13233)
+- new Variable (line 13257)
+- new Variable (line 13267)
+- new Variable (line 13419)
+- new Variable (line 13437)
+- new Variable (line 13487)
+- new Variable (line 13514)
+- new Variable (line 13540)
+- new Variable (line 13869)
+- new Variable (line 14237)
+- new Variable (line 14267)
+- new Variable (line 14286)
+- new Variable (line 14316)
+- new Variable (line 14353)
+- new Variable (line 14401)
+- new Variable (line 14444)
+- new VM\Variable (line 14789)
+- new Variable (line 14823)
+- new Variable (line 14874)
+- new Variable (line 14890)
+- new Variable (line 14909)
+- new Variable (line 14916)
+- new OpCode (line 14936)
+- new Variable (line 14937)
+- new Variable (line 15109)
+- new Variable (line 15147)
+- new OpCode (line 15161)
+- new Variable (line 15162)
+- new Variable (line 15221)
+- new OpCode (line 15242)
+- new Variable (line 15243)
+- new Variable (line 15340)
+- new Variable (line 15362)
+- new Variable (line 15430)
+- new Operand\Literal (line 15439)
+- new Variable (line 15454)
+- new Variable (line 15636)
+- new VM\PropertyIsInitializedHandler (line 15718)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15758)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 15933)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 16031)
+- new JIT\Call\VmCoerceVariableToString (line 16121)
+- new JIT\Call\IncludePathResolverResolve (line 16388)
+- new Variable (line 17444)
+- new VM (line 17488)
+- new VM\Variable (line 17497)
+- new Variable (line 17518)
+- new Variable (line 17564)
+- new Variable (line 18058)
 - 369 class method(s)
 - 7 closure(s)
 
@@ -37862,9 +37979,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/IncludePathRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 422)
-- 21 class method(s)
-- 1 closure(s)
+- 12 class method(s)
 
 ### `lib/JIT/Builtin/InetRuntime.php`
 

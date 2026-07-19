@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -239,6 +240,16 @@ final class VmIntlChar
             'getunicodeversion' => [new IntlCharGetUnicodeVersion(), 'getUnicodeVersion'],
             'getnumericvalue' => [new IntlCharGetNumericValue(), 'getNumericValue'],
             'chardigitvalue' => [new IntlCharCharDigitValue(), 'charDigitValue'],
+            'enumcharnames' => [new IntlCharEnumCharNames(), 'enumCharNames'],
+            'charage' => [new IntlCharCharAge(), 'charAge'],
+            'isdefined' => [new IntlCharIsDefined(), 'isdefined'],
+            'isualphabetic' => [new IntlCharIsUAlphabetic(), 'isUAlphabetic'],
+            'isulowercase' => [new IntlCharIsULowercase(), 'isULowercase'],
+            'isuuppercase' => [new IntlCharIsUUppercase(), 'isUUppercase'],
+            'isuwhitespace' => [new IntlCharIsUWhiteSpace(), 'isUWhiteSpace'],
+            'chardirection' => [new IntlCharCharDirection(), 'charDirection'],
+            'charmirror' => [new IntlCharCharMirror(), 'charMirror'],
+            'getbidipairedbracket' => [new IntlCharGetBidiPairedBracket(), 'getBidiPairedBracket'],
         ];
         foreach ($methods as $lc => [$handler, $name]) {
             $entry->methods[$lc] = $handler;
@@ -443,6 +454,236 @@ final class VmIntlChar
     public static function isalnum(string|int $codepoint): bool
     {
         return self::unaryBoolIcu('u_isalnum', $codepoint, static fn (int $cp): bool => self::isalpha($cp) || self::isdigit($cp));
+    }
+
+    /** IntlChar::isdefined() — php-src / ICU u_isdefined (#20858). */
+    public static function isdefined(string|int $codepoint): ?bool
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return null;
+        }
+
+        return self::unaryBoolIcu(
+            'u_isdefined',
+            $cp,
+            static function (int $c): bool {
+                // Noncharacters U+FDD0..FDEF and *FFFE/*FFFF are undefined.
+                if (($c & 0xFFFE) === 0xFFFE) {
+                    return false;
+                }
+                if ($c >= 0xFDD0 && $c <= 0xFDEF) {
+                    return false;
+                }
+
+                return $c <= 0x10FFFF;
+            }
+        );
+    }
+
+    /** IntlChar::isUAlphabetic() — php-src / ICU u_isUAlphabetic (#20858). */
+    public static function isUAlphabetic(string|int $codepoint): ?bool
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return null;
+        }
+
+        return self::unaryBoolIcu(
+            'u_isUAlphabetic',
+            $cp,
+            static fn (int $c): bool => self::hasBinaryProperty($c, self::PROPERTY_ALPHABETIC)
+        );
+    }
+
+    /** IntlChar::isULowercase() — php-src / ICU u_isULowercase (#20858). */
+    public static function isULowercase(string|int $codepoint): ?bool
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return null;
+        }
+
+        return self::unaryBoolIcu(
+            'u_isULowercase',
+            $cp,
+            static fn (int $c): bool => self::hasBinaryProperty($c, self::PROPERTY_LOWERCASE)
+        );
+    }
+
+    /** IntlChar::isUUppercase() — php-src / ICU u_isUUppercase (#20858). */
+    public static function isUUppercase(string|int $codepoint): ?bool
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return null;
+        }
+
+        return self::unaryBoolIcu(
+            'u_isUUppercase',
+            $cp,
+            static fn (int $c): bool => self::hasBinaryProperty($c, self::PROPERTY_UPPERCASE)
+        );
+    }
+
+    /** IntlChar::isUWhiteSpace() — php-src / ICU u_isUWhiteSpace (#20858). */
+    public static function isUWhiteSpace(string|int $codepoint): ?bool
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return null;
+        }
+
+        return self::unaryBoolIcu(
+            'u_isUWhiteSpace',
+            $cp,
+            static fn (int $c): bool => self::hasBinaryProperty($c, self::PROPERTY_WHITE_SPACE)
+        );
+    }
+
+    /** IntlChar::charDirection() — php-src / ICU u_charDirection (#20858). */
+    public static function charDirection(string|int $codepoint): ?int
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return null;
+        }
+
+        return self::unaryIntIcu(
+            'u_charDirection',
+            $cp,
+            static function (int $c): int {
+                // U_LEFT_TO_RIGHT = 0 for ASCII letters/digits; U_OTHER_NEUTRAL ≈ 13 for punctuation.
+                if (($c >= 0x41 && $c <= 0x5A) || ($c >= 0x61 && $c <= 0x7A) || ($c >= 0x30 && $c <= 0x39)) {
+                    return 0;
+                }
+
+                return 13;
+            }
+        );
+    }
+
+    /**
+     * IntlChar::charMirror() — php-src / ICU u_charMirror (#20858).
+     *
+     * @return int|string|null
+     */
+    public static function charMirror(string|int $codepoint)
+    {
+        return self::mirrorLike('u_charMirror', $codepoint);
+    }
+
+    /**
+     * IntlChar::getBidiPairedBracket() — php-src / ICU u_getBidiPairedBracket (#20858).
+     *
+     * @return int|string|null
+     */
+    public static function getBidiPairedBracket(string|int $codepoint)
+    {
+        return self::mirrorLike('u_getBidiPairedBracket', $codepoint);
+    }
+
+    /**
+     * Shared IC_CHAR_METHOD_CHAR shape — return UTF-8 string when input was string.
+     *
+     * @return int|string|null
+     */
+    private static function mirrorLike(string $icuBase, string|int $codepoint)
+    {
+        $asString = \is_string($codepoint);
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return null;
+        }
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = $icuBase.self::$symSuffix;
+            $out = (int) $ffi->$fn($cp);
+        } else {
+            $pairs = [
+                0x28 => 0x29, 0x29 => 0x28,
+                0x5B => 0x5D, 0x5D => 0x5B,
+                0x7B => 0x7D, 0x7D => 0x7B,
+                0x3C => 0x3E, 0x3E => 0x3C,
+            ];
+            $out = $pairs[$cp] ?? $cp;
+        }
+
+        return $asString ? (self::chr($out) ?? '') : $out;
+    }
+
+    /**
+     * IntlChar::charAge() — php-src / ICU u_charAge (#20858).
+     *
+     * @return HashTable|null 4-element version array
+     */
+    public static function charAge(string|int $codepoint): ?HashTable
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return null;
+        }
+        $parts = [0, 0, 0, 0];
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_charAge'.self::$symSuffix;
+            $arr = $ffi->new('uint8_t[4]');
+            $ffi->$fn($cp, $arr);
+            for ($i = 0; $i < 4; ++$i) {
+                $parts[$i] = (int) $arr[$i];
+            }
+        } else {
+            // ASCII was in Unicode 1.1.
+            $parts = ($cp >= 0 && $cp <= 0x7F) ? [1, 1, 0, 0] : [0, 0, 0, 0];
+        }
+        $ht = new HashTable();
+        foreach ($parts as $v) {
+            $slot = new Variable();
+            $slot->int($v);
+            $ht->append($slot);
+        }
+
+        return $ht;
+    }
+
+    /**
+     * IntlChar::enumCharNames() — php-src / ICU u_enumCharNames (#20858).
+     *
+     * Iterates [start, limit) invoking $callback(codepoint, nameChoice, name).
+     */
+    public static function enumCharNames(
+        Context $ctx,
+        Variable $callback,
+        string|int $start,
+        string|int $limit,
+        int $nameChoice = self::UNICODE_CHAR_NAME
+    ): bool {
+        $startCp = self::resolveCodepoint($start);
+        $limitCp = self::resolveCodepoint($limit);
+        if (null === $startCp || null === $limitCp) {
+            return false;
+        }
+        for ($cp = $startCp; $cp < $limitCp; ++$cp) {
+            $name = self::charName($cp, $nameChoice);
+            if (null === $name || '' === $name) {
+                continue;
+            }
+            $argCp = new Variable();
+            $argCp->int($cp);
+            $argChoice = new Variable();
+            $argChoice->int($nameChoice);
+            $argName = new Variable();
+            $argName->string($name);
+            try {
+                VmCallable::invokeAs('IntlChar::enumCharNames', $ctx, $callback, $argCp, $argChoice, $argName);
+            } catch (\Throwable) {
+                IntlError::set(IntlError::U_INTERNAL_PROGRAM_ERROR, 'enumCharNames callback failed');
+
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** IntlChar::isspace() — php-src / ICU u_isspace (#20821). */
@@ -1153,7 +1394,16 @@ UBool u_ispunct{$suffix}(UChar32 c);
 UBool u_isxdigit{$suffix}(UChar32 c);
 UBool u_isbase{$suffix}(UChar32 c);
 UBool u_isMirrored{$suffix}(UChar32 c);
+UBool u_isdefined{$suffix}(UChar32 c);
+UBool u_isUAlphabetic{$suffix}(UChar32 c);
+UBool u_isULowercase{$suffix}(UChar32 c);
+UBool u_isUUppercase{$suffix}(UChar32 c);
+UBool u_isUWhiteSpace{$suffix}(UChar32 c);
 int8_t u_charType{$suffix}(UChar32 c);
+int8_t u_charDirection{$suffix}(UChar32 c);
+UChar32 u_charMirror{$suffix}(UChar32 c);
+UChar32 u_getBidiPairedBracket{$suffix}(UChar32 c);
+void u_charAge{$suffix}(UChar32 c, uint8_t versionArray[4]);
 int32_t ublock_getCode{$suffix}(UChar32 c);
 uint8_t u_getCombiningClass{$suffix}(UChar32 c);
 UBool u_istitle{$suffix}(UChar32 c);
@@ -2249,5 +2499,319 @@ final class IntlCharCharDigitValue extends VmClassMethod
             return;
         }
         $frame->returnVar->int(VmIntlChar::charDigitValue($codepoint));
+    }
+}
+
+/** IntlChar::isdefined() — php-src / ICU u_isdefined (#20858). */
+final class IntlCharIsDefined extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isdefined');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isdefined() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isdefined', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::isdefined($codepoint);
+        if (null === $result) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->bool($result);
+        }
+    }
+}
+
+/** IntlChar::isUAlphabetic() — php-src / ICU u_isUAlphabetic (#20858). */
+final class IntlCharIsUAlphabetic extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isUAlphabetic');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isUAlphabetic() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isUAlphabetic', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::isUAlphabetic($codepoint);
+        if (null === $result) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->bool($result);
+        }
+    }
+}
+
+/** IntlChar::isULowercase() — php-src / ICU u_isULowercase (#20858). */
+final class IntlCharIsULowercase extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isULowercase');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isULowercase() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isULowercase', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::isULowercase($codepoint);
+        if (null === $result) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->bool($result);
+        }
+    }
+}
+
+/** IntlChar::isUUppercase() — php-src / ICU u_isUUppercase (#20858). */
+final class IntlCharIsUUppercase extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isUUppercase');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isUUppercase() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isUUppercase', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::isUUppercase($codepoint);
+        if (null === $result) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->bool($result);
+        }
+    }
+}
+
+/** IntlChar::isUWhiteSpace() — php-src / ICU u_isUWhiteSpace (#20858). */
+final class IntlCharIsUWhiteSpace extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isUWhiteSpace');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isUWhiteSpace() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isUWhiteSpace', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::isUWhiteSpace($codepoint);
+        if (null === $result) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->bool($result);
+        }
+    }
+}
+
+/** IntlChar::charDirection() — php-src / ICU u_charDirection (#20858). */
+final class IntlCharCharDirection extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('charDirection');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::charDirection() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::charDirection', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::charDirection($codepoint);
+        if (null === $result) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->int($result);
+        }
+    }
+}
+
+/** IntlChar::charMirror() — php-src / ICU u_charMirror (#20858). */
+final class IntlCharCharMirror extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('charMirror');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::charMirror() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::charMirror', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::charMirror($codepoint);
+        if (null === $result) {
+            $frame->returnVar->null();
+        } elseif (\is_string($result)) {
+            $frame->returnVar->string($result);
+        } else {
+            $frame->returnVar->int($result);
+        }
+    }
+}
+
+/** IntlChar::getBidiPairedBracket() — php-src / ICU u_getBidiPairedBracket (#20858). */
+final class IntlCharGetBidiPairedBracket extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getBidiPairedBracket');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getBidiPairedBracket() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::getBidiPairedBracket', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::getBidiPairedBracket($codepoint);
+        if (null === $result) {
+            $frame->returnVar->null();
+        } elseif (\is_string($result)) {
+            $frame->returnVar->string($result);
+        } else {
+            $frame->returnVar->int($result);
+        }
+    }
+}
+
+/** IntlChar::charAge() — php-src / ICU u_charAge (#20858). */
+final class IntlCharCharAge extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('charAge');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::charAge() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::charAge', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::charAge($codepoint);
+        if (null === $result) {
+            $frame->returnVar->null();
+        } else {
+            $frame->returnVar->array($result);
+        }
+    }
+}
+
+/** IntlChar::enumCharNames() — php-src / ICU u_enumCharNames (#20858). */
+final class IntlCharEnumCharNames extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('enumCharNames');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3 || $argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::enumCharNames() expects between 3 and 4 arguments, %d given',
+                $argc
+            ));
+        }
+        $start = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::enumCharNames', 0);
+        $limit = VmIntlChar::coerceOrdArg($frame->calledArgs[1], 'IntlChar::enumCharNames', 1);
+        $callback = $frame->calledArgs[2];
+        $nameChoice = VmIntlChar::UNICODE_CHAR_NAME;
+        if ($argc >= 4) {
+            $nameChoice = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[3],
+                'IntlChar::enumCharNames',
+                4,
+                'type'
+            );
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException('IntlChar::enumCharNames() requires VM context');
+        }
+        $ok = VmIntlChar::enumCharNames($frame->vmContext, $callback, $start, $limit, $nameChoice);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
     }
 }
