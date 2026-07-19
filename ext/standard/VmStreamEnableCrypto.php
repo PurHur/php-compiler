@@ -64,7 +64,12 @@ final class VmStreamEnableCrypto
             $args[] = $passphrase;
         }
 
-        return (bool) @\call_user_func_array('stream_socket_enable_crypto', $args);
+        $ok = (bool) @\call_user_func_array('stream_socket_enable_crypto', $args);
+        if ($ok) {
+            VmStreamSocketGetCryptoStatus::markCryptoEnabled($handle, $enable);
+        }
+
+        return $ok;
     }
 
     private static function emitUnsupportedWarning(): void

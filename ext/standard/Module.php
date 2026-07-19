@@ -567,6 +567,9 @@ class Module extends ModuleAbstract
             new stream_socket_recvfrom(),
             new stream_socket_sendto(),
             new stream_socket_enable_crypto(),
+            ...(CompilerVersion::supportsStreamSocketGetCryptoStatus() ? [
+                new stream_socket_get_crypto_status(),
+            ] : []),
             ...(CompilerVersion::supportsStreamErrorApi() ? [
                 new stream_last_errors(),
                 new stream_clear_errors(),
