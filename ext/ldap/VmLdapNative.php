@@ -239,6 +239,153 @@ final class VmLdapNative
         self::requireFfi()->ldap_msgfree($msg);
     }
 
+    /**
+     * Synchronous EXOP (php-src ldap_exop with &$response_data).
+     *
+     * @return array{ok: bool, errno: int, oid: string, data: string}
+     */
+    public static function extendedOperationSync(\FFI\CData $ld, string $oid, ?string $data): array
+    {
+        $ffi = self::requireFfi();
+        $req = null;
+        if (null !== $data && '' !== $data) {
+            $req = $ffi->new('BerValue');
+            $req->bv_len = \strlen($data);
+            $buf = $ffi->new('char['.\strlen($data).']', false);
+            \FFI::memcpy($buf, $data, \strlen($data));
+            $req->bv_val = $buf;
+        }
+        $oidp = $ffi->new('char*[1]');
+        $datap = $ffi->new('BerValue*[1]');
+        $oidp[0] = null;
+        $datap[0] = null;
+        $rc = (int) $ffi->ldap_extended_operation_s(
+            $ld,
+            $oid,
+            $req,
+            null,
+            null,
+            $oidp,
+            $datap
+        );
+        $outOid = '';
+        $outData = '';
+        if (null !== $oidp[0]) {
+            $outOid = self::ffiString($oidp[0]);
+            $ffi->ldap_memfree($oidp[0]);
+        }
+        if (null !== $datap[0]) {
+            $bv = $datap[0];
+            $len = (int) $bv->bv_len;
+            if ($len > 0 && null !== $bv->bv_val) {
+                try {
+                    $outData = \FFI::string($bv->bv_val, $len);
+                } catch (\Throwable) {
+                    $outData = '';
+                }
+            }
+            $ffi->ldap_memfree($bv->bv_val);
+            $ffi->ldap_memfree($bv);
+        }
+
+        return [
+            'ok' => self::LDAP_SUCCESS === $rc,
+            'errno' => $rc,
+            'oid' => $outOid,
+            'data' => $outData,
+        ];
+    }
+
+    /**
+     * Asynchronous EXOP → LDAPMessage* result (php-src ldap_exop without &$response_data).
+     *
+     * @return array{result: ?\FFI\CData, errno: int}
+     */
+    public static function extendedOperationAsync(\FFI\CData $ld, string $oid, ?string $data): array
+    {
+        $ffi = self::requireFfi();
+        $req = null;
+        if (null !== $data && '' !== $data) {
+            $req = $ffi->new('BerValue');
+            $req->bv_len = \strlen($data);
+            $buf = $ffi->new('char['.\strlen($data).']', false);
+            \FFI::memcpy($buf, $data, \strlen($data));
+            $req->bv_val = $buf;
+        }
+        $msgid = $ffi->new('int');
+        $rc = (int) $ffi->ldap_extended_operation($ld, $oid, $req, null, null, \FFI::addr($msgid));
+        if (self::LDAP_SUCCESS !== $rc) {
+            return ['result' => null, 'errno' => $rc];
+        }
+        $res = $ffi->new('LDAPMessage*[1]');
+        $res[0] = null;
+        $rrc = (int) $ffi->ldap_result($ld, (int) $msgid->cdata, 1, null, $res);
+        if (-1 === $rrc || null === $res[0]) {
+            return ['result' => null, 'errno' => -1];
+        }
+
+        return ['result' => $res[0], 'errno' => self::LDAP_SUCCESS];
+    }
+
+    /**
+     * @return array{ok: bool, errno: int, oid: string, data: string}
+     */
+    public static function parseExtendedResult(\FFI\CData $ld, \FFI\CData $res): array
+    {
+        $ffi = self::requireFfi();
+        $oidp = $ffi->new('char*[1]');
+        $datap = $ffi->new('BerValue*[1]');
+        $oidp[0] = null;
+        $datap[0] = null;
+        $rc = (int) $ffi->ldap_parse_extended_result($ld, $res, $oidp, $datap, 0);
+        $outOid = '';
+        $outData = '';
+        if (null !== $oidp[0]) {
+            $outOid = self::ffiString($oidp[0]);
+            $ffi->ldap_memfree($oidp[0]);
+        }
+        if (null !== $datap[0]) {
+            $bv = $datap[0];
+            $len = (int) $bv->bv_len;
+            if ($len > 0 && null !== $bv->bv_val) {
+                try {
+                    $outData = \FFI::string($bv->bv_val, $len);
+                } catch (\Throwable) {
+                    $outData = '';
+                }
+            }
+            $ffi->ldap_memfree($bv->bv_val);
+            $ffi->ldap_memfree($bv);
+        }
+
+        return [
+            'ok' => self::LDAP_SUCCESS === $rc,
+            'errno' => $rc,
+            'oid' => $outOid,
+            'data' => $outData,
+        ];
+    }
+
+    /**
+     * @return array{ok: bool, errno: int, ttl: int}
+     */
+    public static function refreshSync(\FFI\CData $ld, string $dn, int $ttl): array
+    {
+        $ffi = self::requireFfi();
+        $bv = $ffi->new('BerValue');
+        $bv->bv_len = \strlen($dn);
+        $buf = $ffi->new('char['.\strlen($dn).']', false);
+        \FFI::memcpy($buf, $dn, \strlen($dn));
+        $bv->bv_val = $buf;
+        $newttl = $ffi->new('int');
+        $rc = (int) $ffi->ldap_refresh_s($ld, \FFI::addr($bv), $ttl, \FFI::addr($newttl), null, null);
+        if (self::LDAP_SUCCESS !== $rc) {
+            return ['ok' => false, 'errno' => $rc, 'ttl' => 0];
+        }
+
+        return ['ok' => true, 'errno' => self::LDAP_SUCCESS, 'ttl' => (int) $newttl->cdata];
+    }
+
     public static function err2string(int $errno): string
     {
         return self::ffiString(self::requireFfi()->ldap_err2string($errno));
@@ -320,6 +467,11 @@ BerValue **ldap_get_values_len(LDAP *ld, LDAPMessage *entry, const char *attr);
 void ldap_value_free_len(BerValue **vals);
 void ldap_memfree(void *p);
 int ldap_msgfree(LDAPMessage *msg);
+int ldap_extended_operation_s(LDAP *ld, const char *reqoid, BerValue *reqdata, void *serverctrls, void *clientctrls, char **retoidp, BerValue **retdatap);
+int ldap_extended_operation(LDAP *ld, const char *reqoid, BerValue *reqdata, void *serverctrls, void *clientctrls, int *msgidp);
+int ldap_result(LDAP *ld, int msgid, int all, timeval *timeout, LDAPMessage **result);
+int ldap_parse_extended_result(LDAP *ld, LDAPMessage *res, char **retoidp, BerValue **retdatap, int freeit);
+int ldap_refresh_s(LDAP *ld, BerValue *dn, int ttl, int *newttl, void *serverctrls, void *clientctrls);
 CDEF;
 
         foreach (['libldap-2.5.so.0', 'libldap.so.2', 'libldap.so'] as $lib) {

@@ -29,7 +29,13 @@ final class LdapConstants
     public const LDAP_SCOPE_ONELEVEL = 0x0001;
     public const LDAP_SCOPE_SUBTREE = 0x0002;
 
-    /** @return array<string, int> */
+    public const LDAP_EXOP_START_TLS = '1.3.6.1.4.1.1466.20037';
+    public const LDAP_EXOP_MODIFY_PASSWD = '1.3.6.1.4.1.4203.1.11.1';
+    public const LDAP_EXOP_REFRESH = '1.3.6.1.4.1.1466.101.119.1';
+    public const LDAP_EXOP_WHO_AM_I = '1.3.6.1.4.1.4203.1.11.3';
+    public const LDAP_EXOP_TURN = '1.3.6.1.1.19';
+
+    /** @return array<string, int|string> */
     public static function registeredConstants(): array
     {
         return [
@@ -49,6 +55,11 @@ final class LdapConstants
             'LDAP_SCOPE_BASE' => self::LDAP_SCOPE_BASE,
             'LDAP_SCOPE_ONELEVEL' => self::LDAP_SCOPE_ONELEVEL,
             'LDAP_SCOPE_SUBTREE' => self::LDAP_SCOPE_SUBTREE,
+            'LDAP_EXOP_START_TLS' => self::LDAP_EXOP_START_TLS,
+            'LDAP_EXOP_MODIFY_PASSWD' => self::LDAP_EXOP_MODIFY_PASSWD,
+            'LDAP_EXOP_REFRESH' => self::LDAP_EXOP_REFRESH,
+            'LDAP_EXOP_WHO_AM_I' => self::LDAP_EXOP_WHO_AM_I,
+            'LDAP_EXOP_TURN' => self::LDAP_EXOP_TURN,
         ];
     }
 }

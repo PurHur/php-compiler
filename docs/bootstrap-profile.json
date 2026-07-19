@@ -1100,6 +1100,7 @@
         "ext/ldap/VmLdapResult.php",
         "ext/ldap/ldap_connect.php",
         "ext/ldap/ldap_escape.php",
+        "ext/ldap/ldap_exop_builtins.php",
         "ext/ldap/ldap_link_builtins.php",
         "ext/ldap/ldap_search_builtins.php",
         "ext/libxml/BuiltinClasses.php",
@@ -6296,9 +6297,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6062,
+        "inventory_files": 6063,
         "excluded": 0,
-        "eligible": 6062,
+        "eligible": 6063,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
