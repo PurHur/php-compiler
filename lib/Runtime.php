@@ -275,6 +275,7 @@ class Runtime {
         $this->load(new ext\sqlite3\Module);
         $this->load(new ext\pgsql\Module);
         $this->load(new ext\odbc\Module);
+        $this->load(new ext\dba\Module);
         $this->load(new ext\mailparse\Module);
         $this->load(new ext\enchant\Module);
         $this->load(new ext\pdo\Module);
