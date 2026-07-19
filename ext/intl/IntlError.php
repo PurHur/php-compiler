@@ -17,6 +17,9 @@ final class IntlError
     /** php-src / ICU U_ILLEGAL_ARGUMENT_ERROR */
     public const U_ILLEGAL_ARGUMENT_ERROR = 1;
 
+    /** php-src / ICU U_MISSING_RESOURCE_ERROR */
+    public const U_MISSING_RESOURCE_ERROR = 2;
+
     /** php-src / ICU U_PARSE_ERROR */
     public const U_PARSE_ERROR = 9;
 

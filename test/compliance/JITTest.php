@@ -1390,6 +1390,11 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'dom_xpath_living')) {
                 continue;
             }
+            // ResourceBundle getLocales/errors: VM green (#20739); jit.php WeakRefNativeOpsJit::nullSlot
+            // getValue() abort during helper bootstrap (same as dom_xpath_living).
+            if (str_contains($name, 'resourcebundle_locales_errors')) {
+                continue;
+            }
             // Phar instance API: VM green (#20628); jit.php hits MathBaseConvertRuntime::constFloat
             // (hexdec/WeakRef bootstrap) same as curl_share_init_persistent.
             if (str_contains($name, 'phar_instance_api')) {

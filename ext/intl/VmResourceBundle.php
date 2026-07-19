@@ -4,26 +4,37 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
+use PHPCompiler\ext\spl\ArrayIteratorBuiltin;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * ResourceBundle create/get — ICU ures_* via thin FFI (#6187).
+ * ResourceBundle create/get/locales/errors — ICU ures_* via thin FFI (#6187, #20739).
  *
- * php-src: ext/intl/resourcebundle/resourcebundle_class.c
- * ICU: unicode/ures.h — ures_open_N / ures_getStringByKey_N / ures_close_N
+ * php-src: ext/intl/resourcebundle/resourcebundle_class.cpp
+ * ICU: unicode/ures.h — ures_open_N / ures_getStringByKey_N / ures_openAvailableLocales_N / ures_close_N
  */
 final class VmResourceBundle
 {
     public const CLASS_LC = 'resourcebundle';
 
-    /** @var array<int, array{locale: string, bundle: ?string, handle: object|null, fallback: bool}> */
+    /**
+     * @var array<int, array{
+     *   locale: string,
+     *   bundle: ?string,
+     *   handle: object|null,
+     *   fallback: bool,
+     *   errorCode: int,
+     *   errorMessage: string
+     * }>
+     */
     private static array $state = [];
 
     private static ?\FFI $ffi = null;
@@ -45,12 +56,24 @@ final class VmResourceBundle
         $entry->methods['create'] = new ResourceBundleCreate();
         $entry->methodVisibility['create'] = $pubStatic;
         $entry->methodNames['create'] = 'create';
+        $entry->methods['getlocales'] = new ResourceBundleGetLocales();
+        $entry->methodVisibility['getlocales'] = $pubStatic;
+        $entry->methodNames['getlocales'] = 'getLocales';
         $entry->methods['get'] = new ResourceBundleGet();
         $entry->methodVisibility['get'] = $pub;
         $entry->methodNames['get'] = 'get';
         $entry->methods['count'] = new ResourceBundleCount();
         $entry->methodVisibility['count'] = $pub;
         $entry->methodNames['count'] = 'count';
+        $entry->methods['geterrorcode'] = new ResourceBundleGetErrorCode();
+        $entry->methodVisibility['geterrorcode'] = $pub;
+        $entry->methodNames['geterrorcode'] = 'getErrorCode';
+        $entry->methods['geterrormessage'] = new ResourceBundleGetErrorMessage();
+        $entry->methodVisibility['geterrormessage'] = $pub;
+        $entry->methodNames['geterrormessage'] = 'getErrorMessage';
+        $entry->methods['getiterator'] = new ResourceBundleGetIterator();
+        $entry->methodVisibility['getiterator'] = $pub;
+        $entry->methodNames['getiterator'] = 'getIterator';
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
@@ -86,12 +109,16 @@ final class VmResourceBundle
             'bundle' => $bundleName,
             'handle' => $handle,
             'fallback' => $fallback,
+            'errorCode' => IntlError::U_ZERO_ERROR,
+            'errorMessage' => 'U_ZERO_ERROR',
         ];
         if ($fallback) {
             IntlError::set(
                 IntlError::U_USING_FALLBACK_WARNING,
                 'resourcebundle_create: ICU data unavailable; using Version fallback: U_USING_DEFAULT_WARNING'
             );
+            self::$state[$object->id]['errorCode'] = IntlError::U_USING_FALLBACK_WARNING;
+            self::$state[$object->id]['errorMessage'] = IntlError::getMessage();
         } elseif (IntlError::U_ZERO_ERROR === IntlError::getCode()) {
             IntlError::clear();
         }
@@ -100,22 +127,50 @@ final class VmResourceBundle
     }
 
     /**
-     * @return string|int|false
+     * ResourceBundle::getLocales() — php-src resourcebundle_locales (#20739).
+     *
+     * @return list<string>|false
+     */
+    public static function getLocales(string $bundleName)
+    {
+        IntlError::clear();
+        // Empty string → ICU default package (php-src resourcebundle_locales).
+        $path = '' === $bundleName ? null : $bundleName;
+        $locales = self::enumerateAvailableLocales($path);
+        if (null === $locales) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'resourcebundle_locales: cannot fetch locales list: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        IntlError::clear();
+
+        return $locales;
+    }
+
+    /**
+     * @return string|int|null null = missing/failed lookup (php-src returns null)
      */
     public static function get(ObjectEntry $bundle, string $index)
     {
         $state = self::$state[$bundle->id] ?? null;
         if (null === $state) {
-            IntlError::set(
+            self::fail(
+                $bundle,
                 IntlError::U_ILLEGAL_ARGUMENT_ERROR,
-                'resourcebundle_get: bad bundle: U_ILLEGAL_ARGUMENT_ERROR'
+                'Found unconstructed ResourceBundle: U_ILLEGAL_ARGUMENT_ERROR'
             );
 
-            return false;
+            return null;
         }
+        self::clearObjectError($bundle);
+        IntlError::clear();
         if (null !== $state['handle']) {
             $str = self::getStringByKey($state['handle'], $index);
             if (null !== $str) {
+                self::clearObjectError($bundle);
                 IntlError::clear();
 
                 return $str;
@@ -123,17 +178,16 @@ final class VmResourceBundle
             // Fall through for Version when key lookup fails with warning-only.
         }
         if ($state['fallback'] || 'Version' === $index) {
+            self::clearObjectError($bundle);
             IntlError::clear();
             if ('Version' === $index) {
                 return self::fallbackVersion();
             }
         }
-        IntlError::set(
-            IntlError::U_ILLEGAL_ARGUMENT_ERROR,
-            'resourcebundle_get: cannot find resource key "'.$index.'": U_MISSING_RESOURCE_ERROR'
-        );
+        $message = "Cannot load resource element '".$index."': U_MISSING_RESOURCE_ERROR";
+        self::fail($bundle, IntlError::U_MISSING_RESOURCE_ERROR, $message);
 
-        return false;
+        return null;
     }
 
     public static function count(ObjectEntry $bundle): int
@@ -147,6 +201,43 @@ final class VmResourceBundle
         }
         // v1: do not enumerate full ICU tree — report at least Version presence.
         return 1;
+    }
+
+    public static function getErrorCode(ObjectEntry $bundle): int
+    {
+        $state = self::$state[$bundle->id] ?? null;
+
+        return null === $state ? IntlError::U_ZERO_ERROR : $state['errorCode'];
+    }
+
+    public static function getErrorMessage(ObjectEntry $bundle): string
+    {
+        $state = self::$state[$bundle->id] ?? null;
+
+        return null === $state ? 'U_ZERO_ERROR' : $state['errorMessage'];
+    }
+
+    /**
+     * ResourceBundle::getIterator() — php-src returns InternalIterator; expose ArrayIterator over top-level keys (#20739).
+     */
+    public static function getIterator(Context $ctx, ObjectEntry $bundle): ObjectEntry
+    {
+        $class = $ctx->classes[ArrayIteratorBuiltin::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('ArrayIterator is not registered in this compiler build');
+        }
+        $ht = new HashTable();
+        $version = self::peekVersion($bundle);
+        if (null !== $version) {
+            $v = new Variable();
+            $v->string($version);
+            $ht->add('Version', $v);
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        ArrayIteratorBuiltin::init($entry, $ht);
+
+        return $entry;
     }
 
     public static function coerceLocaleArg(Variable $var, string $function, int $position): ?string
@@ -179,9 +270,101 @@ final class VmResourceBundle
         return VmString::coerceStringBuiltinArg($var, $function, $position, 'index');
     }
 
+    public static function coerceBundleNameArg(Variable $var, string $function, int $position): string
+    {
+        return VmString::coerceStringBuiltinArg($var, $function, $position, 'bundle');
+    }
+
+    private static function fail(ObjectEntry $bundle, int $code, string $message): void
+    {
+        IntlError::set($code, $message);
+        if (isset(self::$state[$bundle->id])) {
+            self::$state[$bundle->id]['errorCode'] = $code;
+            self::$state[$bundle->id]['errorMessage'] = $message;
+        }
+    }
+
+    private static function clearObjectError(ObjectEntry $bundle): void
+    {
+        if (!isset(self::$state[$bundle->id])) {
+            return;
+        }
+        self::$state[$bundle->id]['errorCode'] = IntlError::U_ZERO_ERROR;
+        self::$state[$bundle->id]['errorMessage'] = 'U_ZERO_ERROR';
+    }
+
+    private static function peekVersion(ObjectEntry $bundle): ?string
+    {
+        $state = self::$state[$bundle->id] ?? null;
+        if (null === $state) {
+            return null;
+        }
+        if (null !== $state['handle']) {
+            $str = self::getStringByKey($state['handle'], 'Version');
+            if (null !== $str) {
+                return $str;
+            }
+        }
+
+        return self::fallbackVersion();
+    }
+
     private static function fallbackVersion(): string
     {
         return '40';
+    }
+
+    /**
+     * @return list<string>|null null = ICU unavailable / open failed
+     */
+    private static function enumerateAvailableLocales(?string $packageName): ?array
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $open = 'ures_openAvailableLocales'.self::$symSuffix;
+        $next = 'uenum_next'.self::$symSuffix;
+        $countFn = 'uenum_count'.self::$symSuffix;
+        $close = 'uenum_close'.self::$symSuffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $en = $ffi->$open($packageName, \FFI::addr($status));
+            if (null === $en || (int) $status->cdata > 0) {
+                return null;
+            }
+            $status->cdata = 0;
+            $count = (int) $ffi->$countFn($en, \FFI::addr($status));
+            if ((int) $status->cdata > 0) {
+                $count = 0;
+                $status->cdata = 0;
+            }
+            $out = [];
+            while (true) {
+                $status->cdata = 0;
+                $len = $ffi->new('int32_t');
+                $len->cdata = 0;
+                $entry = $ffi->$next($en, \FFI::addr($len), \FFI::addr($status));
+                if (null === $entry || (int) $status->cdata > 0) {
+                    break;
+                }
+                if (\is_string($entry)) {
+                    $out[] = $entry;
+                } else {
+                    $n = (int) $len->cdata;
+                    $out[] = $n > 0 ? \FFI::string($entry, $n) : \FFI::string($entry);
+                }
+            }
+            $ffi->$close($en);
+            if (0 === \count($out) && $count > 0) {
+                return null;
+            }
+
+            return $out;
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /** @return object|null */
@@ -321,10 +504,15 @@ final class VmResourceBundle
 typedef int32_t UErrorCode;
 typedef uint16_t UChar;
 typedef struct UResourceBundle UResourceBundle;
+typedef struct UEnumeration UEnumeration;
 UResourceBundle *ures_open{$suffix}(const char *path, const char *locale, UErrorCode *status);
 void ures_close{$suffix}(UResourceBundle *resB);
 const char *ures_getVersionNumber{$suffix}(const UResourceBundle *resB);
 const UChar *ures_getStringByKey{$suffix}(const UResourceBundle *resB, const char *key, int32_t *len, UErrorCode *status);
+UEnumeration *ures_openAvailableLocales{$suffix}(const char *packageName, UErrorCode *status);
+int32_t uenum_count{$suffix}(UEnumeration *en, UErrorCode *status);
+const char *uenum_next{$suffix}(UEnumeration *en, int32_t *resultLength, UErrorCode *status);
+void uenum_close{$suffix}(UEnumeration *en);
 C;
     }
 }
@@ -391,8 +579,8 @@ final class ResourceBundleGet extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        if (false === $result) {
-            $frame->returnVar->bool(false);
+        if (null === $result) {
+            $frame->returnVar->null();
 
             return;
         }
@@ -431,5 +619,129 @@ final class ResourceBundleCount extends VmClassMethod
             return;
         }
         $frame->returnVar->int(VmResourceBundle::count($receiver->toObject()));
+    }
+}
+
+/** ResourceBundle::getLocales() — php-src resourcebundle_locales (#20739). */
+final class ResourceBundleGetLocales extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getLocales');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ResourceBundle::getLocales() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $bundle = VmResourceBundle::coerceBundleNameArg($frame->calledArgs[0], 'ResourceBundle::getLocales', 0);
+        $locales = VmResourceBundle::getLocales($bundle);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $locales) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($locales as $locale) {
+            $v = new Variable();
+            $v->string($locale);
+            $ht->append($v);
+        }
+        $frame->returnVar->array($ht);
+    }
+}
+
+/** ResourceBundle::getErrorCode() — php-src resourcebundle_get_error_code (#20739). */
+final class ResourceBundleGetErrorCode extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getErrorCode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ResourceBundle::getErrorCode() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmResourceBundle::isResourceBundleObject($receiver->toObject())) {
+            throw new \Error('ResourceBundle::getErrorCode() called on incompatible object');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmResourceBundle::getErrorCode($receiver->toObject()));
+    }
+}
+
+/** ResourceBundle::getErrorMessage() — php-src resourcebundle_get_error_message (#20739). */
+final class ResourceBundleGetErrorMessage extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getErrorMessage');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ResourceBundle::getErrorMessage() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmResourceBundle::isResourceBundleObject($receiver->toObject())) {
+            throw new \Error('ResourceBundle::getErrorMessage() called on incompatible object');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(VmResourceBundle::getErrorMessage($receiver->toObject()));
+    }
+}
+
+/** ResourceBundle::getIterator() — php-src resourcebundle getIterator (#20739). */
+final class ResourceBundleGetIterator extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getIterator');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'ResourceBundle::getIterator() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmResourceBundle::isResourceBundleObject($receiver->toObject())) {
+            throw new \Error('ResourceBundle::getIterator() called on incompatible object');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->object(VmResourceBundle::getIterator($frame->vmContext, $receiver->toObject()));
     }
 }
