@@ -91,22 +91,23 @@ final class VmIntlDateFormatter
         ];
     }
 
-    public static function create(
-        Context $ctx,
+    /**
+     * Shared init for create() / __construct() (#21097; mirrors MessageFormatter #20809).
+     *
+     * @throws NativeDateInvalidTimeZoneException when $timezone is non-empty and invalid
+     */
+    public static function initObject(
+        ObjectEntry $object,
         string $locale,
         int $dateType,
         int $timeType,
         ?string $timezone,
         int $calendar,
         ?string $pattern
-    ): ObjectEntry {
-        if (!isset($ctx->classes[self::CLASS_LC])) {
-            throw new \Error('Class "IntlDateFormatter" not found');
-        }
+    ): void {
         $tz = null !== $timezone && '' !== $timezone
             ? VmDateTimeNative::validateTimezoneId($timezone)
             : VmDate::defaultTimezoneGet();
-        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
         self::$state[$object->id] = [
             'locale' => $locale,
@@ -119,6 +120,22 @@ final class VmIntlDateFormatter
             'errorCode' => IntlError::U_ZERO_ERROR,
             'errorMessage' => 'U_ZERO_ERROR',
         ];
+    }
+
+    public static function create(
+        Context $ctx,
+        string $locale,
+        int $dateType,
+        int $timeType,
+        ?string $timezone,
+        int $calendar,
+        ?string $pattern
+    ): ObjectEntry {
+        if (!isset($ctx->classes[self::CLASS_LC])) {
+            throw new \Error('Class "IntlDateFormatter" not found');
+        }
+        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        self::initObject($object, $locale, $dateType, $timeType, $timezone, $calendar, $pattern);
 
         return $object;
     }
