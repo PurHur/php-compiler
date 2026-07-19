@@ -1422,6 +1422,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'soap_client')) {
                 continue;
             }
+            // FFI::cdef / dynamic C calls — VM + host libffi first (#4420); JIT class-method deferred.
+            if (str_contains($name, 'ffi_puts')) {
+                continue;
+            }
             // use_soap_error_handler — VM-first (#20267).
             if (str_contains($name, 'soap_use_soap_error_handler')) {
                 continue;

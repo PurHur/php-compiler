@@ -30,6 +30,8 @@ final class BuiltinExceptionSupport
     public const CLASS_PDO_EXCEPTION = 'pdoexception';
     public const CLASS_SQLITE3_EXCEPTION = 'sqlite3exception';
     public const CLASS_SOAP_FAULT = 'soapfault';
+    public const CLASS_FFI_EXCEPTION = 'ffi\\exception';
+    public const CLASS_FFI_PARSER_EXCEPTION = 'ffi\\parserexception';
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
     public const CLASS_INVALID_ARGUMENT_EXCEPTION = 'invalidargumentexception';
@@ -225,6 +227,22 @@ final class BuiltinExceptionSupport
         }
 
         return $var;
+    }
+
+    /** Bridge native FFI\Exception / FFI\ParserException from ext/ffi builtins (#4420). */
+    public static function materializeFfiException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0,
+        bool $parser = false
+    ): Variable {
+        $classLc = $parser ? self::CLASS_FFI_PARSER_EXCEPTION : self::CLASS_FFI_EXCEPTION;
+        if (!isset($ctx->classes[$classLc])) {
+            return self::materializeError($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, $classLc, $message, $file, $line);
     }
 
     public static function materializeSQLite3Exception(
