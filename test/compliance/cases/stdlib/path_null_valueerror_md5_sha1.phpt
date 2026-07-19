@@ -1,10 +1,9 @@
 --TEST--
-stdlib md5_file/sha1_file/hash_file null path — ValueError on 8.4 forward profile (#19146, ext/standard/md5.c)
+stdlib md5_file/sha1_file/hash_file null path — TypeError on 8.4 forward profile (#21062, ext/standard/md5.c)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-$expected = 'Path cannot be empty';
 foreach (['md5_file', 'sha1_file', 'hash_file', 'hash_hmac_file'] as $fn) {
     try {
         if ('hash_file' === $fn) {
@@ -15,13 +14,22 @@ foreach (['md5_file', 'sha1_file', 'hash_file', 'hash_hmac_file'] as $fn) {
             $fn(null);
         }
         echo $fn, ": miss\n";
-    } catch (ValueError $e) {
+    } catch (TypeError $e) {
         echo $fn, ':', $e->getMessage(), "\n";
+    } catch (ValueError $e) {
+        echo $fn, ':VALUEERROR:', $e->getMessage(), "\n";
     }
+}
+try {
+    md5_file('');
+    echo "empty: miss\n";
+} catch (ValueError $e) {
+    echo 'empty:', $e->getMessage(), "\n";
 }
 ?>
 --EXPECT--
-md5_file:Path cannot be empty
-sha1_file:Path cannot be empty
-hash_file:Path cannot be empty
-hash_hmac_file:Path cannot be empty
+md5_file:md5_file(): Argument #1 ($filename) must be of type string, null given
+sha1_file:sha1_file(): Argument #1 ($filename) must be of type string, null given
+hash_file:hash_file(): Argument #2 ($filename) must be of type string, null given
+hash_hmac_file:hash_hmac_file(): Argument #2 ($filename) must be of type string, null given
+empty:Path cannot be empty
