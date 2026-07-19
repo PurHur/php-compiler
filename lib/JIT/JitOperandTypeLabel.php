@@ -69,22 +69,27 @@ final class JitOperandTypeLabel
 
     private static function compileTimeValueBoxEnumClassName(Context $context, Variable $arg): ?string
     {
-        if (Variable::KIND_VALUE !== $arg->kind) {
+        if (Variable::KIND_VALUE !== $arg->kind && Variable::KIND_VARIABLE !== $arg->kind) {
             return null;
         }
         $map = $context->structFieldMap['__value__'] ?? null;
         if (null === $map || !isset($map['type'])) {
             return null;
         }
+        // NestedJIT mid-{main} can leave KIND_VALUE operands as __value__** slots (#21041).
+        // Always resolve via valuePtrFromVariable — never structGep raw ->value.
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $typeByte = $context->builder->load(
-            $context->builder->structGep($arg->value, $map['type'])
+            $context->builder->structGep($valuePtr, $map['type'])
         );
         if (!method_exists($typeByte, 'isConstant') || !$typeByte->isConstant()) {
             return null;
         }
+        if (!method_exists($typeByte, 'getConstantValue')) {
+            return null;
+        }
         $type = (int) $typeByte->getConstantValue();
         if (VmVariable::TYPE_OBJECT === $type) {
-            $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
             $obj = $context->builder->call(
                 $context->lookupFunction('__value__readObject'),
                 $valuePtr
@@ -101,8 +106,9 @@ final class JitOperandTypeLabel
         if (null === $enumMap || !isset($enumMap['class_id'])) {
             return null;
         }
+        // Same overlay as JitStringBuiltinArg::emitRuntimeBoxedEnumCaseReject — enum fields on value box.
         $classIdVal = $context->builder->load(
-            $context->builder->structGep($arg->value, $enumMap['class_id'])
+            $context->builder->structGep($valuePtr, $enumMap['class_id'])
         );
         if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
             return null;
@@ -139,9 +145,18 @@ final class JitOperandTypeLabel
         if (null === $objMap || !isset($objMap['class_id'])) {
             return null;
         }
-        $classIdVal = $context->builder->load(
-            $context->builder->structGep($arg->value, $objMap['class_id'])
-        );
+        $receiver = $arg->value;
+        $tyName = $context->getStringFromType($receiver->typeOf());
+        if ('__object__**' === $tyName) {
+            $receiver = $context->builder->load($receiver);
+        }
+        try {
+            $classIdVal = $context->builder->load(
+                $context->builder->structGep($receiver, $objMap['class_id'])
+            );
+        } catch (\Throwable) {
+            return null;
+        }
         if (!method_exists($classIdVal, 'isConstant') || !$classIdVal->isConstant()) {
             return null;
         }

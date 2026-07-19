@@ -1131,7 +1131,8 @@ class Context {
             Builtin\StringOffsetRuntime::ensureStandaloneBodies($this);
             // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
             // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
-            \PHPCompiler\ext\standard\JitStreamFilterKernel::ensureDeferredStubsForInventoryEmit($this);
+            // NestedJIT StreamFilterJitHelper during full standalone init (#21041 / peer #20998).
+            Builtin\StreamFilter::ensureLinked($this);
             Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
             Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);

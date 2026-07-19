@@ -164,6 +164,11 @@ final class JitValueBox
             return self::normalizeValuePtr($context, self::pointer($context, $var->value));
         }
         $valueTy = $var->value->typeOf();
+        $valueTyName = $context->getStringFromType($valueTy);
+        // KIND_VALUE operands may still be __value__** slots after NestedJIT mid-{main} (#21041).
+        if ('__value__**' === $valueTyName) {
+            return self::normalizeValuePtr($context, $context->builder->load($var->value));
+        }
         if (
             LlvmType::KIND_POINTER === $valueTy->getKind()
             && '__value__' === $context->getStringFromType($valueTy->getElementType())

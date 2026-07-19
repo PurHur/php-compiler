@@ -4,19 +4,24 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin\StreamIoRuntime;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\DomInstanceMethodRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT ABI bridges for stream_filter_* via StreamFilterJitHelper PHP (#9047, #19644).
+ * JIT/AOT embed + thin standalone link for stream_filter_* via StreamFilterJitHelper PHP (#9047, #21041).
  *
- * Quarantined from lib/JIT/Builtin/StreamFilterJit — {@see \PHPCompiler\JIT\Builtin\StreamFilter}
- * stays the thin orchestrator. Call-site lowering stays in {@see JitStreamFilter}.
+ * Always NestedJIT {@see StreamFilterJitHelper} (StreamBucket #20998 / StreamRead #20982 shape —
+ * no constant-0 / deferred inventory stub fork). Call-site lowering stays in {@see JitStreamFilter}.
  *
+ * SSOT: {@see StreamFilterJitHelper}
  * php-src: ext/standard/streamsfuncs.c — stream_filter_append/prepend/remove/register
  */
 final class JitStreamFilterKernel
@@ -64,24 +69,32 @@ final class JitStreamFilterKernel
         self::implement($context);
     }
 
+    /** Standalone AOT: emit stream_filter ABI during Context init (#21041). */
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        // Thin + embed: publish sg_vm_context before NestedJIT of StreamFilterJitHelper (#17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+
         $probe = $context->module->getNamedFunction('__compiler_stream_filter_append');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            // Repair apply_* if inventory left ret i32 0 on __string__* decls (#19462).
-            self::ensureIdentityApplyStubs($context);
             self::registerLinkedRuntime($context);
 
             return;
         }
 
-        // Thin standalone AOT + Context standalone init — stubs without NestedJIT (#20553).
-        if ($context->isThinStandaloneAotMain() || StreamIoRuntime::isStandaloneInitPhase()) {
-            self::implementDeferredInventoryStubs($context);
-
-            return;
-        }
-
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::implementAppendBridge($context);
         self::implementPrependBridge($context);
@@ -91,7 +104,11 @@ final class JitStreamFilterKernel
         self::implementApplyWriteBridge($context);
         self::implementApplyReadBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementAppendBridge(Context $context): void
@@ -247,7 +264,7 @@ final class JitStreamFilterKernel
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after StreamFilterJitHelper compile (#9047)');
+            throw new \LogicException($logical.' missing after StreamFilterJitHelper compile (#21041)');
         }
 
         return $fn;
@@ -255,41 +272,12 @@ final class JitStreamFilterKernel
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 2).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $real = \realpath($path) ?: $path;
-            if ($context->hasJitIncludedFileCompiled($real)) {
-                return;
-            }
-            $block = $runtime->parseAndCompile(
-                (string) \file_get_contents($path),
-                'StreamFilterJitHelper.php'
-            );
-            if (null === $block) {
-                throw new \LogicException('StreamFilterJitHelper.php parseAndCompile failed (#9047)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-            $context->markJitIncludedFileCompiled($real);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9047)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#21041'
+        );
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -297,88 +285,9 @@ final class JitStreamFilterKernel
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StreamFilterJit bridge (#9047)');
+                throw new \LogicException($name.' missing after StreamFilterJit bridge (#21041)');
             }
             $context->registerFunction($name, $fn);
-        }
-    }
-
-    /** Thin standalone / Context init: link stream_filter ABI without nested helper JIT (#13245, #20553). */
-    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
-    {
-        if (!$context->isThinStandaloneAotMain() && !StreamIoRuntime::isStandaloneInitPhase()) {
-            return;
-        }
-        self::implementDeferredInventoryStubs($context);
-    }
-
-    private static function implementDeferredInventoryStubs(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $zero = $i32->constInt(0, false);
-        $minusOne = $i32->constInt(-1, true);
-
-        foreach (self::ABI_FUNCTIONS as $abiName) {
-            if (self::bridgeAlreadyImplemented($context, $abiName)) {
-                continue;
-            }
-            if ('__compiler_is_stream_filter_resource' === $abiName) {
-                $ft = $context->context->functionType($i32, false, $i64);
-                $fn = self::declareOrReuse($context, $abiName, $ft);
-                $entry = $fn->appendBasicBlock('stream_filter_is_inv_stub');
-                $context->builder->positionAtEnd($entry);
-                $context->builder->returnValue($zero);
-                $context->registerFunction($abiName, $fn);
-                continue;
-            }
-            if ('__compiler_stream_filter_register' === $abiName) {
-                $ft = $context->context->functionType($i32, false, $strPtr, $strPtr);
-                $fn = self::declareOrReuse($context, $abiName, $ft);
-                $entry = $fn->appendBasicBlock('stream_filter_reg_inv_stub');
-                $context->builder->positionAtEnd($entry);
-                $context->builder->returnValue($minusOne);
-                $context->registerFunction($abiName, $fn);
-                continue;
-            }
-            if ('__compiler_stream_filter_apply_write' === $abiName
-                || '__compiler_stream_filter_apply_read' === $abiName) {
-                continue; // handled by ensureIdentityApplyStubs below
-            }
-            $ft = $context->context->functionType($i32, false, $i64);
-            $fn = self::declareOrReuse($context, $abiName, $ft);
-            $entry = $fn->appendBasicBlock('stream_filter_inv_stub');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($zero);
-            $context->registerFunction($abiName, $fn);
-        }
-
-        self::ensureIdentityApplyStubs($context);
-        self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
-    }
-
-    /**
-     * Identity passthrough for apply_read/write — must return __string__*, not i32 (#19462).
-     */
-    private static function ensureIdentityApplyStubs(Context $context): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false, $i64, $strPtr);
-
-        foreach (['__compiler_stream_filter_apply_write', '__compiler_stream_filter_apply_read'] as $abiName) {
-            $fn = self::declareOrReuse($context, $abiName, $ft);
-            if ($fn->countBasicBlocks() > 0) {
-                foreach (array_reverse($fn->getBasicBlocks()) as $block) {
-                    $block->delete();
-                }
-            }
-            $entry = $fn->appendBasicBlock('stream_filter_apply_inv_stub');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($fn->getParam(1));
-            $context->registerFunction($abiName, $fn);
         }
     }
 }
