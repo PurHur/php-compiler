@@ -1163,7 +1163,7 @@ final class VmDomXPath
 
     private static function isBooleanExpression(string $expression): bool
     {
-        if (preg_match('~^(true|false|boolean\(|not\()~i', $expression)) {
+        if (preg_match('~^(true|false|boolean\(|not\(|starts-with\(|contains\()~i', $expression)) {
             return true;
         }
 
@@ -1173,7 +1173,7 @@ final class VmDomXPath
 
     private static function isNumericExpression(string $expression): bool
     {
-        if (preg_match('~^(number|count|sum)\(~i', $expression)) {
+        if (preg_match('~^(number|count|sum|string-length|floor|ceiling|round)\(~i', $expression)) {
             return true;
         }
         if (self::isNumericLiteral($expression)) {
@@ -1190,7 +1190,15 @@ final class VmDomXPath
 
     private static function isStringExpression(string $expression): bool
     {
-        return (bool) preg_match('~^(string|name)\(~i', $expression);
+        if (null !== self::tryParseStringLiteral($expression)) {
+            return true;
+        }
+
+        // XPath 1.0 string core + name()/string() (#20818; follows #20280).
+        return (bool) preg_match(
+            '~^(string|name|concat|substring-before|substring-after|substring|normalize-space|translate|local-name|namespace-uri)\(~i',
+            $expression
+        );
     }
 
     private static function isNumericLiteral(string $expression): bool
@@ -1217,6 +1225,27 @@ final class VmDomXPath
             }
 
             return !self::booleanize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode));
+        }
+        // starts-with(string, string) / contains(string, string) — XPath 1.0 (#20818).
+        if (preg_match('~^starts-with\(~i', $expression)) {
+            $args = self::wrappedFunctionArgs($expression, 'starts-with');
+            if (null === $args || 2 !== \count($args)) {
+                throw new \DOMException('Invalid expression');
+            }
+            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
+            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
+
+            return str_starts_with($haystack, $needle);
+        }
+        if (preg_match('~^contains\(~i', $expression)) {
+            $args = self::wrappedFunctionArgs($expression, 'contains');
+            if (null === $args || 2 !== \count($args)) {
+                throw new \DOMException('Invalid expression');
+            }
+            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
+            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
+
+            return str_contains($haystack, $needle);
         }
         $comparison = self::findTopLevelComparison($expression);
         if (null !== $comparison) {
@@ -1275,6 +1304,52 @@ final class VmDomXPath
 
             return self::numberize($value);
         }
+        // string-length([string]) — XPath 1.0 character count (#20818).
+        if (preg_match('~^string-length\(~i', $expression)) {
+            $args = self::wrappedFunctionArgs($expression, 'string-length');
+            if (null === $args || \count($args) > 1) {
+                throw new \DOMException('Invalid expression');
+            }
+            if ([] === $args || '' === trim($args[0])) {
+                $str = self::stringify(self::contextNodeStringValue($xpath, $contextNode));
+            } else {
+                $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
+            }
+
+            return (float) self::xpathStringLength($str);
+        }
+        // floor / ceiling / round — XPath 1.0 number core (#20818).
+        if (preg_match('~^floor\(~i', $expression)) {
+            $inner = self::wrappedFunctionInner($expression, 'floor');
+            if (null === $inner || '' === $inner) {
+                throw new \DOMException('Invalid expression');
+            }
+            $n = self::numberize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode));
+
+            return is_nan($n) || is_infinite($n) ? $n : floor($n);
+        }
+        if (preg_match('~^ceiling\(~i', $expression)) {
+            $inner = self::wrappedFunctionInner($expression, 'ceiling');
+            if (null === $inner || '' === $inner) {
+                throw new \DOMException('Invalid expression');
+            }
+            $n = self::numberize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode));
+
+            return is_nan($n) || is_infinite($n) ? $n : ceil($n);
+        }
+        if (preg_match('~^round\(~i', $expression)) {
+            $inner = self::wrappedFunctionInner($expression, 'round');
+            if (null === $inner || '' === $inner) {
+                throw new \DOMException('Invalid expression');
+            }
+            $n = self::numberize(self::evaluateToMixed($ctx, $xpath, $inner, $contextNode));
+            if (is_nan($n) || is_infinite($n)) {
+                return $n;
+            }
+
+            // XPath 1.0: round half toward +∞ ≡ floor(n + 0.5).
+            return floor($n + 0.5);
+        }
         // XPath 1.0 sum(node-set): coerce each string-value to number (#19682).
         if (preg_match('~^sum\((.+)\)$~i', $expression, $matches)) {
             $nodeIds = self::evaluateNodeSet($ctx, $xpath, trim($matches[1]), $contextNode, false);
@@ -1331,6 +1406,10 @@ final class VmDomXPath
         string $expression,
         ?ObjectEntry $contextNode
     ): string {
+        $literal = self::tryParseStringLiteral($expression);
+        if (null !== $literal) {
+            return $literal;
+        }
         if (preg_match('~^name\(~i', $expression)) {
             $inner = self::wrappedFunctionInner($expression, 'name');
             if (null === $inner) {
@@ -1360,32 +1439,130 @@ final class VmDomXPath
 
             return DomRegistry::state($node)->nodeName ?? '';
         }
-        if (!preg_match('~^string\((.+)\)$~i', $expression, $matches)) {
-            throw new \DOMException('Invalid expression');
-        }
-        $value = self::evaluateToMixed($ctx, $xpath, trim($matches[1]), $contextNode);
-        if (is_array($value)) {
-            if ([] === $value) {
+        // local-name([node-set]) — XPath 1.0 (#20818).
+        if (preg_match('~^local-name\(~i', $expression)) {
+            $args = self::wrappedFunctionArgs($expression, 'local-name');
+            if (null === $args || \count($args) > 1) {
+                throw new \DOMException('Invalid expression');
+            }
+            $node = self::firstNodeFromOptionalArg($ctx, $xpath, $args, $contextNode);
+            if (null === $node) {
                 return '';
             }
-            $node = DomRegistry::entry($value[0]);
+            $name = DomRegistry::state($node)->nodeName ?? '';
+            $colon = strrpos($name, ':');
+
+            return false === $colon ? $name : substr($name, $colon + 1);
+        }
+        // namespace-uri([node-set]) — XPath 1.0 (#20818).
+        if (preg_match('~^namespace-uri\(~i', $expression)) {
+            $args = self::wrappedFunctionArgs($expression, 'namespace-uri');
+            if (null === $args || \count($args) > 1) {
+                throw new \DOMException('Invalid expression');
+            }
+            $node = self::firstNodeFromOptionalArg($ctx, $xpath, $args, $contextNode);
             if (null === $node) {
                 return '';
             }
 
-            return VmDom::readNodeValue($node) ?? '';
+            return DomRegistry::state($node)->namespaceURI ?? '';
         }
-        if (is_string($value)) {
-            return $value;
-        }
-        if (is_float($value) || is_int($value)) {
-            return (string) $value;
-        }
-        if (is_bool($value)) {
-            return $value ? 'true' : 'false';
-        }
+        // concat(string, string, ...) — XPath 1.0 (#20818).
+        if (preg_match('~^concat\(~i', $expression)) {
+            $args = self::wrappedFunctionArgs($expression, 'concat');
+            if (null === $args || \count($args) < 2) {
+                throw new \DOMException('Invalid expression');
+            }
+            $out = '';
+            foreach ($args as $arg) {
+                $out .= self::stringify(self::evaluateToMixed($ctx, $xpath, trim($arg), $contextNode));
+            }
 
-        return '';
+            return $out;
+        }
+        // substring-before / substring-after (#20818).
+        if (preg_match('~^substring-before\(~i', $expression)) {
+            $args = self::wrappedFunctionArgs($expression, 'substring-before');
+            if (null === $args || 2 !== \count($args)) {
+                throw new \DOMException('Invalid expression');
+            }
+            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
+            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
+            if ('' === $needle) {
+                return '';
+            }
+            $pos = strpos($haystack, $needle);
+
+            return false === $pos ? '' : substr($haystack, 0, $pos);
+        }
+        if (preg_match('~^substring-after\(~i', $expression)) {
+            $args = self::wrappedFunctionArgs($expression, 'substring-after');
+            if (null === $args || 2 !== \count($args)) {
+                throw new \DOMException('Invalid expression');
+            }
+            $haystack = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
+            $needle = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
+            if ('' === $needle) {
+                return $haystack;
+            }
+            $pos = strpos($haystack, $needle);
+
+            return false === $pos ? '' : substr($haystack, $pos + \strlen($needle));
+        }
+        // substring(string, number[, number]) — 1-based, XPath round on indices (#20818).
+        if (preg_match('~^substring\(~i', $expression)) {
+            $args = self::wrappedFunctionArgs($expression, 'substring');
+            if (null === $args || \count($args) < 2 || \count($args) > 3) {
+                throw new \DOMException('Invalid expression');
+            }
+            $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
+            $start = self::numberize(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
+            $len = null;
+            if (isset($args[2])) {
+                $len = self::numberize(self::evaluateToMixed($ctx, $xpath, trim($args[2]), $contextNode));
+            }
+
+            return self::xpathSubstring($str, $start, $len);
+        }
+        // normalize-space([string]) (#20818).
+        if (preg_match('~^normalize-space\(~i', $expression)) {
+            $args = self::wrappedFunctionArgs($expression, 'normalize-space');
+            if (null === $args || \count($args) > 1) {
+                throw new \DOMException('Invalid expression');
+            }
+            if ([] === $args || '' === trim($args[0])) {
+                $str = self::stringify(self::contextNodeStringValue($xpath, $contextNode));
+            } else {
+                $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
+            }
+
+            return self::xpathNormalizeSpace($str);
+        }
+        // translate(string, string, string) (#20818).
+        if (preg_match('~^translate\(~i', $expression)) {
+            $args = self::wrappedFunctionArgs($expression, 'translate');
+            if (null === $args || 3 !== \count($args)) {
+                throw new \DOMException('Invalid expression');
+            }
+            $str = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[0]), $contextNode));
+            $from = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[1]), $contextNode));
+            $to = self::stringify(self::evaluateToMixed($ctx, $xpath, trim($args[2]), $contextNode));
+
+            return self::xpathTranslate($str, $from, $to);
+        }
+        if (!preg_match('~^string\(~i', $expression)) {
+            throw new \DOMException('Invalid expression');
+        }
+        $inner = self::wrappedFunctionInner($expression, 'string');
+        if (null === $inner) {
+            throw new \DOMException('Invalid expression');
+        }
+        if ('' === $inner) {
+            return self::stringify(self::contextNodeStringValue($xpath, $contextNode));
+        }
+        $value = self::evaluateToMixed($ctx, $xpath, trim($inner), $contextNode);
+
+        return self::stringify($value);
     }
 
     /**
@@ -1571,6 +1748,217 @@ final class VmDomXPath
         }
 
         return NAN;
+    }
+
+    /** XPath 1.0 string() conversion for evaluate() helpers (#20818). */
+    private static function stringify(mixed $value): string
+    {
+        if (is_string($value)) {
+            return $value;
+        }
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+        if (is_int($value)) {
+            return (string) $value;
+        }
+        if (is_float($value)) {
+            if (is_nan($value)) {
+                return 'NaN';
+            }
+            if (is_infinite($value)) {
+                return $value > 0 ? 'Infinity' : '-Infinity';
+            }
+            // Match php/libxml: drop trailing .0 for whole numbers.
+            if (floor($value) == $value) {
+                return (string) (int) $value;
+            }
+
+            return (string) $value;
+        }
+        if (is_array($value)) {
+            if ([] === $value) {
+                return '';
+            }
+            $node = DomRegistry::entry($value[0]);
+
+            return null !== $node ? (VmDom::readNodeValue($node) ?? '') : '';
+        }
+
+        return '';
+    }
+
+    private static function tryParseStringLiteral(string $expression): ?string
+    {
+        $expression = trim($expression);
+        if (preg_match('~^"(.*)"$~s', $expression, $m) || preg_match("~^'(.*)'$~s", $expression, $m)) {
+            return $m[1];
+        }
+
+        return null;
+    }
+
+    /**
+     * Args of func(...) when the call spans the whole expression.
+     *
+     * @return list<string>|null
+     */
+    private static function wrappedFunctionArgs(string $expression, string $funcName): ?array
+    {
+        $inner = self::wrappedFunctionInner($expression, $funcName);
+        if (null === $inner) {
+            return null;
+        }
+
+        return self::splitXPathCallArgs($inner);
+    }
+
+    private static function contextNodeStringValue(ObjectEntry $xpath, ?ObjectEntry $contextNode): mixed
+    {
+        $node = $contextNode;
+        if (null === $node) {
+            $state = DomRegistry::state($xpath);
+            $node = DomRegistry::entry($state->xpathDocumentId ?? 0);
+        }
+        if (null === $node || !DomRegistry::has($node)) {
+            return '';
+        }
+        if (VmDom::isDocument($node)) {
+            $rootVar = $node->getProperty(VmDom::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $rootVar->type) {
+                return '';
+            }
+            $root = $rootVar->toObject();
+
+            return null !== $root ? (VmDom::readNodeValue($root) ?? '') : '';
+        }
+        if (VmDom::isElement($node) || VmDom::isTextNode($node) || VmDom::isAttr($node)) {
+            return VmDom::readNodeValue($node) ?? '';
+        }
+
+        return '';
+    }
+
+    /**
+     * @param list<string> $args
+     */
+    private static function firstNodeFromOptionalArg(
+        Context $ctx,
+        ObjectEntry $xpath,
+        array $args,
+        ?ObjectEntry $contextNode
+    ): ?ObjectEntry {
+        if ([] === $args || '' === trim($args[0])) {
+            $node = $contextNode;
+            if (null === $node) {
+                $state = DomRegistry::state($xpath);
+                $node = DomRegistry::entry($state->xpathDocumentId ?? 0);
+            }
+
+            return (null !== $node && DomRegistry::has($node)) ? $node : null;
+        }
+        $nodeIds = self::evaluateNodeSet($ctx, $xpath, trim($args[0]), $contextNode, false);
+        if ([] === $nodeIds) {
+            return null;
+        }
+
+        return DomRegistry::entry($nodeIds[0]);
+    }
+
+    private static function xpathStringLength(string $str): int
+    {
+        if (\function_exists('mb_strlen')) {
+            return (int) mb_strlen($str, 'UTF-8');
+        }
+
+        return \strlen($str);
+    }
+
+    /**
+     * XPath 1.0 substring(): 1-based start; start/len rounded via floor(n+0.5).
+     */
+    private static function xpathSubstring(string $str, float $start, ?float $len): string
+    {
+        if (is_nan($start) || (null !== $len && is_nan($len))) {
+            return '';
+        }
+        $chars = self::xpathChars($str);
+        $count = \count($chars);
+        $startPos = (int) floor($start + 0.5);
+        if (null === $len) {
+            if ($startPos > $count) {
+                return '';
+            }
+            $from = max(1, $startPos) - 1;
+
+            return implode('', \array_slice($chars, $from));
+        }
+        $length = (int) floor($len + 0.5);
+        if ($length <= 0) {
+            return '';
+        }
+        // Characters with position p where start <= p < start+len.
+        $from = max(1, $startPos);
+        $toExclusive = $startPos + $length;
+        if ($from > $count || $from >= $toExclusive) {
+            return '';
+        }
+        $sliceStart = $from - 1;
+        $sliceLen = min($count, $toExclusive - 1) - $sliceStart;
+
+        return $sliceLen <= 0 ? '' : implode('', \array_slice($chars, $sliceStart, $sliceLen));
+    }
+
+    /** @return list<string> */
+    private static function xpathChars(string $str): array
+    {
+        if ('' === $str) {
+            return [];
+        }
+        if (\function_exists('mb_str_split')) {
+            return mb_str_split($str, 1, 'UTF-8');
+        }
+        if (\function_exists('preg_split')) {
+            $parts = preg_split('//u', $str, -1, PREG_SPLIT_NO_EMPTY);
+
+            return false === $parts ? str_split($str) : $parts;
+        }
+
+        return str_split($str);
+    }
+
+    private static function xpathNormalizeSpace(string $str): string
+    {
+        $str = preg_replace('/[ \t\r\n]+/u', ' ', $str) ?? $str;
+
+        return trim($str);
+    }
+
+    private static function xpathTranslate(string $str, string $from, string $to): string
+    {
+        $fromChars = self::xpathChars($from);
+        $toChars = self::xpathChars($to);
+        $map = [];
+        $delete = [];
+        foreach ($fromChars as $i => $ch) {
+            if (isset($map[$ch]) || isset($delete[$ch])) {
+                continue; // first occurrence wins (XPath 1.0)
+            }
+            if ($i < \count($toChars)) {
+                $map[$ch] = $toChars[$i];
+            } else {
+                $delete[$ch] = true;
+            }
+        }
+        $out = '';
+        foreach (self::xpathChars($str) as $ch) {
+            if (isset($delete[$ch])) {
+                continue;
+            }
+            $out .= $map[$ch] ?? $ch;
+        }
+
+        return $out;
     }
 
     /**
