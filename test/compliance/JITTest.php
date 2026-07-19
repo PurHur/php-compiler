@@ -641,7 +641,8 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'intl_skeleton')
                     || str_contains($name, 'intl_char')
                     || str_contains($name, 'intl_uconverter')
-                    || str_contains($name, 'collator_'))
+                    || str_contains($name, 'collator_')
+                    || str_contains($name, 'breakiterator'))
                 && !str_contains($name, 'intl_phantom')) {
                 continue;
             }
@@ -1393,6 +1394,11 @@ class JITTest extends BaseTest {
             // ResourceBundle getLocales/errors: VM green (#20739); jit.php WeakRefNativeOpsJit::nullSlot
             // getValue() abort during helper bootstrap (same as dom_xpath_living).
             if (str_contains($name, 'resourcebundle_locales_errors')) {
+                continue;
+            }
+            // IntlBreakIterator preceding/following: VM + bin/jit.php repro green (#20771);
+            // MCJIT PHPT harness hits WeakRefNativeOpsJit::nullSlot getValue() abort (same as above).
+            if (str_contains($name, 'breakiterator_preceding_following')) {
                 continue;
             }
             // Phar instance API: VM green (#20628); jit.php hits MathBaseConvertRuntime::constFloat

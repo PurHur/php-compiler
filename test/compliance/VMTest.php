@@ -526,7 +526,8 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'intl_skeleton')
                     || str_contains($name, 'intl_char')
                     || str_contains($name, 'intl_uconverter')
-                    || str_contains($name, 'collator_'))
+                    || str_contains($name, 'collator_')
+                    || str_contains($name, 'breakiterator'))
                 && !str_contains($name, 'intl_phantom')) {
                 continue;
             }
