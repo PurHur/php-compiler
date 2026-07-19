@@ -176,6 +176,10 @@ final class VmDomXPath
     ): Variable {
         $nodeIds = self::evaluateNodeSet($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
 
+        if (VmDom::prefersDomNodeList($xpath)) {
+            return VmDom::createDomNodeList($ctx, $nodeIds);
+        }
+
         return VmDom::createNodeList($ctx, $nodeIds);
     }
 

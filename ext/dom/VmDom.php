@@ -7148,6 +7148,41 @@ final class VmDom
         return $var;
     }
 
+    /**
+     * Dom\NodeList handle — XPath node-sets (php-src php_dom.stub.php; #20757).
+     *
+     * @param list<int> $nodeIds
+     */
+    public static function createDomNodeList(Context $ctx, array $nodeIds): Variable
+    {
+        $class = $ctx->classes[VmDomLiving::CLASS_NODE_LIST] ?? null;
+        if (null === $class) {
+            return self::createNodeList($ctx, $nodeIds);
+        }
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_LENGTH)->int(\count($nodeIds));
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_NODELIST;
+        $state->nodeName = '#nodelist';
+        $state->listNodeIds = $nodeIds;
+        $state->listIterIndex = 0;
+        DomRegistry::attach($entry, $state);
+
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
+    /** Living Dom\XPath query/evaluate node-sets use Dom\NodeList (#20757). */
+    public static function prefersDomNodeList(ObjectEntry $xpath): bool
+    {
+        return VmDomLiving::CLASS_XPATH === strtolower($xpath->class->name);
+    }
+
     /** Living Dom\* receivers use HTMLCollection; legacy DOM* keep DOMNodeList (#20709). */
     public static function prefersHtmlCollection(ObjectEntry $root): bool
     {
@@ -7293,7 +7328,10 @@ final class VmDom
     public static function isNodeList(ObjectEntry $entry): bool
     {
         $lc = strtolower($entry->class->name);
-        if (self::CLASS_NODE_LIST !== $lc && VmDomLiving::CLASS_HTML_COLLECTION !== $lc) {
+        if (self::CLASS_NODE_LIST !== $lc
+            && VmDomLiving::CLASS_HTML_COLLECTION !== $lc
+            && VmDomLiving::CLASS_NODE_LIST !== $lc
+        ) {
             return false;
         }
 
@@ -7562,8 +7600,12 @@ final class VmDom
 
     public static function isXPath(ObjectEntry $entry): bool
     {
-        return self::CLASS_XPATH === strtolower($entry->class->name)
-            && DomRegistry::has($entry)
+        $lc = strtolower($entry->class->name);
+        if (self::CLASS_XPATH !== $lc && VmDomLiving::CLASS_XPATH !== $lc) {
+            return false;
+        }
+
+        return DomRegistry::has($entry)
             && DomConstants::XML_XPATH === DomRegistry::state($entry)->nodeType;
     }
 
@@ -9609,11 +9651,23 @@ final class VmDom
             if (self::CLASS_TOKEN_LIST === $classLc && self::isTokenList($object)) {
                 return $object;
             }
-            // Dom\HTMLCollection shares DOMNodeList item/count/iterator handlers (#20709).
+            // Dom\HTMLCollection / Dom\NodeList share DOMNodeList item/count/iterator handlers (#20709, #20757).
             if (self::CLASS_NODE_LIST === $classLc && self::isNodeList($object)) {
                 return $object;
             }
             if (VmDomLiving::CLASS_HTML_COLLECTION === $classLc && self::isHtmlCollection($object)) {
+                return $object;
+            }
+            if (VmDomLiving::CLASS_NODE_LIST === $classLc && self::isNodeList($object)
+                && VmDomLiving::CLASS_NODE_LIST === strtolower($object->class->name)
+            ) {
+                return $object;
+            }
+            // Dom\XPath shares DOMXPath query/evaluate handlers (#20757).
+            if (self::CLASS_XPATH === $classLc && self::isXPath($object)) {
+                return $object;
+            }
+            if (VmDomLiving::CLASS_XPATH === $classLc && self::isXPath($object)) {
                 return $object;
             }
             throw new \TypeError(sprintf('%s must be called on a %s instance', $label, self::classNameFromLc($classLc)));

@@ -467,6 +467,7 @@ require_once __DIR__.'/../../../ext/dom/VmDomTokenList.php';
 require_once __DIR__.'/../../../ext/dom/VmDomValidationNative.php';
 require_once __DIR__.'/../../../ext/dom/VmDomXPath.php';
 require_once __DIR__.'/../../../ext/dom/XPathConstruct.php';
+require_once __DIR__.'/../../../ext/dom/LivingXPathConstruct.php';
 require_once __DIR__.'/../../../ext/dom/XPathEvaluate.php';
 require_once __DIR__.'/../../../ext/dom/XPathQuery.php';
 require_once __DIR__.'/../../../ext/dom/XPathQuote.php';

@@ -30,6 +30,12 @@ final class VmDomLiving
     /** php-src Dom\HTMLCollection (ext/dom/html_collection.c / php_dom.stub.php; #20709). */
     public const CLASS_HTML_COLLECTION = 'dom\\htmlcollection';
 
+    /** php-src Dom\NodeList (php_dom.stub.php; XPath query/evaluate node-sets; #20757). */
+    public const CLASS_NODE_LIST = 'dom\\nodelist';
+
+    /** php-src Dom\XPath (php_dom.stub.php / xpath.c; #20757). */
+    public const CLASS_XPATH = 'dom\\xpath';
+
     /** HTML namespace URI (https://html.spec.whatwg.org/#html-namespace). */
     public const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
