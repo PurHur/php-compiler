@@ -1,0 +1,58 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\intl;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
+use PHPLLVM\Value;
+
+/** numfmt_parse() — procedural NumberFormatter::parse (#20754). */
+final class numfmt_parse extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('numfmt_parse');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'numfmt_parse() expects between 2 and 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmNumberFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \TypeError('numfmt_parse(): Argument #1 ($formatter) must be of type NumberFormatter');
+        }
+        $value = VmNumberFormatter::coerceStringArg($frame->calledArgs[1], 'numfmt_parse', 1, 'string');
+        $result = VmNumberFormatter::parse($receiver->toObject(), $value);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (\is_int($result)) {
+            $frame->returnVar->int($result);
+        } else {
+            $frame->returnVar->float((float) $result);
+        }
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \Error('numfmt_parse() is not implemented for JIT in this compiler build (issue #20754)');
+    }
+}
+

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5827 |
-| Phase A inventory files (M2 ratio SSOT) | 5827 |
+| PHP files on vm.php path | 5831 |
+| Phase A inventory files (M2 ratio SSOT) | 5831 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17317 |
+| Source constructs flagged (warnings) | 17336 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -825,7 +825,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 46 |
+| `ext/intl/Module.php` | 0 | 50 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -841,7 +841,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmLocale.php` | 0 | 2 |
 | `ext/intl/VmMessageFormatter.php` | 0 | 34 |
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
-| `ext/intl/VmNumberFormatter.php` | 0 | 41 |
+| `ext/intl/VmNumberFormatter.php` | 0 | 44 |
 | `ext/intl/VmResourceBundle.php` | 0 | 12 |
 | `ext/intl/VmSpoofchecker.php` | 0 | 24 |
 | `ext/intl/VmTransliterator.php` | 0 | 27 |
@@ -883,6 +883,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/normalizer_get_raw_decomposition.php` | 0 | 2 |
 | `ext/intl/normalizer_is_normalized.php` | 0 | 2 |
 | `ext/intl/normalizer_normalize.php` | 0 | 2 |
+| `ext/intl/numfmt_create.php` | 0 | 3 |
+| `ext/intl/numfmt_format.php` | 0 | 3 |
+| `ext/intl/numfmt_format_currency.php` | 0 | 3 |
+| `ext/intl/numfmt_parse.php` | 0 | 3 |
 | `ext/intl/transliterator_create.php` | 0 | 3 |
 | `ext/intl/transliterator_create_from_rules.php` | 0 | 3 |
 | `ext/intl/transliterator_create_inverse.php` | 0 | 3 |
@@ -11374,31 +11378,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new idn_to_utf8 (line 109)
 - new collator_create (line 113)
 - new collator_compare (line 113)
-- new msgfmt_create (line 118)
-- new msgfmt_format (line 119)
-- new msgfmt_format_message (line 120)
-- new transliterator_create (line 126)
-- new transliterator_create_from_rules (line 127)
-- new transliterator_create_inverse (line 128)
-- new transliterator_list_ids (line 129)
-- new transliterator_transliterate (line 130)
-- new transliterator_get_error_code (line 131)
-- new transliterator_get_error_message (line 132)
-- new grapheme_strlen (line 155)
-- new grapheme_substr (line 156)
-- new grapheme_strpos (line 157)
-- new grapheme_str_contains (line 158)
-- new grapheme_strstr (line 159)
-- new grapheme_stristr (line 160)
-- new grapheme_stripos (line 161)
-- new grapheme_strrpos (line 162)
-- new grapheme_extract (line 163)
-- new grapheme_levenshtein (line 164)
-- new grapheme_str_split (line 165)
-- new grapheme_strimwidth (line 166)
-- new intl_get_error_code (line 167)
-- new intl_get_error_message (line 168)
-- new intl_is_failure (line 169)
+- new numfmt_create (line 118)
+- new numfmt_format (line 119)
+- new numfmt_parse (line 120)
+- new numfmt_format_currency (line 121)
+- new msgfmt_create (line 127)
+- new msgfmt_format (line 128)
+- new msgfmt_format_message (line 129)
+- new transliterator_create (line 135)
+- new transliterator_create_from_rules (line 136)
+- new transliterator_create_inverse (line 137)
+- new transliterator_list_ids (line 138)
+- new transliterator_transliterate (line 139)
+- new transliterator_get_error_code (line 140)
+- new transliterator_get_error_message (line 141)
+- new grapheme_strlen (line 166)
+- new grapheme_substr (line 167)
+- new grapheme_strpos (line 168)
+- new grapheme_str_contains (line 169)
+- new grapheme_strstr (line 170)
+- new grapheme_stristr (line 171)
+- new grapheme_stripos (line 172)
+- new grapheme_strrpos (line 173)
+- new grapheme_extract (line 174)
+- new grapheme_levenshtein (line 175)
+- new grapheme_str_split (line 176)
+- new grapheme_strimwidth (line 177)
+- new intl_get_error_code (line 178)
+- new intl_get_error_message (line 179)
+- new intl_is_failure (line 180)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -11660,45 +11668,48 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 123)
 - new Variable (line 127)
-- new NumberFormatterCreate (line 135)
-- new NumberFormatterFormat (line 136)
-- new NumberFormatterFormatCurrency (line 137)
-- new NumberFormatterParse (line 138)
-- new NumberFormatterParseCurrency (line 139)
-- new NumberFormatterGetAttribute (line 140)
-- new NumberFormatterSetAttribute (line 141)
-- new NumberFormatterGetPattern (line 142)
-- new NumberFormatterSetPattern (line 143)
-- new NumberFormatterGetLocale (line 144)
-- new NumberFormatterGetErrorCode (line 145)
-- new NumberFormatterGetErrorMessage (line 146)
-- new Error (line 164)
-- new ObjectEntry (line 166)
-- new Error (line 211)
-- new ArgumentCountError (line 589)
-- new ArgumentCountError (line 619)
-- new Error (line 627)
-- new ArgumentCountError (line 655)
-- new Error (line 663)
-- new ArgumentCountError (line 692)
-- new Error (line 700)
-- new ArgumentCountError (line 728)
-- new Error (line 736)
+- new NumberFormatterConstruct (line 134)
+- new NumberFormatterCreate (line 138)
+- new NumberFormatterFormat (line 139)
+- new NumberFormatterFormatCurrency (line 140)
+- new NumberFormatterParse (line 141)
+- new NumberFormatterParseCurrency (line 142)
+- new NumberFormatterGetAttribute (line 143)
+- new NumberFormatterSetAttribute (line 144)
+- new NumberFormatterGetPattern (line 145)
+- new NumberFormatterSetPattern (line 146)
+- new NumberFormatterGetLocale (line 147)
+- new NumberFormatterGetErrorCode (line 148)
+- new NumberFormatterGetErrorMessage (line 149)
+- new Error (line 167)
+- new ObjectEntry (line 169)
+- new Error (line 222)
+- new ArgumentCountError (line 600)
+- new Error (line 608)
+- new ArgumentCountError (line 632)
+- new ArgumentCountError (line 662)
+- new Error (line 670)
+- new ArgumentCountError (line 698)
+- new Error (line 706)
+- new ArgumentCountError (line 735)
+- new Error (line 743)
 - new ArgumentCountError (line 771)
 - new Error (line 779)
-- new ArgumentCountError (line 811)
-- new Error (line 819)
-- new ArgumentCountError (line 843)
-- new Error (line 851)
-- new ArgumentCountError (line 878)
-- new Error (line 886)
-- new ArgumentCountError (line 909)
-- new Error (line 917)
-- new ArgumentCountError (line 944)
-- new Error (line 952)
-- new ArgumentCountError (line 973)
-- new Error (line 981)
-- 37 class method(s)
+- new ArgumentCountError (line 814)
+- new Error (line 822)
+- new ArgumentCountError (line 854)
+- new Error (line 862)
+- new ArgumentCountError (line 886)
+- new Error (line 894)
+- new ArgumentCountError (line 921)
+- new Error (line 929)
+- new ArgumentCountError (line 952)
+- new Error (line 960)
+- new ArgumentCountError (line 987)
+- new Error (line 995)
+- new ArgumentCountError (line 1016)
+- new Error (line 1024)
+- 39 class method(s)
 
 ### `ext/intl/VmResourceBundle.php`
 
@@ -12037,6 +12048,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/intl/numfmt_create.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 44)
+- 2 class method(s)
+
+### `ext/intl/numfmt_format.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 56)
+- 2 class method(s)
+
+### `ext/intl/numfmt_format_currency.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 52)
+- 2 class method(s)
+
+### `ext/intl/numfmt_parse.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 55)
 - 2 class method(s)
 
 ### `ext/intl/transliterator_create.php`

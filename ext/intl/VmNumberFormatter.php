@@ -131,7 +131,10 @@ final class VmNumberFormatter
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
+        $construct = new NumberFormatterConstruct();
+        $entry->constructor = $construct;
         $methods = [
+            '__construct' => [$construct, $pub, '__construct'],
             'create' => [new NumberFormatterCreate(), $pubStatic, 'create'],
             'format' => [new NumberFormatterFormat(), $pub, 'format'],
             'formatcurrency' => [new NumberFormatterFormatCurrency(), $pub, 'formatCurrency'],
@@ -164,6 +167,16 @@ final class VmNumberFormatter
             throw new \Error('Class "NumberFormatter" not found');
         }
         $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        self::initObject($object, $locale, $style, $pattern);
+
+        return $object;
+    }
+
+    /**
+     * NumberFormatter::__construct / create shared init (#20754).
+     */
+    public static function initObject(ObjectEntry $object, string $locale, int $style, ?string $pattern): void
+    {
         $object->constructed = true;
         self::$state[$object->id] = [
             'locale' => '' !== $locale ? $locale : VmLocale::getDefault(),
@@ -178,8 +191,6 @@ final class VmNumberFormatter
             'errorMessage' => 'U_ZERO_ERROR',
         ];
         IntlError::clear();
-
-        return $object;
     }
 
     /**
@@ -571,6 +582,38 @@ final class VmNumberFormatter
         }
 
         return $out;
+    }
+}
+
+/** NumberFormatter::__construct() — php-src numfmt_create / new NumberFormatter (#20754). */
+final class NumberFormatterConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3 || $argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'NumberFormatter::__construct() expects between 2 and 3 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmNumberFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('NumberFormatter::__construct() called on incompatible object');
+        }
+        $locale = VmIntlDateFormatter::coerceLocaleArg($frame->calledArgs[1], 'NumberFormatter::__construct', 1);
+        $style = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'NumberFormatter::__construct', 2, 'style');
+        $pattern = null;
+        if ($argc >= 4) {
+            $pattern = VmIntlDateFormatter::coerceOptionalPattern($frame->calledArgs[3], 'NumberFormatter::__construct', 3);
+        }
+        VmNumberFormatter::initObject($receiver->toObject(), $locale, $style, $pattern);
     }
 }
 
