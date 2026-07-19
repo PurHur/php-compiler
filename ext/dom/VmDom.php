@@ -1872,6 +1872,207 @@ final class VmDom
         self::syncSubtree($ctx, $parent);
     }
 
+    /**
+     * Dom\Element::$substitutedNodeValue getter — xmlNodeGetContent (entity substitution)
+     * (php-src ext/dom/element.c dom_modern_element_substituted_node_value_read; #21034).
+     */
+    public static function getSubstitutedNodeValue(ObjectEntry $element): string
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+
+        return self::readTextContent($element);
+    }
+
+    /**
+     * Dom\Element::$substitutedNodeValue setter — xmlNodeSetContentLen entity parse
+     * (php-src ext/dom/element.c dom_modern_element_substituted_node_value_write; #21034).
+     */
+    public static function setSubstitutedNodeValue(Context $ctx, ObjectEntry $element, string $value): void
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $unterminated = self::xmlContentUnterminatedEntityName($value);
+        self::removeAllLiveStandardChildren($ctx, $element);
+        if (null !== $unterminated) {
+            $ctx->errors->triggerError(
+                'unterminated entity reference '.$unterminated,
+                ErrorReporter::E_WARNING,
+                null,
+                $ctx
+            );
+            self::syncSubtree($ctx, $element);
+
+            return;
+        }
+        $ownerDocument = self::ownerDocumentEntry($element);
+        $generalEntities = null !== $ownerDocument
+            ? DomRegistry::state($ownerDocument)->generalEntities
+            : [];
+        self::appendXmlNodeSetContentChildren(
+            $ctx,
+            $element,
+            $value,
+            $ownerDocument,
+            $generalEntities
+        );
+        self::syncSubtree($ctx, $element);
+        VmDomSimpleXmlBridge::syncSimpleXmlTextFromDom($element, self::readTextContent($element));
+    }
+
+    /**
+     * Detect libxml unterminated entity refs in xmlNodeSetContentLen input (#21034).
+     *
+     * @return null|string null when well-formed; entity name (may be '') when unterminated
+     */
+    private static function xmlContentUnterminatedEntityName(string $text): ?string
+    {
+        $pos = 0;
+        $len = \strlen($text);
+        while ($pos < $len) {
+            $amp = strpos($text, '&', $pos);
+            if (false === $amp) {
+                return null;
+            }
+            $semi = strpos($text, ';', $amp + 1);
+            if (false === $semi) {
+                return substr($text, $amp + 1);
+            }
+            $pos = $semi + 1;
+        }
+
+        return null;
+    }
+
+    /**
+     * Approximate libxml xmlStringGetNodeList for xmlNodeSetContentLen (#21034).
+     *
+     * @param array<string, string> $generalEntities
+     */
+    private static function appendXmlNodeSetContentChildren(
+        Context $ctx,
+        ObjectEntry $parent,
+        string $text,
+        ?ObjectEntry $ownerDocument,
+        array $generalEntities
+    ): void {
+        if ('' === $text) {
+            return;
+        }
+        $state = DomRegistry::state($parent);
+        $pos = 0;
+        $len = \strlen($text);
+        $buffer = '';
+        while ($pos < $len) {
+            $amp = strpos($text, '&', $pos);
+            if (false === $amp) {
+                $buffer .= substr($text, $pos);
+                break;
+            }
+            if ($amp > $pos) {
+                $buffer .= substr($text, $pos, $amp - $pos);
+            }
+            $semi = strpos($text, ';', $amp + 1);
+            // Unterminated refs are rejected before this helper runs.
+            if (false === $semi) {
+                $buffer .= substr($text, $amp);
+                break;
+            }
+            $refName = substr($text, $amp + 1, $semi - $amp - 1);
+            $decoded = self::decodeXmlContentEntityRef($refName);
+            if (null !== $decoded) {
+                $buffer .= $decoded;
+            } elseif ('' === $refName || str_starts_with($refName, '#')) {
+                // Empty / broken numeric refs contribute nothing (libxml quirks).
+            } else {
+                if ('' !== $buffer) {
+                    $textNode = self::createTextNode($ctx, $buffer, $ownerDocument);
+                    $state->childIds[] = $textNode->id;
+                    self::linkChildToParent($textNode, $parent);
+                    $buffer = '';
+                }
+                $replacement = $generalEntities[$refName] ?? '';
+                $entityRef = self::createEntityReferenceFromLoad(
+                    $ctx,
+                    $refName,
+                    $replacement,
+                    $ownerDocument
+                );
+                $state->childIds[] = $entityRef->id;
+                self::linkChildToParent($entityRef, $parent);
+            }
+            $pos = $semi + 1;
+        }
+        if ('' !== $buffer) {
+            $textNode = self::createTextNode($ctx, $buffer, $ownerDocument);
+            $state->childIds[] = $textNode->id;
+            self::linkChildToParent($textNode, $parent);
+        }
+    }
+
+    /**
+     * Decode predefined / numeric character references for xmlNodeSetContentLen (#21034).
+     *
+     * @return null|string null when the ref should become an EntityReference (named)
+     */
+    private static function decodeXmlContentEntityRef(string $refName): ?string
+    {
+        if ('' === $refName) {
+            return '';
+        }
+        $predefined = self::decodePredefinedXmlEntity($refName);
+        if (null !== $predefined) {
+            return $predefined;
+        }
+        if (!str_starts_with($refName, '#')) {
+            return null;
+        }
+        $body = substr($refName, 1);
+        if ('' === $body) {
+            return '';
+        }
+        if ('x' === $body[0] || 'X' === $body[0]) {
+            $hex = substr($body, 1);
+            if ('' === $hex || 1 !== preg_match('/^[0-9A-Fa-f]+$/', $hex)) {
+                return '';
+            }
+            $codepoint = hexdec($hex);
+        } else {
+            if (1 !== preg_match('/^[0-9]+$/', $body)) {
+                return '';
+            }
+            $codepoint = (int) $body;
+        }
+        if ($codepoint <= 0 || $codepoint > 0x10FFFF) {
+            return '';
+        }
+        if (\function_exists('mb_chr')) {
+            $char = \mb_chr($codepoint, 'UTF-8');
+            if (false !== $char && null !== $char) {
+                return $char;
+            }
+        }
+        // BMP fallback without mbstring.
+        if ($codepoint <= 0x7F) {
+            return \chr($codepoint);
+        }
+        if ($codepoint <= 0x7FF) {
+            return \chr(0xC0 | ($codepoint >> 6)).\chr(0x80 | ($codepoint & 0x3F));
+        }
+        if ($codepoint <= 0xFFFF) {
+            return \chr(0xE0 | ($codepoint >> 12))
+                .\chr(0x80 | (($codepoint >> 6) & 0x3F))
+                .\chr(0x80 | ($codepoint & 0x3F));
+        }
+
+        return \chr(0xF0 | ($codepoint >> 18))
+            .\chr(0x80 | (($codepoint >> 12) & 0x3F))
+            .\chr(0x80 | (($codepoint >> 6) & 0x3F))
+            .\chr(0x80 | ($codepoint & 0x3F));
+    }
+
     public static function setAttributeNS(
         Context $ctx,
         ObjectEntry $element,
@@ -9250,6 +9451,11 @@ final class VmDom
             return $state->textContent ?? '';
         }
         if (DomConstants::XML_ELEMENT_NODE === $state->nodeType) {
+            // Modern Dom\Element::$nodeValue is always null (php-src / RFC; #21034).
+            // Legacy DOMElement still returns concatenated child text.
+            if (VmDomLiving::isLivingElement($node)) {
+                return null;
+            }
             $parts = [];
             foreach ($state->childIds as $childId) {
                 $child = DomRegistry::entry($childId);

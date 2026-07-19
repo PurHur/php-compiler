@@ -22,6 +22,9 @@ final class DomHtmlElementPropertySupport
 
     public const PROP_OUTER_HTML = 'outerHTML';
 
+    /** php-src Dom\Element::$substitutedNodeValue (ext/dom/element.c; #21034). */
+    public const PROP_SUBSTITUTED_NODE_VALUE = 'substitutedNodeValue';
+
     public static function isManagedProperty(ObjectEntry $object, string $name): bool
     {
         if (!VmDomLiving::isLivingElement($object) || !VmDom::isElement($object)) {
@@ -32,11 +35,13 @@ final class DomHtmlElementPropertySupport
         return 'id' === $lc
             || 'classname' === $lc
             || 'innerhtml' === $lc
-            || 'outerhtml' === $lc;
+            || 'outerhtml' === $lc
+            || 'substitutednodevalue' === $lc;
     }
 
     /**
-     * isset($el->id|/className|/innerHTML|/outerHTML) — typed string props, not the null ClassProperty slot (#20532).
+     * isset($el->id|/className|/innerHTML|/outerHTML|/substitutedNodeValue) — typed string props,
+     * not the null ClassProperty slot (#20532, #21034).
      *
      * @return bool|null null when this support does not own the property
      */
@@ -44,6 +49,10 @@ final class DomHtmlElementPropertySupport
     {
         if (!self::isManagedProperty($object, $name)) {
             return null;
+        }
+        // substitutedNodeValue is always "set" (empty string is still isset) like php-src (#21034).
+        if ('substitutednodevalue' === strtolower($name)) {
+            return true;
         }
         $var = self::getProperty($object, $name)->resolveIndirect();
 
@@ -91,6 +100,11 @@ final class DomHtmlElementPropertySupport
 
             return $var;
         }
+        if ('substitutednodevalue' === $lc) {
+            $var->string(VmDom::getSubstitutedNodeValue($object));
+
+            return $var;
+        }
 
         throw new \LogicException('DomHtmlElementPropertySupport::getProperty() called with unmanaged name');
     }
@@ -117,6 +131,7 @@ final class DomHtmlElementPropertySupport
             'id' => 'id',
             'classname' => 'className',
             'innerhtml' => 'innerHTML',
+            'substitutednodevalue' => 'substitutedNodeValue',
             default => 'outerHTML',
         };
         if (Variable::TYPE_STRING !== $resolved->type) {
@@ -144,6 +159,11 @@ final class DomHtmlElementPropertySupport
         }
         if ('outerhtml' === $lc) {
             VmDom::setOuterHTML($ctx, $owner, $string);
+
+            return true;
+        }
+        if ('substitutednodevalue' === $lc) {
+            VmDom::setSubstitutedNodeValue($ctx, $owner, $string);
 
             return true;
         }
