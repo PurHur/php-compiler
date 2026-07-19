@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6021 |
-| Phase A inventory files (M2 ratio SSOT) | 6021 |
+| PHP files on vm.php path | 6030 |
+| Phase A inventory files (M2 ratio SSOT) | 6030 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18669 |
+| Source constructs flagged (warnings) | 18692 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1097,6 +1097,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/lzf/VmLzfCore.php` | 0 | 1 |
 | `ext/lzf/lzf_compress.php` | 0 | 1 |
 | `ext/lzf/lzf_decompress.php` | 0 | 1 |
+| `ext/mailparse/MailparseExtensionPolicy.php` | 0 | 1 |
+| `ext/mailparse/MailparseFunction.php` | 0 | 1 |
+| `ext/mailparse/Module.php` | 0 | 6 |
+| `ext/mailparse/VmMailparse.php` | 0 | 4 |
+| `ext/mailparse/mailparse_msg_create.php` | 0 | 2 |
+| `ext/mailparse/mailparse_msg_free.php` | 0 | 2 |
+| `ext/mailparse/mailparse_msg_get_part_data.php` | 0 | 2 |
+| `ext/mailparse/mailparse_msg_parse.php` | 0 | 2 |
+| `ext/mailparse/mailparse_rfc822_parse_addresses.php` | 0 | 2 |
 | `ext/mbstring/EastAsianWidthTable.php` | 0 | 1 |
 | `ext/mbstring/JitMbCheckEncoding.php` | 0 | 1 |
 | `ext/mbstring/JitMbConvertCase.php` | 0 | 1 |
@@ -5330,7 +5339,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 102 |
+| `lib/Runtime.php` | 0 | 103 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -14442,6 +14451,64 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/mailparse/MailparseExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/mailparse/MailparseFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/mailparse/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new mailparse_msg_create (line 32)
+- new mailparse_msg_parse (line 33)
+- new mailparse_msg_get_part_data (line 34)
+- new mailparse_msg_free (line 35)
+- new mailparse_rfc822_parse_addresses (line 36)
+- 2 class method(s)
+
+### `ext/mailparse/VmMailparse.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 40)
+- new ObjectEntry (line 48)
+- new Variable (line 57)
+- 17 class method(s)
+
+### `ext/mailparse/mailparse_msg_create.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_msg_free.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_msg_get_part_data.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_msg_parse.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_rfc822_parse_addresses.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
 
 ### `ext/mbstring/EastAsianWidthTable.php`
 
@@ -43649,28 +43716,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\sqlite3\Module (line 274)
 - new ext\pgsql\Module (line 275)
 - new ext\odbc\Module (line 276)
-- new ext\enchant\Module (line 277)
-- new ext\pdo\Module (line 278)
-- new ext\phar\Module (line 279)
-- new ext\uri\Module (line 280)
-- new ext\uuid\Module (line 281)
-- new ext\uploadprogress\Module (line 282)
-- new ext\apcu\Module (line 283)
-- new ext\sysvshm\Module (line 284)
-- new ext\sysvsem\Module (line 285)
-- new ext\sysvmsg\Module (line 286)
-- new ext\reflection\Module (line 287)
-- new ext\standard\Module (line 288)
-- new JIT (line 364)
-- new JITContext (line 378)
-- new SealedClassPreprocessor (line 444)
-- new StaticClassPreprocessor (line 447)
-- new SourcePreprocessor\PropertyHooks (line 450)
-- new State (line 591)
-- new ReflectionProperty (line 618)
-- new ReflectionProperty (line 621)
-- new LintCompiler (line 1032)
-- new Variable (line 1162)
+- new ext\mailparse\Module (line 277)
+- new ext\enchant\Module (line 278)
+- new ext\pdo\Module (line 279)
+- new ext\phar\Module (line 280)
+- new ext\uri\Module (line 281)
+- new ext\uuid\Module (line 282)
+- new ext\uploadprogress\Module (line 283)
+- new ext\apcu\Module (line 284)
+- new ext\sysvshm\Module (line 285)
+- new ext\sysvsem\Module (line 286)
+- new ext\sysvmsg\Module (line 287)
+- new ext\reflection\Module (line 288)
+- new ext\standard\Module (line 289)
+- new JIT (line 365)
+- new JITContext (line 379)
+- new SealedClassPreprocessor (line 445)
+- new StaticClassPreprocessor (line 448)
+- new SourcePreprocessor\PropertyHooks (line 451)
+- new State (line 592)
+- new ReflectionProperty (line 619)
+- new ReflectionProperty (line 622)
+- new LintCompiler (line 1033)
+- new Variable (line 1163)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

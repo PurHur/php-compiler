@@ -1107,6 +1107,15 @@
         "ext/lzf/VmLzfCore.php",
         "ext/lzf/lzf_compress.php",
         "ext/lzf/lzf_decompress.php",
+        "ext/mailparse/MailparseExtensionPolicy.php",
+        "ext/mailparse/MailparseFunction.php",
+        "ext/mailparse/Module.php",
+        "ext/mailparse/VmMailparse.php",
+        "ext/mailparse/mailparse_msg_create.php",
+        "ext/mailparse/mailparse_msg_free.php",
+        "ext/mailparse/mailparse_msg_get_part_data.php",
+        "ext/mailparse/mailparse_msg_parse.php",
+        "ext/mailparse/mailparse_rfc822_parse_addresses.php",
         "ext/mbstring/EastAsianWidthTable.php",
         "ext/mbstring/JitMbCheckEncoding.php",
         "ext/mbstring/JitMbConvertCase.php",
@@ -6255,9 +6264,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 6022,
+        "inventory_files": 6030,
         "excluded": 0,
-        "eligible": 6022,
+        "eligible": 6030,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
