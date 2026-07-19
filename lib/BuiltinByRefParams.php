@@ -116,6 +116,9 @@ final class BuiltinByRefParams
             case 'openssl_csr_export':
             case 'openssl_x509_export':
                 return [1];
+            case 'openssl_encrypt':
+                // &$tag — php-src openssl.stub.php (#21135)
+                return [5];
             case 'openssl_csr_new':
                 return [1];
             case 'openssl_pkcs12_read':

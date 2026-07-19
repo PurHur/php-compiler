@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6087 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18916 |
+| Source constructs flagged (warnings) | 18922 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1528,7 +1528,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/session/SessionConstants.php` | 0 | 1 |
 | `ext/session/SessionFileStorage.php` | 0 | 1 |
 | `ext/session/SessionHandlerBuiltin.php` | 0 | 14 |
-| `ext/session/SessionUserHandler.php` | 0 | 9 |
+| `ext/session/SessionUserHandler.php` | 0 | 15 |
 | `ext/session/session_register_shutdown.php` | 0 | 1 |
 | `ext/session/session_set_save_handler.php` | 0 | 3 |
 | `ext/simplexml/BuiltinClasses.php` | 0 | 1 |
@@ -6683,7 +6683,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/CurlConstants.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 6 class method(s)
 
 ### `ext/curl/CurlExtensionPolicy.php`
 
@@ -6781,9 +6781,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 54)
 - new Variable (line 66)
 - new ObjectEntry (line 67)
-- new Variable (line 425)
-- new ObjectEntry (line 426)
-- 31 class method(s)
+- new Variable (line 452)
+- new ObjectEntry (line 453)
+- 32 class method(s)
 
 ### `ext/curl/VmCurlEscape.php`
 
@@ -8882,61 +8882,61 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 6140)
 - new DOMException (line 6182)
 - new DOMException (line 6209)
-- new DOMException (line 7102)
-- new Variable (line 7132)
-- new DOMException (line 7413)
-- new DOMException (line 7531)
-- new DOMException (line 7576)
-- new ObjectEntry (line 7661)
-- new DomNodeState (line 7665)
-- new Variable (line 7672)
-- new ObjectEntry (line 7690)
-- new DomNodeState (line 7694)
-- new Variable (line 7701)
-- new ObjectEntry (line 7719)
-- new DomNodeState (line 7723)
-- new Variable (line 7730)
-- new DOMException (line 7813)
-- new ObjectEntry (line 8106)
-- new DomNodeState (line 8110)
-- new Variable (line 8119)
-- new ObjectEntry (line 8169)
-- new DomNodeState (line 8172)
-- new Variable (line 8180)
-- new Variable (line 8384)
-- new DOMException (line 8521)
-- new DOMException (line 8528)
-- new DOMException (line 8535)
-- new DOMException (line 8539)
-- new DOMException (line 8542)
-- new DOMException (line 8551)
+- new DOMException (line 7105)
+- new Variable (line 7160)
+- new DOMException (line 7441)
+- new DOMException (line 7559)
+- new DOMException (line 7604)
+- new ObjectEntry (line 7689)
+- new DomNodeState (line 7693)
+- new Variable (line 7700)
+- new ObjectEntry (line 7718)
+- new DomNodeState (line 7722)
+- new Variable (line 7729)
+- new ObjectEntry (line 7747)
+- new DomNodeState (line 7751)
+- new Variable (line 7758)
+- new DOMException (line 7841)
+- new ObjectEntry (line 8134)
+- new DomNodeState (line 8138)
+- new Variable (line 8147)
+- new ObjectEntry (line 8197)
+- new DomNodeState (line 8200)
+- new Variable (line 8208)
+- new Variable (line 8412)
+- new DOMException (line 8549)
+- new DOMException (line 8556)
 - new DOMException (line 8563)
-- new Variable (line 8673)
-- new DOMException (line 9765)
-- new Variable (line 9824)
-- new Variable (line 9845)
+- new DOMException (line 8567)
+- new DOMException (line 8570)
+- new DOMException (line 8579)
+- new DOMException (line 8591)
+- new Variable (line 8701)
+- new DOMException (line 9793)
+- new Variable (line 9852)
 - new Variable (line 9873)
-- new Variable (line 9911)
-- new DOMException (line 9922)
-- new Variable (line 9924)
-- new DOMException (line 10098)
-- new DOMException (line 10125)
-- new DOMException (line 10161)
-- new DOMException (line 10227)
-- new DOMException (line 10235)
-- new DOMException (line 10248)
-- new DOMException (line 10259)
-- new DOMException (line 10264)
-- new DOMException (line 10290)
-- new DOMException (line 10311)
-- new DOMException (line 10369)
-- new DOMException (line 10374)
-- new DOMException (line 10377)
-- new DOMException (line 10380)
-- new DOMException (line 10409)
-- new Error (line 11450)
-- new Error (line 11454)
-- 451 class method(s)
+- new Variable (line 9901)
+- new Variable (line 9939)
+- new DOMException (line 9950)
+- new Variable (line 9952)
+- new DOMException (line 10126)
+- new DOMException (line 10153)
+- new DOMException (line 10189)
+- new DOMException (line 10255)
+- new DOMException (line 10263)
+- new DOMException (line 10276)
+- new DOMException (line 10287)
+- new DOMException (line 10292)
+- new DOMException (line 10318)
+- new DOMException (line 10339)
+- new DOMException (line 10397)
+- new DOMException (line 10402)
+- new DOMException (line 10405)
+- new DOMException (line 10408)
+- new DOMException (line 10437)
+- new Error (line 11478)
+- new Error (line 11482)
+- 452 class method(s)
 - 3 closure(s)
 
 ### `ext/dom/VmDomCollectionDimension.php`
@@ -15671,7 +15671,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/JitOpensslEncrypt.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/openssl/JitOpensslMethods.php`
 
@@ -15762,7 +15762,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/OpensslCipherRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 7 class method(s)
 
 ### `ext/openssl/OpensslConstants.php`
 
@@ -15777,7 +15777,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/OpensslEncryptJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/openssl/OpensslExtensionPolicy.php`
 
@@ -15803,17 +15803,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 92)
-- new Variable (line 883)
-- new HashTable (line 2154)
-- new Variable (line 2156)
-- new HashTable (line 2167)
-- new Variable (line 2169)
+- new Variable (line 939)
+- new HashTable (line 2210)
+- new Variable (line 2212)
+- new HashTable (line 2223)
+- new Variable (line 2225)
 - 67 class method(s)
 
 ### `ext/openssl/VmOpensslCipherNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 10 class method(s)
 
 ### `ext/openssl/VmOpensslCmsNative.php`
 
@@ -15985,8 +15985,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/openssl_decrypt.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 29)
-- new ArgumentCountError (line 76)
+- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 92)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_dh_compute_key.php`
@@ -16006,7 +16006,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
-- new ArgumentCountError (line 68)
+- new ArgumentCountError (line 87)
 - 2 class method(s)
 
 ### `ext/openssl/openssl_error_string.php`
@@ -18246,15 +18246,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/session/SessionUserHandler.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 77)
-- new Variable (line 79)
-- new Variable (line 99)
-- new Variable (line 121)
-- new Variable (line 123)
-- new Variable (line 154)
-- new Variable (line 173)
-- new Variable (line 198)
-- 15 class method(s)
+- new Variable (line 128)
+- new Variable (line 130)
+- new Variable (line 149)
+- new Variable (line 170)
+- new Variable (line 172)
+- new Variable (line 201)
+- new Variable (line 219)
+- new Variable (line 242)
+- new Variable (line 255)
+- new Variable (line 296)
+- new Variable (line 298)
+- new Variable (line 336)
+- new Variable (line 338)
+- new Variable (line 412)
+- 24 class method(s)
 
 ### `ext/session/session_register_shutdown.php`
 
@@ -18264,9 +18270,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/session/session_set_save_handler.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
-- 2 class method(s)
-- 2 closure(s)
+- new ArgumentCountError (line 36)
+- 4 class method(s)
+- 4 closure(s)
 
 ### `ext/simplexml/BuiltinClasses.php`
 
@@ -28060,13 +28066,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 806)
-- new HashTable (line 813)
-- new Variable (line 824)
-- new Variable (line 928)
-- new Variable (line 936)
-- new Variable (line 944)
-- 57 class method(s)
+- new HashTable (line 824)
+- new HashTable (line 831)
+- new Variable (line 842)
+- new Variable (line 946)
+- new Variable (line 954)
+- new Variable (line 962)
+- 58 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
 
@@ -28860,23 +28866,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSession.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 149)
-- new Variable (line 151)
-- new Variable (line 154)
-- new Variable (line 157)
-- new Variable (line 160)
-- new Variable (line 163)
-- new Variable (line 166)
-- new Variable (line 288)
-- new HashTable (line 573)
-- new HashTable (line 639)
-- new HashTable (line 661)
-- new HashTable (line 811)
-- new HashTable (line 818)
-- new HashTable (line 825)
-- new HashTable (line 831)
-- new HashTable (line 836)
-- 54 class method(s)
+- new HashTable (line 157)
+- new Variable (line 159)
+- new Variable (line 162)
+- new Variable (line 165)
+- new Variable (line 168)
+- new Variable (line 171)
+- new Variable (line 174)
+- new Variable (line 296)
+- new HashTable (line 598)
+- new HashTable (line 665)
+- new HashTable (line 687)
+- new HashTable (line 837)
+- new HashTable (line 845)
+- new HashTable (line 856)
+- new HashTable (line 863)
+- new HashTable (line 869)
+- 56 class method(s)
 
 ### `ext/standard/VmSessionSerializer.php`
 
@@ -37189,7 +37195,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 630)
+- new ArgumentCountError (line 635)
 - 14 class method(s)
 - 1 closure(s)
 
@@ -39861,9 +39867,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/OpensslEncryptRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 178)
-- 10 class method(s)
-- 4 closure(s)
+- new JIT (line 248)
+- 12 class method(s)
+- 7 closure(s)
 
 ### `lib/JIT/Builtin/OpensslMethodsCrypto.php`
 
@@ -48237,7 +48243,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ShutdownQueue.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `lib/VM/SplArrayCastJitHelper.php`
 

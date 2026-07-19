@@ -168,6 +168,9 @@ patch_already_applied() {
     php-types-sem-get-auto-release-bool.patch)
       grep -qF "'sem_get' => ['SysvSemaphore|false', 'key' => 'int', 'max_acquire=' => 'int', 'permissions=' => 'int', 'auto_release=' => 'bool']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-openssl-encrypt-aead-args.patch)
+      grep -qF "'openssl_encrypt' => ['string|false', 'data' => 'string', 'cipher_algo' => 'string', 'passphrase' => 'string', 'options=' => 'int', 'iv=' => 'string', '&tag=' => 'string', 'aad=' => '?string', 'tag_length=' => 'int']" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-llvm-builder-xor.patch)
       grep -q 'function xor(' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Builder.php" 2>/dev/null
       ;;
@@ -6362,6 +6365,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_patch "$PATCH_DIR/php-types-link-bool.patch"
   apply_patch "$PATCH_DIR/php-types-gc-enabled-bool.patch"
   apply_patch "$PATCH_DIR/php-types-sem-get-auto-release-bool.patch"
+  apply_patch "$PATCH_DIR/php-types-openssl-encrypt-aead-args.patch"
   apply_patch "$PATCH_DIR/php-types-dollars-brace.patch"
   apply_patch "$PATCH_DIR/php-types-missing-parent-no-echo.patch"
   apply_patch "$PATCH_DIR/php-types-mixed-reserved.patch"

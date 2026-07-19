@@ -292,6 +292,11 @@ final class BuiltinParamNames
             case 'openssl_cipher_iv_length':
             case 'openssl_cipher_key_length':
                 return ['cipher_algo'];
+            case 'openssl_encrypt':
+                // php-src ext/openssl/openssl.stub.php (#21135)
+                return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad', 'tag_length'];
+            case 'openssl_decrypt':
+                return ['data', 'cipher_algo', 'passphrase', 'options', 'iv', 'tag', 'aad'];
             case 'hash':
                 return ['algo', 'data', 'binary', 'options'];
             case 'hash_hmac':

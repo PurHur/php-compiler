@@ -45,6 +45,8 @@ final class OpensslEncryptRuntimeStandaloneTest extends TestCase
         foreach ([
             '__compiler_openssl_encrypt',
             '__compiler_openssl_decrypt',
+            '__compiler_openssl_encrypt_take_tag',
+            '__compiler_openssl_encrypt_tag_is_null',
         ] as $name) {
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn, $name);

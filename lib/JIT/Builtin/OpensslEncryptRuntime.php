@@ -12,7 +12,7 @@ use PHPCompiler\ext\openssl\VmOpensslCipherNative;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for openssl_encrypt()/openssl_decrypt() via OpensslEncryptJitHelper PHP (#21065).
+ * JIT/AOT link for openssl_encrypt()/openssl_decrypt() via OpensslEncryptJitHelper PHP (#21065, AEAD #21135).
  *
  * Peer of {@see OpensslSignRuntime}. SSOT: {@see \PHPCompiler\ext\openssl\VmOpensslCipherNative}
  * php-src: ext/openssl/openssl.c
@@ -25,16 +25,24 @@ final class OpensslEncryptRuntime
 
     private const DECRYPT_HELPER = 'PHPCompiler\\ext\\openssl\\OpensslEncryptJitHelper::decryptArgv';
 
+    private const TAKE_TAG_HELPER = 'PHPCompiler\\ext\\openssl\\OpensslEncryptJitHelper::takeEncryptTag';
+
+    private const TAG_IS_NULL_HELPER = 'PHPCompiler\\ext\\openssl\\OpensslEncryptJitHelper::takeEncryptTagIsNull';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::ENCRYPT_HELPER,
         self::DECRYPT_HELPER,
+        self::TAKE_TAG_HELPER,
+        self::TAG_IS_NULL_HELPER,
     ];
 
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_openssl_encrypt',
         '__compiler_openssl_decrypt',
+        '__compiler_openssl_encrypt_take_tag',
+        '__compiler_openssl_encrypt_tag_is_null',
     ];
 
     public static function opensslCipherRuntimeAvailable(): bool
@@ -71,6 +79,8 @@ final class OpensslEncryptRuntime
             self::ensureJitHelperCompiled($context);
             self::implementIfMissing($context, '__compiler_openssl_encrypt', self::implementEncryptBridge(...));
             self::implementIfMissing($context, '__compiler_openssl_decrypt', self::implementDecryptBridge(...));
+            self::implementIfMissing($context, '__compiler_openssl_encrypt_take_tag', self::implementTakeTagBridge(...));
+            self::implementIfMissing($context, '__compiler_openssl_encrypt_tag_is_null', self::implementTagIsNullBridge(...));
         }
         self::registerLinkedRuntime($context);
 
@@ -106,7 +116,16 @@ final class OpensslEncryptRuntime
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             self::helperFunction($context, self::ENCRYPT_HELPER),
-            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $fn->getParam(3), $fn->getParam(4)]
+            [
+                $fn->getParam(0),
+                $fn->getParam(1),
+                $fn->getParam(2),
+                $fn->getParam(3),
+                $fn->getParam(4),
+                $fn->getParam(5),
+                $fn->getParam(6),
+                $fn->getParam(7),
+            ]
         );
         $context->builder->returnValue(
             JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
@@ -120,26 +139,77 @@ final class OpensslEncryptRuntime
         $raw = JitNestedHelperCoerce::callHelper(
             $context,
             self::helperFunction($context, self::DECRYPT_HELPER),
-            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $fn->getParam(3), $fn->getParam(4)]
+            [
+                $fn->getParam(0),
+                $fn->getParam(1),
+                $fn->getParam(2),
+                $fn->getParam(3),
+                $fn->getParam(4),
+                $fn->getParam(5),
+                $fn->getParam(6),
+            ]
         );
         $context->builder->returnValue(
             JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
         );
     }
 
+    private static function implementTakeTagBridge(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ossl_encrypt_take_tag_entry');
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::TAKE_TAG_HELPER),
+            []
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
+        );
+    }
+
+    private static function implementTagIsNullBridge(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('ossl_encrypt_tag_is_null_entry');
+        $context->builder->positionAtEnd($entry);
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::TAG_IS_NULL_HELPER),
+            []
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceHelperScalarResult(
+                $context,
+                $raw,
+                $context->getTypeFromString('int64')
+            )
+        );
+    }
+
     private static function implementStubBridges(Context $context): void
     {
-        $stub = static function (Context $context, LlvmFunction $fn, string $label): void {
+        $stubStr = static function (Context $context, LlvmFunction $fn, string $label): void {
             $entry = $fn->appendBasicBlock($label);
             $context->builder->positionAtEnd($entry);
             $strPtr = $context->getTypeFromString('__string__*');
             $context->builder->returnValue($strPtr->constNull());
         };
-        self::implementIfMissing($context, '__compiler_openssl_encrypt', static function (Context $context, LlvmFunction $fn) use ($stub): void {
-            $stub($context, $fn, 'ossl_encrypt_stub_entry');
+        $stubI64 = static function (Context $context, LlvmFunction $fn, string $label): void {
+            $entry = $fn->appendBasicBlock($label);
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($context->getTypeFromString('int64')->constInt(0, false));
+        };
+        self::implementIfMissing($context, '__compiler_openssl_encrypt', static function (Context $context, LlvmFunction $fn) use ($stubStr): void {
+            $stubStr($context, $fn, 'ossl_encrypt_stub_entry');
         });
-        self::implementIfMissing($context, '__compiler_openssl_decrypt', static function (Context $context, LlvmFunction $fn) use ($stub): void {
-            $stub($context, $fn, 'ossl_decrypt_stub_entry');
+        self::implementIfMissing($context, '__compiler_openssl_decrypt', static function (Context $context, LlvmFunction $fn) use ($stubStr): void {
+            $stubStr($context, $fn, 'ossl_decrypt_stub_entry');
+        });
+        self::implementIfMissing($context, '__compiler_openssl_encrypt_take_tag', static function (Context $context, LlvmFunction $fn) use ($stubStr): void {
+            $stubStr($context, $fn, 'ossl_encrypt_take_tag_stub_entry');
+        });
+        self::implementIfMissing($context, '__compiler_openssl_encrypt_tag_is_null', static function (Context $context, LlvmFunction $fn) use ($stubI64): void {
+            $stubI64($context, $fn, 'ossl_encrypt_tag_is_null_stub_entry');
         });
     }
 
