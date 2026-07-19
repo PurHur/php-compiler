@@ -879,6 +879,10 @@
         "ext/intl/collator_sort.php",
         "ext/intl/collator_sort_with_sort_keys.php",
         "ext/intl/datefmt_format_object.php",
+        "ext/intl/datefmt_get_error_code.php",
+        "ext/intl/datefmt_get_error_message.php",
+        "ext/intl/datefmt_localtime.php",
+        "ext/intl/datefmt_parse.php",
         "ext/intl/grapheme_extract.php",
         "ext/intl/grapheme_levenshtein.php",
         "ext/intl/grapheme_str_contains.php",
@@ -4740,7 +4744,6 @@
         "lib/JIT/Builtin/StringFilterUrl.php",
         "lib/JIT/Builtin/StringFindSubstr.php",
         "lib/JIT/Builtin/StringFormat.php",
-        "lib/JIT/Builtin/StringFormatInventoryStubs.php",
         "lib/JIT/Builtin/StringFsDir.php",
         "lib/JIT/Builtin/StringFsDirJit.php",
         "lib/JIT/Builtin/StringFsGlob.php",
@@ -6130,9 +6133,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5896,
+        "inventory_files": 5899,
         "excluded": 0,
-        "eligible": 5896,
+        "eligible": 5899,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
