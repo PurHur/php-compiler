@@ -1073,6 +1073,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsAttributeTargetConstantFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsAttributeTargetConstant());
+    }
+
+    public function testSupportsAttributeTargetConstantTrueOnForwardProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsAttributeTargetConstant());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsAsymmetricVisibilityFalseOn84DevReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());

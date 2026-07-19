@@ -993,6 +993,22 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ {@code Attribute::TARGET_CONSTANT} and 8.5 Attribute flag bit layout (#20727).
+     *
+     * On ≤8.4: no TARGET_CONSTANT; TARGET_ALL=63; IS_REPEATABLE=(1<<6)=64.
+     * On 8.5+: TARGET_CONSTANT=(1<<6); TARGET_ALL=127; IS_REPEATABLE=(1<<7)=128.
+     * php-src: Zend/zend_attributes.h ZEND_ATTRIBUTE_TARGET_CONST / TARGET_ALL / IS_REPEATABLE.
+     */
+    public static function supportsAttributeTargetConstant(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2 (#12508, #17197).

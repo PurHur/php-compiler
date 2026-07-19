@@ -1,5 +1,5 @@
 --TEST--
-Language: Attribute ctor bitmask from Attribute:: constants (#6913)
+Language: Attribute ctor bitmask from Attribute:: constants (#6913, #20727)
 --FILE--
 <?php
 #[Attribute(Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE)]
@@ -10,4 +10,4 @@ $args = (new ReflectionClass(Rep::class))
     ->getArguments();
 echo $args[0], "\n";
 --EXPECT--
-132
+68

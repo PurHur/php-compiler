@@ -26,7 +26,7 @@ final class AttributeConstruct extends VmClassMethod
             throw new \LogicException('Attribute::__construct() called without $this');
         }
 
-        $flags = AttributeSupport::TARGET_ALL;
+        $flags = AttributeSupport::targetAll();
         if (isset($frame->calledArgs[1])) {
             $arg = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $arg->type) {
@@ -35,7 +35,7 @@ final class AttributeConstruct extends VmClassMethod
                 );
             }
             $flags = $arg->toInt();
-            $allowed = AttributeSupport::TARGET_ALL | AttributeSupport::IS_REPEATABLE;
+            $allowed = AttributeSupport::targetAll() | AttributeSupport::isRepeatableFlag();
             if (0 !== ($flags & ~$allowed)) {
                 throw new \Error('Invalid attribute flags specified');
             }

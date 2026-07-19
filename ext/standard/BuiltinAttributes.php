@@ -171,13 +171,17 @@ final class BuiltinAttributes
             $ctx,
             'DelayedTargetValidation',
             AttributeSupport::CLASS_DELAYED_TARGET_VALIDATION,
-            AttributeSupport::TARGET_ALL
+            AttributeSupport::targetAll()
         );
     }
 
     private static function registerCompileTime(Context $ctx): void
     {
-        $targets = AttributeSupport::TARGET_CLASS_CONSTANT | AttributeSupport::TARGET_CONSTANT;
+        // TARGET_CONSTANT bit only exists on 8.5+; on ≤8.4 bit 64 is IS_REPEATABLE (#20727).
+        $targets = AttributeSupport::TARGET_CLASS_CONSTANT;
+        if (AttributeSupport::hasTargetConstant()) {
+            $targets |= AttributeSupport::TARGET_CONSTANT;
+        }
         self::registerMarkerAttributeClass(
             $ctx,
             'CompileTime',
