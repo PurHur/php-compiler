@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5842 |
-| Phase A inventory files (M2 ratio SSOT) | 5842 |
+| PHP files on vm.php path | 5844 |
+| Phase A inventory files (M2 ratio SSOT) | 5844 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17500 |
+| Source constructs flagged (warnings) | 17509 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -235,7 +235,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomImportNodeJitHelper.php` | 0 | 3 |
 | `ext/dom/DomIsConnectedJitHelper.php` | 0 | 1 |
 | `ext/dom/DomIsEqualNodeJitHelper.php` | 0 | 1 |
-| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 53 |
+| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 54 |
 | `ext/dom/DomLoadHTMLFileJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadHTMLJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadJitHelper.php` | 0 | 1 |
@@ -412,7 +412,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/VmDomInstanceInvoke.php` | 0 | 2 |
 | `ext/dom/VmDomJitDispatch.php` | 0 | 42 |
 | `ext/dom/VmDomJitFrame.php` | 0 | 1 |
-| `ext/dom/VmDomLiving.php` | 0 | 15 |
+| `ext/dom/VmDomLiving.php` | 0 | 16 |
 | `ext/dom/VmDomSimpleXmlBridge.php` | 0 | 4 |
 | `ext/dom/VmDomTokenList.php` | 0 | 4 |
 | `ext/dom/VmDomValidationNative.php` | 0 | 2 |
@@ -425,6 +425,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/XPathRegisterPhpFunctionNS.php` | 0 | 2 |
 | `ext/dom/XPathRegisterPhpFunctions.php` | 0 | 1 |
 | `ext/dom/XmlDocumentCreateEmpty.php` | 0 | 2 |
+| `ext/dom/XmlDocumentCreateFromFile.php` | 0 | 3 |
 | `ext/dom/XmlDocumentCreateFromString.php` | 0 | 3 |
 | `ext/dom/dom_import_simplexml.php` | 0 | 2 |
 | `ext/dom/ns_import_simplexml.php` | 0 | 2 |
@@ -831,7 +832,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 56 |
+| `ext/intl/Module.php` | 0 | 57 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -898,6 +899,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/numfmt_format.php` | 0 | 3 |
 | `ext/intl/numfmt_format_currency.php` | 0 | 3 |
 | `ext/intl/numfmt_parse.php` | 0 | 3 |
+| `ext/intl/numfmt_parse_currency.php` | 0 | 3 |
 | `ext/intl/resourcebundle_count.php` | 0 | 3 |
 | `ext/intl/transliterator_create.php` | 0 | 3 |
 | `ext/intl/transliterator_create_from_rules.php` | 0 | 3 |
@@ -7163,7 +7165,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 226)
 - new ClassProperty (line 229)
 - new XmlDocumentCreateFromString (line 230)
-- new XmlDocumentCreateEmpty (line 233)
+- new XmlDocumentCreateFromFile (line 233)
+- new XmlDocumentCreateEmpty (line 236)
 - 3 class method(s)
 
 ### `ext/dom/DomLoadHTMLFileJitHelper.php`
@@ -8580,10 +8583,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 280)
 - new DOMException (line 311)
 - new DOMException (line 323)
-- new DOMException (line 436)
-- new Variable (line 442)
-- new Variable (line 476)
-- 36 class method(s)
+- new Exception (line 465)
+- new DOMException (line 487)
+- new Variable (line 493)
+- new Variable (line 527)
+- 38 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`
@@ -8691,6 +8695,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+- 1 closure(s)
+
+### `ext/dom/XmlDocumentCreateFromFile.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 2 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/XmlDocumentCreateFromString.php`
@@ -11446,33 +11457,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new numfmt_create (line 123)
 - new numfmt_format (line 124)
 - new numfmt_parse (line 125)
-- new numfmt_format_currency (line 126)
-- new msgfmt_create (line 132)
-- new msgfmt_format (line 133)
-- new msgfmt_format_message (line 134)
-- new transliterator_create (line 140)
-- new transliterator_create_from_rules (line 141)
-- new transliterator_create_inverse (line 142)
-- new transliterator_list_ids (line 143)
-- new transliterator_transliterate (line 144)
-- new transliterator_get_error_code (line 145)
-- new transliterator_get_error_message (line 146)
-- new resourcebundle_count (line 151)
-- new grapheme_strlen (line 177)
-- new grapheme_substr (line 178)
-- new grapheme_strpos (line 179)
-- new grapheme_str_contains (line 180)
-- new grapheme_strstr (line 181)
-- new grapheme_stristr (line 182)
-- new grapheme_stripos (line 183)
-- new grapheme_strrpos (line 184)
-- new grapheme_extract (line 185)
-- new grapheme_levenshtein (line 186)
-- new grapheme_str_split (line 187)
-- new grapheme_strimwidth (line 188)
-- new intl_get_error_code (line 189)
-- new intl_get_error_message (line 190)
-- new intl_is_failure (line 191)
+- new numfmt_parse_currency (line 126)
+- new numfmt_format_currency (line 127)
+- new msgfmt_create (line 133)
+- new msgfmt_format (line 134)
+- new msgfmt_format_message (line 135)
+- new transliterator_create (line 141)
+- new transliterator_create_from_rules (line 142)
+- new transliterator_create_inverse (line 143)
+- new transliterator_list_ids (line 144)
+- new transliterator_transliterate (line 145)
+- new transliterator_get_error_code (line 146)
+- new transliterator_get_error_message (line 147)
+- new resourcebundle_count (line 152)
+- new grapheme_strlen (line 178)
+- new grapheme_substr (line 179)
+- new grapheme_strpos (line 180)
+- new grapheme_str_contains (line 181)
+- new grapheme_strstr (line 182)
+- new grapheme_stristr (line 183)
+- new grapheme_stripos (line 184)
+- new grapheme_strrpos (line 185)
+- new grapheme_extract (line 186)
+- new grapheme_levenshtein (line 187)
+- new grapheme_str_split (line 188)
+- new grapheme_strimwidth (line 189)
+- new intl_get_error_code (line 190)
+- new intl_get_error_message (line 191)
+- new intl_is_failure (line 192)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12298,6 +12310,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
 - new Error (line 55)
+- 2 class method(s)
+
+### `ext/intl/numfmt_parse_currency.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 58)
 - 2 class method(s)
 
 ### `ext/intl/resourcebundle_count.php`

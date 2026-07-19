@@ -161,6 +161,9 @@ final class BuiltinByRefParams
             case 'numberformatter::parsecurrency':
                 // $this + $string + &$currency — php-src formatter.stub.php (#20728)
                 return [2];
+            case 'numfmt_parse_currency':
+                // $formatter + $string + &$currency — php-src formatter.stub.php (#20780)
+                return [2];
             case 'intltimezone::getoffset':
                 // $this + $date + $local + &$rawOffset + &$dstOffset — php-src timezone.stub.php (#20769)
                 return [3, 4];
