@@ -3199,6 +3199,8 @@ final class VmDom
         self::ensureDocument($document);
         self::rejectEmptyLoadSource($xml, 'DOMDocument::loadXML()');
 
+        // trim() for parse structure, but keep leading bytes so getLineNo matches libxml (#20795).
+        $leadingLen = \strlen($xml) - \strlen(ltrim($xml));
         $trimmed = trim($xml);
         $decl = self::parseXmlDeclaration($trimmed);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
@@ -3232,8 +3234,8 @@ final class VmDom
         $root = self::parseElementTree(
             $ctx,
             $elementXml,
-            $trimmed,
-            $elementOffset,
+            $xml,
+            $leadingLen + $elementOffset,
             $generalEntities,
             $substituteEntities
         );
@@ -4351,13 +4353,18 @@ final class VmDom
      * With LIBXML_NOENT (XML_PARSE_NOENT), general entity refs become text like libxml2
      * (#19796, php-src ext/dom/document.c). Adjacent text + substituted entities merge.
      */
+    /**
+     * @param array<string, string> $generalEntities
+     */
     private static function appendParsedTextOrEntityRefs(
         Context $ctx,
         ObjectEntry $parent,
         string $text,
         ?ObjectEntry $ownerDocument,
         array $generalEntities,
-        bool $substituteEntities = false
+        bool $substituteEntities = false,
+        ?string $sourceXml = null,
+        int $textBaseOffset = 0
     ): void {
         if ('' === $text) {
             return;
@@ -4366,17 +4373,27 @@ final class VmDom
         $pos = 0;
         $len = \strlen($text);
         $buffer = '';
+        $bufferStart = 0;
         while ($pos < $len) {
             $amp = strpos($text, '&', $pos);
             if (false === $amp) {
+                if ('' === $buffer) {
+                    $bufferStart = $pos;
+                }
                 $buffer .= substr($text, $pos);
                 break;
             }
             if ($amp > $pos) {
+                if ('' === $buffer) {
+                    $bufferStart = $pos;
+                }
                 $buffer .= substr($text, $pos, $amp - $pos);
             }
             $semi = strpos($text, ';', $amp + 1);
             if (false === $semi) {
+                if ('' === $buffer) {
+                    $bufferStart = $amp;
+                }
                 $buffer .= substr($text, $amp);
                 break;
             }
@@ -4384,6 +4401,9 @@ final class VmDom
             if (isset($generalEntities[$refName])) {
                 if ($substituteEntities) {
                     // Fold replacement into the text buffer (libxml NOENT merge).
+                    if ('' === $buffer) {
+                        $bufferStart = $amp;
+                    }
                     $buffer .= self::expandGeneralEntityReplacement(
                         $generalEntities[$refName],
                         $generalEntities
@@ -4391,6 +4411,12 @@ final class VmDom
                 } else {
                     if ('' !== $buffer) {
                         $textNode = self::createTextNode($ctx, self::decodePredefinedXmlEntities($buffer), $ownerDocument);
+                        // libxml xmlGetLineNo for text uses the line after consuming the chars (#20795).
+                        self::assignLineNoFromSource(
+                            $textNode,
+                            $sourceXml,
+                            $textBaseOffset + $bufferStart + \strlen($buffer)
+                        );
                         $state->childIds[] = $textNode->id;
                         self::linkChildToParent($textNode, $parent);
                         $buffer = '';
@@ -4401,14 +4427,21 @@ final class VmDom
                         $generalEntities[$refName],
                         $ownerDocument
                     );
+                    self::assignLineNoFromSource($entityRef, $sourceXml, $textBaseOffset + $amp);
                     $state->childIds[] = $entityRef->id;
                     self::linkChildToParent($entityRef, $parent);
                 }
             } else {
                 $decoded = self::decodePredefinedXmlEntity($refName);
                 if (null !== $decoded) {
+                    if ('' === $buffer) {
+                        $bufferStart = $amp;
+                    }
                     $buffer .= $decoded;
                 } else {
+                    if ('' === $buffer) {
+                        $bufferStart = $amp;
+                    }
                     $buffer .= substr($text, $amp, $semi - $amp + 1);
                 }
             }
@@ -4416,9 +4449,23 @@ final class VmDom
         }
         if ('' !== $buffer) {
             $textNode = self::createTextNode($ctx, self::decodePredefinedXmlEntities($buffer), $ownerDocument);
+            self::assignLineNoFromSource(
+                $textNode,
+                $sourceXml,
+                $textBaseOffset + $bufferStart + \strlen($buffer)
+            );
             $state->childIds[] = $textNode->id;
             self::linkChildToParent($textNode, $parent);
         }
+    }
+
+    /** libxml xmlGetLineNo — set DomNodeState::$lineNo from source byte offset (#20795). */
+    private static function assignLineNoFromSource(ObjectEntry $node, ?string $sourceXml, int $offset): void
+    {
+        if (null === $sourceXml) {
+            return;
+        }
+        DomRegistry::state($node)->lineNo = self::lineNoAtOffset($sourceXml, $offset);
     }
 
     /**
@@ -6644,6 +6691,9 @@ final class VmDom
         array $generalEntities = [],
         bool $substituteEntities = false
     ): ?ObjectEntry {
+        // Offsets are relative to $sourceXml; skip chunk-leading whitespace so lineNo hits the '<' (#20795).
+        $chunkLeading = \strlen($elementXml) - \strlen(ltrim($elementXml));
+        $baseOffset += $chunkLeading;
         $trimmed = trim($elementXml);
         if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
             $entry = self::createElement($ctx, $selfClose[1])->toObject();
@@ -6683,7 +6733,9 @@ final class VmDom
                     $text,
                     null,
                     $generalEntities,
-                    $substituteEntities
+                    $substituteEntities,
+                    $sourceXml,
+                    $innerBase + $pos
                 );
                 $pos = false === $next ? $len : $next;
 
@@ -6692,6 +6744,7 @@ final class VmDom
             $cdata = VmXml::parseCdataSectionAt($inner, $pos);
             if (null !== $cdata) {
                 $cdataNode = self::createCdataSection($ctx, $cdata['data'], null);
+                self::assignLineNoFromSource($cdataNode, $sourceXml, $innerBase + $pos);
                 $state->childIds[] = $cdataNode->id;
                 self::linkChildToParent($cdataNode, $entry);
                 $pos = $cdata['end'];
@@ -6701,6 +6754,7 @@ final class VmDom
             $comment = VmXml::parseCommentAt($inner, $pos);
             if (null !== $comment) {
                 $commentNode = self::createComment($ctx, $comment['data'], null);
+                self::assignLineNoFromSource($commentNode, $sourceXml, $innerBase + $pos);
                 $state->childIds[] = $commentNode->id;
                 self::linkChildToParent($commentNode, $entry);
                 $pos = $comment['end'];
@@ -6711,6 +6765,7 @@ final class VmDom
             if (null !== $pi) {
                 $owner = self::ownerDocumentEntry($entry) ?? $entry;
                 $piNode = self::createProcessingInstruction($ctx, $pi['target'], $pi['data'], $owner);
+                self::assignLineNoFromSource($piNode, $sourceXml, $innerBase + $pos);
                 $state->childIds[] = $piNode->id;
                 self::linkChildToParent($piNode, $entry);
                 $pos = $pi['end'];

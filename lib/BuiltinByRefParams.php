@@ -161,6 +161,12 @@ final class BuiltinByRefParams
             case 'numberformatter::parsecurrency':
                 // $this + $string + &$currency — php-src formatter.stub.php (#20728)
                 return [2];
+            case 'intltimezone::getoffset':
+                // $this + $date + $local + &$rawOffset + &$dstOffset — php-src timezone.stub.php (#20769)
+                return [3, 4];
+            case 'intltimezone::getcanonicalid':
+                // $timezoneId + &$isSystemId — php-src timezone.stub.php (#20769)
+                return [1];
             case 'redis::scan':
                 // $this + &$iterator (+ optional pattern/count) — phpredis redis.stub.php (#20682)
                 return [1];

@@ -13,14 +13,15 @@ use PHPCompiler\ReflectionSupport;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * UConverter construct/convert — charset conversion OOP API (php-src ext/intl/converter; #6171 / #20770).
+ * UConverter construct/convert — charset conversion OOP API (php-src ext/intl/converter; #6171 / #20770 / #20788).
  *
- * Conversion uses {@see CharsetEngine} / {@see VmIconv} (PHP-in-PHP); no ICU ucnv_* FFI in v1.
- * Encoding introspection + subst chars + reasonText mirror php-src converter.c without C runtime growth.
+ * Conversion uses {@see CharsetEngine} / {@see VmIconv} (PHP-in-PHP). Catalog / type APIs use thin
+ * ICU `ucnv_*` FFI when libicuuc is available, with a static fallback list otherwise.
  */
 final class VmUConverter
 {
@@ -43,6 +44,19 @@ final class VmUConverter
     public const REASON_CLOSE = 4;
     public const REASON_CLONE = 5;
 
+    /** @see unicode/ucnv.h UConverterType (php-src UConverter::* type constants). */
+    public const UNSUPPORTED_CONVERTER = -1;
+    public const SBCS = 0;
+    public const DBCS = 1;
+    public const MBCS = 2;
+    public const LATIN_1 = 3;
+    public const UTF8 = 4;
+    public const UTF16_BigEndian = 5;
+    public const UTF16_LittleEndian = 6;
+    public const UTF32_BigEndian = 7;
+    public const UTF32_LittleEndian = 8;
+    public const US_ASCII = 26;
+
     /**
      * @var array<int, array{
      *     dest: string,
@@ -57,6 +71,12 @@ final class VmUConverter
      */
     private static array $state = [];
 
+    private static ?\FFI $ffi = null;
+
+    private static bool $ffiUnavailable = false;
+
+    private static string $symSuffix = '';
+
     /** @return array<string, int> */
     public static function classConstants(): array
     {
@@ -67,6 +87,17 @@ final class VmUConverter
             'REASON_RESET' => self::REASON_RESET,
             'REASON_CLOSE' => self::REASON_CLOSE,
             'REASON_CLONE' => self::REASON_CLONE,
+            'UNSUPPORTED_CONVERTER' => self::UNSUPPORTED_CONVERTER,
+            'SBCS' => self::SBCS,
+            'DBCS' => self::DBCS,
+            'MBCS' => self::MBCS,
+            'LATIN_1' => self::LATIN_1,
+            'UTF8' => self::UTF8,
+            'UTF16_BigEndian' => self::UTF16_BigEndian,
+            'UTF16_LittleEndian' => self::UTF16_LittleEndian,
+            'UTF32_BigEndian' => self::UTF32_BigEndian,
+            'UTF32_LittleEndian' => self::UTF32_LittleEndian,
+            'US_ASCII' => self::US_ASCII,
         ];
     }
 
@@ -96,10 +127,15 @@ final class VmUConverter
             'geterrormessage' => [new UConverterGetErrorMessage(), 'getErrorMessage', false],
             'getsourceencoding' => [new UConverterGetSourceEncoding(), 'getSourceEncoding', false],
             'getdestinationencoding' => [new UConverterGetDestinationEncoding(), 'getDestinationEncoding', false],
+            'getsourcetype' => [new UConverterGetSourceType(), 'getSourceType', false],
+            'getdestinationtype' => [new UConverterGetDestinationType(), 'getDestinationType', false],
             'getsubstchars' => [new UConverterGetSubstChars(), 'getSubstChars', false],
             'setsubstchars' => [new UConverterSetSubstChars(), 'setSubstChars', false],
             'reasontext' => [new UConverterReasonText(), 'reasonText', true],
             'transcode' => [new UConverterTranscode(), 'transcode', true],
+            'getavailable' => [new UConverterGetAvailable(), 'getAvailable', true],
+            'getaliases' => [new UConverterGetAliases(), 'getAliases', true],
+            'getstandards' => [new UConverterGetStandards(), 'getStandards', true],
         ];
         foreach ($methods as $lc => [$handler, $name, $static]) {
             $entry->methods[$lc] = $handler;
@@ -286,6 +322,124 @@ final class VmUConverter
         };
     }
 
+    /**
+     * UConverter::getAvailable() — php-src / ICU ucnv_countAvailable (#20788).
+     */
+    public static function getAvailable(): HashTable
+    {
+        $names = [];
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $countFn = 'ucnv_countAvailable'.self::$symSuffix;
+            $nameFn = 'ucnv_getAvailableName'.self::$symSuffix;
+            $n = (int) $ffi->$countFn();
+            for ($i = 0; $i < $n; ++$i) {
+                $ptr = $ffi->$nameFn($i);
+                $s = self::ffiCString($ptr);
+                if (null !== $s && '' !== $s) {
+                    $names[] = $s;
+                }
+            }
+        }
+        if ([] === $names) {
+            $names = ['UTF-8', 'UTF-16', 'UTF-16BE', 'UTF-16LE', 'UTF-32', 'ISO-8859-1', 'US-ASCII', 'windows-1252'];
+        }
+
+        return self::stringListToHashTable($names);
+    }
+
+    /**
+     * UConverter::getAliases() — php-src / ICU ucnv_countAliases (#20788).
+     *
+     * @return HashTable|false|null
+     */
+    public static function getAliases(string $name): HashTable|false|null
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $countFn = 'ucnv_countAliases'.self::$symSuffix;
+            $aliasFn = 'ucnv_getAlias'.self::$symSuffix;
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $n = (int) $ffi->$countFn($name, \FFI::addr($status));
+            if ((int) $status->cdata > 0 || $n <= 0) {
+                return false;
+            }
+            $aliases = [];
+            for ($i = 0; $i < $n; ++$i) {
+                $status->cdata = 0;
+                $ptr = $ffi->$aliasFn($name, $i, \FFI::addr($status));
+                $s = self::ffiCString($ptr);
+                if (null !== $s && '' !== $s) {
+                    $aliases[] = $s;
+                }
+            }
+
+            return self::stringListToHashTable($aliases);
+        }
+        $norm = strtoupper(str_replace(['-', '_'], '', $name));
+        if (\in_array($norm, ['UTF8', 'CP1208', 'WINDOWS65001'], true)) {
+            return self::stringListToHashTable(['UTF-8', 'ibm-1208', 'windows-65001', 'cp1208']);
+        }
+
+        return false;
+    }
+
+    /**
+     * UConverter::getStandards() — php-src / ICU ucnv_countStandards (#20788).
+     */
+    public static function getStandards(): ?HashTable
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $countFn = 'ucnv_countStandards'.self::$symSuffix;
+            $stdFn = 'ucnv_getStandard'.self::$symSuffix;
+            $n = (int) $ffi->$countFn();
+            $status = $ffi->new('UErrorCode');
+            $names = [];
+            for ($i = 0; $i < $n; ++$i) {
+                $status->cdata = 0;
+                $ptr = $ffi->$stdFn($i, \FFI::addr($status));
+                $s = self::ffiCString($ptr);
+                $names[] = null === $s ? '' : $s;
+            }
+
+            return self::stringListToHashTable($names);
+        }
+
+        return self::stringListToHashTable(['UTR22', 'IBM', 'WINDOWS', 'JAVA', 'IANA', 'MIME', '']);
+    }
+
+    /**
+     * UConverter::getSourceType() — php-src / ICU ucnv_getType (#20788).
+     *
+     * @return int|false|null
+     */
+    public static function getSourceType(ObjectEntry $object): int|false|null
+    {
+        $state = self::$state[$object->id] ?? null;
+        if (null === $state || !$state['srcOk']) {
+            return null;
+        }
+
+        return self::typeForEncoding($state['src']);
+    }
+
+    /**
+     * UConverter::getDestinationType() — php-src / ICU ucnv_getType (#20788).
+     *
+     * @return int|false|null
+     */
+    public static function getDestinationType(ObjectEntry $object): int|false|null
+    {
+        $state = self::$state[$object->id] ?? null;
+        if (null === $state || !$state['destOk']) {
+            return null;
+        }
+
+        return self::typeForEncoding($state['dest']);
+    }
+
     public static function coerceIntArg(Variable $var, string $function, int $position, string $name): int
     {
         $var = $var->resolveIndirect();
@@ -310,6 +464,19 @@ final class VmUConverter
         ));
     }
 
+    /** @param list<string> $names */
+    public static function stringListToHashTable(array $names): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($names as $name) {
+            $slot = new Variable();
+            $slot->string($name);
+            $ht->append($slot);
+        }
+
+        return $ht;
+    }
+
     /** ICU default subst: UTF/UCS sources use U+FFFD; single-byte sources use 0x1A. */
     private static function defaultSubstChars(string $srcEncoding): string
     {
@@ -326,6 +493,112 @@ final class VmUConverter
     private static function isSingleByteCharset(string $encoding): bool
     {
         return !self::isUnicodeCharset($encoding);
+    }
+
+    private static function typeForEncoding(string $encoding): int
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $open = 'ucnv_open'.self::$symSuffix;
+            $getType = 'ucnv_getType'.self::$symSuffix;
+            $close = 'ucnv_close'.self::$symSuffix;
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $cnv = $ffi->$open($encoding, \FFI::addr($status));
+            if ((int) $status->cdata > 0 || null === $cnv) {
+                return self::UNSUPPORTED_CONVERTER;
+            }
+            $type = (int) $ffi->$getType($cnv);
+            $ffi->$close($cnv);
+
+            return $type;
+        }
+        $n = strtoupper(str_replace(['-', '_', ' '], '', $encoding));
+        if (str_contains($n, 'UTF8') || 'CP1208' === $n) {
+            return self::UTF8;
+        }
+        if ('ISO88591' === $n || 'LATIN1' === $n) {
+            return self::LATIN_1;
+        }
+        if ('USASCII' === $n || 'ASCII' === $n) {
+            return self::US_ASCII;
+        }
+        if (str_contains($n, 'UTF16BE')) {
+            return self::UTF16_BigEndian;
+        }
+        if (str_contains($n, 'UTF16LE')) {
+            return self::UTF16_LittleEndian;
+        }
+
+        return self::SBCS;
+    }
+
+    private static function ffiCString(mixed $ptr): ?string
+    {
+        if (null === $ptr || false === $ptr) {
+            return null;
+        }
+        if (\is_string($ptr)) {
+            return $ptr;
+        }
+
+        return \FFI::string($ptr);
+    }
+
+    private static function ffi(): ?\FFI
+    {
+        if (self::$ffiUnavailable) {
+            return null;
+        }
+        if (null !== self::$ffi) {
+            return self::$ffi;
+        }
+        if (!\class_exists(\FFI::class, false) && !\extension_loaded('FFI')) {
+            self::$ffiUnavailable = true;
+
+            return null;
+        }
+        /** @var list<array{0: string, 1: string}> */
+        $candidates = [
+            ['libicuuc.so.70', '_70'],
+            ['libicuuc.so.74', '_74'],
+            ['libicuuc.so.72', '_72'],
+            ['libicuuc.so.71', '_71'],
+            ['libicuuc.so', '_70'],
+            ['libicuuc.dylib', ''],
+        ];
+        foreach ($candidates as [$lib, $suffix]) {
+            try {
+                self::$ffi = \FFI::cdef(self::cdefForSuffix($suffix), $lib);
+                self::$symSuffix = $suffix;
+
+                return self::$ffi;
+            } catch (\Throwable) {
+                self::$ffi = null;
+            }
+        }
+        self::$ffiUnavailable = true;
+
+        return null;
+    }
+
+    private static function cdefForSuffix(string $suffix): string
+    {
+        return <<<C
+typedef int32_t UErrorCode;
+typedef uint16_t uint16_t;
+typedef struct UConverter UConverter;
+typedef int32_t UConverterType;
+int32_t ucnv_countAvailable{$suffix}(void);
+const char *ucnv_getAvailableName{$suffix}(int32_t n);
+int32_t ucnv_countAliases{$suffix}(const char *alias, UErrorCode *pErrorCode);
+const char *ucnv_getAlias{$suffix}(const char *alias, uint16_t n, UErrorCode *pErrorCode);
+uint16_t ucnv_countStandards{$suffix}(void);
+const char *ucnv_getStandard{$suffix}(uint16_t n, UErrorCode *pErrorCode);
+UConverter *ucnv_open{$suffix}(const char *converterName, UErrorCode *err);
+void ucnv_close{$suffix}(UConverter *converter);
+UConverterType ucnv_getType{$suffix}(const UConverter *converter);
+C;
     }
 
     public static function requireReceiver(Variable $var, string $label): ObjectEntry
@@ -696,5 +969,167 @@ final class UConverterReasonText extends VmClassMethod
             return;
         }
         $frame->returnVar->string(VmUConverter::reasonText($reason));
+    }
+}
+
+/** UConverter::getAvailable() — php-src / ICU ucnv_countAvailable (#20788). */
+final class UConverterGetAvailable extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getAvailable');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::getAvailable() expects exactly 0 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(VmUConverter::getAvailable());
+    }
+}
+
+/** UConverter::getAliases() — php-src / ICU ucnv_countAliases (#20788). */
+final class UConverterGetAliases extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getAliases');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::getAliases() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'UConverter::getAliases', 0, 'name');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmUConverter::getAliases($name);
+        if (null === $result) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->array($result);
+    }
+}
+
+/** UConverter::getStandards() — php-src / ICU ucnv_countStandards (#20788). */
+final class UConverterGetStandards extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getStandards');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::getStandards() expects exactly 0 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmUConverter::getStandards();
+        if (null === $result) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->array($result);
+    }
+}
+
+/** UConverter::getSourceType() — php-src / ICU ucnv_getType (#20788). */
+final class UConverterGetSourceType extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSourceType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::getSourceType() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getSourceType()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmUConverter::getSourceType($object);
+        if (null === $result) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** UConverter::getDestinationType() — php-src / ICU ucnv_getType (#20788). */
+final class UConverterGetDestinationType extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getDestinationType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::getDestinationType() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getDestinationType()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmUConverter::getDestinationType($object);
+        if (null === $result) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($result);
     }
 }
