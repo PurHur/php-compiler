@@ -11,6 +11,7 @@ use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\ReflectionSupport;
 use PHPCfg\Func as CfgFunc;
 
 /**
@@ -29,6 +30,9 @@ final class VmBreakIterator
     private const UBRK_WORD = 1;
     private const UBRK_LINE = 2;
     private const UBRK_SENTENCE = 3;
+    /** ULOC_ACTUAL_LOCALE / ULOC_VALID_LOCALE — php-src Locale::ACTUAL_LOCALE / VALID_LOCALE */
+    private const ULOC_ACTUAL_LOCALE = 0;
+    private const ULOC_VALID_LOCALE = 1;
     private const PROP_HANDLE = '__breakiterator_id';
 
     /** @var array<int, array<string, mixed>> */
@@ -146,6 +150,12 @@ final class VmBreakIterator
             'next' => [new BreakIteratorNext(), 'next'],
             'previous' => [new BreakIteratorPrevious(), 'previous'],
             'current' => [new BreakIteratorCurrent(), 'current'],
+            'preceding' => [new BreakIteratorPreceding(), 'preceding'],
+            'following' => [new BreakIteratorFollowing(), 'following'],
+            'isboundary' => [new BreakIteratorIsBoundary(), 'isBoundary'],
+            'getlocale' => [new BreakIteratorGetLocale(), 'getLocale'],
+            'geterrorcode' => [new BreakIteratorGetErrorCode(), 'getErrorCode'],
+            'geterrormessage' => [new BreakIteratorGetErrorMessage(), 'getErrorMessage'],
             'getpartsiterator' => [new BreakIteratorGetPartsIterator(), 'getPartsIterator'],
         ];
         foreach ($methods as $lc => [$handler, $name]) {
@@ -172,8 +182,11 @@ final class VmBreakIterator
             'boundaries' => [0],
             'parts' => null,
             'index' => 0,
+            'errorCode' => IntlError::U_ZERO_ERROR,
+            'errorMessage' => 'U_ZERO_ERROR',
         ];
         $obj->constructed = true;
+        self::clearObjectError($obj);
         IntlError::clear();
 
         return $obj;
@@ -216,6 +229,7 @@ final class VmBreakIterator
         $st['text'] = $text;
         $st['boundaries'] = self::computeBoundaries((int) $st['type'], (string) $st['locale'], $text);
         $st['pos'] = $st['boundaries'][0] ?? 0;
+        self::clearObjectError($obj);
         IntlError::clear();
 
         return true;
@@ -261,11 +275,15 @@ final class VmBreakIterator
             foreach ($bounds as $b) {
                 if ($b > $offset) {
                     $st['pos'] = $b;
+                    self::clearObjectError($obj);
+                    IntlError::clear();
 
                     return (int) $b;
                 }
             }
             $st['pos'] = self::DONE;
+            self::clearObjectError($obj);
+            IntlError::clear();
 
             return self::DONE;
         }
@@ -297,6 +315,112 @@ final class VmBreakIterator
         $st['pos'] = $prev;
 
         return $prev;
+    }
+
+    /**
+     * preceding($offset) — largest boundary strictly before $offset (ICU ubrk_preceding; #20771).
+     */
+    public static function preceding(ObjectEntry $obj, int $offset): int
+    {
+        $st = &self::stateRef($obj);
+        $prev = self::DONE;
+        foreach ($st['boundaries'] as $b) {
+            $b = (int) $b;
+            if ($b >= $offset) {
+                break;
+            }
+            $prev = $b;
+        }
+        $st['pos'] = $prev;
+        self::clearObjectError($obj);
+        IntlError::clear();
+
+        return $prev;
+    }
+
+    /**
+     * following($offset) — first boundary strictly after $offset (ICU ubrk_following; #20771).
+     */
+    public static function following(ObjectEntry $obj, int $offset): int
+    {
+        return self::nextPos($obj, $offset);
+    }
+
+    /**
+     * isBoundary($offset) — whether $offset is a break; advances to first boundary at/after offset
+     * (ICU ubrk_isBoundary; #20771).
+     */
+    public static function isBoundary(ObjectEntry $obj, int $offset): bool
+    {
+        $st = &self::stateRef($obj);
+        $bounds = $st['boundaries'];
+        $is = \in_array($offset, $bounds, true);
+        $atOrAfter = self::DONE;
+        foreach ($bounds as $b) {
+            $b = (int) $b;
+            if ($b >= $offset) {
+                $atOrAfter = $b;
+                break;
+            }
+        }
+        $st['pos'] = $atOrAfter;
+        self::clearObjectError($obj);
+        IntlError::clear();
+
+        return $is;
+    }
+
+    /**
+     * getLocale($type) — ULOC_ACTUAL_LOCALE / ULOC_VALID_LOCALE (php-src breakiterator_get_locale; #20771).
+     *
+     * Without a live UBreakIterator handle, VALID returns the factory locale and ACTUAL is ''
+     * (matches Zend ICU for createWordInstance('en_US')).
+     *
+     * @return string|false
+     */
+    public static function getLocale(ObjectEntry $obj, int $type)
+    {
+        $st = self::stateRef($obj);
+        self::clearObjectError($obj);
+        IntlError::clear();
+        if (self::ULOC_ACTUAL_LOCALE === $type) {
+            return '';
+        }
+        if (self::ULOC_VALID_LOCALE === $type) {
+            return (string) $st['locale'];
+        }
+        self::fail($obj, 'breakiterator_get_locale: bad type: U_ILLEGAL_ARGUMENT_ERROR');
+
+        return false;
+    }
+
+    public static function getErrorCode(ObjectEntry $obj): int
+    {
+        $st = self::stateRef($obj);
+
+        return (int) ($st['errorCode'] ?? IntlError::U_ZERO_ERROR);
+    }
+
+    public static function getErrorMessage(ObjectEntry $obj): string
+    {
+        $st = self::stateRef($obj);
+
+        return (string) ($st['errorMessage'] ?? 'U_ZERO_ERROR');
+    }
+
+    private static function clearObjectError(ObjectEntry $obj): void
+    {
+        $st = &self::stateRef($obj);
+        $st['errorCode'] = IntlError::U_ZERO_ERROR;
+        $st['errorMessage'] = 'U_ZERO_ERROR';
+    }
+
+    private static function fail(ObjectEntry $obj, string $message): void
+    {
+        IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, $message);
+        $st = &self::stateRef($obj);
+        $st['errorCode'] = IntlError::U_ILLEGAL_ARGUMENT_ERROR;
+        $st['errorMessage'] = $message;
     }
 
     /** @return list<string> */
@@ -728,6 +852,152 @@ final class BreakIteratorCurrent extends VmClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->int(VmBreakIterator::currentPos($obj));
         }
+    }
+}
+
+final class BreakIteratorPreceding extends VmClassMethod
+{
+    public function __construct() { parent::__construct('preceding'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc !== 2) {
+            throw new \ArgumentCountError(sprintf(
+                'IntlBreakIterator::preceding() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $obj = VmBreakIterator::requireBreakIterator($frame, $frame->calledArgs[0]);
+        $offset = BreakIteratorOffsetArg::coerce($frame->calledArgs[1], 'IntlBreakIterator::preceding');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmBreakIterator::preceding($obj, $offset));
+        }
+    }
+}
+
+final class BreakIteratorFollowing extends VmClassMethod
+{
+    public function __construct() { parent::__construct('following'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc !== 2) {
+            throw new \ArgumentCountError(sprintf(
+                'IntlBreakIterator::following() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $obj = VmBreakIterator::requireBreakIterator($frame, $frame->calledArgs[0]);
+        $offset = BreakIteratorOffsetArg::coerce($frame->calledArgs[1], 'IntlBreakIterator::following');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmBreakIterator::following($obj, $offset));
+        }
+    }
+}
+
+final class BreakIteratorIsBoundary extends VmClassMethod
+{
+    public function __construct() { parent::__construct('isBoundary'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc !== 2) {
+            throw new \ArgumentCountError(sprintf(
+                'IntlBreakIterator::isBoundary() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $obj = VmBreakIterator::requireBreakIterator($frame, $frame->calledArgs[0]);
+        $offset = BreakIteratorOffsetArg::coerce($frame->calledArgs[1], 'IntlBreakIterator::isBoundary');
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(VmBreakIterator::isBoundary($obj, $offset));
+        }
+    }
+}
+
+final class BreakIteratorGetLocale extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getLocale'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc !== 2) {
+            throw new \ArgumentCountError(sprintf(
+                'IntlBreakIterator::getLocale() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $obj = VmBreakIterator::requireBreakIterator($frame, $frame->calledArgs[0]);
+        $type = BreakIteratorOffsetArg::coerce($frame->calledArgs[1], 'IntlBreakIterator::getLocale', 'type');
+        $result = VmBreakIterator::getLocale($obj, $type);
+        if (null !== $frame->returnVar) {
+            false === $result ? $frame->returnVar->bool(false) : $frame->returnVar->string($result);
+        }
+    }
+}
+
+final class BreakIteratorGetErrorCode extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getErrorCode'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc !== 1) {
+            throw new \ArgumentCountError(sprintf(
+                'IntlBreakIterator::getErrorCode() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $obj = VmBreakIterator::requireBreakIterator($frame, $frame->calledArgs[0]);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmBreakIterator::getErrorCode($obj));
+        }
+    }
+}
+
+final class BreakIteratorGetErrorMessage extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getErrorMessage'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc !== 1) {
+            throw new \ArgumentCountError(sprintf(
+                'IntlBreakIterator::getErrorMessage() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $obj = VmBreakIterator::requireBreakIterator($frame, $frame->calledArgs[0]);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->string(VmBreakIterator::getErrorMessage($obj));
+        }
+    }
+}
+
+/** Coerce int offset / locale-type args for BreakIterator (#20771). */
+final class BreakIteratorOffsetArg
+{
+    public static function coerce(Variable $arg, string $method, string $param = 'offset'): int
+    {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $arg->type) {
+            return $arg->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $arg->type) {
+            return (int) $arg->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $arg->type) {
+            return $arg->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_STRING === $arg->type && is_numeric($arg->toString())) {
+            return (int) $arg->toString();
+        }
+        throw new \TypeError(sprintf(
+            '%s(): Argument #1 ($%s) must be of type int, %s given',
+            $method,
+            $param,
+            ReflectionSupport::valueTypeLabelPublic($arg)
+        ));
     }
 }
 

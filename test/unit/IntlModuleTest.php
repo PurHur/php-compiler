@@ -222,4 +222,30 @@ PHP;
             ob_get_clean()
         );
     }
+
+    public function test_breakiterator_preceding_following_locale_via_forced_registration(): void
+    {
+        $runtime = new Runtime();
+        \PHPCompiler\ext\intl\BuiltinClasses::registerBreakIterator($runtime->vmContext);
+        $code = <<<'PHP'
+<?php
+$bi = IntlBreakIterator::createWordInstance('en_US');
+$bi->setText('Hello world');
+echo (int) method_exists($bi, 'preceding'), "\n";
+echo $bi->preceding(6), "\n";
+echo $bi->current(), "\n";
+echo $bi->following(6), "\n";
+echo (int) $bi->isBoundary(5), (int) $bi->isBoundary(6), (int) $bi->isBoundary(7), "\n";
+echo var_export($bi->getLocale(0), true), "\n";
+echo var_export($bi->getLocale(1), true), "\n";
+echo $bi->getErrorCode(), ':', $bi->getErrorMessage(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'intl_breakiterator_preceding.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "1\n5\n5\n11\n110\n''\n'en_US'\n0:U_ZERO_ERROR\n",
+            ob_get_clean()
+        );
+    }
 }
