@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPUnit\Framework\TestCase;
 
 /**
- * PendingHeaders routes through PendingHeadersJitHelper PHP (#9545, #13679, #20420).
+ * PendingHeaders: always NestedJIT PendingHeadersJitHelper — no thin stubs (#9545, #20930).
  */
 final class PendingHeadersRuntimeShrinkTest extends TestCase
 {
@@ -20,13 +20,26 @@ final class PendingHeadersRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
     }
 
-    public function testBridgeGatesThinStubsOnIsThinStandaloneAotMain(): void
+    public function testBridgeAlwaysUsesNestedJitHelperNoThinStubs(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersJitBridge.php');
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringContainsString('implementDeferredInventoryStubs', $source);
         $this->assertStringContainsString('PendingHeadersJitHelper', $source);
+        $this->assertStringContainsString('ensureJitHelperCompiled', $source);
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('implementDeferredInventoryStubs', $source);
+        $this->assertStringNotContainsString('ph_sent_inv_stub', $source);
+        $this->assertStringNotContainsString('ph_add_inv_stub', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
+    }
+
+    public function testSpineBundleIncludesPendingHeadersPhpJitPath(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('PendingHeadersJitHelper.php', $spine);
+        $this->assertStringContainsString('PendingHeadersJitBridge.php', $spine);
+        $this->assertStringContainsString('PendingHeadersRuntime.php', $spine);
     }
 }

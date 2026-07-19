@@ -7,10 +7,10 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT pending HTTP header dispatch via PendingHeadersJitHelper PHP (#9545, #13679).
+ * JIT/AOT pending HTTP header dispatch via PendingHeadersJitHelper PHP (#9545, #20930).
  *
- * Embed and standalone both route through {@see PendingHeadersJitBridge}.
- * User-script AOT uses deferred inventory stubs (no nested JIT) per #13571.
+ * Embed and thin standalone AOT both NestedJIT via {@see PendingHeadersJitBridge}
+ * (IncludePath #20877 shape — no thin stub fork).
  * php-src: ext/standard/head.c
  */
 final class PendingHeadersRuntime

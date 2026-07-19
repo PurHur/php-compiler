@@ -1414,7 +1414,11 @@ class Type extends Builtin {
             ObGzhandler::ensureLinked($this->context);
             ObOutputRuntime::ensureLinked($this->context);
         }
-        PendingHeadersRuntime::ensureLinked($this->context);
+        // Thin user-script AOT: lazy-link PendingHeaders on first header()/headers_list use
+        // — NestedJIT during Type::initialize segfaults (#20930, peer #13571).
+        if (!$this->context->isThinStandaloneAotMain()) {
+            PendingHeadersRuntime::ensureLinked($this->context);
+        }
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
             // Remaining runtimes link lazily via Context::defineBuiltins ensureStandaloneBodies (#12910).
             return;
