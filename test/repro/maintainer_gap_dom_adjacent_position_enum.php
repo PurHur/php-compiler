@@ -2,31 +2,43 @@
 
 declare(strict_types=1);
 
-/** Repro #20782 — Dom\AdjacentPosition enum + insertAdjacent* enum where. */
+/** Repro #20782 follow-up — living enum-only / legacy string-only for insertAdjacent*. */
 if (!enum_exists('Dom\\AdjacentPosition')) {
     fwrite(STDERR, "fail: Dom\\AdjacentPosition missing (need PHP_COMPILER_PROFILE=8.4)\n");
     exit(1);
 }
-echo 'enum: yes'."\n";
-echo 'case: '.Dom\AdjacentPosition::BeforeBegin->value."\n";
+echo "enum: yes\n";
 
-$d = Dom\HTMLDocument::createFromString('<p id="p">hi</p>');
-$p = $d->getElementById('p');
+$d = Dom\HTMLDocument::createEmpty();
+$html = $d->createElement('html');
+$body = $d->createElement('body');
+$d->append($html);
+$html->append($body);
+$p = $d->createElement('p');
+$body->append($p);
 $n = $d->createElement('i');
-$p->insertAdjacentElement(Dom\AdjacentPosition::BeforeBegin, $n);
-echo "insert: ok\n";
-$body = $d->body;
-echo 'tag: '.$body->firstElementChild->tagName."\n";
+$p->insertAdjacentElement(Dom\AdjacentPosition::AfterBegin, $n);
+echo "living-enum: ok\n";
 
-$p2 = $d->getElementById('p');
-$p2->insertAdjacentText(Dom\AdjacentPosition::AfterBegin, 'X');
-$html = '<b>Y</b>';
-$p2->insertAdjacentHTML(Dom\AdjacentPosition::BeforeEnd, $html);
-echo "text_html: ok\n";
+$n2 = $d->createElement('b');
+try {
+    $p->insertAdjacentElement('beforeend', $n2);
+    echo "living-string: ok\n";
+} catch (TypeError $e) {
+    echo "living-string: TypeError\n";
+}
 
 $legacy = new DOMDocument();
-$legacy->loadHTML('<div id="d">z</div>', LIBXML_NOERROR);
-$el = $legacy->getElementById('d');
-$span = $legacy->createElement('span');
-$el->insertAdjacentElement(Dom\AdjacentPosition::AfterEnd, $span);
-echo "legacy: ok\n";
+$legacy->loadXML('<root><a/></root>');
+$el = $legacy->documentElement;
+$x = $legacy->createElement('x');
+$el->insertAdjacentElement('beforeend', $x);
+echo "legacy-string: ok\n";
+
+$y = $legacy->createElement('y');
+try {
+    $el->insertAdjacentElement(Dom\AdjacentPosition::AfterEnd, $y);
+    echo "legacy-enum: ok\n";
+} catch (TypeError $e) {
+    echo "legacy-enum: TypeError\n";
+}

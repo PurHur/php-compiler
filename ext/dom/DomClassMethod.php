@@ -50,27 +50,89 @@ abstract class DomClassMethod extends VmClassMethod
     }
 
     /**
-     * insertAdjacent* $where — string or Dom\AdjacentPosition (php-src php_dom.stub.php; #20782).
+     * insertAdjacentElement/Text $where — Dom\AdjacentPosition on living Dom\Element; string on DOMElement (#20782).
+     *
+     * php-src: ext/dom/php_dom.stub.php — living AdjacentPosition vs legacy string
      */
     protected function adjacentPositionArg(
+        ObjectEntry $receiver,
+        Variable $var,
+        string $method,
+        ?Frame $frame = null
+    ): string {
+        $var = $var->resolveIndirect();
+        $living = VmDomLiving::isLivingElement($receiver);
+        $label = $living
+            ? 'Dom\\Element::'.$method
+            : 'DOMElement::'.$method;
+
+        if ($living) {
+            $fromEnum = DomAdjacentPositionEnum::tryPositionString($var);
+            if (null !== $fromEnum) {
+                return $fromEnum;
+            }
+            $given = EnumCaseSupport::isEnumCaseVariable($var)
+                ? EnumCaseSupport::typeNameForVariable($var)
+                : (Variable::TYPE_OBJECT === $var->type
+                    ? $var->toObject()->class->name
+                    : VmDom::typeLabel($var));
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($where) must be of type Dom\\AdjacentPosition, %s given',
+                $label,
+                $given
+            ));
+        }
+
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($where) must be of type string, %s given',
+                $label,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::rejectNullString($var, $label.'()', 'where', 0, $frame);
+        }
+        if (Variable::TYPE_STRING !== $var->type && Variable::TYPE_NULL !== $var->type) {
+            $given = Variable::TYPE_OBJECT === $var->type
+                ? $var->toObject()->class->name
+                : VmDom::typeLabel($var);
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($where) must be of type string, %s given',
+                $label,
+                $given
+            ));
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            return '';
+        }
+
+        return $var->toString();
+    }
+
+    /**
+     * DOMElement::insertAdjacentHTML $position — string only (php-src stub; living Dom\Element has no HTML API).
+     */
+    protected function adjacentHtmlPositionArg(
         Variable $var,
         string $label,
         int $index,
         ?Frame $frame = null,
-        string $paramName = 'where'
+        string $paramName = 'position'
     ): string {
         $var = $var->resolveIndirect();
-        $fromEnum = DomAdjacentPositionEnum::tryPositionString($var);
-        if (null !== $fromEnum) {
-            return $fromEnum;
-        }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            // Allow Dom\AdjacentPosition backing for copied living handlers; prefer string for legacy.
+            $fromEnum = DomAdjacentPositionEnum::tryPositionString($var);
+            if (null !== $fromEnum) {
+                return $fromEnum;
+            }
             throw new \TypeError(sprintf(
-                '%s: Argument #%d ($%s) must be of type Dom\\AdjacentPosition|string, %s given',
+                '%s: Argument #%d ($%s) must be of type string, %s given',
                 $label,
                 $index + 1,
                 $paramName,
-                VmDom::typeLabel($var)
+                EnumCaseSupport::typeNameForVariable($var)
             ));
         }
         if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
@@ -78,7 +140,7 @@ abstract class DomClassMethod extends VmClassMethod
         }
         if (Variable::TYPE_STRING !== $var->type && Variable::TYPE_NULL !== $var->type) {
             throw new \TypeError(sprintf(
-                '%s: Argument #%d ($%s) must be of type Dom\\AdjacentPosition|string, %s given',
+                '%s: Argument #%d ($%s) must be of type string, %s given',
                 $label,
                 $index + 1,
                 $paramName,

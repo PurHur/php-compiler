@@ -22,11 +22,10 @@ final class ElementInsertAdjacentElement extends DomClassMethod
             throw new \LogicException('DOMElement::insertAdjacentElement() expects at least 2 arguments');
         }
         $position = $this->adjacentPositionArg(
+            $receiver,
             $frame->calledArgs[1],
-            'DOMElement::insertAdjacentElement()',
-            0,
-            $frame,
-            'where'
+            'insertAdjacentElement',
+            $frame
         );
         $elementArg = $frame->calledArgs[2]->resolveIndirect();
         if (Variable::TYPE_NULL === $elementArg->type) {

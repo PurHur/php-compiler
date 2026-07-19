@@ -21,11 +21,10 @@ final class ElementInsertAdjacentText extends DomClassMethod
             throw new \LogicException('DOMElement::insertAdjacentText() expects at least 2 arguments');
         }
         $position = $this->adjacentPositionArg(
+            $receiver,
             $frame->calledArgs[1],
-            'DOMElement::insertAdjacentText()',
-            0,
-            $frame,
-            'where'
+            'insertAdjacentText',
+            $frame
         );
         $data = $this->stringArg($frame->calledArgs[2], 'DOMElement::insertAdjacentText()', 1, $frame, 'data');
         if (null === $frame->vmContext) {
