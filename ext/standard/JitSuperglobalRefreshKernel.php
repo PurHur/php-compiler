@@ -115,6 +115,7 @@ final class JitSuperglobalRefreshKernel
         $methodCstr = self::storeLibcGetenvInEntry($context, $entry, 'REQUEST_METHOD');
         $scriptNameCstr = self::storeLibcGetenvOrDefaultInEntry($context, $entry, 'SCRIPT_NAME', self::DEFAULT_SCRIPT_NAME);
         $requestUriCstr = self::storeLibcGetenvInEntry($context, $entry, 'REQUEST_URI');
+        $pathInfoCstr = self::storeLibcGetenvInEntry($context, $entry, 'PATH_INFO');
         $serverProtocolCstr = self::storeLibcGetenvOrDefaultInEntry($context, $entry, 'SERVER_PROTOCOL', 'HTTP/1.1');
         $cookieCstr = self::storeLibcGetenvInEntry($context, $entry, 'HTTP_COOKIE');
         $documentRootCstr = self::storeLibcGetenvInEntry($context, $entry, 'DOCUMENT_ROOT');
@@ -123,6 +124,14 @@ final class JitSuperglobalRefreshKernel
         $httpHostCstr = self::storeLibcGetenvInEntry($context, $entry, 'HTTP_HOST');
         $methodResolved = self::storeResolvedMethodInEntry($context, $entry, $methodCstr, $postBodyCstr);
         $requestUriResolved = self::storeResolvedRequestUriInEntry($context, $entry, $requestUriCstr, $scriptNameCstr);
+        // PATH_INFO from environ, else derive URI suffix after SCRIPT_NAME (#20923).
+        $pathInfoResolved = self::storeResolvedPathInfoInEntry(
+            $context,
+            $entry,
+            $pathInfoCstr,
+            $scriptNameCstr,
+            $requestUriResolved
+        );
 
         $workBb = $fn->appendBasicBlock('sg_user_refresh_work');
         $context->builder->branch($workBb);
@@ -172,6 +181,7 @@ final class JitSuperglobalRefreshKernel
         self::setServerKeyFromCstr($context, $serverHt, 'PHP_SELF', $scriptNameCstr);
         self::setServerKeyFromCstrIfNonEmpty($context, $fn, $serverHt, 'REQUEST_METHOD', $methodResolved);
         self::setServerKeyFromCstr($context, $serverHt, 'REQUEST_URI', $requestUriResolved);
+        self::setServerKeyFromCstr($context, $serverHt, 'PATH_INFO', $pathInfoResolved);
         self::setServerKeyFromLiteral($context, $serverHt, 'GATEWAY_INTERFACE', self::GATEWAY_INTERFACE);
         self::setServerKeyFromLiteral($context, $serverHt, 'SERVER_SOFTWARE', self::SERVER_SOFTWARE);
         self::setServerKeyFromCstr($context, $serverHt, 'SERVER_PROTOCOL', $serverProtocolCstr);
@@ -285,7 +295,6 @@ final class JitSuperglobalRefreshKernel
         Value $requestUriSlot,
         Value $scriptNameSlot
     ): Value {
-        $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
         $outSlot = self::entryAllocaInBlock($context, $entry, $i8p);
         $uriEmpty = self::isCstrSlotEmpty($context, $requestUriSlot);
@@ -293,6 +302,65 @@ final class JitSuperglobalRefreshKernel
             $context->builder->select($uriEmpty, $context->builder->load($scriptNameSlot), $context->builder->load($requestUriSlot)),
             $outSlot
         );
+
+        return $outSlot;
+    }
+
+    /**
+     * PATH_INFO from environ, else REQUEST_URI path suffix after SCRIPT_NAME (#20923).
+     *
+     * Uses selects only (no extra basic blocks) so it can run in the refresh entry block
+     * alongside other getenv slots. GEP is only consumed when URI is longer than SCRIPT_NAME.
+     *
+     * php-src / VM SSOT: {@see \PHPCompiler\Web\Superglobals::derivePathInfo()}
+     */
+    private static function storeResolvedPathInfoInEntry(
+        Context $context,
+        \PHPLLVM\BasicBlock $entry,
+        Value $pathInfoSlot,
+        Value $scriptNameSlot,
+        Value $requestUriSlot
+    ): Value {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $outSlot = self::entryAllocaInBlock($context, $entry, $i8p);
+
+        $fromEnv = $context->builder->load($pathInfoSlot);
+        $envEmpty = self::isCstrEmpty($context, $fromEnv);
+
+        $script = $context->builder->load($scriptNameSlot);
+        $uri = $context->builder->load($requestUriSlot);
+        $empty = self::literalCstr($context, '');
+        $scriptLen = $context->builder->call($context->lookupFunction('strlen'), $script);
+        $uriLen = $context->builder->call($context->lookupFunction('strlen'), $uri);
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $uri,
+            $script,
+            $scriptLen
+        );
+        $prefixOk = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+        $longer = $context->builder->icmp(Builder::INT_UGT, $uriLen, $scriptLen);
+        $canDerive = $context->builder->and($prefixOk, $longer);
+
+        // Safe GEP base: when !canDerive, index 0 on uri (NUL or first char) — never past end.
+        $safeIndex = $context->builder->select(
+            $canDerive,
+            $scriptLen,
+            $context->getTypeFromString('size_t')->constInt(0, false)
+        );
+        $derivedPtr = $context->builder->gep($uri, $safeIndex);
+        $derivedFirst = $context->builder->load($derivedPtr);
+        $derivedIsQueryOnly = $context->builder->icmp(
+            Builder::INT_EQ,
+            $derivedFirst,
+            $i8->constInt(ord('?'), false)
+        );
+        $derivedClean = $context->builder->select($derivedIsQueryOnly, $empty, $derivedPtr);
+        $derivedOrEmpty = $context->builder->select($canDerive, $derivedClean, $empty);
+        $resolved = $context->builder->select($envEmpty, $derivedOrEmpty, $fromEnv);
+        $context->builder->store($resolved, $outSlot);
 
         return $outSlot;
     }
