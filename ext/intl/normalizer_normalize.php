@@ -8,11 +8,14 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
  * normalizer_normalize() — Unicode normalization (php-src ext/intl/normalizer; #5153).
+ *
+ * Z_PARAM_STR null TypeError on 8.4 forward profile (#21063, normalizer.stub.php).
  */
 final class normalizer_normalize extends Internal
 {
@@ -29,8 +32,10 @@ final class normalizer_normalize extends Internal
                 \sprintf('normalizer_normalize() expects 1 or 2 arguments, %d given', $argc)
             );
         }
-        $input = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21063).
+        $input = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
             'normalizer_normalize',
             0,
             'string'
@@ -45,8 +50,28 @@ final class normalizer_normalize extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
+        $argc = \count($args);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(
+                \sprintf('normalizer_normalize() expects 1 or 2 arguments, %d given', $argc)
+            );
+        }
+        // Z_PARAM_STR — null TypeError on 8.4 forward (constants + boxed VALUE) (#21063).
+        JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'normalizer_normalize', 0, 'string');
+        $zparamStrict = $context->callerStrictTypes
+            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile();
+        $nullConst = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
+        if ($nullConst && $zparamStrict) {
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+        // Boxed VALUE: lowerZparamStr already emitted runtime null TypeError (#21063).
+        // Full NFC/NFD runtime remains VM; ok-path placeholder keeps AOT IR valid.
+        if (JITVariable::TYPE_VALUE === $args[0]->type && $zparamStrict) {
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+
         throw new \LogicException(
-            'normalizer_normalize() JIT runtime lowering is deferred; use VM (#5153)'
+            'normalizer_normalize() JIT runtime lowering is deferred; use VM or compile-time literals (#5153)'
         );
     }
 }

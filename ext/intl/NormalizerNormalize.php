@@ -8,7 +8,11 @@ use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 
-/** Normalizer::normalize() — OOP alias of normalizer_normalize() (#19535). */
+/**
+ * Normalizer::normalize() — OOP alias of normalizer_normalize() (#19535).
+ *
+ * Z_PARAM_STR null TypeError on 8.4 forward profile (#21063, normalizer.stub.php).
+ */
 final class NormalizerNormalize extends VmClassMethod
 {
     public function __construct()
@@ -24,8 +28,10 @@ final class NormalizerNormalize extends VmClassMethod
                 \sprintf('Normalizer::normalize() expects 1 or 2 arguments, %d given', $argc)
             );
         }
-        $input = VmString::coerceStringBuiltinArg(
-            $frame->calledArgs[0],
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21063).
+        $input = VmString::zparamStrBuiltinArgForFrame(
+            $frame,
+            0,
             'Normalizer::normalize',
             0,
             'string'
