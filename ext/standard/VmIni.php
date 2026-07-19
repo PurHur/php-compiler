@@ -199,7 +199,7 @@ final class VmIni
             case 'session.save_path':
                 return self::setSessionSavePath($newValue);
             case 'include_path':
-                return IncludePathJitHelper::push($newValue);
+                return VmIncludePath::push($newValue);
             case 'default_charset':
                 return self::setDefaultCharset($newValue);
             case 'date.timezone':
@@ -280,7 +280,7 @@ final class VmIni
             case 'session.save_path':
                 return self::$sessionSavePath;
             case 'include_path':
-                return IncludePathJitHelper::get();
+                return VmIncludePath::get();
             case 'default_charset':
                 return self::$defaultCharset;
             case 'date.timezone':

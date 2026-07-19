@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * include_path stack for compiled JIT/AOT modules (#9245, php-in-PHP).
+ * include_path stack for compiled JIT/AOT modules (#9245, php-in-PHP, #20877).
  *
  * Stack uses a NUL-delimited static string (JIT cannot lower static array push/pop yet).
+ * NestedJIT-safe: no ini_get() (would pull __compiler_ini_get under thin AOT).
+ * Host SAPI seed lives in {@see VmIncludePath} (#10461).
  * VM SSOT delegates via {@see VmIncludePath}.
  * php-src: ext/standard/basic_functions.c — php_get_include_path / php_set_include_path
  */
@@ -15,14 +17,27 @@ final class IncludePathJitHelper
 {
     private static ?string $stack = null;
 
-    /** Seed from host SAPI ini on first access (issue #10461). */
+    /** True before first get/set/seed (VmIncludePath host-ini seed). */
+    public static function isUninitialized(): bool
+    {
+        return null === self::$stack;
+    }
+
+    /** Seed stack once (host ini or default "."); no-op if already initialized. */
+    public static function seed(string $path): void
+    {
+        if (null === self::$stack) {
+            self::$stack = '' !== $path ? $path : '.';
+        }
+    }
+
+    /** Default "." — NestedJIT must not call ini_get (#20877 / thin stubs). */
     private static function ensureStack(): string
     {
         if (null !== self::$stack) {
             return self::$stack;
         }
-        $ini = @ini_get('include_path');
-        self::$stack = (false !== $ini && '' !== $ini) ? $ini : '.';
+        self::$stack = '.';
 
         return self::$stack;
     }
