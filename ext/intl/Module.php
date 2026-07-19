@@ -192,11 +192,17 @@ class Module extends ModuleAbstract
 
         $datefmt = IntlExtensionPolicy::advertisesIntlDateFormatter()
             ? [
+                new datefmt_create(),
+                new datefmt_format(),
                 new datefmt_format_object(),
                 new datefmt_parse(),
                 new datefmt_localtime(),
                 new datefmt_get_error_code(),
                 new datefmt_get_error_message(),
+                new datefmt_get_pattern(),
+                new datefmt_set_pattern(),
+                new datefmt_get_timezone(),
+                new datefmt_set_timezone(),
             ]
             : [];
 
