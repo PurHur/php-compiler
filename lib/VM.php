@@ -9187,6 +9187,10 @@ restart:
             return $this->dispatchVmSodiumException($e, $callerFrame);
         } catch (\RedisException $e) {
             return $this->dispatchVmRedisException($e, $callerFrame);
+        } catch (\FFI\ParserException $e) {
+            return $this->dispatchVmFfiException($e, $callerFrame, true);
+        } catch (\FFI\Exception $e) {
+            return $this->dispatchVmFfiException($e, $callerFrame, false);
         } catch (VM\NativeDateInvalidTimeZoneException $e) {
             return $this->dispatchVmDateInvalidTimeZoneException($e, $callerFrame);
         } catch (VM\NativeDateMalformedStringException $e) {
@@ -9418,6 +9422,21 @@ restart:
             $faultactor,
             $detail,
             $name
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native FFI\Exception / FFI\ParserException from ext/ffi builtins (#4420). */
+    private function dispatchVmFfiException(\FFI\Exception $error, Frame $frame, bool $parser): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeFfiException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line,
+            $parser || $error instanceof \FFI\ParserException
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
