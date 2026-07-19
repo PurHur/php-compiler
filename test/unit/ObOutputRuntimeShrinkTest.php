@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\ObOutputJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** ObOutputRuntime routes standalone + embed through ObOutputJitHelper PHP; thin AOT via isThinStandaloneAotMain + JitObOutputKernel (#9268, #12951, #19422, #20169, #20443). */
+/** ObOutputRuntime: thin inventory NestedJIT ObOutputJitHelper; user-script via JitObOutputKernel (#9268, #12951, #19422, #20169, #20443, #21066). */
 final class ObOutputRuntimeShrinkTest extends TestCase
 {
     public function testObOutputRuntimeUsesHelperNotLlvmStack(): void
@@ -29,7 +29,10 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $bridge);
         $this->assertStringContainsString('JitObOutputKernel::shouldUse', $bridge);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $bridge);
+        // Thin inventory no longer uses implementDeferredInventoryStubs (#21066).
+        $this->assertStringNotContainsString('implementDeferredInventoryStubs', $bridge);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $bridge);
+        $this->assertStringContainsString('implementMissingUserScriptAbiPads', $bridge);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $bridge);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $bridge);
         $this->assertStringNotContainsString('ObOutputUserScriptLlvm', $bridge);
@@ -40,7 +43,6 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureEchoAbiDeclared', $bridge);
         $bridgeLines = \substr_count($bridge, "\n") + 1;
         $this->assertLessThan(820, $bridgeLines, 'ObOutputJitBridge LOC (#12999 echo ABI forward declare)');
-        // #12974: list-spread destructuring in foreach breaks self-host parseAndCompile.
         $this->assertDoesNotMatchRegularExpression(
             '/as\s+\$[a-zA-Z_]+\s*=>\s*\[\$[a-zA-Z_]+,\s*\$[a-zA-Z_]+,\s*\.\.\.\$/',
             $bridge
@@ -59,6 +61,7 @@ final class ObOutputRuntimeShrinkTest extends TestCase
 
         $kernel = (string) file_get_contents(__DIR__.'/../../ext/standard/JitObOutputKernel.php');
         $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $kernel);
+        $this->assertStringContainsString('ObOutputExecCaptureRuntime::ensureLinked', $kernel);
         $this->assertStringNotContainsString('EmbedObEchoBridge::implementAll', $kernel);
 
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/ObOutputJitHelper.php');

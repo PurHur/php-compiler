@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\ext\standard\JitObOutputKernel;
 use PHPCompiler\JIT\Context;
 
-/** JIT/AOT ob_* dispatch — standalone routes through ObOutputJitBridge (#9268, #13571, #19422). */
+/** JIT/AOT ob_* dispatch — standalone routes through ObOutputJitBridge (#9268, #13571, #19422, #21066). */
 final class ObOutputRuntime
 {
     public static function ensureLinked(Context $context): void
