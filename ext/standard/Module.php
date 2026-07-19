@@ -567,6 +567,10 @@ class Module extends ModuleAbstract
             new stream_socket_recvfrom(),
             new stream_socket_sendto(),
             new stream_socket_enable_crypto(),
+            ...(CompilerVersion::supportsStreamErrorApi() ? [
+                new stream_last_errors(),
+                new stream_clear_errors(),
+            ] : []),
             new fsockopen(),
             new pfsockopen(),
             new stream_set_chunk_size_(),

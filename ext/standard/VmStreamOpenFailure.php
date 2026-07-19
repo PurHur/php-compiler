@@ -17,6 +17,7 @@ final class VmStreamOpenFailure
         if (null === $frame->vmContext) {
             return;
         }
+        VmStreamErrorStore::recordOpenFailed($path);
         $message = \sprintf(
             '%s(%s): Failed to open stream: No such file or directory',
             $function,

@@ -59,6 +59,9 @@ final class BuiltinIntrospectionPolicy
         if ('stream_supports' === $lc) {
             return CompilerVersion::advertisesStreamSupports();
         }
+        if (\in_array($lc, ['stream_last_errors', 'stream_clear_errors'], true)) {
+            return CompilerVersion::advertisesStreamErrorApi();
+        }
         if ('nextafter' === $lc) {
             return CompilerVersion::advertisesNextafter();
         }
