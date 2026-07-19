@@ -139,6 +139,30 @@ final class DomLivingBuiltinClasses
         $htmlCollection->methodNames['nameditem'] = 'namedItem';
         $ctx->classes[VmDomLiving::CLASS_HTML_COLLECTION] = $htmlCollection;
 
+        // Dom\NodeList — XPath node-set results (php-src php_dom.stub.php; #20757).
+        $nodeList = new ClassEntry('Dom\\NodeList');
+        $nodeList->isInternal = true;
+        $nodeList->interfaces[] = 'countable';
+        if (isset($ctx->classes['iterator'])) {
+            $nodeList->interfaces[] = 'iterator';
+        }
+        if (isset($ctx->classes['traversable'])) {
+            $nodeList->interfaces[] = 'traversable';
+        }
+        $nodeList->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
+        self::copyMethods($ctx->classes[VmDom::CLASS_NODE_LIST] ?? null, $nodeList);
+        $ctx->classes[VmDomLiving::CLASS_NODE_LIST] = $nodeList;
+
+        // Dom\XPath — living Document XPath (php-src php_dom.stub.php / xpath.c; #20757).
+        $xpath = new ClassEntry('Dom\\XPath');
+        $xpath->isInternal = true;
+        $xpathConstruct = new LivingXPathConstruct();
+        $xpath->constructor = $xpathConstruct;
+        $xpath->methods['__construct'] = $xpathConstruct;
+        $xpath->methodVisibility['__construct'] = $pub;
+        self::copyMethods($ctx->classes[VmDom::CLASS_XPATH] ?? null, $xpath);
+        $ctx->classes[VmDomLiving::CLASS_XPATH] = $xpath;
+
         $document = new ClassEntry('Dom\\Document');
         $document->isInternal = true;
         $document->parentLc = VmDomLiving::CLASS_NODE;
