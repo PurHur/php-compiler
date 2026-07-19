@@ -34,7 +34,11 @@ final class numfmt_parse extends Internal
             throw new \TypeError('numfmt_parse(): Argument #1 ($formatter) must be of type NumberFormatter');
         }
         $value = VmNumberFormatter::coerceStringArg($frame->calledArgs[1], 'numfmt_parse', 1, 'string');
-        $result = VmNumberFormatter::parse($receiver->toObject(), $value);
+        $type = VmNumberFormatter::TYPE_DOUBLE;
+        if ($argc >= 3) {
+            $type = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'numfmt_parse', 2, 'type');
+        }
+        $result = VmNumberFormatter::parse($receiver->toObject(), $value, $type);
         if (null === $frame->returnVar) {
             return;
         }

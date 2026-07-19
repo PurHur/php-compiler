@@ -33,21 +33,47 @@ final class VmNumberFormatter
     public const SPELLOUT = 5;
     public const ORDINAL = 6;
     public const DURATION = 7;
-    public const PATTERN_RULEBASED = 8;
-    public const IGNORE = 9;
+    /** ICU UNUM_PATTERN_RULEBASED — was wrongly 8 (UNUM_NUMBERING_SYSTEM); #20993. */
+    public const PATTERN_RULEBASED = 9;
+    /** ICU UNUM_IGNORE alias of UNUM_PATTERN_DECIMAL — was wrongly 9; #20993. */
+    public const IGNORE = 0;
     public const CURRENCY_ACCOUNTING = 12;
     public const DEFAULT_STYLE = 1;
 
     public const PARSE_INT_ONLY = 0;
     public const GROUPING_USED = 1;
+    public const DECIMAL_ALWAYS_SHOWN = 2;
     public const MAX_INTEGER_DIGITS = 3;
     public const MIN_INTEGER_DIGITS = 4;
     public const INTEGER_DIGITS = 5;
     public const MAX_FRACTION_DIGITS = 6;
     public const MIN_FRACTION_DIGITS = 7;
     public const FRACTION_DIGITS = 8;
+    public const MULTIPLIER = 9;
     public const GROUPING_SIZE = 10;
     public const ROUNDING_MODE = 11;
+    public const ROUNDING_INCREMENT = 12;
+    public const FORMAT_WIDTH = 13;
+    public const PADDING_POSITION = 14;
+    public const SECONDARY_GROUPING_SIZE = 15;
+    public const SIGNIFICANT_DIGITS_USED = 16;
+    public const MIN_SIGNIFICANT_DIGITS = 17;
+    public const MAX_SIGNIFICANT_DIGITS = 18;
+    public const LENIENT_PARSE = 19;
+
+    /** UNumberFormatPadPosition (unicode/unum.h; #20993). */
+    public const PAD_BEFORE_PREFIX = 0;
+    public const PAD_AFTER_PREFIX = 1;
+    public const PAD_BEFORE_SUFFIX = 2;
+    public const PAD_AFTER_SUFFIX = 3;
+
+    /** FORMAT_TYPE_* for format()/parse() (#20993). */
+    public const TYPE_DEFAULT = 0;
+    public const TYPE_INT32 = 1;
+    public const TYPE_INT64 = 2;
+    public const TYPE_DOUBLE = 3;
+    /** @deprecated since PHP 8.3 */
+    public const TYPE_CURRENCY = 4;
 
     /** ICU UNumberFormatSymbol (unicode/unum.h; #20789). */
     public const DECIMAL_SEPARATOR_SYMBOL = 0;
@@ -124,14 +150,33 @@ final class VmNumberFormatter
             'DEFAULT_STYLE' => self::DEFAULT_STYLE,
             'PARSE_INT_ONLY' => self::PARSE_INT_ONLY,
             'GROUPING_USED' => self::GROUPING_USED,
+            'DECIMAL_ALWAYS_SHOWN' => self::DECIMAL_ALWAYS_SHOWN,
             'MAX_INTEGER_DIGITS' => self::MAX_INTEGER_DIGITS,
             'MIN_INTEGER_DIGITS' => self::MIN_INTEGER_DIGITS,
             'INTEGER_DIGITS' => self::INTEGER_DIGITS,
             'MAX_FRACTION_DIGITS' => self::MAX_FRACTION_DIGITS,
             'MIN_FRACTION_DIGITS' => self::MIN_FRACTION_DIGITS,
             'FRACTION_DIGITS' => self::FRACTION_DIGITS,
+            'MULTIPLIER' => self::MULTIPLIER,
             'GROUPING_SIZE' => self::GROUPING_SIZE,
             'ROUNDING_MODE' => self::ROUNDING_MODE,
+            'ROUNDING_INCREMENT' => self::ROUNDING_INCREMENT,
+            'FORMAT_WIDTH' => self::FORMAT_WIDTH,
+            'PADDING_POSITION' => self::PADDING_POSITION,
+            'SECONDARY_GROUPING_SIZE' => self::SECONDARY_GROUPING_SIZE,
+            'SIGNIFICANT_DIGITS_USED' => self::SIGNIFICANT_DIGITS_USED,
+            'MIN_SIGNIFICANT_DIGITS' => self::MIN_SIGNIFICANT_DIGITS,
+            'MAX_SIGNIFICANT_DIGITS' => self::MAX_SIGNIFICANT_DIGITS,
+            'LENIENT_PARSE' => self::LENIENT_PARSE,
+            'PAD_BEFORE_PREFIX' => self::PAD_BEFORE_PREFIX,
+            'PAD_AFTER_PREFIX' => self::PAD_AFTER_PREFIX,
+            'PAD_BEFORE_SUFFIX' => self::PAD_BEFORE_SUFFIX,
+            'PAD_AFTER_SUFFIX' => self::PAD_AFTER_SUFFIX,
+            'TYPE_DEFAULT' => self::TYPE_DEFAULT,
+            'TYPE_INT32' => self::TYPE_INT32,
+            'TYPE_INT64' => self::TYPE_INT64,
+            'TYPE_DOUBLE' => self::TYPE_DOUBLE,
+            'TYPE_CURRENCY' => self::TYPE_CURRENCY,
             'DECIMAL_SEPARATOR_SYMBOL' => self::DECIMAL_SEPARATOR_SYMBOL,
             'GROUPING_SEPARATOR_SYMBOL' => self::GROUPING_SEPARATOR_SYMBOL,
             'PATTERN_SEPARATOR_SYMBOL' => self::PATTERN_SEPARATOR_SYMBOL,
@@ -261,7 +306,7 @@ final class VmNumberFormatter
     /**
      * @return string|false
      */
-    public static function format(ObjectEntry $formatter, float $num)
+    public static function format(ObjectEntry $formatter, float $num, int $type = self::TYPE_DEFAULT)
     {
         $state = self::$state[$formatter->id] ?? null;
         if (null === $state) {
@@ -271,6 +316,17 @@ final class VmNumberFormatter
         }
         self::clearObjectError($formatter);
         IntlError::clear();
+        if (self::TYPE_INT32 === $type || self::TYPE_INT64 === $type) {
+            $num = (float) (int) $num;
+        } elseif (self::TYPE_CURRENCY === $type) {
+            throw new \ValueError(
+                'NumberFormatter::format(): Argument #2 ($type) cannot be NumberFormatter::TYPE_CURRENCY constant, use NumberFormatter::formatCurrency() method instead'
+            );
+        } elseif (self::TYPE_DEFAULT !== $type && self::TYPE_DOUBLE !== $type) {
+            throw new \ValueError(
+                'NumberFormatter::format(): Argument #2 ($type) must be a NumberFormatter::TYPE_* constant'
+            );
+        }
         $style = $state['style'];
         $locale = $state['locale'];
         if (self::PERCENT === $style) {
@@ -319,15 +375,25 @@ final class VmNumberFormatter
     }
 
     /**
-     * @return float|false
+     * @return int|float|false
      */
-    public static function parse(ObjectEntry $formatter, string $value)
+    public static function parse(ObjectEntry $formatter, string $value, int $type = self::TYPE_DOUBLE)
     {
         $state = self::$state[$formatter->id] ?? null;
         if (null === $state) {
             self::fail($formatter, 'numfmt_parse: bad formatter: U_ILLEGAL_ARGUMENT_ERROR');
 
             return false;
+        }
+        if (self::TYPE_CURRENCY === $type) {
+            throw new \ValueError(
+                'NumberFormatter::parse(): Argument #2 ($type) cannot be NumberFormatter::TYPE_CURRENCY constant, use NumberFormatter::parseCurrency() method instead'
+            );
+        }
+        if (self::TYPE_INT32 !== $type && self::TYPE_INT64 !== $type && self::TYPE_DOUBLE !== $type) {
+            throw new \ValueError(
+                'NumberFormatter::parse(): Argument #2 ($type) must be a NumberFormatter::TYPE_* constant'
+            );
         }
         $num = self::parseNumberString($value, $state['locale']);
         if (null === $num) {
@@ -337,6 +403,9 @@ final class VmNumberFormatter
         }
         self::clearObjectError($formatter);
         IntlError::clear();
+        if (self::TYPE_INT32 === $type || self::TYPE_INT64 === $type) {
+            return (int) $num;
+        }
 
         return $num;
     }
@@ -879,7 +948,11 @@ final class NumberFormatterFormat extends VmClassMethod
             throw new \Error('NumberFormatter::format() called on incompatible object');
         }
         $num = VmNumberFormatter::coerceFloatArg($frame->calledArgs[1], 'NumberFormatter::format', 1, 'num');
-        $result = VmNumberFormatter::format($receiver->toObject(), $num);
+        $type = VmNumberFormatter::TYPE_DEFAULT;
+        if ($argc >= 3) {
+            $type = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'NumberFormatter::format', 2, 'type');
+        }
+        $result = VmNumberFormatter::format($receiver->toObject(), $num, $type);
         if (null === $frame->returnVar) {
             return;
         }
@@ -940,9 +1013,9 @@ final class NumberFormatterParse extends VmClassMethod
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
+        if ($argc < 2 || $argc > 4) {
             throw new \ArgumentCountError(\sprintf(
-                'NumberFormatter::parse() expects between 1 and 2 arguments, %d given',
+                'NumberFormatter::parse() expects between 1 and 3 arguments, %d given',
                 max(0, $argc - 1)
             ));
         }
@@ -952,12 +1025,30 @@ final class NumberFormatterParse extends VmClassMethod
             throw new \Error('NumberFormatter::parse() called on incompatible object');
         }
         $value = VmNumberFormatter::coerceStringArg($frame->calledArgs[1], 'NumberFormatter::parse', 1, 'string');
-        $result = VmNumberFormatter::parse($receiver->toObject(), $value);
+        $type = VmNumberFormatter::TYPE_DOUBLE;
+        if ($argc >= 3) {
+            $type = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'NumberFormatter::parse', 2, 'type');
+        }
+        $result = VmNumberFormatter::parse($receiver->toObject(), $value, $type);
+        if ($argc >= 4) {
+            // php-src updates &$offset to bytes consumed; subset advances to strlen on success (#20993).
+            $offsetVar = $frame->calledArgs[3]->resolveIndirect();
+            if (false === $result) {
+                // leave offset unchanged on failure (Zend keeps prior value)
+            } else {
+                $offsetVar->int(\strlen($value));
+            }
+        }
         if (null === $frame->returnVar) {
             return;
         }
         if (false === $result) {
             $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (\is_int($result)) {
+            $frame->returnVar->int($result);
 
             return;
         }
