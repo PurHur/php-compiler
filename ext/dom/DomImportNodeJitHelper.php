@@ -24,6 +24,16 @@ final class DomImportNodeJitHelper
         return VmDom::importNode($ctx, $document, $node, 0 !== $deep)->toObject();
     }
 
+    /** Dom\Document::importLegacyNode() — compiled JIT/AOT (#20940). */
+    public static function importLegacyNodeArgv(
+        Context $ctx,
+        ObjectEntry $document,
+        ObjectEntry $node,
+        int $deep
+    ): ObjectEntry {
+        return VmDom::importLegacyNode($ctx, $document, $node, 0 !== $deep)->toObject();
+    }
+
     public static function getAttributeArgv(ObjectEntry $element, string $name): string
     {
         return VmDom::getAttribute($element, $name);
