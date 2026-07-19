@@ -999,12 +999,15 @@ final class VmSoapClient
             }
         }
         foreach ($xpath->query('//xsd:complexType|//xsd:simpleType') ?: [] as $type) {
-            if ($type instanceof \DOMElement) {
-                $n = $type->getAttribute('name');
-                if ('' !== $n) {
-                    $state->types[] = $n;
-                }
+            if (!$type instanceof \DOMElement) {
+                continue;
             }
+            $n = $type->getAttribute('name');
+            if ('' === $n) {
+                continue;
+            }
+            // php-src soap.c type_to_string — struct descriptions for __getTypes (#21089).
+            $state->types[] = self::wsdlTypeToString($type, $n);
         }
         // php-src SDL element → type_str bindings for classmap without xsi:type (#21088).
         foreach ($xpath->query('//xsd:element') ?: [] as $el) {
@@ -1022,6 +1025,72 @@ final class VmSoapClient
                 $state->elementTypes[$elName] = $typeLocal;
             }
         }
+    }
+
+    /**
+     * php-src soap.c type_to_string subset for named schema types (#21089).
+     */
+    private static function wsdlTypeToString(\DOMElement $type, string $name): string
+    {
+        $local = $type->localName ?? $type->nodeName;
+        if ('simpleType' === $local) {
+            $base = 'anyType';
+            foreach ($type->getElementsByTagNameNS('http://www.w3.org/2001/XMLSchema', 'restriction') as $rest) {
+                if ($rest instanceof \DOMElement) {
+                    $b = $rest->getAttribute('base');
+                    if ('' !== $b) {
+                        $base = self::xsdLocalName($b);
+                    }
+                    break;
+                }
+            }
+
+            return $base.' '.$name;
+        }
+
+        $fields = [];
+        foreach ($type->getElementsByTagNameNS('http://www.w3.org/2001/XMLSchema', 'element') as $el) {
+            if (!$el instanceof \DOMElement) {
+                continue;
+            }
+            // Only direct sequence/all/choice members of this complexType (skip nested anonymous types' children
+            // that are deeper than one model level by requiring the element to be under this type's first model).
+            $elName = $el->getAttribute('name');
+            if ('' === $elName) {
+                continue;
+            }
+            // Skip elements that belong to a nested named/anonymous complexType inside this one.
+            $parent = $el->parentNode;
+            $underNestedComplex = false;
+            while ($parent instanceof \DOMNode && $parent !== $type) {
+                if ($parent instanceof \DOMElement) {
+                    $pl = $parent->localName ?? $parent->nodeName;
+                    if ('complexType' === $pl && $parent !== $type) {
+                        $underNestedComplex = true;
+                        break;
+                    }
+                }
+                $parent = $parent->parentNode;
+            }
+            if ($underNestedComplex) {
+                continue;
+            }
+            $elType = $el->getAttribute('type');
+            $typeStr = '' !== $elType ? self::xsdLocalName($elType) : 'anyType';
+            $fields[] = ' '.$typeStr.' '.$elName.';';
+        }
+        if ([] === $fields) {
+            return 'struct '.$name." {\n}";
+        }
+
+        return 'struct '.$name." {\n".\implode("\n", $fields)."\n}";
+    }
+
+    private static function xsdLocalName(string $qname): string
+    {
+        $pos = \strrpos($qname, ':');
+
+        return false !== $pos ? \substr($qname, $pos + 1) : $qname;
     }
 
     /**
