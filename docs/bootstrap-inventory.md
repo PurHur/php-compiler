@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5899 |
-| Phase A inventory files (M2 ratio SSOT) | 5899 |
+| PHP files on vm.php path | 5905 |
+| Phase A inventory files (M2 ratio SSOT) | 5905 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17856 |
+| Source constructs flagged (warnings) | 17880 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -833,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 112 |
+| `ext/intl/Module.php` | 0 | 118 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -868,11 +868,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/collator_set_strength.php` | 0 | 3 |
 | `ext/intl/collator_sort.php` | 0 | 3 |
 | `ext/intl/collator_sort_with_sort_keys.php` | 0 | 3 |
+| `ext/intl/datefmt_create.php` | 0 | 3 |
+| `ext/intl/datefmt_format.php` | 0 | 3 |
 | `ext/intl/datefmt_format_object.php` | 0 | 3 |
 | `ext/intl/datefmt_get_error_code.php` | 0 | 3 |
 | `ext/intl/datefmt_get_error_message.php` | 0 | 3 |
+| `ext/intl/datefmt_get_pattern.php` | 0 | 3 |
+| `ext/intl/datefmt_get_timezone.php` | 0 | 3 |
 | `ext/intl/datefmt_localtime.php` | 0 | 3 |
 | `ext/intl/datefmt_parse.php` | 0 | 3 |
+| `ext/intl/datefmt_set_pattern.php` | 0 | 3 |
+| `ext/intl/datefmt_set_timezone.php` | 0 | 3 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
 | `ext/intl/grapheme_levenshtein.php` | 0 | 2 |
 | `ext/intl/grapheme_str_contains.php` | 0 | 2 |
@@ -8635,16 +8641,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 142)
 - new Variable (line 145)
 - new DOMException (line 185)
-- new DOMException (line 268)
-- new DOMException (line 273)
-- new DOMException (line 280)
-- new DOMException (line 311)
-- new DOMException (line 323)
-- new Exception (line 465)
-- new DOMException (line 487)
-- new Variable (line 493)
-- new Variable (line 527)
-- 38 class method(s)
+- new DOMException (line 269)
+- new DOMException (line 274)
+- new DOMException (line 281)
+- new DOMException (line 312)
+- new DOMException (line 324)
+- new Exception (line 466)
+- new DOMException (line 488)
+- new Variable (line 494)
+- new Variable (line 528)
+- 39 class method(s)
 - 1 closure(s)
 
 ### `ext/dom/VmDomSimpleXmlBridge.php`
@@ -11594,43 +11600,49 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new resourcebundle_get (line 187)
 - new resourcebundle_locales (line 188)
 - new resourcebundle_count (line 189)
-- new datefmt_format_object (line 195)
-- new datefmt_parse (line 196)
-- new datefmt_localtime (line 197)
-- new datefmt_get_error_code (line 198)
-- new datefmt_get_error_message (line 199)
-- new intlcal_create_instance (line 205)
-- new intlcal_get_now (line 206)
-- new intlcal_from_date_time (line 207)
-- new intlcal_get (line 208)
-- new intlcal_set (line 209)
-- new intlcal_get_type (line 210)
-- new intlcal_add (line 211)
-- new intlcal_roll (line 212)
-- new intlcal_clear (line 213)
-- new intlcal_is_set (line 214)
-- new intlcal_equals (line 215)
-- new intlcal_get_time (line 216)
-- new intlcal_set_time (line 217)
-- new intlcal_get_time_zone (line 218)
-- new intlcal_to_date_time (line 219)
-- new intlcal_field_difference (line 220)
-- new grapheme_strlen (line 251)
-- new grapheme_substr (line 252)
-- new grapheme_strpos (line 253)
-- new grapheme_str_contains (line 254)
-- new grapheme_strstr (line 255)
-- new grapheme_stristr (line 256)
-- new grapheme_stripos (line 257)
-- new grapheme_strrpos (line 258)
-- new grapheme_strripos (line 259)
-- new grapheme_extract (line 260)
-- new grapheme_levenshtein (line 261)
-- new grapheme_str_split (line 262)
-- new grapheme_strimwidth (line 263)
-- new intl_get_error_code (line 264)
-- new intl_get_error_message (line 265)
-- new intl_is_failure (line 266)
+- new datefmt_create (line 195)
+- new datefmt_format (line 196)
+- new datefmt_format_object (line 197)
+- new datefmt_parse (line 198)
+- new datefmt_localtime (line 199)
+- new datefmt_get_error_code (line 200)
+- new datefmt_get_error_message (line 201)
+- new datefmt_get_pattern (line 202)
+- new datefmt_set_pattern (line 203)
+- new datefmt_get_timezone (line 204)
+- new datefmt_set_timezone (line 205)
+- new intlcal_create_instance (line 211)
+- new intlcal_get_now (line 212)
+- new intlcal_from_date_time (line 213)
+- new intlcal_get (line 214)
+- new intlcal_set (line 215)
+- new intlcal_get_type (line 216)
+- new intlcal_add (line 217)
+- new intlcal_roll (line 218)
+- new intlcal_clear (line 219)
+- new intlcal_is_set (line 220)
+- new intlcal_equals (line 221)
+- new intlcal_get_time (line 222)
+- new intlcal_set_time (line 223)
+- new intlcal_get_time_zone (line 224)
+- new intlcal_to_date_time (line 225)
+- new intlcal_field_difference (line 226)
+- new grapheme_strlen (line 257)
+- new grapheme_substr (line 258)
+- new grapheme_strpos (line 259)
+- new grapheme_str_contains (line 260)
+- new grapheme_strstr (line 261)
+- new grapheme_stristr (line 262)
+- new grapheme_stripos (line 263)
+- new grapheme_strrpos (line 264)
+- new grapheme_strripos (line 265)
+- new grapheme_extract (line 266)
+- new grapheme_levenshtein (line 267)
+- new grapheme_str_split (line 268)
+- new grapheme_strimwidth (line 269)
+- new intl_get_error_code (line 270)
+- new intl_get_error_message (line 271)
+- new intl_is_failure (line 272)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12346,6 +12358,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 50)
 - 2 class method(s)
 
+### `ext/intl/datefmt_create.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- new Error (line 76)
+- 2 class method(s)
+
+### `ext/intl/datefmt_format.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
 ### `ext/intl/datefmt_format_object.php`
 
 **Warnings** (review for bootstrap subset):
@@ -12367,6 +12393,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 51)
 - 2 class method(s)
 
+### `ext/intl/datefmt_get_pattern.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
+### `ext/intl/datefmt_get_timezone.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 56)
+- 2 class method(s)
+
 ### `ext/intl/datefmt_localtime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -12379,6 +12419,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
 - new Error (line 74)
+- 2 class method(s)
+
+### `ext/intl/datefmt_set_pattern.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 57)
+- 2 class method(s)
+
+### `ext/intl/datefmt_set_timezone.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new Error (line 51)
 - 2 class method(s)
 
 ### `ext/intl/grapheme_extract.php`

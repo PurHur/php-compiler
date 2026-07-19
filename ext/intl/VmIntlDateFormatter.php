@@ -189,7 +189,7 @@ final class VmIntlDateFormatter
     }
 
     /**
-     * IntlDateFormatter::setPattern() / datefmt_set_pattern — php-src dateformat_attr.c (#20850).
+     * IntlDateFormatter::setPattern() / datefmt_set_pattern — php-src dateformat_attr.c (#20850 / #20837).
      */
     public static function setPattern(ObjectEntry $formatter, string $pattern): bool
     {
