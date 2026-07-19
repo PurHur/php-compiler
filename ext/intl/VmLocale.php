@@ -262,7 +262,11 @@ final class VmLocale
     }
 
     /**
-     * locale_filter_matches() / Locale::filterMatches() — prefix filter (php-src; #20036).
+     * locale_filter_matches() / Locale::filterMatches() — prefix filter (php-src; #20036, #20939).
+     *
+     * When {@code $canonicalize} is true, both tags are ICU-canonicalized first and a following
+     * {@code @} keyword separator is allowed (php-src locale_methods.cpp); when false, only
+     * ID separators / end-of-tag match after the prefix.
      */
     public static function filterMatches(
         string $langtag,
@@ -275,7 +279,29 @@ final class VmLocale
         if ('*' === $locale) {
             return true;
         }
-        unset($canonicalize); // ICU canonicalize path deferred; non-canonical match matches php-src |b=false
+        if ($canonicalize) {
+            IntlError::clear();
+            $canLang = self::canonicalize($langtag);
+            if (null === $canLang || '' === $canLang) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'unable to canonicalize lang_tag'
+                );
+
+                return false;
+            }
+            $canLoc = self::canonicalize($locale);
+            if (null === $canLoc || '' === $canLoc) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'unable to canonicalize loc_range'
+                );
+
+                return false;
+            }
+            $langtag = $canLang;
+            $locale = $canLoc;
+        }
         $curLang = self::strToMatch($langtag);
         $curRange = self::strToMatch($locale);
         if (null === $curLang || null === $curRange) {
@@ -289,8 +315,15 @@ final class VmLocale
             return true;
         }
         $ch = $curLang[$next];
+        if ('_' === $ch || '-' === $ch) {
+            return true;
+        }
+        // php-src: keyword separator only accepted after canonicalize branch.
+        if ($canonicalize && '@' === $ch) {
+            return true;
+        }
 
-        return '_' === $ch || '-' === $ch || '@' === $ch;
+        return false;
     }
 
     /**
