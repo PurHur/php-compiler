@@ -244,6 +244,11 @@ final class VmMath
             return $var->toFloat();
         }
         if (Variable::TYPE_BOOLEAN === $var->type) {
+            // Z_PARAM_NUMBER + caller strict_types → TypeError (php-src zend_verify_arg_type; #4189).
+            if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'bool'));
+            }
+
             return $var->toBool() ? 1 : 0;
         }
         if (Variable::TYPE_NULL === $var->type) {
@@ -255,6 +260,10 @@ final class VmMath
             return 0;
         }
         if (Variable::TYPE_STRING === $var->type) {
+            // Numeric strings coerce only when the caller is not strict_types (#4189).
+            if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'string'));
+            }
             $s = $var->toString();
             if ('' === $s || !is_numeric($s)) {
                 throw new \TypeError(self::numberBuiltinTypeError($function, $argIndex, $paramName, 'string'));
