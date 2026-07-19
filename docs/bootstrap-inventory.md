@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5841 |
-| Phase A inventory files (M2 ratio SSOT) | 5841 |
+| PHP files on vm.php path | 5842 |
+| Phase A inventory files (M2 ratio SSOT) | 5842 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17419 |
+| Source constructs flagged (warnings) | 17423 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -831,7 +831,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 55 |
+| `ext/intl/Module.php` | 0 | 56 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -898,6 +898,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/numfmt_format.php` | 0 | 3 |
 | `ext/intl/numfmt_format_currency.php` | 0 | 3 |
 | `ext/intl/numfmt_parse.php` | 0 | 3 |
+| `ext/intl/resourcebundle_count.php` | 0 | 3 |
 | `ext/intl/transliterator_create.php` | 0 | 3 |
 | `ext/intl/transliterator_create_from_rules.php` | 0 | 3 |
 | `ext/intl/transliterator_create_inverse.php` | 0 | 3 |
@@ -11456,21 +11457,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new transliterator_transliterate (line 144)
 - new transliterator_get_error_code (line 145)
 - new transliterator_get_error_message (line 146)
-- new grapheme_strlen (line 171)
-- new grapheme_substr (line 172)
-- new grapheme_strpos (line 173)
-- new grapheme_str_contains (line 174)
-- new grapheme_strstr (line 175)
-- new grapheme_stristr (line 176)
-- new grapheme_stripos (line 177)
-- new grapheme_strrpos (line 178)
-- new grapheme_extract (line 179)
-- new grapheme_levenshtein (line 180)
-- new grapheme_str_split (line 181)
-- new grapheme_strimwidth (line 182)
-- new intl_get_error_code (line 183)
-- new intl_get_error_message (line 184)
-- new intl_is_failure (line 185)
+- new resourcebundle_count (line 151)
+- new grapheme_strlen (line 177)
+- new grapheme_substr (line 178)
+- new grapheme_strpos (line 179)
+- new grapheme_str_contains (line 180)
+- new grapheme_strstr (line 181)
+- new grapheme_stristr (line 182)
+- new grapheme_stripos (line 183)
+- new grapheme_strrpos (line 184)
+- new grapheme_extract (line 185)
+- new grapheme_levenshtein (line 186)
+- new grapheme_str_split (line 187)
+- new grapheme_strimwidth (line 188)
+- new intl_get_error_code (line 189)
+- new intl_get_error_message (line 190)
+- new intl_is_failure (line 191)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -11791,32 +11793,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 52)
-- new ResourceBundleCreate (line 56)
-- new ResourceBundleGetLocales (line 59)
-- new ResourceBundleGet (line 62)
-- new ResourceBundleCount (line 65)
-- new ResourceBundleGetErrorCode (line 68)
-- new ResourceBundleGetErrorMessage (line 71)
-- new ResourceBundleGetIterator (line 74)
-- new Error (line 91)
-- new ObjectEntry (line 105)
-- new HashTable (line 229)
-- new Variable (line 232)
-- new ObjectEntry (line 236)
-- new ArgumentCountError (line 532)
-- new ArgumentCountError (line 567)
-- new Error (line 575)
-- new ArgumentCountError (line 608)
-- new Error (line 616)
-- new ArgumentCountError (line 637)
-- new HashTable (line 652)
-- new Variable (line 654)
-- new ArgumentCountError (line 674)
-- new Error (line 682)
-- new ArgumentCountError (line 703)
-- new Error (line 711)
-- new ArgumentCountError (line 732)
-- new Error (line 740)
+- new ResourceBundleCreate (line 58)
+- new ResourceBundleGetLocales (line 61)
+- new ResourceBundleGet (line 64)
+- new ResourceBundleCount (line 67)
+- new ResourceBundleGetErrorCode (line 70)
+- new ResourceBundleGetErrorMessage (line 73)
+- new ResourceBundleGetIterator (line 76)
+- new Error (line 93)
+- new ObjectEntry (line 107)
+- new HashTable (line 231)
+- new Variable (line 234)
+- new ObjectEntry (line 238)
+- new ArgumentCountError (line 534)
+- new ArgumentCountError (line 569)
+- new Error (line 577)
+- new ArgumentCountError (line 610)
+- new Error (line 618)
+- new ArgumentCountError (line 639)
+- new HashTable (line 654)
+- new Variable (line 656)
+- new ArgumentCountError (line 676)
+- new Error (line 684)
+- new ArgumentCountError (line 705)
+- new Error (line 713)
+- new ArgumentCountError (line 734)
+- new Error (line 742)
 - 30 class method(s)
 
 ### `ext/intl/VmSpoofchecker.php`
@@ -12216,6 +12218,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
 - new Error (line 55)
+- 2 class method(s)
+
+### `ext/intl/resourcebundle_count.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 53)
 - 2 class method(s)
 
 ### `ext/intl/transliterator_create.php`

@@ -147,6 +147,10 @@ class Module extends ModuleAbstract
             ]
             : [];
 
+        $resourcebundle = IntlExtensionPolicy::advertisesResourceBundle()
+            ? [new resourcebundle_count()]
+            : [];
+
         if (!IntlExtensionPolicy::advertisesBuiltins()) {
             return [
                 ...$functions,
@@ -156,6 +160,7 @@ class Module extends ModuleAbstract
                 ...$numfmt,
                 ...$msgfmt,
                 ...$transliterator,
+                ...$resourcebundle,
                 ...IntlExtensionPolicy::profileLocaleParserFunctions(),
             ];
         }
@@ -168,6 +173,7 @@ class Module extends ModuleAbstract
             ...$numfmt,
             ...$msgfmt,
             ...$transliterator,
+            ...$resourcebundle,
             new grapheme_strlen(),
             new grapheme_substr(),
             new grapheme_strpos(),

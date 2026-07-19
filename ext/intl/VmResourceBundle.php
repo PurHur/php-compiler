@@ -51,6 +51,8 @@ final class VmResourceBundle
 
         $entry = new ClassEntry('ResourceBundle');
         $entry->isInternal = true;
+        // php-src ResourceBundle implements Countable (#20781).
+        $entry->interfaces[] = 'countable';
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $entry->methods['create'] = new ResourceBundleCreate();
