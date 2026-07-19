@@ -6,12 +6,15 @@ namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\ext\standard\VmDate;
 use PHPCompiler\ext\standard\VmDateTimeNative;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\DateTimeSupport;
+use PHPCompiler\VM\DateTimeZoneSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
@@ -83,6 +86,13 @@ final class VmIntlTimeZone
             'getcanonicalid' => [new IntlTimeZoneGetCanonicalID(), 'getCanonicalID', $pubStatic],
             'getregion' => [new IntlTimeZoneGetRegion(), 'getRegion', $pubStatic],
             'getgmt' => [new IntlTimeZoneGetGMT(), 'getGMT', $pubStatic],
+            'getunknown' => [new IntlTimeZoneGetUnknown(), 'getUnknown', $pubStatic],
+            'getutc' => [new IntlTimeZoneGetUTC(), 'getUTC', $pubStatic],
+            'createenumeration' => [new IntlTimeZoneCreateEnumeration(), 'createEnumeration', $pubStatic],
+            'createtimezoneidenumeration' => [new IntlTimeZoneCreateTimeZoneIDEnumeration(), 'createTimeZoneIDEnumeration', $pubStatic],
+            'getidforwindowsid' => [new IntlTimeZoneGetIDForWindowsID(), 'getIDForWindowsID', $pubStatic],
+            'geterrorcode' => [new IntlTimeZoneGetErrorCode(), 'getErrorCode', $pub],
+            'geterrormessage' => [new IntlTimeZoneGetErrorMessage(), 'getErrorMessage', $pub],
             'getid' => [new IntlTimeZoneGetID(), 'getID', $pub],
             'getrawoffset' => [new IntlTimeZoneGetRawOffset(), 'getRawOffset', $pub],
             'getdstsavings' => [new IntlTimeZoneGetDSTSavings(), 'getDSTSavings', $pub],
@@ -108,6 +118,148 @@ final class VmIntlTimeZone
     public static function idOf(ObjectEntry $object): string
     {
         return self::$state[$object->id]['id'] ?? 'UTC';
+    }
+
+    /**
+     * Windows timezone ID → Olson (subset; #20852). Region filter ignored in v1.
+     *
+     * @var array<string, string>
+     */
+    private const WINDOWS_TO_OLSON = [
+        'UTC' => 'UTC',
+        'GMT Standard Time' => 'Europe/London',
+        'Greenwich Standard Time' => 'Atlantic/Reykjavik',
+        'Eastern Standard Time' => 'America/New_York',
+        'Central Standard Time' => 'America/Chicago',
+        'Mountain Standard Time' => 'America/Denver',
+        'Pacific Standard Time' => 'America/Los_Angeles',
+        'Alaskan Standard Time' => 'America/Anchorage',
+        'Hawaiian Standard Time' => 'Pacific/Honolulu',
+        'W. Europe Standard Time' => 'Europe/Berlin',
+        'Central Europe Standard Time' => 'Europe/Budapest',
+        'Romance Standard Time' => 'Europe/Paris',
+        'GTB Standard Time' => 'Europe/Bucharest',
+        'FLE Standard Time' => 'Europe/Helsinki',
+        'Russian Standard Time' => 'Europe/Moscow',
+        'Tokyo Standard Time' => 'Asia/Tokyo',
+        'China Standard Time' => 'Asia/Shanghai',
+        'Singapore Standard Time' => 'Asia/Singapore',
+        'Korea Standard Time' => 'Asia/Seoul',
+        'India Standard Time' => 'Asia/Kolkata',
+        'AUS Eastern Standard Time' => 'Australia/Sydney',
+        'New Zealand Standard Time' => 'Pacific/Auckland',
+    ];
+
+    /** @return list<string> */
+    public static function listAvailableIds(): array
+    {
+        return VmDateTimeNative::timezoneIdentifiersList(DateTimeZoneSupport::GROUP_ALL, null);
+    }
+
+    public static function createEnumeration(?string $countryOrZoneId = null): HashTable
+    {
+        $ids = self::listAvailableIds();
+        if (null !== $countryOrZoneId && '' !== $countryOrZoneId) {
+            $needle = $countryOrZoneId;
+            $filtered = [];
+            if (2 === \strlen($needle)) {
+                $cc = strtoupper($needle);
+                foreach ($ids as $id) {
+                    $region = self::regionOfId($id);
+                    if ($region === $cc) {
+                        $filtered[] = $id;
+                    }
+                }
+            } else {
+                foreach ($ids as $id) {
+                    if ($id === $needle || str_starts_with($id, $needle.'/')) {
+                        $filtered[] = $id;
+                    }
+                }
+            }
+            $ids = $filtered;
+        }
+        IntlError::clear();
+
+        return VmFs::stringListToArray($ids);
+    }
+
+    public static function createTimeZoneIDEnumeration(int $zoneType, ?string $region, ?int $rawOffset): HashTable
+    {
+        $ids = self::listAvailableIds();
+        if (null !== $region && '' !== $region) {
+            $cc = strtoupper($region);
+            $ids = array_values(array_filter(
+                $ids,
+                static fn (string $id): bool => self::regionOfId($id) === $cc
+            ));
+        }
+        if (self::TYPE_CANONICAL === $zoneType || self::TYPE_CANONICAL_LOCATION === $zoneType) {
+            // Drop POSIX-style aliases with only Etc/ when canonical-location preferred.
+            $ids = array_values(array_filter(
+                $ids,
+                static fn (string $id): bool => !str_starts_with($id, 'Etc/') || 'Etc/UTC' === $id || 'Etc/GMT' === $id
+            ));
+        }
+        if (null !== $rawOffset) {
+            $ids = array_values(array_filter(
+                $ids,
+                static function (string $id) use ($rawOffset): bool {
+                    try {
+                        return VmDateTimeNative::timezoneOffsetSeconds($id, VmDate::time()) * 1000 === $rawOffset;
+                    } catch (\Throwable) {
+                        return false;
+                    }
+                }
+            ));
+        }
+        IntlError::clear();
+
+        return VmFs::stringListToArray($ids);
+    }
+
+    private static function regionOfId(string $id): string
+    {
+        $region = self::getRegion($id);
+
+        return false === $region ? '' : $region;
+    }
+
+    public static function getIDForWindowsID(string $windowsId, ?string $region): string|false
+    {
+        unset($region);
+        foreach (self::WINDOWS_TO_OLSON as $win => $olson) {
+            if (0 === strcasecmp($win, $windowsId)) {
+                IntlError::clear();
+
+                return $olson;
+            }
+        }
+        IntlError::set(
+            IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+            'intltz_get_id_for_windows_id: unknown Windows ID: U_ILLEGAL_ARGUMENT_ERROR'
+        );
+
+        return false;
+    }
+
+    public static function getErrorCode(ObjectEntry $tz): int|false
+    {
+        if (!isset(self::$state[$tz->id])) {
+            return false;
+        }
+
+        return IntlError::getCode();
+    }
+
+    public static function getErrorMessage(ObjectEntry $tz): string|false
+    {
+        if (!isset(self::$state[$tz->id])) {
+            return false;
+        }
+        $msg = IntlError::getMessage();
+
+        return '' === $msg ? 'U_ZERO_ERROR' : $msg;
     }
 
     public static function createFromId(Context $ctx, string $id): ObjectEntry
@@ -164,6 +316,10 @@ final class VmIntlTimeZone
         $id = trim($id);
         if ('' === $id) {
             return VmDate::defaultTimezoneGet();
+        }
+        // ICU sentinel — preserve literal ID (php-src TimeZone::getUnknown(); #20852).
+        if ('Etc/Unknown' === $id || 'unknown' === strtolower($id)) {
+            return 'Etc/Unknown';
         }
         try {
             return VmDateTimeNative::validateTimezoneId($id);
@@ -876,5 +1032,159 @@ final class IntlTimeZoneGetGMT extends VmClassMethod
             return;
         }
         $frame->returnVar->object(VmIntlTimeZone::createFromId($frame->vmContext, 'GMT'));
+    }
+}
+
+/** IntlTimeZone::getUnknown() — php-src intltz_get_unknown (#20852). */
+final class IntlTimeZoneGetUnknown extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getUnknown'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlTimeZone::getUnknown() expects exactly 0 arguments, %d given', $argc));
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->object(VmIntlTimeZone::createFromId($frame->vmContext, 'Etc/Unknown'));
+    }
+}
+
+/** IntlTimeZone::getUTC() — php-src intltz_get_utc (#20852). */
+final class IntlTimeZoneGetUTC extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getUTC'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlTimeZone::getUTC() expects exactly 0 arguments, %d given', $argc));
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->object(VmIntlTimeZone::createFromId($frame->vmContext, 'UTC'));
+    }
+}
+
+/** IntlTimeZone::createEnumeration() — php-src intltz_create_enumeration (#20852). */
+final class IntlTimeZoneCreateEnumeration extends VmClassMethod
+{
+    public function __construct() { parent::__construct('createEnumeration'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(\sprintf('IntlTimeZone::createEnumeration() expects at most 1 argument, %d given', $argc));
+        }
+        $countryOrZone = null;
+        if (1 === $argc) {
+            $arg = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $arg->type) {
+                if (Variable::TYPE_INTEGER === $arg->type) {
+                    // php-src also accepts int country? treat as string cast of number — rare; ignore filter
+                    $countryOrZone = null;
+                } else {
+                    $countryOrZone = VmString::coerceStringBuiltinArg($arg, 'IntlTimeZone::createEnumeration', 1, 'countryOrZoneId');
+                }
+            }
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->array(VmIntlTimeZone::createEnumeration($countryOrZone));
+    }
+}
+
+/** IntlTimeZone::createTimeZoneIDEnumeration() — php-src intltz_create_timezone_id_enumeration (#20852). */
+final class IntlTimeZoneCreateTimeZoneIDEnumeration extends VmClassMethod
+{
+    public function __construct() { parent::__construct('createTimeZoneIDEnumeration'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 3) {
+            throw new \ArgumentCountError(\sprintf('IntlTimeZone::createTimeZoneIDEnumeration() expects between 1 and 3 arguments, %d given', $argc));
+        }
+        $zoneType = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[0], 'IntlTimeZone::createTimeZoneIDEnumeration', 1, 'type');
+        $region = null;
+        if ($argc >= 2) {
+            $r = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $r->type) {
+                $region = VmString::coerceStringBuiltinArg($r, 'IntlTimeZone::createTimeZoneIDEnumeration', 2, 'region');
+            }
+        }
+        $rawOffset = null;
+        if ($argc >= 3) {
+            $o = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $o->type) {
+                $rawOffset = VmIntlDateFormatter::coerceIntArg($o, 'IntlTimeZone::createTimeZoneIDEnumeration', 3, 'rawOffset');
+            }
+        }
+        if (null === $frame->returnVar) { return; }
+        $frame->returnVar->array(VmIntlTimeZone::createTimeZoneIDEnumeration($zoneType, $region, $rawOffset));
+    }
+}
+
+/** IntlTimeZone::getIDForWindowsID() — php-src intltz_get_id_for_windows_id (#20852). */
+final class IntlTimeZoneGetIDForWindowsID extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getIDForWindowsID'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf('IntlTimeZone::getIDForWindowsID() expects between 1 and 2 arguments, %d given', $argc));
+        }
+        $windowsId = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'IntlTimeZone::getIDForWindowsID', 1, 'windowsID');
+        $region = null;
+        if (2 === $argc) {
+            $r = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $r->type) {
+                $region = VmString::coerceStringBuiltinArg($r, 'IntlTimeZone::getIDForWindowsID', 2, 'region');
+            }
+        }
+        $olson = VmIntlTimeZone::getIDForWindowsID($windowsId, $region);
+        if (null === $frame->returnVar) { return; }
+        if (false === $olson) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->string($olson);
+    }
+}
+
+/** IntlTimeZone::getErrorCode() — php-src intltz_get_error_code (#20852). */
+final class IntlTimeZoneGetErrorCode extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getErrorCode'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlTimeZone::getErrorCode() expects exactly 0 arguments, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlTimeZone::isTimeZoneObject($receiver->toObject())) {
+            throw new \Error('IntlTimeZone::getErrorCode() called on incompatible object');
+        }
+        $code = VmIntlTimeZone::getErrorCode($receiver->toObject());
+        if (null === $frame->returnVar) { return; }
+        if (false === $code) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->int($code);
+    }
+}
+
+/** IntlTimeZone::getErrorMessage() — php-src intltz_get_error_message (#20852). */
+final class IntlTimeZoneGetErrorMessage extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getErrorMessage'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlTimeZone::getErrorMessage() expects exactly 0 arguments, %d given', max(0, $argc - 1)));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlTimeZone::isTimeZoneObject($receiver->toObject())) {
+            throw new \Error('IntlTimeZone::getErrorMessage() called on incompatible object');
+        }
+        $msg = VmIntlTimeZone::getErrorMessage($receiver->toObject());
+        if (null === $frame->returnVar) { return; }
+        if (false === $msg) { $frame->returnVar->bool(false); return; }
+        $frame->returnVar->string($msg);
     }
 }
