@@ -241,6 +241,7 @@ final class VmIntlChar
             'getnumericvalue' => [new IntlCharGetNumericValue(), 'getNumericValue'],
             'chardigitvalue' => [new IntlCharCharDigitValue(), 'charDigitValue'],
             'enumcharnames' => [new IntlCharEnumCharNames(), 'enumCharNames'],
+            'enumchartypes' => [new IntlCharEnumCharTypes(), 'enumCharTypes'],
             'charage' => [new IntlCharCharAge(), 'charAge'],
             'isdefined' => [new IntlCharIsDefined(), 'isdefined'],
             'isualphabetic' => [new IntlCharIsUAlphabetic(), 'isUAlphabetic'],
@@ -692,6 +693,93 @@ final class VmIntlChar
         }
 
         return true;
+    }
+
+    /**
+     * IntlChar::enumCharTypes() — php-src / ICU u_enumCharTypes (#20937).
+     *
+     * Invokes $callback($start, $limit, $type) for each contiguous general-category
+     * range. $start is inclusive and $limit is exclusive (php-src uchar.c).
+     */
+    public static function enumCharTypes(Context $ctx, Variable $callback): void
+    {
+        foreach (self::collectCharTypeRanges() as [$start, $limit, $type]) {
+            $argStart = new Variable();
+            $argStart->int($start);
+            $argLimit = new Variable();
+            $argLimit->int($limit);
+            $argType = new Variable();
+            $argType->int($type);
+            try {
+                VmCallable::invokeAs(
+                    'IntlChar::enumCharTypes',
+                    $ctx,
+                    $callback,
+                    $argStart,
+                    $argLimit,
+                    $argType
+                );
+            } catch (\Throwable) {
+                IntlError::set(IntlError::U_INTERNAL_PROGRAM_ERROR, 'enumCharTypes callback failed');
+
+                return;
+            }
+        }
+    }
+
+    /**
+     * Collect ICU/php-src enumCharTypes ranges as [start, limit, type] triples.
+     *
+     * @return list<array{0: int, 1: int, 2: int}>
+     */
+    private static function collectCharTypeRanges(): array
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_enumCharTypes'.self::$symSuffix;
+            /** @var list<array{0: int, 1: int, 2: int}> $ranges */
+            $ranges = [];
+            try {
+                $ffi->$fn(static function ($context, int $start, int $limit, int $type) use (&$ranges): int {
+                    $ranges[] = [$start, $limit, $type];
+
+                    return 1;
+                }, null);
+                if ([] !== $ranges) {
+                    return $ranges;
+                }
+                // Empty result usually means FFI callbacks are unavailable (e.g. some AOT
+                // hosts); fall through to PHP coalesce via charType().
+            } catch (\Throwable) {
+                // Fall through to PHP coalesce via charType().
+            }
+        }
+
+        return self::coalesceCharTypeRangesViaCharType();
+    }
+
+    /**
+     * ASCII/ICU-fallback path: coalesce contiguous u_charType values over 0..0x110000.
+     *
+     * @return list<array{0: int, 1: int, 2: int}>
+     */
+    private static function coalesceCharTypeRangesViaCharType(): array
+    {
+        $unicodeLimit = 0x110000;
+        /** @var list<array{0: int, 1: int, 2: int}> $ranges */
+        $ranges = [];
+        $rangeStart = 0;
+        $curType = self::charType(0);
+        for ($cp = 1; $cp <= $unicodeLimit; ++$cp) {
+            $nextType = ($cp < $unicodeLimit) ? self::charType($cp) : -1;
+            if ($nextType !== $curType) {
+                $ranges[] = [$rangeStart, $cp, $curType];
+                $rangeStart = $cp;
+                $curType = $nextType;
+            }
+        }
+
+        return $ranges;
     }
 
     /** IntlChar::isspace() — php-src / ICU u_isspace (#20821). */
@@ -1598,6 +1686,8 @@ int32_t u_getIntPropertyMaxValue{$suffix}(UProperty which);
 void u_getUnicodeVersion{$suffix}(uint8_t versionArray[4]);
 double u_getNumericValue{$suffix}(UChar32 c);
 int32_t u_charDigitValue{$suffix}(UChar32 c);
+typedef int8_t (*UCharEnumTypeRange{$suffix})(void *context, UChar32 start, UChar32 limit, int8_t type);
+void u_enumCharTypes{$suffix}(UCharEnumTypeRange{$suffix} enumRange, const void *context);
 C;
     }
 }
@@ -2985,6 +3075,33 @@ final class IntlCharEnumCharNames extends VmClassMethod
             return;
         }
         $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlChar::enumCharTypes() — php-src / ICU u_enumCharTypes (#20937). */
+final class IntlCharEnumCharTypes extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('enumCharTypes');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::enumCharTypes() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException('IntlChar::enumCharTypes() requires VM context');
+        }
+        VmIntlChar::enumCharTypes($frame->vmContext, $frame->calledArgs[0]);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->null();
+        }
     }
 }
 
