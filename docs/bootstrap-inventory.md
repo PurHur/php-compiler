@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5880 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17751 |
+| Source constructs flagged (warnings) | 17781 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -793,7 +793,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_init.php` | 0 | 2 |
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
-| `ext/intl/BuiltinClasses.php` | 0 | 37 |
+| `ext/intl/BuiltinClasses.php` | 0 | 47 |
 | `ext/intl/GraphemeStrSplitJitHelper.php` | 0 | 3 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
@@ -844,7 +844,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmIdn.php` | 0 | 5 |
 | `ext/intl/VmIntlCalendar.php` | 0 | 52 |
 | `ext/intl/VmIntlChar.php` | 0 | 84 |
-| `ext/intl/VmIntlDateFormatter.php` | 0 | 5 |
+| `ext/intl/VmIntlDateFormatter.php` | 0 | 25 |
 | `ext/intl/VmIntlDatePatternGenerator.php` | 0 | 12 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 34 |
 | `ext/intl/VmLocale.php` | 0 | 2 |
@@ -11225,14 +11225,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new IntlDateFormatterFormat (line 163)
 - new IntlDateFormatterFormatObject (line 166)
 - new IntlDateFormatterGetPattern (line 169)
-- new IntlDateFormatterParse (line 172)
-- new IntlDateFormatterParseToCalendar (line 175)
-- new IntlDateFormatterLocaltime (line 178)
-- new IntlDateFormatterGetTimeZone (line 181)
-- new IntlDateFormatterSetTimeZone (line 184)
-- new IntlDateFormatterGetErrorCode (line 187)
-- new IntlDateFormatterGetErrorMessage (line 190)
-- new ClassEntry (line 273)
+- new IntlDateFormatterSetPattern (line 172)
+- new IntlDateFormatterGetLocale (line 175)
+- new IntlDateFormatterGetDateType (line 178)
+- new IntlDateFormatterGetTimeType (line 181)
+- new IntlDateFormatterIsLenient (line 184)
+- new IntlDateFormatterSetLenient (line 187)
+- new IntlDateFormatterGetCalendar (line 190)
+- new IntlDateFormatterSetCalendar (line 193)
+- new IntlDateFormatterGetTimeZoneId (line 196)
+- new IntlDateFormatterGetCalendarObject (line 199)
+- new IntlDateFormatterParse (line 202)
+- new IntlDateFormatterParseToCalendar (line 205)
+- new IntlDateFormatterLocaltime (line 208)
+- new IntlDateFormatterGetTimeZone (line 211)
+- new IntlDateFormatterSetTimeZone (line 214)
+- new IntlDateFormatterGetErrorCode (line 217)
+- new IntlDateFormatterGetErrorMessage (line 220)
+- new ClassEntry (line 303)
 - 17 class method(s)
 
 ### `ext/intl/GraphemeStrSplitJitHelper.php`
@@ -11874,11 +11884,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmIntlDateFormatter.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 92)
-- new ObjectEntry (line 97)
-- new HashTable (line 315)
-- new Variable (line 328)
-- 37 class method(s)
+- new Error (line 104)
+- new ObjectEntry (line 109)
+- new HashTable (line 549)
+- new Variable (line 562)
+- new ArgumentCountError (line 1473)
+- new Error (line 1481)
+- new ArgumentCountError (line 1509)
+- new Error (line 1517)
+- new ArgumentCountError (line 1547)
+- new Error (line 1555)
+- new ArgumentCountError (line 1582)
+- new Error (line 1590)
+- new ArgumentCountError (line 1617)
+- new Error (line 1625)
+- new ArgumentCountError (line 1646)
+- new Error (line 1654)
+- new ArgumentCountError (line 1676)
+- new Error (line 1684)
+- new ArgumentCountError (line 1711)
+- new Error (line 1719)
+- new ArgumentCountError (line 1741)
+- new Error (line 1749)
+- new ArgumentCountError (line 1776)
+- new Error (line 1784)
+- 58 class method(s)
 
 ### `ext/intl/VmIntlDatePatternGenerator.php`
 

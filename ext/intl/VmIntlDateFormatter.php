@@ -8,6 +8,7 @@ use PHPCompiler\ext\standard\VmDate;
 use PHPCompiler\ext\standard\VmDateTimeNative;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -47,6 +48,16 @@ final class VmIntlDateFormatter
     /** Narrow no-break space (U+202F) — ICU en_US time patterns before `a`. */
     private const NNBSP = "\u{202F}";
 
+    /** ULOC_ACTUAL_LOCALE / ULOC_VALID_LOCALE — php-src Locale::ACTUAL_LOCALE / VALID_LOCALE */
+    public const ULOC_ACTUAL_LOCALE = 0;
+    public const ULOC_VALID_LOCALE = 1;
+
+    /**
+     * Stored when an IntlCalendar object was set via setCalendar(); getCalendar() returns false.
+     * php-src dateformat_attrcpp.cpp datefmt_get_calendar.
+     */
+    public const CALENDAR_FROM_OBJECT = -1;
+
     /**
      * @var array<int, array{
      *   locale: string,
@@ -55,6 +66,7 @@ final class VmIntlDateFormatter
      *   timezone: string,
      *   calendar: int,
      *   pattern: ?string,
+     *   lenient: bool,
      *   errorCode: int,
      *   errorMessage: string
      * }>
@@ -103,6 +115,7 @@ final class VmIntlDateFormatter
             'timezone' => $tz,
             'calendar' => $calendar,
             'pattern' => $pattern,
+            'lenient' => true,
             'errorCode' => IntlError::U_ZERO_ERROR,
             'errorMessage' => 'U_ZERO_ERROR',
         ];
@@ -173,6 +186,227 @@ final class VmIntlDateFormatter
         self::clearObjectError($formatter);
 
         return $pattern;
+    }
+
+    /**
+     * IntlDateFormatter::setPattern() / datefmt_set_pattern — php-src dateformat_attr.c (#20850).
+     */
+    public static function setPattern(ObjectEntry $formatter, string $pattern): bool
+    {
+        if (!isset(self::$state[$formatter->id])) {
+            self::fail($formatter, 'datefmt_set_pattern: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        self::$state[$formatter->id]['pattern'] = $pattern;
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return true;
+    }
+
+    /**
+     * IntlDateFormatter::getLocale() — php-src datefmt_get_locale (#20850).
+     *
+     * Without a live ICU DateFormat handle, both ACTUAL and VALID return the stored locale
+     * (factory locale). Invalid $type → false + U_ILLEGAL_ARGUMENT_ERROR.
+     *
+     * @return string|false
+     */
+    public static function getLocale(ObjectEntry $formatter, int $type = self::ULOC_ACTUAL_LOCALE)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'datefmt_get_locale: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        if (self::ULOC_ACTUAL_LOCALE !== $type && self::ULOC_VALID_LOCALE !== $type) {
+            self::fail($formatter, 'datefmt_get_locale: bad type: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return $state['locale'];
+    }
+
+    /**
+     * IntlDateFormatter::getDateType() — php-src datefmt_get_datetype (#20850).
+     *
+     * @return int|false
+     */
+    public static function getDateType(ObjectEntry $formatter)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'datefmt_get_datetype: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return $state['dateType'];
+    }
+
+    /**
+     * IntlDateFormatter::getTimeType() — php-src datefmt_get_timetype (#20850).
+     *
+     * @return int|false
+     */
+    public static function getTimeType(ObjectEntry $formatter)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'datefmt_get_timetype: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return $state['timeType'];
+    }
+
+    /**
+     * IntlDateFormatter::isLenient() — php-src datefmt_is_lenient (#20850).
+     */
+    public static function isLenient(ObjectEntry $formatter): bool
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            return false;
+        }
+
+        return $state['lenient'];
+    }
+
+    /**
+     * IntlDateFormatter::setLenient() — php-src datefmt_set_lenient (#20850).
+     */
+    public static function setLenient(ObjectEntry $formatter, bool $lenient): void
+    {
+        if (!isset(self::$state[$formatter->id])) {
+            return;
+        }
+        self::$state[$formatter->id]['lenient'] = $lenient;
+        self::clearObjectError($formatter);
+        IntlError::clear();
+    }
+
+    /**
+     * IntlDateFormatter::getCalendar() — php-src datefmt_get_calendar (#20850).
+     *
+     * @return int|false
+     */
+    public static function getCalendar(ObjectEntry $formatter)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'datefmt_get_calendar: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        if (self::CALENDAR_FROM_OBJECT === $state['calendar']) {
+            self::clearObjectError($formatter);
+            IntlError::clear();
+
+            return false;
+        }
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return $state['calendar'];
+    }
+
+    /**
+     * IntlDateFormatter::setCalendar() — php-src datefmt_set_calendar (#20850).
+     *
+     * Int/null keeps the formatter timezone; IntlCalendar adopts the calendar's timezone
+     * and marks calendar type as {@see CALENDAR_FROM_OBJECT}.
+     */
+    public static function setCalendar(ObjectEntry $formatter, Variable $calendarArg, Context $ctx): bool
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'datefmt_set_calendar: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        $var = $calendarArg->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            self::$state[$formatter->id]['calendar'] = self::GREGORIAN;
+        } elseif (Variable::TYPE_OBJECT === $var->type) {
+            $obj = $var->toObject();
+            if (!VmIntlCalendar::isCalendarObject($obj)) {
+                throw new \TypeError(\sprintf(
+                    'IntlDateFormatter::setCalendar(): Argument #1 ($calendar) must be of type IntlCalendar|int|null, %s given',
+                    $obj->class->name
+                ));
+            }
+            $tz = VmIntlCalendar::getTimeZoneObject($obj, $ctx);
+            if (false === $tz) {
+                self::fail($formatter, 'datefmt_set_calendar: bad calendar: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+                return false;
+            }
+            self::$state[$formatter->id]['calendar'] = self::CALENDAR_FROM_OBJECT;
+            self::$state[$formatter->id]['timezone'] = VmIntlTimeZone::idOf($tz);
+        } else {
+            self::$state[$formatter->id]['calendar'] = self::coerceIntArg(
+                $var,
+                'IntlDateFormatter::setCalendar',
+                0,
+                'calendar'
+            );
+        }
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return true;
+    }
+
+    /**
+     * IntlDateFormatter::getTimeZoneId() — php-src datefmt_get_timezone_id (#20850).
+     *
+     * @return string|false
+     */
+    public static function getTimeZoneId(ObjectEntry $formatter)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'datefmt_get_timezone_id: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return $state['timezone'];
+    }
+
+    /**
+     * IntlDateFormatter::getCalendarObject() — php-src datefmt_get_calendar_object (#20850).
+     *
+     * @return ObjectEntry|false|null
+     */
+    public static function getCalendarObject(ObjectEntry $formatter, Context $ctx)
+    {
+        $state = self::$state[$formatter->id] ?? null;
+        if (null === $state) {
+            self::fail($formatter, 'datefmt_get_calendar_object: bad formatter: U_ILLEGAL_ARGUMENT_ERROR', IntlError::U_ILLEGAL_ARGUMENT_ERROR);
+
+            return false;
+        }
+        if (!isset($ctx->classes[VmIntlCalendar::CLASS_LC])) {
+            VmIntlCalendar::registerClass($ctx);
+        }
+        self::clearObjectError($formatter);
+        IntlError::clear();
+
+        return VmIntlCalendar::createInstance($ctx, $state['timezone'], $state['locale']);
     }
 
     /**
@@ -664,6 +898,11 @@ final class VmIntlDateFormatter
         }
 
         return VmString::coerceStringBuiltinArg($var, $function, $position, 'pattern');
+    }
+
+    public static function coerceBoolArg(Variable $var, string $function, int $position, string $name): bool
+    {
+        return LocaleLookup::coerceBool($var, $function, $position, $name);
     }
 
     public static function isFormatterObject(?ObjectEntry $object): bool
@@ -1216,5 +1455,348 @@ final class VmIntlDateFormatter
         }
         self::$state[$formatter->id]['errorCode'] = IntlError::U_ZERO_ERROR;
         self::$state[$formatter->id]['errorMessage'] = 'U_ZERO_ERROR';
+    }
+}
+
+/** IntlDateFormatter::setPattern() — php-src datefmt_set_pattern (#20850). */
+final class IntlDateFormatterSetPattern extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setPattern');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlDateFormatter::setPattern() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlDateFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('IntlDateFormatter::setPattern() called on incompatible object');
+        }
+        $pattern = VmIntlDateFormatter::coerceOptionalPattern($frame->calledArgs[1], 'IntlDateFormatter::setPattern', 1);
+        if (null === $pattern) {
+            throw new \TypeError(
+                'IntlDateFormatter::setPattern(): Argument #1 ($pattern) must be of type string, null given'
+            );
+        }
+        $ok = VmIntlDateFormatter::setPattern($receiver->toObject(), $pattern);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlDateFormatter::getLocale() — php-src datefmt_get_locale (#20850). */
+final class IntlDateFormatterGetLocale extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getLocale');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlDateFormatter::getLocale() expects between 0 and 1 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlDateFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('IntlDateFormatter::getLocale() called on incompatible object');
+        }
+        $type = $argc >= 2
+            ? VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlDateFormatter::getLocale', 1, 'type')
+            : VmIntlDateFormatter::ULOC_ACTUAL_LOCALE;
+        $result = VmIntlDateFormatter::getLocale($receiver->toObject(), $type);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+}
+
+/** IntlDateFormatter::getDateType() — php-src datefmt_get_datetype (#20850). */
+final class IntlDateFormatterGetDateType extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getDateType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlDateFormatter::getDateType() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlDateFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('IntlDateFormatter::getDateType() called on incompatible object');
+        }
+        $result = VmIntlDateFormatter::getDateType($receiver->toObject());
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlDateFormatter::getTimeType() — php-src datefmt_get_timetype (#20850). */
+final class IntlDateFormatterGetTimeType extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getTimeType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlDateFormatter::getTimeType() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlDateFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('IntlDateFormatter::getTimeType() called on incompatible object');
+        }
+        $result = VmIntlDateFormatter::getTimeType($receiver->toObject());
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlDateFormatter::isLenient() — php-src datefmt_is_lenient (#20850). */
+final class IntlDateFormatterIsLenient extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isLenient');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlDateFormatter::isLenient() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlDateFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('IntlDateFormatter::isLenient() called on incompatible object');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlDateFormatter::isLenient($receiver->toObject()));
+    }
+}
+
+/** IntlDateFormatter::setLenient() — php-src datefmt_set_lenient (#20850). */
+final class IntlDateFormatterSetLenient extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setLenient');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlDateFormatter::setLenient() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlDateFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('IntlDateFormatter::setLenient() called on incompatible object');
+        }
+        $lenient = VmIntlDateFormatter::coerceBoolArg($frame->calledArgs[1], 'IntlDateFormatter::setLenient', 1, 'lenient');
+        VmIntlDateFormatter::setLenient($receiver->toObject(), $lenient);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->null();
+        }
+    }
+}
+
+/** IntlDateFormatter::getCalendar() — php-src datefmt_get_calendar (#20850). */
+final class IntlDateFormatterGetCalendar extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getCalendar');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlDateFormatter::getCalendar() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlDateFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('IntlDateFormatter::getCalendar() called on incompatible object');
+        }
+        $result = VmIntlDateFormatter::getCalendar($receiver->toObject());
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlDateFormatter::setCalendar() — php-src datefmt_set_calendar (#20850). */
+final class IntlDateFormatterSetCalendar extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setCalendar');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlDateFormatter::setCalendar() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlDateFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('IntlDateFormatter::setCalendar() called on incompatible object');
+        }
+        $ok = VmIntlDateFormatter::setCalendar($receiver->toObject(), $frame->calledArgs[1], $frame->vmContext);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** IntlDateFormatter::getTimeZoneId() — php-src datefmt_get_timezone_id (#20850). */
+final class IntlDateFormatterGetTimeZoneId extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getTimeZoneId');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlDateFormatter::getTimeZoneId() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlDateFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('IntlDateFormatter::getTimeZoneId() called on incompatible object');
+        }
+        $result = VmIntlDateFormatter::getTimeZoneId($receiver->toObject());
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+}
+
+/** IntlDateFormatter::getCalendarObject() — php-src datefmt_get_calendar_object (#20850). */
+final class IntlDateFormatterGetCalendarObject extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getCalendarObject');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlDateFormatter::getCalendarObject() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlDateFormatter::isFormatterObject($receiver->toObject())) {
+            throw new \Error('IntlDateFormatter::getCalendarObject() called on incompatible object');
+        }
+        $result = VmIntlDateFormatter::getCalendarObject($receiver->toObject(), $frame->vmContext);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        if (null === $result) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->object($result);
     }
 }
