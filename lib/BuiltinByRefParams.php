@@ -158,6 +158,9 @@ final class BuiltinByRefParams
             case 'collator::sortwithsortkeys':
                 // $this + &$array (+ optional flags) — php-src collator.stub.php (#5747, #20717)
                 return [1];
+            case 'numberformatter::parsecurrency':
+                // $this + $string + &$currency — php-src formatter.stub.php (#20728)
+                return [2];
             case 'redis::scan':
                 // $this + &$iterator (+ optional pattern/count) — phpredis redis.stub.php (#20682)
                 return [1];
