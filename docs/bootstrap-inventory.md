@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5987 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18366 |
+| Source constructs flagged (warnings) | 18371 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -863,7 +863,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmMessageFormatter.php` | 0 | 37 |
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/VmNumberFormatter.php` | 0 | 56 |
-| `ext/intl/VmResourceBundle.php` | 0 | 28 |
+| `ext/intl/VmResourceBundle.php` | 0 | 33 |
 | `ext/intl/VmSpoofchecker.php` | 0 | 29 |
 | `ext/intl/VmTransliterator.php` | 0 | 27 |
 | `ext/intl/VmUConverter.php` | 0 | 46 |
@@ -12543,34 +12543,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmResourceBundle.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 52)
-- new ResourceBundleCreate (line 58)
-- new ResourceBundleGetLocales (line 61)
-- new ResourceBundleGet (line 64)
-- new ResourceBundleCount (line 67)
-- new ResourceBundleGetErrorCode (line 70)
-- new ResourceBundleGetErrorMessage (line 73)
-- new ResourceBundleGetIterator (line 76)
-- new Error (line 93)
-- new ObjectEntry (line 107)
-- new HashTable (line 231)
-- new Variable (line 234)
-- new ObjectEntry (line 238)
-- new ArgumentCountError (line 534)
-- new ArgumentCountError (line 569)
-- new Error (line 577)
-- new ArgumentCountError (line 610)
-- new Error (line 618)
-- new ArgumentCountError (line 639)
-- new HashTable (line 654)
-- new Variable (line 656)
-- new ArgumentCountError (line 676)
-- new Error (line 684)
-- new ArgumentCountError (line 705)
-- new Error (line 713)
-- new ArgumentCountError (line 734)
-- new Error (line 742)
-- 30 class method(s)
+- new ClassEntry (line 62)
+- new ResourceBundleCreate (line 73)
+- new ResourceBundleGetLocales (line 76)
+- new ResourceBundleGet (line 79)
+- new ResourceBundleCount (line 82)
+- new ResourceBundleGetErrorCode (line 85)
+- new ResourceBundleGetErrorMessage (line 88)
+- new ResourceBundleGetIterator (line 91)
+- new Error (line 108)
+- new ObjectEntry (line 122)
+- new ObjectEntry (line 249)
+- new HashTable (line 319)
+- new Variable (line 325)
+- new Variable (line 343)
+- new Error (line 443)
+- new ObjectEntry (line 445)
+- new HashTable (line 727)
+- new Variable (line 729)
+- new ArgumentCountError (line 902)
+- new ArgumentCountError (line 937)
+- new Error (line 945)
+- new ArgumentCountError (line 988)
+- new Error (line 996)
+- new ArgumentCountError (line 1017)
+- new HashTable (line 1032)
+- new Variable (line 1034)
+- new ArgumentCountError (line 1054)
+- new Error (line 1062)
+- new ArgumentCountError (line 1083)
+- new Error (line 1091)
+- new ArgumentCountError (line 1112)
+- new Error (line 1120)
+- 44 class method(s)
 
 ### `ext/intl/VmSpoofchecker.php`
 
@@ -13774,7 +13779,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 33)
-- new Error (line 68)
+- new Error (line 78)
 - 2 class method(s)
 
 ### `ext/intl/resourcebundle_get_error_code.php`
