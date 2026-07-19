@@ -919,6 +919,7 @@ require_once __DIR__.'/../../../ext/intl/grapheme_strstr.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_substr.php';
 require_once __DIR__.'/../../../ext/intl/idn_to_ascii.php';
 require_once __DIR__.'/../../../ext/intl/idn_to_utf8.php';
+require_once __DIR__.'/../../../ext/intl/intl_error_name.php';
 require_once __DIR__.'/../../../ext/intl/intl_get_error_code.php';
 require_once __DIR__.'/../../../ext/intl/intl_get_error_message.php';
 require_once __DIR__.'/../../../ext/intl/intl_is_failure.php';

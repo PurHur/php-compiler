@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5907 |
-| Phase A inventory files (M2 ratio SSOT) | 5907 |
+| PHP files on vm.php path | 5908 |
+| Phase A inventory files (M2 ratio SSOT) | 5908 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17966 |
+| Source constructs flagged (warnings) | 17968 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -833,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 120 |
+| `ext/intl/Module.php` | 0 | 121 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -894,6 +894,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/grapheme_substr.php` | 0 | 4 |
 | `ext/intl/idn_to_ascii.php` | 0 | 1 |
 | `ext/intl/idn_to_utf8.php` | 0 | 1 |
+| `ext/intl/intl_error_name.php` | 0 | 1 |
 | `ext/intl/intl_get_error_code.php` | 0 | 1 |
 | `ext/intl/intl_get_error_message.php` | 0 | 1 |
 | `ext/intl/intl_is_failure.php` | 0 | 1 |
@@ -11372,7 +11373,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/IntlError.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 8 class method(s)
 
 ### `ext/intl/IntlExtensionPolicy.php`
 
@@ -11647,6 +11648,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new intl_get_error_code (line 272)
 - new intl_get_error_message (line 273)
 - new intl_is_failure (line 274)
+- new intl_error_name (line 275)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12622,6 +12624,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/intl/intl_error_name.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/intl/intl_get_error_code.php`
 
@@ -20579,7 +20586,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/IncludePathJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/IncludePathResolveJitHelper.php`
 
@@ -26348,7 +26355,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIncludePath.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/VmInet.php`
 

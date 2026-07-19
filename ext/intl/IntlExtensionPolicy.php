@@ -103,7 +103,7 @@ final class IntlExtensionPolicy
             || CompilerVersion::advertisesLocaleParserForwardProfile();
     }
 
-    /** grapheme_* / intl_get_error_* — with ICU-backed ext/intl (#11472, #5156, #20630). */
+    /** grapheme_* / intl_get_error_* / intl_error_name — with ICU-backed ext/intl (#11472, #5156, #20630, #20872). */
     public static function advertisesBuiltins(): bool
     {
         return self::advertisesExtension();

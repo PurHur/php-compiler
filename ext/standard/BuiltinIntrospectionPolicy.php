@@ -131,6 +131,7 @@ final class BuiltinIntrospectionPolicy
             'intl_get_error_code',
             'intl_get_error_message',
             'intl_is_failure',
+            'intl_error_name',
         ], true)) {
             return IntlExtensionPolicy::advertisesBuiltins();
         }
