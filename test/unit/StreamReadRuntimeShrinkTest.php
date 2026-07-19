@@ -8,19 +8,28 @@ use PHPCompiler\ext\standard\StreamReadJitHelper;
 use PHPCompiler\ext\standard\VmPhpMemoryStream;
 use PHPUnit\Framework\TestCase;
 
-/** StreamReadRuntime: embed via StreamReadJitHelper; thin AOT via isThinStandaloneAotMain (#9393, #12937, #20553). */
+/**
+ * StreamReadRuntime: always NestedJIT StreamReadJitHelper — no thin deferred stubs (#9393, #20982).
+ */
 final class StreamReadRuntimeShrinkTest extends TestCase
 {
-    public function testStreamReadRuntimeUsesJitHelperNotStandaloneLlvm(): void
+    public function testStreamReadRuntimeUsesJitHelperAlwaysNoThinFork(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamReadRuntime.php');
         $this->assertStringContainsString('StreamReadJitHelper', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringContainsString('isStandaloneInitPhase', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('isStandaloneInitPhase', $source);
+        $this->assertStringNotContainsString('ensureDeferredStubsForInventoryEmit', $source);
+        $this->assertStringNotContainsString('shouldDeferInventoryEmitStubs', $source);
+        $this->assertStringNotContainsString('implementDeferredStubs', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
         $this->assertStringNotContainsString('StreamReadStandaloneLlvm', $source);
         $this->assertStringNotContainsString('__phpc_resolve_stream', $source);
-        $this->assertLessThan(360, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamReadStandaloneLlvm.php');
     }

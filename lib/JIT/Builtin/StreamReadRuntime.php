@@ -4,21 +4,24 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
-use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\ext\standard\JitStreamReadBridgeKernel;
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #12937, #18672, #19559, #20553).
+ * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #20982).
  *
- * Embed / non-thin: NestedJIT {@see \PHPCompiler\ext\standard\StreamReadJitHelper}; LLVM bridges
- * live in {@see JitStreamReadBridgeKernel}.
- * Thin standalone AOT (`isThinStandaloneAotMain`) + Context standalone init: deferred ABI stubs
- * without NestedJIT (#13571 / peer #20308).
+ * Embed + thin standalone AOT: NestedJIT {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
+ * via {@see JitVmHelperLink} (StreamLifecycle #20966 / StreamIo #20943 shape — no deferred stub fork).
+ * LLVM bridges live in {@see JitStreamReadBridgeKernel}.
  * SSOT: {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
- * php-src: ext/standard/flock.c, ext/standard/streams.c
+ * php-src: ext/standard/file.c, ext/standard/flock_compat.c
  */
 final class StreamReadRuntime
 {
@@ -94,6 +97,16 @@ final class StreamReadRuntime
 
     public static function implement(Context $context, bool $withLifecycleDeps = true): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        // Thin + embed: publish sg_vm_context before NestedJIT of StreamReadJitHelper (#17391).
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+
         $probe = $context->module->getNamedFunction('__compiler_flock');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -101,11 +114,7 @@ final class StreamReadRuntime
             return;
         }
 
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
 
         StreamFilter::ensureLinked($context);
         if ($withLifecycleDeps) {
@@ -127,7 +136,7 @@ final class StreamReadRuntime
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $context->builder->clearInsertionPosition();
         }
@@ -139,7 +148,7 @@ final class StreamReadRuntime
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after StreamReadJitHelper compile (#9393)');
+            throw new \LogicException($logical.' missing after StreamReadJitHelper compile (#20982)');
         }
 
         return $fn;
@@ -147,33 +156,12 @@ final class StreamReadRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamReadJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('StreamReadJitHelper.php parseAndCompile failed (#9393)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT stream read (#9393)');
-            }
-        }
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20982'
+        );
     }
 
     public static function registerLinkedRuntime(Context $context): void
@@ -181,22 +169,9 @@ final class StreamReadRuntime
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after StreamReadRuntime bridge (#9393)');
+                throw new \LogicException($name.' missing after StreamReadRuntime bridge (#20982)');
             }
             $context->registerFunction($name, $fn);
         }
-    }
-
-    public static function shouldDeferInventoryEmitStubs(Context $context): bool
-    {
-        return $context->isThinStandaloneAotMain() || StreamIoRuntime::isStandaloneInitPhase();
-    }
-
-    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
-    {
-        if (!self::shouldDeferInventoryEmitStubs($context)) {
-            return;
-        }
-        JitStreamReadBridgeKernel::implementDeferredStubs($context);
     }
 }
