@@ -3272,13 +3272,15 @@ final class VmDom
 
             return false;
         }
+        // Pass $document so living Dom\XMLDocument nodeClassMap → Dom\Element (#20856).
         $root = self::parseElementTree(
             $ctx,
             $elementXml,
             $xml,
             $leadingLen + $elementOffset,
             $generalEntities,
-            $substituteEntities
+            $substituteEntities,
+            $document
         );
         if (null === $root) {
             return false;
@@ -6742,14 +6744,15 @@ final class VmDom
         string $sourceXml,
         int $baseOffset,
         array $generalEntities = [],
-        bool $substituteEntities = false
+        bool $substituteEntities = false,
+        ?ObjectEntry $ownerDocument = null
     ): ?ObjectEntry {
         // Offsets are relative to $sourceXml; skip chunk-leading whitespace so lineNo hits the '<' (#20795).
         $chunkLeading = \strlen($elementXml) - \strlen(ltrim($elementXml));
         $baseOffset += $chunkLeading;
         $trimmed = trim($elementXml);
         if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
-            $entry = self::createElement($ctx, $selfClose[1])->toObject();
+            $entry = self::createElement($ctx, $selfClose[1], $ownerDocument)->toObject();
             $state = DomRegistry::state($entry);
             $state->lineNo = self::lineNoAtOffset($sourceXml, $baseOffset);
             $state->attributes = self::parseAttributes($selfClose[2] ?? '');
@@ -6762,7 +6765,7 @@ final class VmDom
             return null;
         }
 
-        $entry = self::createElement($ctx, $matches[1])->toObject();
+        $entry = self::createElement($ctx, $matches[1], $ownerDocument)->toObject();
         $state = DomRegistry::state($entry);
         $state->lineNo = self::lineNoAtOffset($sourceXml, $baseOffset);
         $state->attributes = self::parseAttributes($matches[2] ?? '');
@@ -6784,7 +6787,7 @@ final class VmDom
                     $ctx,
                     $entry,
                     $text,
-                    null,
+                    $ownerDocument,
                     $generalEntities,
                     $substituteEntities,
                     $sourceXml,
@@ -6796,7 +6799,7 @@ final class VmDom
             }
             $cdata = VmXml::parseCdataSectionAt($inner, $pos);
             if (null !== $cdata) {
-                $cdataNode = self::createCdataSection($ctx, $cdata['data'], null);
+                $cdataNode = self::createCdataSection($ctx, $cdata['data'], $ownerDocument);
                 self::assignLineNoFromSource($cdataNode, $sourceXml, $innerBase + $pos);
                 $state->childIds[] = $cdataNode->id;
                 self::linkChildToParent($cdataNode, $entry);
@@ -6806,7 +6809,7 @@ final class VmDom
             }
             $comment = VmXml::parseCommentAt($inner, $pos);
             if (null !== $comment) {
-                $commentNode = self::createComment($ctx, $comment['data'], null);
+                $commentNode = self::createComment($ctx, $comment['data'], $ownerDocument);
                 self::assignLineNoFromSource($commentNode, $sourceXml, $innerBase + $pos);
                 $state->childIds[] = $commentNode->id;
                 self::linkChildToParent($commentNode, $entry);
@@ -6816,7 +6819,8 @@ final class VmDom
             }
             $pi = VmXml::parseProcessingInstructionAt($inner, $pos);
             if (null !== $pi) {
-                $owner = self::ownerDocumentEntry($entry) ?? $entry;
+                // Prefer the load document; fall back only when parsing a detached fragment (#20856).
+                $owner = $ownerDocument ?? (self::ownerDocumentEntry($entry) ?? $entry);
                 $piNode = self::createProcessingInstruction($ctx, $pi['target'], $pi['data'], $owner);
                 self::assignLineNoFromSource($piNode, $sourceXml, $innerBase + $pos);
                 $state->childIds[] = $piNode->id;
@@ -6836,7 +6840,8 @@ final class VmDom
                 $sourceXml,
                 $innerBase + $pos,
                 $generalEntities,
-                $substituteEntities
+                $substituteEntities,
+                $ownerDocument
             );
             if (null === $child) {
                 return null;
