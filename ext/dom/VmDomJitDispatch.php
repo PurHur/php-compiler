@@ -250,11 +250,39 @@ final class VmDomJitDispatch
             } elseif (Variable::TYPE_INTEGER === $deepVar->type) {
                 $deep = 0 !== $deepVar->toInt();
             } else {
-                throw new \TypeError('DOMDocument::importNode(): Argument #2 ($deep) must be of type bool');
+                $label = VmDomLiving::isLivingDocument($document)
+                    ? 'Dom\\Document::importNode()'
+                    : 'DOMDocument::importNode()';
+                throw new \TypeError($label.': Argument #2 ($deep) must be of type bool');
             }
         }
 
         return VmDom::importNode($ctx, $document, $node, $deep);
+    }
+
+    /**
+     * Dom\Document::importLegacyNode() — JIT/AOT instance invoke (#20940).
+     *
+     * @param list<Variable> $extra
+     */
+    public static function importLegacyNode(VmContext $ctx, ObjectEntry $document, array $extra): Variable
+    {
+        $node = VariableObject::entry($extra[0] ?? self::missingArg('importLegacyNode', 0));
+        $deep = false;
+        if (isset($extra[1])) {
+            $deepVar = $extra[1]->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $deepVar->type) {
+                $deep = $deepVar->toBool();
+            } elseif (Variable::TYPE_INTEGER === $deepVar->type) {
+                $deep = 0 !== $deepVar->toInt();
+            } else {
+                throw new \TypeError(
+                    'Dom\\Document::importLegacyNode(): Argument #2 ($deep) must be of type bool'
+                );
+            }
+        }
+
+        return VmDom::importLegacyNode($ctx, $document, $node, $deep);
     }
 
     /**

@@ -129,6 +129,39 @@ final class VmDomLiving
         return self::CLASS_ELEMENT === $lc || self::CLASS_HTML_ELEMENT === $lc;
     }
 
+    /**
+     * True when $entry is under Dom\Node (php-src dom_modern_node_class_entry; #20940).
+     */
+    public static function isLivingNodeInstance(ObjectEntry $entry, Context $ctx): bool
+    {
+        return self::isUnderClass($entry, self::CLASS_NODE, $ctx);
+    }
+
+    /**
+     * True when $entry is under legacy DOMNode (php-src dom_node_class_entry; #20940).
+     */
+    public static function isLegacyDomNodeInstance(ObjectEntry $entry, Context $ctx): bool
+    {
+        return self::isUnderClass($entry, VmDom::CLASS_NODE, $ctx);
+    }
+
+    private static function isUnderClass(ObjectEntry $entry, string $wantLc, Context $ctx): bool
+    {
+        $wantLc = strtolower($wantLc);
+        $class = $entry->class;
+        for ($guard = 0; null !== $class && $guard < 64; ++$guard) {
+            if ($wantLc === strtolower($class->name)) {
+                return true;
+            }
+            if (null === $class->parentLc || !isset($ctx->classes[$class->parentLc])) {
+                return false;
+            }
+            $class = $ctx->classes[$class->parentLc];
+        }
+
+        return false;
+    }
+
     public static function allocateHtmlDocument(Context $ctx): ObjectEntry
     {
         $class = $ctx->classes[self::CLASS_HTML_DOCUMENT] ?? null;

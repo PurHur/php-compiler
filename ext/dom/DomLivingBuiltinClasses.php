@@ -234,6 +234,10 @@ final class DomLivingBuiltinClasses
         $document->methods['getelementsbyclassname'] = new DocumentGetElementsByClassName();
         $document->methodVisibility['getelementsbyclassname'] = $pub;
         $document->methodNames['getelementsbyclassname'] = 'getElementsByClassName';
+        // Dom\Document::importLegacyNode — legacy DOM* → living Dom\* (#20940).
+        $document->methods['importlegacynode'] = new DocumentImportLegacyNode();
+        $document->methodVisibility['importlegacynode'] = $pub;
+        $document->methodNames['importlegacynode'] = 'importLegacyNode';
         $ctx->classes[VmDomLiving::CLASS_DOCUMENT] = $document;
 
         $htmlDocument = new ClassEntry('Dom\\HTMLDocument');

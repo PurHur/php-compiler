@@ -71,6 +71,7 @@ final class VmDomInstanceInvoke
             'createdocumentfragment' => VmDomJitDispatch::createDocumentFragment($ctx, $self, $extra),
             'createdocumenttype' => VmDomJitDispatch::createDocumentType($ctx, $self, $extra),
             'importnode' => VmDomJitDispatch::importNode($ctx, $self, $extra),
+            'importlegacynode' => VmDomJitDispatch::importLegacyNode($ctx, $self, $extra),
             'adoptnode' => VmDomJitDispatch::adoptNode($ctx, $self, $extra),
             'getattribute' => VmDomJitDispatch::getAttribute($self, $extra),
             'setattribute' => VmDomJitDispatch::setAttribute($ctx, $self, $extra),

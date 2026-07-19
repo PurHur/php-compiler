@@ -9304,8 +9304,44 @@ final class VmDom
     public static function importNode(Context $ctx, ObjectEntry $document, ObjectEntry $node, bool $deep): Variable
     {
         self::ensureDocument($document);
-        if (!self::isDomNode($node)) {
+        $living = VmDomLiving::isLivingDocument($document);
+        if ($living) {
+            // php-src Dom\Document::importNode — Dom\Node only (#20940).
+            if (!VmDomLiving::isLivingNodeInstance($node, $ctx)) {
+                throw new \TypeError(
+                    'Dom\\Document::importNode(): Argument #1 ($node) must be of type Dom\\Node'
+                );
+            }
+        } elseif (!self::isDomNode($node)) {
             throw new \TypeError('DOMDocument::importNode(): Argument #1 ($importedNode) must be of type DOMNode');
+        }
+        $imported = self::importNodeEntry($ctx, $document, $node, $deep);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($imported);
+
+        return $var;
+    }
+
+    /**
+     * Dom\Document::importLegacyNode() — import legacy DOMNode into living document
+     * (php-src ext/dom/document.c Dom_Document_importLegacyNode; #20940).
+     */
+    public static function importLegacyNode(
+        Context $ctx,
+        ObjectEntry $document,
+        ObjectEntry $node,
+        bool $deep
+    ): Variable {
+        self::ensureDocument($document);
+        if (!VmDomLiving::isLivingDocument($document)) {
+            throw new \LogicException(
+                'importLegacyNode() is only defined on Dom\\Document in this compiler build'
+            );
+        }
+        if (!VmDomLiving::isLegacyDomNodeInstance($node, $ctx)) {
+            throw new \TypeError(
+                'Dom\\Document::importLegacyNode(): Argument #1 ($node) must be of type DOMNode'
+            );
         }
         $imported = self::importNodeEntry($ctx, $document, $node, $deep);
         $var = new Variable(Variable::TYPE_OBJECT);
@@ -9470,7 +9506,8 @@ final class VmDom
         }
         if (self::isElement($node)) {
             $sourceState = DomRegistry::state($node);
-            $imported = self::createElement($ctx, $sourceState->nodeName)->toObject();
+            // Pass $document so living Dom\* nodeClassMap → Dom\Element / Dom\HTMLElement (#20940).
+            $imported = self::createElement($ctx, $sourceState->nodeName, $document)->toObject();
             self::linkChildToParent($imported, null);
             $importedState = DomRegistry::state($imported);
             $importedState->documentId = $document->id;
@@ -9502,7 +9539,7 @@ final class VmDom
             return $imported;
         }
         if (self::isDocumentFragment($node)) {
-            $imported = self::createDocumentFragment($ctx)->toObject();
+            $imported = self::createDocumentFragment($ctx, $document)->toObject();
             self::linkChildToParent($imported, null);
             $importedState = DomRegistry::state($imported);
             $importedState->documentId = $document->id;
