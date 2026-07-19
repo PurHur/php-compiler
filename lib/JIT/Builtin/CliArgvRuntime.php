@@ -4,23 +4,21 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Progress;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for CLI $argc/$argv via CliArgvJitHelper + VmCliArgv PHP (#9439, #20401).
+ * JIT/AOT link for CLI $argc/$argv via honest refresh + VmCliArgv PHP (#9439, #20904).
  *
- * Embed / non-thin: hashtable materialization via compiled {@see \PHPCompiler\ext\standard\CliArgvJitHelper}.
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20395 / #20380 shape): {@see ensureUserScriptMainStubs}
- * without nested JIT (#13571).
+ * Embed + thin standalone AOT: ABI stubs then real `__phpc_cli_refresh_argv_global`
+ * (no void-refresh fork). Empty argv tables use `__hashtable__alloc` (DefineRuntime /
+ * SuperglobalInit shape) — NestedJIT `new HashTable()` segfaults in user-script AOT.
+ * Thin init links via {@see Context::ensureMinimalUserStandaloneBodies} before {main} $argc lowering.
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmCliArgv} / {@see \PHPCompiler\ext\standard\CliArgvJitHelper}
  * php-src: ext/standard/basic_functions.c — $argc / $argv in CLI SAPI
  */
 final class CliArgvRuntime
@@ -28,15 +26,6 @@ final class CliArgvRuntime
     private const G_ARGC = 'phpc_cli_argc_global';
 
     private const G_ARGV = 'phpc_cli_argv_global';
-
-    private const HELPER_PATH = '/ext/standard/CliArgvJitHelper.php';
-
-    private const CREATE_TABLE_HELPER = 'PHPCompiler\\ext\\standard\\CliArgvJitHelper::createTable';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::CREATE_TABLE_HELPER,
-    ];
 
     /** @var list<string> */
     private const ABI_FUNCTIONS = [
@@ -57,77 +46,12 @@ final class CliArgvRuntime
         self::implement($context);
     }
 
-    /** User-script standalone main(): argv ABI stubs without nested JIT (#13571). */
-    public static function ensureUserScriptMainStubs(Context $context): void
-    {
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            return;
-        }
-        $probe = $context->module->getNamedFunction('__phpc_cli_store_argv');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        self::ensureGlobals($context);
-        self::ensureExternals($context);
-
-        self::implementStoreArgv($context, self::declareAbi($context, '__phpc_cli_store_argv', $context->context->functionType(
-            $context->getTypeFromString('void'),
-            false,
-            $context->getTypeFromString('int32'),
-            $context->getTypeFromString('int8**')
-        )));
-        self::implementArgc($context, self::declareAbi($context, '__phpc_cli_argc', $context->context->functionType(
-            $context->getTypeFromString('int64'),
-            false
-        )));
-        self::implementArgvCstr($context, self::declareAbi($context, '__phpc_cli_argv_cstr', $context->context->functionType(
-            $context->getTypeFromString('int8*'),
-            false,
-            $context->getTypeFromString('int32')
-        )));
-        self::implementStrEq($context, self::declareAbi($context, '__phpc_cli_str_eq', $context->context->functionType(
-            $context->getTypeFromString('int32'),
-            false,
-            $context->getTypeFromString('int8*'),
-            $context->getTypeFromString('int8*')
-        )));
-
-        $voidTy = $context->getTypeFromString('void');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $refreshFn = self::declareAbi($context, '__phpc_cli_refresh_argv_global', $context->context->functionType(
-            $voidTy,
-            false,
-            $valuePtr
-        ));
-        if (0 === $refreshFn->countBasicBlocks()) {
-            $entry = $refreshFn->appendBasicBlock('cli_refresh_stub');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnVoid();
-            $context->builder->clearInsertionPosition();
-        }
-
-        self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
-    }
-
     public static function implement(Context $context): void
     {
-        if (NestedJitCompileScope::isActive()) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__phpc_cli_refresh_argv_global');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        // Real NestedJIT refresh has multiple blocks; ignore void stub leftovers.
+        if (null !== $probe && $probe->countBasicBlocks() > 1) {
             self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if ($context->isThinStandaloneAotMain()) {
-            self::ensureUserScriptMainStubs($context);
 
             return;
         }
@@ -135,7 +59,7 @@ final class CliArgvRuntime
         self::ensureGlobals($context);
         self::ensureExternals($context);
 
-        // Thin CLI argv ABI before nested CliArgvJitHelper compile — nested JIT during
+        // CLI argv ABI before nested CliArgvJitHelper compile — nested JIT during
         // bridge emission corrupts the parent insert block (LLVM 9; #8559, #14470).
         self::implementStoreArgv($context, self::declareAbi($context, '__phpc_cli_store_argv', $context->context->functionType(
             $context->getTypeFromString('void'),
@@ -158,8 +82,6 @@ final class CliArgvRuntime
             $context->getTypeFromString('int8*'),
             $context->getTypeFromString('int8*')
         )));
-
-        self::ensureJitHelperCompiled($context);
 
         self::implementRefreshArgvGlobal($context, self::declareAbi($context, '__phpc_cli_refresh_argv_global', $context->context->functionType(
             $context->getTypeFromString('void'),
@@ -346,8 +268,14 @@ final class CliArgvRuntime
 
     private static function implementRefreshArgvGlobal(Context $context, LlvmFunction $fn): void
     {
-        if ($fn->countBasicBlocks() > 0) {
+        // NestedJIT refresh has multiple blocks; a single-block void stub must not win (#20904).
+        if ($fn->countBasicBlocks() > 1) {
             return;
+        }
+        if ($fn->countBasicBlocks() === 1) {
+            throw new \LogicException(
+                '__phpc_cli_refresh_argv_global already has a void stub body; use a fresh JIT Context (#20904)'
+            );
         }
 
         $entry = $fn->appendBasicBlock('cli_refresh_entry');
@@ -379,8 +307,7 @@ final class CliArgvRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
-        $htRaw = $context->builder->call(self::helperFunction($context, self::CREATE_TABLE_HELPER));
-        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
 
         $argc = $context->builder->load(self::globalPtr($context, self::G_ARGC, $i32));
         $iSlot = $context->builder->alloca($i32, 1, 'cli_argv_i');
@@ -437,6 +364,7 @@ final class CliArgvRuntime
                 'strcmp' => [$i32, false, [$i8p, $i8p]],
                 'strlen' => [$sizeT, false, [$i8p]],
                 '__string__init' => [$strPtr, false, [$i64, $i8p]],
+                '__hashtable__alloc' => [$htPtr, false, []],
                 '__hashtable__setStringAt' => [$voidTy, false, [$htPtr, $sizeT, $strPtr]],
                 '__value__writeHashtable' => [$voidTy, false, [$valuePtr, $htPtr]],
             ] as $name => [$ret, $vararg, $params]
@@ -455,48 +383,7 @@ final class CliArgvRuntime
         }
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after CliArgvJitHelper compile (#9439)');
-        }
 
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CliArgvJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('CliArgvJitHelper.php parseAndCompile failed (#9439)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9439)');
-            }
-        }
-    }
 
     private static function registerLinkedRuntime(Context $context): void
     {

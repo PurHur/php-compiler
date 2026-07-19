@@ -9,8 +9,8 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issues #5407, #6341, #20401: AOT must define CLI argv helpers without phpc_cli_argv.c.
- * Thin path gates on isThinStandaloneAotMain (no StreamIo defer bag).
+ * Issues #5407, #6341, #20904: AOT must define CLI argv helpers without phpc_cli_argv.c.
+ * Thin + embed both use honest refresh (no void stub).
  *
  * @group aot-lint
  */
@@ -25,11 +25,14 @@ final class CliArgvRuntimeStandaloneTest extends TestCase
         '__phpc_cli_refresh_argv_global',
     ];
 
-    public function testSourceGatesThinOnIsThinStandaloneAotMain(): void
+    public function testSourceHasNoThinVoidRefreshFork(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/CliArgvRuntime.php');
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('ensureUserScriptMainStubs', $source);
+        $this->assertStringNotContainsString('cli_refresh_stub', $source);
+        $this->assertStringContainsString('__hashtable__alloc', $source);
+        $this->assertStringContainsString('implementRefreshArgvGlobal', $source);
     }
 
     public function testEnsureLinkedDefinesCliArgvForEmbed(): void
@@ -40,7 +43,7 @@ final class CliArgvRuntimeStandaloneTest extends TestCase
         $this->assertAbiBodies($ctx);
     }
 
-    public function testThinUserScriptDefinesCliArgvStubs(): void
+    public function testThinUserScriptDefinesHonestRefresh(): void
     {
         $prev = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
@@ -49,8 +52,9 @@ final class CliArgvRuntimeStandaloneTest extends TestCase
         try {
             $runtime = new Runtime(Runtime::MODE_AOT);
             $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-            CliArgvRuntime::ensureStandaloneBodies($ctx);
             $this->assertAbiBodies($ctx);
+            $refresh = $ctx->lookupFunction('__phpc_cli_refresh_argv_global');
+            $this->assertGreaterThan(1, $refresh->countBasicBlocks(), 'refresh must be honest bridge, not void stub');
         } finally {
             if (false === $prev || '' === (string) $prev) {
                 putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
