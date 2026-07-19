@@ -6010,4 +6010,22 @@ unset($__spineMimeSample, $__spineMimeEnc, $__spineMimeDec);
 // M2 spine unit: setcookie options array parser Vm inventory (#8698).
 \PHPCompiler\ext\standard\SetcookieOptions::spineSmokeParse();
 
+require_once __DIR__.'/../../../ext/odbc/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/odbc/Module.php';
+require_once __DIR__.'/../../../ext/odbc/OdbcConstants.php';
+require_once __DIR__.'/../../../ext/odbc/OdbcExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/odbc/VmOdbcConnection.php';
+require_once __DIR__.'/../../../ext/odbc/VmOdbcCore.php';
+require_once __DIR__.'/../../../ext/odbc/VmOdbcNative.php';
+require_once __DIR__.'/../../../ext/odbc/VmOdbcResult.php';
+require_once __DIR__.'/../../../ext/odbc/odbc_close.php';
+require_once __DIR__.'/../../../ext/odbc/odbc_close_all.php';
+require_once __DIR__.'/../../../ext/odbc/odbc_connect.php';
+require_once __DIR__.'/../../../ext/odbc/odbc_error.php';
+require_once __DIR__.'/../../../ext/odbc/odbc_errormsg.php';
+require_once __DIR__.'/../../../ext/odbc/odbc_exec.php';
+require_once __DIR__.'/../../../ext/odbc/odbc_fetch_row.php';
+require_once __DIR__.'/../../../ext/odbc/odbc_num_rows.php';
+require_once __DIR__.'/../../../ext/odbc/odbc_pconnect.php';
+require_once __DIR__.'/../../../ext/odbc/odbc_result.php';
 echo "compiler_lib_spine_smoke bundle OK\n";

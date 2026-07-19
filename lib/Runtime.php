@@ -272,6 +272,7 @@ class Runtime {
         $this->load(new ext\sodium\Module);
         $this->load(new ext\sqlite3\Module);
         $this->load(new ext\pgsql\Module);
+        $this->load(new ext\odbc\Module);
         $this->load(new ext\enchant\Module);
         $this->load(new ext\pdo\Module);
         $this->load(new ext\phar\Module);
