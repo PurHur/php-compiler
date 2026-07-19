@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6021 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18611 |
+| Source constructs flagged (warnings) | 18637 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3975,11 +3975,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/uploadprogress/VmUploadprogress.php` | 0 | 1 |
 | `ext/uploadprogress/uploadprogress_get_contents.php` | 0 | 2 |
 | `ext/uploadprogress/uploadprogress_get_info.php` | 0 | 2 |
-| `ext/uri/BuiltinClasses.php` | 0 | 51 |
+| `ext/uri/BuiltinClasses.php` | 0 | 68 |
 | `ext/uri/Module.php` | 0 | 1 |
-| `ext/uri/UriClassMethods.php` | 0 | 14 |
+| `ext/uri/UriClassMethods.php` | 0 | 22 |
 | `ext/uri/UriExtensionPolicy.php` | 0 | 1 |
-| `ext/uri/VmUri.php` | 0 | 5 |
+| `ext/uri/VmUri.php` | 0 | 6 |
 | `ext/uuid/Module.php` | 0 | 4 |
 | `ext/uuid/UuidConstants.php` | 0 | 1 |
 | `ext/uuid/UuidFunction.php` | 0 | 1 |
@@ -22119,10 +22119,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDate.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 255)
-- new ArgumentCountError (line 258)
-- new ArgumentCountError (line 288)
-- new ArgumentCountError (line 291)
+- new ArgumentCountError (line 256)
+- new ArgumentCountError (line 259)
+- new ArgumentCountError (line 289)
+- new ArgumentCountError (line 292)
 - 15 class method(s)
 
 ### `ext/standard/JitDateCreate.php`
@@ -24359,7 +24359,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 21)
-- new JITVariable (line 62)
+- new JITVariable (line 63)
 - 3 class method(s)
 
 ### `ext/standard/JitTimezoneProceduralArg.php`
@@ -29942,7 +29942,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 26)
-- new ArgumentCountError (line 54)
+- new ArgumentCountError (line 56)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -33631,7 +33631,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/timezone_open.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 32)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -34318,57 +34318,74 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/uri/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 37)
-- new ClassEntry (line 43)
-- new ClassEntry (line 49)
-- new ClassEntry (line 53)
-- new ClassEntry (line 91)
-- new Variable (line 105)
-- new ClassEntry (line 124)
-- new Rfc3986UriParse (line 125)
-- new Rfc3986UriGetHost (line 128)
-- new Rfc3986UriGetRawHost (line 129)
-- new Rfc3986UriGetPath (line 130)
-- new Rfc3986UriGetRawPath (line 131)
-- new Rfc3986UriGetScheme (line 132)
-- new Rfc3986UriGetRawScheme (line 133)
-- new Rfc3986UriGetQuery (line 134)
-- new Rfc3986UriGetRawQuery (line 135)
-- new Rfc3986UriGetFragment (line 136)
-- new Rfc3986UriGetRawFragment (line 137)
-- new Rfc3986UriGetPort (line 138)
-- new Rfc3986UriGetUserInfo (line 139)
-- new Rfc3986UriGetRawUserInfo (line 140)
-- new Rfc3986UriGetUsername (line 141)
-- new Rfc3986UriGetRawUsername (line 142)
-- new Rfc3986UriGetPassword (line 143)
-- new Rfc3986UriGetRawPassword (line 144)
-- new Rfc3986UriToString (line 145)
-- new Rfc3986UriToRawString (line 146)
-- new Rfc3986UriWithScheme (line 147)
-- new Rfc3986UriWithHost (line 148)
-- new Rfc3986UriWithPort (line 149)
-- new Rfc3986UriWithPath (line 150)
-- new Rfc3986UriWithQuery (line 151)
-- new Rfc3986UriWithFragment (line 152)
-- new Rfc3986UriWithUserInfo (line 153)
-- new ClassEntry (line 171)
-- new WhatWgUrlParse (line 172)
-- new WhatWgUrlGetScheme (line 175)
-- new WhatWgUrlGetAsciiHost (line 176)
-- new WhatWgUrlGetUnicodeHost (line 177)
-- new WhatWgUrlGetPath (line 178)
-- new WhatWgUrlGetQuery (line 179)
-- new WhatWgUrlGetFragment (line 180)
-- new WhatWgUrlGetPort (line 181)
-- new WhatWgUrlGetUsername (line 182)
-- new WhatWgUrlGetPassword (line 183)
-- new WhatWgUrlToAsciiString (line 184)
-- new WhatWgUrlToUnicodeString (line 185)
-- new WhatWgUrlEquals (line 186)
-- new WhatWgUrlWithQuery (line 187)
-- new WhatWgUrlWithFragment (line 188)
-- 7 class method(s)
+- new ClassEntry (line 38)
+- new ClassEntry (line 44)
+- new ClassEntry (line 50)
+- new ClassEntry (line 54)
+- new ClassEntry (line 68)
+- new Variable (line 69)
+- new Variable (line 70)
+- new Variable (line 71)
+- new ClassProperty (line 72)
+- new ClassProperty (line 73)
+- new ClassProperty (line 74)
+- new WhatWgUrlValidationErrorConstruct (line 75)
+- new ClassEntry (line 146)
+- new Variable (line 160)
+- new ClassEntry (line 179)
+- new Rfc3986UriParse (line 180)
+- new Rfc3986UriGetHost (line 183)
+- new Rfc3986UriGetRawHost (line 184)
+- new Rfc3986UriGetPath (line 185)
+- new Rfc3986UriGetRawPath (line 186)
+- new Rfc3986UriGetScheme (line 187)
+- new Rfc3986UriGetRawScheme (line 188)
+- new Rfc3986UriGetQuery (line 189)
+- new Rfc3986UriGetRawQuery (line 190)
+- new Rfc3986UriGetFragment (line 191)
+- new Rfc3986UriGetRawFragment (line 192)
+- new Rfc3986UriGetPort (line 193)
+- new Rfc3986UriGetUserInfo (line 194)
+- new Rfc3986UriGetRawUserInfo (line 195)
+- new Rfc3986UriGetUsername (line 196)
+- new Rfc3986UriGetRawUsername (line 197)
+- new Rfc3986UriGetPassword (line 198)
+- new Rfc3986UriGetRawPassword (line 199)
+- new Rfc3986UriToString (line 200)
+- new Rfc3986UriToRawString (line 201)
+- new Rfc3986UriWithScheme (line 202)
+- new Rfc3986UriWithHost (line 203)
+- new Rfc3986UriWithPort (line 204)
+- new Rfc3986UriWithPath (line 205)
+- new Rfc3986UriWithQuery (line 206)
+- new Rfc3986UriWithFragment (line 207)
+- new Rfc3986UriWithUserInfo (line 208)
+- new ClassEntry (line 226)
+- new WhatWgUrlParse (line 227)
+- new WhatWgUrlGetScheme (line 230)
+- new WhatWgUrlGetAsciiHost (line 231)
+- new WhatWgUrlGetUnicodeHost (line 232)
+- new WhatWgUrlGetPath (line 233)
+- new WhatWgUrlGetQuery (line 234)
+- new WhatWgUrlGetFragment (line 235)
+- new WhatWgUrlGetPort (line 236)
+- new WhatWgUrlGetUsername (line 237)
+- new WhatWgUrlGetPassword (line 238)
+- new WhatWgUrlToAsciiString (line 239)
+- new WhatWgUrlToUnicodeString (line 240)
+- new WhatWgUrlEquals (line 241)
+- new WhatWgUrlWithQuery (line 242)
+- new WhatWgUrlWithFragment (line 243)
+- new WhatWgUrlWithScheme (line 244)
+- new WhatWgUrlWithHost (line 245)
+- new WhatWgUrlWithPath (line 246)
+- new WhatWgUrlWithPort (line 247)
+- new WhatWgUrlWithUsername (line 248)
+- new WhatWgUrlWithPassword (line 249)
+- new WhatWgUrlIsSpecialScheme (line 250)
+- new WhatWgUrlGetHostType (line 251)
+- new WhatWgUrlResolve (line 252)
+- 8 class method(s)
 
 ### `ext/uri/Module.php`
 
@@ -34390,8 +34407,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 877)
 - new ArgumentCountError (line 920)
 - new ArgumentCountError (line 946)
-- 44 class method(s)
-- 42 closure(s)
+- new ArgumentCountError (line 972)
+- new ArgumentCountError (line 994)
+- new ArgumentCountError (line 1020)
+- new ArgumentCountError (line 1042)
+- new ArgumentCountError (line 1077)
+- new ArgumentCountError (line 1103)
+- new ArgumentCountError (line 1170)
+- new ArgumentCountError (line 1194)
+- 54 class method(s)
+- 51 closure(s)
 
 ### `ext/uri/UriExtensionPolicy.php`
 
@@ -34401,11 +34426,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/uri/VmUri.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 205)
-- new Variable (line 208)
-- new ObjectEntry (line 236)
-- new Variable (line 239)
-- 13 class method(s)
+- new ObjectEntry (line 211)
+- new Variable (line 214)
+- new Uri\WhatWg\InvalidUrlException (line 379)
+- new ObjectEntry (line 406)
+- new Variable (line 409)
+- 19 class method(s)
 
 ### `ext/uuid/Module.php`
 

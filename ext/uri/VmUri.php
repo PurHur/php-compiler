@@ -23,6 +23,12 @@ final class VmUri
     public const CLASS_RFC3986_URI = 'uri\\rfc3986\\uri';
     public const CLASS_WHATWG_URL = 'uri\\whatwg\\url';
     public const CLASS_WHATWG_INVALID_URL = 'uri\\whatwg\\invalidurlexception';
+    public const CLASS_WHATWG_URL_VALIDATION_ERROR = 'uri\\whatwg\\urlvalidationerror';
+    public const CLASS_WHATWG_URL_VALIDATION_ERROR_TYPE = 'uri\\whatwg\\urlvalidationerrortype';
+    public const CLASS_WHATWG_URL_HOST_TYPE = 'uri\\whatwg\\urlhosttype';
+
+    /** WHATWG special schemes (url.spec.whatwg.org/#is-special). */
+    public const SPECIAL_SCHEMES = ['ftp', 'file', 'http', 'https', 'ws', 'wss'];
 
     /** @var array<int, array<string, mixed>> */
     private static array $rfc3986State = [];
@@ -223,11 +229,175 @@ final class VmUri
             return null;
         }
         $scheme = $state['scheme'] ?? '';
-        if (!\in_array($scheme, ['http', 'https', 'file', 'ws', 'wss'], true)) {
+        if (!\in_array($scheme, self::SPECIAL_SCHEMES, true)) {
             return null;
         }
 
         return self::newWhatWgUrlVariable($ctx, $state);
+    }
+
+    public static function isSpecialScheme(?string $scheme): bool
+    {
+        return null !== $scheme && \in_array(strtolower($scheme), self::SPECIAL_SCHEMES, true);
+    }
+
+    /**
+     * Classify host for Uri\WhatWg\Url::getHostType() (#20949).
+     *
+     * @return 'IPv4'|'IPv6'|'Domain'|'Opaque'|'Empty'|null null when host component is missing
+     */
+    public static function whatWgHostType(?string $host, ?string $scheme): ?string
+    {
+        if (null === $host) {
+            return null;
+        }
+        if ('' === $host) {
+            return 'Empty';
+        }
+        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
+            return 'IPv6';
+        }
+        if (false !== filter_var($host, \FILTER_VALIDATE_IP, \FILTER_FLAG_IPV4)) {
+            return 'IPv4';
+        }
+        if (self::isSpecialScheme($scheme)) {
+            return 'Domain';
+        }
+
+        return 'Opaque';
+    }
+
+    /**
+     * Resolve $ref against a WhatWg base URL state (MVP relative resolution; #20949).
+     *
+     * @param array<string, mixed> $base
+     *
+     * @return array<string, mixed>|null
+     */
+    public static function resolveWhatWgParts(array $base, string $ref): ?array
+    {
+        $ref = trim($ref);
+        if ('' === $ref) {
+            return $base;
+        }
+
+        $absolute = self::tryParseRfc3986Parts($ref);
+        if (null !== $absolute) {
+            $scheme = $absolute['scheme'] ?? '';
+            if (\in_array($scheme, self::SPECIAL_SCHEMES, true)) {
+                return $absolute;
+            }
+        }
+
+        if (str_starts_with($ref, '//')) {
+            $scheme = (string) ($base['scheme'] ?? 'https');
+            $joined = self::tryParseRfc3986Parts($scheme.':'.$ref);
+            if (null === $joined) {
+                return null;
+            }
+
+            return $joined;
+        }
+
+        $state = $base;
+        $pathPart = $ref;
+        $query = null;
+        $fragment = null;
+        $hashPos = strpos($pathPart, '#');
+        if (false !== $hashPos) {
+            $fragment = substr($pathPart, $hashPos + 1);
+            $pathPart = substr($pathPart, 0, $hashPos);
+        }
+        $queryPos = strpos($pathPart, '?');
+        if (false !== $queryPos) {
+            $query = substr($pathPart, $queryPos + 1);
+            $pathPart = substr($pathPart, 0, $queryPos);
+        }
+
+        if ('' === $pathPart) {
+            if (null !== $query) {
+                $state['query'] = $query;
+            }
+            $state['fragment'] = $fragment;
+
+            return $state;
+        }
+
+        if (str_starts_with($pathPart, '/')) {
+            $state['path'] = self::removeDotSegments($pathPart);
+        } else {
+            $basePath = (string) ($base['path'] ?? '/');
+            $slash = strrpos($basePath, '/');
+            $dir = false === $slash ? '/' : substr($basePath, 0, $slash + 1);
+            $state['path'] = self::removeDotSegments($dir.$pathPart);
+        }
+        $state['query'] = $query;
+        $state['fragment'] = $fragment;
+
+        return $state;
+    }
+
+    public static function removeDotSegments(string $path): string
+    {
+        $isAbsolute = str_starts_with($path, '/');
+        $segments = explode('/', $path);
+        $output = [];
+        foreach ($segments as $i => $segment) {
+            if ('.' === $segment) {
+                continue;
+            }
+            if ('..' === $segment) {
+                if (\count($output) > ($isAbsolute ? 1 : 0)) {
+                    array_pop($output);
+                }
+                continue;
+            }
+            // Keep empty leading segment for absolute paths; drop other empties from // 
+            if ('' === $segment) {
+                if (0 === $i && $isAbsolute) {
+                    $output[] = '';
+                }
+                continue;
+            }
+            $output[] = $segment;
+        }
+        if ($isAbsolute && ([] === $output || '' !== ($output[0] ?? null))) {
+            array_unshift($output, '');
+        }
+        $joined = implode('/', $output);
+        if ($isAbsolute && '' === $joined) {
+            return '/';
+        }
+
+        return '' === $joined ? ($isAbsolute ? '/' : '') : $joined;
+    }
+
+    public static function whatWgResolve(Context $ctx, ObjectEntry $base, string $ref): Variable
+    {
+        $resolved = self::resolveWhatWgParts(self::whatWgState($base), $ref);
+        if (null === $resolved) {
+            throw new \Uri\WhatWg\InvalidUrlException('Unable to resolve URL');
+        }
+
+        return self::newWhatWgUrlVariable($ctx, $resolved);
+    }
+
+    /** Copy a registered unit-enum case into $dest (or null when missing). */
+    public static function writeEnumCase(Context $ctx, string $enumLc, string $caseName, Variable $dest): void
+    {
+        $enum = $ctx->classes[$enumLc] ?? null;
+        if (!$enum instanceof ClassEntry) {
+            $dest->null();
+
+            return;
+        }
+        $lc = strtolower($caseName);
+        if (!isset($enum->constants[$lc])) {
+            $dest->null();
+
+            return;
+        }
+        $dest->copyFrom($enum->constants[$lc]);
     }
 
     public static function newWhatWgUrlVariable(Context $ctx, array $state): Variable

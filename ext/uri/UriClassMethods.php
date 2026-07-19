@@ -957,3 +957,261 @@ final class WhatWgUrlWithFragment extends WhatWgUrlGetter
         });
     }
 }
+
+final class WhatWgUrlWithScheme extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('withScheme');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::withScheme() requires VM context');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::withScheme() expects exactly 1 argument, 0 given');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $scheme = VmReflection::stringArg($frame->calledArgs[1], 'Uri\\WhatWg\\Url::withScheme() scheme', 0);
+        $next = VmUri::whatWgWith($ctx, $self, ['scheme' => strtolower($scheme)]);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($next): void {
+            $ret->copyFrom($next);
+        });
+    }
+}
+
+final class WhatWgUrlWithHost extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('withHost');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::withHost() requires VM context');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::withHost() expects exactly 1 argument, 0 given');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $host = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            $host = VmReflection::stringArg($arg, 'Uri\\WhatWg\\Url::withHost() host', 0);
+        }
+        $next = VmUri::whatWgWith($ctx, $self, ['host' => $host]);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($next): void {
+            $ret->copyFrom($next);
+        });
+    }
+}
+
+final class WhatWgUrlWithPath extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('withPath');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::withPath() requires VM context');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::withPath() expects exactly 1 argument, 0 given');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $path = VmReflection::stringArg($frame->calledArgs[1], 'Uri\\WhatWg\\Url::withPath() path', 0);
+        $next = VmUri::whatWgWith($ctx, $self, ['path' => $path]);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($next): void {
+            $ret->copyFrom($next);
+        });
+    }
+}
+
+final class WhatWgUrlWithPort extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('withPort');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::withPort() requires VM context');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::withPort() expects exactly 1 argument, 0 given');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $port = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            if (Variable::TYPE_INTEGER === $arg->type) {
+                $port = $arg->toInt();
+            } elseif (Variable::TYPE_FLOAT === $arg->type) {
+                $port = (int) $arg->toFloat();
+            } else {
+                throw new \TypeError(
+                    'Uri\\WhatWg\\Url::withPort(): Argument #1 ($port) must be of type ?int, '
+                    .EnumCaseSupport::typeNameForVariable($arg).' given'
+                );
+            }
+        }
+        $next = VmUri::whatWgWith($ctx, $self, ['port' => $port]);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($next): void {
+            $ret->copyFrom($next);
+        });
+    }
+}
+
+final class WhatWgUrlWithUsername extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('withUsername');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::withUsername() requires VM context');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::withUsername() expects exactly 1 argument, 0 given');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $username = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            $username = VmReflection::stringArg($arg, 'Uri\\WhatWg\\Url::withUsername() username', 0);
+        }
+        $next = VmUri::whatWgWith($ctx, $self, ['username' => $username]);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($next): void {
+            $ret->copyFrom($next);
+        });
+    }
+}
+
+final class WhatWgUrlWithPassword extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('withPassword');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::withPassword() requires VM context');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::withPassword() expects exactly 1 argument, 0 given');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        $password = null;
+        if (Variable::TYPE_NULL !== $arg->type) {
+            $password = VmReflection::stringArg($arg, 'Uri\\WhatWg\\Url::withPassword() password', 0);
+        }
+        $next = VmUri::whatWgWith($ctx, $self, ['password' => $password]);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($next): void {
+            $ret->copyFrom($next);
+        });
+    }
+}
+
+final class WhatWgUrlIsSpecialScheme extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('isSpecialScheme');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $scheme = $this->receiverState($frame)['scheme'] ?? null;
+        $special = VmUri::isSpecialScheme(\is_string($scheme) ? $scheme : null);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($special): void {
+            $ret->bool($special);
+        });
+    }
+}
+
+final class WhatWgUrlGetHostType extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('getHostType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::getHostType() requires VM context');
+        $state = $this->receiverState($frame);
+        $host = \array_key_exists('host', $state) ? $state['host'] : null;
+        $scheme = isset($state['scheme']) && \is_string($state['scheme']) ? $state['scheme'] : null;
+        $case = VmUri::whatWgHostType(\is_string($host) || null === $host ? $host : null, $scheme);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($ctx, $case): void {
+            if (null === $case) {
+                $ret->null();
+            } else {
+                VmUri::writeEnumCase($ctx, VmUri::CLASS_WHATWG_URL_HOST_TYPE, $case, $ret);
+            }
+        });
+    }
+}
+
+final class WhatWgUrlResolve extends WhatWgUrlGetter
+{
+    public function __construct()
+    {
+        parent::__construct('resolve');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\Url::resolve() requires VM context');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError('Uri\\WhatWg\\Url::resolve() expects at least 1 argument, 0 given');
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $uri = VmReflection::stringArg($frame->calledArgs[1], 'Uri\\WhatWg\\Url::resolve() uri', 0);
+        // Optional &$softErrors ignored in MVP (#20949).
+        $next = VmUri::whatWgResolve($ctx, $self, $uri);
+        BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($next): void {
+            $ret->copyFrom($next);
+        });
+    }
+}
+
+/** Uri\WhatWg\UrlValidationError::__construct (#20949). */
+final class WhatWgUrlValidationErrorConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $ctx = $frame->vmContext ?? throw new \LogicException('Uri\\WhatWg\\UrlValidationError::__construct() requires VM context');
+        if (\count($frame->calledArgs) < 4) {
+            throw new \ArgumentCountError(
+                'Uri\\WhatWg\\UrlValidationError::__construct() expects exactly 3 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $context = VmReflection::stringArg($frame->calledArgs[1], 'Uri\\WhatWg\\UrlValidationError::__construct() context', 0);
+        $typeVar = $frame->calledArgs[2]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $typeVar->type) {
+            throw new \TypeError(
+                'Uri\\WhatWg\\UrlValidationError::__construct(): Argument #2 ($type) must be of type Uri\\WhatWg\\UrlValidationErrorType'
+            );
+        }
+        $failureVar = $frame->calledArgs[3]->resolveIndirect();
+        $failure = Variable::TYPE_BOOLEAN === $failureVar->type
+            ? $failureVar->toBool()
+            : (bool) $failureVar->toInt();
+
+        $self->getProperty('context')->string($context);
+        $self->getProperty('type')->copyFrom($typeVar);
+        $self->getProperty('failure')->bool($failure);
+        $self->constructed = true;
+    }
+}

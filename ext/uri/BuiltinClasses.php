@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\uri;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
@@ -53,6 +54,29 @@ final class BuiltinClasses
         $invalidUrl = new ClassEntry('Uri\\WhatWg\\InvalidUrlException');
         $invalidUrl->parentLc = VmUri::CLASS_INVALID_URI_EXCEPTION;
         $ctx->classes[VmUri::CLASS_WHATWG_INVALID_URL] = $invalidUrl;
+
+        self::registerUrlValidationError($ctx);
+    }
+
+    private static function registerUrlValidationError(Context $ctx): void
+    {
+        if (isset($ctx->classes[VmUri::CLASS_WHATWG_URL_VALIDATION_ERROR])) {
+            return;
+        }
+
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $entry = new ClassEntry('Uri\\WhatWg\\UrlValidationError');
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $boolProto = new Variable(Variable::TYPE_BOOLEAN);
+        $nullProto = new Variable(Variable::TYPE_NULL);
+        $entry->properties[] = new ClassProperty('context', null, $strProto, true, $pub, VmUri::CLASS_WHATWG_URL_VALIDATION_ERROR);
+        $entry->properties[] = new ClassProperty('type', null, $nullProto, true, $pub, VmUri::CLASS_WHATWG_URL_VALIDATION_ERROR);
+        $entry->properties[] = new ClassProperty('failure', null, $boolProto, true, $pub, VmUri::CLASS_WHATWG_URL_VALIDATION_ERROR);
+        $ctor = new WhatWgUrlValidationErrorConstruct();
+        $entry->constructor = $ctor;
+        $entry->methods['__construct'] = $ctor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $ctx->classes[VmUri::CLASS_WHATWG_URL_VALIDATION_ERROR] = $entry;
     }
 
     private static function registerEnums(Context $ctx): void
@@ -76,6 +100,37 @@ final class BuiltinClasses
             'Domain',
             'Opaque',
             'Empty',
+        ]);
+        self::registerUnitEnum($ctx, 'Uri\\WhatWg\\UrlValidationErrorType', VmUri::CLASS_WHATWG_URL_VALIDATION_ERROR_TYPE, [
+            'DomainToAscii',
+            'DomainToUnicode',
+            'DomainInvalidCodePoint',
+            'HostInvalidCodePoint',
+            'Ipv4EmptyPart',
+            'Ipv4TooManyParts',
+            'Ipv4NonNumericPart',
+            'Ipv4NonDecimalPart',
+            'Ipv4OutOfRangePart',
+            'Ipv6Unclosed',
+            'Ipv6InvalidCompression',
+            'Ipv6TooManyPieces',
+            'Ipv6MultipleCompression',
+            'Ipv6InvalidCodePoint',
+            'Ipv6TooFewPieces',
+            'Ipv4InIpv6TooManyPieces',
+            'Ipv4InIpv6InvalidCodePoint',
+            'Ipv4InIpv6OutOfRangePart',
+            'Ipv4InIpv6TooFewParts',
+            'InvalidUrlUnit',
+            'SpecialSchemeMissingFollowingSolidus',
+            'MissingSchemeNonRelativeUrl',
+            'InvalidReverseSoldius',
+            'InvalidCredentials',
+            'HostMissing',
+            'PortOutOfRange',
+            'PortInvalid',
+            'FileInvalidWindowsDriveLetter',
+            'FileInvalidWindowsDriveLetterHost',
         ]);
     }
 
@@ -186,6 +241,15 @@ final class BuiltinClasses
             'equals' => new WhatWgUrlEquals(),
             'withquery' => new WhatWgUrlWithQuery(),
             'withfragment' => new WhatWgUrlWithFragment(),
+            'withscheme' => new WhatWgUrlWithScheme(),
+            'withhost' => new WhatWgUrlWithHost(),
+            'withpath' => new WhatWgUrlWithPath(),
+            'withport' => new WhatWgUrlWithPort(),
+            'withusername' => new WhatWgUrlWithUsername(),
+            'withpassword' => new WhatWgUrlWithPassword(),
+            'isspecialscheme' => new WhatWgUrlIsSpecialScheme(),
+            'gethosttype' => new WhatWgUrlGetHostType(),
+            'resolve' => new WhatWgUrlResolve(),
         ] as $name => $method) {
             $entry->methods[$name] = $method;
             $entry->methodVisibility[$name] = $pub;
