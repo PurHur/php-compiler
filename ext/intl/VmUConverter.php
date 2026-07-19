@@ -127,6 +127,8 @@ final class VmUConverter
             'geterrormessage' => [new UConverterGetErrorMessage(), 'getErrorMessage', false],
             'getsourceencoding' => [new UConverterGetSourceEncoding(), 'getSourceEncoding', false],
             'getdestinationencoding' => [new UConverterGetDestinationEncoding(), 'getDestinationEncoding', false],
+            'setsourceencoding' => [new UConverterSetSourceEncoding(), 'setSourceEncoding', false],
+            'setdestinationencoding' => [new UConverterSetDestinationEncoding(), 'setDestinationEncoding', false],
             'getsourcetype' => [new UConverterGetSourceType(), 'getSourceType', false],
             'getdestinationtype' => [new UConverterGetDestinationType(), 'getDestinationType', false],
             'getsubstchars' => [new UConverterGetSubstChars(), 'getSubstChars', false],
@@ -257,6 +259,65 @@ final class VmUConverter
         }
 
         return $state['dest'];
+    }
+
+    /**
+     * UConverter::setSourceEncoding() — php-src converter.c uconverter_set_source_encoding (#20881).
+     */
+    public static function setSourceEncoding(ObjectEntry $object, string $encoding): bool
+    {
+        $state = self::$state[$object->id] ?? null;
+        if (null === $state) {
+            throw new \Error('UConverter::setSourceEncoding() called on uninitialized UConverter');
+        }
+        $enc = '' !== $encoding ? $encoding : 'UTF-8';
+        $ok = null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($enc, true));
+        if (!$ok) {
+            $msg = 'ucnv_open() returned error 4: U_FILE_ACCESS_ERROR: U_FILE_ACCESS_ERROR';
+            self::$state[$object->id]['errorCode'] = self::U_FILE_ACCESS_ERROR;
+            self::$state[$object->id]['errorMessage'] = $msg;
+            IntlError::set(self::U_FILE_ACCESS_ERROR, $msg);
+
+            return false;
+        }
+        self::$state[$object->id]['src'] = $enc;
+        self::$state[$object->id]['srcOk'] = true;
+        self::$state[$object->id]['substChars'] = self::defaultSubstChars($enc);
+        self::$state[$object->id]['openOk'] = (bool) self::$state[$object->id]['destOk'];
+        self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
+        self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
+        IntlError::clear();
+
+        return true;
+    }
+
+    /**
+     * UConverter::setDestinationEncoding() — php-src converter.c uconverter_set_destination_encoding (#20881).
+     */
+    public static function setDestinationEncoding(ObjectEntry $object, string $encoding): bool
+    {
+        $state = self::$state[$object->id] ?? null;
+        if (null === $state) {
+            throw new \Error('UConverter::setDestinationEncoding() called on uninitialized UConverter');
+        }
+        $enc = '' !== $encoding ? $encoding : 'UTF-8';
+        $ok = null !== CharsetEngine::parseEncodingSpec(VmIconv::resolveIconvEncoding($enc, false));
+        if (!$ok) {
+            $msg = 'ucnv_open() returned error 4: U_FILE_ACCESS_ERROR: U_FILE_ACCESS_ERROR';
+            self::$state[$object->id]['errorCode'] = self::U_FILE_ACCESS_ERROR;
+            self::$state[$object->id]['errorMessage'] = $msg;
+            IntlError::set(self::U_FILE_ACCESS_ERROR, $msg);
+
+            return false;
+        }
+        self::$state[$object->id]['dest'] = $enc;
+        self::$state[$object->id]['destOk'] = true;
+        self::$state[$object->id]['openOk'] = (bool) self::$state[$object->id]['srcOk'];
+        self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
+        self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
+        IntlError::clear();
+
+        return true;
     }
 
     /**
@@ -876,6 +937,70 @@ final class UConverterGetDestinationEncoding extends VmClassMethod
             return;
         }
         $frame->returnVar->string($encoding);
+    }
+}
+
+/** UConverter::setSourceEncoding() — php-src ext/intl/converter (#20881). */
+final class UConverterSetSourceEncoding extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setSourceEncoding');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::setSourceEncoding() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::setSourceEncoding()');
+        $encoding = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'UConverter::setSourceEncoding',
+            0,
+            'encoding'
+        );
+        $ok = VmUConverter::setSourceEncoding($object, $encoding);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** UConverter::setDestinationEncoding() — php-src ext/intl/converter (#20881). */
+final class UConverterSetDestinationEncoding extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setDestinationEncoding');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::setDestinationEncoding() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::setDestinationEncoding()');
+        $encoding = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'UConverter::setDestinationEncoding',
+            0,
+            'encoding'
+        );
+        $ok = VmUConverter::setDestinationEncoding($object, $encoding);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
     }
 }
 
