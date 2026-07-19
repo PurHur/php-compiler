@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * stream_socket_get_name() via /proc — no libc getsockname/getpeername FFI (#12445).
+ * stream_socket_get_name() via /proc — no libc getsockname/getpeername FFI (#12445, #21009).
  *
  * php-src: ext/standard/streamsfuncs.c — PHP_FUNCTION(stream_socket_get_name)
- * Linux procfs: man 5 proc — /proc/pid/fd, /proc/net/tcp, /proc/net/tcp6
+ * Linux procfs: man 5 proc — /proc/pid/fd, /proc/net/{tcp,tcp6,udp,udp6}
  */
 final class VmStreamSocketGetNamePure
 {
@@ -23,29 +23,38 @@ final class VmStreamSocketGetNamePure
 
     public static function getName(int $handle, bool $wantPeer): string|false
     {
-        if (!self::available()) {
-            return false;
+        if (self::available()) {
+            $fd = VmPhpFdStream::fdForHandle($handle);
+            if (null === $fd) {
+                $fd = VmFs::socketFdForHandle($handle);
+            }
+            if (null !== $fd && $fd >= 0) {
+                $inode = self::socketInodeForFd($fd);
+                if (null !== $inode) {
+                    foreach (['/proc/net/tcp', '/proc/net/tcp6', '/proc/net/udp', '/proc/net/udp6'] as $path) {
+                        if (!\is_readable($path)) {
+                            continue;
+                        }
+                        $found = self::lookupProcNet($path, $inode, $wantPeer);
+                        if (false !== $found) {
+                            return $found;
+                        }
+                    }
+                }
+            }
         }
 
-        $fd = VmPhpFdStream::fdForHandle($handle);
-        if (null === $fd) {
-            $fd = VmFs::socketFdForHandle($handle);
-        }
-        if (null === $fd || $fd < 0) {
-            return false;
-        }
-
-        $inode = self::socketInodeForFd($fd);
-        if (null === $inode) {
-            return false;
+        if (\function_exists('stream_socket_get_name')) {
+            $fp = VmFs::hostStreamResource($handle);
+            if (\is_resource($fp)) {
+                $name = @\stream_socket_get_name($fp, $wantPeer);
+                if (\is_string($name) && '' !== $name) {
+                    return $name;
+                }
+            }
         }
 
-        $v4 = self::lookupProcNet('/proc/net/tcp', $inode, $wantPeer);
-        if (false !== $v4) {
-            return $v4;
-        }
-
-        return self::lookupProcNet('/proc/net/tcp6', $inode, $wantPeer);
+        return false;
     }
 
     private static function socketInodeForFd(int $fd): ?int
@@ -86,7 +95,7 @@ final class VmStreamSocketGetNamePure
                 return false;
             }
 
-            return self::formatProcNetAddress($addrField, \str_contains($path, 'tcp6'));
+            return self::formatProcNetAddress($addrField, \str_ends_with($path, '6'));
         }
 
         return false;
