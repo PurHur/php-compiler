@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * clamp() — PHP 8.3 value bounds (ext/standard/math.c php_math_clamp).
+ * clamp() — PHP 8.6 value bounds (ext/standard/math.c php_math_clamp; RFC clamp_v2, #21022).
  */
 final class clamp extends Internal
 {
