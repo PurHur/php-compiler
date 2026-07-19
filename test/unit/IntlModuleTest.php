@@ -212,13 +212,19 @@ while ($it->valid()) {
     $it->next();
 }
 echo implode('|', $out), "\n";
+$pi2 = $bi->getPartsIterator();
+echo 'owner_same=', ($pi2->getBreakIterator() === $bi ? '1' : '0'), "\n";
+echo 'pi_status=', (int) method_exists($pi2, 'getRuleStatus'), "\n";
+$pi2->rewind();
+echo 'first_status=', $pi2->getRuleStatus(), "\n";
 PHP;
         $block = $runtime->parseAndCompile($code, 'intl_breakiterator_forced.php');
         ob_start();
         $runtime->run($block);
         self::assertSame(
             "IntlBreakIterator=1\nIntlRuleBasedBreakIterator=1\nIntlPartsIterator=1\n"
-            ."IntlRuleBasedBreakIterator\nHello| |world\nHello| |world\n",
+            ."IntlRuleBasedBreakIterator\nHello| |world\nHello| |world\n"
+            ."owner_same=1\npi_status=1\nfirst_status=200\n",
             ob_get_clean()
         );
     }

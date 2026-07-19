@@ -9,6 +9,7 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\ReflectionSupport;
@@ -75,6 +76,16 @@ final class VmBreakIterator
         ];
     }
 
+    /** @return array<string, int> php-src PARTS_ITERATOR_KEY_* */
+    public static function partsIteratorConstants(): array
+    {
+        return [
+            'KEY_SEQUENTIAL' => 0,
+            'KEY_LEFT' => 1,
+            'KEY_RIGHT' => 2,
+        ];
+    }
+
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC])) {
@@ -101,6 +112,12 @@ final class VmBreakIterator
         $rb->properties[] = new ClassProperty(self::PROP_HANDLE, null, $strProto);
         self::installFactories($rb, $pubStatic);
         self::installInstanceMethods($rb, $pub);
+        $rb->methods['getrulestatus'] = new BreakIteratorGetRuleStatus();
+        $rb->methodVisibility['getrulestatus'] = $pub;
+        $rb->methodNames['getrulestatus'] = 'getRuleStatus';
+        $rb->methods['getrulestatusvec'] = new BreakIteratorGetRuleStatusVec();
+        $rb->methodVisibility['getrulestatusvec'] = $pub;
+        $rb->methodNames['getrulestatusvec'] = 'getRuleStatusVec';
         $ctx->classes[self::RULE_BASED_LC] = $rb;
 
         $cp = new ClassEntry('IntlCodePointBreakIterator');
@@ -118,12 +135,21 @@ final class VmBreakIterator
         $parts = new ClassEntry('IntlPartsIterator');
         $parts->isInternal = true;
         $parts->properties[] = new ClassProperty(self::PROP_HANDLE, null, $strProto);
+        foreach (self::partsIteratorConstants() as $name => $value) {
+            $lc = strtolower($name);
+            $const = new Variable(Variable::TYPE_INTEGER);
+            $const->int($value);
+            $parts->constants[$lc] = $const;
+            $parts->constNames[$lc] = $name;
+        }
         foreach ([
             'current' => [new PartsIteratorCurrent(), 'current'],
             'key' => [new PartsIteratorKey(), 'key'],
             'next' => [new PartsIteratorNext(), 'next'],
             'rewind' => [new PartsIteratorRewind(), 'rewind'],
             'valid' => [new PartsIteratorValid(), 'valid'],
+            'getbreakiterator' => [new PartsIteratorGetBreakIterator(), 'getBreakIterator'],
+            'getrulestatus' => [new PartsIteratorGetRuleStatus(), 'getRuleStatus'],
         ] as $lc => [$handler, $name]) {
             $parts->methods[$lc] = $handler;
             $parts->methodVisibility[$lc] = $pub;
@@ -201,6 +227,7 @@ final class VmBreakIterator
             'text' => '',
             'pos' => 0,
             'boundaries' => [0],
+            'ruleStatuses' => [0],
             'parts' => null,
             'index' => 0,
             'lastCodePoint' => self::LAST_CODE_POINT_SENTINEL,
@@ -259,7 +286,9 @@ final class VmBreakIterator
     {
         $st = &self::stateRef($obj);
         $st['text'] = $text;
-        $st['boundaries'] = self::computeBoundaries((int) $st['type'], (string) $st['locale'], $text);
+        [$bounds, $statuses] = self::computeBoundariesWithStatuses((int) $st['type'], (string) $st['locale'], $text);
+        $st['boundaries'] = $bounds;
+        $st['ruleStatuses'] = $statuses;
         $st['pos'] = $st['boundaries'][0] ?? 0;
         $st['lastCodePoint'] = self::LAST_CODE_POINT_SENTINEL;
         self::clearObjectError($obj);
@@ -493,18 +522,98 @@ final class VmBreakIterator
         $obj = new ObjectEntry($class);
         $id = self::$nextId++;
         $obj->getProperty(self::PROP_HANDLE)->string((string) $id);
+        $biSt = self::stateRef($bi);
+        $parts = self::parts($bi);
+        $partStatuses = self::partRuleStatuses($bi, $parts);
         self::$state[$id] = [
             'type' => -1,
             'locale' => '',
             'text' => '',
             'pos' => 0,
             'boundaries' => [],
-            'parts' => self::parts($bi),
+            'ruleStatuses' => [],
+            'parts' => $parts,
+            'partStatuses' => $partStatuses,
+            'owner' => $bi,
             'index' => 0,
         ];
         $obj->constructed = true;
 
         return $obj;
+    }
+
+    /**
+     * Rule status for the right boundary of each part (php-src IntlPartsIterator::getRuleStatus
+     * delegates to the backing RuleBasedBreakIterator at the current right edge).
+     *
+     * @param list<string> $parts
+     * @return list<int>
+     */
+    public static function partRuleStatuses(ObjectEntry $bi, array $parts): array
+    {
+        $st = self::stateRef($bi);
+        $bounds = $st['boundaries'] ?? [];
+        $statuses = $st['ruleStatuses'] ?? [];
+        $out = [];
+        for ($i = 0, $n = \count($parts); $i < $n; ++$i) {
+            $rightIdx = $i + 1;
+            if (isset($statuses[$rightIdx])) {
+                $out[] = (int) $statuses[$rightIdx];
+            } elseif (isset($bounds[$rightIdx], $bounds[$i])) {
+                $out[] = self::fallbackPartStatus((string) $parts[$i], (int) $st['type']);
+            } else {
+                $out[] = 0;
+            }
+        }
+
+        return $out;
+    }
+
+    public static function getRuleStatus(ObjectEntry $obj): int
+    {
+        $st = self::stateRef($obj);
+        $pos = (int) $st['pos'];
+        $bounds = $st['boundaries'] ?? [];
+        $statuses = $st['ruleStatuses'] ?? [];
+        foreach ($bounds as $i => $b) {
+            if ((int) $b === $pos) {
+                return (int) ($statuses[$i] ?? 0);
+            }
+        }
+
+        return 0;
+    }
+
+    /** @return list<int>|false */
+    public static function getRuleStatusVec(ObjectEntry $obj): array|false
+    {
+        // Word/line/sentence rule-based iterators expose a single status at the current edge
+        // (ICU getRuleStatusVec often returns one entry); match Zend array shape.
+        return [self::getRuleStatus($obj)];
+    }
+
+    public static function partsIteratorRuleStatus(ObjectEntry $partsObj): int
+    {
+        $st = self::stateRef($partsObj);
+        $idx = (int) ($st['index'] ?? 0);
+        $statuses = $st['partStatuses'] ?? [];
+        if (!isset($statuses[$idx])) {
+            $owner = $st['owner'] ?? null;
+            if ($owner instanceof ObjectEntry) {
+                return self::getRuleStatus($owner);
+            }
+
+            return 0;
+        }
+
+        return (int) $statuses[$idx];
+    }
+
+    public static function partsIteratorOwner(ObjectEntry $partsObj): ?ObjectEntry
+    {
+        $owner = self::stateRef($partsObj)['owner'] ?? null;
+
+        return $owner instanceof ObjectEntry ? $owner : null;
     }
 
     public static function requirePartsIterator(Frame $frame, Variable $receiver): ObjectEntry
@@ -524,20 +633,32 @@ final class VmBreakIterator
     /** @return list<int> */
     private static function computeBoundaries(int $type, string $locale, string $text): array
     {
+        return self::computeBoundariesWithStatuses($type, $locale, $text)[0];
+    }
+
+    /**
+     * @return array{0: list<int>, 1: list<int>} boundaries + rule status at each boundary index
+     */
+    private static function computeBoundariesWithStatuses(int $type, string $locale, string $text): array
+    {
         if (self::UBRK_CODE_POINT === $type) {
             // Never use UBRK_CHARACTER (grapheme clusters) — code points only (#20822).
-            return self::fallbackBoundaries(self::UBRK_CODE_POINT, $text);
+            $bounds = self::fallbackBoundaries(self::UBRK_CODE_POINT, $text);
+
+            return [$bounds, array_fill(0, \count($bounds), 0)];
         }
-        $icu = self::icuBoundaries($type, $locale, $text);
+        $icu = self::icuBoundariesWithStatuses($type, $locale, $text);
         if (null !== $icu) {
             return $icu;
         }
+        $bounds = self::fallbackBoundaries($type, $text);
+        $statuses = self::fallbackBoundaryStatuses($type, $text, $bounds);
 
-        return self::fallbackBoundaries($type, $text);
+        return [$bounds, $statuses];
     }
 
-    /** @return list<int>|null */
-    private static function icuBoundaries(int $type, string $locale, string $text): ?array
+    /** @return array{0: list<int>, 1: list<int>}|null */
+    private static function icuBoundariesWithStatuses(int $type, string $locale, string $text): ?array
     {
         $ffi = self::ffi();
         if (null === $ffi) {
@@ -557,26 +678,68 @@ final class VmBreakIterator
             $close = 'ubrk_close' . self::$symSuffix;
             $first = 'ubrk_first' . self::$symSuffix;
             $next = 'ubrk_next' . self::$symSuffix;
+            $getStatus = 'ubrk_getRuleStatus' . self::$symSuffix;
             $bi = $ffi->$open($type, $locale, $buf, $n, \FFI::addr($status));
             if (null === $bi || (int) $status->cdata > 0) {
                 return null;
             }
             $bounds = [];
+            $statuses = [];
             $p = (int) $ffi->$first($bi);
             $bounds[] = $p;
+            $statuses[] = (int) $ffi->$getStatus($bi);
             while (true) {
                 $p = (int) $ffi->$next($bi);
                 if (self::DONE === $p) {
                     break;
                 }
                 $bounds[] = $p;
+                $statuses[] = (int) $ffi->$getStatus($bi);
             }
             $ffi->$close($bi);
 
-            return $bounds;
+            return [$bounds, $statuses];
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    /** @return list<int>|null */
+    private static function icuBoundaries(int $type, string $locale, string $text): ?array
+    {
+        $pair = self::icuBoundariesWithStatuses($type, $locale, $text);
+
+        return null === $pair ? null : $pair[0];
+    }
+
+    /**
+     * @param list<int> $bounds
+     * @return list<int>
+     */
+    private static function fallbackBoundaryStatuses(int $type, string $text, array $bounds): array
+    {
+        $statuses = [0];
+        for ($i = 0, $n = \count($bounds) - 1; $i < $n; ++$i) {
+            $part = substr($text, (int) $bounds[$i], (int) $bounds[$i + 1] - (int) $bounds[$i]);
+            $statuses[] = self::fallbackPartStatus($part, $type);
+        }
+
+        return $statuses;
+    }
+
+    private static function fallbackPartStatus(string $part, int $type): int
+    {
+        if (self::UBRK_WORD !== $type || '' === $part) {
+            return 0;
+        }
+        if (preg_match('/^[0-9]/u', $part)) {
+            return 100; // WORD_NUMBER
+        }
+        if (preg_match('/^\p{L}/u', $part)) {
+            return 200; // WORD_LETTER
+        }
+
+        return 0; // WORD_NONE
     }
 
     /** @return list<int> */
@@ -729,6 +892,7 @@ UBreakIterator *ubrk_open{$suffix}(int32_t type, const char *locale, const UChar
 void ubrk_close{$suffix}(UBreakIterator *bi);
 int32_t ubrk_first{$suffix}(UBreakIterator *bi);
 int32_t ubrk_next{$suffix}(UBreakIterator *bi);
+int32_t ubrk_getRuleStatus{$suffix}(UBreakIterator *bi);
 C;
     }
 
@@ -1239,5 +1403,70 @@ final class PartsIteratorValid extends VmClassMethod
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($idx >= 0 && $idx < \count($parts));
         }
+    }
+}
+
+final class PartsIteratorGetBreakIterator extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getBreakIterator'); }
+    public function execute(Frame $frame): void
+    {
+        $obj = VmBreakIterator::requirePartsIterator($frame, $frame->calledArgs[0]);
+        $owner = VmBreakIterator::partsIteratorOwner($obj);
+        if (null === $owner) {
+            throw new \LogicException('IntlPartsIterator has no backing BreakIterator');
+        }
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->object($owner);
+        }
+    }
+}
+
+final class PartsIteratorGetRuleStatus extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getRuleStatus'); }
+    public function execute(Frame $frame): void
+    {
+        $obj = VmBreakIterator::requirePartsIterator($frame, $frame->calledArgs[0]);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmBreakIterator::partsIteratorRuleStatus($obj));
+        }
+    }
+}
+
+final class BreakIteratorGetRuleStatus extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getRuleStatus'); }
+    public function execute(Frame $frame): void
+    {
+        $obj = VmBreakIterator::requireBreakIterator($frame, $frame->calledArgs[0]);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(VmBreakIterator::getRuleStatus($obj));
+        }
+    }
+}
+
+final class BreakIteratorGetRuleStatusVec extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getRuleStatusVec'); }
+    public function execute(Frame $frame): void
+    {
+        $obj = VmBreakIterator::requireBreakIterator($frame, $frame->calledArgs[0]);
+        $vec = VmBreakIterator::getRuleStatusVec($obj);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $vec) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($vec as $i => $status) {
+            $el = new Variable(Variable::TYPE_INTEGER);
+            $el->int((int) $status);
+            $ht->addIndex((int) $i, $el);
+        }
+        $frame->returnVar->array($ht);
     }
 }
