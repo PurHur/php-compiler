@@ -44,8 +44,12 @@ echo 'const_ss=', Spoofchecker::SINGLE_SCRIPT, "\n";
 $c1 = 'paypal';
 $c2 = "\xCF\x81aypal"; // ρaypal
 echo 'conf=', (int) $s->areConfusable($c1, $c2), "\n";
-$s->setChecks(Spoofchecker::SINGLE_SCRIPT | Spoofchecker::INVISIBLE);
+        $s->setChecks(Spoofchecker::SINGLE_SCRIPT | Spoofchecker::INVISIBLE);
 $s->setRestrictionLevel(Spoofchecker::MODERATELY_RESTRICTIVE);
+echo 'ignore=', Spoofchecker::IGNORE_SPACE, "\n";
+$s->setAllowedChars('[a-z0-9]');
+echo 'allowed_clean=', (int) $s->isSuspicious('hello'), "\n";
+echo 'allowed_accent=', (int) $s->isSuspicious("h\xC3\xA9llo"), "\n";
 echo 'ok', "\n";
 PHP;
         $block = $runtime->parseAndCompile($code, 'spoofchecker_basic.php');
@@ -53,7 +57,7 @@ PHP;
         $runtime->run($block);
         $out = ob_get_clean();
         self::assertMatchesRegularExpression(
-            '/^class=1\nclean=0\nmixed=1\nbits=\d+\nconst_ss=16\nconf=1\nok\n$/',
+            '/^class=1\nclean=0\nmixed=1\nbits=\d+\nconst_ss=16\nconf=1\nignore=1\nallowed_clean=0\nallowed_accent=1\nok\n$/',
             $out
         );
         self::assertSame(16, VmSpoofchecker::SINGLE_SCRIPT);
@@ -79,5 +83,33 @@ PHP;
         $runtime->run($block);
         $out = ob_get_clean();
         self::assertSame("value_error\n", $out);
+    }
+
+    public function test_set_allowed_chars_rejects_invalid_pattern(): void
+    {
+        $runtime = new Runtime();
+        BuiltinClasses::registerSpoofchecker($runtime->vmContext);
+
+        $code = <<<'PHP'
+<?php
+$s = new Spoofchecker();
+try {
+    $s->setAllowedChars('not-a-set');
+    echo "no_throw\n";
+} catch (ValueError $e) {
+    echo "value_error\n";
+}
+try {
+    $s->setAllowedChars('[a-z]', 99);
+    echo "opts_no_throw\n";
+} catch (ValueError $e) {
+    echo "opts_value_error\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'spoofchecker_allowed.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("value_error\nopts_value_error\n", $out);
     }
 }
