@@ -4,61 +4,37 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\VM\Variable;
-use PHPCompiler\Web\Superglobals;
-
 /**
- * json_decode() / json_validate() for compiled JIT/AOT modules (#9359, php-in-PHP).
+ * json_decode() NestedJIT int-wire helper (#9359, #20829).
  *
- * SSOT: {@see VmJsonFormat::decode()} + {@see VmJsonScanner::validate()}
- * php-src: ext/json/php_json.c — php_json_decode_ex / php_json_validate
+ * Peer {@see UnserializeJitHelper::decode}. Object/array NestedJIT is follow-up.
+ * php-src: ext/json/php_json.c — php_json_decode_ex
  */
 final class JsonDecodeJitHelper
 {
-    private const DEFAULT_DEPTH = 512;
-
-    public static function decode(string $json): Variable
+    /**
+     * JSON integer digit walk (#20829). Non-int payloads return 0.
+     */
+    public static function decode(string $payload): int
     {
-        $ctx = self::requireActiveContext();
-        VmJson::setLastError(0);
-        $decoded = VmJsonFormat::decode($json, true, self::DEFAULT_DEPTH, 0);
-        if (VmJson::lastError() !== 0) {
-            $null = new Variable();
-            $null->null();
-
-            return $null;
+        $len = \strlen($payload);
+        if ($len < 1) {
+            return 0;
+        }
+        $i = 0;
+        if ('-' === $payload[0] || '+' === $payload[0]) {
+            $i = 1;
+        }
+        if ($i >= $len) {
+            return 0;
+        }
+        for (; $i < $len; ++$i) {
+            $c = $payload[$i];
+            if ($c < '0' || $c > '9') {
+                return 0;
+            }
         }
 
-        return VmJson::importDecoded($decoded, true, $ctx);
-    }
-
-    /** @return int 1 valid, 0 syntax error, -1 depth exceeded (__compiler_json_validate ABI) */
-    public static function validate(string $json, int $depth): int
-    {
-        if ($depth < 1) {
-            return VmJsonScanner::RESULT_SYNTAX;
-        }
-
-        return VmJsonScanner::validate($json, $depth, 0);
-    }
-
-    public static function lastError(): int
-    {
-        return VmJson::lastError();
-    }
-
-    public static function lastErrorMsg(): string
-    {
-        return VmJson::lastErrorMsg();
-    }
-
-    private static function requireActiveContext(): \PHPCompiler\VM\Context
-    {
-        $ctx = Superglobals::getActiveContext();
-        if (null === $ctx) {
-            throw new \LogicException('json_decode() JIT helper requires active VM context (#9359)');
-        }
-
-        return $ctx;
+        return (int) $payload;
     }
 }

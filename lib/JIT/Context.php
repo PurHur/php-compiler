@@ -1015,7 +1015,6 @@ class Context {
     /** examples/000–009 user-script AOT: thin LLVM bridges only — no nested-JIT stdlib during init (#13571). */
     private function ensureMinimalUserStandaloneBodies(): void
     {
-        Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
         Builtin\StringHtmlspecialcharsDecode::ensureStandaloneBodies($this);
         ExceptionBridge::ensureStandaloneBodies($this);
@@ -1060,7 +1059,6 @@ class Context {
     /** bootstrap-aot-link fixtures: minimal init + CLI argv / superglobal refresh for standalone main (#14459). */
     private function ensureBootstrapAotStandaloneBodies(): void
     {
-        Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
         $this->ensureMinimalUserStandaloneBodies();
         Builtin\EnvLocalRuntime::ensureBootstrapAotStubLinked($this);
         Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
@@ -1121,7 +1119,6 @@ class Context {
             // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
             // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
             Builtin\StringFormat::ensureDeferredStubsForInventoryEmit($this);
-            Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
             \PHPCompiler\ext\standard\JitStreamFilterKernel::ensureDeferredStubsForInventoryEmit($this);
             Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
             Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);

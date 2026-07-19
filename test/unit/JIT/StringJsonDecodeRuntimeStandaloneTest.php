@@ -21,12 +21,15 @@ final class StringJsonDecodeRuntimeStandaloneTest extends TestCase
         $this->assertStringNotContainsString('phpc_json_decode.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringJsonDecode.php');
         $this->assertStringContainsString('JsonDecodeJitHelper', $runtime);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $runtime);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $runtime);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $runtime);
+        $this->assertStringNotContainsString('StringJsonDecodeInventoryStubs', $runtime);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $runtime);
         $this->assertStringNotContainsString('StringJsonDecodeJit', $runtime);
         $this->assertStringNotContainsString('phpc_json_decode.c', $runtime);
         $helper = (string) file_get_contents(__DIR__.'/../../../ext/standard/JsonDecodeJitHelper.php');
-        $this->assertStringContainsString('VmJsonFormat::decode', $helper);
+        $this->assertStringContainsString('function decode(string $payload): int', $helper);
+        $this->assertFileExists(__DIR__.'/../../../ext/standard/JsonValidateJitHelper.php');
     }
 
     public function testJsonDecodeJitCompileTimeBoolUsesLlvmIsAConstantInt(): void

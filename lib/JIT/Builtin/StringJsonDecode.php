@@ -4,36 +4,55 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmActiveContextLlvm;
+use PHPCompiler\JIT\VmActiveContextInitLlvm;
+use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_json_decode via JsonDecodeJitHelper PHP (#9359, #13228, #20380).
+ * JIT/AOT link for __compiler_json_decode via JsonDecodeJitHelper PHP (#9359, #13228, #20829).
  *
- * Embed / non-thin: NestedJIT {@see JsonDecodeJitHelper} (#13228).
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20371 / #20355 shape): thin stubs without nested JIT (#13245).
- * php-src: ext/json/php_json.c — php_json_decode_ex
+ * Embed + thin standalone AOT: {@see JsonDecodeJitHelper} NestedJIT int wire
+ * (JsonEncode #20816 / Unserialize #20785 shape — no thin null stubs).
+ * Validate/last_error live in {@see JsonValidateJitHelper} (separate NestedJIT TU).
+ * Object/array NestedJIT returns are not yet thin-AOT safe.
+ * php-src: ext/json/php_json.c — php_json_decode_ex / php_json_validate
  */
 final class StringJsonDecode
 {
-    private const HELPER_PATH = '/ext/standard/JsonDecodeJitHelper.php';
+    private const DECODE_HELPER_PATH = '/ext/standard/JsonDecodeJitHelper.php';
+
+    private const VALIDATE_HELPER_PATH = '/ext/standard/JsonValidateJitHelper.php';
 
     private const DECODE_HELPER = 'PHPCompiler\\ext\\standard\\JsonDecodeJitHelper::decode';
 
-    private const VALIDATE_HELPER = 'PHPCompiler\\ext\\standard\\JsonDecodeJitHelper::validate';
+    private const VALIDATE_HELPER = 'PHPCompiler\\ext\\standard\\JsonValidateJitHelper::validate';
 
-    private const LAST_ERROR_HELPER = 'PHPCompiler\\ext\\standard\\JsonDecodeJitHelper::lastError';
+    private const LAST_ERROR_HELPER = 'PHPCompiler\\ext\\standard\\JsonValidateJitHelper::lastError';
 
-    private const LAST_ERROR_MSG_HELPER = 'PHPCompiler\\ext\\standard\\JsonDecodeJitHelper::lastErrorMsg';
+    private const LAST_ERROR_MSG_HELPER = 'PHPCompiler\\ext\\standard\\JsonValidateJitHelper::lastErrorMsg';
+
+    private const DECODE_BRIDGE_ENTRY = 'json_decode_bridge_entry';
+
+    private const VALIDATE_BRIDGE_ENTRY = 'json_validate_bridge_entry';
+
+    private const LAST_ERROR_BRIDGE_ENTRY = 'json_last_error_bridge_entry';
+
+    private const LAST_ERROR_MSG_BRIDGE_ENTRY = 'json_last_error_msg_bridge_entry';
 
     /** @var list<string> */
-    private const COMPILED_HELPERS = [
+    private const DECODE_COMPILED_HELPERS = [
         self::DECODE_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const VALIDATE_COMPILED_HELPERS = [
         self::VALIDATE_HELPER,
         self::LAST_ERROR_HELPER,
         self::LAST_ERROR_MSG_HELPER,
@@ -58,61 +77,112 @@ final class StringJsonDecode
         self::implement($context);
     }
 
-    /** Thin standalone AOT: linkable json_decode ABI without nested JsonDecodeJitHelper (#13245, #20380). */
-    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
-    {
-        if (!$context->isThinStandaloneAotMain()) {
-            return;
-        }
-        StringJsonDecodeInventoryStubs::implement($context);
-    }
-
     public static function implement(Context $context): void
     {
         if (NestedJitCompileScope::isActive()) {
             return;
         }
 
-        $probe = $context->module->getNamedFunction('__compiler_json_decode');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if ($context->isThinStandaloneAotMain()) {
-            StringJsonDecodeInventoryStubs::implement($context);
-
-            return;
-        }
-
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        self::ensureJitHelperCompiled($context);
-        self::implementBridges($context);
-        self::registerLinkedRuntime($context);
-        if (null !== $savedInsert) {
+
+        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
+        VmActiveContextLlvm::ensureAbi($context);
+        NestedVmActiveContextLlvm::ensureMethod($context);
+        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
+
+        $decodeProbe = $context->module->getNamedFunction('__compiler_json_decode');
+        $validateProbe = $context->module->getNamedFunction('__compiler_json_validate');
+        $lastErrProbe = $context->module->getNamedFunction('__compiler_json_last_error');
+        $lastMsgProbe = $context->module->getNamedFunction('__compiler_json_last_error_msg');
+        if (JitVmHelperLink::hasNamedBridgeEntry($decodeProbe, self::DECODE_BRIDGE_ENTRY)
+            && JitVmHelperLink::hasNamedBridgeEntry($validateProbe, self::VALIDATE_BRIDGE_ENTRY)
+            && JitVmHelperLink::hasNamedBridgeEntry($lastErrProbe, self::LAST_ERROR_BRIDGE_ENTRY)
+            && JitVmHelperLink::hasNamedBridgeEntry($lastMsgProbe, self::LAST_ERROR_MSG_BRIDGE_ENTRY)) {
+            self::registerLinkedRuntime($context);
             BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
+
+            return;
         }
+        if (null !== $decodeProbe && $decodeProbe->countBasicBlocks() > 0
+            && null !== $validateProbe && $validateProbe->countBasicBlocks() > 0
+            && null !== $lastErrProbe && $lastErrProbe->countBasicBlocks() > 0
+            && null !== $lastMsgProbe && $lastMsgProbe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+
+            return;
+        }
+
+        self::implementDecodeBridge($context);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_json_validate',
+            self::VALIDATE_BRIDGE_ENTRY,
+            [$strPtr, $i64],
+            $i64,
+            self::VALIDATE_HELPER,
+            self::VALIDATE_HELPER_PATH,
+            self::VALIDATE_COMPILED_HELPERS,
+            '#20829'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_json_last_error',
+            self::LAST_ERROR_BRIDGE_ENTRY,
+            [],
+            $i64,
+            self::LAST_ERROR_HELPER,
+            self::VALIDATE_HELPER_PATH,
+            self::VALIDATE_COMPILED_HELPERS,
+            '#20829'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_json_last_error_msg',
+            self::LAST_ERROR_MSG_BRIDGE_ENTRY,
+            [],
+            $strPtr,
+            self::LAST_ERROR_MSG_HELPER,
+            self::VALIDATE_HELPER_PATH,
+            self::VALIDATE_COMPILED_HELPERS,
+            '#20829'
+        );
+        self::registerLinkedRuntime($context);
+        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
     }
 
-    private static function implementBridges(Context $context): void
+    public static function ensureJitHelperCompiled(Context $context): void
     {
-        self::implementVoidValueOutBridge($context, '__compiler_json_decode', 'json_decode_bridge_entry', self::DECODE_HELPER);
-        self::implementInt64Bridge($context, '__compiler_json_validate', 'json_validate_bridge_entry', self::VALIDATE_HELPER, true);
-        self::implementInt64Bridge($context, '__compiler_json_last_error', 'json_last_error_bridge_entry', self::LAST_ERROR_HELPER, false);
-        self::implementStringPtrBridge($context, '__compiler_json_last_error_msg', 'json_last_error_msg_bridge_entry', self::LAST_ERROR_MSG_HELPER);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::DECODE_HELPER_PATH,
+            self::DECODE_COMPILED_HELPERS,
+            '#20829'
+        );
     }
 
-    private static function implementVoidValueOutBridge(
-        Context $context,
-        string $abiName,
-        string $blockName,
-        string $helper
-    ): void {
+    public static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after JsonDecodeJitHelper compile (#20829)');
+        }
+
+        return $fn;
+    }
+
+    /**
+     * NestedJIT decode(): int → box as `__value__*` (#20829 / #20785).
+     */
+    private static function implementDecodeBridge(Context $context): void
+    {
+        $abiName = '__compiler_json_decode';
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::DECODE_BRIDGE_ENTRY)) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -120,110 +190,39 @@ final class StringJsonDecode
 
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $strPtr, $valuePtr);
-        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock($blockName);
-        $context->builder->positionAtEnd($entry);
-        $decoded = $context->builder->call(self::helperFunction($context, $helper), $fn->getParam(0));
-        JitValueBox::copyIntoPointer($context, $fn->getParam(1), $decoded);
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementInt64Bridge(
-        Context $context,
-        string $abiName,
-        string $blockName,
-        string $helper,
-        bool $withDepthArg
-    ): void {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
-        $params = $withDepthArg ? [$strPtr, $i64] : [];
-        $ft = $context->context->functionType($i64, false, ...$params);
-        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $ft = $context->context->functionType($valuePtr, false, $strPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock($blockName);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::DECODE_HELPER_PATH,
+            self::DECODE_COMPILED_HELPERS,
+            '#20829'
+        );
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::DECODE_BRIDGE_ENTRY);
         $context->builder->positionAtEnd($entry);
-        $args = $withDepthArg ? [$fn->getParam(0), $fn->getParam(1)] : [];
-        $raw = $context->builder->call(self::helperFunction($context, $helper), ...$args);
-        $context->builder->returnValue(JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64));
+        $payload = $fn->getParam(0);
+        $helperFn = self::helperFunction($context, self::DECODE_HELPER);
+        $payloadArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $payload,
+            $helperFn->getParam(0)->typeOf()
+        );
+        $raw = $context->builder->call($helperFn, $payloadArg);
+        $long = JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64);
+        $slot = JitValueBox::alloc($context);
+        $outPtr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $outPtr,
+            $long
+        );
+        $context->builder->returnValue($outPtr);
         $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementStringPtrBridge(
-        Context $context,
-        string $abiName,
-        string $blockName,
-        string $helper
-    ): void {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false);
-        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock($blockName);
-        $context->builder->positionAtEnd($entry);
-        $raw = $context->builder->call(self::helperFunction($context, $helper));
-        $context->builder->returnValue(JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw));
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after JsonDecodeJitHelper compile (#9359)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'JsonDecodeJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('JsonDecodeJitHelper.php parseAndCompile failed (#9359)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9359)');
-            }
-        }
     }
 
     private static function registerLinkedRuntime(Context $context): void
@@ -231,7 +230,7 @@ final class StringJsonDecode
         foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringJsonDecode bridge (#9359)');
+                throw new \LogicException($name.' missing after StringJsonDecode bridge (#20829)');
             }
             $context->registerFunction($name, $fn);
         }
