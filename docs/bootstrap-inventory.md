@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5826 |
-| Phase A inventory files (M2 ratio SSOT) | 5826 |
+| PHP files on vm.php path | 5827 |
+| Phase A inventory files (M2 ratio SSOT) | 5827 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17299 |
+| Source constructs flagged (warnings) | 17317 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -825,17 +825,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 45 |
+| `ext/intl/Module.php` | 0 | 46 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
 | `ext/intl/VmBreakIterator.php` | 0 | 31 |
-| `ext/intl/VmCollator.php` | 0 | 53 |
+| `ext/intl/VmCollator.php` | 0 | 55 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
 | `ext/intl/VmIntlCalendar.php` | 0 | 22 |
-| `ext/intl/VmIntlChar.php` | 0 | 7 |
+| `ext/intl/VmIntlChar.php` | 0 | 19 |
 | `ext/intl/VmIntlDateFormatter.php` | 0 | 5 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 12 |
 | `ext/intl/VmLocale.php` | 0 | 2 |
@@ -846,6 +846,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmSpoofchecker.php` | 0 | 24 |
 | `ext/intl/VmTransliterator.php` | 0 | 27 |
 | `ext/intl/VmUConverter.php` | 0 | 16 |
+| `ext/intl/collator_compare.php` | 0 | 3 |
 | `ext/intl/collator_create.php` | 0 | 3 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
 | `ext/intl/grapheme_levenshtein.php` | 0 | 2 |
@@ -11372,6 +11373,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new idn_to_ascii (line 109)
 - new idn_to_utf8 (line 109)
 - new collator_create (line 113)
+- new collator_compare (line 113)
 - new msgfmt_create (line 118)
 - new msgfmt_format (line 119)
 - new msgfmt_format_message (line 120)
@@ -11462,56 +11464,58 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 118)
 - new Variable (line 122)
-- new CollatorCreate (line 130)
-- new CollatorCompare (line 131)
-- new CollatorAsort (line 132)
-- new CollatorSort (line 133)
-- new CollatorSortWithSortKeys (line 134)
-- new CollatorGetSortKey (line 135)
-- new CollatorGetStrength (line 136)
-- new CollatorSetStrength (line 137)
-- new CollatorGetAttribute (line 138)
-- new CollatorSetAttribute (line 139)
-- new CollatorGetLocale (line 140)
-- new CollatorGetErrorCode (line 141)
-- new CollatorGetErrorMessage (line 142)
-- new Error (line 160)
-- new ObjectEntry (line 164)
-- new Variable (line 255)
-- new HashTable (line 259)
-- new Variable (line 624)
-- new HashTable (line 628)
-- new Variable (line 859)
-- new Variable (line 861)
-- new HashTable (line 874)
-- new Variable (line 877)
-- new Error (line 884)
-- new ArgumentCountError (line 966)
-- new ArgumentCountError (line 991)
-- new Error (line 999)
-- new ArgumentCountError (line 1028)
-- new Error (line 1036)
-- new ArgumentCountError (line 1062)
-- new Error (line 1070)
-- new ArgumentCountError (line 1096)
-- new Error (line 1104)
-- new ArgumentCountError (line 1126)
-- new Error (line 1134)
-- new ArgumentCountError (line 1162)
-- new Error (line 1170)
-- new ArgumentCountError (line 1191)
-- new Error (line 1199)
-- new ArgumentCountError (line 1222)
-- new Error (line 1230)
-- new ArgumentCountError (line 1258)
-- new Error (line 1266)
-- new ArgumentCountError (line 1290)
-- new Error (line 1298)
-- new ArgumentCountError (line 1326)
-- new Error (line 1334)
-- new ArgumentCountError (line 1355)
-- new Error (line 1363)
-- 45 class method(s)
+- new CollatorConstruct (line 131)
+- new CollatorCreate (line 136)
+- new CollatorCompare (line 137)
+- new CollatorAsort (line 138)
+- new CollatorSort (line 139)
+- new CollatorSortWithSortKeys (line 140)
+- new CollatorGetSortKey (line 141)
+- new CollatorGetStrength (line 142)
+- new CollatorSetStrength (line 143)
+- new CollatorGetAttribute (line 144)
+- new CollatorSetAttribute (line 145)
+- new CollatorGetLocale (line 146)
+- new CollatorGetErrorCode (line 147)
+- new CollatorGetErrorMessage (line 148)
+- new Error (line 166)
+- new ObjectEntry (line 168)
+- new Variable (line 270)
+- new HashTable (line 274)
+- new Variable (line 639)
+- new HashTable (line 643)
+- new Variable (line 874)
+- new Variable (line 876)
+- new HashTable (line 889)
+- new Variable (line 892)
+- new Error (line 899)
+- new ArgumentCountError (line 984)
+- new ArgumentCountError (line 1011)
+- new ArgumentCountError (line 1036)
+- new Error (line 1044)
+- new ArgumentCountError (line 1073)
+- new Error (line 1081)
+- new ArgumentCountError (line 1107)
+- new Error (line 1115)
+- new ArgumentCountError (line 1141)
+- new Error (line 1149)
+- new ArgumentCountError (line 1171)
+- new Error (line 1179)
+- new ArgumentCountError (line 1207)
+- new Error (line 1215)
+- new ArgumentCountError (line 1236)
+- new Error (line 1244)
+- new ArgumentCountError (line 1267)
+- new Error (line 1275)
+- new ArgumentCountError (line 1303)
+- new Error (line 1311)
+- new ArgumentCountError (line 1335)
+- new Error (line 1343)
+- new ArgumentCountError (line 1371)
+- new Error (line 1379)
+- new ArgumentCountError (line 1400)
+- new Error (line 1408)
+- 47 class method(s)
 - 2 closure(s)
 
 ### `ext/intl/VmGrapheme.php`
@@ -11557,13 +11561,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmIntlChar.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 154)
-- new Variable (line 158)
-- new IntlCharOrd (line 165)
-- new IntlCharChr (line 166)
-- new ArgumentCountError (line 256)
-- new ArgumentCountError (line 287)
-- 8 class method(s)
+- new ClassEntry (line 171)
+- new Variable (line 175)
+- new IntlCharOrd (line 182)
+- new IntlCharChr (line 183)
+- new IntlCharCharName (line 184)
+- new IntlCharHasBinaryProperty (line 185)
+- new IntlCharIsAlpha (line 186)
+- new IntlCharIsDigit (line 187)
+- new IntlCharToUpper (line 188)
+- new IntlCharToLower (line 189)
+- new ArgumentCountError (line 490)
+- new ArgumentCountError (line 521)
+- new ArgumentCountError (line 557)
+- new ArgumentCountError (line 591)
+- new ArgumentCountError (line 622)
+- new ArgumentCountError (line 647)
+- new ArgumentCountError (line 672)
+- new ArgumentCountError (line 702)
+- 24 class method(s)
 
 ### `ext/intl/VmIntlDateFormatter.php`
 
@@ -11778,6 +11794,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 298)
 - new ArgumentCountError (line 355)
 - 13 class method(s)
+
+### `ext/intl/collator_compare.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- new Error (line 59)
+- 2 class method(s)
 
 ### `ext/intl/collator_create.php`
 

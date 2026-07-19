@@ -18,7 +18,7 @@ use PHPCfg\Func as CfgFunc;
 
 /**
  * Collator create/compare/asort/sort/getSortKey/strength/attribute — ICU ucol_* via thin FFI
- * (#5747, #20717).
+ * (#5747, #20717, #20753).
  *
  * php-src: ext/intl/collator/collator_*.cpp, collator.stub.php
  * ICU: unicode/ucol.h — versioned exports ucol_open_N / ucol_strcollUTF8_N / ucol_getSortKey_N / …
@@ -126,6 +126,12 @@ final class VmCollator
         }
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
+        // php-src: Collator::__construct($locale) registers ICU state; without it,
+        // `new Collator` leaves $state empty and compare/getSortKey return false (#20753).
+        $entry->constructor = new CollatorConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methodNames['__construct'] = '__construct';
         $methods = [
             'create' => [new CollatorCreate(), $pubStatic, 'create'],
             'compare' => [new CollatorCompare(), $pub, 'compare'],
@@ -159,9 +165,20 @@ final class VmCollator
         if (!isset($ctx->classes[self::CLASS_LC])) {
             throw new \Error('Class "Collator" not found');
         }
+        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        self::initObject($object, $locale);
+
+        return $object;
+    }
+
+    /**
+     * Register ICU/fallback collator state on an existing object (new Collator / create).
+     * php-src: collator_object_init + ucol_open (ext/intl/collator/collator_class.c).
+     */
+    public static function initObject(ObjectEntry $object, string $locale): void
+    {
         $locale = '' !== $locale ? $locale : VmLocale::getDefault();
         $handle = self::openCollator($locale);
-        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
         $object->constructed = true;
         self::$state[$object->id] = [
             'locale' => $locale,
@@ -181,8 +198,6 @@ final class VmCollator
         } elseif (IntlError::U_ZERO_ERROR === IntlError::getCode()) {
             IntlError::clear();
         }
-
-        return $object;
     }
 
     /**
@@ -948,6 +963,36 @@ void ucol_setAttribute{$suffix}(UCollator *coll, UColAttribute attr, UColAttribu
 int32_t ucol_getSortKey{$suffix}(const UCollator *coll, const UChar *source, int32_t sourceLength, uint8_t *result, int32_t resultLength);
 const char *ucol_getLocaleByType{$suffix}(const UCollator *coll, ULocDataLocaleType type, UErrorCode *status);
 C;
+    }
+}
+
+/** Collator::__construct() — php-src collator_create / Collator::__construct (#20753). */
+final class CollatorConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1) {
+            throw new \LogicException('Collator::__construct() called without $this');
+        }
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'Collator::__construct() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmCollator::isCollatorObject($receiver->toObject())) {
+            throw new \TypeError('Collator::__construct() must be called on Collator');
+        }
+        $locale = VmCollator::coerceLocaleArg($frame->calledArgs[1], 'Collator::__construct', 0);
+        VmCollator::initObject($receiver->toObject(), $locale);
     }
 }
 
