@@ -27,6 +27,6 @@ try {
 ?>
 --EXPECT--
 same
-<root><p/><div><b/><i/></div><em/></root>
+<root><p></p><div><b></b><i></i></div><em></em></root>
 null
 ValueError
