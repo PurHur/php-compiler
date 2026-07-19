@@ -99,6 +99,7 @@ final class VmIntlTimeZone
             'createdefault' => [new IntlTimeZoneCreateDefault(), 'createDefault', $pubStatic],
             'fromdatetimezone' => [new IntlTimeZoneFromDateTimeZone(), 'fromDateTimeZone', $pubStatic],
             'getcanonicalid' => [new IntlTimeZoneGetCanonicalID(), 'getCanonicalID', $pubStatic],
+            'getianaid' => [new IntlTimeZoneGetIanaID(), 'getIanaID', $pubStatic],
             'getregion' => [new IntlTimeZoneGetRegion(), 'getRegion', $pubStatic],
             'getgmt' => [new IntlTimeZoneGetGMT(), 'getGMT', $pubStatic],
             'getunknown' => [new IntlTimeZoneGetUnknown(), 'getUnknown', $pubStatic],
@@ -694,6 +695,45 @@ final class VmIntlTimeZone
     }
 
     /**
+     * php-src intltz_get_iana_id / TimeZone::getIanaID (ICU≥74) — resolve zoneinfo
+     * symlinks to the IANA id (e.g. US/Pacific → America/Los_Angeles) (#20926).
+     */
+    public static function getIanaID(string $timezoneId): string|false
+    {
+        try {
+            $id = VmDateTimeNative::validateTimezoneId($timezoneId);
+        } catch (\Throwable) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intltz_get_iana_id: No such time zone: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+
+        $root = self::ZONEINFO_ROOT;
+        $path = $root.'/'.$id;
+        if (is_link($path) || is_file($path)) {
+            $real = realpath($path);
+            if (false !== $real) {
+                $prefix = $root.'/';
+                if (str_starts_with($real, $prefix)) {
+                    $iana = substr($real, strlen($prefix));
+                    if ('' !== $iana && !str_contains($iana, "\0")) {
+                        IntlError::clear();
+
+                        return $iana;
+                    }
+                }
+            }
+        }
+
+        IntlError::clear();
+
+        return $id;
+    }
+
+    /**
      * php-src intltz_get_offset — fills raw/dst offset by-ref in milliseconds.
      *
      * @param-out int $rawOffset
@@ -1118,6 +1158,42 @@ final class IntlTimeZoneGetRegion extends VmClassMethod
             return;
         }
         $frame->returnVar->string($region);
+    }
+}
+
+/** IntlTimeZone::getIanaID() — php-src intltz_get_iana_id (#20926). */
+final class IntlTimeZoneGetIanaID extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getIanaID');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::getIanaID() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $id = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'IntlTimeZone::getIanaID',
+            0,
+            'zoneId'
+        );
+        $iana = VmIntlTimeZone::getIanaID($id);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $iana) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($iana);
     }
 }
 

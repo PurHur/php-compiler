@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5996 |
-| Phase A inventory files (M2 ratio SSOT) | 5996 |
+| PHP files on vm.php path | 6011 |
+| Phase A inventory files (M2 ratio SSOT) | 6011 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18435 |
+| Source constructs flagged (warnings) | 18499 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -848,7 +848,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 176 |
+| `ext/intl/Module.php` | 0 | 191 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -861,14 +861,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmIntlChar.php` | 0 | 109 |
 | `ext/intl/VmIntlDateFormatter.php` | 0 | 25 |
 | `ext/intl/VmIntlDatePatternGenerator.php` | 0 | 12 |
-| `ext/intl/VmIntlTimeZone.php` | 0 | 61 |
+| `ext/intl/VmIntlTimeZone.php` | 0 | 63 |
 | `ext/intl/VmLocale.php` | 0 | 2 |
 | `ext/intl/VmMessageFormatter.php` | 0 | 37 |
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/VmNumberFormatter.php` | 0 | 56 |
 | `ext/intl/VmResourceBundle.php` | 0 | 33 |
 | `ext/intl/VmSpoofchecker.php` | 0 | 29 |
-| `ext/intl/VmTransliterator.php` | 0 | 27 |
+| `ext/intl/VmTransliterator.php` | 0 | 29 |
 | `ext/intl/VmUConverter.php` | 0 | 46 |
 | `ext/intl/collator_asort.php` | 0 | 3 |
 | `ext/intl/collator_compare.php` | 0 | 3 |
@@ -973,17 +973,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/intlgregcal_get_gregorian_change.php` | 0 | 3 |
 | `ext/intl/intlgregcal_is_leap_year.php` | 0 | 3 |
 | `ext/intl/intlgregcal_set_gregorian_change.php` | 0 | 3 |
+| `ext/intl/intltz_count_equivalent_ids.php` | 0 | 3 |
 | `ext/intl/intltz_create_default.php` | 0 | 3 |
+| `ext/intl/intltz_create_enumeration.php` | 0 | 3 |
 | `ext/intl/intltz_create_time_zone.php` | 0 | 3 |
+| `ext/intl/intltz_create_time_zone_id_enumeration.php` | 0 | 3 |
 | `ext/intl/intltz_from_date_time_zone.php` | 0 | 3 |
 | `ext/intl/intltz_get_canonical_id.php` | 0 | 3 |
 | `ext/intl/intltz_get_display_name.php` | 0 | 3 |
 | `ext/intl/intltz_get_dst_savings.php` | 0 | 3 |
+| `ext/intl/intltz_get_equivalent_id.php` | 0 | 3 |
+| `ext/intl/intltz_get_error_code.php` | 0 | 3 |
+| `ext/intl/intltz_get_error_message.php` | 0 | 3 |
 | `ext/intl/intltz_get_gmt.php` | 0 | 3 |
+| `ext/intl/intltz_get_iana_id.php` | 0 | 3 |
 | `ext/intl/intltz_get_id.php` | 0 | 3 |
+| `ext/intl/intltz_get_id_for_windows_id.php` | 0 | 3 |
+| `ext/intl/intltz_get_offset.php` | 0 | 3 |
 | `ext/intl/intltz_get_raw_offset.php` | 0 | 3 |
 | `ext/intl/intltz_get_region.php` | 0 | 3 |
+| `ext/intl/intltz_get_tz_data_version.php` | 0 | 3 |
+| `ext/intl/intltz_get_unknown.php` | 0 | 3 |
+| `ext/intl/intltz_get_utc.php` | 0 | 3 |
+| `ext/intl/intltz_get_windows_id.php` | 0 | 3 |
+| `ext/intl/intltz_has_same_rules.php` | 0 | 3 |
 | `ext/intl/intltz_to_date_time_zone.php` | 0 | 3 |
+| `ext/intl/intltz_use_daylight_time.php` | 0 | 3 |
 | `ext/intl/locale_accept_from_http.php` | 0 | 2 |
 | `ext/intl/locale_canonicalize.php` | 0 | 3 |
 | `ext/intl/locale_compose.php` | 0 | 2 |
@@ -11929,23 +11944,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new intltz_to_date_time_zone (line 285)
 - new intltz_get_canonical_id (line 286)
 - new intltz_get_region (line 287)
-- new grapheme_strlen (line 318)
-- new grapheme_substr (line 319)
-- new grapheme_strpos (line 320)
-- new grapheme_str_contains (line 321)
-- new grapheme_strstr (line 322)
-- new grapheme_stristr (line 323)
-- new grapheme_stripos (line 324)
-- new grapheme_strrpos (line 325)
-- new grapheme_strripos (line 326)
-- new grapheme_extract (line 327)
-- new grapheme_levenshtein (line 328)
-- new grapheme_str_split (line 329)
-- new grapheme_strimwidth (line 330)
-- new intl_get_error_code (line 331)
-- new intl_get_error_message (line 332)
-- new intl_is_failure (line 333)
-- new intl_error_name (line 334)
+- new intltz_count_equivalent_ids (line 289)
+- new intltz_get_equivalent_id (line 290)
+- new intltz_get_windows_id (line 291)
+- new intltz_get_id_for_windows_id (line 292)
+- new intltz_create_enumeration (line 293)
+- new intltz_create_time_zone_id_enumeration (line 294)
+- new intltz_get_unknown (line 295)
+- new intltz_get_utc (line 296)
+- new intltz_get_tz_data_version (line 297)
+- new intltz_use_daylight_time (line 298)
+- new intltz_has_same_rules (line 299)
+- new intltz_get_error_code (line 300)
+- new intltz_get_error_message (line 301)
+- new intltz_get_offset (line 302)
+- new intltz_get_iana_id (line 303)
+- new grapheme_strlen (line 334)
+- new grapheme_substr (line 335)
+- new grapheme_strpos (line 336)
+- new grapheme_str_contains (line 337)
+- new grapheme_strstr (line 338)
+- new grapheme_stristr (line 339)
+- new grapheme_stripos (line 340)
+- new grapheme_strrpos (line 341)
+- new grapheme_strripos (line 342)
+- new grapheme_extract (line 343)
+- new grapheme_levenshtein (line 344)
+- new grapheme_str_split (line 345)
+- new grapheme_strimwidth (line 346)
+- new intl_get_error_code (line 347)
+- new intl_get_error_message (line 348)
+- new intl_is_failure (line 349)
+- new intl_error_name (line 350)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12439,66 +12469,68 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new IntlTimeZoneCreateDefault (line 99)
 - new IntlTimeZoneFromDateTimeZone (line 100)
 - new IntlTimeZoneGetCanonicalID (line 101)
-- new IntlTimeZoneGetRegion (line 102)
-- new IntlTimeZoneGetGMT (line 103)
-- new IntlTimeZoneGetUnknown (line 104)
-- new IntlTimeZoneGetUTC (line 105)
-- new IntlTimeZoneCreateEnumeration (line 106)
-- new IntlTimeZoneCreateTimeZoneIDEnumeration (line 107)
-- new IntlTimeZoneGetIDForWindowsID (line 108)
-- new IntlTimeZoneGetWindowsID (line 109)
-- new IntlTimeZoneCountEquivalentIDs (line 110)
-- new IntlTimeZoneGetEquivalentID (line 111)
-- new IntlTimeZoneGetTZDataVersion (line 112)
-- new IntlTimeZoneGetErrorCode (line 113)
-- new IntlTimeZoneGetErrorMessage (line 114)
-- new IntlTimeZoneGetID (line 115)
-- new IntlTimeZoneGetRawOffset (line 116)
-- new IntlTimeZoneGetDSTSavings (line 117)
-- new IntlTimeZoneUseDaylightTime (line 118)
-- new IntlTimeZoneGetDisplayName (line 119)
-- new IntlTimeZoneGetOffset (line 120)
-- new IntlTimeZoneToDateTimeZone (line 121)
-- new IntlTimeZoneHasSameRules (line 122)
-- new RecursiveIteratorIterator (line 403)
-- new RecursiveDirectoryIterator (line 404)
-- new Error (line 457)
-- new ObjectEntry (line 460)
-- new Error (line 739)
-- new ArgumentCountError (line 774)
-- new ArgumentCountError (line 804)
-- new ArgumentCountError (line 828)
-- new ArgumentCountError (line 853)
-- new ArgumentCountError (line 878)
-- new ArgumentCountError (line 903)
-- new ArgumentCountError (line 928)
-- new ArgumentCountError (line 989)
-- new ArgumentCountError (line 1020)
-- new ArgumentCountError (line 1067)
-- new ArgumentCountError (line 1100)
-- new ArgumentCountError (line 1136)
-- new ArgumentCountError (line 1181)
-- new ArgumentCountError (line 1215)
-- new ArgumentCountError (line 1235)
-- new ArgumentCountError (line 1250)
-- new ArgumentCountError (line 1265)
-- new ArgumentCountError (line 1292)
-- new ArgumentCountError (line 1322)
-- new ArgumentCountError (line 1351)
-- new ArgumentCountError (line 1382)
-- new ArgumentCountError (line 1407)
-- new ArgumentCountError (line 1433)
-- new ArgumentCountError (line 1453)
-- new Error (line 1457)
-- new ArgumentCountError (line 1474)
-- new Error (line 1478)
-- 60 class method(s)
+- new IntlTimeZoneGetIanaID (line 102)
+- new IntlTimeZoneGetRegion (line 103)
+- new IntlTimeZoneGetGMT (line 104)
+- new IntlTimeZoneGetUnknown (line 105)
+- new IntlTimeZoneGetUTC (line 106)
+- new IntlTimeZoneCreateEnumeration (line 107)
+- new IntlTimeZoneCreateTimeZoneIDEnumeration (line 108)
+- new IntlTimeZoneGetIDForWindowsID (line 109)
+- new IntlTimeZoneGetWindowsID (line 110)
+- new IntlTimeZoneCountEquivalentIDs (line 111)
+- new IntlTimeZoneGetEquivalentID (line 112)
+- new IntlTimeZoneGetTZDataVersion (line 113)
+- new IntlTimeZoneGetErrorCode (line 114)
+- new IntlTimeZoneGetErrorMessage (line 115)
+- new IntlTimeZoneGetID (line 116)
+- new IntlTimeZoneGetRawOffset (line 117)
+- new IntlTimeZoneGetDSTSavings (line 118)
+- new IntlTimeZoneUseDaylightTime (line 119)
+- new IntlTimeZoneGetDisplayName (line 120)
+- new IntlTimeZoneGetOffset (line 121)
+- new IntlTimeZoneToDateTimeZone (line 122)
+- new IntlTimeZoneHasSameRules (line 123)
+- new RecursiveIteratorIterator (line 404)
+- new RecursiveDirectoryIterator (line 405)
+- new Error (line 458)
+- new ObjectEntry (line 461)
+- new Error (line 779)
+- new ArgumentCountError (line 814)
+- new ArgumentCountError (line 844)
+- new ArgumentCountError (line 868)
+- new ArgumentCountError (line 893)
+- new ArgumentCountError (line 918)
+- new ArgumentCountError (line 943)
+- new ArgumentCountError (line 968)
+- new ArgumentCountError (line 1029)
+- new ArgumentCountError (line 1060)
+- new ArgumentCountError (line 1107)
+- new ArgumentCountError (line 1140)
+- new ArgumentCountError (line 1176)
+- new ArgumentCountError (line 1212)
+- new ArgumentCountError (line 1257)
+- new ArgumentCountError (line 1291)
+- new ArgumentCountError (line 1311)
+- new ArgumentCountError (line 1326)
+- new ArgumentCountError (line 1341)
+- new ArgumentCountError (line 1368)
+- new ArgumentCountError (line 1398)
+- new ArgumentCountError (line 1427)
+- new ArgumentCountError (line 1458)
+- new ArgumentCountError (line 1483)
+- new ArgumentCountError (line 1509)
+- new ArgumentCountError (line 1529)
+- new Error (line 1533)
+- new ArgumentCountError (line 1550)
+- new Error (line 1554)
+- 62 class method(s)
 - 3 closure(s)
 
 ### `ext/intl/VmLocale.php`
 
 **Warnings** (review for bootstrap subset):
-- 49 class method(s)
+- 48 class method(s)
 - 1 closure(s)
 
 ### `ext/intl/VmMessageFormatter.php`
@@ -12680,33 +12712,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmTransliterator.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 58)
-- new Variable (line 62)
-- new TransliteratorCreate (line 70)
-- new TransliteratorCreateFromRules (line 71)
-- new TransliteratorCreateInverse (line 72)
-- new TransliteratorListIDs (line 73)
-- new TransliteratorTransliterate (line 74)
-- new TransliteratorGetErrorCode (line 75)
-- new TransliteratorGetErrorMessage (line 76)
-- new Error (line 106)
-- new Error (line 137)
-- new Error (line 169)
-- new HashTable (line 208)
-- new Variable (line 210)
-- new ObjectEntry (line 291)
-- new ArgumentCountError (line 717)
-- new ArgumentCountError (line 753)
-- new ArgumentCountError (line 794)
-- new Error (line 802)
-- new ArgumentCountError (line 829)
-- new ArgumentCountError (line 859)
-- new Error (line 867)
-- new ArgumentCountError (line 888)
-- new Error (line 896)
-- new ArgumentCountError (line 917)
-- new Error (line 925)
-- 35 class method(s)
+- new ClassEntry (line 63)
+- new Variable (line 70)
+- new Variable (line 78)
+- new ClassProperty (line 80)
+- new TransliteratorCreate (line 89)
+- new TransliteratorCreateFromRules (line 90)
+- new TransliteratorCreateInverse (line 91)
+- new TransliteratorListIDs (line 92)
+- new TransliteratorTransliterate (line 93)
+- new TransliteratorGetErrorCode (line 94)
+- new TransliteratorGetErrorMessage (line 95)
+- new Error (line 125)
+- new Error (line 156)
+- new Error (line 188)
+- new HashTable (line 227)
+- new Variable (line 229)
+- new ObjectEntry (line 310)
+- new ArgumentCountError (line 769)
+- new ArgumentCountError (line 805)
+- new ArgumentCountError (line 846)
+- new Error (line 854)
+- new ArgumentCountError (line 881)
+- new ArgumentCountError (line 911)
+- new Error (line 919)
+- new ArgumentCountError (line 940)
+- new Error (line 948)
+- new ArgumentCountError (line 969)
+- new Error (line 977)
+- 36 class method(s)
 
 ### `ext/intl/VmUConverter.php`
 
@@ -13472,6 +13506,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 53)
 - 2 class method(s)
 
+### `ext/intl/intltz_count_equivalent_ids.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 49)
+- 2 class method(s)
+
 ### `ext/intl/intltz_create_default.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13479,11 +13520,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 41)
 - 2 class method(s)
 
+### `ext/intl/intltz_create_enumeration.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 31)
+- new Error (line 58)
+- 2 class method(s)
+
 ### `ext/intl/intltz_create_time_zone.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 30)
 - new Error (line 49)
+- 2 class method(s)
+
+### `ext/intl/intltz_create_time_zone_id_enumeration.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 73)
 - 2 class method(s)
 
 ### `ext/intl/intltz_from_date_time_zone.php`
@@ -13514,6 +13569,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 53)
 - 2 class method(s)
 
+### `ext/intl/intltz_get_equivalent_id.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 55)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_error_code.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 58)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_error_message.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 58)
+- 2 class method(s)
+
 ### `ext/intl/intltz_get_gmt.php`
 
 **Warnings** (review for bootstrap subset):
@@ -13521,11 +13597,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 41)
 - 2 class method(s)
 
+### `ext/intl/intltz_get_iana_id.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 55)
+- 2 class method(s)
+
 ### `ext/intl/intltz_get_id.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
 - new Error (line 53)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_id_for_windows_id.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 67)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_offset.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 75)
 - 2 class method(s)
 
 ### `ext/intl/intltz_get_raw_offset.php`
@@ -13542,11 +13639,53 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 55)
 - 2 class method(s)
 
+### `ext/intl/intltz_get_tz_data_version.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 42)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_unknown.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 42)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_utc.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 42)
+- 2 class method(s)
+
+### `ext/intl/intltz_get_windows_id.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new Error (line 55)
+- 2 class method(s)
+
+### `ext/intl/intltz_has_same_rules.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 61)
+- 2 class method(s)
+
 ### `ext/intl/intltz_to_date_time_zone.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 29)
 - new Error (line 59)
+- 2 class method(s)
+
+### `ext/intl/intltz_use_daylight_time.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 53)
 - 2 class method(s)
 
 ### `ext/intl/locale_accept_from_http.php`
@@ -23996,7 +24135,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitSuperglobalRefreshKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- 31 class method(s)
+- 32 class method(s)
 
 ### `ext/standard/JitSymlink.php`
 

@@ -285,6 +285,22 @@ class Module extends ModuleAbstract
                 new intltz_to_date_time_zone(),
                 new intltz_get_canonical_id(),
                 new intltz_get_region(),
+                // IntlTimeZone procedurals after OOP (#20925; get_iana_id also #20926)
+                new intltz_count_equivalent_ids(),
+                new intltz_get_equivalent_id(),
+                new intltz_get_windows_id(),
+                new intltz_get_id_for_windows_id(),
+                new intltz_create_enumeration(),
+                new intltz_create_time_zone_id_enumeration(),
+                new intltz_get_unknown(),
+                new intltz_get_utc(),
+                new intltz_get_tz_data_version(),
+                new intltz_use_daylight_time(),
+                new intltz_has_same_rules(),
+                new intltz_get_error_code(),
+                new intltz_get_error_message(),
+                new intltz_get_offset(),
+                new intltz_get_iana_id(),
             ]
             : [];
 

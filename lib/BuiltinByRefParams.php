@@ -180,8 +180,14 @@ final class BuiltinByRefParams
             case 'intltimezone::getoffset':
                 // $this + $date + $local + &$rawOffset + &$dstOffset — php-src timezone.stub.php (#20769)
                 return [3, 4];
+            case 'intltz_get_offset':
+                // $timezone + $date + $local + &$rawOffset + &$dstOffset — php-src timezone.stub.php (#20925)
+                return [3, 4];
             case 'intltimezone::getcanonicalid':
                 // $timezoneId + &$isSystemId — php-src timezone.stub.php (#20769)
+                return [1];
+            case 'intltz_get_canonical_id':
+                // $timezoneId + &$isSystemId — php-src timezone.stub.php (#20859 / #20925)
                 return [1];
             case 'redis::scan':
                 // $this + &$iterator (+ optional pattern/count) — phpredis redis.stub.php (#20682)
