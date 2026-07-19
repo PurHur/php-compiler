@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitEnvironMirrorKernel;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -13,25 +14,24 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_getenv_all via GetenvJitHelper PHP (#5075, #20156).
+ * JIT/AOT link for __compiler_getenv_all (#5075, #20156, #20758).
  *
- * Embed / non-thin: {@see GetenvJitHelper::fillAllEnvironmentHashtable} via {@see JitVmHelperLink}.
- * Thin standalone AOT: linkable void stub (inventory / user-script init — #14470 / #16075).
+ * Embed + thin standalone AOT: libc environ via {@see JitEnvironMirrorKernel} (no NestedJIT),
+ * then putenv overlay via {@see GetenvJitHelper::mergeLocalOverlayIntoNative}.
+ * No thin void stub (Rename #20603 / getenv named #20644 shape).
  * php-src: ext/standard/basic_functions.c — zif_getenv argc==0
  */
 final class StringGetenvAll
 {
     private const HELPER_PATH = '/ext/standard/GetenvJitHelper.php';
 
-    private const GETENV_ALL_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::fillAllEnvironmentHashtable';
+    private const MERGE_OVERLAY_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::mergeLocalOverlayIntoNative';
 
     private const BRIDGE_ENTRY = 'getenv_all_bridge_entry';
 
-    private const THIN_STUB_ENTRY = 'getenv_all_thin_stub';
-
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::GETENV_ALL_HELPER,
+        self::MERGE_OVERLAY_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -51,8 +51,7 @@ final class StringGetenvAll
         }
 
         $probe = $context->module->getNamedFunction('__compiler_getenv_all');
-        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)
-            || JitVmHelperLink::hasNamedBridgeEntry($probe, self::THIN_STUB_ENTRY)) {
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::BRIDGE_ENTRY)) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -63,37 +62,10 @@ final class StringGetenvAll
             return;
         }
 
-        if ($context->isThinStandaloneAotMain()) {
-            self::implementThinStub($context, $probe);
-
-            return;
-        }
-
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureHashtableHelpers($context);
-        self::ensureJitHelperCompiled($context);
+        self::ensureOverlayHelperCompiled($context);
         self::implementBridge($context);
-        self::registerLinkedRuntime($context);
-        if (null !== $savedInsert) {
-            $context->builder->positionAtEnd($savedInsert);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function implementThinStub(Context $context, ?LlvmFunction $probe): void
-    {
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-        $voidTy = $context->getTypeFromString('void');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $ft = $context->context->functionType($voidTy, false, $valuePtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction('__compiler_getenv_all', $ft);
-        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::THIN_STUB_ENTRY);
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnVoid();
-        $context->registerFunction('__compiler_getenv_all', $fn);
         self::registerLinkedRuntime($context);
         if (null !== $savedInsert) {
             $context->builder->positionAtEnd($savedInsert);
@@ -148,11 +120,26 @@ final class StringGetenvAll
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($fillBb);
-        JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::GETENV_ALL_HELPER),
-            [$ht]
-        );
+        $prevActive = $context->activeFunction;
+        $context->functions[$abiName] = $fn;
+        $context->activeFunction = $abiName;
+        try {
+            // Inline libc environ walk — NestedJIT EnvironMirrorNativeJitHelper is empty under
+            // thin AOT with HELPER_RUNTIME_O=0 (#20758 / #19157).
+            JitEnvironMirrorKernel::mirrorIntoHashtablePtr($context, $ht);
+            $i64 = $context->getTypeFromString('int64');
+            $htI64 = JitNestedHelperCoerce::ptrToI64($context, $ht);
+            $htSlot = $context->builder->alloca($i64, 1);
+            $context->builder->store($htI64, $htSlot);
+            $htArg = $context->builder->load($htSlot);
+            JitNestedHelperCoerce::callHelper(
+                $context,
+                self::overlayHelper($context),
+                [$htArg]
+            );
+        } finally {
+            $context->activeFunction = $prevActive;
+        }
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             $out,
@@ -184,29 +171,29 @@ final class StringGetenvAll
         }
     }
 
-    private static function ensureJitHelperCompiled(Context $context): void
+    private static function ensureOverlayHelperCompiled(Context $context): void
     {
         StringGetenv::ensureNativeHtInternalProxies($context);
         JitVmHelperLink::ensureCompiled(
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#20156'
+            '#20758'
         );
     }
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    private static function overlayHelper(Context $context): LlvmFunction
     {
-        self::ensureJitHelperCompiled($context);
+        self::ensureOverlayHelperCompiled($context);
 
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#20156');
+        return JitVmHelperLink::lookupCompiled($context, self::MERGE_OVERLAY_HELPER, '#20758');
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction('__compiler_getenv_all');
         if (null === $fn) {
-            throw new \LogicException('__compiler_getenv_all missing after StringGetenvAll bridge (#20156)');
+            throw new \LogicException('__compiler_getenv_all missing after StringGetenvAll bridge (#20758)');
         }
         $context->registerFunction('__compiler_getenv_all', $fn);
     }

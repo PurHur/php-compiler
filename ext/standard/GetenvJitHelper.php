@@ -93,15 +93,12 @@ final class GetenvJitHelper
         }
     }
 
-    /** Populate a native hashtable with inherited environ + local putenv overlay (JIT getenv argc==0, #5075). */
+    /** Populate a native hashtable with inherited environ + local putenv overlay (JIT getenv argc==0, #5075, #20758). */
     public static function fillAllEnvironmentHashtable(int $htPtr): void
     {
-        foreach (self::getAllEnvironmentMap() as $name => $value) {
-            if ('' === $name) {
-                continue;
-            }
-            phpc_native_ht_set_string_key($htPtr, $name, $value);
-        }
+        // Init-safe libc environ walk — NestedJIT of /proc enumerate segfaults under thin AOT (#19157 / #20758).
+        VmEnvEnvironNative::mirrorIntoNativeHashtable($htPtr);
+        self::mergeLocalOverlayIntoNative($htPtr);
     }
 
     /** @return array<string, string> VM overlay map for interpreter-side merge helpers. */
