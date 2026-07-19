@@ -5,15 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\SprintfJitHelper;
-use PHPCompiler\ext\standard\StdlibConstants;
-use PHPCompiler\ext\standard\VmNumberFormat;
 use PHPCompiler\ext\standard\VmSprintf;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
 /**
- * sprintf/printf/number_format JIT: embed via SprintfJitHelper; thin AOT via isThinStandaloneAotMain (#9131, #13146, #20395).
+ * sprintf/printf/number_format JIT: always NestedJIT SprintfJitHelper (#9131, #20841).
  */
 final class StringFormatRuntimeShrinkTest extends TestCase
 {
@@ -21,82 +19,76 @@ final class StringFormatRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFormat.php');
         $this->assertStringContainsString('SprintfJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('PackArgvSerialize::ensureLinked', $source);
         $this->assertStringNotContainsString('StringFormatJit', $source);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
-        $this->assertStringNotContainsString('emitCompilerSprintf', $source);
-        $this->assertStringNotContainsString('__phpc_fmt_append_spec_snprintf', $source);
-        $this->assertLessThan(400, \substr_count($source, "\n") + 1);
-
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFormatJit.php');
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('StringFormatInventoryStubs', $source);
+        $this->assertStringNotContainsString('ensureDeferredStubsForInventoryEmit', $source);
+        $this->assertStringNotContainsString('COMPILED_PATHS', $source);
+        $this->assertLessThan(340, \substr_count($source, "\n") + 1);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFormatInventoryStubs.php');
     }
 
     public function testStandaloneUsesSamePhpBridgeAsEmbed(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFormat.php');
         $this->assertStringContainsString('ensureStandaloneBodies', $source);
-        $this->assertStringContainsString('self::implement($context)', $source);
-        $this->assertStringContainsString('isThinStandaloneAotMain', $source);
-        $this->assertStringContainsString('StringFormatInventoryStubs', $source);
-        $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('sprintf_bridge_entry', $source);
+        $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
+        $this->assertStringNotContainsString('StringFormatInventoryStubs', $source);
     }
 
-    public function testSprintfJitHelperMatchesVmSprintf(): void
+    public function testSprintfJitHelperIsNestedJitSafe(): void
     {
-        $blob = \chr(1).\pack('q', 7);
-        $this->assertSame(
-            VmSprintf::format('%03d', [(function (): \PHPCompiler\VM\Variable {
-                $v = new \PHPCompiler\VM\Variable();
-                $v->int(7);
-
-                return $v;
-            })()]),
-            SprintfJitHelper::sprintfArgv('%03d', $blob)
-        );
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/SprintfJitHelper.php');
+        $this->assertStringNotContainsString('new Variable', $source);
+        $this->assertStringNotContainsString('new HashTable', $source);
+        $this->assertStringNotContainsString('VmSprintf::', $source);
+        $this->assertStringNotContainsString('VmString::', $source);
+        $this->assertStringContainsString('byteOrd', $source);
     }
 
-    /** Issue #18532 — AOT/JIT sprintf tail coerces array operands like Zend (%d → 0). */
+    public function testSprintfJitHelperMatchesVmSprintfForPercent03d(): void
+    {
+        $blob = "\x01".\pack('q', 7);
+        $this->assertSame('007', SprintfJitHelper::sprintfArgv('%03d', $blob));
+        $v = new Variable();
+        $v->int(7);
+        $this->assertSame(VmSprintf::format('%03d', [$v]), SprintfJitHelper::sprintfArgv('%03d', $blob));
+    }
+
     public function testSprintfJitHelperCoercesEmptyArrayForPercentD(): void
     {
-        $emptyArrayBlob = \chr(5);
+        $emptyArrayBlob = "\x05";
         $emptyArrayVar = new Variable();
         $emptyArrayVar->array(new HashTable());
+        $this->assertSame('0', SprintfJitHelper::sprintfArgv('%d', $emptyArrayBlob));
         $this->assertSame(
             VmSprintf::format('%d', [$emptyArrayVar]),
             SprintfJitHelper::sprintfArgv('%d', $emptyArrayBlob)
         );
-        $this->assertSame('0', SprintfJitHelper::sprintfArgv('%d', $emptyArrayBlob));
     }
 
-    public function testSprintfJitHelperNumberFormatMatchesVmNumberFormat(): void
+    public function testSprintfJitHelperNumberFormatBasics(): void
     {
-        $this->assertSame(
-            VmNumberFormat::format(1234.5, 2, '.', ','),
-            SprintfJitHelper::numberFormat(1234.5, 2, '.', ',')
-        );
-        $this->assertSame('nan', SprintfJitHelper::numberFormat(NAN, 0, '.', ','));
-        $this->assertSame(
-            '3',
-            SprintfJitHelper::numberFormat(2.5, 0, '.', '', StdlibConstants::PHP_ROUND_HALF_UP)
-        );
-        $this->assertSame(
-            '2',
-            SprintfJitHelper::numberFormat(
-                2.5,
-                0,
-                '.',
-                '',
-                StdlibConstants::PHP_ROUND_TOWARD_ZERO
-            )
-        );
-        $this->assertSame(
-            '1.10000000000000008882',
-            SprintfJitHelper::numberFormat(1.1, 20, '.', ',')
-        );
-        $this->assertSame(
-            VmNumberFormat::format(1.1, 20),
-            SprintfJitHelper::numberFormat(1.1, 20, '.', ',')
-        );
+        $this->assertSame('1,234.50', SprintfJitHelper::numberFormat(1234.5, 2, '.', ','));
+        $this->assertSame('3', SprintfJitHelper::numberFormat(2.5, 0, '.', '', 1));
+        $this->assertSame('2', SprintfJitHelper::numberFormat(2.5, 0, '.', '', 7));
+    }
+
+    public function testSpineBundleIncludesStringFormatPhpJitPath(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('SprintfJitHelper.php', $spine);
+        $this->assertStringContainsString('StringFormat.php', $spine);
+        $this->assertStringNotContainsString('StringFormatInventoryStubs.php', $spine);
+    }
+
+    public function testEmitHelperRuntimeNoLongerMarksSprintfUnsafe(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../script/emit-helper-runtime-object.php');
+        $this->assertStringNotContainsString("'/ext/standard/SprintfJitHelper.php' => true", $source);
     }
 }

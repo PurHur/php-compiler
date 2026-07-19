@@ -4720,7 +4720,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilterSanitize.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilterUrl.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFindSubstr.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFormat.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringFormatInventoryStubs.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsDir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsDirJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsGlob.php';
