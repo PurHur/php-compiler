@@ -11,9 +11,10 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_stream_socket_pair via StreamSocketPairJitHelper PHP (#13710).
+ * JIT/AOT link for __compiler_stream_socket_pair via StreamSocketPairJitHelper PHP (#13710, #21082).
  *
- * Embed and standalone AOT compile the same PHP bridge; no libc socketpair LLVM.
+ * Embed + inventory/standalone AOT: always NestedJIT the same PHP bridge — no inventory
+ * null-stub fork (StreamIo #20943 / StreamLifecycle #20966 shape). No libc socketpair LLVM.
  * SSOT: {@see \PHPCompiler\ext\standard\VmStreamSocketPairNative}
  * php-src: ext/standard/streams.c — PHP_FUNCTION(stream_socket_pair)
  */
@@ -40,17 +41,13 @@ final class StreamSocketPairRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_stream_socket_pair');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
-        if (self::shouldDeferInventoryEmit($context)) {
-            self::implementStub($context);
+        $probe = $context->module->getNamedFunction('__compiler_stream_socket_pair');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
-            $context->builder->clearInsertionPosition();
 
             return;
         }
@@ -150,37 +147,6 @@ final class StreamSocketPairRuntime
 
         $context->builder->positionAtEnd($fail);
         $context->builder->returnValue($htPtr->constNull());
-    }
-
-    private static function implementStub(Context $context): void
-    {
-        $probe = $context->module->getNamedFunction('__compiler_stream_socket_pair');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('__compiler_stream_socket_pair', $probe);
-
-            return;
-        }
-
-        $fn = self::declareFunction($context, '__compiler_stream_socket_pair');
-        $entry = $fn->appendBasicBlock('stream_socket_pair_stub_entry');
-        $context->builder->positionAtEnd($entry);
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $context->builder->returnValue($htPtr->constNull());
-        $context->registerFunction('__compiler_stream_socket_pair', $fn);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function shouldDeferInventoryEmit(Context $context): bool
-    {
-        unset($context);
-        foreach (['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', 'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] as $key) {
-            $flag = getenv($key);
-            if ('1' === $flag || 'true' === strtolower((string) $flag)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
