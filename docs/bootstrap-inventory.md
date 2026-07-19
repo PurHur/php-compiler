@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5880 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17751 |
+| Source constructs flagged (warnings) | 17776 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -793,7 +793,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_init.php` | 0 | 2 |
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
-| `ext/intl/BuiltinClasses.php` | 0 | 37 |
+| `ext/intl/BuiltinClasses.php` | 0 | 47 |
 | `ext/intl/GraphemeStrSplitJitHelper.php` | 0 | 3 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
@@ -844,7 +844,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmIdn.php` | 0 | 5 |
 | `ext/intl/VmIntlCalendar.php` | 0 | 52 |
 | `ext/intl/VmIntlChar.php` | 0 | 84 |
-| `ext/intl/VmIntlDateFormatter.php` | 0 | 5 |
+| `ext/intl/VmIntlDateFormatter.php` | 0 | 25 |
 | `ext/intl/VmIntlDatePatternGenerator.php` | 0 | 12 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 34 |
 | `ext/intl/VmLocale.php` | 0 | 2 |
@@ -852,7 +852,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/VmNumberFormatter.php` | 0 | 56 |
 | `ext/intl/VmResourceBundle.php` | 0 | 28 |
-| `ext/intl/VmSpoofchecker.php` | 0 | 29 |
+| `ext/intl/VmSpoofchecker.php` | 0 | 24 |
 | `ext/intl/VmTransliterator.php` | 0 | 27 |
 | `ext/intl/VmUConverter.php` | 0 | 40 |
 | `ext/intl/collator_asort.php` | 0 | 3 |
@@ -11225,14 +11225,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new IntlDateFormatterFormat (line 163)
 - new IntlDateFormatterFormatObject (line 166)
 - new IntlDateFormatterGetPattern (line 169)
-- new IntlDateFormatterParse (line 172)
-- new IntlDateFormatterParseToCalendar (line 175)
-- new IntlDateFormatterLocaltime (line 178)
-- new IntlDateFormatterGetTimeZone (line 181)
-- new IntlDateFormatterSetTimeZone (line 184)
-- new IntlDateFormatterGetErrorCode (line 187)
-- new IntlDateFormatterGetErrorMessage (line 190)
-- new ClassEntry (line 273)
+- new IntlDateFormatterSetPattern (line 172)
+- new IntlDateFormatterGetLocale (line 175)
+- new IntlDateFormatterGetDateType (line 178)
+- new IntlDateFormatterGetTimeType (line 181)
+- new IntlDateFormatterIsLenient (line 184)
+- new IntlDateFormatterSetLenient (line 187)
+- new IntlDateFormatterGetCalendar (line 190)
+- new IntlDateFormatterSetCalendar (line 193)
+- new IntlDateFormatterGetTimeZoneId (line 196)
+- new IntlDateFormatterGetCalendarObject (line 199)
+- new IntlDateFormatterParse (line 202)
+- new IntlDateFormatterParseToCalendar (line 205)
+- new IntlDateFormatterLocaltime (line 208)
+- new IntlDateFormatterGetTimeZone (line 211)
+- new IntlDateFormatterSetTimeZone (line 214)
+- new IntlDateFormatterGetErrorCode (line 217)
+- new IntlDateFormatterGetErrorMessage (line 220)
+- new ClassEntry (line 303)
 - 17 class method(s)
 
 ### `ext/intl/GraphemeStrSplitJitHelper.php`
@@ -11874,11 +11884,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmIntlDateFormatter.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 92)
-- new ObjectEntry (line 97)
-- new HashTable (line 315)
-- new Variable (line 328)
-- 37 class method(s)
+- new Error (line 104)
+- new ObjectEntry (line 109)
+- new HashTable (line 549)
+- new Variable (line 562)
+- new ArgumentCountError (line 1473)
+- new Error (line 1481)
+- new ArgumentCountError (line 1509)
+- new Error (line 1517)
+- new ArgumentCountError (line 1547)
+- new Error (line 1555)
+- new ArgumentCountError (line 1582)
+- new Error (line 1590)
+- new ArgumentCountError (line 1617)
+- new Error (line 1625)
+- new ArgumentCountError (line 1646)
+- new Error (line 1654)
+- new ArgumentCountError (line 1676)
+- new Error (line 1684)
+- new ArgumentCountError (line 1711)
+- new Error (line 1719)
+- new ArgumentCountError (line 1741)
+- new Error (line 1749)
+- new ArgumentCountError (line 1776)
+- new Error (line 1784)
+- 58 class method(s)
 
 ### `ext/intl/VmIntlDatePatternGenerator.php`
 
@@ -12081,35 +12111,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmSpoofchecker.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 104)
-- new Variable (line 108)
-- new SpoofcheckerConstruct (line 114)
-- new SpoofcheckerIsSuspicious (line 118)
-- new SpoofcheckerAreConfusable (line 119)
-- new SpoofcheckerSetAllowedLocales (line 120)
-- new SpoofcheckerSetChecks (line 121)
-- new SpoofcheckerSetRestrictionLevel (line 122)
-- new SpoofcheckerSetAllowedChars (line 123)
-- new Variable (line 144)
-- new Error (line 178)
-- new Error (line 222)
-- new Error (line 265)
+- new ClassEntry (line 92)
+- new Variable (line 96)
+- new SpoofcheckerConstruct (line 102)
+- new SpoofcheckerIsSuspicious (line 106)
+- new SpoofcheckerAreConfusable (line 107)
+- new SpoofcheckerSetAllowedLocales (line 108)
+- new SpoofcheckerSetChecks (line 109)
+- new SpoofcheckerSetRestrictionLevel (line 110)
+- new Error (line 147)
+- new Error (line 186)
+- new Error (line 229)
+- new Error (line 258)
 - new Error (line 294)
-- new Error (line 330)
-- new Error (line 368)
-- new Error (line 491)
-- new Error (line 495)
-- new ArgumentCountError (line 848)
-- new ArgumentCountError (line 873)
-- new ArgumentCountError (line 879)
-- new ArgumentCountError (line 908)
-- new ArgumentCountError (line 914)
-- new ArgumentCountError (line 944)
-- new ArgumentCountError (line 967)
-- new ArgumentCountError (line 990)
-- new ArgumentCountError (line 1014)
-- new ArgumentCountError (line 1020)
-- 36 class method(s)
+- new Error (line 355)
+- new Error (line 359)
+- new ArgumentCountError (line 606)
+- new ArgumentCountError (line 631)
+- new ArgumentCountError (line 637)
+- new ArgumentCountError (line 666)
+- new ArgumentCountError (line 672)
+- new ArgumentCountError (line 702)
+- new ArgumentCountError (line 725)
+- new ArgumentCountError (line 748)
+- 27 class method(s)
 
 ### `ext/intl/VmTransliterator.php`
 
