@@ -11,7 +11,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #13137: standalone AOT must link stream/assert ABI when lowering touches them.
+ * Issue #13137 / #20966: standalone AOT must link stream/assert ABI when lowering touches them.
  *
  * @group aot-lint
  */
@@ -34,23 +34,38 @@ final class ContextStandaloneDefineBuiltinsTest extends TestCase
 
     public function testLazyLinkDefinesBootstrapCompileAbiSymbols(): void
     {
-        $runtime = new Runtime(Runtime::MODE_AOT);
-        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        StreamLifecycleRuntime::ensureLinked($ctx);
-        StreamReadRuntime::ensureLinked($ctx);
-        AssertFail::ensureStandaloneBodies($ctx);
+        $prev = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        putenv('PHP_COMPILER_AOT_USER_SCRIPT=1');
+        $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
+        try {
+            $runtime = new Runtime(Runtime::MODE_AOT);
+            $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+            StreamLifecycleRuntime::ensureLinked($ctx);
+            StreamReadRuntime::ensureLinked($ctx);
+            AssertFail::ensureStandaloneBodies($ctx);
 
-        foreach ([
-            '__compiler_is_resource',
-            '__compiler_fflush',
-            '__compiler_ftell',
-            '__compiler_stream_get_contents',
-            '__compiler_fseek',
-            '__compiler_jit_raise_assertion_error',
-        ] as $name) {
-            $fn = $ctx->lookupFunction($name);
-            $this->assertNotNull($fn, $name);
-            $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
+            foreach ([
+                '__compiler_is_resource',
+                '__compiler_fflush',
+                '__compiler_ftell',
+                '__compiler_stream_get_contents',
+                '__compiler_fseek',
+                '__compiler_jit_raise_assertion_error',
+            ] as $name) {
+                $fn = $ctx->lookupFunction($name);
+                $this->assertNotNull($fn, $name);
+                $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
+            }
+        } finally {
+            if (false === $prev || '' === (string) $prev) {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT=');
+                unset($_ENV['PHP_COMPILER_AOT_USER_SCRIPT'], $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT']);
+            } else {
+                putenv('PHP_COMPILER_AOT_USER_SCRIPT='.$prev);
+                $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = $prev;
+                $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = $prev;
+            }
         }
     }
 }

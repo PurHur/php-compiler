@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 6021 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18575 |
+| Source constructs flagged (warnings) | 18573 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2449,7 +2449,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamIsLocal.php` | 0 | 1 |
 | `ext/standard/JitStreamIsatty.php` | 0 | 1 |
 | `ext/standard/JitStreamLibcHandleKernel.php` | 0 | 3 |
-| `ext/standard/JitStreamLifecycleKernel.php` | 0 | 3 |
+| `ext/standard/JitStreamLifecycleKernel.php` | 0 | 1 |
 | `ext/standard/JitStreamMetaKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamModeKernel.php` | 0 | 3 |
 | `ext/standard/JitStreamNotificationCallback.php` | 0 | 2 |
@@ -24079,9 +24079,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamLifecycleKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 298)
-- 17 class method(s)
-- 1 closure(s)
+- 9 class method(s)
 
 ### `ext/standard/JitStreamMetaKernel.php`
 
@@ -39859,7 +39857,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamLifecycleRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StreamMeta.php`
 
@@ -42278,19 +42276,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 958)
 - new Call\DateTimeFormat (line 961)
 - new Call\DateTimeFormat (line 962)
-- new Result (line 1296)
-- new Result (line 1317)
-- new Variable (line 1918)
-- new Variable (line 2055)
-- new Variable (line 2281)
-- new Variable (line 2339)
-- new VMVariable (line 2477)
-- new VMVariable (line 2493)
-- new VMVariable (line 2499)
-- new VMVariable (line 2505)
-- new VMVariable (line 2516)
-- new Variable (line 2546)
-- new Variable (line 2586)
+- new Result (line 1298)
+- new Result (line 1319)
+- new Variable (line 1920)
+- new Variable (line 2057)
+- new Variable (line 2283)
+- new Variable (line 2341)
+- new VMVariable (line 2479)
+- new VMVariable (line 2495)
+- new VMVariable (line 2501)
+- new VMVariable (line 2507)
+- new VMVariable (line 2518)
+- new Variable (line 2548)
+- new Variable (line 2588)
 - 102 class method(s)
 - 28 closure(s)
 
