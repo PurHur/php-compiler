@@ -43,10 +43,23 @@ final class LivingXPathConstruct extends DomClassMethod
                 $document->class->name
             ));
         }
+        // php-src Dom\XPath::__construct(Document $document, bool $registerNodeNS = true) (#20842).
+        $registerNodeNS = true;
+        if (isset($frame->calledArgs[2])) {
+            $regVar = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN !== $regVar->type) {
+                throw new \TypeError(sprintf(
+                    'Dom\\XPath::__construct(): Argument #2 ($registerNodeNS) must be of type bool, %s given',
+                    VmDom::typeLabel($regVar)
+                ));
+            }
+            $registerNodeNS = $regVar->toBool();
+        }
         VmDom::ensureDocument($document);
         if (DomRegistry::has($receiver)) {
             $state = DomRegistry::state($receiver);
             $state->xpathDocumentId = $document->id;
+            $state->xpathRegisterNodeNamespaces = $registerNodeNS;
 
             return;
         }
@@ -54,6 +67,7 @@ final class LivingXPathConstruct extends DomClassMethod
         $state->nodeType = DomConstants::XML_XPATH;
         $state->nodeName = 'Dom\\XPath';
         $state->xpathDocumentId = $document->id;
+        $state->xpathRegisterNodeNamespaces = $registerNodeNS;
         DomRegistry::attach($receiver, $state);
     }
 }

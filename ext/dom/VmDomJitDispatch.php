@@ -676,7 +676,10 @@ final class VmDomJitDispatch
     {
         $expression = self::stringArg($extra[0] ?? self::missingArg('query', 0), 'query', 0);
         $contextNode = self::optionalDomNodeArg($extra[1] ?? null, 'query', 1);
-        $registerNodeNS = self::optionalBoolArg($extra[2] ?? null, 'query', 2);
+        // php-src: omitted 3rd arg uses intern->register_node_ns (default true) (#20842).
+        $registerNodeNS = \array_key_exists(2, $extra)
+            ? self::optionalBoolArg($extra[2], 'query', 2)
+            : DomRegistry::state($xpath)->xpathRegisterNodeNamespaces;
 
         return VmDomXPath::query($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
     }
@@ -688,7 +691,10 @@ final class VmDomJitDispatch
     {
         $expression = self::stringArg($extra[0] ?? self::missingArg('evaluate', 0), 'evaluate', 0);
         $contextNode = self::optionalDomNodeArg($extra[1] ?? null, 'evaluate', 1);
-        $registerNodeNS = self::optionalBoolArg($extra[2] ?? null, 'evaluate', 2);
+        // php-src: omitted 3rd arg uses intern->register_node_ns (default true) (#20842).
+        $registerNodeNS = \array_key_exists(2, $extra)
+            ? self::optionalBoolArg($extra[2], 'evaluate', 2)
+            : DomRegistry::state($xpath)->xpathRegisterNodeNamespaces;
 
         return VmDomXPath::evaluate($ctx, $xpath, $expression, $contextNode, $registerNodeNS);
     }

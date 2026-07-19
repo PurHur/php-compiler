@@ -20,6 +20,11 @@ final class DomNodePropertySupport
      */
     public static function rejectReadOnlyPropertyWrite(ObjectEntry $owner, string $name): void
     {
+        if (VmDom::isXPath($owner) && strtolower(VmDom::PROP_XPATH_DOCUMENT) === strtolower($name)) {
+            throw new \Error(
+                'Cannot write read-only property '.$owner->class->name.'::$document'
+            );
+        }
         if (!VmDom::isAttr($owner)) {
             return;
         }
@@ -36,6 +41,12 @@ final class DomNodePropertySupport
             return false;
         }
         $lc = strtolower($name);
+
+        // DOMXPath / Dom\XPath computed props (php-src php_dom.stub.php; #20842).
+        if (VmDom::isXPath($object)) {
+            return strtolower(VmDom::PROP_REGISTER_NODE_NAMESPACES) === $lc
+                || strtolower(VmDom::PROP_XPATH_DOCUMENT) === $lc;
+        }
 
         return strtolower(VmDom::PROP_NODE_TYPE) === $lc
             || strtolower(VmDom::PROP_NODE_NAME) === $lc
@@ -66,6 +77,26 @@ final class DomNodePropertySupport
         $var = new Variable();
         $var->objectPropertyOwner = $object;
         $var->objectPropertyName = $lc;
+
+        if (VmDom::isXPath($object)) {
+            $state = DomRegistry::state($object);
+            if (strtolower(VmDom::PROP_REGISTER_NODE_NAMESPACES) === $lc) {
+                $var->bool($state->xpathRegisterNodeNamespaces);
+
+                return $var;
+            }
+            if (strtolower(VmDom::PROP_XPATH_DOCUMENT) === $lc) {
+                $document = DomRegistry::entry($state->xpathDocumentId ?? 0);
+                if (null === $document) {
+                    $var->null();
+                } else {
+                    $var->object($document);
+                }
+
+                return $var;
+            }
+        }
+
         if (strtolower(VmDom::PROP_NODE_TYPE) === $lc) {
             $var->int(DomRegistry::state($object)->nodeType);
 
@@ -208,6 +239,16 @@ final class DomNodePropertySupport
         Context $ctx
     ): bool {
         $lc = strtolower($propName);
+        if (VmDom::isXPath($owner) && strtolower(VmDom::PROP_REGISTER_NODE_NAMESPACES) === $lc) {
+            $resolved = $value->resolveIndirect();
+            // php-src zend_is_true for the write handler.
+            DomRegistry::state($owner)->xpathRegisterNodeNamespaces = $resolved->toBool();
+
+            return true;
+        }
+        if (VmDom::isXPath($owner) && strtolower(VmDom::PROP_XPATH_DOCUMENT) === $lc) {
+            throw new \Error('Cannot write read-only property '.$owner->class->name.'::$document');
+        }
         if (strtolower(VmDom::PROP_NODE_VALUE) !== $lc
             && strtolower(VmDom::PROP_TEXT_CONTENT) !== $lc
             && strtolower(VmDom::PROP_VALUE) !== $lc

@@ -118,6 +118,13 @@ final class DomNodeState
     public ?int $xpathDocumentId = null;
 
     /**
+     * DOMXPath::$registerNodeNamespaces — auto-register in-scope prefixes (php-src xpath.c; #20842).
+     *
+     * Default true matches {@see DOMXPath::__construct} `$registerNodeNS = true`.
+     */
+    public bool $xpathRegisterNodeNamespaces = true;
+
+    /**
      * Registered namespace prefixes for {@see DomConstants::XML_XPATH} (#6066).
      *
      * @var array<string, string>

@@ -23,7 +23,11 @@ final class XPathEvaluate extends DomClassMethod
         }
         $expression = $this->stringArg($frame->calledArgs[1], 'DOMXPath::evaluate()', 0);
         $context = $this->optionalDomNodeArg($frame, 2, 'DOMXPath::evaluate()', 1);
-        $registerNodeNS = $this->optionalBoolArg($frame, 3, 'DOMXPath::evaluate()', 2);
+        // php-src: bool register_node_ns = intern->register_node_ns; optional |b overrides (#20842).
+        $registerNodeNS = DomRegistry::state($xpath)->xpathRegisterNodeNamespaces;
+        if (isset($frame->calledArgs[3])) {
+            $registerNodeNS = $this->optionalBoolArg($frame, 3, 'DOMXPath::evaluate()', 2);
+        }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMXPath::evaluate() requires VM context in this compiler build');
         }
@@ -92,7 +96,7 @@ final class XPathEvaluate extends DomClassMethod
             return false;
         }
         $var = $frame->calledArgs[$argIndex]->resolveIndirect();
-        if (Variable::TYPE_BOOL !== $var->type) {
+        if (Variable::TYPE_BOOLEAN !== $var->type) {
             throw new \TypeError(sprintf(
                 '%s expects argument #%d to be of type bool, %s given',
                 $label,
@@ -101,6 +105,6 @@ final class XPathEvaluate extends DomClassMethod
             ));
         }
 
-        return $var->bool;
+        return $var->toBool();
     }
 }
