@@ -6,11 +6,13 @@ namespace PHPCompiler\ext\intl;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\ext\standard\VmMath;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -88,6 +90,16 @@ final class VmIntlChar
     public const PROPERTY_CHANGES_WHEN_CASEMAPPED = 55;
     public const PROPERTY_CHANGES_WHEN_NFKC_CASEFOLDED = 56;
 
+    /** php-src IntlChar::PROPERTY_GENERAL_CATEGORY (UCHAR_GENERAL_CATEGORY). */
+    public const PROPERTY_GENERAL_CATEGORY = 0x1005;
+
+    /** php-src IntlChar::SHORT_PROPERTY_NAME / LONG_PROPERTY_NAME (UPropertyNameChoice). */
+    public const SHORT_PROPERTY_NAME = 0;
+    public const LONG_PROPERTY_NAME = 1;
+
+    /** ICU U_NO_NUMERIC_VALUE sentinel for getNumericValue(). */
+    public const NO_NUMERIC_VALUE = -123456789.0;
+
     /** php-src IntlChar::FOLD_CASE_* (icu/uchar.h U_FOLD_CASE_*). */
     public const FOLD_CASE_DEFAULT = 0;
     public const FOLD_CASE_EXCLUDE_SPECIAL_I = 1;
@@ -163,6 +175,9 @@ final class VmIntlChar
             'PROPERTY_CHANGES_WHEN_CASEFOLDED' => self::PROPERTY_CHANGES_WHEN_CASEFOLDED,
             'PROPERTY_CHANGES_WHEN_CASEMAPPED' => self::PROPERTY_CHANGES_WHEN_CASEMAPPED,
             'PROPERTY_CHANGES_WHEN_NFKC_CASEFOLDED' => self::PROPERTY_CHANGES_WHEN_NFKC_CASEFOLDED,
+            'PROPERTY_GENERAL_CATEGORY' => self::PROPERTY_GENERAL_CATEGORY,
+            'SHORT_PROPERTY_NAME' => self::SHORT_PROPERTY_NAME,
+            'LONG_PROPERTY_NAME' => self::LONG_PROPERTY_NAME,
             'FOLD_CASE_DEFAULT' => self::FOLD_CASE_DEFAULT,
             'FOLD_CASE_EXCLUDE_SPECIAL_I' => self::FOLD_CASE_EXCLUDE_SPECIAL_I,
         ];
@@ -198,6 +213,17 @@ final class VmIntlChar
             'digit' => [new IntlCharDigit(), 'digit'],
             'fordigit' => [new IntlCharForDigit(), 'forDigit'],
             'istitle' => [new IntlCharIsTitle(), 'istitle'],
+            'charfromname' => [new IntlCharCharFromName(), 'charFromName'],
+            'getpropertyname' => [new IntlCharGetPropertyName(), 'getPropertyName'],
+            'getpropertyenum' => [new IntlCharGetPropertyEnum(), 'getPropertyEnum'],
+            'getpropertyvaluename' => [new IntlCharGetPropertyValueName(), 'getPropertyValueName'],
+            'getpropertyvalueenum' => [new IntlCharGetPropertyValueEnum(), 'getPropertyValueEnum'],
+            'getintpropertyvalue' => [new IntlCharGetIntPropertyValue(), 'getIntPropertyValue'],
+            'getintpropertyminvalue' => [new IntlCharGetIntPropertyMinValue(), 'getIntPropertyMinValue'],
+            'getintpropertymaxvalue' => [new IntlCharGetIntPropertyMaxValue(), 'getIntPropertyMaxValue'],
+            'getunicodeversion' => [new IntlCharGetUnicodeVersion(), 'getUnicodeVersion'],
+            'getnumericvalue' => [new IntlCharGetNumericValue(), 'getNumericValue'],
+            'chardigitvalue' => [new IntlCharCharDigitValue(), 'charDigitValue'],
         ];
         foreach ($methods as $lc => [$handler, $name]) {
             $entry->methods[$lc] = $handler;
@@ -518,6 +544,276 @@ final class VmIntlChar
         return false;
     }
 
+    /**
+     * IntlChar::charFromName() — php-src / ICU u_charFromName (#20787).
+     */
+    public static function charFromName(string $name, int $nameChoice = self::UNICODE_CHAR_NAME): ?int
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_charFromName'.self::$symSuffix;
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $cp = (int) $ffi->$fn($nameChoice, $name, \FFI::addr($status));
+            if ((int) $status->cdata > 0 || $cp < 0) {
+                return null;
+            }
+
+            return self::isValidCodepoint($cp) ? $cp : null;
+        }
+        $upper = strtoupper(trim($name));
+        if (preg_match('/^LATIN CAPITAL LETTER ([A-Z])$/', $upper, $m)) {
+            return \ord($m[1]);
+        }
+        if (preg_match('/^LATIN SMALL LETTER ([A-Z])$/', $upper, $m)) {
+            return \ord(strtolower($m[1]));
+        }
+        if ('COPYRIGHT SIGN' === $upper) {
+            return 0xA9;
+        }
+
+        return null;
+    }
+
+    /**
+     * IntlChar::getPropertyName() — php-src / ICU u_getPropertyName (#20787).
+     *
+     * @return string|false
+     */
+    public static function getPropertyName(int $property, int $nameChoice = self::LONG_PROPERTY_NAME): string|false
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_getPropertyName'.self::$symSuffix;
+            $ptr = $ffi->$fn($property, $nameChoice);
+            if (null === $ptr || false === $ptr) {
+                return false;
+            }
+            if (\is_string($ptr)) {
+                return '' === $ptr ? false : $ptr;
+            }
+
+            return \FFI::string($ptr);
+        }
+        if (self::PROPERTY_ALPHABETIC === $property) {
+            return self::SHORT_PROPERTY_NAME === $nameChoice ? 'Alpha' : 'Alphabetic';
+        }
+        if (self::PROPERTY_UPPERCASE === $property) {
+            return self::SHORT_PROPERTY_NAME === $nameChoice ? 'Upper' : 'Uppercase';
+        }
+
+        return false;
+    }
+
+    /**
+     * IntlChar::getPropertyEnum() — php-src / ICU u_getPropertyEnum (#20787).
+     */
+    public static function getPropertyEnum(string $alias): int
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_getPropertyEnum'.self::$symSuffix;
+
+            return (int) $ffi->$fn($alias);
+        }
+        $map = [
+            'alphabetic' => self::PROPERTY_ALPHABETIC,
+            'alpha' => self::PROPERTY_ALPHABETIC,
+            'uppercase' => self::PROPERTY_UPPERCASE,
+            'upper' => self::PROPERTY_UPPERCASE,
+            'lowercase' => self::PROPERTY_LOWERCASE,
+            'lower' => self::PROPERTY_LOWERCASE,
+            'general_category' => self::PROPERTY_GENERAL_CATEGORY,
+            'gc' => self::PROPERTY_GENERAL_CATEGORY,
+        ];
+
+        return $map[strtolower($alias)] ?? -1;
+    }
+
+    /**
+     * IntlChar::getPropertyValueName() — php-src / ICU u_getPropertyValueName (#20787).
+     *
+     * @return string|false
+     */
+    public static function getPropertyValueName(
+        int $property,
+        int $value,
+        int $nameChoice = self::LONG_PROPERTY_NAME
+    ): string|false {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_getPropertyValueName'.self::$symSuffix;
+            $ptr = $ffi->$fn($property, $value, $nameChoice);
+            if (null === $ptr || false === $ptr) {
+                return false;
+            }
+            if (\is_string($ptr)) {
+                return '' === $ptr ? false : $ptr;
+            }
+
+            return \FFI::string($ptr);
+        }
+        if (self::PROPERTY_ALPHABETIC === $property && 1 === $value) {
+            return self::SHORT_PROPERTY_NAME === $nameChoice ? 'Y' : 'Yes';
+        }
+        if (self::PROPERTY_GENERAL_CATEGORY === $property && 1 === $value) {
+            return self::SHORT_PROPERTY_NAME === $nameChoice ? 'Lu' : 'Uppercase_Letter';
+        }
+
+        return false;
+    }
+
+    /**
+     * IntlChar::getPropertyValueEnum() — php-src / ICU u_getPropertyValueEnum (#20787).
+     */
+    public static function getPropertyValueEnum(int $property, string $name): int
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_getPropertyValueEnum'.self::$symSuffix;
+
+            return (int) $ffi->$fn($property, $name);
+        }
+        $lc = strtolower($name);
+        if (self::PROPERTY_ALPHABETIC === $property && ('yes' === $lc || 'y' === $lc || 'true' === $lc || 't' === $lc)) {
+            return 1;
+        }
+        if (self::PROPERTY_GENERAL_CATEGORY === $property && ('lu' === $lc || 'uppercase_letter' === $lc)) {
+            return 1;
+        }
+
+        return -1;
+    }
+
+    /**
+     * IntlChar::getIntPropertyValue() — php-src / ICU u_getIntPropertyValue (#20787).
+     */
+    public static function getIntPropertyValue(string|int $codepoint, int $property): int
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return 0;
+        }
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_getIntPropertyValue'.self::$symSuffix;
+
+            return (int) $ffi->$fn($cp, $property);
+        }
+
+        return self::hasBinaryProperty($cp, $property) ? 1 : 0;
+    }
+
+    /**
+     * IntlChar::getIntPropertyMinValue() — php-src / ICU u_getIntPropertyMinValue (#20787).
+     */
+    public static function getIntPropertyMinValue(int $property): int
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_getIntPropertyMinValue'.self::$symSuffix;
+
+            return (int) $ffi->$fn($property);
+        }
+
+        return 0;
+    }
+
+    /**
+     * IntlChar::getIntPropertyMaxValue() — php-src / ICU u_getIntPropertyMaxValue (#20787).
+     */
+    public static function getIntPropertyMaxValue(int $property): int
+    {
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_getIntPropertyMaxValue'.self::$symSuffix;
+
+            return (int) $ffi->$fn($property);
+        }
+        if ($property >= self::PROPERTY_ALPHABETIC && $property <= self::PROPERTY_CHANGES_WHEN_NFKC_CASEFOLDED) {
+            return 1;
+        }
+
+        return -1;
+    }
+
+    /**
+     * IntlChar::getUnicodeVersion() — php-src / ICU u_getUnicodeVersion (#20787).
+     *
+     * @return HashTable packed [major, minor, milli, micro]
+     */
+    public static function getUnicodeVersion(): HashTable
+    {
+        $parts = [0, 0, 0, 0];
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_getUnicodeVersion'.self::$symSuffix;
+            $info = $ffi->new('uint8_t[4]');
+            $ffi->$fn($info);
+            $parts = [(int) $info[0], (int) $info[1], (int) $info[2], (int) $info[3]];
+        } else {
+            $parts = [15, 0, 0, 0];
+        }
+        $ht = new HashTable();
+        foreach ($parts as $i => $v) {
+            $slot = new Variable();
+            $slot->int($v);
+            $ht->append($slot);
+            unset($i);
+        }
+
+        return $ht;
+    }
+
+    /**
+     * IntlChar::getNumericValue() — php-src / ICU u_getNumericValue (#20787).
+     */
+    public static function getNumericValue(string|int $codepoint): float
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return self::NO_NUMERIC_VALUE;
+        }
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_getNumericValue'.self::$symSuffix;
+
+            return (float) $ffi->$fn($cp);
+        }
+        if ($cp >= 0x30 && $cp <= 0x39) {
+            return (float) ($cp - 0x30);
+        }
+
+        return self::NO_NUMERIC_VALUE;
+    }
+
+    /**
+     * IntlChar::charDigitValue() — php-src / ICU u_charDigitValue (#20787).
+     */
+    public static function charDigitValue(string|int $codepoint): int
+    {
+        $cp = self::resolveCodepoint($codepoint);
+        if (null === $cp) {
+            return -1;
+        }
+        $ffi = self::ffi();
+        if (null !== $ffi) {
+            $fn = 'u_charDigitValue'.self::$symSuffix;
+
+            return (int) $ffi->$fn($cp);
+        }
+        if ($cp >= 0x30 && $cp <= 0x39) {
+            return $cp - 0x30;
+        }
+
+        return -1;
+    }
+
+    public static function coerceStringArg(Variable $var, string $function, int $position, string $name): string
+    {
+        return VmString::coerceStringBuiltinArg($var, $function, $position, $name);
+    }
+
     /** @param 'upper'|'lower'|'title' $kind */
     private static function caseMap(int $cp, string $kind): int
     {
@@ -608,9 +904,11 @@ final class VmIntlChar
 typedef int32_t UChar32;
 typedef int32_t UProperty;
 typedef int32_t UCharNameChoice;
+typedef int32_t UPropertyNameChoice;
 typedef int8_t UBool;
 typedef int32_t UErrorCode;
 typedef uint32_t uint32_t;
+typedef uint8_t uint8_t;
 UBool u_isalpha{$suffix}(UChar32 c);
 UBool u_isdigit{$suffix}(UChar32 c);
 UBool u_istitle{$suffix}(UChar32 c);
@@ -622,6 +920,17 @@ int8_t u_digit{$suffix}(UChar32 ch, int8_t radix);
 UChar32 u_forDigit{$suffix}(int32_t digit, int8_t radix);
 UBool u_hasBinaryProperty{$suffix}(UChar32 c, UProperty which);
 int32_t u_charName{$suffix}(UChar32 code, UCharNameChoice nameChoice, char *buffer, int32_t bufferLength, UErrorCode *pErrorCode);
+UChar32 u_charFromName{$suffix}(UCharNameChoice nameChoice, const char *name, UErrorCode *pErrorCode);
+const char *u_getPropertyName{$suffix}(UProperty property, UPropertyNameChoice nameChoice);
+UProperty u_getPropertyEnum{$suffix}(const char *alias);
+const char *u_getPropertyValueName{$suffix}(UProperty property, int32_t value, UPropertyNameChoice nameChoice);
+int32_t u_getPropertyValueEnum{$suffix}(UProperty property, const char *alias);
+int32_t u_getIntPropertyValue{$suffix}(UChar32 c, UProperty which);
+int32_t u_getIntPropertyMinValue{$suffix}(UProperty which);
+int32_t u_getIntPropertyMaxValue{$suffix}(UProperty which);
+void u_getUnicodeVersion{$suffix}(uint8_t versionArray[4]);
+double u_getNumericValue{$suffix}(UChar32 c);
+int32_t u_charDigitValue{$suffix}(UChar32 c);
 C;
     }
 }
@@ -1015,5 +1324,309 @@ final class IntlCharIsTitle extends VmClassMethod
             return;
         }
         $frame->returnVar->bool(VmIntlChar::istitle($codepoint));
+    }
+}
+
+/** IntlChar::charFromName() — php-src / ICU u_charFromName (#20787). */
+final class IntlCharCharFromName extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('charFromName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::charFromName() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $name = VmIntlChar::coerceStringArg($frame->calledArgs[0], 'IntlChar::charFromName', 0, 'name');
+        $choice = $argc >= 2
+            ? VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'IntlChar::charFromName', 2, 'nameChoice')
+            : VmIntlChar::UNICODE_CHAR_NAME;
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::charFromName($name, $choice);
+        if (null === $result) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->int($result);
+    }
+}
+
+/** IntlChar::getPropertyName() — php-src / ICU u_getPropertyName (#20787). */
+final class IntlCharGetPropertyName extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPropertyName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getPropertyName() expects between 1 and 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $property = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'IntlChar::getPropertyName', 1, 'property');
+        $choice = $argc >= 2
+            ? VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'IntlChar::getPropertyName', 2, 'nameChoice')
+            : VmIntlChar::LONG_PROPERTY_NAME;
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::getPropertyName($property, $choice);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+}
+
+/** IntlChar::getPropertyEnum() — php-src / ICU u_getPropertyEnum (#20787). */
+final class IntlCharGetPropertyEnum extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPropertyEnum');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getPropertyEnum() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $alias = VmIntlChar::coerceStringArg($frame->calledArgs[0], 'IntlChar::getPropertyEnum', 0, 'alias');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlChar::getPropertyEnum($alias));
+    }
+}
+
+/** IntlChar::getPropertyValueName() — php-src / ICU u_getPropertyValueName (#20787). */
+final class IntlCharGetPropertyValueName extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPropertyValueName');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2 || $argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getPropertyValueName() expects between 2 and 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $property = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'IntlChar::getPropertyValueName', 1, 'property');
+        $value = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'IntlChar::getPropertyValueName', 2, 'value');
+        $choice = $argc >= 3
+            ? VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'IntlChar::getPropertyValueName', 3, 'nameChoice')
+            : VmIntlChar::LONG_PROPERTY_NAME;
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $result = VmIntlChar::getPropertyValueName($property, $value, $choice);
+        if (false === $result) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($result);
+    }
+}
+
+/** IntlChar::getPropertyValueEnum() — php-src / ICU u_getPropertyValueEnum (#20787). */
+final class IntlCharGetPropertyValueEnum extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPropertyValueEnum');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getPropertyValueEnum() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $property = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'IntlChar::getPropertyValueEnum', 1, 'property');
+        $name = VmIntlChar::coerceStringArg($frame->calledArgs[1], 'IntlChar::getPropertyValueEnum', 1, 'name');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlChar::getPropertyValueEnum($property, $name));
+    }
+}
+
+/** IntlChar::getIntPropertyValue() — php-src / ICU u_getIntPropertyValue (#20787). */
+final class IntlCharGetIntPropertyValue extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getIntPropertyValue');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getIntPropertyValue() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::getIntPropertyValue', 0);
+        $property = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'IntlChar::getIntPropertyValue', 2, 'property');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlChar::getIntPropertyValue($codepoint, $property));
+    }
+}
+
+/** IntlChar::getIntPropertyMinValue() — php-src / ICU u_getIntPropertyMinValue (#20787). */
+final class IntlCharGetIntPropertyMinValue extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getIntPropertyMinValue');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getIntPropertyMinValue() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $property = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'IntlChar::getIntPropertyMinValue', 1, 'property');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlChar::getIntPropertyMinValue($property));
+    }
+}
+
+/** IntlChar::getIntPropertyMaxValue() — php-src / ICU u_getIntPropertyMaxValue (#20787). */
+final class IntlCharGetIntPropertyMaxValue extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getIntPropertyMaxValue');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getIntPropertyMaxValue() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $property = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'IntlChar::getIntPropertyMaxValue', 1, 'property');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlChar::getIntPropertyMaxValue($property));
+    }
+}
+
+/** IntlChar::getUnicodeVersion() — php-src / ICU u_getUnicodeVersion (#20787). */
+final class IntlCharGetUnicodeVersion extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getUnicodeVersion');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getUnicodeVersion() expects exactly 0 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(VmIntlChar::getUnicodeVersion());
+    }
+}
+
+/** IntlChar::getNumericValue() — php-src / ICU u_getNumericValue (#20787). */
+final class IntlCharGetNumericValue extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getNumericValue');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getNumericValue() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::getNumericValue', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->float(VmIntlChar::getNumericValue($codepoint));
+    }
+}
+
+/** IntlChar::charDigitValue() — php-src / ICU u_charDigitValue (#20787). */
+final class IntlCharCharDigitValue extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('charDigitValue');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::charDigitValue() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::charDigitValue', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlChar::charDigitValue($codepoint));
     }
 }

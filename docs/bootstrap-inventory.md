@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5842 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17467 |
+| Source constructs flagged (warnings) | 17491 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -841,7 +841,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
 | `ext/intl/VmIntlCalendar.php` | 0 | 22 |
-| `ext/intl/VmIntlChar.php` | 0 | 29 |
+| `ext/intl/VmIntlChar.php` | 0 | 53 |
 | `ext/intl/VmIntlDateFormatter.php` | 0 | 5 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 34 |
 | `ext/intl/VmLocale.php` | 0 | 2 |
@@ -11647,35 +11647,59 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmIntlChar.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 177)
-- new Variable (line 181)
-- new IntlCharOrd (line 188)
-- new IntlCharChr (line 189)
-- new IntlCharCharName (line 190)
-- new IntlCharHasBinaryProperty (line 191)
-- new IntlCharIsAlpha (line 192)
-- new IntlCharIsDigit (line 193)
-- new IntlCharToUpper (line 194)
-- new IntlCharToLower (line 195)
-- new IntlCharToTitle (line 196)
-- new IntlCharFoldCase (line 197)
-- new IntlCharDigit (line 198)
-- new IntlCharForDigit (line 199)
-- new IntlCharIsTitle (line 200)
-- new ArgumentCountError (line 641)
-- new ArgumentCountError (line 672)
-- new ArgumentCountError (line 708)
-- new ArgumentCountError (line 742)
-- new ArgumentCountError (line 773)
-- new ArgumentCountError (line 798)
-- new ArgumentCountError (line 823)
-- new ArgumentCountError (line 853)
-- new ArgumentCountError (line 883)
-- new ArgumentCountError (line 913)
-- new ArgumentCountError (line 946)
-- new ArgumentCountError (line 980)
-- new ArgumentCountError (line 1008)
-- 35 class method(s)
+- new ClassEntry (line 192)
+- new Variable (line 196)
+- new IntlCharOrd (line 203)
+- new IntlCharChr (line 204)
+- new IntlCharCharName (line 205)
+- new IntlCharHasBinaryProperty (line 206)
+- new IntlCharIsAlpha (line 207)
+- new IntlCharIsDigit (line 208)
+- new IntlCharToUpper (line 209)
+- new IntlCharToLower (line 210)
+- new IntlCharToTitle (line 211)
+- new IntlCharFoldCase (line 212)
+- new IntlCharDigit (line 213)
+- new IntlCharForDigit (line 214)
+- new IntlCharIsTitle (line 215)
+- new IntlCharCharFromName (line 216)
+- new IntlCharGetPropertyName (line 217)
+- new IntlCharGetPropertyEnum (line 218)
+- new IntlCharGetPropertyValueName (line 219)
+- new IntlCharGetPropertyValueEnum (line 220)
+- new IntlCharGetIntPropertyValue (line 221)
+- new IntlCharGetIntPropertyMinValue (line 222)
+- new IntlCharGetIntPropertyMaxValue (line 223)
+- new IntlCharGetUnicodeVersion (line 224)
+- new IntlCharGetNumericValue (line 225)
+- new IntlCharCharDigitValue (line 226)
+- new HashTable (line 757)
+- new Variable (line 759)
+- new ArgumentCountError (line 950)
+- new ArgumentCountError (line 981)
+- new ArgumentCountError (line 1017)
+- new ArgumentCountError (line 1051)
+- new ArgumentCountError (line 1082)
+- new ArgumentCountError (line 1107)
+- new ArgumentCountError (line 1132)
+- new ArgumentCountError (line 1162)
+- new ArgumentCountError (line 1192)
+- new ArgumentCountError (line 1222)
+- new ArgumentCountError (line 1255)
+- new ArgumentCountError (line 1289)
+- new ArgumentCountError (line 1317)
+- new ArgumentCountError (line 1342)
+- new ArgumentCountError (line 1376)
+- new ArgumentCountError (line 1410)
+- new ArgumentCountError (line 1435)
+- new ArgumentCountError (line 1470)
+- new ArgumentCountError (line 1496)
+- new ArgumentCountError (line 1522)
+- new ArgumentCountError (line 1547)
+- new ArgumentCountError (line 1572)
+- new ArgumentCountError (line 1596)
+- new ArgumentCountError (line 1621)
+- 58 class method(s)
 
 ### `ext/intl/VmIntlDateFormatter.php`
 
