@@ -107,4 +107,7 @@
 -            $int1->constInt($isVolatile ? 1 : 0, false)
 -        );
 -    }
- }
+-
+-}
+\ No newline at end of file
++}
