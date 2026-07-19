@@ -13,11 +13,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_attr_* lookup via AttributeRegistryJitHelper PHP (#10086, #20327).
+ * JIT/AOT link for __compiler_attr_* lookup via AttributeRegistryJitHelper PHP (#10086, #20901).
  *
- * Embed / non-thin: NestedJIT {@see AttributeRegistryJitHelper} / {@see AttributeRegistryArgsJitHelper}.
- * Thin standalone AOT (`isThinStandaloneAotMain`, #20308 / #20229 shape): thin stubs without nested JIT (#15417).
- * Args hashtable: {@see AttributeRegistryArgsJitHelper} when ctor args exist; null stub otherwise.
+ * Embed + thin standalone AOT: NestedJIT {@see AttributeRegistryJitHelper} /
+ * {@see AttributeRegistryArgsJitHelper} (IncludePath #20877 / Serialize #20773 shape — no thin stubs).
+ * Args hashtable: {@see AttributeRegistryArgsJitHelper} when ctor args exist; null bridge otherwise.
  */
 final class AttributeRegistryLookupRuntime
 {
@@ -54,14 +54,12 @@ final class AttributeRegistryLookupRuntime
         string $methodNamesJson,
         string $classEntriesJson
     ): void {
-        $probe = $context->module->getNamedFunction('__compiler_attr_class_count');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
-        if ($context->isThinStandaloneAotMain()) {
-            self::implementThinStandaloneStubs($context);
-
+        $probe = $context->module->getNamedFunction('__compiler_attr_class_count');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
             return;
         }
 
@@ -72,77 +70,6 @@ final class AttributeRegistryLookupRuntime
         self::implementMethodNameAtBridge($context, $methodNamesJson);
         self::implementClassArgsHashtableBridge($context, $classEntriesJson);
         $context->builder->clearInsertionPosition();
-    }
-
-    /** Thin standalone AOT: linkable attr ABI without nested AttributeRegistryJitHelper (#15417, #20327). */
-    private static function implementThinStandaloneStubs(Context $context): void
-    {
-        $sizeT = $context->getTypeFromString('size_t');
-        $i8p = $context->getTypeFromString('int8*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $voidp = $context->getTypeFromString('void*');
-
-        self::implementDeferredSizeTUnaryStub(
-            $context,
-            '__compiler_attr_class_count',
-            $context->context->functionType($sizeT, false, $i8p)
-        );
-        self::implementDeferredCstrTernaryStub(
-            $context,
-            '__compiler_attr_class_name_at',
-            $context->context->functionType($i8p, false, $i8p, $sizeT)
-        );
-        self::implementDeferredSizeTBinaryStub(
-            $context,
-            '__compiler_attr_method_count',
-            $context->context->functionType($sizeT, false, $i8p, $i8p)
-        );
-        self::implementDeferredCstrQuaternaryStub(
-            $context,
-            '__compiler_attr_method_name_at',
-            $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT)
-        );
-
-        $abiName = '__compiler_attr_class_args_hashtable';
-        $ft = $context->context->functionType($htPtr, false, $i8p, $sizeT);
-        $fn = $context->module->addFunction($abiName, $ft);
-        $entry = $fn->appendBasicBlock('attr_class_args_ht_user_stub');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue(
-            $context->builder->pointerCast($voidp->constNull(), $htPtr)
-        );
-        $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementDeferredSizeTUnaryStub(Context $context, string $abiName, $ft): void
-    {
-        $sizeT = $context->getTypeFromString('size_t');
-        $fn = $context->module->addFunction($abiName, $ft);
-        $entry = $fn->appendBasicBlock($abiName.'_user_stub');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($sizeT->constInt(0, false));
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementDeferredSizeTBinaryStub(Context $context, string $abiName, $ft): void
-    {
-        self::implementDeferredSizeTUnaryStub($context, $abiName, $ft);
-    }
-
-    private static function implementDeferredCstrTernaryStub(Context $context, string $abiName, $ft): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $fn = $context->module->addFunction($abiName, $ft);
-        $entry = $fn->appendBasicBlock($abiName.'_user_stub');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($i8p->constNull());
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementDeferredCstrQuaternaryStub(Context $context, string $abiName, $ft): void
-    {
-        self::implementDeferredCstrTernaryStub($context, $abiName, $ft);
     }
 
     private static function implementClassCountBridge(Context $context, string $classNamesJson): void
