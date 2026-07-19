@@ -914,6 +914,7 @@ require_once __DIR__.'/../../../ext/intl/numfmt_create.php';
 require_once __DIR__.'/../../../ext/intl/numfmt_format.php';
 require_once __DIR__.'/../../../ext/intl/numfmt_format_currency.php';
 require_once __DIR__.'/../../../ext/intl/numfmt_parse.php';
+require_once __DIR__.'/../../../ext/intl/numfmt_parse_currency.php';
 require_once __DIR__.'/../../../ext/intl/normalizer_get_raw_decomposition.php';
 require_once __DIR__.'/../../../ext/intl/normalizer_is_normalized.php';
 require_once __DIR__.'/../../../ext/intl/normalizer_normalize.php';
