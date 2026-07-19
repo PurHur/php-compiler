@@ -70,7 +70,7 @@ PHP;
     public function testVmDateIntervalMalformedSpecThrowsTypedException(): void
     {
         if (!CompilerVersion::advertisesDateExceptionHierarchy()) {
-            $this->markTestSkipped('DateMalformedIntervalException requires PHP 8.3+ date hierarchy');
+            $this->markTestSkipped('DateMalformedIntervalStringException requires PHP 8.3+ date hierarchy');
         }
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -78,7 +78,7 @@ PHP;
 try {
     new DateInterval('bad');
     echo "no throw\n";
-} catch (DateMalformedIntervalException $e) {
+} catch (DateMalformedIntervalStringException $e) {
     echo $e->getMessage(), "\n";
 }
 PHP;

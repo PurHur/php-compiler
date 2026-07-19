@@ -5694,7 +5694,6 @@
         "lib/VM/NativeDateInvalidOperationException.php",
         "lib/VM/NativeDateInvalidTimeZoneException.php",
         "lib/VM/NativeDateMalformedIntervalException.php",
-        "lib/VM/NativeDateMalformedPeriodException.php",
         "lib/VM/NativeDateMalformedPeriodStringException.php",
         "lib/VM/NativeDateMalformedStringException.php",
         "lib/VM/NativeDateObjectError.php",

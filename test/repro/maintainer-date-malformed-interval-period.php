@@ -1,19 +1,18 @@
 <?php
-// Repro for #7129 — DateMalformedIntervalException / DateMalformedPeriodException (ext/date/php_date.h).
-
-echo 'DateMalformedIntervalException: ', class_exists('DateMalformedIntervalException', false) ? 'yes' : 'no', "\n";
-echo 'DateMalformedPeriodException: ', class_exists('DateMalformedPeriodException', false) ? 'yes' : 'no', "\n";
-echo 'interval sub DateException: ', is_subclass_of('DateMalformedIntervalException', 'DateException') ? 'yes' : 'no', "\n";
-echo 'period sub DateException: ', is_subclass_of('DateMalformedPeriodException', 'DateException') ? 'yes' : 'no', "\n";
-
+// Repro for #20779 — php-src DateMalformed*StringException names (not phantom #7129 names).
+echo 'DateMalformedIntervalStringException: ', class_exists('DateMalformedIntervalStringException', false) ? 'yes' : 'no', "\n";
+echo 'DateMalformedPeriodStringException: ', class_exists('DateMalformedPeriodStringException', false) ? 'yes' : 'no', "\n";
+echo 'phantom IntervalException: ', class_exists('DateMalformedIntervalException', false) ? 'yes' : 'no', "\n";
+echo 'phantom PeriodException: ', class_exists('DateMalformedPeriodException', false) ? 'yes' : 'no', "\n";
+echo 'interval sub DateException: ', is_subclass_of('DateMalformedIntervalStringException', 'DateException') ? 'yes' : 'no', "\n";
+echo 'period sub DateException: ', is_subclass_of('DateMalformedPeriodStringException', 'DateException') ? 'yes' : 'no', "\n";
 try {
-    throw new DateMalformedIntervalException('interval test');
+    throw new DateMalformedIntervalStringException('interval test');
 } catch (DateException $e) {
-    echo "catch interval DateException: ok\n";
+    echo 'caught interval: ', $e->getMessage(), "\n";
 }
-
 try {
-    throw new DateMalformedPeriodException('period test');
+    throw new DateMalformedPeriodStringException('period test');
 } catch (DateException $e) {
-    echo "catch period DateException: ok\n";
+    echo 'caught period: ', $e->getMessage(), "\n";
 }

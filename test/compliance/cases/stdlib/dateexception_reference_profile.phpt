@@ -1,5 +1,5 @@
 --TEST--
-stdlib DateException/DateError hierarchy absent on 8.2 reference profile (#13118, ext/date/php_date.h)
+stdlib DateException/DateError hierarchy absent on 8.2 reference profile (#13118, #20779)
 --FILE--
 <?php
 var_export(class_exists('DateException', false));
@@ -8,9 +8,9 @@ var_export(class_exists('DateError', false));
 echo "\n";
 var_export(class_exists('DateInvalidTimeZoneException', false));
 echo "\n";
-var_export(class_exists('DateMalformedIntervalException', false));
+var_export(class_exists('DateMalformedIntervalStringException', false));
 echo "\n";
-var_export(class_exists('DateMalformedPeriodException', false));
+var_export(class_exists('DateMalformedPeriodStringException', false));
 echo "\n";
 try {
     new DateTimeZone('Not/A/Timezone');
