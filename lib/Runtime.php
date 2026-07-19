@@ -458,6 +458,7 @@ class Runtime {
         ClassConstBraceDerefRejector::reject($code, $filename);
         ClassConstDynamicFetchRejector::reject($code, $filename);
         EncapsedCoalesceRejector::reject($code, $filename);
+        NestedTernaryRejector::reject($code, $filename);
         ReadonlyMethodModifierRejector::reject($code, $filename);
         ReadonlyFunctionRejector::reject($code, $filename);
         EnumCaseListSyntaxRejector::reject($code, $filename);
