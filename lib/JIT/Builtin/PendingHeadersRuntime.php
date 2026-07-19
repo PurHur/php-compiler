@@ -20,6 +20,12 @@ final class PendingHeadersRuntime
         self::implement($context);
     }
 
+    /** Thin AOT: fill Type::register empty pending-header ABI shells for link (#20932). */
+    public static function ensureThinAotLinkStubs(Context $context): void
+    {
+        PendingHeadersJitBridge::fillThinAotLinkStubs($context);
+    }
+
     public static function implement(Context $context): void
     {
         PendingHeadersJitBridge::implement($context);

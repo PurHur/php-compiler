@@ -10,10 +10,14 @@ use PHPCompiler\JIT\Builtin\StringStrIncdec;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
  * str_decrement() — PHP 8.3 alphanumeric string decrement (issue #3102).
+ *
+ * php-src: ext/standard/string.c — PHP_FUNCTION(str_decrement) / Z_PARAM_STR
+ * Null → TypeError on 8.4 forward profile (#21005); empty string → ValueError.
  */
 final class str_decrement extends Internal
 {
@@ -27,7 +31,7 @@ final class str_decrement extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('str_decrement() requires exactly one argument in this compiler build');
         }
-        $input = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'str_decrement', 0, 'string');
+        $input = self::vmStringArg($frame);
         $result = VmString::strDecrement($input);
         if (null === $frame->returnVar) {
             return;
@@ -44,8 +48,44 @@ final class str_decrement extends Internal
             throw new \LogicException('str_decrement() requires exactly one argument in this compiler build');
         }
 
-        $input = JitStringBuiltinArg::lower($context, $args[0], 'str_decrement', 0, 'string');
+        $input = self::jitStringArg($context, $args[0]);
 
         return StringStrIncdec::invokeDecrement($context, $input);
+    }
+
+    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#21005, ext/standard/string.c). */
+    private static function vmStringArg(Frame $frame): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, 0, 'str_decrement', 'string')->toString();
+        }
+
+        return VmString::coerceZparamStrBuiltinArg(
+            $frame->calledArgs[0],
+            'str_decrement',
+            0,
+            'string'
+        );
+    }
+
+    private static function jitStringArg(Context $context, JITVariable $arg): Value
+    {
+        if ($context->callerStrictTypes) {
+            return JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $arg,
+                'str_decrement',
+                0,
+                'string'
+            );
+        }
+
+        return JitStringBuiltinArg::lowerZparamStr(
+            $context,
+            $arg,
+            'str_decrement',
+            0,
+            'string'
+        );
     }
 }

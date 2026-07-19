@@ -107,6 +107,108 @@ final class PendingHeadersJitBridge
         $context->builder->clearInsertionPosition();
     }
 
+    /**
+     * Thin AOT link fillers for Type::register empty ABI shells (#20932 regression).
+     *
+     * Type declares pending-header symbols without bodies; helper-runtime units and
+     * ScriptExit call them. NestedJIT during Type::initialize segfaults (#13571), so
+     * fill no-op / alloc stubs here for link + HelloWorld. Real NestedJIT still runs
+     * via {@see implement} when ensureLinked is invoked with empty bodies.
+     */
+    public static function fillThinAotLinkStubs(Context $context): void
+    {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
+        self::ensureHashtableHelpers($context);
+        $voidTy = $context->getTypeFromString('void');
+        $i32 = $context->getTypeFromString('int32');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $zero = $i32->constInt(0, false);
+
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null !== $probe && $probe->countBasicBlocks() > 0) {
+                $context->registerFunction($abiName, $probe);
+                continue;
+            }
+
+            if ('__phpc_headers_sent' === $abiName) {
+                $ft = $context->context->functionType($i32, false);
+                $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+                $entry = $fn->appendBasicBlock('ph_sent_link_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnValue($zero);
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+
+            if ('__phpc_pending_header_list' === $abiName) {
+                $ft = $context->context->functionType($htPtr, false);
+                $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+                $entry = $fn->appendBasicBlock('ph_list_link_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnValue($context->builder->call($context->lookupFunction('__hashtable__alloc')));
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+
+            if ('__phpc_pending_header_add' === $abiName) {
+                $ft = $context->context->functionType($voidTy, false, $strPtr, $i32);
+                $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+                $entry = $fn->appendBasicBlock('ph_add_link_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnVoid();
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+
+            if ('__phpc_pending_header_remove' === $abiName) {
+                $ft = $context->context->functionType($voidTy, false, $strPtr);
+                $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+                $entry = $fn->appendBasicBlock('ph_rem_link_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnVoid();
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+
+            if ('__phpc_setcookie_add' === $abiName) {
+                $i64 = $context->getTypeFromString('int64');
+                $ft = $context->context->functionType(
+                    $voidTy,
+                    false,
+                    $strPtr,
+                    $strPtr,
+                    $i64,
+                    $strPtr,
+                    $strPtr,
+                    $i32,
+                    $i32,
+                    $strPtr,
+                    $i32
+                );
+                $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+                $entry = $fn->appendBasicBlock('ph_sc_link_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnVoid();
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+
+            $ft = $context->context->functionType($voidTy, false);
+            $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+            $entry = $fn->appendBasicBlock('ph_void_link_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnVoid();
+            $context->registerFunction($abiName, $fn);
+        }
+
+        $context->builder->clearInsertionPosition();
+    }
+
     private static function implementResetBridge(Context $context): void
     {
         $abiName = '__phpc_pending_header_reset';
