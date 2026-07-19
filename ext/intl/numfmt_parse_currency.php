@@ -11,7 +11,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** numfmt_parse_currency() — procedural NumberFormatter::parseCurrency (#20780). */
+/**
+ * numfmt_parse_currency() — procedural NumberFormatter::parseCurrency
+ * (php-src formatter.stub.php / formatter_parse.c; #20780, #21127).
+ */
 final class numfmt_parse_currency extends Internal
 {
     public function __construct()
@@ -22,9 +25,9 @@ final class numfmt_parse_currency extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if (3 !== $argc) {
+        if ($argc < 3 || $argc > 4) {
             throw new \ArgumentCountError(\sprintf(
-                'numfmt_parse_currency() expects exactly 3 arguments, %d given',
+                'numfmt_parse_currency() expects between 3 and 4 arguments, %d given',
                 $argc
             ));
         }
@@ -34,8 +37,21 @@ final class numfmt_parse_currency extends Internal
             throw new \TypeError('numfmt_parse_currency(): Argument #1 ($formatter) must be of type NumberFormatter');
         }
         $value = VmNumberFormatter::coerceStringArg($frame->calledArgs[1], 'numfmt_parse_currency', 1, 'string');
+        $hasOffset = $argc >= 4;
+        $offset = null;
+        if ($hasOffset) {
+            $offsetVar = $frame->calledArgs[3]->resolveIndirect();
+            $offset = Variable::TYPE_NULL === $offsetVar->type
+                ? 0
+                : VmIntlDateFormatter::coerceIntArg($offsetVar, 'numfmt_parse_currency', 3, 'offset');
+        }
         $currencyOut = null;
-        $result = VmNumberFormatter::parseCurrency($receiver->toObject(), $value, $currencyOut);
+        if ($hasOffset) {
+            $result = VmNumberFormatter::parseCurrency($receiver->toObject(), $value, $currencyOut, $offset);
+            $frame->calledArgs[3]->byRefTarget()->int($offset);
+        } else {
+            $result = VmNumberFormatter::parseCurrency($receiver->toObject(), $value, $currencyOut);
+        }
         $currencyVar = $frame->calledArgs[2]->resolveIndirect();
         if (null === $currencyOut) {
             $currencyVar->null();
