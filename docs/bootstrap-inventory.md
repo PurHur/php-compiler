@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5913 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17992 |
+| Source constructs flagged (warnings) | 18005 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -843,7 +843,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
-| `ext/intl/VmBreakIterator.php` | 0 | 43 |
+| `ext/intl/VmBreakIterator.php` | 0 | 56 |
 | `ext/intl/VmCollator.php` | 0 | 55 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
@@ -11726,49 +11726,62 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmBreakIterator.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 78)
-- new ClassEntry (line 81)
-- new ClassProperty (line 85)
-- new ClassEntry (line 90)
-- new ClassProperty (line 94)
+- new Variable (line 96)
 - new ClassEntry (line 99)
-- new ClassProperty (line 101)
-- new PartsIteratorCurrent (line 103)
-- new PartsIteratorKey (line 104)
-- new PartsIteratorNext (line 105)
-- new PartsIteratorRewind (line 106)
-- new PartsIteratorValid (line 107)
-- new Variable (line 120)
-- new BreakIteratorCreateWordInstance (line 130)
-- new BreakIteratorCreateCharacterInstance (line 131)
-- new BreakIteratorCreateLineInstance (line 132)
-- new BreakIteratorCreateSentenceInstance (line 133)
-- new BreakIteratorCreateTitleInstance (line 134)
-- new BreakIteratorSetText (line 146)
-- new BreakIteratorGetText (line 147)
-- new BreakIteratorFirst (line 148)
-- new BreakIteratorLast (line 149)
-- new BreakIteratorNext (line 150)
-- new BreakIteratorPrevious (line 151)
-- new BreakIteratorCurrent (line 152)
-- new BreakIteratorPreceding (line 153)
-- new BreakIteratorFollowing (line 154)
-- new BreakIteratorIsBoundary (line 155)
-- new BreakIteratorGetLocale (line 156)
-- new BreakIteratorGetErrorCode (line 157)
-- new BreakIteratorGetErrorMessage (line 158)
-- new BreakIteratorGetPartsIterator (line 159)
-- new ObjectEntry (line 174)
-- new ObjectEntry (line 446)
-- new ArgumentCountError (line 714)
-- new ArgumentCountError (line 766)
-- new ArgumentCountError (line 865)
-- new ArgumentCountError (line 885)
-- new ArgumentCountError (line 905)
-- new ArgumentCountError (line 925)
-- new ArgumentCountError (line 946)
-- new ArgumentCountError (line 965)
-- 65 class method(s)
+- new ClassProperty (line 103)
+- new ClassEntry (line 108)
+- new ClassProperty (line 112)
+- new BreakIteratorGetRuleStatus (line 115)
+- new BreakIteratorGetRuleStatusVec (line 118)
+- new ClassEntry (line 123)
+- new ClassProperty (line 127)
+- new BreakIteratorGetLastCodePoint (line 130)
+- new ClassEntry (line 135)
+- new ClassProperty (line 137)
+- new Variable (line 140)
+- new PartsIteratorCurrent (line 146)
+- new PartsIteratorKey (line 147)
+- new PartsIteratorNext (line 148)
+- new PartsIteratorRewind (line 149)
+- new PartsIteratorValid (line 150)
+- new PartsIteratorGetBreakIterator (line 151)
+- new PartsIteratorGetRuleStatus (line 152)
+- new Variable (line 165)
+- new BreakIteratorCreateWordInstance (line 175)
+- new BreakIteratorCreateCharacterInstance (line 176)
+- new BreakIteratorCreateCodePointInstance (line 177)
+- new BreakIteratorCreateLineInstance (line 178)
+- new BreakIteratorCreateSentenceInstance (line 179)
+- new BreakIteratorCreateTitleInstance (line 180)
+- new BreakIteratorSetText (line 192)
+- new BreakIteratorGetText (line 193)
+- new BreakIteratorFirst (line 194)
+- new BreakIteratorLast (line 195)
+- new BreakIteratorNext (line 196)
+- new BreakIteratorPrevious (line 197)
+- new BreakIteratorCurrent (line 198)
+- new BreakIteratorPreceding (line 199)
+- new BreakIteratorFollowing (line 200)
+- new BreakIteratorIsBoundary (line 201)
+- new BreakIteratorGetLocale (line 202)
+- new BreakIteratorGetErrorCode (line 203)
+- new BreakIteratorGetErrorMessage (line 204)
+- new BreakIteratorGetPartsIterator (line 205)
+- new ObjectEntry (line 221)
+- new ObjectEntry (line 522)
+- new ArgumentCountError (line 984)
+- new ArgumentCountError (line 1025)
+- new ArgumentCountError (line 1065)
+- new ArgumentCountError (line 1104)
+- new ArgumentCountError (line 1188)
+- new ArgumentCountError (line 1208)
+- new ArgumentCountError (line 1228)
+- new ArgumentCountError (line 1248)
+- new ArgumentCountError (line 1269)
+- new ArgumentCountError (line 1288)
+- new HashTable (line 1464)
+- new Variable (line 1466)
+- 87 class method(s)
 
 ### `ext/intl/VmCollator.php`
 
