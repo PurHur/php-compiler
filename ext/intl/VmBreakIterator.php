@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\Frame;
+use PHPCompiler\ext\spl\ArrayIteratorBuiltin;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
@@ -99,6 +100,10 @@ final class VmBreakIterator
         $entry = new ClassEntry('IntlBreakIterator');
         $entry->isInternal = true;
         $entry->isAbstract = true;
+        // php-src breakiterator.stub.php — implements IteratorAggregate (#20986).
+        if (isset($ctx->classes['iteratoraggregate'])) {
+            $entry->interfaces[] = 'iteratoraggregate';
+        }
         self::installConstants($entry);
         $entry->properties[] = new ClassProperty(self::PROP_HANDLE, null, $strProto);
         self::installFactories($entry, $pubStatic);
@@ -218,12 +223,39 @@ final class VmBreakIterator
             'geterrorcode' => [new BreakIteratorGetErrorCode(), 'getErrorCode'],
             'geterrormessage' => [new BreakIteratorGetErrorMessage(), 'getErrorMessage'],
             'getpartsiterator' => [new BreakIteratorGetPartsIterator(), 'getPartsIterator'],
+            'getiterator' => [new BreakIteratorGetIterator(), 'getIterator'],
         ];
         foreach ($methods as $lc => [$handler, $name]) {
             $entry->methods[$lc] = $handler;
             $entry->methodVisibility[$lc] = $vis;
             $entry->methodNames[$lc] = $name;
         }
+    }
+
+    /**
+     * IntlBreakIterator::getIterator() — php-src breakiterator_iterators.cpp (#20986).
+     *
+     * Snapshot of current boundary offsets into ArrayIterator (foreach values are ints;
+     * live ICU cursor linking deferred).
+     */
+    public static function getIterator(Context $ctx, ObjectEntry $bi): ObjectEntry
+    {
+        $class = $ctx->classes[ArrayIteratorBuiltin::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('ArrayIterator is not registered in this compiler build');
+        }
+        $st = self::stateRef($bi);
+        $ht = new HashTable();
+        foreach ($st['boundaries'] as $i => $offset) {
+            $v = new Variable(Variable::TYPE_INTEGER);
+            $v->int((int) $offset);
+            $ht->add((string) $i, $v);
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        ArrayIteratorBuiltin::init($entry, $ht);
+
+        return $entry;
     }
 
     public static function createInstance(Context $ctx, int $type, ?string $locale): ?ObjectEntry
@@ -1486,6 +1518,30 @@ final class BreakIteratorOffsetArg
             $param,
             ReflectionSupport::valueTypeLabelPublic($arg)
         ));
+    }
+}
+
+final class BreakIteratorGetIterator extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getIterator'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlBreakIterator::getIterator() expects exactly 0 arguments, %d given',
+                $argc - 1
+            ));
+        }
+        $obj = VmBreakIterator::requireBreakIterator($frame, $frame->calledArgs[0]);
+        $ctx = $frame->vmContext ?? null;
+        if (null === $ctx) {
+            throw new \LogicException('getIterator requires VM context');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->object(VmBreakIterator::getIterator($ctx, $obj));
     }
 }
 
