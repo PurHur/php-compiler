@@ -53,7 +53,8 @@ final class SetcookieOptions
 
                 return self::parseOptionsArray(
                     $function,
-                    VmString::coerceStringBuiltinArg($args[0], $function, 0, 'name', 'string', false),
+                    // Z_PARAM_STR — TypeError on PROFILE=8.4 before empty-name ValueError (#21003, re-#18659).
+                    VmString::coerceZparamStrBuiltinArg($args[0], $function, 0, 'name'),
                     $argc >= 2
                         ? VmString::coerceStringBuiltinArg($args[1], $function, 1, 'value')
                         : '',
@@ -86,7 +87,8 @@ final class SetcookieOptions
     private static function parsePositional(string $function, array $args): array
     {
         $argc = \count($args);
-        $name = VmString::coerceStringBuiltinArg($args[0], $function, 0, 'name', 'string', false);
+        // Z_PARAM_STR — TypeError on PROFILE=8.4 before empty-name ValueError (#21003, re-#18659).
+        $name = VmString::coerceZparamStrBuiltinArg($args[0], $function, 0, 'name');
         $value = '';
         if ($argc >= 2) {
             $value = VmString::coerceStringBuiltinArg($args[1], $function, 1, 'value');

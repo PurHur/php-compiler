@@ -20,6 +20,8 @@ use PHPLLVM\Value;
  * setrawcookie() — emit Set-Cookie without URL-encoding the value (mirrors setcookie; issue #1368).
  *
  * VM uses ResponseContext only — no host Zend setrawcookie() delegation (bootstrap/M5; #5344 phase 3).
+ * php-src: ext/standard/head.c — PHP_FUNCTION(setrawcookie) / Z_PARAM_STR $name
+ * Null → TypeError on 8.4 forward profile (#21003, re-#18659) before empty-name ValueError.
  */
 final class setrawcookie extends Internal
 {
@@ -63,7 +65,23 @@ final class setrawcookie extends Internal
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
-        $namePtr = JitStringBuiltinArg::lower($context, $args[0], 'setrawcookie', 0, 'name', 'string', null, false);
+        // Null operand: TypeError under PROFILE=8.4 without empty-name ValueError (#21003 / putenv #21004).
+        $nullName = JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false);
+        if ($nullName && (
+            $context->callerStrictTypes
+            || JitStringBuiltinArg::requiresZparamStrStrictNullOnForwardProfile()
+        )) {
+            JitStringBuiltinArg::lowerRequiredString(
+                $context,
+                $args[0],
+                'setrawcookie',
+                0,
+                'name'
+            );
+
+            return $context->constantFromBool(false);
+        }
+        $namePtr = JitStringBuiltinArg::lowerZparamStr($context, $args[0], 'setrawcookie', 0, 'name');
         JitStringBuiltinArg::rejectEmpty(
             $context,
             $args[0],

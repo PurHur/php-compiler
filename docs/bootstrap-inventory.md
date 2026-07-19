@@ -26332,12 +26332,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 43)
 - new ArgumentCountError (line 49)
-- new ArgumentCountError (line 65)
-- new Variable (line 203)
+- new ArgumentCountError (line 66)
 - new Variable (line 205)
-- new HashTable (line 207)
-- new Variable (line 208)
-- new Variable (line 211)
+- new Variable (line 207)
+- new HashTable (line 209)
+- new Variable (line 210)
+- new Variable (line 213)
 - 5 class method(s)
 
 ### `ext/standard/SettypeJitHelper.php`

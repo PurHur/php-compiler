@@ -1,5 +1,5 @@
 --TEST--
-stdlib empty-rejectable builtins null — ValueError not TypeError on 8.4 forward profile (#18659, ext/standard/head.c, basic_functions.c, dns.c)
+stdlib empty-rejectable builtins null — ValueError / TypeError on 8.4 forward profile (#18659, #21003)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
@@ -22,4 +22,4 @@ foreach ([
 --EXPECT--
 parse_ini_file(): Argument #1 ($filename) cannot be empty
 checkdnsrr(): Argument #1 ($hostname) cannot be empty
-setcookie(): Argument #1 ($name) cannot be empty
+TypeError: setcookie(): Argument #1 ($name) must be of type string, null given
