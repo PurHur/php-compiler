@@ -23,7 +23,7 @@ use PHPCfg\Func as CfgFunc;
  *
  * Subset: createInstance, get/set, getTimeZone, getTime/setTime, getType, getNow,
  * add/roll/clear/isSet/equals, toDateTime/fromDateTime, fieldDifference,
- * before/after, setDate/setTimeZone, field bounds, weekend, wall-time options (#20851),
+ * before/after, setDate/setDateTime/setTimeZone, field bounds, weekend, wall-time options (#20851, #20905),
  * getAvailableLocales + comparison/zone/min-max procedurals (#20897).
  * ICU field constants match UCalendarDateFields (unicode/ucal.h).
  */
@@ -208,6 +208,7 @@ final class VmIntlCalendar
             'before' => [new IntlCalendarBefore(), 'before', $pub],
             'after' => [new IntlCalendarAfter(), 'after', $pub],
             'setdate' => [new IntlCalendarSetDate(), 'setDate', $pub],
+            'setdatetime' => [new IntlCalendarSetDateTime(), 'setDateTime', $pub],
             'settimezone' => [new IntlCalendarSetTimeZone(), 'setTimeZone', $pub],
             'getmaximum' => [new IntlCalendarGetMaximum(), 'getMaximum', $pub],
             'getminimum' => [new IntlCalendarGetMinimum(), 'getMinimum', $pub],
@@ -2199,6 +2200,44 @@ final class IntlCalendarSetDate extends VmClassMethod
         $month = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'IntlCalendar::setDate', 2, 'month');
         $day = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[3], 'IntlCalendar::setDate', 3, 'dayOfMonth');
         VmIntlCalendar::setDate($receiver->toObject(), $year, $month, $day, null, null, null);
+    }
+}
+
+/**
+ * IntlCalendar::setDateTime() — php-src calendar.stub.php / calendar_methods.cpp (#20905).
+ * Optional/?null $second uses ICU 5-arg set (second becomes 0), not leave-existing.
+ */
+final class IntlCalendarSetDateTime extends VmClassMethod
+{
+    public function __construct() { parent::__construct('setDateTime'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        $userArgc = max(0, $argc - 1);
+        if ($userArgc < 5 || $userArgc > 6) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlCalendar::setDateTime() expects between 5 and 6 arguments, %d given',
+                $userArgc
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type || !VmIntlCalendar::isCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlCalendar::setDateTime() called on incompatible object');
+        }
+        $year = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlCalendar::setDateTime', 1, 'year');
+        $month = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'IntlCalendar::setDateTime', 2, 'month');
+        $day = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[3], 'IntlCalendar::setDateTime', 3, 'dayOfMonth');
+        $hour = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[4], 'IntlCalendar::setDateTime', 4, 'hour');
+        $minute = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[5], 'IntlCalendar::setDateTime', 5, 'minute');
+        // php-src: null/omitted → ucal->set(y,m,d,h,i) (second 0); explicit int → 6-arg set.
+        $second = 0;
+        if ($userArgc >= 6) {
+            $secondVar = $frame->calledArgs[6]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $secondVar->type) {
+                $second = VmIntlDateFormatter::coerceIntArg($secondVar, 'IntlCalendar::setDateTime', 6, 'second');
+            }
+        }
+        VmIntlCalendar::setDate($receiver->toObject(), $year, $month, $day, $hour, $minute, $second);
     }
 }
 
