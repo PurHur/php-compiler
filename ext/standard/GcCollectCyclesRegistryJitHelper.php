@@ -84,8 +84,10 @@ final class GcCollectCyclesRegistryJitHelper
         if ($objPtr <= 0) {
             return -1;
         }
-        for ($i = 0; $i < self::$count; ++$i) {
-            if (isset(self::$objectPtr[$i]) && self::$objectPtr[$i] === $objPtr) {
+        // Avoid isset()+=== on static arrays — NestedJIT emits store i1 into hashtable spill (#21109).
+        $n = self::$count;
+        for ($i = 0; $i < $n; ++$i) {
+            if ((self::$objectPtr[$i] ?? 0) == $objPtr) {
                 return $i;
             }
         }

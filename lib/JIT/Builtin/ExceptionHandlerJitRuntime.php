@@ -70,25 +70,86 @@ final class ExceptionHandlerJitRuntime
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $restoreBlock = self::captureInsertBlock($context);
-            self::ensureValueWriters($context);
-            self::implementStandaloneThinAbi($context);
-            self::registerLinkedRuntime($context);
-            self::restoreInsertBlock($context, $restoreBlock);
-
-            return;
-        }
-
+        // NestedJIT ExceptionHandlerJitHelper still stores __string__* into i64 depth spill
+        // (#21109). Use thin ABI on EMBED too, but do not replace $context->builder
+        // (builderCreate() mid-init corrupts MCJIT — segfault on jit()).
         $restoreBlock = self::captureInsertBlock($context);
-        self::ensureJitHelperCompiled($context);
         self::ensureValueWriters($context);
-        self::implementDispatchBridge($context);
-        self::implementSetApplyBridge($context);
-        self::implementRestoreApplyBridge($context);
-        self::implementGetApplyBridge($context);
+        self::implementStandaloneThinAbiReuseBuilder($context);
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $restoreBlock);
+    }
+
+    /** Thin ABI stubs without replacing Context::$builder (EMBED MCJIT-safe). */
+    private static function implementStandaloneThinAbiReuseBuilder(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $valPtr = $context->getTypeFromString('__value__*');
+        $objPtr = $context->getTypeFromString('__object__*');
+        $voidTy = $context->getTypeFromString('void');
+
+        $dispatch = self::standaloneAbiFunction(
+            $context,
+            '__phpc_exception_handler_dispatch',
+            $context->context->functionType($i32, false, $objPtr)
+        );
+        if (0 === $dispatch->countBasicBlocks()) {
+            $entry = $dispatch->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($i32->constInt(0, false));
+        }
+        $context->registerFunction('__phpc_exception_handler_dispatch', $dispatch);
+
+        $setApply = self::standaloneAbiFunction(
+            $context,
+            '__phpc_exception_handler_set_apply',
+            $context->context->functionType($voidTy, false, $valPtr, $i8p, $sizeT, $i8p)
+        );
+        if (0 === $setApply->countBasicBlocks()) {
+            $entry = $setApply->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                $setApply->getParam(0)
+            );
+            $context->builder->returnVoid();
+        }
+        $context->registerFunction('__phpc_exception_handler_set_apply', $setApply);
+
+        $restoreApply = self::standaloneAbiFunction(
+            $context,
+            '__phpc_exception_handler_restore_apply',
+            $context->context->functionType($voidTy, false, $valPtr)
+        );
+        if (0 === $restoreApply->countBasicBlocks()) {
+            $entry = $restoreApply->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeBool'),
+                $restoreApply->getParam(0),
+                $i32->constInt(1, false)
+            );
+            $context->builder->returnVoid();
+        }
+        $context->registerFunction('__phpc_exception_handler_restore_apply', $restoreApply);
+
+        $getApply = self::standaloneAbiFunction(
+            $context,
+            '__phpc_exception_handler_get_apply',
+            $context->context->functionType($voidTy, false, $valPtr)
+        );
+        if (0 === $getApply->countBasicBlocks()) {
+            $entry = $getApply->appendBasicBlock('entry');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                $getApply->getParam(0)
+            );
+            $context->builder->returnVoid();
+        }
+        $context->registerFunction('__phpc_exception_handler_get_apply', $getApply);
     }
 
     private static function implementStandaloneThinAbi(Context $context): void
@@ -216,10 +277,12 @@ final class ExceptionHandlerJitRuntime
         $oneI32 = $i32->constInt(1, false);
 
         $depth = $context->builder->call(self::helperFunction($context, self::DEPTH_HELPER));
+        // NestedJIT PHP int is i64; dispatch loop uses i32 indices (#21109).
+        $depthI32 = $context->builder->trunc($depth, $i32);
         $emptyBb = $fn->appendBasicBlock('xh_dispatch_empty');
         $loopInitBb = $fn->appendBasicBlock('xh_dispatch_loop_init');
         $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_SLE, $depth, $zeroI32),
+            $context->builder->icmp(Builder::INT_SLE, $depthI32, $zeroI32),
             $emptyBb,
             $loopInitBb
         );
@@ -234,7 +297,7 @@ final class ExceptionHandlerJitRuntime
 
         $context->builder->positionAtEnd($loopInitBb);
         $idxVar = $context->builder->alloca($i32, 'xh_idx');
-        $context->builder->store($context->builder->sub($depth, $oneI32), $idxVar);
+        $context->builder->store($context->builder->sub($depthI32, $oneI32), $idxVar);
         $context->builder->branch($loopCondBb);
 
         $context->builder->positionAtEnd($loopCondBb);
@@ -309,6 +372,13 @@ final class ExceptionHandlerJitRuntime
 
         $fnAddr = $context->builder->ptrToInt($fnOpaque, $i64);
         $handlerName = self::optionalCstrToString($context, $fn, $name, $nameLen);
+        $strPtr = $context->getTypeFromString('__string__*');
+        $emptyName = $context->builder->load($context->constantStringFromString(''));
+        $handlerName = $context->builder->select(
+            $context->builder->icmp(Builder::INT_EQ, $handlerName, $strPtr->constNull()),
+            $emptyName,
+            $handlerName
+        );
         $previous = $context->builder->call(
             self::helperFunction($context, self::SET_APPLY_HELPER),
             $fnAddr,
@@ -429,11 +499,15 @@ final class ExceptionHandlerJitRuntime
         $strBb = $fn->appendBasicBlock('xh_prev_str');
         $doneBb = $fn->appendBasicBlock('xh_prev_done');
 
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $maybeStr, $strPtr->constNull()),
-            $nullBb,
-            $strBb
+        // Empty string sentinel = no previous handler (#21109 NestedJIT ?string ABI).
+        $empty = $context->builder->load($context->constantStringFromString(''));
+        $isNullPtr = $context->builder->icmp(Builder::INT_EQ, $maybeStr, $strPtr->constNull());
+        $isEmpty = $context->builder->or(
+            $isNullPtr,
+            $context->builder->icmp(Builder::INT_EQ, $maybeStr, $empty)
         );
+
+        $context->builder->branchIf($isEmpty, $nullBb, $strBb);
 
         $context->builder->positionAtEnd($nullBb);
         $context->builder->call($context->lookupFunction('__value__writeNull'), $out);

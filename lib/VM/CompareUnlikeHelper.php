@@ -5,58 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * Lowered into JIT/AOT modules for spaceship (<=>) on runtime values (#9381, #9476, php-in-PHP).
+ * Zend zend_compare() for unlike kinds involving array/object/null (#12033).
  *
- * php-src: Zend/zend_operators.c — compare_function, zend_compare_arrays, zend_compare_objects
- * SSOT: {@see Variable::spaceshipCompare()}, {@see ObjectEntry::compareSpaceship()}, {@see HashTable::compareSpaceship()}
+ * Kept out of {@see CompareJitHelper} so NestedJIT spaceship compile (#9381 / #21109)
+ * does not lower this VM-only path into the JIT module.
+ *
+ * php-src: Zend/zend_operators.c — compare_function
+ * SSOT consumers: {@see Variable::spaceshipOp()}
  */
-final class CompareJitHelper
+final class CompareUnlikeHelper
 {
-    /** @return int -1, 0, or 1 (LLVM i64 ABI) */
-    public static function longSpaceship(int $left, int $right): int
-    {
-        return CompareJitHelperScalars::longSpaceship($left, $right);
-    }
-
-    /** @return int -1, 0, or 1 (LLVM i64 ABI) */
-    public static function doubleSpaceship(float $left, float $right): int
-    {
-        return CompareJitHelperScalars::doubleSpaceship($left, $right);
-    }
-
-    /** @return int -1, 0, or 1 (LLVM i64 ABI) */
-    public static function stringSpaceship(string $left, string $right): int
-    {
-        return CompareJitHelperScalars::stringSpaceship($left, $right);
-    }
-
-    /** @param int $numOnLeft 1 when the numeric operand is on the left, 0 otherwise */
-    public static function spaceshipNumberString(float $num, string $str, int $numOnLeft): int
-    {
-        return CompareJitHelperScalars::spaceshipNumberString($num, $str, $numOnLeft);
-    }
-
-    /** Compare boxed-value type tags when kinds differ (Zend type ordering). */
-    public static function kindSpaceship(int $leftKind, int $rightKind): int
-    {
-        return CompareJitHelperScalars::kindSpaceship($leftKind, $rightKind);
-    }
-
-    /** @return int -1, 0, or 1 (LLVM i64 ABI) */
-    public static function objectSpaceship(ObjectEntry $left, ObjectEntry $right): int
-    {
-        return $left->compareSpaceship($right);
-    }
-
-    /** @return int -1, 0, or 1 (LLVM i64 ABI) */
-    public static function hashtableSpaceship(HashTable $left, HashTable $right): int
-    {
-        return $left->compareSpaceship($right);
-    }
-
     /**
-     * Zend zend_compare() for unlike kinds involving array/object/null (#12033, zend_operators.c).
-     *
      * VM SSOT for relational < > <= >= and spaceship when {@see Variable::spaceshipMixedScalars()}
      * would coerce through toNumeric() and throw on array/object operands.
      */
@@ -87,7 +46,7 @@ final class CompareJitHelper
                 $object = Variable::TYPE_OBJECT === $left->type ? $left : $right;
                 $bool = Variable::TYPE_BOOLEAN === $left->type ? $left : $right;
                 $casted = (int) $object->toBool();
-                $cmp = self::longSpaceship($casted, (int) $bool->bool);
+                $cmp = CompareJitHelper::longSpaceship($casted, (int) $bool->bool);
 
                 return Variable::TYPE_OBJECT === $left->type ? $cmp : -$cmp;
             }
@@ -138,5 +97,4 @@ final class CompareJitHelper
 
         return $var->toBool();
     }
-
 }

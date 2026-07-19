@@ -755,17 +755,13 @@ final class GcCollectCyclesRuntime
 
     private static function loadObjectConstructed(Context $context, Value $objI8): Value
     {
+        // Byte-offset load — avoid structGep load typing as [8 x i8] (#21109).
         $i8 = $context->getTypeFromString('int8');
-        $objPtr = $context->getTypeFromString('__object__*');
-        $objMap = $context->structFieldMap['__object__'] ?? null;
-        if (null !== $objMap && isset($objMap['constructed'])) {
-            $objTyped = $context->builder->pointerCast($objI8, $objPtr);
-
-            return $context->builder->load(self::objectFieldPtr($context, $objTyped, 'constructed', $i8));
-        }
         $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $raw = $context->builder->pointerCast($objI8, $i8p);
         $constructedPtr = $context->builder->pointerCast(
-            $context->builder->inBoundsGEP($objI8, $i32->constInt(16, false)),
+            $context->builder->inBoundsGEP($raw, $i32->constInt(16, false)),
             $i8->pointerType(0)
         );
 
@@ -1310,7 +1306,8 @@ final class GcCollectCyclesRuntime
         $entry = $fn->appendBasicBlock('collect_impl_php_entry');
         $context->builder->positionAtEnd($entry);
         $collected = $context->builder->call($collectEmbed);
-        $context->builder->returnValue($collected);
+        // NestedJIT PHP int is i64; ABI is i32 (#21109).
+        $context->builder->returnValue($context->builder->trunc($collected, $i32));
         $context->builder->clearInsertionPosition();
     }
 

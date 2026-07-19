@@ -1875,7 +1875,7 @@ restart:
                 } elseif (self::needsZendUnlikeKindCompare($left, $right)) {
                     $this->bool($this->_compareFromSpaceship(
                         $opCode,
-                        CompareJitHelper::zendUnlikeValueSpaceship($left, $right, $vm)
+                        CompareUnlikeHelper::zendUnlikeValueSpaceship($left, $right, $vm)
                     ));
                 } else {
                     // Zend compare_function: unlike scalars use spaceship parity (#4681, #10243).
@@ -2056,7 +2056,7 @@ restart:
                     if (null !== $bcCmp) {
                         $this->int($bcCmp);
                     } else {
-                        $this->int(CompareJitHelper::zendUnlikeValueSpaceship($leftCopy, $rightCopy, $vm));
+                        $this->int(CompareUnlikeHelper::zendUnlikeValueSpaceship($leftCopy, $rightCopy, $vm));
                     }
                 } else {
                     $bcCmp = \PHPCompiler\ext\bcmath\VmBcMathNumber::tryCompare($leftCopy, $rightCopy);

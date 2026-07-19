@@ -33,6 +33,10 @@ final class PregQuoteRuntimeShrinkTest extends TestCase
         $expected = VmString::pregQuote('a.b*?', '.');
         $this->assertSame($expected, PregQuoteJitHelper::pregQuoteArgv('a.b*?', '.'));
         $this->assertSame($expected, VmString::pregQuote('a.b*?', '.'));
+        $this->assertSame(
+            VmString::pregQuote('a.b*?', null),
+            PregQuoteJitHelper::pregQuoteArgv('a.b*?', '')
+        );
     }
 
     public function testSpineBundleOmitsDeletedJitPregQuote(): void

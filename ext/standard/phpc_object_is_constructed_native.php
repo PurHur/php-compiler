@@ -31,6 +31,7 @@ final class phpc_object_is_constructed_native extends Internal
         }
         $isConstructed = GcCollectCyclesNativeOpsJit::objectIsConstructed($context, $args[0]);
 
-        return $context->builder->zext($isConstructed, $context->getTypeFromString('int32'));
+        // NestedJIT boxes PHP ints via __value__writeLong (i64); i32 zext breaks module verify (#21109).
+        return $context->builder->zext($isConstructed, $context->getTypeFromString('int64'));
     }
 }

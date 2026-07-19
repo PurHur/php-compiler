@@ -46,6 +46,7 @@ final class EmbedObOutput
         foreach (self::ZERO_FUNCTIONS as $name) {
             self::implementReturnZero($context, $name);
         }
+        \PHPCompiler\JIT\McjitEmbedHostEcho::ensureGlobals($context);
         EmbedObEchoBridge::implementAll($context);
         self::registerLinked($context);
         $context->builder->clearInsertionPosition();

@@ -12,27 +12,23 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for spaceship (<=>) — CompareJitHelper PHP SSOT + LLVM dispatch (#9381).
+ * JIT/AOT link for spaceship (<=>) — CompareJitHelperScalars NestedJIT + LLVM object/ht (#9381, #21109).
  *
  * php-src: Zend/zend_operators.c; VM SSOT {@see \PHPCompiler\VM\Variable}.
  */
 final class SpaceshipRuntime
 {
-    private const HELPER_PATH = '/lib/VM/CompareJitHelper.php';
+    private const HELPER_PATH = '/lib/VM/CompareJitHelperScalars.php';
 
-    private const LONG_HELPER = 'PHPCompiler\\VM\\CompareJitHelper::longSpaceship';
+    private const LONG_HELPER = 'PHPCompiler\\VM\\CompareJitHelperScalars::longSpaceship';
 
-    private const DOUBLE_HELPER = 'PHPCompiler\\VM\\CompareJitHelper::doubleSpaceship';
+    private const DOUBLE_HELPER = 'PHPCompiler\\VM\\CompareJitHelperScalars::doubleSpaceship';
 
-    private const STRING_HELPER = 'PHPCompiler\\VM\\CompareJitHelper::stringSpaceship';
+    private const STRING_HELPER = 'PHPCompiler\\VM\\CompareJitHelperScalars::stringSpaceship';
 
-    private const NUMBER_STRING_HELPER = 'PHPCompiler\\VM\\CompareJitHelper::spaceshipNumberString';
+    private const NUMBER_STRING_HELPER = 'PHPCompiler\\VM\\CompareJitHelperScalars::spaceshipNumberString';
 
-    private const KIND_HELPER = 'PHPCompiler\\VM\\CompareJitHelper::kindSpaceship';
-
-    private const OBJECT_HELPER = 'PHPCompiler\\VM\\CompareJitHelper::objectSpaceship';
-
-    private const HASHTABLE_HELPER = 'PHPCompiler\\VM\\CompareJitHelper::hashtableSpaceship';
+    private const KIND_HELPER = 'PHPCompiler\\VM\\CompareJitHelperScalars::kindSpaceship';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -41,13 +37,12 @@ final class SpaceshipRuntime
         self::STRING_HELPER,
         self::NUMBER_STRING_HELPER,
         self::KIND_HELPER,
-        self::OBJECT_HELPER,
-        self::HASHTABLE_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
     {
-        GcCollectCyclesRuntime::ensureLinked($context);
+        // Do not eager-link GC here (#21109): NestedJIT GC/NativeOps mid-spaceship
+        // compile pollutes the module with [8 x i8] icmp / bitcast verify failures.
         self::implement($context);
     }
 
@@ -81,7 +76,7 @@ final class SpaceshipRuntime
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException($logical.' missing after CompareJitHelper compile (#9381)');
+            throw new \LogicException($logical.' missing after CompareJitHelperScalars compile (#9381/#21109)');
         }
 
         return $fn;
@@ -124,9 +119,9 @@ final class SpaceshipRuntime
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CompareJitHelper.php');
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CompareJitHelperScalars.php');
             if (null === $block) {
-                throw new \LogicException('CompareJitHelper.php parseAndCompile failed (#9381)');
+                throw new \LogicException('CompareJitHelperScalars.php parseAndCompile failed (#9381/#21109)');
             }
             $jit = new JIT($context);
             $jit->compile($block);
@@ -134,7 +129,7 @@ final class SpaceshipRuntime
         foreach (self::COMPILED_HELPERS as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9381)');
+                throw new \LogicException($lc.' was not compiled for JIT (#9381/#21109)');
             }
         }
     }

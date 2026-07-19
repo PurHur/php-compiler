@@ -2149,6 +2149,15 @@ class JIT {
             ) {
                 $varType = Variable::TYPE_VALUE;
             }
+            if (
+                JIT\NestedJitCompileScope::isActive()
+                && $idx < $cfgParamCount
+                && $this->isCfgVmHashTableParamType(
+                    $this->declaredTypeFromCfgParam($block->func->params[$idx])
+                )
+            ) {
+                $varType = Variable::TYPE_HASHTABLE;
+            }
             if ($idx < $cfgParamCount && $block->func->params[$idx]->variadic) {
                 $varType = Variable::TYPE_HASHTABLE;
             }
@@ -3743,6 +3752,19 @@ class JIT {
             || 'variable' === $name;
     }
 
+    /** VM HashTable handles use __hashtable__* ABI in nested php-in-PHP JIT helpers (#21109). */
+    private function isCfgVmHashTableParamType(?Type $type): bool
+    {
+        if (null === $type || Type::TYPE_OBJECT !== $type->type) {
+            return false;
+        }
+        $name = strtolower(ltrim($type->userType ?? '', '\\'));
+
+        return 'phpcompiler\\vm\\hashtable' === $name
+            || str_ends_with($name, '\\vm\\hashtable')
+            || 'hashtable' === $name;
+    }
+
     private function isCfgOperandDeclaredName(string $name): bool
     {
         $lc = strtolower(ltrim($name, '\\'));
@@ -3829,6 +3851,12 @@ class JIT {
         ) {
             return $this->context->getTypeFromString('__value__*');
         }
+        if (
+            JIT\NestedJitCompileScope::isActive()
+            && $this->isCfgVmHashTableParamType($declared)
+        ) {
+            return $this->context->getTypeFromString('__hashtable__*');
+        }
         if (null !== $declared && $this->isCfgObjectIdentityParamType($declared)) {
             return $this->context->getTypeFromString('__object__*');
         }
@@ -3838,6 +3866,12 @@ class JIT {
             && $this->isCfgVmVariableParamType($rawType)
         ) {
             return $this->context->getTypeFromString('__value__*');
+        }
+        if (
+            JIT\NestedJitCompileScope::isActive()
+            && $this->isCfgVmHashTableParamType($rawType)
+        ) {
+            return $this->context->getTypeFromString('__hashtable__*');
         }
         if ($this->isCfgObjectIdentityParamType($rawType)) {
             return $this->context->getTypeFromString('__object__*');
@@ -11560,6 +11594,9 @@ class JIT {
                 // thin-AOT always-helper bridges fail module verify (peer Serialize #20773).
                 if (JIT\NestedJitCompileScope::isActive() && $this->isCfgVmVariableParamType($type)) {
                     $callback = '__value__*';
+                } elseif (JIT\NestedJitCompileScope::isActive() && $this->isCfgVmHashTableParamType($type)) {
+                    // CompareJitHelper::hashtableSpaceship etc. (#21109).
+                    $callback = '__hashtable__*';
                 } else {
                     $callback = '__object__*';
                 }
@@ -16073,9 +16110,34 @@ class JIT {
         if (!JIT\NestedJitCompileScope::isActive()) {
             return false;
         }
+        // Prefer TYPE_HASHTABLE / HashTable class before ObjectEntry — both expose
+        // compareSpaceship; wrong bridge fails NestedJIT module verify (#21109).
+        if (
+            JIT\NestedVmHashTableMethodLlvm::isNestedHashTableMethod($methodLc)
+            && (
+                'phpcompiler\\vm\\hashtable' === $declaringClassLc
+                || Variable::TYPE_HASHTABLE === $receiverVar->type
+            )
+        ) {
+            if (!JIT\NestedVmHashTableMethodLlvm::ensureMethod($this->context, $methodLc)) {
+                return false;
+            }
+            $proxyName = 'phpcompiler\\vm\\hashtable::'.$methodLc;
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+            $this->context->scope->args = [$receiverVar];
+
+            return true;
+        }
         if (
             JIT\NestedVmObjectMethodLlvm::isNestedObjectMethod($methodLc)
-            && ('phpcompiler\\vm\\objectentry' === $declaringClassLc || 'object' === $declaringClassLc)
+            && (
+                'phpcompiler\\vm\\objectentry' === $declaringClassLc
+                || 'object' === $declaringClassLc
+                || (
+                    Variable::TYPE_OBJECT === $receiverVar->type
+                    && Variable::TYPE_HASHTABLE !== $receiverVar->type
+                )
+            )
         ) {
             if (!JIT\NestedVmObjectMethodLlvm::ensureMethod($this->context, $methodLc)) {
                 return false;
@@ -16086,15 +16148,8 @@ class JIT {
 
             return true;
         }
-        if (
-            JIT\NestedVmHashTableMethodLlvm::isNestedHashTableMethod($methodLc)
-            && (
-                'phpcompiler\\vm\\hashtable' === $declaringClassLc
-                || 'object' === $declaringClassLc
-                // Outer user enums can leak into NestedJIT receiver userType (#21109).
-                || JIT\NestedJitCompileScope::isActive()
-            )
-        ) {
+        if (JIT\NestedVmHashTableMethodLlvm::isNestedHashTableMethod($methodLc)) {
+            // Leaked NestedJIT receiver userType (enums etc.) — catch-all after Object (#21109).
             if (!JIT\NestedVmHashTableMethodLlvm::ensureMethod($this->context, $methodLc)) {
                 return false;
             }

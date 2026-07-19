@@ -161,6 +161,9 @@ final class BackedEnumFromRuntime
 
         $context->builder->positionAtEnd($typeErrorEmit);
         ExceptionBridge::emitTypeError($context, 'Argument #1 ($value) must be of type string given');
+        // Fresh load in this block — $nullStr from nullBlock does not dominate (#21109).
+        $typeErrorStr = $context->builder->load($context->constantStringFromString('0'));
+        $typeErrorEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $strPtrTy = $context->getTypeFromString('__string__*');
@@ -171,7 +174,7 @@ final class BackedEnumFromRuntime
         $phi->addIncoming($floatStr, $floatEnd);
         $phi->addIncoming($boolStr, $boolEnd);
         $phi->addIncoming($nullStr, $nullEnd);
-        $phi->addIncoming($nullStr, $typeErrorEmit);
+        $phi->addIncoming($typeErrorStr, $typeErrorEnd);
 
         return $phi;
     }

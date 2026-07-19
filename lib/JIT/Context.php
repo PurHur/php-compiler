@@ -860,6 +860,7 @@ class Context {
         // Stale sg_* from a prior JITContext in the same PHP process breaks SessionDestroy::implement (#4415).
         SuperglobalInit::$globals = [];
         LibcExtern::register($this);
+        LibcExtern::implementMcjitMemBodies($this);
         foreach ($this->builtins as $builtin) {
             // this is a separate loop, since implementation may
             // depend on global variables set during init()
@@ -1308,6 +1309,8 @@ class Context {
                 $machine = $engine->getTargetMachine();
                 $machine->emitToFile($this->module, $this->debugFile . '.s', $machine::CODEGEN_FILE_TYPE_ASM);
             }
+            // Bind php_write before Result::__construct runs __init__ (#21124).
+            McjitEmbedHostEcho::bindEngine($engine);
             $this->result = new Result(
                 $engine,
                 $this->loadType
@@ -1329,6 +1332,7 @@ class Context {
         $message = '';
         $this->module->verify($this->module::VERIFY_ACTION_THROW, $message);
         $engine = $this->module->createJITCompiler(0);
+        McjitEmbedHostEcho::bindEngine($engine);
         $this->result = new Result(
             $engine,
             $this->loadType

@@ -204,16 +204,9 @@ final class GcCollectCyclesNativeOpsJit
 
     private static function loadObjectConstructed(Context $context, Value $obj): Value
     {
+        // Byte-offset load — structGep+pointerCast can leave load typed as [8 x i8] under
+        // NestedJIT modules (#21109); offsetof(constructed) after __ref__+class_id is 16.
         $i8 = $context->getTypeFromString('int8');
-        $objMap = $context->structFieldMap['__object__'] ?? null;
-        if (null !== $objMap && isset($objMap['constructed'])) {
-            return $context->builder->load(
-                $context->builder->pointerCast(
-                    $context->builder->structGep($obj, $objMap['constructed']),
-                    $i8->pointerType(0)
-                )
-            );
-        }
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
         $raw = $context->builder->pointerCast($obj, $i8p);
