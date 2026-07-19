@@ -104,7 +104,10 @@ final class hash_ extends Internal
         );
     }
 
-    /** Z_PARAM_STR $data — null TypeError on 8.4 forward profile (#19275, ext/hash/hash.c). */
+    /**
+     * Z_PARAM_STR $data — non-strict null is E_DEPRECATED + '' on 8.4 (php-src hash.c / #21181).
+     * Reverts mistaken #19275 forward-profile TypeError; strict_types still TypeErrors.
+     */
     private static function vmDataArg(Frame $frame): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
@@ -113,7 +116,7 @@ final class hash_ extends Internal
             return $frame->calledArgs[1]->resolveIndirect()->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[1],
             'hash',
             1,
@@ -133,7 +136,7 @@ final class hash_ extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'hash',

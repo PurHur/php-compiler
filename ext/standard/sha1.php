@@ -14,7 +14,7 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** sha1() — hex digest via native __compiler_hash (issue #2160; #19255 null TypeError). */
+/** sha1() — hex digest via native __compiler_hash (issue #2160; #21181 null DEP+coerce on 8.4). */
 final class sha1 extends Internal
 {
     public function __construct()
@@ -66,14 +66,17 @@ final class sha1 extends Internal
         );
     }
 
-    /** Z_PARAM_STR — null TypeError on 8.4 forward profile (#19255, ext/standard/sha1.c). */
+    /**
+     * Z_PARAM_STR $string — non-strict null is E_DEPRECATED + '' on 8.4 (php-src sha1.c / #21181).
+     * strict_types still TypeErrors via {@see InternalStrictArg}.
+     */
     private static function vmStringArg(Frame $frame): string
     {
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireString($frame, 0, 'sha1', 'string')->toString();
         }
 
-        return VmString::coerceZparamStrBuiltinArg(
+        return VmString::coerceTrimFamilyStringArg(
             $frame->calledArgs[0],
             'sha1',
             0,
@@ -93,7 +96,7 @@ final class sha1 extends Internal
             );
         }
 
-        return JitStringBuiltinArg::lowerZparamStr(
+        return JitStringBuiltinArg::lowerTrimFamilyString(
             $context,
             $arg,
             'sha1',

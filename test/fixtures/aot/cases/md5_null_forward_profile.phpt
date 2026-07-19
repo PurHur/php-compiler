@@ -1,10 +1,11 @@
 --TEST--
-AOT: md5(null)/sha1(null) — TypeError on 8.4 forward profile (#19255, ext/standard/md5.c)
+AOT: md5(null) — empty digest on 8.4 (#21181, reverts #19255)
 --ENV--
 PHP_COMPILER_PROFILE=8.4
 --FILE--
 <?php
-md5(null);
+error_reporting(E_ALL & ~E_DEPRECATED);
+echo md5(null), "\n";
+?>
 --EXPECT--
---EXPECT_EXIT--
-255
+d41d8cd98f00b204e9800998ecf8427e
