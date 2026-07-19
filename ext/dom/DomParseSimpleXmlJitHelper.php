@@ -140,6 +140,56 @@ final class DomParseSimpleXmlJitHelper
         return null;
     }
 
+    /**
+     * Attribute value on the first //tag[@predAttr="predVal"] element (#21148).
+     */
+    public static function matchingTagAttributeValueArgv(
+        string $xml,
+        string $tag,
+        string $predAttr,
+        string $predValue,
+        string $attr
+    ): ?string {
+        $tag = strtolower($tag);
+        $predAttr = strtolower($predAttr);
+        $attr = strtolower($attr);
+        $needle = '<'.$tag;
+        $offset = 0;
+        while (false !== ($pos = stripos($xml, $needle, $offset))) {
+            $after = $pos + \strlen($needle);
+            if ($after >= \strlen($xml)) {
+                break;
+            }
+            $next = $xml[$after];
+            if ('>' !== $next && '/' !== $next && ' ' !== $next) {
+                $offset = $pos + 1;
+                continue;
+            }
+            $gt = strpos($xml, '>', $pos);
+            if (false === $gt) {
+                break;
+            }
+            $openTag = substr($xml, $pos, $gt - $pos + 1);
+            $predNeedle = $predAttr.'="'.str_replace('"', '', $predValue).'"';
+            if (false === stripos($openTag, $predNeedle)) {
+                $predNeedle = $predAttr."='".str_replace("'", '', $predValue)."'";
+                if (false === stripos($openTag, $predNeedle)) {
+                    $offset = $pos + 1;
+                    continue;
+                }
+            }
+            if (preg_match('/\b'.preg_quote($attr, '/').'\s*=\s*"([^"]*)"/i', $openTag, $m)
+                || preg_match("/\b".preg_quote($attr, '/')."\s*=\s*'([^']*)'/i", $openTag, $m)
+            ) {
+                return $m[1];
+            }
+
+            return null;
+        }
+
+        return null;
+    }
+
     /** First descendant element's concatenated text for //tag (#19352). */
     public static function firstTagTextArgv(string $xml, string $tag): ?string
     {

@@ -31,7 +31,18 @@ final class JitDomXPathEvaluate
 
         $exprLit = JitStringBuiltinArg::compileTimeLiteral($args[1]) ?? $args[1]->compileTimeString;
         $expr = null !== $exprLit ? trim($exprLit) : null;
-        // Bool: boolean()/not()/comparisons; double: count/sum/number/arithmetic; string: string()/name() (#20280).
+        // string()/name() before bool — `=` inside [@attr=…] is not a comparison (#21148).
+        if (null !== $expr && preg_match('~^(string|name)\(~i', $expr)) {
+            DomXPathEvaluateRuntime::ensureStringLinked($context);
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_xpath_evaluate_string_cont');
+
+            return $context->builder->call(
+                $context->lookupFunction(DomXPathEvaluateRuntime::ABI_STRING),
+                self::loadObjectArg($context, $args[0]),
+                self::loadStringArg($context, $args[1])
+            );
+        }
+        // Bool: boolean()/not()/comparisons; double: count/sum/number/arithmetic (#20280).
         if (null !== $expr && self::isBoolEvaluateExpr($expr)) {
             DomXPathEvaluateRuntime::ensureBoolLinked($context);
             BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_xpath_evaluate_bool_cont');
@@ -52,16 +63,6 @@ final class JitDomXPathEvaluate
                 self::loadStringArg($context, $args[1])
             );
         }
-        if (null !== $expr && preg_match('~^(string|name)\(~i', $expr)) {
-            DomXPathEvaluateRuntime::ensureStringLinked($context);
-            BasicBlockHelper::ensureOpenInsertBlock($context, 'dom_xpath_evaluate_string_cont');
-
-            return $context->builder->call(
-                $context->lookupFunction(DomXPathEvaluateRuntime::ABI_STRING),
-                self::loadObjectArg($context, $args[0]),
-                self::loadStringArg($context, $args[1])
-            );
-        }
 
         throw new \LogicException('DOMXPath::evaluate() user-script AOT requires boolean/not/compare, count/sum/number/arithmetic, or string/name() literal');
     }
@@ -71,8 +72,36 @@ final class JitDomXPathEvaluate
         if (preg_match('~^(true|false|boolean\(|not\()~i', $expr)) {
             return true;
         }
+        // Top-level comparison only — skip [=<>] inside () / [] (#21148).
+        $depth = 0;
+        $quote = null;
+        $len = \strlen($expr);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $expr[$i];
+            if (null !== $quote) {
+                if ($ch === $quote) {
+                    $quote = null;
+                }
+                continue;
+            }
+            if ('"' === $ch || "'" === $ch) {
+                $quote = $ch;
+                continue;
+            }
+            if ('(' === $ch || '[' === $ch) {
+                ++$depth;
+                continue;
+            }
+            if (')' === $ch || ']' === $ch) {
+                --$depth;
+                continue;
+            }
+            if (0 === $depth && ('=' === $ch || '<' === $ch || '>' === $ch)) {
+                return true;
+            }
+        }
 
-        return 1 === preg_match('~[=<>]~', $expr);
+        return false;
     }
 
     private static function isDoubleEvaluateExpr(string $expr): bool
