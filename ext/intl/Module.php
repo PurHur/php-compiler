@@ -98,6 +98,7 @@ class Module extends ModuleAbstract
             $functions[] = new locale_compose();
             $functions[] = new locale_get_keywords();
             $functions[] = new locale_get_display_language();
+            $functions[] = new locale_get_display_name();
             $functions[] = new locale_get_display_region();
             $functions[] = new locale_get_display_script();
             $functions[] = new locale_get_display_variant();

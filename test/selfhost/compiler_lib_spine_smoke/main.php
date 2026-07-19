@@ -5930,6 +5930,7 @@ require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayScript.php';
 require_once __DIR__.'/../../../ext/intl/LocaleGetDisplayVariant.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_all_variants.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_display_language.php';
+require_once __DIR__.'/../../../ext/intl/locale_get_display_name.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_display_region.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_display_script.php';
 require_once __DIR__.'/../../../ext/intl/locale_get_display_variant.php';
