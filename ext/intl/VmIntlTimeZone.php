@@ -44,6 +44,21 @@ final class VmIntlTimeZone
     /** @var array<int, array{id: string}> */
     private static array $state = [];
 
+    /**
+     * Zoneinfo realpath → sorted equivalent IDs (php-src TimeZone::countEquivalentIDs; #20824).
+     *
+     * @var array<string, list<string>>|null
+     */
+    private static ?array $equivalentByReal = null;
+
+    /** @var array<string, list<string>>|null id → sorted equivalents */
+    private static ?array $equivalentById = null;
+
+    /** @var array<string, string>|null Olson → Windows (reverse of WINDOWS_TO_OLSON) */
+    private static ?array $olsonToWindows = null;
+
+    private const ZONEINFO_ROOT = '/usr/share/zoneinfo';
+
     /** @return array<string, int> */
     public static function classConstants(): array
     {
@@ -91,6 +106,10 @@ final class VmIntlTimeZone
             'createenumeration' => [new IntlTimeZoneCreateEnumeration(), 'createEnumeration', $pubStatic],
             'createtimezoneidenumeration' => [new IntlTimeZoneCreateTimeZoneIDEnumeration(), 'createTimeZoneIDEnumeration', $pubStatic],
             'getidforwindowsid' => [new IntlTimeZoneGetIDForWindowsID(), 'getIDForWindowsID', $pubStatic],
+            'getwindowsid' => [new IntlTimeZoneGetWindowsID(), 'getWindowsID', $pubStatic],
+            'countequivalentids' => [new IntlTimeZoneCountEquivalentIDs(), 'countEquivalentIDs', $pubStatic],
+            'getequivalentid' => [new IntlTimeZoneGetEquivalentID(), 'getEquivalentID', $pubStatic],
+            'gettzdataversion' => [new IntlTimeZoneGetTZDataVersion(), 'getTZDataVersion', $pubStatic],
             'geterrorcode' => [new IntlTimeZoneGetErrorCode(), 'getErrorCode', $pub],
             'geterrormessage' => [new IntlTimeZoneGetErrorMessage(), 'getErrorMessage', $pub],
             'getid' => [new IntlTimeZoneGetID(), 'getID', $pub],
@@ -241,6 +260,176 @@ final class VmIntlTimeZone
         );
 
         return false;
+    }
+
+    /**
+     * php-src intltz_get_windows_id — reverse of {@see getIDForWindowsID} (#20824).
+     * Alias IDs resolve via zoneinfo equivalence (subset map).
+     */
+    public static function getWindowsID(string $timezoneId): string|false
+    {
+        $equiv = self::equivalentIds($timezoneId);
+        if ([] === $equiv) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'intltz_get_windows_id: No such time zone: U_ILLEGAL_ARGUMENT_ERROR'
+            );
+
+            return false;
+        }
+        self::ensureOlsonToWindows();
+        foreach ($equiv as $id) {
+            if (isset(self::$olsonToWindows[$id])) {
+                IntlError::clear();
+
+                return self::$olsonToWindows[$id];
+            }
+        }
+        IntlError::set(
+            IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+            'intltz_get_windows_id: no Windows ID for zone: U_ILLEGAL_ARGUMENT_ERROR'
+        );
+
+        return false;
+    }
+
+    /** php-src intltz_count_equivalent_ids — zoneinfo symlink clique (#20824). */
+    public static function countEquivalentIDs(string $timezoneId): int
+    {
+        $ids = self::equivalentIds($timezoneId);
+        IntlError::clear();
+
+        return \count($ids);
+    }
+
+    /**
+     * php-src intltz_get_equivalent_id — empty string when out of range (#20824).
+     */
+    public static function getEquivalentID(string $timezoneId, int $index): string
+    {
+        $ids = self::equivalentIds($timezoneId);
+        IntlError::clear();
+        if ($index < 0 || $index >= \count($ids)) {
+            return '';
+        }
+
+        return $ids[$index];
+    }
+
+    /**
+     * php-src intltz_get_tz_data_version — Olson/tzdata version string (#20824).
+     * Reads `# version YYYYx` from zoneinfo tzdata.zi when present (ICU shape).
+     */
+    public static function getTZDataVersion(): string
+    {
+        $zi = self::ZONEINFO_ROOT.'/tzdata.zi';
+        if (\is_file($zi)) {
+            $fh = \fopen($zi, 'rb');
+            if (false !== $fh) {
+                $line = \fgets($fh);
+                \fclose($fh);
+                if (\is_string($line) && 1 === \preg_match('/^#\s*version\s+(\S+)/i', $line, $m)) {
+                    IntlError::clear();
+
+                    return $m[1];
+                }
+            }
+        }
+        $versionFile = self::ZONEINFO_ROOT.'/+VERSION';
+        if (\is_file($versionFile)) {
+            $raw = \trim((string) \file_get_contents($versionFile));
+            if ('' !== $raw) {
+                IntlError::clear();
+
+                return $raw;
+            }
+        }
+        IntlError::clear();
+
+        return '2022e';
+    }
+
+    /**
+     * Sorted equivalent IDs for $timezoneId, or [] if the zone is unknown.
+     *
+     * @return list<string>
+     */
+    private static function equivalentIds(string $timezoneId): array
+    {
+        $timezoneId = \trim($timezoneId);
+        if ('' === $timezoneId || 'Etc/Unknown' === $timezoneId || 'unknown' === \strtolower($timezoneId)) {
+            return [];
+        }
+        self::ensureEquivalentIndex();
+        if (isset(self::$equivalentById[$timezoneId])) {
+            return self::$equivalentById[$timezoneId];
+        }
+        // Accept IDs that validate but were not walked (rare); singleton clique.
+        try {
+            $id = VmDateTimeNative::validateTimezoneId($timezoneId);
+        } catch (\Throwable) {
+            return [];
+        }
+        if (isset(self::$equivalentById[$id])) {
+            return self::$equivalentById[$id];
+        }
+
+        return [$id];
+    }
+
+    private static function ensureOlsonToWindows(): void
+    {
+        if (null !== self::$olsonToWindows) {
+            return;
+        }
+        self::$olsonToWindows = [];
+        foreach (self::WINDOWS_TO_OLSON as $win => $olson) {
+            self::$olsonToWindows[$olson] = $win;
+        }
+    }
+
+    private static function ensureEquivalentIndex(): void
+    {
+        if (null !== self::$equivalentById) {
+            return;
+        }
+        self::$equivalentByReal = [];
+        self::$equivalentById = [];
+        $root = self::ZONEINFO_ROOT;
+        if (!\is_dir($root)) {
+            return;
+        }
+        // Walk full zoneinfo (including legacy US/*, GB, … aliases) so cliques match ICU.
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS)
+        );
+        $rootLen = \strlen($root) + 1;
+        foreach ($iterator as $file) {
+            if (!$file->isFile() && !$file->isLink()) {
+                continue;
+            }
+            $path = $file->getPathname();
+            $base = \basename($path);
+            if ('posixrules' === $base || \str_starts_with($base, '+') || \str_contains($base, '.')) {
+                continue;
+            }
+            $id = \str_replace(\DIRECTORY_SEPARATOR, '/', \substr($path, $rootLen));
+            if ('' === $id) {
+                continue;
+            }
+            $real = \realpath($path);
+            if (false === $real) {
+                continue;
+            }
+            self::$equivalentByReal[$real][] = $id;
+        }
+        foreach (self::$equivalentByReal as $group) {
+            $group = \array_values(\array_unique($group));
+            \sort($group, \SORT_STRING);
+            foreach ($group as $id) {
+                self::$equivalentById[$id] = $group;
+            }
+        }
     }
 
     public static function getErrorCode(ObjectEntry $tz): int|false
@@ -1144,6 +1333,112 @@ final class IntlTimeZoneGetIDForWindowsID extends VmClassMethod
         if (null === $frame->returnVar) { return; }
         if (false === $olson) { $frame->returnVar->bool(false); return; }
         $frame->returnVar->string($olson);
+    }
+}
+
+/** IntlTimeZone::getWindowsID() — php-src intltz_get_windows_id (#20824). */
+final class IntlTimeZoneGetWindowsID extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getWindowsID');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::getWindowsID() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $id = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'IntlTimeZone::getWindowsID', 1, 'timezoneId');
+        $win = VmIntlTimeZone::getWindowsID($id);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        if (false === $win) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($win);
+    }
+}
+
+/** IntlTimeZone::countEquivalentIDs() — php-src intltz_count_equivalent_ids (#20824). */
+final class IntlTimeZoneCountEquivalentIDs extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('countEquivalentIDs');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::countEquivalentIDs() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $id = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'IntlTimeZone::countEquivalentIDs', 1, 'timezoneId');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlTimeZone::countEquivalentIDs($id));
+    }
+}
+
+/** IntlTimeZone::getEquivalentID() — php-src intltz_get_equivalent_id (#20824). */
+final class IntlTimeZoneGetEquivalentID extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getEquivalentID');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::getEquivalentID() expects exactly 2 arguments, %d given',
+                $argc
+            ));
+        }
+        $id = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'IntlTimeZone::getEquivalentID', 1, 'timezoneId');
+        $index = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlTimeZone::getEquivalentID', 2, 'index');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(VmIntlTimeZone::getEquivalentID($id, $index));
+    }
+}
+
+/** IntlTimeZone::getTZDataVersion() — php-src intltz_get_tz_data_version (#20824). */
+final class IntlTimeZoneGetTZDataVersion extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getTZDataVersion');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlTimeZone::getTZDataVersion() expects exactly 0 arguments, %d given',
+                $argc
+            ));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(VmIntlTimeZone::getTZDataVersion());
     }
 }
 
