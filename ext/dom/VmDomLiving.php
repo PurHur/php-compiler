@@ -8,6 +8,7 @@ use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -53,6 +54,15 @@ final class VmDomLiving
 
     /** php-src Dom\DocumentType (php_dom.stub.php; #20910). */
     public const CLASS_DOCUMENT_TYPE = 'dom\\documenttype';
+
+    /** php-src Dom\NamespaceInfo (php_dom.stub.php; #20924). */
+    public const CLASS_NAMESPACE_INFO = 'dom\\namespaceinfo';
+
+    public const PROP_NAMESPACE_INFO_PREFIX = 'prefix';
+
+    public const PROP_NAMESPACE_INFO_NAMESPACE_URI = 'namespaceURI';
+
+    public const PROP_NAMESPACE_INFO_ELEMENT = 'element';
 
     public const PROP_BODY = 'body';
 
@@ -936,5 +946,129 @@ final class VmDomLiving
                 : sprintf('%s: Argument #%d ($%s) must be a valid document encoding', $method, $argNum, $paramName);
             throw new \ValueError($msg);
         }
+    }
+
+    /**
+     * Dom\Element::getInScopeNamespaces() — XPath in-scope xmlns attrs (php-src element.c; #20924).
+     *
+     * @return list<ObjectEntry> Dom\NamespaceInfo objects; NamespaceInfo::$element is always $element
+     */
+    public static function getInScopeNamespaces(Context $ctx, ObjectEntry $element): array
+    {
+        $prefixToUri = [];
+        $current = $element;
+        while (DomRegistry::has($current) && VmDom::isElement($current)) {
+            $state = DomRegistry::state($current);
+            // Reverse attribute order so later decls win for the same prefix (php-src element.c).
+            $prefixes = array_keys($state->xmlnsAttributePrefixes);
+            for ($i = \count($prefixes) - 1; $i >= 0; --$i) {
+                $prefix = $prefixes[$i];
+                if (\array_key_exists($prefix, $prefixToUri)) {
+                    continue;
+                }
+                if (!\array_key_exists($prefix, $state->namespaceDeclarations)) {
+                    continue;
+                }
+                $prefixToUri[$prefix] = $state->namespaceDeclarations[$prefix];
+            }
+            $parentId = $state->parentId;
+            if (null === $parentId) {
+                break;
+            }
+            $parent = DomRegistry::entry($parentId);
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        $infos = [];
+        // Reverse insertion order (ZEND_HASH_MAP_REVERSE_FOREACH).
+        foreach (array_reverse($prefixToUri, true) as $prefix => $uri) {
+            if ('' === $prefix && '' === $uri) {
+                // Empty default xmlns undeclares — omitted (XPath namespace-nodes).
+                continue;
+            }
+            $infos[] = self::createNamespaceInfo(
+                $ctx,
+                '' === $prefix ? null : $prefix,
+                '' === $uri ? null : $uri,
+                $element
+            );
+        }
+
+        return $infos;
+    }
+
+    /**
+     * Dom\Element::getDescendantNamespaces() (php-src element.c; #20924).
+     *
+     * @return list<ObjectEntry>
+     */
+    public static function getDescendantNamespaces(Context $ctx, ObjectEntry $element): array
+    {
+        $infos = self::getInScopeNamespaces($ctx, $element);
+        foreach (self::collectDescendantElements($element) as $desc) {
+            foreach (self::getInScopeNamespaces($ctx, $desc) as $info) {
+                $infos[] = $info;
+            }
+        }
+
+        return $infos;
+    }
+
+    /**
+     * Dom\Element::rename() — QName + namespaceURI update (php-src element.c; #20924).
+     */
+    public static function renameElement(ObjectEntry $element, ?string $namespaceUri, string $qualifiedName): void
+    {
+        VmDom::renameElement($element, $namespaceUri, $qualifiedName);
+    }
+
+    /**
+     * Build Dom\NamespaceInfo with prefix / namespaceURI / element (php-src php_dom.stub.php; #20924).
+     */
+    public static function createNamespaceInfo(
+        Context $ctx,
+        ?string $prefix,
+        ?string $namespaceUri,
+        ObjectEntry $element
+    ): ObjectEntry {
+        $class = $ctx->classes[self::CLASS_NAMESPACE_INFO] ?? null;
+        if (null === $class) {
+            throw new \LogicException('Dom\\NamespaceInfo is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        if (null === $prefix) {
+            $entry->getProperty(self::PROP_NAMESPACE_INFO_PREFIX)->null();
+        } else {
+            $entry->getProperty(self::PROP_NAMESPACE_INFO_PREFIX)->string($prefix);
+        }
+        if (null === $namespaceUri) {
+            $entry->getProperty(self::PROP_NAMESPACE_INFO_NAMESPACE_URI)->null();
+        } else {
+            $entry->getProperty(self::PROP_NAMESPACE_INFO_NAMESPACE_URI)->string($namespaceUri);
+        }
+        $entry->getProperty(self::PROP_NAMESPACE_INFO_ELEMENT)->object($element);
+
+        return $entry;
+    }
+
+    /**
+     * Pack NamespaceInfo objects into a VM array (php-src list<NamespaceInfo>; #20924).
+     *
+     * @param list<ObjectEntry> $infos
+     */
+    public static function namespaceInfoListToArray(array $infos): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($infos as $info) {
+            $v = new Variable(Variable::TYPE_OBJECT);
+            $v->object($info);
+            $ht->append($v);
+        }
+
+        return $ht;
     }
 }

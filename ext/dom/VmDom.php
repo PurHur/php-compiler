@@ -1852,6 +1852,7 @@ final class VmDom
         if ('xmlns' === $qualifiedName
             && (null === $namespace || '' === $namespace || self::isXmlnsNamespaceUri($namespace))) {
             $state->namespaceDeclarations[''] = $value;
+            $state->xmlnsAttributePrefixes[''] = true;
             self::detachCachedAttributeIfAny($state, 'xmlns');
             unset($state->attributes['xmlns'], $state->attributeNamespaces['xmlns']);
             self::syncElementAttributes($ctx, $element);
@@ -1861,6 +1862,7 @@ final class VmDom
         if (str_starts_with($qualifiedName, 'xmlns:') && self::isXmlnsNamespaceUri($namespace)) {
             $prefix = substr($qualifiedName, 6);
             $state->namespaceDeclarations[$prefix] = $value;
+            $state->xmlnsAttributePrefixes[$prefix] = true;
             self::detachCachedAttributeIfAny($state, $qualifiedName);
             unset($state->attributes[$qualifiedName], $state->attributeNamespaces[$qualifiedName]);
             self::syncElementAttributes($ctx, $element);
@@ -2841,6 +2843,11 @@ final class VmDom
     private static function applyParsedAttributes(DomNodeState $state, array $attributes): void
     {
         $state->namespaceDeclarations = self::extractNamespaceDeclarations($attributes);
+        // Attribute-sourced xmlns only — createElementNS nsDef stays unmarked (#20924).
+        $state->xmlnsAttributePrefixes = [];
+        foreach (array_keys($state->namespaceDeclarations) as $prefix) {
+            $state->xmlnsAttributePrefixes[$prefix] = true;
+        }
         $state->attributes = self::stripNamespaceDeclarationAttributes($attributes);
         foreach ($state->attributes as $qName => $_) {
             [$prefix] = self::splitQualifiedName($qName);
@@ -9470,6 +9477,7 @@ final class VmDom
             $importedState->attributes = $sourceState->attributes;
             $importedState->attributeNamespaces = $sourceState->attributeNamespaces;
             $importedState->namespaceDeclarations = $sourceState->namespaceDeclarations;
+            $importedState->xmlnsAttributePrefixes = $sourceState->xmlnsAttributePrefixes;
             $importedState->localName = $sourceState->localName;
             $importedState->prefix = $sourceState->prefix;
             $importedState->namespaceUri = $sourceState->namespaceUri;
@@ -9589,6 +9597,7 @@ final class VmDom
             $clonedState->attributes = $sourceState->attributes;
             $clonedState->attributeNamespaces = $sourceState->attributeNamespaces;
             $clonedState->namespaceDeclarations = $sourceState->namespaceDeclarations;
+            $clonedState->xmlnsAttributePrefixes = $sourceState->xmlnsAttributePrefixes;
             $clonedState->localName = $sourceState->localName;
             $clonedState->prefix = $sourceState->prefix;
             $clonedState->namespaceUri = $sourceState->namespaceUri;
@@ -9654,6 +9663,44 @@ final class VmDom
         if ('' === $name || !preg_match('/^[A-Za-z_:][\w.:-]*$/', $name)) {
             throw new \DOMException('Invalid Character Error', DomExceptionConstants::INVALID_CHARACTER_ERR);
         }
+    }
+
+    /**
+     * Dom\Element::rename() / Dom\Attr::rename() — update QName + namespaceURI
+     * (php-src ext/dom/element.c PHP_METHOD(Dom_Element, rename); #20924).
+     *
+     * @throws \DOMException
+     */
+    public static function renameElement(ObjectEntry $element, ?string $namespaceUri, string $qualifiedName): void
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        self::assertValidElementNSName($namespaceUri, $qualifiedName);
+        [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
+
+        $state = DomRegistry::state($element);
+        $isCurrentlyHtmlNs = VmDomLiving::HTML_NS === ($state->namespaceUri ?? '')
+            || VmDomLiving::CLASS_HTML_ELEMENT === strtolower($element->class->name);
+        $willBeHtmlNs = null !== $namespaceUri && VmDomLiving::HTML_NS === $namespaceUri;
+        if ($isCurrentlyHtmlNs !== $willBeHtmlNs) {
+            if ($isCurrentlyHtmlNs) {
+                throw new \DOMException(
+                    'It is not possible to move an element out of the HTML namespace because the HTML namespace is tied to the HTMLElement class',
+                    DomExceptionConstants::INVALID_MODIFICATION_ERR
+                );
+            }
+            throw new \DOMException(
+                'It is not possible to move an element into the HTML namespace because the HTML namespace is tied to the HTMLElement class',
+                DomExceptionConstants::INVALID_MODIFICATION_ERR
+            );
+        }
+
+        $state->localName = $localName;
+        $state->prefix = '' !== $prefix ? $prefix : null;
+        $state->namespaceUri = $namespaceUri;
+        $state->nodeName = $qualifiedName;
+        self::writeElementNameSlots($element, $qualifiedName);
     }
 
     /**
