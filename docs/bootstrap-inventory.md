@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5856 |
-| Phase A inventory files (M2 ratio SSOT) | 5856 |
+| PHP files on vm.php path | 5864 |
+| Phase A inventory files (M2 ratio SSOT) | 5864 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17614 |
+| Source constructs flagged (warnings) | 17646 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -833,7 +833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 68 |
+| `ext/intl/Module.php` | 0 | 76 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -857,6 +857,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmUConverter.php` | 0 | 40 |
 | `ext/intl/collator_compare.php` | 0 | 3 |
 | `ext/intl/collator_create.php` | 0 | 3 |
+| `ext/intl/collator_get_attribute.php` | 0 | 3 |
+| `ext/intl/collator_get_error_code.php` | 0 | 3 |
+| `ext/intl/collator_get_error_message.php` | 0 | 3 |
+| `ext/intl/collator_get_locale.php` | 0 | 3 |
+| `ext/intl/collator_get_sort_key.php` | 0 | 3 |
+| `ext/intl/collator_get_strength.php` | 0 | 3 |
+| `ext/intl/collator_set_attribute.php` | 0 | 3 |
+| `ext/intl/collator_set_strength.php` | 0 | 3 |
 | `ext/intl/datefmt_format_object.php` | 0 | 3 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
 | `ext/intl/grapheme_levenshtein.php` | 0 | 2 |
@@ -11486,50 +11494,58 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new normalizer_get_raw_decomposition (line 110)
 - new idn_to_ascii (line 114)
 - new idn_to_utf8 (line 114)
-- new collator_create (line 118)
-- new collator_compare (line 118)
-- new numfmt_create (line 123)
-- new numfmt_format (line 124)
-- new numfmt_parse (line 125)
-- new numfmt_parse_currency (line 126)
-- new numfmt_format_currency (line 127)
-- new numfmt_get_attribute (line 128)
-- new numfmt_set_attribute (line 129)
-- new numfmt_get_pattern (line 130)
-- new numfmt_set_pattern (line 131)
-- new numfmt_get_locale (line 132)
-- new numfmt_get_error_code (line 133)
-- new numfmt_get_error_message (line 134)
-- new msgfmt_create (line 140)
-- new msgfmt_format (line 141)
-- new msgfmt_format_message (line 142)
-- new transliterator_create (line 148)
-- new transliterator_create_from_rules (line 149)
-- new transliterator_create_inverse (line 150)
-- new transliterator_list_ids (line 151)
-- new transliterator_transliterate (line 152)
-- new transliterator_get_error_code (line 153)
-- new transliterator_get_error_message (line 154)
-- new resourcebundle_create (line 160)
-- new resourcebundle_get (line 161)
-- new resourcebundle_locales (line 162)
-- new resourcebundle_count (line 163)
-- new datefmt_format_object (line 168)
-- new grapheme_strlen (line 196)
-- new grapheme_substr (line 197)
-- new grapheme_strpos (line 198)
-- new grapheme_str_contains (line 199)
-- new grapheme_strstr (line 200)
-- new grapheme_stristr (line 201)
-- new grapheme_stripos (line 202)
-- new grapheme_strrpos (line 203)
-- new grapheme_extract (line 204)
-- new grapheme_levenshtein (line 205)
-- new grapheme_str_split (line 206)
-- new grapheme_strimwidth (line 207)
-- new intl_get_error_code (line 208)
-- new intl_get_error_message (line 209)
-- new intl_is_failure (line 210)
+- new collator_create (line 119)
+- new collator_compare (line 120)
+- new collator_get_attribute (line 121)
+- new collator_set_attribute (line 122)
+- new collator_get_strength (line 123)
+- new collator_set_strength (line 124)
+- new collator_get_sort_key (line 125)
+- new collator_get_locale (line 126)
+- new collator_get_error_code (line 127)
+- new collator_get_error_message (line 128)
+- new numfmt_create (line 134)
+- new numfmt_format (line 135)
+- new numfmt_parse (line 136)
+- new numfmt_parse_currency (line 137)
+- new numfmt_format_currency (line 138)
+- new numfmt_get_attribute (line 139)
+- new numfmt_set_attribute (line 140)
+- new numfmt_get_pattern (line 141)
+- new numfmt_set_pattern (line 142)
+- new numfmt_get_locale (line 143)
+- new numfmt_get_error_code (line 144)
+- new numfmt_get_error_message (line 145)
+- new msgfmt_create (line 151)
+- new msgfmt_format (line 152)
+- new msgfmt_format_message (line 153)
+- new transliterator_create (line 159)
+- new transliterator_create_from_rules (line 160)
+- new transliterator_create_inverse (line 161)
+- new transliterator_list_ids (line 162)
+- new transliterator_transliterate (line 163)
+- new transliterator_get_error_code (line 164)
+- new transliterator_get_error_message (line 165)
+- new resourcebundle_create (line 171)
+- new resourcebundle_get (line 172)
+- new resourcebundle_locales (line 173)
+- new resourcebundle_count (line 174)
+- new datefmt_format_object (line 179)
+- new grapheme_strlen (line 207)
+- new grapheme_substr (line 208)
+- new grapheme_strpos (line 209)
+- new grapheme_str_contains (line 210)
+- new grapheme_strstr (line 211)
+- new grapheme_stristr (line 212)
+- new grapheme_stripos (line 213)
+- new grapheme_strrpos (line 214)
+- new grapheme_extract (line 215)
+- new grapheme_levenshtein (line 216)
+- new grapheme_str_split (line 217)
+- new grapheme_strimwidth (line 218)
+- new intl_get_error_code (line 219)
+- new intl_get_error_message (line 220)
+- new intl_is_failure (line 221)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -12110,6 +12126,62 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
 - new Error (line 41)
+- 2 class method(s)
+
+### `ext/intl/collator_get_attribute.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 59)
+- 2 class method(s)
+
+### `ext/intl/collator_get_error_code.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 52)
+- 2 class method(s)
+
+### `ext/intl/collator_get_error_message.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 52)
+- 2 class method(s)
+
+### `ext/intl/collator_get_locale.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 59)
+- 2 class method(s)
+
+### `ext/intl/collator_get_sort_key.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 59)
+- 2 class method(s)
+
+### `ext/intl/collator_get_strength.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 52)
+- 2 class method(s)
+
+### `ext/intl/collator_set_attribute.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 55)
+- 2 class method(s)
+
+### `ext/intl/collator_set_strength.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new Error (line 54)
 - 2 class method(s)
 
 ### `ext/intl/datefmt_format_object.php`

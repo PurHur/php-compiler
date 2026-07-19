@@ -115,7 +115,18 @@ class Module extends ModuleAbstract
             : [];
 
         $collator = IntlExtensionPolicy::advertisesCollator()
-            ? [new collator_create(), new collator_compare()]
+            ? [
+                new collator_create(),
+                new collator_compare(),
+                new collator_get_attribute(),
+                new collator_set_attribute(),
+                new collator_get_strength(),
+                new collator_set_strength(),
+                new collator_get_sort_key(),
+                new collator_get_locale(),
+                new collator_get_error_code(),
+                new collator_get_error_message(),
+            ]
             : [];
 
         $numfmt = IntlExtensionPolicy::advertisesNumberFormatter()
