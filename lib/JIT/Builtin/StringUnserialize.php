@@ -21,9 +21,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for __compiler_unserialize via UnserializeJitHelper PHP (#9163, #20785).
  *
  * Embed + thin standalone AOT: {@see UnserializeJitHelper} NestedJIT
- * (ArrayPop #12647 / Serialize #20773 shape — no thin null/empty stubs).
- * `__compiler_unserialize` returns {@see __value__*} via {@see JitVmHelperLink::ensureBridge}
- * (same Variable-return ABI as array_pop — void+out-pointer mis-copied object identity).
+ * (Serialize #20773 shape — no thin null/empty stubs).
+ * Helper NestedJIT-decodes `i:N;` as int; bridge boxes to `__value__*` (#20785).
+ * Variable/mixed NestedJIT returns are not yet thin-AOT safe.
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -101,19 +101,7 @@ final class StringUnserialize
         }
 
         self::ensureRuntimeHelpers($context);
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        JitVmHelperLink::ensureBridge(
-            $context,
-            '__compiler_unserialize',
-            self::UNSER_BRIDGE_ENTRY,
-            [$strPtr],
-            $valuePtr,
-            self::DECODE_HELPER,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#20785'
-        );
+        self::implementUnserializeBridge($context);
         self::implementSessionDecodeBridge($context);
         self::registerLinkedRuntime($context);
         BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
@@ -139,6 +127,57 @@ final class StringUnserialize
         }
 
         return $fn;
+    }
+
+    /**
+     * NestedJIT decode(): int → box as `__value__*` (#20785).
+     * (Variable / mixed NestedJIT returns are not yet thin-AOT safe.)
+     */
+    private static function implementUnserializeBridge(Context $context): void
+    {
+        $abiName = '__compiler_unserialize';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (JitVmHelperLink::hasNamedBridgeEntry($probe, self::UNSER_BRIDGE_ENTRY)) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($valuePtr, false, $strPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#20785'
+        );
+
+        $entry = JitVmHelperLink::bridgeEntryForEmit($fn, self::UNSER_BRIDGE_ENTRY);
+        $context->builder->positionAtEnd($entry);
+        $payload = $fn->getParam(0);
+        $helperFn = self::helperFunction($context, self::DECODE_HELPER);
+        $payloadArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $payload,
+            $helperFn->getParam(0)->typeOf()
+        );
+        $raw = $context->builder->call($helperFn, $payloadArg);
+        $long = JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64);
+        $slot = \PHPCompiler\JIT\JitValueBox::alloc($context);
+        $outPtr = \PHPCompiler\JIT\JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $outPtr,
+            $long
+        );
+        $context->builder->returnValue($outPtr);
+        $context->registerFunction($abiName, $fn);
     }
 
     private static function implementSessionDecodeBridge(Context $context): void

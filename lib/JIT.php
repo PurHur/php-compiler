@@ -10871,6 +10871,37 @@ class JIT {
 
                 return JIT\JitValueBox::pointer($this->context, $slot);
             }
+            // mixed / NestedJIT scalar returns must box into `__value__*` (#20785).
+            if (Variable::TYPE_NATIVE_LONG === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeLong'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $retval
+                );
+
+                return JIT\JitValueBox::pointer($this->context, $slot);
+            }
+            if (Variable::TYPE_NATIVE_BOOL === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                JIT\JitValueBox::writeBool(
+                    $this->context,
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $retval
+                );
+
+                return JIT\JitValueBox::pointer($this->context, $slot);
+            }
+            if (Variable::TYPE_NATIVE_DOUBLE === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeDouble'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $retval
+                );
+
+                return JIT\JitValueBox::pointer($this->context, $slot);
+            }
 
             return $this->context->getTypeFromString('__value__*')->constNull();
         }
@@ -15851,11 +15882,37 @@ class JIT {
             && JIT\XmlWriterInstanceMethodJit::isUserScriptAot();
         $xsltUserScript = JIT\XsltInstanceMethodJit::isXsltInstanceMethodProxy($proxyName)
             && JIT\XsltInstanceMethodJit::isUserScriptAot();
-        if (Type::TYPE_OBJECT === $receiverOp->type?->type && !$splObjectStorageMethod && !$simpleXmlUserScript && !$xmlWriterUserScript && !$xsltUserScript) {
+        // NestedJIT VM\Variable params are `__value__*` (#16565) — never run object lazy-init on them (#20785).
+        $nestedVmVariableReceiver = JIT\NestedJitCompileScope::isActive()
+            && Variable::TYPE_VALUE === $receiverVar->type
+            && (
+                'phpcompiler\\vm\\variable' === $declaringClassLc
+                || 'variable' === $declaringClassLc
+                || str_ends_with($declaringClassLc, '\\vm\\variable')
+            );
+        if (
+            !$nestedVmVariableReceiver
+            && Type::TYPE_OBJECT === $receiverOp->type?->type
+            && !$splObjectStorageMethod
+            && !$simpleXmlUserScript
+            && !$xmlWriterUserScript
+            && !$xsltUserScript
+        ) {
             JIT\LazyObjectHelper::emitEnsureInitialized(
                 $this->context,
                 $this->context->helper->loadValue($dispatchReceiver)
             );
+        }
+        if ($nestedVmVariableReceiver && JIT\NestedVmVariableMethodLlvm::isNestedVariableMethod($methodLc)) {
+            if (!JIT\NestedVmVariableMethodLlvm::ensureMethod($this->context, $methodLc)) {
+                throw new \LogicException("Nested VM Variable method {$methodLc} missing (#20785)");
+            }
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy(
+                'phpcompiler\\vm\\variable::'.$methodLc
+            );
+            $this->context->scope->args = [$receiverVar];
+
+            return;
         }
         if (!$this->context->functionIsRegistered($proxyName)) {
             if ('getmessage' === $methodLc && $this->context->functionIsRegistered('exception::getmessage')) {
@@ -16065,7 +16122,13 @@ class JIT {
         if (!JIT\NestedVmVariableMethodLlvm::isNestedVariableMethod($methodLc)) {
             return false;
         }
-        if ('phpcompiler\\vm\\variable' !== $declaringClassLc && 'object' !== $declaringClassLc) {
+        // Bare `Variable` (use-import) must match FQCN — same as isCfgVmVariableParamType (#20785).
+        if (
+            'phpcompiler\\vm\\variable' !== $declaringClassLc
+            && 'object' !== $declaringClassLc
+            && 'variable' !== $declaringClassLc
+            && !str_ends_with($declaringClassLc, '\\vm\\variable')
+        ) {
             return false;
         }
         if (!JIT\NestedVmVariableMethodLlvm::ensureMethod($this->context, $methodLc)) {

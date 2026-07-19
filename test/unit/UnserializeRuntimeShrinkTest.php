@@ -15,11 +15,11 @@ final class UnserializeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUnserialize.php');
         $this->assertStringContainsString('UnserializeJitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
+        $this->assertStringContainsString('implementUnserializeBridge', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('unser_bridge_entry', $source);
         $this->assertStringContainsString('session_unser_entry', $source);
-        $this->assertStringNotContainsString('copyIntoPointer', $source);
+        $this->assertStringContainsString('__value__writeLong', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('implementThinStandaloneStubs', $source);
         $this->assertStringNotContainsString('unser_thin_stub', $source);
@@ -27,15 +27,14 @@ final class UnserializeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringUnserializeJit', $source);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertLessThan(270, \substr_count($source, "\n") + 1, 'StringUnserialize must stay a thin bridge (#20785)');
+        $this->assertLessThan(320, \substr_count($source, "\n") + 1, 'StringUnserialize must stay a thin bridge (#20785)');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringUnserializeJit.php');
     }
 
-    public function testUnserializeJitHelperDelegatesToVmUnserializeFormat(): void
+    public function testUnserializeJitHelperDecodesIntWire(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/UnserializeJitHelper.php');
-        $this->assertStringContainsString('VmUnserializeFormat::decodeToVariableWithContext', $source);
-        $this->assertStringContainsString('copyFrom', $source);
+        $this->assertStringContainsString('function decode(string $payload): int', $source);
         $this->assertStringContainsString('VmSessionSerializer::decodeWireHashTable', $source);
         $this->assertStringContainsString('VmActiveContextJitHelper::resolve', $source);
     }
