@@ -72,6 +72,36 @@ PHP;
         self::assertSame("e9\n0\nc3a9\n4\nfalse\n27\n", $out);
     }
 
+    /** @see https://github.com/PurHur/php-compiler/issues/20770 */
+    public function test_uconverter_encodings_subst_reason_text(): void
+    {
+        $runtime = new Runtime();
+        BuiltinClasses::registerUConverter($runtime->vmContext);
+
+        $code = <<<'PHP'
+<?php
+$c = new UConverter('UTF-8', 'ISO-8859-1');
+echo $c->getSourceEncoding(), "\n";
+echo $c->getDestinationEncoding(), "\n";
+echo bin2hex($c->getSubstChars()), "\n";
+var_export($c->setSubstChars('?'));
+echo "\n";
+echo $c->getSubstChars(), "\n";
+echo UConverter::reasonText(UConverter::REASON_ILLEGAL), "\n";
+echo UConverter::reasonText(UConverter::REASON_CLONE), "\n";
+$bad = new UConverter('not-a-real-encoding', 'UTF-8');
+var_export($bad->getDestinationEncoding());
+echo "\n";
+var_export($bad->getSourceEncoding());
+echo "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'uconverter_encodings.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("ISO-8859-1\nUTF-8\n1a\ntrue\n?\nREASON_ILLEGAL\nREASON_CLONE\nNULL\n'UTF-8'\n", $out);
+    }
+
     public function test_vm_helpers_match_zend_scalars(): void
     {
         self::assertSame(65, VmIntlChar::ord('A'));

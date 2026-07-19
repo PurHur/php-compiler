@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5831 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17336 |
+| Source constructs flagged (warnings) | 17348 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -845,7 +845,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmResourceBundle.php` | 0 | 12 |
 | `ext/intl/VmSpoofchecker.php` | 0 | 24 |
 | `ext/intl/VmTransliterator.php` | 0 | 27 |
-| `ext/intl/VmUConverter.php` | 0 | 16 |
+| `ext/intl/VmUConverter.php` | 0 | 28 |
 | `ext/intl/collator_compare.php` | 0 | 3 |
 | `ext/intl/collator_create.php` | 0 | 3 |
 | `ext/intl/grapheme_extract.php` | 0 | 2 |
@@ -11789,22 +11789,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmUConverter.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 46)
-- new UConverterConstruct (line 50)
-- new UConverterConvert (line 54)
-- new UConverterGetErrorCode (line 55)
-- new UConverterGetErrorMessage (line 56)
-- new UConverterTranscode (line 57)
-- new Error (line 109)
-- new Error (line 156)
-- new Error (line 160)
-- new ArgumentCountError (line 204)
-- new ArgumentCountError (line 225)
-- new ArgumentCountError (line 267)
-- new ArgumentCountError (line 292)
-- new ArgumentCountError (line 298)
-- new ArgumentCountError (line 355)
-- 13 class method(s)
+- new ClassEntry (line 79)
+- new Variable (line 83)
+- new UConverterConstruct (line 90)
+- new UConverterConvert (line 94)
+- new UConverterGetErrorCode (line 95)
+- new UConverterGetErrorMessage (line 96)
+- new UConverterGetSourceEncoding (line 97)
+- new UConverterGetDestinationEncoding (line 98)
+- new UConverterGetSubstChars (line 99)
+- new UConverterSetSubstChars (line 100)
+- new UConverterReasonText (line 101)
+- new UConverterTranscode (line 102)
+- new Error (line 157)
+- new Error (line 249)
+- new Error (line 335)
+- new Error (line 339)
+- new ArgumentCountError (line 383)
+- new ArgumentCountError (line 404)
+- new ArgumentCountError (line 446)
+- new ArgumentCountError (line 471)
+- new ArgumentCountError (line 477)
+- new ArgumentCountError (line 534)
+- new ArgumentCountError (line 559)
+- new ArgumentCountError (line 590)
+- new ArgumentCountError (line 621)
+- new ArgumentCountError (line 652)
+- new ArgumentCountError (line 684)
+- 28 class method(s)
 
 ### `ext/intl/collator_compare.php`
 

@@ -17,9 +17,10 @@ use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
- * UConverter construct/convert — charset conversion OOP API (php-src ext/intl/converter; #6171).
+ * UConverter construct/convert — charset conversion OOP API (php-src ext/intl/converter; #6171 / #20770).
  *
  * Conversion uses {@see CharsetEngine} / {@see VmIconv} (PHP-in-PHP); no ICU ucnv_* FFI in v1.
+ * Encoding introspection + subst chars + reasonText mirror php-src converter.c without C runtime growth.
  */
 final class VmUConverter
 {
@@ -34,8 +35,40 @@ final class VmUConverter
     /** ICU U_INVALID_CHAR_FOUND — illegal input sequence. */
     public const U_INVALID_CHAR_FOUND = 10;
 
-    /** @var array<int, array{dest: string, src: string, errorCode: int, errorMessage: string, openOk: bool}> */
+    /** @see unicode/ucnv_err.h UCNV_UNASSIGNED … UCNV_CLONE (php-src UConverter::REASON_*). */
+    public const REASON_UNASSIGNED = 0;
+    public const REASON_ILLEGAL = 1;
+    public const REASON_IRREGULAR = 2;
+    public const REASON_RESET = 3;
+    public const REASON_CLOSE = 4;
+    public const REASON_CLONE = 5;
+
+    /**
+     * @var array<int, array{
+     *     dest: string,
+     *     src: string,
+     *     destOk: bool,
+     *     srcOk: bool,
+     *     substChars: string,
+     *     errorCode: int,
+     *     errorMessage: string,
+     *     openOk: bool
+     * }>
+     */
     private static array $state = [];
+
+    /** @return array<string, int> */
+    public static function classConstants(): array
+    {
+        return [
+            'REASON_UNASSIGNED' => self::REASON_UNASSIGNED,
+            'REASON_ILLEGAL' => self::REASON_ILLEGAL,
+            'REASON_IRREGULAR' => self::REASON_IRREGULAR,
+            'REASON_RESET' => self::REASON_RESET,
+            'REASON_CLOSE' => self::REASON_CLOSE,
+            'REASON_CLONE' => self::REASON_CLONE,
+        ];
+    }
 
     public static function registerClass(Context $ctx): void
     {
@@ -45,6 +78,13 @@ final class VmUConverter
 
         $entry = new ClassEntry('UConverter');
         $entry->isInternal = true;
+        foreach (self::classConstants() as $name => $value) {
+            $lc = strtolower($name);
+            $const = new Variable(Variable::TYPE_INTEGER);
+            $const->int($value);
+            $entry->constants[$lc] = $const;
+            $entry->constNames[$lc] = $name;
+        }
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $entry->constructor = new UConverterConstruct();
@@ -54,6 +94,11 @@ final class VmUConverter
             'convert' => [new UConverterConvert(), 'convert', false],
             'geterrorcode' => [new UConverterGetErrorCode(), 'getErrorCode', false],
             'geterrormessage' => [new UConverterGetErrorMessage(), 'getErrorMessage', false],
+            'getsourceencoding' => [new UConverterGetSourceEncoding(), 'getSourceEncoding', false],
+            'getdestinationencoding' => [new UConverterGetDestinationEncoding(), 'getDestinationEncoding', false],
+            'getsubstchars' => [new UConverterGetSubstChars(), 'getSubstChars', false],
+            'setsubstchars' => [new UConverterSetSubstChars(), 'setSubstChars', false],
+            'reasontext' => [new UConverterReasonText(), 'reasonText', true],
             'transcode' => [new UConverterTranscode(), 'transcode', true],
         ];
         foreach ($methods as $lc => [$handler, $name, $static]) {
@@ -93,6 +138,9 @@ final class VmUConverter
         self::$state[$object->id] = [
             'dest' => $dest,
             'src' => $src,
+            'destOk' => $destOk,
+            'srcOk' => $srcOk,
+            'substChars' => $srcOk ? self::defaultSubstChars($src) : '',
             'errorCode' => $openOk ? IntlError::U_ZERO_ERROR : self::U_FILE_ACCESS_ERROR,
             'errorMessage' => $openOk
                 ? 'U_ZERO_ERROR'
@@ -147,6 +195,137 @@ final class VmUConverter
         }
 
         return $state['errorMessage'];
+    }
+
+    /**
+     * UConverter::getSourceEncoding() — php-src converter.c php_converter_do_get_encoding (#20770).
+     */
+    public static function getSourceEncoding(ObjectEntry $object): ?string
+    {
+        $state = self::$state[$object->id] ?? null;
+        if (null === $state || !$state['srcOk']) {
+            return null;
+        }
+
+        return $state['src'];
+    }
+
+    /**
+     * UConverter::getDestinationEncoding() — php-src converter.c (#20770).
+     */
+    public static function getDestinationEncoding(ObjectEntry $object): ?string
+    {
+        $state = self::$state[$object->id] ?? null;
+        if (null === $state || !$state['destOk']) {
+            return null;
+        }
+
+        return $state['dest'];
+    }
+
+    /**
+     * UConverter::getSubstChars() — php-src converter.c (#20770).
+     */
+    public static function getSubstChars(ObjectEntry $object): ?string
+    {
+        $state = self::$state[$object->id] ?? null;
+        if (null === $state || !$state['srcOk']) {
+            return null;
+        }
+
+        return $state['substChars'];
+    }
+
+    /**
+     * UConverter::setSubstChars() — php-src converter.c ucnv_setSubstChars (#20770).
+     *
+     * Without ICU, approximate charset acceptance: single-byte converters reject multi-byte
+     * substitution sequences (matches Zend ISO-8859-1 vs UTF-8 behavior).
+     */
+    public static function setSubstChars(ObjectEntry $object, string $chars): bool
+    {
+        $state = self::$state[$object->id] ?? null;
+        if (null === $state) {
+            throw new \Error('UConverter::setSubstChars() called on uninitialized UConverter');
+        }
+        if (!$state['srcOk'] || !$state['destOk']) {
+            self::$state[$object->id]['errorCode'] = self::U_INVALID_STATE_ERROR;
+            self::$state[$object->id]['errorMessage'] = 'Internal converters not initialized: U_INVALID_STATE_ERROR';
+
+            return false;
+        }
+        $len = \strlen($chars);
+        if ($len < 1 || $len > 4) {
+            return false;
+        }
+        if ($len > 1 && (self::isSingleByteCharset($state['src']) || self::isSingleByteCharset($state['dest']))) {
+            return false;
+        }
+        self::$state[$object->id]['substChars'] = $chars;
+        self::$state[$object->id]['errorCode'] = IntlError::U_ZERO_ERROR;
+        self::$state[$object->id]['errorMessage'] = 'U_ZERO_ERROR';
+
+        return true;
+    }
+
+    /**
+     * UConverter::reasonText() — php-src converter.c UCNV_REASON_CASE (#20770).
+     */
+    public static function reasonText(int $reason): string
+    {
+        return match ($reason) {
+            self::REASON_UNASSIGNED => 'REASON_UNASSIGNED',
+            self::REASON_ILLEGAL => 'REASON_ILLEGAL',
+            self::REASON_IRREGULAR => 'REASON_IRREGULAR',
+            self::REASON_RESET => 'REASON_RESET',
+            self::REASON_CLOSE => 'REASON_CLOSE',
+            self::REASON_CLONE => 'REASON_CLONE',
+            default => throw new \ValueError(
+                'UConverter::reasonText(): Argument #1 ($reason) must be a UConverter::REASON_* constant'
+            ),
+        };
+    }
+
+    public static function coerceIntArg(Variable $var, string $function, int $position, string $name): int
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return $var->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            return (int) $var->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            return $var->toBool() ? 1 : 0;
+        }
+        if (Variable::TYPE_STRING === $var->type && is_numeric($var->toString())) {
+            return (int) $var->toString();
+        }
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type int, %s given',
+            $function,
+            $position + 1,
+            $name,
+            ReflectionSupport::valueTypeLabelPublic($var)
+        ));
+    }
+
+    /** ICU default subst: UTF/UCS sources use U+FFFD; single-byte sources use 0x1A. */
+    private static function defaultSubstChars(string $srcEncoding): string
+    {
+        return self::isUnicodeCharset($srcEncoding) ? "\xEF\xBF\xBD" : "\x1a";
+    }
+
+    private static function isUnicodeCharset(string $encoding): bool
+    {
+        $n = strtoupper(str_replace(['-', '_', ' '], '', $encoding));
+
+        return str_contains($n, 'UTF') || str_contains($n, 'UCS') || str_starts_with($n, 'GB18030');
+    }
+
+    private static function isSingleByteCharset(string $encoding): bool
+    {
+        return !self::isUnicodeCharset($encoding);
     }
 
     public static function requireReceiver(Variable $var, string $label): ObjectEntry
@@ -362,5 +541,160 @@ final class UConverterGetErrorMessage extends VmClassMethod
             return;
         }
         $frame->returnVar->string(VmUConverter::getErrorMessage($object));
+    }
+}
+
+/** UConverter::getSourceEncoding() — php-src ext/intl/converter (#20770). */
+final class UConverterGetSourceEncoding extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSourceEncoding');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::getSourceEncoding() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getSourceEncoding()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $encoding = VmUConverter::getSourceEncoding($object);
+        if (null === $encoding) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->string($encoding);
+    }
+}
+
+/** UConverter::getDestinationEncoding() — php-src ext/intl/converter (#20770). */
+final class UConverterGetDestinationEncoding extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getDestinationEncoding');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::getDestinationEncoding() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getDestinationEncoding()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $encoding = VmUConverter::getDestinationEncoding($object);
+        if (null === $encoding) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->string($encoding);
+    }
+}
+
+/** UConverter::getSubstChars() — php-src ext/intl/converter (#20770). */
+final class UConverterGetSubstChars extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSubstChars');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::getSubstChars() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::getSubstChars()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $chars = VmUConverter::getSubstChars($object);
+        if (null === $chars) {
+            $frame->returnVar->null();
+
+            return;
+        }
+        $frame->returnVar->string($chars);
+    }
+}
+
+/** UConverter::setSubstChars() — php-src ext/intl/converter (#20770). */
+final class UConverterSetSubstChars extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setSubstChars');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::setSubstChars() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $object = VmUConverter::requireReceiver($frame->calledArgs[0], 'UConverter::setSubstChars()');
+        $chars = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[1],
+            'UConverter::setSubstChars',
+            0,
+            'chars'
+        );
+        $ok = VmUConverter::setSubstChars($object, $chars);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
+    }
+}
+
+/** UConverter::reasonText() — php-src ext/intl/converter (#20770). */
+final class UConverterReasonText extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('reasonText');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'UConverter::reasonText() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $reason = VmUConverter::coerceIntArg(
+            $frame->calledArgs[0],
+            'UConverter::reasonText',
+            0,
+            'reason'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(VmUConverter::reasonText($reason));
     }
 }
