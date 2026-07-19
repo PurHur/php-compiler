@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\bcmath;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Bcmath;
 use PHPCompiler\JIT\Builtin\RoundingModeJit;
 use PHPCompiler\JIT\Context;
@@ -14,6 +15,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** LLVM lowering helper for bcmath builtins via __compiler_bc* runtime bodies (#6100). */
@@ -26,14 +28,18 @@ final class JitBcmath
     public static function scale(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) > 1) {
-            throw new \LogicException('bcscale() accepts zero or one argument in this compiler build');
+            throw new \ArgumentCountError('bcscale() expects at most 1 argument, '.\count($args).' given');
         }
 
-        if (0 === \count($args) && self::$compileTimeScaleKnown) {
+        // Explicit null is the getter — same as omitted arg (php-src ?int $scale = null; #20974).
+        $nullGetter = 1 === \count($args) && self::isNullScaleArg($args[0]);
+        $effectiveArgc = $nullGetter ? 0 : \count($args);
+
+        if (0 === $effectiveArgc && self::$compileTimeScaleKnown) {
             return self::boxLong($context, $context->getTypeFromString('int64')->constInt(self::$compileTimeScale, true));
         }
 
-        if (1 === \count($args)) {
+        if (1 === $effectiveArgc) {
             $scaleLit = self::compileTimeLong($args[0]);
             if (null !== $scaleLit && self::$compileTimeScaleKnown) {
                 $old = self::$compileTimeScale;
@@ -46,8 +52,12 @@ final class JitBcmath
         self::$compileTimeScaleKnown = false;
         Bcmath::ensureLinked($context);
         $i64 = $context->getTypeFromString('int64');
-        $scale = 0 === \count($args) ? $i64->constInt(0, true) : self::lowerScaleArg($context, $args[0], 'bcscale', 0, 'scale');
-        $hasScale = 0 === \count($args) ? $i64->constInt(-1, true) : $i64->constInt(1, true);
+        if (0 === $effectiveArgc) {
+            $scale = $i64->constInt(0, true);
+            $hasScale = $i64->constInt(-1, true);
+        } else {
+            [$scale, $hasScale] = self::lowerBcscaleNullableArg($context, $args[0]);
+        }
 
         return self::boxLong(
             $context,
@@ -384,6 +394,79 @@ final class JitBcmath
         }
 
         throw new \LogicException($function.'(): Argument #'.($argIndex + 1).' ($'.$name.') must be an integer in this compiler build');
+    }
+
+    /** Compile-time / typed null for bcscale(?int $scale = null) getter (#20974). */
+    private static function isNullScaleArg(JITVariable $arg): bool
+    {
+        return JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant;
+    }
+
+    /**
+     * Lower bcscale's optional scale to (long, hasScale) with runtime null → hasScale=-1 (#20974).
+     *
+     * @return array{0: Value, 1: Value}
+     */
+    private static function lowerBcscaleNullableArg(Context $context, JITVariable $arg): array
+    {
+        $i64 = $context->getTypeFromString('int64');
+        if (self::isNullScaleArg($arg)) {
+            return [$i64->constInt(0, true), $i64->constInt(-1, true)];
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return self::lowerBcscaleNullableValueBox($context, $arg);
+        }
+
+        return [
+            self::lowerScaleArg($context, $arg, 'bcscale', 0, 'scale'),
+            $i64->constInt(1, true),
+        ];
+    }
+
+    /**
+     * Runtime value-box: null → getter (hasScale=-1); else read long (#20974).
+     *
+     * @return array{0: Value, 1: Value}
+     */
+    private static function lowerBcscaleNullableValueBox(Context $context, JITVariable $arg): array
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
+
+        $nullBlock = BasicBlockHelper::append($context, 'bcscale_null');
+        $intBlock = BasicBlockHelper::append($context, 'bcscale_int');
+        $mergeBlock = BasicBlockHelper::append($context, 'bcscale_merge');
+
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTy);
+        $context->builder->branchIf($isNull, $nullBlock, $intBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $nullScale = $i64->constInt(0, true);
+        $nullHas = $i64->constInt(-1, true);
+        $nullEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($intBlock);
+        $intScale = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $intHas = $i64->constInt(1, true);
+        $intEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $scalePhi = $context->builder->phi($i64, 'bcscale_scale');
+        $scalePhi->addIncoming($nullScale, $nullEnd);
+        $scalePhi->addIncoming($intScale, $intEnd);
+        $hasPhi = $context->builder->phi($i64, 'bcscale_has');
+        $hasPhi->addIncoming($nullHas, $nullEnd);
+        $hasPhi->addIncoming($intHas, $intEnd);
+
+        return [$scalePhi, $hasPhi];
     }
 
     private static function compileTimeString(JITVariable $arg): ?string
