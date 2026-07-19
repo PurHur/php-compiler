@@ -756,6 +756,9 @@ class Context {
             'phpc_sqrt_kernel',
             'phpc_rename_kernel',
             'phpc_getenv_kernel',
+            // Stat path always-helper NestedJIT leaves (#20742) — peer rename (#20603).
+            'phpc_stat_mode_kernel',
+            'phpc_access_kernel',
             // Hash algos always-helper NestedJIT leaves (#20652).
             'phpc_hash_algos_kernel',
             'phpc_hash_hmac_algos_kernel' => true,

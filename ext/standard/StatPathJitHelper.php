@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * File path predicates for compiled JIT/AOT modules (#9112, #19215, php-in-PHP).
+ * File path predicates for compiled JIT/AOT modules (#9112, #19215, #20742, php-in-PHP).
  *
- * User-script AOT: thin {@see phpc_stat_mode_kernel} / {@see phpc_access_kernel}
- * (libc) — VmStatPath is an external stub in nested helper TUs so `@\\stat` is unused.
- * VM SSOT for non-compiled paths remains {@see VmStatPath}.
+ * Embed + thin standalone AOT: {@see phpc_stat_mode_kernel} / {@see phpc_access_kernel}
+ * (NestedJIT leaf → {@see JitStatKernel} libc). VM SSOT for non-compiled paths remains
+ * {@see VmStatPath}.
  * php-src: ext/standard/filestat.c
  */
 final class StatPathJitHelper
