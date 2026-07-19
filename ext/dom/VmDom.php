@@ -834,8 +834,8 @@ final class VmDom
         $state->internalSubset = null;
         DomRegistry::attach($entry, $state);
         self::initDocumentTypePropertySlots($entry, $qualifiedName, $publicId, $systemId);
-        $entitiesMap = self::createNamedNodeMap($ctx, [], $entry);
-        $notationsMap = self::createNamedNodeMap($ctx, [], $entry);
+        $entitiesMap = self::createNamedNodeMap($ctx, [], $entry, true);
+        $notationsMap = self::createNamedNodeMap($ctx, [], $entry, true);
         $state->entitiesMapId = $entitiesMap->toObject()->id;
         $state->notationsMapId = $notationsMap->toObject()->id;
         $entry->getProperty(self::PROP_ENTITIES)->copyFrom($entitiesMap);
@@ -4430,11 +4430,11 @@ final class VmDom
             }
         }
 
-        $entitiesMap = self::createNamedNodeMap($ctx, $entityIds, $doctype);
+        $entitiesMap = self::createNamedNodeMap($ctx, $entityIds, $doctype, true);
         $doctypeState->entitiesMapId = $entitiesMap->toObject()->id;
         $doctype->getProperty(self::PROP_ENTITIES)->copyFrom($entitiesMap);
 
-        $notationsMap = self::createNamedNodeMap($ctx, $notationIds, $doctype);
+        $notationsMap = self::createNamedNodeMap($ctx, $notationIds, $doctype, true);
         $doctypeState->notationsMapId = $notationsMap->toObject()->id;
         $doctype->getProperty(self::PROP_NOTATIONS)->copyFrom($notationsMap);
     }
@@ -7793,13 +7793,21 @@ final class VmDom
 
     /**
      * @param list<int> $nodeIds
-     * @param ObjectEntry|null $livingOwner When set on a living Dom\* node, allocate Dom\NamedNodeMap (#20948).
+     * @param ObjectEntry|null $livingOwner When set on a living Dom\* node, allocate Dom\NamedNodeMap (#20948)
+     *                                      or Dom\DtdNamedNodeMap when $dtdMap (#21014).
+     * @param bool $dtdMap DocumentType entities/notations → Dom\DtdNamedNodeMap on living trees.
      */
-    public static function createNamedNodeMap(Context $ctx, array $nodeIds, ?ObjectEntry $livingOwner = null): Variable
-    {
+    public static function createNamedNodeMap(
+        Context $ctx,
+        array $nodeIds,
+        ?ObjectEntry $livingOwner = null,
+        bool $dtdMap = false
+    ): Variable {
         $classLc = self::CLASS_NAMED_NODE_MAP;
         if (null !== $livingOwner && VmDomLiving::prefersLivingCollections($livingOwner)) {
-            if (isset($ctx->classes[VmDomLiving::CLASS_NAMED_NODE_MAP])) {
+            if ($dtdMap && isset($ctx->classes[VmDomLiving::CLASS_DTD_NAMED_NODE_MAP])) {
+                $classLc = VmDomLiving::CLASS_DTD_NAMED_NODE_MAP;
+            } elseif (isset($ctx->classes[VmDomLiving::CLASS_NAMED_NODE_MAP])) {
                 $classLc = VmDomLiving::CLASS_NAMED_NODE_MAP;
             }
         }
@@ -7814,7 +7822,9 @@ final class VmDom
 
         $state = new DomNodeState();
         $state->nodeType = DomConstants::XML_NAMEDNODEMAP;
-        $state->nodeName = '#namednodemap';
+        $state->nodeName = $dtdMap && VmDomLiving::CLASS_DTD_NAMED_NODE_MAP === $classLc
+            ? '#dtdnamednodemap'
+            : '#namednodemap';
         $state->listNodeIds = $nodeIds;
         $state->listIterIndex = 0;
         DomRegistry::attach($entry, $state);
@@ -7828,12 +7838,31 @@ final class VmDom
     public static function isNamedNodeMap(ObjectEntry $entry): bool
     {
         $lc = strtolower($entry->class->name);
-        if (self::CLASS_NAMED_NODE_MAP !== $lc && VmDomLiving::CLASS_NAMED_NODE_MAP !== $lc) {
+        if (self::CLASS_NAMED_NODE_MAP !== $lc
+            && VmDomLiving::CLASS_NAMED_NODE_MAP !== $lc
+            && VmDomLiving::CLASS_DTD_NAMED_NODE_MAP !== $lc
+        ) {
             return false;
         }
 
         return DomRegistry::has($entry)
             && DomConstants::XML_NAMEDNODEMAP === DomRegistry::state($entry)->nodeType;
+    }
+
+    /** Attr / element attribute maps — not DocumentType DtdNamedNodeMap (#21014). */
+    public static function isAttrNamedNodeMap(ObjectEntry $entry): bool
+    {
+        $lc = strtolower($entry->class->name);
+
+        return (self::CLASS_NAMED_NODE_MAP === $lc || VmDomLiving::CLASS_NAMED_NODE_MAP === $lc)
+            && self::isNamedNodeMap($entry);
+    }
+
+    /** Dom\DtdNamedNodeMap — DocumentType entities/notations (#21014). */
+    public static function isDtdNamedNodeMap(ObjectEntry $entry): bool
+    {
+        return VmDomLiving::CLASS_DTD_NAMED_NODE_MAP === strtolower($entry->class->name)
+            && self::isNamedNodeMap($entry);
     }
 
     public static function createTokenList(Context $ctx, ObjectEntry $element): Variable
@@ -10043,10 +10072,14 @@ final class VmDom
             if (self::CLASS_DOCUMENT_FRAGMENT === $classLc && self::isDocumentFragment($object)) {
                 return $object;
             }
+            // Dom\NamedNodeMap + Dom\DtdNamedNodeMap share DOMNamedNodeMap method handlers (#20948, #21014).
             if (self::CLASS_NAMED_NODE_MAP === $classLc && self::isNamedNodeMap($object)) {
                 return $object;
             }
-            if (VmDomLiving::CLASS_NAMED_NODE_MAP === $classLc && self::isNamedNodeMap($object)) {
+            if (VmDomLiving::CLASS_NAMED_NODE_MAP === $classLc && self::isAttrNamedNodeMap($object)) {
+                return $object;
+            }
+            if (VmDomLiving::CLASS_DTD_NAMED_NODE_MAP === $classLc && self::isDtdNamedNodeMap($object)) {
                 return $object;
             }
             // Dom\TokenList shares DOMTokenList method handlers (#20512).
