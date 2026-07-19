@@ -15,10 +15,11 @@ final class UnserializeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUnserialize.php');
         $this->assertStringContainsString('UnserializeJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureBridge', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
         $this->assertStringContainsString('unser_bridge_entry', $source);
         $this->assertStringContainsString('session_unser_entry', $source);
-        $this->assertStringContainsString('JitValueBox::copyIntoPointer', $source);
+        $this->assertStringNotContainsString('copyIntoPointer', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('implementThinStandaloneStubs', $source);
         $this->assertStringNotContainsString('unser_thin_stub', $source);
@@ -34,7 +35,9 @@ final class UnserializeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/UnserializeJitHelper.php');
         $this->assertStringContainsString('VmUnserializeFormat::decodeToVariableWithContext', $source);
+        $this->assertStringContainsString('copyFrom', $source);
         $this->assertStringContainsString('VmSessionSerializer::decodeWireHashTable', $source);
+        $this->assertStringContainsString('VmActiveContextJitHelper::resolve', $source);
     }
 
     public function testStandaloneUsesSamePhpBridgeAsEmbed(): void
@@ -42,6 +45,7 @@ final class UnserializeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUnserialize.php');
         $this->assertStringContainsString('ensureStandaloneBodies', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+        $this->assertStringContainsString('NestedVmVariableMethodLlvm::ensureMethod', $source);
         $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
         $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
