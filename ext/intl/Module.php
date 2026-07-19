@@ -93,6 +93,10 @@ class Module extends ModuleAbstract
             $functions[] = new locale_lookup();
             $functions[] = new locale_filter_matches();
             $functions[] = new locale_accept_from_http();
+            $functions[] = new locale_canonicalize();
+            $functions[] = new locale_parse();
+            $functions[] = new locale_compose();
+            $functions[] = new locale_get_keywords();
         }
         $normalizer = IntlExtensionPolicy::advertisesNormalizer()
             ? [

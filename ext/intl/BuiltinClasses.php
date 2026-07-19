@@ -119,6 +119,10 @@ final class BuiltinClasses
             'lookup' => [new LocaleLookup(), 'lookup'],
             'filtermatches' => [new LocaleFilterMatches(), 'filterMatches'],
             'acceptfromhttp' => [new LocaleAcceptFromHttp(), 'acceptFromHttp'],
+            'canonicalize' => [new LocaleCanonicalize(), 'canonicalize'],
+            'parselocale' => [new LocaleParseLocale(), 'parseLocale'],
+            'composelocale' => [new LocaleComposeLocale(), 'composeLocale'],
+            'getkeywords' => [new LocaleGetKeywords(), 'getKeywords'],
         ];
         foreach ($methods as $lc => [$handler, $name]) {
             $entry->methods[$lc] = $handler;

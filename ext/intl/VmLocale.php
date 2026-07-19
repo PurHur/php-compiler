@@ -5,13 +5,35 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 /**
- * Process default BCP-47 locale id (php-src ext/intl/php_intl.c; issue #9576).
+ * Process default BCP-47 locale id (php-src ext/intl/php_intl.c / locale_methods.c).
  *
- * v1: PHP-only store without ICU — uloc wiring deferred to full ext/intl (#11472).
+ * Issues #9576 / #6696 / #20036 / #20738. Prefer thin ICU FFI (`uloc_*`) when available;
+ * PHP fallbacks cover hyphen/underscore normalize + `@keyword` parse without C runtime growth.
  */
 final class VmLocale
 {
+    /** php-src INTL_MAX_LOCALE_LEN = ULOC_FULLNAME_CAPACITY - 1 */
+    private const MAX_LOCALE_LEN = 156;
+
+    /** @var list<string> php-src LOC_GRANDFATHERED (hyphen form, case-insensitive match) */
+    private const GRANDFATHERED = [
+        'art-lojban', 'cel-gaulish', 'en-GB-oed', 'i-ami', 'i-bnn', 'i-default', 'i-enochian',
+        'i-hak', 'i-klingon', 'i-lux', 'i-mingo', 'i-navajo', 'i-pwn', 'i-tao', 'i-tay', 'i-tsu',
+        'no-bok', 'no-nyn', 'sgn-BE-FR', 'sgn-BE-NL', 'sgn-BR', 'sgn-CH-DE', 'sgn-CO', 'sgn-DE',
+        'sgn-DK', 'sgn-ES', 'sgn-FR', 'sgn-GB', 'sgn-GR', 'sgn-IE', 'sgn-IT', 'sgn-JP', 'sgn-MX',
+        'sgn-NI', 'sgn-NL', 'sgn-NO', 'sgn-PT', 'sgn-SE', 'sgn-US', 'sgn-ZA', 'zh-cmn',
+        'zh-cmn-Hans', 'zh-cmn-Hant', 'zh-gan', 'zh-guoyu', 'zh-hakka', 'zh-min', 'zh-min-nan',
+        'zh-wuu', 'zh-xiang',
+    ];
+
     private static ?string $default = null;
+
+    /** @var object|null FFI instance for uloc_* (libicui18n) */
+    private static $ulocFfi = null;
+
+    private static ?string $ulocSuffix = null;
+
+    private static bool $ulocFfiResolved = false;
 
     public static function getDefault(): string
     {
@@ -176,6 +198,199 @@ final class VmLocale
         }
 
         return self::acceptFromHttpFallback($header);
+    }
+
+    /**
+     * locale_canonicalize() / Locale::canonicalize() — ICU uloc_canonicalize (#20738).
+     *
+     * @return string|null null when locale id exceeds INTL_MAX_LOCALE_LEN or ICU fails hard
+     */
+    public static function canonicalize(string $locale): ?string
+    {
+        IntlError::clear();
+        if ('' === $locale) {
+            $locale = self::getDefault();
+        }
+        if (\strlen($locale) > self::MAX_LOCALE_LEN) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'Locale string too long, should be no longer than '.self::MAX_LOCALE_LEN.' characters'
+            );
+
+            return null;
+        }
+        $icu = self::ulocGetTag($locale, 'canonicalize');
+        if (null !== $icu) {
+            return $icu;
+        }
+
+        return self::canonicalizeFallback($locale);
+    }
+
+    /**
+     * locale_parse() / Locale::parseLocale() — subtag map (#20738).
+     *
+     * @return array<string, string>|null
+     */
+    public static function parseLocale(string $locale): ?array
+    {
+        IntlError::clear();
+        if (\strlen($locale) > self::MAX_LOCALE_LEN) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'Locale string too long, should be no longer than '.self::MAX_LOCALE_LEN.' characters'
+            );
+
+            return null;
+        }
+        if ('' === $locale) {
+            $locale = self::getDefault();
+        }
+        $gf = self::matchGrandfathered($locale);
+        if (null !== $gf) {
+            return ['grandfathered' => $locale];
+        }
+        $out = [];
+        $lang = self::ulocGetTag($locale, 'language', true);
+        if (null === $lang) {
+            $lang = self::parseBcp47Tags($locale)['language'];
+        }
+        if ('' !== $lang) {
+            $out['language'] = $lang;
+        }
+        $script = self::ulocGetTag($locale, 'script', true);
+        if (null === $script) {
+            $script = self::parseBcp47Tags($locale)['script'];
+        }
+        if ('' !== $script) {
+            $out['script'] = $script;
+        }
+        $region = self::ulocGetTag($locale, 'region', true);
+        if (null === $region) {
+            $region = self::parseBcp47Tags($locale)['region'];
+        }
+        if ('' !== $region) {
+            $out['region'] = $region;
+        }
+        $variant = self::ulocGetTag($locale, 'variant', true);
+        if (null === $variant) {
+            $variant = self::parseVariantFallback($locale);
+        }
+        if (null !== $variant && '' !== $variant) {
+            self::addNumberedSubtags($out, 'variant', $variant);
+        }
+        $private = self::extractPrivateSubtags($locale);
+        if (null !== $private && '' !== $private) {
+            self::addNumberedSubtags($out, 'private', $private);
+        }
+
+        return $out;
+    }
+
+    /**
+     * locale_compose() / Locale::composeLocale() — join subtag map (#20738).
+     *
+     * @param array<string|int, mixed> $subtags
+     *
+     * @return string|false
+     */
+    public static function composeLocale(array $subtags, string $function = 'Locale::composeLocale')
+    {
+        IntlError::clear();
+        if ([] === $subtags) {
+            return false;
+        }
+        if (isset($subtags['grandfathered'])) {
+            if (!\is_string($subtags['grandfathered'])) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'locale_compose: parameter array element is not a string'
+                );
+
+                return false;
+            }
+
+            return $subtags['grandfathered'];
+        }
+        if (!isset($subtags['language'])) {
+            throw new \ValueError($function.'(): Argument #1 ($subtags) must contain a "language" key');
+        }
+        if (!\is_string($subtags['language'])) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'locale_compose: parameter array element is not a string'
+            );
+
+            return false;
+        }
+        $parts = [$subtags['language']];
+        $ext = self::collectNumberedOrList($subtags, 'extlang');
+        if (false === $ext) {
+            return false;
+        }
+        foreach ($ext as $v) {
+            $parts[] = $v;
+        }
+        foreach (['script', 'region'] as $key) {
+            if (!isset($subtags[$key])) {
+                continue;
+            }
+            if (!\is_string($subtags[$key])) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'locale_compose: parameter array element is not a string'
+                );
+
+                return false;
+            }
+            $parts[] = $subtags[$key];
+        }
+        $variants = self::collectNumberedOrList($subtags, 'variant');
+        if (false === $variants) {
+            return false;
+        }
+        foreach ($variants as $v) {
+            $parts[] = $v;
+        }
+        $private = self::collectNumberedOrList($subtags, 'private');
+        if (false === $private) {
+            return false;
+        }
+        if ([] !== $private) {
+            $parts[] = 'x';
+            foreach ($private as $v) {
+                $parts[] = $v;
+            }
+        }
+
+        return implode('_', $parts);
+    }
+
+    /**
+     * locale_get_keywords() / Locale::getKeywords() — @keyword map (#20738).
+     *
+     * @return array<string, string>|false|null null when no keywords; false on ICU error
+     */
+    public static function getKeywords(string $locale)
+    {
+        IntlError::clear();
+        if (\strlen($locale) > self::MAX_LOCALE_LEN) {
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'Locale string too long, should be no longer than '.self::MAX_LOCALE_LEN.' characters'
+            );
+
+            return null;
+        }
+        if ('' === $locale) {
+            $locale = self::getDefault();
+        }
+        $icu = self::ulocOpenKeywords($locale);
+        if (null !== $icu) {
+            return $icu;
+        }
+
+        return self::getKeywordsFallback($locale);
     }
 
     /**
@@ -618,5 +833,421 @@ C;
             '/^[a-zA-Z][a-zA-Z0-9]*(?:_[a-zA-Z0-9]+)*(?:@[a-zA-Z0-9_=\\-\\.,]+)?$/',
             $locale
         );
+    }
+
+    /** Case-insensitive match against php-src LOC_GRANDFATHERED (hyphen form). */
+    private static function matchGrandfathered(string $locale): ?string
+    {
+        $needle = strtolower(str_replace('_', '-', $locale));
+        foreach (self::GRANDFATHERED as $tag) {
+            if (strtolower($tag) === $needle) {
+                return $tag;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * ICU uloc_canonicalize / getLanguage / getScript / getCountry / getVariant.
+     *
+     * @return string|null null = ICU unavailable; "" = empty ICU result
+     */
+    private static function ulocGetTag(string $locale, string $tag, bool $fromParseLocale = false): ?string
+    {
+        $ffi = self::ulocFfi();
+        if (null === $ffi) {
+            return null;
+        }
+        $suffix = self::$ulocSuffix ?? '';
+        $fn = match ($tag) {
+            'canonicalize' => 'uloc_canonicalize'.$suffix,
+            'language' => 'uloc_getLanguage'.$suffix,
+            'script' => 'uloc_getScript'.$suffix,
+            'region' => 'uloc_getCountry'.$suffix,
+            'variant' => 'uloc_getVariant'.$suffix,
+            default => null,
+        };
+        if (null === $fn) {
+            return null;
+        }
+        $mod = $locale;
+        if ($fromParseLocale && 'canonicalize' !== $tag) {
+            $singletonPos = self::getSingletonPos($locale);
+            if (0 === $singletonPos) {
+                return '';
+            }
+            if ($singletonPos > 0) {
+                $mod = substr($locale, 0, $singletonPos - 1);
+            }
+            if ('language' === $tag && \strlen($locale) > 1 && self::isIdPrefix($locale)) {
+                return $locale;
+            }
+        }
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $buflen = 157;
+            $buf = $ffi->new('char['.$buflen.']');
+            $len = (int) $ffi->$fn($mod, $buf, $buflen - 1, \FFI::addr($status));
+            if ((int) $status->cdata > 0 && 15 !== (int) $status->cdata) { // U_BUFFER_OVERFLOW_ERROR=15
+                return null;
+            }
+            if (15 === (int) $status->cdata) {
+                $status->cdata = 0;
+                $buflen = $len + 1;
+                $buf = $ffi->new('char['.$buflen.']');
+                $len = (int) $ffi->$fn($mod, $buf, $buflen, \FFI::addr($status));
+            }
+            if ((int) $status->cdata > 0) {
+                return null;
+            }
+            if ($len <= 0) {
+                return '';
+            }
+
+            return \FFI::string($buf, $len);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @return array<string, string>|false|null null = no keywords / ICU unavailable for empty;
+     *                                         false = error; array = keywords (possibly empty)
+     */
+    private static function ulocOpenKeywords(string $locale)
+    {
+        $ffi = self::ulocFfi();
+        if (null === $ffi) {
+            return null;
+        }
+        $suffix = self::$ulocSuffix ?? '';
+        $open = 'uloc_openKeywords'.$suffix;
+        $next = 'uenum_next'.$suffix;
+        $close = 'uenum_close'.$suffix;
+        $getKw = 'uloc_getKeywordValue'.$suffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $status->cdata = 0;
+            $en = $ffi->$open($locale, \FFI::addr($status));
+            if ((int) $status->cdata > 0 || null === $en) {
+                return null;
+            }
+            $out = [];
+            while (true) {
+                $status->cdata = 0;
+                $keyLen = $ffi->new('int32_t');
+                $keyLen->cdata = 0;
+                $keyPtr = $ffi->$next($en, \FFI::addr($keyLen), \FFI::addr($status));
+                if (null === $keyPtr) {
+                    break;
+                }
+                $key = \FFI::string($keyPtr);
+                $status->cdata = 0;
+                $vlen = 100;
+                $vbuf = $ffi->new('char['.$vlen.']');
+                $got = (int) $ffi->$getKw($locale, $key, $vbuf, $vlen, \FFI::addr($status));
+                if (15 === (int) $status->cdata) {
+                    $status->cdata = 0;
+                    $vlen = $got + 1;
+                    $vbuf = $ffi->new('char['.$vlen.']');
+                    $got = (int) $ffi->$getKw($locale, $key, $vbuf, $vlen, \FFI::addr($status));
+                }
+                if ((int) $status->cdata > 0) {
+                    $ffi->$close($en);
+                    IntlError::set(
+                        IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                        'locale_get_keywords: Error encountered while getting the keyword value for the keyword'
+                    );
+
+                    return false;
+                }
+                $out[$key] = $got > 0 ? \FFI::string($vbuf, $got) : \FFI::string($vbuf);
+            }
+            $ffi->$close($en);
+
+            return $out;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /** @return object|null */
+    private static function ulocFfi()
+    {
+        if (self::$ulocFfiResolved) {
+            return self::$ulocFfi;
+        }
+        self::$ulocFfiResolved = true;
+        if (!\class_exists(\FFI::class, false) && !\extension_loaded('FFI')) {
+            return null;
+        }
+        $candidates = [
+            ['libicui18n.so.70', '_70'],
+            ['libicui18n.so.74', '_74'],
+            ['libicui18n.so.72', '_72'],
+            ['libicui18n.so.71', '_71'],
+            ['libicui18n.so', '_70'],
+            ['libicui18n.dylib', ''],
+        ];
+        foreach ($candidates as [$lib, $suffix]) {
+            try {
+                $cdef = <<<C
+typedef int32_t UErrorCode;
+typedef struct UEnumeration UEnumeration;
+int32_t uloc_canonicalize{$suffix}(const char *localeID, char *name, int32_t nameCapacity, UErrorCode *err);
+int32_t uloc_getLanguage{$suffix}(const char *localeID, char *language, int32_t languageCapacity, UErrorCode *err);
+int32_t uloc_getScript{$suffix}(const char *localeID, char *script, int32_t scriptCapacity, UErrorCode *err);
+int32_t uloc_getCountry{$suffix}(const char *localeID, char *country, int32_t countryCapacity, UErrorCode *err);
+int32_t uloc_getVariant{$suffix}(const char *localeID, char *variant, int32_t variantCapacity, UErrorCode *err);
+UEnumeration *uloc_openKeywords{$suffix}(const char *localeID, UErrorCode *status);
+const char *uenum_next{$suffix}(UEnumeration *en, int32_t *resultLength, UErrorCode *status);
+void uenum_close{$suffix}(UEnumeration *en);
+int32_t uloc_getKeywordValue{$suffix}(const char *localeID, const char *keywordName, char *buffer, int32_t bufferCapacity, UErrorCode *status);
+C;
+                self::$ulocFfi = \FFI::cdef($cdef, $lib);
+                self::$ulocSuffix = $suffix;
+
+                return self::$ulocFfi;
+            } catch (\Throwable) {
+                continue;
+            }
+        }
+
+        return null;
+    }
+
+    private static function canonicalizeFallback(string $locale): string
+    {
+        $at = '';
+        $base = $locale;
+        $atPos = strpos($locale, '@');
+        if (false !== $atPos) {
+            $base = substr($locale, 0, $atPos);
+            $at = substr($locale, $atPos);
+        }
+        $tags = self::parseBcp47Tags($base);
+        $parts = [];
+        if ('' !== $tags['language']) {
+            $parts[] = $tags['language'];
+        }
+        if ('' !== $tags['script']) {
+            $parts[] = $tags['script'];
+        }
+        if ('' !== $tags['region']) {
+            $parts[] = $tags['region'];
+        }
+        $variant = self::parseVariantFallback($base);
+        if (null !== $variant && '' !== $variant) {
+            foreach (preg_split('/[_-]/', $variant) ?: [] as $v) {
+                if ('' !== $v) {
+                    $parts[] = strtoupper($v);
+                }
+            }
+        }
+
+        return implode('_', $parts).$at;
+    }
+
+    /**
+     * @return array<string, string>|null
+     */
+    private static function getKeywordsFallback(string $locale): ?array
+    {
+        $atPos = strpos($locale, '@');
+        if (false === $atPos) {
+            return null;
+        }
+        $raw = substr($locale, $atPos + 1);
+        if ('' === $raw) {
+            return [];
+        }
+        $out = [];
+        foreach (explode(';', $raw) as $pair) {
+            $pair = trim($pair);
+            if ('' === $pair) {
+                continue;
+            }
+            $eq = strpos($pair, '=');
+            if (false === $eq) {
+                continue;
+            }
+            $key = trim(substr($pair, 0, $eq));
+            $val = trim(substr($pair, $eq + 1));
+            if ('' !== $key) {
+                $out[$key] = $val;
+            }
+        }
+
+        return $out;
+    }
+
+    private static function parseVariantFallback(string $locale): ?string
+    {
+        $locale = str_replace('_', '-', $locale);
+        $atPos = strpos($locale, '@');
+        if (false !== $atPos) {
+            $locale = substr($locale, 0, $atPos);
+        }
+        $singleton = self::getSingletonPos($locale);
+        if ($singleton > 0) {
+            $locale = substr($locale, 0, $singleton - 1);
+        }
+        $segments = explode('-', $locale);
+        if (\count($segments) < 2) {
+            return null;
+        }
+        $i = 1;
+        $n = \count($segments);
+        if ($i < $n && 4 === \strlen($segments[$i]) && ctype_alpha($segments[$i])) {
+            ++$i; // script
+        }
+        if ($i < $n && ((2 === \strlen($segments[$i]) && ctype_alpha($segments[$i]))
+            || (3 === \strlen($segments[$i]) && ctype_digit($segments[$i])))) {
+            ++$i; // region
+        }
+        $variants = [];
+        for (; $i < $n; ++$i) {
+            $part = $segments[$i];
+            if ('' === $part || 1 === \strlen($part)) {
+                break;
+            }
+            $variants[] = $part;
+        }
+        if ([] === $variants) {
+            return null;
+        }
+
+        return implode('_', $variants);
+    }
+
+    private static function extractPrivateSubtags(string $locale): ?string
+    {
+        $len = \strlen($locale);
+        if ($len < 1) {
+            return null;
+        }
+        $mod = $locale;
+        $modLen = $len;
+        while (($singletonPos = self::getSingletonPos($mod)) > -1) {
+            $ch = $mod[$singletonPos];
+            if ('x' === $ch || 'X' === $ch) {
+                if ($singletonPos + 2 >= $modLen) {
+                    return null;
+                }
+
+                return substr($mod, $singletonPos + 2);
+            }
+            if ($singletonPos + 1 >= $modLen) {
+                break;
+            }
+            $mod = substr($mod, $singletonPos + 1);
+            $modLen = \strlen($mod);
+        }
+
+        return null;
+    }
+
+    /**
+     * php-src getSingletonPos — index of singleton subtag char, 0 if leading, or -1.
+     * Separators are '_' / '-'; a singleton is one char between two separators (…-x-…).
+     */
+    private static function getSingletonPos(string $str): int
+    {
+        $len = \strlen($str);
+        if ($len < 1) {
+            return -1;
+        }
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $str[$i];
+            if ('_' !== $ch && '-' !== $ch) {
+                continue;
+            }
+            if (1 === $i) {
+                return 0;
+            }
+            if ($i + 2 < $len && ('_' === $str[$i + 2] || '-' === $str[$i + 2])) {
+                return $i + 1;
+            }
+        }
+
+        return -1;
+    }
+
+    private static function isIdPrefix(string $locale): bool
+    {
+        return 1 === preg_match('/^[iIxX][_-]/', $locale);
+    }
+
+    /**
+     * @param array<string, string> $out
+     */
+    private static function addNumberedSubtags(array &$out, string $prefix, string $value): void
+    {
+        $tokens = preg_split('/[_-]/', $value) ?: [];
+        $cnt = 0;
+        foreach ($tokens as $token) {
+            if ('' === $token || 1 === \strlen($token)) {
+                break;
+            }
+            $out[$prefix.$cnt] = $token;
+            ++$cnt;
+        }
+    }
+
+    /**
+     * @param array<string|int, mixed> $subtags
+     *
+     * @return list<string>|false
+     */
+    private static function collectNumberedOrList(array $subtags, string $key)
+    {
+        if (isset($subtags[$key])) {
+            $ele = $subtags[$key];
+            if (\is_string($ele)) {
+                return [$ele];
+            }
+            if (\is_array($ele)) {
+                $out = [];
+                foreach ($ele as $data) {
+                    if (!\is_string($data)) {
+                        IntlError::set(
+                            IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                            'locale_compose: parameter array element is not a string'
+                        );
+
+                        return false;
+                    }
+                    $out[] = $data;
+                }
+
+                return $out;
+            }
+            IntlError::set(
+                IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                'locale_compose: parameter array element is not a string'
+            );
+
+            return false;
+        }
+        $out = [];
+        for ($i = 0; $i < 15; ++$i) {
+            $cur = $key.$i;
+            if (!isset($subtags[$cur])) {
+                break;
+            }
+            if (!\is_string($subtags[$cur])) {
+                IntlError::set(
+                    IntlError::U_ILLEGAL_ARGUMENT_ERROR,
+                    'locale_compose: parameter array element is not a string'
+                );
+
+                return false;
+            }
+            $out[] = $subtags[$cur];
+        }
+
+        return $out;
     }
 }
