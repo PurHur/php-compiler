@@ -46,6 +46,9 @@ class Module extends ModuleAbstract
             new dba_exists(),
             new dba_delete(),
             new dba_handlers(),
+            new dba_firstkey(),
+            new dba_nextkey(),
+            new dba_list(),
         ];
     }
 }

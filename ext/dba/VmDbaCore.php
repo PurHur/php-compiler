@@ -141,6 +141,32 @@ final class VmDbaCore
         return VmDbaFlatfile::delete($fp, $key);
     }
 
+    public static function firstKey(ObjectEntry $connection): string|false
+    {
+        $state = VmDbaConnection::state($connection);
+        /** @var resource $fp */
+        $fp = $state['fp'];
+        [$key, $cursor] = VmDbaFlatfile::firstKey($fp);
+        VmDbaConnection::mutate($connection, static function (array &$row) use ($cursor): void {
+            $row['cursor'] = $cursor;
+        });
+
+        return null === $key ? false : $key;
+    }
+
+    public static function nextKey(ObjectEntry $connection): string|false
+    {
+        $state = VmDbaConnection::state($connection);
+        /** @var resource $fp */
+        $fp = $state['fp'];
+        [$key, $cursor] = VmDbaFlatfile::nextKey($fp, (int) $state['cursor']);
+        VmDbaConnection::mutate($connection, static function (array &$row) use ($cursor): void {
+            $row['cursor'] = $cursor;
+        });
+
+        return null === $key ? false : $key;
+    }
+
     public static function requireConnection(Variable $var, string $function): ObjectEntry
     {
         $var = $var->resolveIndirect();

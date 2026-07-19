@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6117 |
-| Phase A inventory files (M2 ratio SSOT) | 6117 |
+| PHP files on vm.php path | 6120 |
+| Phase A inventory files (M2 ratio SSOT) | 6120 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 19028 |
+| Source constructs flagged (warnings) | 19043 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -179,16 +179,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dba/BuiltinClasses.php` | 0 | 1 |
 | `ext/dba/DbaExtensionPolicy.php` | 0 | 1 |
 | `ext/dba/DbaFunction.php` | 0 | 1 |
-| `ext/dba/Module.php` | 0 | 10 |
+| `ext/dba/Module.php` | 0 | 13 |
 | `ext/dba/VmDbaConnection.php` | 0 | 4 |
-| `ext/dba/VmDbaCore.php` | 0 | 2 |
+| `ext/dba/VmDbaCore.php` | 0 | 3 |
 | `ext/dba/VmDbaFlatfile.php` | 0 | 1 |
 | `ext/dba/dba_close.php` | 0 | 2 |
 | `ext/dba/dba_delete.php` | 0 | 3 |
 | `ext/dba/dba_exists.php` | 0 | 3 |
 | `ext/dba/dba_fetch.php` | 0 | 3 |
+| `ext/dba/dba_firstkey.php` | 0 | 3 |
 | `ext/dba/dba_handlers.php` | 0 | 5 |
 | `ext/dba/dba_insert.php` | 0 | 3 |
+| `ext/dba/dba_list.php` | 0 | 5 |
+| `ext/dba/dba_nextkey.php` | 0 | 3 |
 | `ext/dba/dba_open.php` | 0 | 3 |
 | `ext/dba/dba_popen.php` | 0 | 3 |
 | `ext/dba/dba_replace.php` | 0 | 3 |
@@ -7098,6 +7101,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new dba_exists (line 46)
 - new dba_delete (line 47)
 - new dba_handlers (line 48)
+- new dba_firstkey (line 49)
+- new dba_nextkey (line 50)
+- new dba_list (line 51)
 - 3 class method(s)
 
 ### `ext/dba/VmDbaConnection.php`
@@ -7111,13 +7117,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dba/VmDbaCore.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 200)
-- 16 class method(s)
+- new Error (line 226)
+- 18 class method(s)
+- 2 closure(s)
 
 ### `ext/dba/VmDbaFlatfile.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 9 class method(s)
 
 ### `ext/dba/dba_close.php`
 
@@ -7146,6 +7153,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 - 1 closure(s)
 
+### `ext/dba/dba_firstkey.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
+- 1 class method(s)
+- 1 closure(s)
+
 ### `ext/dba/dba_handlers.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7159,6 +7173,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/dba/dba_list.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new HashTable (line 33)
+- new Variable (line 35)
+- 1 class method(s)
+- 1 closure(s)
+
+### `ext/dba/dba_nextkey.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 23)
 - 1 class method(s)
 - 1 closure(s)
 
