@@ -39,6 +39,16 @@ final class addslashes extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('addslashes() requires exactly one argument in this compiler build');
         }
+        // Null → soft-coerce to "" without helper IR (addslashes("") === ""; #21180 / #20007).
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'addslashes', 0, 'string');
+
+                return $context->getTypeFromString('__string__*')->constNull();
+            }
+
+            return JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'addslashes', 0, 'string');
+        }
         $subject = self::jitStringArg($context, $args[0], 0, 'string');
         StringAddslashes::ensureLinked($context);
 
