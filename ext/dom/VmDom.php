@@ -2488,6 +2488,64 @@ final class VmDom
         }
     }
 
+    /**
+     * Attrs whose libxml atype is XML_ATTRIBUTE_ID — copied by xmlCopyProp / importNode.
+     * Includes DTD ATTLIST ID, HTML id, xml:id, and prior attributeIsId stamps.
+     * Does not include setIdAttribute-only markers (idAttributeName alone) (#21102, #20830).
+     */
+    private static function attributeQNameHasCopyableLibxmlIdType(
+        ObjectEntry $document,
+        DomNodeState $docState,
+        DomNodeState $nodeState,
+        string $qName
+    ): bool {
+        if (isset($nodeState->attributeIsId[$qName])) {
+            return true;
+        }
+        if ($docState->isHtmlDocument && 'id' === $qName) {
+            return true;
+        }
+        if (!$docState->isHtmlDocument || self::documentValidateOnParse($document)) {
+            $dtdId = $docState->idAttrByElement[$nodeState->nodeName] ?? null;
+            if (null !== $dtdId && $dtdId === $qName) {
+                return true;
+            }
+        }
+        if (!$docState->isHtmlDocument) {
+            if ('xml:id' === $qName) {
+                return true;
+            }
+            if ('id' === $qName
+                && self::XML_NAMESPACE_URI === ($nodeState->attributeNamespaces[$qName] ?? '')
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Stamp copyable libxml ID types from $sourceDocument onto $destState for importNode (#21102).
+     */
+    private static function stampCopyableLibxmlIdTypesFromDocument(
+        ObjectEntry $sourceDocument,
+        DomNodeState $sourceState,
+        DomNodeState $destState
+    ): void {
+        $docState = DomRegistry::state($sourceDocument);
+        foreach ($sourceState->attributes as $qName => $_) {
+            if (self::attributeQNameHasCopyableLibxmlIdType(
+                $sourceDocument,
+                $docState,
+                $sourceState,
+                $qName
+            )) {
+                $destState->attributeIsId[$qName] = true;
+            }
+        }
+    }
+
     private static function elementAttributeIsIdBearing(ObjectEntry $element, string $qName): bool
     {
         $document = self::ownerDocumentEntry($element);
@@ -9986,9 +10044,17 @@ final class VmDom
             $importedState->localName = $sourceState->localName;
             $importedState->prefix = $sourceState->prefix;
             $importedState->namespaceUri = $sourceState->namespaceUri;
-            // libxml xmlCopyProp copies XML_ATTRIBUTE_ID (HTML id / xml:id); setIdAttribute
-            // does not survive importNode on Zend (#20830, re-#19212).
+            // libxml xmlCopyProp copies XML_ATTRIBUTE_ID (HTML id / xml:id / DTD ATTLIST ID);
+            // setIdAttribute does not survive importNode on Zend (#20830, #21102, re-#19212).
             $importedState->attributeIsId = $sourceState->attributeIsId;
+            $sourceDocument = self::ownerDocumentEntry($node);
+            if (null !== $sourceDocument) {
+                self::stampCopyableLibxmlIdTypesFromDocument(
+                    $sourceDocument,
+                    $sourceState,
+                    $importedState
+                );
+            }
             $importedState->idAttributeName = null;
             if ($deep) {
                 foreach ($sourceState->childIds as $childId) {
