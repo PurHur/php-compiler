@@ -27,6 +27,7 @@ use PHPCompiler\ext\standard\VmUserCall;
  * options['exceptions']=false returns SoapFault objects instead of throwing (#20293).
  * options['classmap'] maps SOAP type names (xsi:type local name) to PHP classes (#21044).
  * WSDL xsd:element[@type] bindings also drive classmap when xsi:type is absent (#21088).
+ * Document/literal operation→output message parts + complexType fields scope nested SDL types (#21091).
  * options['typemap'] from_xml/to_xml string callbacks (#21046).
  */
 final class VmSoapClient
@@ -274,7 +275,9 @@ final class VmSoapClient
                 $state->features,
                 $state->classmap,
                 $state->typemap,
-                $state->elementTypes
+                $state->elementTypes,
+                $state->operationOutputParts,
+                $state->complexTypeFields
             );
 
             return self::importValue($decoded, $ctx);
@@ -1019,12 +1022,185 @@ final class VmSoapClient
             if ('' === $elName || '' === $elType) {
                 continue;
             }
-            $pos = \strrpos($elType, ':');
-            $typeLocal = false !== $pos ? \substr($elType, $pos + 1) : $elType;
+            $typeLocal = self::xsdLocalName($elType);
             if ('' !== $typeLocal) {
                 $state->elementTypes[$elName] = $typeLocal;
             }
         }
+        // Named complexType field → type map for nested decode without xsi:type (#21091).
+        foreach ($xpath->query('//xsd:complexType[@name]') ?: [] as $type) {
+            if (!$type instanceof \DOMElement) {
+                continue;
+            }
+            $typeName = $type->getAttribute('name');
+            if ('' === $typeName) {
+                continue;
+            }
+            $fields = self::wsdlComplexTypeFields($type);
+            if ([] !== $fields) {
+                $state->complexTypeFields[$typeName] = $fields;
+            }
+        }
+        // Operation → output message part/element child types (document/literal SDL) (#21091).
+        $messages = [];
+        foreach ($xpath->query('//wsdl:message') ?: [] as $msg) {
+            if (!$msg instanceof \DOMElement) {
+                continue;
+            }
+            $msgName = $msg->getAttribute('name');
+            if ('' !== $msgName) {
+                $messages[self::xsdLocalName($msgName)] = $msg;
+            }
+        }
+        $schemaElements = [];
+        foreach ($xpath->query('//xsd:schema/xsd:element[@name]') ?: [] as $el) {
+            if (!$el instanceof \DOMElement) {
+                continue;
+            }
+            $elName = $el->getAttribute('name');
+            if ('' !== $elName) {
+                $schemaElements[$elName] = $el;
+            }
+        }
+        foreach ($xpath->query('//wsdl:portType/wsdl:operation') ?: [] as $op) {
+            if (!$op instanceof \DOMElement) {
+                continue;
+            }
+            $opName = $op->getAttribute('name');
+            if ('' === $opName) {
+                continue;
+            }
+            $output = null;
+            foreach ($op->childNodes as $child) {
+                if ($child instanceof \DOMElement && 'output' === ($child->localName ?? $child->nodeName)) {
+                    $output = $child;
+                    break;
+                }
+            }
+            if (!$output instanceof \DOMElement) {
+                continue;
+            }
+            $msgRef = $output->getAttribute('message');
+            if ('' === $msgRef) {
+                continue;
+            }
+            $msg = $messages[self::xsdLocalName($msgRef)] ?? null;
+            if (!$msg instanceof \DOMElement) {
+                continue;
+            }
+            $parts = [];
+            foreach ($msg->childNodes as $part) {
+                if (!$part instanceof \DOMElement || 'part' !== ($part->localName ?? $part->nodeName)) {
+                    continue;
+                }
+                $elRef = $part->getAttribute('element');
+                if ('' === $elRef) {
+                    $partType = $part->getAttribute('type');
+                    $partName = $part->getAttribute('name');
+                    if ('' !== $partName && '' !== $partType) {
+                        $parts[$partName] = self::xsdLocalName($partType);
+                    }
+                    continue;
+                }
+                $elDef = $schemaElements[self::xsdLocalName($elRef)] ?? null;
+                if (!$elDef instanceof \DOMElement) {
+                    continue;
+                }
+                // Document/literal: unwrap response element sequence into part child → type.
+                foreach (self::wsdlElementSequenceFields($elDef) as $childName => $childType) {
+                    $parts[$childName] = $childType;
+                }
+            }
+            if ([] !== $parts) {
+                $state->operationOutputParts[\strtolower($opName)] = $parts;
+            }
+        }
+    }
+
+    /**
+     * Direct sequence/all/choice members of a named complexType (#21091).
+     *
+     * @return array<string, string> field local-name → type local-name
+     */
+    private static function wsdlComplexTypeFields(\DOMElement $type): array
+    {
+        $fields = [];
+        foreach ($type->getElementsByTagNameNS('http://www.w3.org/2001/XMLSchema', 'element') as $el) {
+            if (!$el instanceof \DOMElement) {
+                continue;
+            }
+            $elName = $el->getAttribute('name');
+            $elType = $el->getAttribute('type');
+            if ('' === $elName || '' === $elType) {
+                continue;
+            }
+            $parent = $el->parentNode;
+            $underNestedComplex = false;
+            while ($parent instanceof \DOMNode && $parent !== $type) {
+                if ($parent instanceof \DOMElement) {
+                    $pl = $parent->localName ?? $parent->nodeName;
+                    if ('complexType' === $pl && $parent !== $type) {
+                        $underNestedComplex = true;
+                        break;
+                    }
+                }
+                $parent = $parent->parentNode;
+            }
+            if ($underNestedComplex) {
+                continue;
+            }
+            $fields[$elName] = self::xsdLocalName($elType);
+        }
+
+        return $fields;
+    }
+
+    /**
+     * Sequence fields under a global element (inline complexType or @type reference) (#21091).
+     *
+     * @return array<string, string>
+     */
+    private static function wsdlElementSequenceFields(\DOMElement $el): array
+    {
+        $elType = $el->getAttribute('type');
+        if ('' !== $elType) {
+            // Whole element is a named type — treat as single synthetic part using element name.
+            return [$el->getAttribute('name') => self::xsdLocalName($elType)];
+        }
+        $fields = [];
+        foreach ($el->getElementsByTagNameNS('http://www.w3.org/2001/XMLSchema', 'element') as $child) {
+            if (!$child instanceof \DOMElement) {
+                continue;
+            }
+            $childName = $child->getAttribute('name');
+            $childType = $child->getAttribute('type');
+            if ('' === $childName || '' === $childType) {
+                continue;
+            }
+            // Only first-level members of this element's inline complexType.
+            $parent = $child->parentNode;
+            $underNested = false;
+            while ($parent instanceof \DOMNode && $parent !== $el) {
+                if ($parent instanceof \DOMElement) {
+                    $pl = $parent->localName ?? $parent->nodeName;
+                    if ('complexType' === $pl) {
+                        // Walk up: if this complexType is not the element's immediate CT, skip.
+                        $ctParent = $parent->parentNode;
+                        if ($ctParent !== $el) {
+                            $underNested = true;
+                        }
+                        break;
+                    }
+                }
+                $parent = $parent->parentNode;
+            }
+            if ($underNested) {
+                continue;
+            }
+            $fields[$childName] = self::xsdLocalName($childType);
+        }
+
+        return $fields;
     }
 
     /**
@@ -1396,6 +1572,8 @@ final class VmSoapClient
      * @param array<string, string>                                                                 $classmap
      * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
      * @param array<string, string>                                                                 $elementTypes WSDL element local-name → type local-name (#21088)
+     * @param array<string, array<string, string>>                                                  $operationOutputParts op → response child → type (#21091)
+     * @param array<string, array<string, string>>                                                  $complexTypeFields type → field → type (#21091)
      */
     private static function decodeResponse(
         string $response,
@@ -1403,7 +1581,9 @@ final class VmSoapClient
         int $features = 0,
         array $classmap = [],
         array $typemap = [],
-        array $elementTypes = []
+        array $elementTypes = [],
+        array $operationOutputParts = [],
+        array $complexTypeFields = []
     ): mixed {
         $dom = new \DOMDocument();
         if (!@$dom->loadXML($response)) {
@@ -1444,19 +1624,29 @@ final class VmSoapClient
             return null;
         }
 
+        // Operation-scoped output parts override flat global elementTypes (#21091; php_sdl.c).
+        $scopedTypes = $elementTypes;
+        $opKey = \strtolower($name);
+        if (isset($operationOutputParts[$opKey])) {
+            foreach ($operationOutputParts[$opKey] as $partName => $partType) {
+                $scopedTypes[$partName] = $partType;
+            }
+        }
+
         $singleElementArrays = 0 !== ($features & SoapConstants::SOAP_SINGLE_ELEMENT_ARRAYS);
         $children = [];
         foreach ($responseEl->childNodes as $child) {
             if ($child instanceof \DOMElement) {
                 $childName = $child->localName ?? $child->nodeName;
-                $hint = $elementTypes[$childName] ?? null;
+                $hint = $scopedTypes[$childName] ?? null;
                 $children[$childName] = self::domElementToValue(
                     $child,
                     $singleElementArrays,
                     $classmap,
                     $typemap,
-                    $elementTypes,
-                    $hint
+                    $scopedTypes,
+                    $hint,
+                    $complexTypeFields
                 );
             }
         }
@@ -1467,13 +1657,14 @@ final class VmSoapClient
             return \reset($children);
         }
 
-        return self::maybeMappedObject($responseEl, $children, $classmap, $typemap, $elementTypes, null);
+        return self::maybeMappedObject($responseEl, $children, $classmap, $typemap, $scopedTypes, null);
     }
 
     /**
      * @param array<string, string>                                                                 $classmap
      * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
      * @param array<string, string>                                                                 $elementTypes
+     * @param array<string, array<string, string>>                                                  $complexTypeFields
      */
     private static function domElementToValue(
         \DOMElement $el,
@@ -1481,7 +1672,8 @@ final class VmSoapClient
         array $classmap = [],
         array $typemap = [],
         array $elementTypes = [],
-        ?string $hintType = null
+        ?string $hintType = null,
+        array $complexTypeFields = []
     ): mixed {
         // typemap from_xml wins over structural decode (#21046; to_zval_user).
         $typemapHit = self::matchTypemapFromXml($el, $typemap, $elementTypes, $hintType);
@@ -1505,9 +1697,13 @@ final class VmSoapClient
         }
         $map = [];
         $list = true;
+        $parentFields = (null !== $hintType && isset($complexTypeFields[$hintType]))
+            ? $complexTypeFields[$hintType]
+            : [];
         foreach ($childElements as $child) {
             $key = $child->localName ?? $child->nodeName;
-            $childHint = $elementTypes[$key] ?? null;
+            // Prefer parent complexType field types over flat global element name map (#21091).
+            $childHint = $parentFields[$key] ?? $elementTypes[$key] ?? null;
             if (isset($map[$key])) {
                 if (!\is_array($map[$key]) || !\array_is_list($map[$key])) {
                     $map[$key] = [$map[$key]];
@@ -1518,7 +1714,8 @@ final class VmSoapClient
                     $classmap,
                     $typemap,
                     $elementTypes,
-                    $childHint
+                    $childHint,
+                    $complexTypeFields
                 );
             } else {
                 $map[$key] = self::domElementToValue(
@@ -1527,7 +1724,8 @@ final class VmSoapClient
                     $classmap,
                     $typemap,
                     $elementTypes,
-                    $childHint
+                    $childHint,
+                    $complexTypeFields
                 );
             }
             if ('item' !== $key) {
@@ -2005,6 +2203,20 @@ final class SoapClientState
      * @var array<string, string>
      */
     public array $elementTypes = [];
+
+    /**
+     * Operation (lowercase) → document/literal output part child → type local-name (#21091).
+     *
+     * @var array<string, array<string, string>>
+     */
+    public array $operationOutputParts = [];
+
+    /**
+     * Named complexType → field local-name → type local-name (#21091).
+     *
+     * @var array<string, array<string, string>>
+     */
+    public array $complexTypeFields = [];
 
     public string $lastRequest = '';
 
