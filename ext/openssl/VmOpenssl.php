@@ -493,7 +493,7 @@ final class VmOpenssl
     }
 
     /**
-     * openssl_encrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594).
+     * openssl_encrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594, AEAD #21135).
      *
      * @return string|false ciphertext bytes (caller applies base64 unless OPENSSL_RAW_DATA)
      */
@@ -503,7 +503,10 @@ final class VmOpenssl
         string $passphrase,
         int $options,
         string $iv,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        ?Variable $tagVar = null,
+        string $aad = '',
+        int $tagLength = 16
     ): string|false {
         if (!VmOpensslCipherNative::available()) {
             self::userWarning('openssl_encrypt(): OpenSSL cipher encryption is unavailable in this compiler build', $frame);
@@ -518,8 +521,9 @@ final class VmOpenssl
             return false;
         }
 
+        $isAead = OpensslCipherRegistry::isAeadCipher($cipher);
         $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
-        if (false !== $ivLen && $ivLen > 0 && \strlen($iv) !== $ivLen) {
+        if (!$isAead && false !== $ivLen && $ivLen > 0 && \strlen($iv) !== $ivLen) {
             self::userWarning(\sprintf(
                 'openssl_encrypt(): IV passed is only %d bytes long, cipher expects an IV of precisely %d bytes, padding with \\0',
                 \strlen($iv),
@@ -536,19 +540,53 @@ final class VmOpenssl
             return false;
         }
 
-        $zeroPadding = 0 !== ($options & OpensslConstants::OPENSSL_ZERO_PADDING);
-        $encrypted = VmOpensslCipherNative::encrypt($data, $cipher, $passphrase, $iv, $zeroPadding);
-        if (false === $encrypted) {
-            self::userWarning('openssl_encrypt(): Encryption failed', $frame);
+        $wantTag = null !== $tagVar;
+        if ($isAead && !$wantTag) {
+            self::userWarning('openssl_encrypt(): A tag should be provided when using AEAD mode', $frame);
 
             return false;
         }
 
-        return $encrypted;
+        $zeroPadding = 0 !== ($options & OpensslConstants::OPENSSL_ZERO_PADDING);
+        $encrypted = VmOpensslCipherNative::encrypt(
+            $data,
+            $cipher,
+            $passphrase,
+            $iv,
+            $zeroPadding,
+            $aad,
+            $tagLength,
+            $wantTag
+        );
+        if (false === $encrypted) {
+            if ($isAead && $wantTag) {
+                self::userWarning('openssl_encrypt(): Retrieving verification tag failed', $frame);
+            } else {
+                self::userWarning('openssl_encrypt(): Encryption failed', $frame);
+            }
+
+            return false;
+        }
+
+        if ($wantTag) {
+            $tagTarget = $tagVar->resolveIndirect();
+            if ($isAead) {
+                if (null === $encrypted['tag']) {
+                    self::userWarning('openssl_encrypt(): Retrieving verification tag failed', $frame);
+
+                    return false;
+                }
+                $tagTarget->string($encrypted['tag']);
+            } else {
+                $tagTarget->null();
+            }
+        }
+
+        return $encrypted['ciphertext'];
     }
 
     /**
-     * openssl_decrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594).
+     * openssl_decrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594, AEAD #21135).
      *
      * @return string|false plaintext bytes (caller decodes base64 unless OPENSSL_RAW_DATA)
      */
@@ -558,7 +596,9 @@ final class VmOpenssl
         string $passphrase,
         int $options,
         string $iv,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        string $tag = '',
+        string $aad = ''
     ): string|false {
         if (!VmOpensslCipherNative::available()) {
             self::userWarning('openssl_decrypt(): OpenSSL cipher decryption is unavailable in this compiler build', $frame);
@@ -573,8 +613,9 @@ final class VmOpenssl
             return false;
         }
 
+        $isAead = OpensslCipherRegistry::isAeadCipher($cipher);
         $ivLen = OpensslCipherRegistry::cipherIvLength($cipher);
-        if (false !== $ivLen && $ivLen > 0 && \strlen($iv) !== $ivLen) {
+        if (!$isAead && false !== $ivLen && $ivLen > 0 && \strlen($iv) !== $ivLen) {
             self::userWarning(\sprintf(
                 'openssl_decrypt(): IV passed is only %d bytes long, cipher expects an IV of precisely %d bytes, padding with \\0',
                 \strlen($iv),
@@ -591,8 +632,23 @@ final class VmOpenssl
             return false;
         }
 
+        if ('' !== $tag && !$isAead) {
+            self::userWarning(
+                'openssl_decrypt(): The tag cannot be used because the cipher algorithm does not support AEAD',
+                $frame
+            );
+        }
+
         $zeroPadding = 0 !== ($options & OpensslConstants::OPENSSL_ZERO_PADDING);
-        $plain = VmOpensslCipherNative::decrypt($data, $cipher, $passphrase, $iv, $zeroPadding);
+        $plain = VmOpensslCipherNative::decrypt(
+            $data,
+            $cipher,
+            $passphrase,
+            $iv,
+            $zeroPadding,
+            $aad,
+            $tag
+        );
         if (false === $plain) {
             self::userWarning('openssl_decrypt(): Decryption failed', $frame);
 

@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_encrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594, JIT/AOT #21065).
+ * openssl_encrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594, JIT/AOT #21065, AEAD #21135).
  */
 final class openssl_encrypt extends Internal
 {
@@ -47,8 +47,27 @@ final class openssl_encrypt extends Internal
         if ($argc >= 5) {
             $iv = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'openssl_encrypt', 4, 'iv');
         }
+        $tagVar = $argc >= 6 ? $frame->calledArgs[5] : null;
+        $aad = '';
+        if ($argc >= 7) {
+            $aad = VmString::coerceStringBuiltinArg($frame->calledArgs[6], 'openssl_encrypt', 6, 'aad');
+        }
+        $tagLength = 16;
+        if ($argc >= 8) {
+            $tagLength = VmMath::parseIntBuiltinArgForFrame($frame, 7, 'openssl_encrypt', 8, 'tag_length');
+        }
 
-        $encrypted = VmOpenssl::encrypt($data, $cipherAlgo, $passphrase, $options, $iv, $frame);
+        $encrypted = VmOpenssl::encrypt(
+            $data,
+            $cipherAlgo,
+            $passphrase,
+            $options,
+            $iv,
+            $frame,
+            $tagVar,
+            $aad,
+            $tagLength
+        );
         if (false === $encrypted) {
             $frame->returnVar->bool(false);
 
@@ -70,14 +89,16 @@ final class openssl_encrypt extends Internal
             );
         }
 
-        // Args 6–8 (tag / tag_length / aad) accepted for arity parity; VM ignores them today (#18594).
         return JitOpensslEncrypt::encrypt(
             $context,
             $args[0],
             $args[1],
             $args[2],
             $args[3] ?? null,
-            $args[4] ?? null
+            $args[4] ?? null,
+            $args[5] ?? null,
+            $args[6] ?? null,
+            $args[7] ?? null
         );
     }
 }

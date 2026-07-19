@@ -10,10 +10,11 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * openssl_decrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594, JIT/AOT #21065).
+ * openssl_decrypt() — symmetric EVP cipher (php-src ext/openssl/openssl.c; #18594, JIT/AOT #21065, AEAD #21135).
  */
 final class openssl_decrypt extends Internal
 {
@@ -25,7 +26,8 @@ final class openssl_decrypt extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 8) {
+        // php-src openssl.stub.php: 7 params (no tag_length on decrypt).
+        if ($argc < 3 || $argc > 7) {
             throw new \ArgumentCountError(
                 'openssl_decrypt() expects at least 3 arguments, '.$argc.' given'
             );
@@ -47,6 +49,20 @@ final class openssl_decrypt extends Internal
         if ($argc >= 5) {
             $iv = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'openssl_decrypt', 4, 'iv');
         }
+        $tag = '';
+        if ($argc >= 6) {
+            $tagVar = $frame->calledArgs[5]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $tagVar->type) {
+                $tag = VmString::coerceStringBuiltinArg($frame->calledArgs[5], 'openssl_decrypt', 5, 'tag');
+            }
+        }
+        $aad = '';
+        if ($argc >= 7) {
+            $aadVar = $frame->calledArgs[6]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $aadVar->type) {
+                $aad = VmString::coerceStringBuiltinArg($frame->calledArgs[6], 'openssl_decrypt', 6, 'aad');
+            }
+        }
 
         $payload = $data;
         if (0 === ($options & OpensslConstants::OPENSSL_RAW_DATA)) {
@@ -60,7 +76,7 @@ final class openssl_decrypt extends Internal
             $payload = $decoded;
         }
 
-        $plain = VmOpenssl::decrypt($payload, $cipherAlgo, $passphrase, $options, $iv, $frame);
+        $plain = VmOpenssl::decrypt($payload, $cipherAlgo, $passphrase, $options, $iv, $frame, $tag, $aad);
         if (false === $plain) {
             $frame->returnVar->bool(false);
 
@@ -72,20 +88,21 @@ final class openssl_decrypt extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 3 || $argc > 8) {
+        if ($argc < 3 || $argc > 7) {
             throw new \ArgumentCountError(
                 'openssl_decrypt() expects at least 3 arguments, '.$argc.' given'
             );
         }
 
-        // Args 6–8 (tag / tag_length / aad) accepted for arity parity; VM ignores them today (#18594).
         return JitOpensslEncrypt::decrypt(
             $context,
             $args[0],
             $args[1],
             $args[2],
             $args[3] ?? null,
-            $args[4] ?? null
+            $args[4] ?? null,
+            $args[5] ?? null,
+            $args[6] ?? null
         );
     }
 }

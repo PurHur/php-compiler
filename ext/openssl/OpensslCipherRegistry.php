@@ -271,6 +271,27 @@ final class OpensslCipherRegistry
         return self::CIPHER_KEY_LENGTHS[$key] ?? false;
     }
 
+    /**
+     * AEAD ciphers that use authentication tags (php-src php_openssl_load_cipher_mode; #21135).
+     */
+    public static function isAeadCipher(string $cipherAlgo): bool
+    {
+        $key = strtolower($cipherAlgo);
+        if ('chacha20-poly1305' === $key) {
+            return true;
+        }
+
+        return str_ends_with($key, '-gcm')
+            || str_ends_with($key, '-ccm')
+            || str_ends_with($key, '-ocb');
+    }
+
+    /** CCM (and similar) need tag length set before encrypt (php-src set_tag_length_when_encrypting). */
+    public static function aeadSetsTagLengthWhenEncrypting(string $cipherAlgo): bool
+    {
+        return str_ends_with(strtolower($cipherAlgo), '-ccm');
+    }
+
     /** @return list<string> */
     public static function cipherMethods(bool $aliases = false): array
     {
