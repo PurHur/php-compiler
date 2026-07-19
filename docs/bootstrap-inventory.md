@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 6021 |
-| Phase A inventory files (M2 ratio SSOT) | 6021 |
+| PHP files on vm.php path | 6030 |
+| Phase A inventory files (M2 ratio SSOT) | 6030 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 18666 |
+| Source constructs flagged (warnings) | 18696 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -237,7 +237,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DomImportNodeJitHelper.php` | 0 | 3 |
 | `ext/dom/DomIsConnectedJitHelper.php` | 0 | 1 |
 | `ext/dom/DomIsEqualNodeJitHelper.php` | 0 | 1 |
-| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 115 |
+| `ext/dom/DomLivingBuiltinClasses.php` | 0 | 117 |
 | `ext/dom/DomLoadHTMLFileJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadHTMLJitHelper.php` | 0 | 1 |
 | `ext/dom/DomLoadJitHelper.php` | 0 | 1 |
@@ -860,7 +860,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
-| `ext/intl/VmBreakIterator.php` | 0 | 56 |
+| `ext/intl/VmBreakIterator.php` | 0 | 61 |
 | `ext/intl/VmCollator.php` | 0 | 55 |
 | `ext/intl/VmGrapheme.php` | 0 | 1 |
 | `ext/intl/VmIdn.php` | 0 | 5 |
@@ -1098,6 +1098,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/lzf/VmLzfCore.php` | 0 | 1 |
 | `ext/lzf/lzf_compress.php` | 0 | 1 |
 | `ext/lzf/lzf_decompress.php` | 0 | 1 |
+| `ext/mailparse/MailparseExtensionPolicy.php` | 0 | 1 |
+| `ext/mailparse/MailparseFunction.php` | 0 | 1 |
+| `ext/mailparse/Module.php` | 0 | 6 |
+| `ext/mailparse/VmMailparse.php` | 0 | 4 |
+| `ext/mailparse/mailparse_msg_create.php` | 0 | 2 |
+| `ext/mailparse/mailparse_msg_free.php` | 0 | 2 |
+| `ext/mailparse/mailparse_msg_get_part_data.php` | 0 | 2 |
+| `ext/mailparse/mailparse_msg_parse.php` | 0 | 2 |
+| `ext/mailparse/mailparse_rfc822_parse_addresses.php` | 0 | 2 |
 | `ext/mbstring/EastAsianWidthTable.php` | 0 | 1 |
 | `ext/mbstring/JitMbCheckEncoding.php` | 0 | 1 |
 | `ext/mbstring/JitMbConvertCase.php` | 0 | 1 |
@@ -5331,7 +5340,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
 | `lib/ReferenceProfileTokenScan.php` | 0 | 1 |
-| `lib/Runtime.php` | 0 | 102 |
+| `lib/Runtime.php` | 0 | 103 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 5 |
@@ -7306,121 +7315,123 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomLivingBuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 65)
 - new Variable (line 66)
-- new ClassEntry (line 74)
-- new Variable (line 76)
-- new ClassProperty (line 77)
-- new ClassProperty (line 78)
-- new ClassProperty (line 79)
-- new ClassEntry (line 83)
-- new ImplementationCreateHTMLDocument (line 86)
-- new LivingImplementationCreateDocument (line 90)
-- new LivingImplementationCreateDocumentType (line 93)
-- new ClassEntry (line 99)
-- new ClassProperty (line 102)
-- new Variable (line 102)
-- new ClassEntry (line 108)
-- new Variable (line 111)
-- new ClassProperty (line 112)
-- new ClassProperty (line 113)
-- new ClassProperty (line 114)
-- new ClassProperty (line 115)
-- new ClassProperty (line 116)
+- new Variable (line 67)
+- new ClassEntry (line 78)
+- new Variable (line 80)
+- new ClassProperty (line 81)
+- new ClassProperty (line 82)
+- new ClassProperty (line 83)
+- new ClassEntry (line 87)
+- new ImplementationCreateHTMLDocument (line 90)
+- new LivingImplementationCreateDocument (line 94)
+- new LivingImplementationCreateDocumentType (line 97)
+- new ClassEntry (line 103)
+- new ClassProperty (line 106)
+- new Variable (line 106)
+- new ClassEntry (line 112)
+- new Variable (line 116)
 - new ClassProperty (line 117)
-- new ClassEntry (line 121)
-- new ClassProperty (line 124)
-- new ClassProperty (line 125)
-- new ClassProperty (line 126)
-- new Variable (line 126)
-- new ClassProperty (line 127)
-- new ClassProperty (line 128)
+- new ClassProperty (line 118)
+- new ClassProperty (line 119)
+- new ClassProperty (line 120)
+- new ClassProperty (line 121)
+- new ClassProperty (line 122)
 - new ClassEntry (line 132)
-- new ClassProperty (line 135)
 - new ClassProperty (line 136)
-- new ClassEntry (line 140)
-- new ClassProperty (line 143)
-- new ClassEntry (line 147)
-- new ClassProperty (line 150)
-- new ClassEntry (line 154)
-- new ClassProperty (line 157)
-- new ClassProperty (line 158)
-- new ClassProperty (line 159)
-- new ClassProperty (line 160)
-- new ClassEntry (line 164)
-- new ClassProperty (line 167)
-- new ClassProperty (line 168)
+- new ClassProperty (line 137)
+- new ClassProperty (line 138)
+- new Variable (line 138)
+- new ClassProperty (line 139)
+- new ClassProperty (line 140)
+- new ClassEntry (line 144)
+- new ClassProperty (line 147)
+- new ClassProperty (line 148)
+- new ClassEntry (line 152)
+- new ClassProperty (line 155)
+- new ClassEntry (line 159)
+- new ClassProperty (line 162)
+- new ClassEntry (line 166)
 - new ClassProperty (line 169)
 - new ClassProperty (line 170)
-- new Variable (line 171)
-- new ClassProperty (line 173)
-- new Variable (line 173)
-- new ClassEntry (line 177)
+- new ClassProperty (line 171)
+- new ClassProperty (line 172)
+- new ClassEntry (line 176)
+- new ClassProperty (line 179)
 - new ClassProperty (line 180)
 - new ClassProperty (line 181)
 - new ClassProperty (line 182)
-- new ClassProperty (line 183)
 - new Variable (line 183)
-- new ElementQuerySelector (line 186)
-- new ElementQuerySelectorAll (line 189)
-- new ClassEntry (line 194)
-- new ClassProperty (line 203)
-- new Variable (line 203)
+- new ClassProperty (line 185)
+- new Variable (line 185)
+- new ClassEntry (line 189)
+- new ClassProperty (line 193)
+- new ClassProperty (line 194)
+- new ClassProperty (line 195)
+- new ClassProperty (line 196)
+- new Variable (line 196)
+- new ElementQuerySelector (line 199)
+- new ElementQuerySelectorAll (line 202)
 - new ClassEntry (line 207)
-- new ClassProperty (line 210)
-- new Variable (line 210)
-- new Variable (line 212)
-- new ClassProperty (line 213)
-- new ClassProperty (line 214)
-- new ClassProperty (line 215)
 - new ClassProperty (line 216)
-- new ClassProperty (line 218)
-- new ElementClosest (line 221)
-- new ElementMatches (line 224)
-- new ElementQuerySelector (line 227)
-- new ElementQuerySelectorAll (line 230)
-- new ElementGetElementsByClassName (line 233)
-- new ElementGetInScopeNamespaces (line 236)
-- new ElementGetDescendantNamespaces (line 239)
-- new ElementRename (line 242)
-- new ClassEntry (line 247)
-- new ClassEntry (line 254)
-- new ClassProperty (line 263)
-- new Variable (line 263)
-- new ClassProperty (line 264)
-- new Variable (line 264)
-- new ClassEntry (line 270)
+- new Variable (line 216)
+- new ClassEntry (line 220)
+- new ClassProperty (line 225)
+- new Variable (line 225)
+- new Variable (line 227)
+- new ClassProperty (line 228)
+- new ClassProperty (line 229)
+- new ClassProperty (line 230)
+- new ClassProperty (line 231)
+- new ClassProperty (line 233)
+- new ElementClosest (line 236)
+- new ElementMatches (line 239)
+- new ElementQuerySelector (line 242)
+- new ElementQuerySelectorAll (line 245)
+- new ElementGetElementsByClassName (line 248)
+- new ElementGetInScopeNamespaces (line 251)
+- new ElementGetDescendantNamespaces (line 254)
+- new ElementRename (line 257)
+- new ClassEntry (line 262)
+- new ClassEntry (line 269)
+- new ClassProperty (line 278)
+- new Variable (line 278)
 - new ClassProperty (line 279)
 - new Variable (line 279)
-- new HtmlCollectionNamedItem (line 281)
-- new ClassEntry (line 287)
-- new ClassProperty (line 296)
-- new Variable (line 296)
-- new ClassEntry (line 301)
-- new LivingXPathConstruct (line 303)
-- new ClassEntry (line 310)
-- new ClassProperty (line 313)
-- new DocumentGetElementsByClassName (line 321)
-- new DocumentImportLegacyNode (line 325)
-- new ClassEntry (line 330)
-- new ClassProperty (line 333)
-- new ClassProperty (line 334)
-- new ClassProperty (line 335)
-- new HtmlDocumentCreateFromString (line 336)
-- new HtmlDocumentCreateEmpty (line 339)
-- new HtmlDocumentCreateFromFile (line 342)
-- new HtmlDocumentGetElementById (line 345)
-- new HtmlDocumentQuerySelector (line 348)
-- new HtmlDocumentQuerySelectorAll (line 351)
-- new HtmlDocumentSaveHtml (line 354)
-- new ClassEntry (line 371)
-- new ClassProperty (line 374)
-- new ClassProperty (line 375)
-- new Variable (line 378)
-- new XmlDocumentCreateFromString (line 380)
-- new XmlDocumentCreateFromFile (line 383)
-- new XmlDocumentCreateEmpty (line 386)
-- 3 class method(s)
+- new ClassEntry (line 285)
+- new ClassProperty (line 294)
+- new Variable (line 294)
+- new HtmlCollectionNamedItem (line 296)
+- new ClassEntry (line 302)
+- new ClassProperty (line 311)
+- new Variable (line 311)
+- new ClassEntry (line 316)
+- new LivingXPathConstruct (line 318)
+- new ClassEntry (line 325)
+- new ClassProperty (line 329)
+- new DocumentGetElementsByClassName (line 337)
+- new DocumentImportLegacyNode (line 341)
+- new ClassEntry (line 346)
+- new ClassProperty (line 349)
+- new ClassProperty (line 350)
+- new ClassProperty (line 351)
+- new HtmlDocumentCreateFromString (line 352)
+- new HtmlDocumentCreateEmpty (line 355)
+- new HtmlDocumentCreateFromFile (line 358)
+- new HtmlDocumentGetElementById (line 361)
+- new HtmlDocumentQuerySelector (line 364)
+- new HtmlDocumentQuerySelectorAll (line 367)
+- new HtmlDocumentSaveHtml (line 370)
+- new ClassEntry (line 387)
+- new ClassProperty (line 390)
+- new ClassProperty (line 391)
+- new Variable (line 394)
+- new XmlDocumentCreateFromString (line 396)
+- new XmlDocumentCreateFromFile (line 399)
+- new XmlDocumentCreateEmpty (line 402)
+- new ClassEntry (line 427)
+- new ClassEntry (line 440)
+- 4 class method(s)
 
 ### `ext/dom/DomLoadHTMLFileJitHelper.php`
 
@@ -8899,24 +8910,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomLiving.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 122)
-- new ObjectEntry (line 196)
-- new ObjectEntry (line 214)
-- new DOMException (line 243)
-- new Variable (line 246)
-- new DOMException (line 286)
-- new DOMException (line 374)
-- new DOMException (line 379)
-- new DOMException (line 386)
-- new DOMException (line 417)
-- new DOMException (line 429)
-- new Exception (line 576)
-- new DOMException (line 602)
-- new Variable (line 608)
-- new Variable (line 642)
-- new ObjectEntry (line 1156)
-- new HashTable (line 1180)
-- new Variable (line 1182)
+- new ObjectEntry (line 128)
+- new ObjectEntry (line 202)
+- new ObjectEntry (line 220)
+- new DOMException (line 249)
+- new Variable (line 252)
+- new DOMException (line 292)
+- new DOMException (line 380)
+- new DOMException (line 385)
+- new DOMException (line 392)
+- new DOMException (line 423)
+- new DOMException (line 435)
+- new Exception (line 582)
+- new DOMException (line 608)
+- new Variable (line 614)
+- new Variable (line 648)
+- new ObjectEntry (line 1162)
+- new HashTable (line 1186)
+- new Variable (line 1188)
 - 53 class method(s)
 - 1 closure(s)
 
@@ -12116,57 +12127,62 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 103)
 - new ClassEntry (line 108)
 - new ClassProperty (line 112)
-- new BreakIteratorGetRuleStatus (line 115)
-- new BreakIteratorGetRuleStatusVec (line 118)
-- new ClassEntry (line 123)
-- new ClassProperty (line 127)
-- new BreakIteratorGetLastCodePoint (line 130)
-- new ClassEntry (line 135)
-- new ClassProperty (line 137)
-- new Variable (line 140)
-- new PartsIteratorCurrent (line 146)
-- new PartsIteratorKey (line 147)
-- new PartsIteratorNext (line 148)
-- new PartsIteratorRewind (line 149)
-- new PartsIteratorValid (line 150)
-- new PartsIteratorGetBreakIterator (line 151)
-- new PartsIteratorGetRuleStatus (line 152)
-- new Variable (line 165)
-- new BreakIteratorCreateWordInstance (line 175)
-- new BreakIteratorCreateCharacterInstance (line 176)
-- new BreakIteratorCreateCodePointInstance (line 177)
-- new BreakIteratorCreateLineInstance (line 178)
-- new BreakIteratorCreateSentenceInstance (line 179)
-- new BreakIteratorCreateTitleInstance (line 180)
-- new BreakIteratorSetText (line 192)
-- new BreakIteratorGetText (line 193)
-- new BreakIteratorFirst (line 194)
-- new BreakIteratorLast (line 195)
-- new BreakIteratorNext (line 196)
-- new BreakIteratorPrevious (line 197)
-- new BreakIteratorCurrent (line 198)
-- new BreakIteratorPreceding (line 199)
-- new BreakIteratorFollowing (line 200)
-- new BreakIteratorIsBoundary (line 201)
-- new BreakIteratorGetLocale (line 202)
-- new BreakIteratorGetErrorCode (line 203)
-- new BreakIteratorGetErrorMessage (line 204)
-- new BreakIteratorGetPartsIterator (line 205)
-- new ObjectEntry (line 221)
-- new ObjectEntry (line 522)
-- new ArgumentCountError (line 984)
-- new ArgumentCountError (line 1025)
-- new ArgumentCountError (line 1065)
-- new ArgumentCountError (line 1104)
-- new ArgumentCountError (line 1188)
-- new ArgumentCountError (line 1208)
-- new ArgumentCountError (line 1228)
-- new ArgumentCountError (line 1248)
-- new ArgumentCountError (line 1269)
-- new ArgumentCountError (line 1288)
-- new HashTable (line 1464)
-- new Variable (line 1466)
-- 87 class method(s)
+- new RuleBasedBreakIteratorConstruct (line 115)
+- new RuleBasedBreakIteratorGetRules (line 120)
+- new RuleBasedBreakIteratorGetBinaryRules (line 123)
+- new BreakIteratorGetRuleStatus (line 126)
+- new BreakIteratorGetRuleStatusVec (line 129)
+- new ClassEntry (line 134)
+- new ClassProperty (line 138)
+- new BreakIteratorGetLastCodePoint (line 141)
+- new ClassEntry (line 146)
+- new ClassProperty (line 148)
+- new Variable (line 151)
+- new PartsIteratorCurrent (line 157)
+- new PartsIteratorKey (line 158)
+- new PartsIteratorNext (line 159)
+- new PartsIteratorRewind (line 160)
+- new PartsIteratorValid (line 161)
+- new PartsIteratorGetBreakIterator (line 162)
+- new PartsIteratorGetRuleStatus (line 163)
+- new Variable (line 176)
+- new BreakIteratorCreateWordInstance (line 186)
+- new BreakIteratorCreateCharacterInstance (line 187)
+- new BreakIteratorCreateCodePointInstance (line 188)
+- new BreakIteratorCreateLineInstance (line 189)
+- new BreakIteratorCreateSentenceInstance (line 190)
+- new BreakIteratorCreateTitleInstance (line 191)
+- new BreakIteratorSetText (line 203)
+- new BreakIteratorGetText (line 204)
+- new BreakIteratorFirst (line 205)
+- new BreakIteratorLast (line 206)
+- new BreakIteratorNext (line 207)
+- new BreakIteratorPrevious (line 208)
+- new BreakIteratorCurrent (line 209)
+- new BreakIteratorPreceding (line 210)
+- new BreakIteratorFollowing (line 211)
+- new BreakIteratorIsBoundary (line 212)
+- new BreakIteratorGetLocale (line 213)
+- new BreakIteratorGetErrorCode (line 214)
+- new BreakIteratorGetErrorMessage (line 215)
+- new BreakIteratorGetPartsIterator (line 216)
+- new ObjectEntry (line 232)
+- new ObjectEntry (line 588)
+- new ArgumentCountError (line 1055)
+- new ArgumentCountError (line 1060)
+- new ArgumentCountError (line 1145)
+- new ArgumentCountError (line 1186)
+- new ArgumentCountError (line 1226)
+- new ArgumentCountError (line 1265)
+- new ArgumentCountError (line 1349)
+- new ArgumentCountError (line 1369)
+- new ArgumentCountError (line 1389)
+- new ArgumentCountError (line 1409)
+- new ArgumentCountError (line 1430)
+- new ArgumentCountError (line 1449)
+- new HashTable (line 1625)
+- new Variable (line 1627)
+- 93 class method(s)
 
 ### `ext/intl/VmCollator.php`
 
@@ -14444,6 +14460,64 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/mailparse/MailparseExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/mailparse/MailparseFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/mailparse/Module.php`
+
+**Warnings** (review for bootstrap subset):
+- new mailparse_msg_create (line 32)
+- new mailparse_msg_parse (line 33)
+- new mailparse_msg_get_part_data (line 34)
+- new mailparse_msg_free (line 35)
+- new mailparse_rfc822_parse_addresses (line 36)
+- 2 class method(s)
+
+### `ext/mailparse/VmMailparse.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 40)
+- new ObjectEntry (line 48)
+- new Variable (line 57)
+- 17 class method(s)
+
+### `ext/mailparse/mailparse_msg_create.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_msg_free.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_msg_get_part_data.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 21)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_msg_parse.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/mailparse/mailparse_rfc822_parse_addresses.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
 
 ### `ext/mbstring/EastAsianWidthTable.php`
 
@@ -41296,36 +41370,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/Type/Object_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 887)
-- new Variable (line 926)
-- new Variable (line 963)
-- new Variable (line 1789)
-- new Variable (line 2217)
-- new Variable (line 2279)
-- new Variable (line 2303)
-- new Variable (line 2315)
-- new Variable (line 2328)
-- new Variable (line 2487)
-- new VMVariable (line 3255)
-- new VMVariable (line 3273)
-- new VMVariable (line 3281)
-- new VMVariable (line 3299)
-- new ReflectionClassConstant (line 4508)
-- new Variable (line 4888)
-- new Variable (line 4914)
+- new Variable (line 888)
+- new Variable (line 927)
+- new Variable (line 964)
+- new Variable (line 1823)
+- new Variable (line 2251)
+- new Variable (line 2313)
+- new Variable (line 2337)
+- new Variable (line 2349)
+- new Variable (line 2362)
+- new Variable (line 2521)
+- new VMVariable (line 3289)
+- new VMVariable (line 3307)
+- new VMVariable (line 3315)
+- new VMVariable (line 3333)
+- new ReflectionClassConstant (line 4542)
 - new Variable (line 4922)
-- new Variable (line 4945)
-- new Variable (line 4971)
+- new Variable (line 4948)
+- new Variable (line 4956)
 - new Variable (line 4979)
-- new Variable (line 5053)
-- new Literal (line 5070)
-- new Literal (line 5075)
-- new Literal (line 5080)
-- new Variable (line 5091)
-- new Variable (line 5124)
-- new Variable (line 5147)
-- new Variable (line 5511)
-- 259 class method(s)
+- new Variable (line 5005)
+- new Variable (line 5013)
+- new Variable (line 5087)
+- new Literal (line 5104)
+- new Literal (line 5109)
+- new Literal (line 5114)
+- new Variable (line 5125)
+- new Variable (line 5158)
+- new Variable (line 5181)
+- new Variable (line 5545)
+- 260 class method(s)
 - 8 closure(s)
 
 ### `lib/JIT/Builtin/Type/String_.php`
@@ -43651,28 +43725,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\sqlite3\Module (line 274)
 - new ext\pgsql\Module (line 275)
 - new ext\odbc\Module (line 276)
-- new ext\enchant\Module (line 277)
-- new ext\pdo\Module (line 278)
-- new ext\phar\Module (line 279)
-- new ext\uri\Module (line 280)
-- new ext\uuid\Module (line 281)
-- new ext\uploadprogress\Module (line 282)
-- new ext\apcu\Module (line 283)
-- new ext\sysvshm\Module (line 284)
-- new ext\sysvsem\Module (line 285)
-- new ext\sysvmsg\Module (line 286)
-- new ext\reflection\Module (line 287)
-- new ext\standard\Module (line 288)
-- new JIT (line 364)
-- new JITContext (line 378)
-- new SealedClassPreprocessor (line 444)
-- new StaticClassPreprocessor (line 447)
-- new SourcePreprocessor\PropertyHooks (line 450)
-- new State (line 591)
-- new ReflectionProperty (line 618)
-- new ReflectionProperty (line 621)
-- new LintCompiler (line 1032)
-- new Variable (line 1162)
+- new ext\mailparse\Module (line 277)
+- new ext\enchant\Module (line 278)
+- new ext\pdo\Module (line 279)
+- new ext\phar\Module (line 280)
+- new ext\uri\Module (line 281)
+- new ext\uuid\Module (line 282)
+- new ext\uploadprogress\Module (line 283)
+- new ext\apcu\Module (line 284)
+- new ext\sysvshm\Module (line 285)
+- new ext\sysvsem\Module (line 286)
+- new ext\sysvmsg\Module (line 287)
+- new ext\reflection\Module (line 288)
+- new ext\standard\Module (line 289)
+- new JIT (line 365)
+- new JITContext (line 379)
+- new SealedClassPreprocessor (line 445)
+- new StaticClassPreprocessor (line 448)
+- new SourcePreprocessor\PropertyHooks (line 451)
+- new State (line 592)
+- new ReflectionProperty (line 619)
+- new ReflectionProperty (line 622)
+- new LintCompiler (line 1033)
+- new Variable (line 1163)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
