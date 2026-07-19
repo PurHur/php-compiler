@@ -183,13 +183,13 @@ final class SuperglobalRefreshRuntime
         }
     }
 
+    /**
+     * Type::register declares empty ABI shells; lookup alone is not enough (#20932 regression).
+     * Fill thin-AOT link stubs so ScriptExit / helper-runtime units resolve pending-header ABI.
+     */
     private static function ensureHeaderQueueExternal(Context $context): void
     {
-        try {
-            $context->lookupFunction('__phpc_header_queue_enable');
-        } catch (\Throwable) {
-            PendingHeadersRuntime::ensureLinked($context);
-        }
+        PendingHeadersRuntime::ensureThinAotLinkStubs($context);
     }
 
     private static function sgGlobalPtr(Context $context, string $name): Value
