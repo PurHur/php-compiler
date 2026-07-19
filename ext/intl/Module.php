@@ -156,7 +156,12 @@ class Module extends ModuleAbstract
             : [];
 
         $resourcebundle = IntlExtensionPolicy::advertisesResourceBundle()
-            ? [new resourcebundle_count()]
+            ? [
+                new resourcebundle_create(),
+                new resourcebundle_get(),
+                new resourcebundle_locales(),
+                new resourcebundle_count(),
+            ]
             : [];
 
         $datefmt = IntlExtensionPolicy::advertisesIntlDateFormatter()
