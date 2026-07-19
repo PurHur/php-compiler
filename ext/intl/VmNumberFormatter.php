@@ -411,10 +411,9 @@ final class VmNumberFormatter
     }
 
     /**
-     * Parse currency amount (php-src unum_parseDoubleCurrency; #20728, #21127).
+     * numfmt_parse_currency / NumberFormatter::parseCurrency — php-src formatter_main.c (#20728, #21127, #21145).
      *
-     * Optional &$offset is both start position (bytes) and end position out-param,
-     * matching formatter.stub.php `parseCurrency(..., &$currency, &$offset = null)`.
+     * Optional by-ref $offset is both parse start (bytes) and end (bytes consumed) like ICU.
      *
      * @param-out string|null $currencyOut
      * @param-out int|null    $offset
@@ -434,59 +433,122 @@ final class VmNumberFormatter
 
             return false;
         }
+        $hasOffset = null !== $offset;
         $start = 0;
-        if (null !== $offset) {
-            $start = $offset;
+        if ($hasOffset) {
+            $start = $offset ?? 0;
             if ($start < 0) {
                 $start = 0;
             }
             if ($start > \strlen($value)) {
-                $start = \strlen($value);
+                self::fail($formatter, 'numfmt_parse_currency: Currency parsing failed: U_PARSE_ERROR');
+                $currencyOut = null;
+
+                return false;
             }
         }
-        $slice = $start > 0 ? substr($value, $start) : $value;
-        $trimmed = trim($slice);
-        $currency = null;
-        $numeric = $trimmed;
-        if (preg_match('/^([A-Z]{3})\s*(.+)$/i', $trimmed, $m)) {
-            $currency = strtoupper($m[1]);
-            $numeric = $m[2];
-        } elseif (preg_match('/^(.+?)\s*([A-Z]{3})$/i', $trimmed, $m)) {
-            $numeric = $m[1];
-            $currency = strtoupper($m[2]);
-        } elseif (str_starts_with($trimmed, '$')) {
-            $currency = 'USD';
-            $numeric = substr($trimmed, 1);
-        } elseif (str_starts_with($trimmed, '€')) {
-            $currency = 'EUR';
-            $numeric = substr($trimmed, strlen('€'));
-        } elseif (str_starts_with($trimmed, '£')) {
-            $currency = 'GBP';
-            $numeric = substr($trimmed, strlen('£'));
-        } elseif (str_starts_with($trimmed, '¥')) {
-            $currency = 'JPY';
-            $numeric = substr($trimmed, strlen('¥'));
-        } elseif (str_starts_with($trimmed, '-$')) {
-            $currency = 'USD';
-            $numeric = '-'.substr($trimmed, 2);
-        }
-        $num = self::parseNumberString(trim($numeric), $state['locale']);
-        if (null === $num || null === $currency) {
+        $slice = $hasOffset ? \substr($value, $start) : $value;
+        $parsed = self::parseCurrencySlice($slice, $state['locale']);
+        if (null === $parsed) {
             self::fail($formatter, 'numfmt_parse_currency: Currency parsing failed: U_PARSE_ERROR');
             $currencyOut = null;
-            // Leave &$offset unchanged on failure (matches NumberFormatter::parse subset #20993).
 
             return false;
         }
+        [$num, $currency, $consumed] = $parsed;
         $currencyOut = $currency;
-        if (null !== $offset) {
-            // Subset: advance to end of input on success (ICU updates parse end index).
-            $offset = \strlen($value);
+        if ($hasOffset) {
+            $offset = $start + $consumed;
         }
         self::clearObjectError($formatter);
         IntlError::clear();
 
         return $num;
+    }
+
+    /**
+     * Parse a currency amount prefix; return [amount, currency, bytesConsumed] or null.
+     *
+     * @return array{0: float, 1: string, 2: int}|null
+     */
+    private static function parseCurrencySlice(string $slice, string $locale): ?array
+    {
+        if ('' === $slice) {
+            return null;
+        }
+        // Prefer leading currency symbols over trailing ISO codes so "$12abc" stays USD (#21145).
+        $negative = false;
+        $numericStart = 0;
+        $currency = null;
+        if (str_starts_with($slice, '-$')) {
+            $currency = 'USD';
+            $numericStart = 2;
+            $negative = true;
+        } elseif (str_starts_with($slice, '$')) {
+            $currency = 'USD';
+            $numericStart = 1;
+        } elseif (str_starts_with($slice, '€')) {
+            $currency = 'EUR';
+            $numericStart = \strlen('€');
+        } elseif (str_starts_with($slice, '£')) {
+            $currency = 'GBP';
+            $numericStart = \strlen('£');
+        } elseif (str_starts_with($slice, '¥')) {
+            $currency = 'JPY';
+            $numericStart = \strlen('¥');
+        } elseif (preg_match('/^([A-Z]{3})\s*/i', $slice, $m)) {
+            $currency = strtoupper($m[1]);
+            $numericStart = \strlen($m[0]);
+        } elseif (preg_match('/^(.+?)\s*([A-Z]{3})$/i', $slice, $m)) {
+            // Trailing ISO only when it is the entire remainder (end-anchored).
+            $num = self::parseNumberString(trim($m[1]), $locale);
+            if (null === $num) {
+                return null;
+            }
+
+            return [$num, strtoupper($m[2]), \strlen($m[0])];
+        } else {
+            return null;
+        }
+
+        $numericSlice = \substr($slice, $numericStart);
+        if ($negative) {
+            $numericSlice = '-'.$numericSlice;
+        }
+        $prefix = self::matchNumberPrefix($numericSlice, $locale);
+        if (null === $prefix) {
+            return null;
+        }
+        [$num, $numBytes] = $prefix;
+        $consumed = $numericStart + ($negative ? $numBytes - 1 : $numBytes);
+
+        return [$num, $currency, $consumed];
+    }
+
+    /**
+     * Longest locale-aware numeric prefix (stops before trailing junk — e.g. "$12abc" → "12").
+     *
+     * @return array{0: float, 1: int}|null
+     */
+    private static function matchNumberPrefix(string $value, string $locale): ?array
+    {
+        [$grouping, $decimal] = self::separatorsForLocale($locale);
+        $g = preg_quote($grouping, '/');
+        $d = preg_quote($decimal, '/');
+        $pattern = '/^(-)?(?:\d{1,3}(?:'.$g.'\d{3})*|\d+)(?:'.$d.'\d+)?/';
+        if (!preg_match($pattern, $value, $m)) {
+            $pattern = '/^(-)?('.$d.'\d+)/';
+            if (!preg_match($pattern, $value, $m)) {
+                return null;
+            }
+        }
+        $matched = $m[0];
+        $num = self::parseNumberString($matched, $locale);
+        if (null === $num) {
+            return null;
+        }
+
+        return [$num, \strlen($matched)];
     }
 
     /**
