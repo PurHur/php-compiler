@@ -206,21 +206,21 @@ final class VmIntlChar
             'hasbinaryproperty' => [new IntlCharHasBinaryProperty(), 'hasBinaryProperty'],
             'isalpha' => [new IntlCharIsAlpha(), 'isalpha'],
             'isdigit' => [new IntlCharIsDigit(), 'isdigit'],
-            'isalnum' => [new IntlCharUnaryBool('isalnum', VmIntlChar::isalnum(...)), 'isalnum'],
-            'isspace' => [new IntlCharUnaryBool('isspace', VmIntlChar::isspace(...)), 'isspace'],
-            'islower' => [new IntlCharUnaryBool('islower', VmIntlChar::islower(...)), 'islower'],
-            'isupper' => [new IntlCharUnaryBool('isupper', VmIntlChar::isupper(...)), 'isupper'],
-            'isblank' => [new IntlCharUnaryBool('isblank', VmIntlChar::isblank(...)), 'isblank'],
-            'iscntrl' => [new IntlCharUnaryBool('iscntrl', VmIntlChar::iscntrl(...)), 'iscntrl'],
-            'isgraph' => [new IntlCharUnaryBool('isgraph', VmIntlChar::isgraph(...)), 'isgraph'],
-            'isprint' => [new IntlCharUnaryBool('isprint', VmIntlChar::isprint(...)), 'isprint'],
-            'ispunct' => [new IntlCharUnaryBool('ispunct', VmIntlChar::ispunct(...)), 'ispunct'],
-            'isxdigit' => [new IntlCharUnaryBool('isxdigit', VmIntlChar::isxdigit(...)), 'isxdigit'],
-            'isbase' => [new IntlCharUnaryBool('isbase', VmIntlChar::isbase(...)), 'isbase'],
-            'ismirrored' => [new IntlCharUnaryBool('isMirrored', VmIntlChar::isMirrored(...)), 'isMirrored'],
-            'chartype' => [new IntlCharUnaryInt('charType', VmIntlChar::charType(...)), 'charType'],
-            'getblockcode' => [new IntlCharUnaryInt('getBlockCode', VmIntlChar::getBlockCode(...)), 'getBlockCode'],
-            'getcombiningclass' => [new IntlCharUnaryInt('getCombiningClass', VmIntlChar::getCombiningClass(...)), 'getCombiningClass'],
+            'isalnum' => [new IntlCharIsAlnum(), 'isalnum'],
+            'isspace' => [new IntlCharIsSpace(), 'isspace'],
+            'islower' => [new IntlCharIsLower(), 'islower'],
+            'isupper' => [new IntlCharIsUpper(), 'isupper'],
+            'isblank' => [new IntlCharIsBlank(), 'isblank'],
+            'iscntrl' => [new IntlCharIsCntrl(), 'iscntrl'],
+            'isgraph' => [new IntlCharIsGraph(), 'isgraph'],
+            'isprint' => [new IntlCharIsPrint(), 'isprint'],
+            'ispunct' => [new IntlCharIsPunct(), 'ispunct'],
+            'isxdigit' => [new IntlCharIsXdigit(), 'isxdigit'],
+            'isbase' => [new IntlCharIsBase(), 'isbase'],
+            'ismirrored' => [new IntlCharIsMirrored(), 'isMirrored'],
+            'chartype' => [new IntlCharCharType(), 'charType'],
+            'getblockcode' => [new IntlCharGetBlockCode(), 'getBlockCode'],
+            'getcombiningclass' => [new IntlCharGetCombiningClass(), 'getCombiningClass'],
             'toupper' => [new IntlCharToUpper(), 'toupper'],
             'tolower' => [new IntlCharToLower(), 'tolower'],
             'totitle' => [new IntlCharToTitle(), 'totitle'],
@@ -1363,19 +1363,12 @@ final class IntlCharIsDigit extends VmClassMethod
 }
 
 
-/**
- * Shared unary bool IntlChar::* handler (#20821).
- *
- * @param callable(string|int):bool $impl
- */
-final class IntlCharUnaryBool extends VmClassMethod
+/** IntlChar::isalnum() — php-src / ICU (#20821). */
+final class IntlCharIsAlnum extends VmClassMethod
 {
-    /** @param callable(string|int):bool $impl */
-    public function __construct(
-        string $name,
-        private $impl,
-    ) {
-        parent::__construct($name);
+    public function __construct()
+    {
+        parent::__construct('isalnum');
     }
 
     public function execute(Frame $frame): void
@@ -1383,36 +1376,24 @@ final class IntlCharUnaryBool extends VmClassMethod
         $argc = \count($frame->calledArgs);
         if (1 !== $argc) {
             throw new \ArgumentCountError(\sprintf(
-                'IntlChar::%s() expects exactly 1 argument, %d given',
-                $this->name,
+                'IntlChar::isalnum() expects exactly 1 argument, %d given',
                 $argc
             ));
         }
-        $codepoint = VmIntlChar::coerceOrdArg(
-            $frame->calledArgs[0],
-            'IntlChar::'.$this->name,
-            0
-        );
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isalnum', 0);
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(($this->impl)($codepoint));
+        $frame->returnVar->bool(VmIntlChar::isalnum($codepoint));
     }
 }
 
-/**
- * Shared unary int IntlChar::* handler (#20821).
- *
- * @param callable(string|int):int $impl
- */
-final class IntlCharUnaryInt extends VmClassMethod
+/** IntlChar::isspace() — php-src / ICU (#20821). */
+final class IntlCharIsSpace extends VmClassMethod
 {
-    /** @param callable(string|int):int $impl */
-    public function __construct(
-        string $name,
-        private $impl,
-    ) {
-        parent::__construct($name);
+    public function __construct()
+    {
+        parent::__construct('isspace');
     }
 
     public function execute(Frame $frame): void
@@ -1420,20 +1401,340 @@ final class IntlCharUnaryInt extends VmClassMethod
         $argc = \count($frame->calledArgs);
         if (1 !== $argc) {
             throw new \ArgumentCountError(\sprintf(
-                'IntlChar::%s() expects exactly 1 argument, %d given',
-                $this->name,
+                'IntlChar::isspace() expects exactly 1 argument, %d given',
                 $argc
             ));
         }
-        $codepoint = VmIntlChar::coerceOrdArg(
-            $frame->calledArgs[0],
-            'IntlChar::'.$this->name,
-            0
-        );
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isspace', 0);
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(($this->impl)($codepoint));
+        $frame->returnVar->bool(VmIntlChar::isspace($codepoint));
+    }
+}
+
+/** IntlChar::islower() — php-src / ICU (#20821). */
+final class IntlCharIsLower extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('islower');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::islower() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::islower', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::islower($codepoint));
+    }
+}
+
+/** IntlChar::isupper() — php-src / ICU (#20821). */
+final class IntlCharIsUpper extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isupper');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isupper() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isupper', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isupper($codepoint));
+    }
+}
+
+/** IntlChar::isblank() — php-src / ICU (#20821). */
+final class IntlCharIsBlank extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isblank');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isblank() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isblank', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isblank($codepoint));
+    }
+}
+
+/** IntlChar::iscntrl() — php-src / ICU (#20821). */
+final class IntlCharIsCntrl extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('iscntrl');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::iscntrl() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::iscntrl', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::iscntrl($codepoint));
+    }
+}
+
+/** IntlChar::isgraph() — php-src / ICU (#20821). */
+final class IntlCharIsGraph extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isgraph');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isgraph() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isgraph', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isgraph($codepoint));
+    }
+}
+
+/** IntlChar::isprint() — php-src / ICU (#20821). */
+final class IntlCharIsPrint extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isprint');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isprint() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isprint', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isprint($codepoint));
+    }
+}
+
+/** IntlChar::ispunct() — php-src / ICU (#20821). */
+final class IntlCharIsPunct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('ispunct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::ispunct() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::ispunct', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::ispunct($codepoint));
+    }
+}
+
+/** IntlChar::isxdigit() — php-src / ICU (#20821). */
+final class IntlCharIsXdigit extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isxdigit');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isxdigit() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isxdigit', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isxdigit($codepoint));
+    }
+}
+
+/** IntlChar::isbase() — php-src / ICU (#20821). */
+final class IntlCharIsBase extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isbase');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isbase() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isbase', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isbase($codepoint));
+    }
+}
+
+/** IntlChar::isMirrored() — php-src / ICU (#20821). */
+final class IntlCharIsMirrored extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isMirrored');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::isMirrored() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::isMirrored', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlChar::isMirrored($codepoint));
+    }
+}
+
+/** IntlChar::charType() — php-src / ICU (#20821). */
+final class IntlCharCharType extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('charType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::charType() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::charType', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlChar::charType($codepoint));
+    }
+}
+
+/** IntlChar::getBlockCode() — php-src / ICU (#20821). */
+final class IntlCharGetBlockCode extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getBlockCode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getBlockCode() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::getBlockCode', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlChar::getBlockCode($codepoint));
+    }
+}
+
+/** IntlChar::getCombiningClass() — php-src / ICU (#20821). */
+final class IntlCharGetCombiningClass extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getCombiningClass');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlChar::getCombiningClass() expects exactly 1 argument, %d given',
+                $argc
+            ));
+        }
+        $codepoint = VmIntlChar::coerceOrdArg($frame->calledArgs[0], 'IntlChar::getCombiningClass', 0);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(VmIntlChar::getCombiningClass($codepoint));
     }
 }
 
