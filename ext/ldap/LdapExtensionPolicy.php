@@ -26,4 +26,12 @@ final class LdapExtensionPolicy
     {
         return self::advertisesExtension();
     }
+
+    /**
+     * ldap_connect_wallet + GSLC_SSL_* (php-src HAVE_ORALDAP; #20638).
+     */
+    public static function advertisesWalletConnect(): bool
+    {
+        return self::advertisesExtension() && VmLdapNative::walletAvailable();
+    }
 }

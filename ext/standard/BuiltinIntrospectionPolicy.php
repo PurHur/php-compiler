@@ -204,7 +204,12 @@ final class BuiltinIntrospectionPolicy
             'ldap_exop_sync',
             'ldap_parse_exop',
             'ldap_exop_refresh',
+            'ldap_connect_wallet',
         ], true)) {
+            if ('ldap_connect_wallet' === $lc) {
+                return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesWalletConnect();
+            }
+
             return \PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesBuiltins();
         }
         if ('fastcgi_finish_request' === $lc) {

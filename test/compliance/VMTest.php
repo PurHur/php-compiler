@@ -589,6 +589,15 @@ class VMTest extends BaseTest {
                     || (str_contains($name, 'ldap_') && str_contains($name, 'phantom')))) {
                 continue;
             }
+            if (\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesWalletConnect()
+                && str_contains($name, 'ldap_connect_wallet_withhold')) {
+                continue;
+            }
+            if (!\PHPCompiler\ext\ldap\LdapExtensionPolicy::advertisesWalletConnect()
+                && str_contains($name, 'ldap_connect_wallet')
+                && str_contains($name, 'oracle')) {
+                continue;
+            }
             if (!\PHPCompiler\ext\pgsql\PgsqlExtensionPolicy::advertisesBuiltins()
                 && str_contains($name, 'pgsql_')) {
                 continue;
