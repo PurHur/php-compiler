@@ -40,6 +40,9 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('EnvironMirrorRuntime::ensureLinked', $source);
         $this->assertStringContainsString('EnvironMirrorRuntime::emitFillCall', $source);
         $this->assertStringContainsString('ensurePrerequisites', $source);
+        $this->assertStringContainsString("storeLibcGetenvInEntry(\$context, \$entry, 'PATH_INFO')", $source);
+        $this->assertStringContainsString('storeResolvedPathInfoInEntry', $source);
+        $this->assertStringContainsString("setServerKeyFromCstr(\$context, \$serverHt, 'PATH_INFO'", $source);
         $this->assertStringContainsString('__compiler_parse_str', $source);
         $this->assertStringContainsString('__compiler_parse_cookie_header', $source);
         $this->assertStringContainsString('__compiler_multipart_populate_post_body', $source);
