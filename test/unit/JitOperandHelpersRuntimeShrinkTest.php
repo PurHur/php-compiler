@@ -21,8 +21,18 @@ final class JitOperandHelpersRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/VM/VmFloatCompare.php');
         $this->assertStringContainsString('eitherOperandIsNaN', $source);
+        $this->assertStringContainsString('lookupOrDeclareIsNan', $source);
         $this->assertStringContainsString('spaceship', $source);
+        $this->assertStringContainsString('self::lookupOrDeclareIsNan', $source);
         $this->assertGreaterThan(70, substr_count($source, "\n") + 1);
+    }
+
+    /** #21105: clamp NaN bounds must not bare-lookup libc isnan. */
+    public function testJitClampUsesDeclareOnDemandIsNan(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitClamp.php');
+        $this->assertStringContainsString('VmFloatCompare::lookupOrDeclareIsNan', $source);
+        $this->assertStringNotContainsString("lookupFunction('isnan')", $source);
     }
 
     public function testJitResourceIdStringIsThinTrampoline(): void

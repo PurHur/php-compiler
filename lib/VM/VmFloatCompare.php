@@ -16,9 +16,42 @@ use PHPLLVM\Value;
  */
 final class VmFloatCompare
 {
+    /**
+     * Declare libc `isnan(double) → i32` when missing.
+     *
+     * Selfhost / minimal compiles skip ext/standard Module init, so bare
+     * {@see Context::lookupFunction}('isnan') throws (#21105). Mirrors
+     * {@see \PHPCompiler\ext\standard\JitSpaceshipCompareKernel} declareExternal.
+     */
+    public static function lookupOrDeclareIsNan(Context $context): \PHPLLVM\Value\Function_
+    {
+        try {
+            return $context->lookupFunction('isnan');
+        } catch (\Throwable) {
+            // Declare or re-bind into functionScope below.
+        }
+
+        $existing = $context->module->getNamedFunction('isnan');
+        if (null !== $existing) {
+            $context->registerFunction('isnan', $existing);
+
+            return $existing;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $dbl = $context->getTypeFromString('double');
+        $fn = $context->module->addFunction(
+            'isnan',
+            $context->context->functionType($i32, false, $dbl)
+        );
+        $context->registerFunction('isnan', $fn);
+
+        return $fn;
+    }
+
     private static function eitherOperandIsNaN(Context $context, Value $left, Value $right): Value
     {
-        $isnan = $context->lookupFunction('isnan');
+        $isnan = self::lookupOrDeclareIsNan($context);
         $i32 = $context->getTypeFromString('int32');
         $zero = $i32->constInt(0, false);
         $leftNan = $context->builder->icmp(
