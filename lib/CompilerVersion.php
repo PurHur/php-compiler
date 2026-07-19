@@ -1009,6 +1009,22 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.5+ Locale::isRightToLeft / addLikelySubtags / minimizeSubtags (#20927).
+     *
+     * Withheld on 8.4.0-dev / PROFILE=8.4 so method_exists matches Zend ≤8.4. Enable via
+     * stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5` forward profile.
+     * php-src: ext/intl/locale/locale.stub.php (GH-18345 / GH-18344).
+     */
+    public static function advertisesLocaleRtlAndLikelySubtags(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
      * Gated on {@see languageProfileVersion()} so 8.4.0-dev reference profile rejects like Zend 8.2 (#12508, #17197).
