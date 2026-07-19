@@ -2643,7 +2643,13 @@ final class VmDom
         }
         $state = DomRegistry::state($node);
         if (DomConstants::XML_DOCUMENT_NODE === $state->nodeType) {
-            return $state->documentUri ?? '';
+            // Living Dom\* documents: unset URL → about:blank (php-src follow_spec; #21056).
+            $uri = $state->documentUri ?? '';
+            if ('' === $uri && VmDomLiving::isLivingDocument($node)) {
+                return 'about:blank';
+            }
+
+            return $uri;
         }
 
         $doc = self::ownerDocumentEntry($node);
@@ -2652,6 +2658,10 @@ final class VmDom
         }
         $docState = DomRegistry::state($doc);
         $base = $docState->documentUri ?? '';
+        // Living Dom\* nodes inherit document URI; about:blank when URL unset (#21056).
+        if ('' === $base && VmDomLiving::isLivingDocument($doc)) {
+            $base = 'about:blank';
+        }
         if ($docState->isHtmlDocument) {
             $htmlBase = self::findHtmlBaseHref($doc);
             if (null !== $htmlBase && '' !== $htmlBase) {
@@ -9449,6 +9459,15 @@ final class VmDom
             || DomConstants::XML_PROCESSING_INSTRUCTION_NODE === $state->nodeType
             || DomConstants::XML_NAMESPACE_DECL_NODE === $state->nodeType) {
             return $state->textContent ?? '';
+        }
+        // Living Dom\* Element / DocumentFragment — always null (php-src modern node.c; #21054).
+        // Legacy DOMElement still concatenates descendant text (libxml / #19455).
+        if (DomConstants::XML_ELEMENT_NODE === $state->nodeType
+            || DomConstants::XML_DOCUMENT_FRAG_NODE === $state->nodeType
+        ) {
+            if (str_starts_with(strtolower($node->class->name), 'dom\\')) {
+                return null;
+            }
         }
         if (DomConstants::XML_ELEMENT_NODE === $state->nodeType) {
             // Modern Dom\Element::$nodeValue is always null (php-src / RFC; #21034).

@@ -248,7 +248,7 @@ class ObjectEntry {
         if (null !== $domHtmlElIsset) {
             return $domHtmlElIsset;
         }
-        // Dom\* ParentNode::$children (#21033).
+        // Dom\* Node/CharacterData/ParentNode computed props (#21033, #21053, #21055).
         $domChildrenIsset = \PHPCompiler\ext\dom\DomNodePropertySupport::propertyIsSet($this, $name);
         if (null !== $domChildrenIsset) {
             return $domChildrenIsset;
