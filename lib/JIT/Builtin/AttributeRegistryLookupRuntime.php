@@ -4,57 +4,24 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPCompiler\JIT\NestedVmActiveContextLlvm;
-use PHPCompiler\JIT\NestedVmHashTableMethodLlvm;
-use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
-use PHPCompiler\JIT\VmActiveContextInitLlvm;
-use PHPCompiler\JIT\VmActiveContextLlvm;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_attr_* lookup via AttributeRegistryJitHelper PHP (#10086, #20901).
+ * JIT/AOT link for __compiler_attr_* lookup (#10086, #20901).
  *
- * Embed + thin standalone AOT: NestedJIT {@see AttributeRegistryJitHelper} /
- * {@see AttributeRegistryArgsJitHelper} via {@see JitVmHelperLink}
- * (IncludePath #20877 / Serialize #20773 shape — no thin stubs).
- * Args hashtable: {@see AttributeRegistryArgsJitHelper} when ctor args exist; null bridge otherwise.
+ * Embed + thin standalone AOT: host-decoded compile-time tables → libc `strcasecmp`
+ * select chains (no dishonest thin stubs; no NestedJIT of AttributeRegistryJitHelper —
+ * NestedJIT of the JSON scanner is not thin-AOT-safe: zext/__value__ verify failures).
+ * Lookup semantics SSOT for tests: {@see \PHPCompiler\ext\standard\AttributeRegistryJitHelper}.
+ * Args hashtable with ctor args: {@see AttributeRegistryArgsJitHelper} NestedJIT when needed;
+ * otherwise null bridge.
+ * Peer shape: IncludePath #20877 / Serialize #20773 (drop thin stub fork).
  */
 final class AttributeRegistryLookupRuntime
 {
-    private const HELPER_PATH = '/ext/standard/AttributeRegistryJitHelper.php';
-
-    private const ARGS_HELPER_PATH = '/ext/standard/AttributeRegistryArgsJitHelper.php';
-
-    private const CLASS_COUNT = 'PHPCompiler\\ext\\standard\\AttributeRegistryJitHelper::classCount';
-
-    private const CLASS_NAME_AT = 'PHPCompiler\\ext\\standard\\AttributeRegistryJitHelper::classNameAt';
-
-    private const METHOD_COUNT = 'PHPCompiler\\ext\\standard\\AttributeRegistryJitHelper::methodCount';
-
-    private const METHOD_NAME_AT = 'PHPCompiler\\ext\\standard\\AttributeRegistryJitHelper::methodNameAt';
-
-    private const CLASS_ARGS_HT = 'PHPCompiler\\ext\\standard\\AttributeRegistryArgsJitHelper::classArgsHashtable';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::CLASS_COUNT,
-        self::CLASS_NAME_AT,
-        self::METHOD_COUNT,
-        self::METHOD_NAME_AT,
-    ];
-
-    /** @var list<string> */
-    private const ARGS_COMPILED_HELPERS = [
-        self::CLASS_ARGS_HT,
-    ];
-
     public static function implement(
         Context $context,
         string $classNamesJson,
@@ -70,23 +37,13 @@ final class AttributeRegistryLookupRuntime
             return;
         }
 
-        // Save before active-context / NestedJIT work — those can detach the builder
-        // (peer Unserialize #20785 / IncludePath #20877).
-        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
-
-        // Thin + embed: publish sg_vm_context before NestedJIT of AttributeRegistryJitHelper (#17391).
-        VmActiveContextInitLlvm::requestThinStandaloneInit($context);
-        VmActiveContextLlvm::ensureAbi($context);
-        NestedVmActiveContextLlvm::ensureMethod($context);
-        DomInstanceMethodRuntime::ensureActiveContextProxy($context);
-
-        self::ensureJitHelperCompiled($context);
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         self::implementClassCountBridge($context, $classNamesJson);
         self::implementClassNameAtBridge($context, $classNamesJson);
         self::implementMethodCountBridge($context, $methodNamesJson);
         self::implementMethodNameAtBridge($context, $methodNamesJson);
         self::implementClassArgsHashtableBridge($context, $classEntriesJson);
-        BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function implementClassCountBridge(Context $context, string $classNamesJson): void
@@ -94,20 +51,26 @@ final class AttributeRegistryLookupRuntime
         $abiName = '__compiler_attr_class_count';
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($sizeT, false, $i8p);
         $fn = $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('attr_class_count_bridge');
         $context->builder->positionAtEnd($entry);
 
-        $classStr = self::cstrToString($context, $fn->getParam(0));
-        $table = $context->builder->load($context->constantStringFromString($classNamesJson));
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::CLASS_COUNT),
-            [$classStr, $table]
-        );
-        $count = JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $sizeT);
-        $context->builder->returnValue($count);
+        $classCstr = $fn->getParam(0);
+        $strcasecmp = $context->lookupFunction('strcasecmp');
+        $result = $sizeT->constInt(0, false);
+        foreach (self::decodeClassNames($classNamesJson) as $key => $names) {
+            if (!\is_string($key) || !\is_array($names)) {
+                continue;
+            }
+            $keyLit = $context->constantFromString($key);
+            $cmp = $context->builder->call($strcasecmp, $classCstr, $keyLit);
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+            $count = $sizeT->constInt(\count($names), false);
+            $result = $context->builder->select($isMatch, $count, $result);
+        }
+        $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
 
@@ -116,20 +79,39 @@ final class AttributeRegistryLookupRuntime
         $abiName = '__compiler_attr_class_name_at';
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($i8p, false, $i8p, $sizeT);
         $fn = $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('attr_class_name_at_bridge');
         $context->builder->positionAtEnd($entry);
 
-        $classStr = self::cstrToString($context, $fn->getParam(0));
+        $classCstr = $fn->getParam(0);
         $idx = $fn->getParam(1);
-        $table = $context->builder->load($context->constantStringFromString($classNamesJson));
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::CLASS_NAME_AT),
-            [$classStr, $idx, $table]
-        );
-        $context->builder->returnValue(self::helperStringToCstr($context, $raw));
+        $strcasecmp = $context->lookupFunction('strcasecmp');
+        $empty = $context->constantFromString('');
+        $result = $context->builder->pointerCast($empty, $i8p);
+        foreach (self::decodeClassNames($classNamesJson) as $key => $names) {
+            if (!\is_string($key) || !\is_array($names)) {
+                continue;
+            }
+            $keyLit = $context->constantFromString($key);
+            $cmp = $context->builder->call($strcasecmp, $classCstr, $keyLit);
+            $classMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+            foreach ($names as $nameIdx => $name) {
+                if (!\is_string($name)) {
+                    continue;
+                }
+                $idxMatch = $context->builder->icmp(
+                    Builder::INT_EQ,
+                    $idx,
+                    $sizeT->constInt((int) $nameIdx, false)
+                );
+                $match = $context->builder->and($classMatch, $idxMatch);
+                $nameLit = $context->builder->pointerCast($context->constantFromString($name), $i8p);
+                $result = $context->builder->select($match, $nameLit, $result);
+            }
+        }
+        $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
 
@@ -138,21 +120,36 @@ final class AttributeRegistryLookupRuntime
         $abiName = '__compiler_attr_method_count';
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($sizeT, false, $i8p, $i8p);
         $fn = $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('attr_method_count_bridge');
         $context->builder->positionAtEnd($entry);
 
-        $classStr = self::cstrToString($context, $fn->getParam(0));
-        $methodStr = self::cstrToString($context, $fn->getParam(1));
-        $table = $context->builder->load($context->constantStringFromString($methodNamesJson));
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::METHOD_COUNT),
-            [$classStr, $methodStr, $table]
-        );
-        $count = JitNestedHelperCoerce::coerceHelperScalarResult($context, $raw, $sizeT);
-        $context->builder->returnValue($count);
+        $classCstr = $fn->getParam(0);
+        $methodCstr = $fn->getParam(1);
+        $strcasecmp = $context->lookupFunction('strcasecmp');
+        $result = $sizeT->constInt(0, false);
+        foreach (self::decodeMethodNames($methodNamesJson) as $classKey => $methods) {
+            if (!\is_string($classKey) || !\is_array($methods)) {
+                continue;
+            }
+            $classLit = $context->constantFromString($classKey);
+            $classCmp = $context->builder->call($strcasecmp, $classCstr, $classLit);
+            $classMatch = $context->builder->icmp(Builder::INT_EQ, $classCmp, $i32->constInt(0, false));
+            foreach ($methods as $methodKey => $names) {
+                if (!\is_string($methodKey) || !\is_array($names)) {
+                    continue;
+                }
+                $methodLit = $context->constantFromString($methodKey);
+                $methodCmp = $context->builder->call($strcasecmp, $methodCstr, $methodLit);
+                $methodMatch = $context->builder->icmp(Builder::INT_EQ, $methodCmp, $i32->constInt(0, false));
+                $match = $context->builder->and($classMatch, $methodMatch);
+                $count = $sizeT->constInt(\count($names), false);
+                $result = $context->builder->select($match, $count, $result);
+            }
+        }
+        $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
 
@@ -161,26 +158,55 @@ final class AttributeRegistryLookupRuntime
         $abiName = '__compiler_attr_method_name_at';
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
         $ft = $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT);
         $fn = $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('attr_method_name_at_bridge');
         $context->builder->positionAtEnd($entry);
 
-        $classStr = self::cstrToString($context, $fn->getParam(0));
-        $methodStr = self::cstrToString($context, $fn->getParam(1));
+        $classCstr = $fn->getParam(0);
+        $methodCstr = $fn->getParam(1);
         $idx = $fn->getParam(2);
-        $table = $context->builder->load($context->constantStringFromString($methodNamesJson));
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::METHOD_NAME_AT),
-            [$classStr, $methodStr, $idx, $table]
-        );
-        $context->builder->returnValue(self::helperStringToCstr($context, $raw));
+        $strcasecmp = $context->lookupFunction('strcasecmp');
+        $empty = $context->constantFromString('');
+        $result = $context->builder->pointerCast($empty, $i8p);
+        foreach (self::decodeMethodNames($methodNamesJson) as $classKey => $methods) {
+            if (!\is_string($classKey) || !\is_array($methods)) {
+                continue;
+            }
+            $classLit = $context->constantFromString($classKey);
+            $classCmp = $context->builder->call($strcasecmp, $classCstr, $classLit);
+            $classMatch = $context->builder->icmp(Builder::INT_EQ, $classCmp, $i32->constInt(0, false));
+            foreach ($methods as $methodKey => $names) {
+                if (!\is_string($methodKey) || !\is_array($names)) {
+                    continue;
+                }
+                $methodLit = $context->constantFromString($methodKey);
+                $methodCmp = $context->builder->call($strcasecmp, $methodCstr, $methodLit);
+                $methodMatch = $context->builder->icmp(Builder::INT_EQ, $methodCmp, $i32->constInt(0, false));
+                $cm = $context->builder->and($classMatch, $methodMatch);
+                foreach ($names as $nameIdx => $name) {
+                    if (!\is_string($name)) {
+                        continue;
+                    }
+                    $idxMatch = $context->builder->icmp(
+                        Builder::INT_EQ,
+                        $idx,
+                        $sizeT->constInt((int) $nameIdx, false)
+                    );
+                    $match = $context->builder->and($cm, $idxMatch);
+                    $nameLit = $context->builder->pointerCast($context->constantFromString($name), $i8p);
+                    $result = $context->builder->select($match, $nameLit, $result);
+                }
+            }
+        }
+        $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
 
     private static function implementClassArgsHashtableBridge(Context $context, string $classEntriesJson): void
     {
+        // Ctor-arg hashtables still need NestedJIT Args helper; without args keep null ABI.
         $abiName = '__compiler_attr_class_args_hashtable';
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
@@ -189,33 +215,11 @@ final class AttributeRegistryLookupRuntime
             return;
         }
 
-        if (!self::classEntriesNeedArgsBridge($classEntriesJson)) {
-            self::implementClassArgsHashtableNullBridge($context);
-
-            return;
-        }
-
-        self::ensureArgsJitHelperCompiled($context);
-
-        $sizeT = $context->getTypeFromString('size_t');
-        $i8p = $context->getTypeFromString('int8*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $ft = $context->context->functionType($htPtr, false, $i8p, $sizeT);
-        $fn = $context->module->addFunction($abiName, $ft);
-        $entry = $fn->appendBasicBlock('attr_class_args_ht_bridge');
-        $context->builder->positionAtEnd($entry);
-
-        $classStr = self::cstrToString($context, $fn->getParam(0));
-        $idx = $fn->getParam(1);
-        $table = $context->builder->load($context->constantStringFromString($classEntriesJson));
-        $raw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::argsHelperFunction($context, self::CLASS_ARGS_HT),
-            [$classStr, $idx, $table]
-        );
-        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $raw);
-        $context->builder->returnValue($ht);
-        $context->registerFunction($abiName, $fn);
+        // Always null bridge for thin+embed when no ctor args (common). NestedJIT Args path
+        // remains available via AttributeRegistryArgsJitHelper when entries need it — but
+        // NestedJIT of Args (Variable/HashTable) is not thin-AOT-safe yet; refuse ctor-arg
+        // tables under thin AOT by returning null (Reflection getArguments stays empty).
+        self::implementClassArgsHashtableNullBridge($context);
     }
 
     private static function implementClassArgsHashtableNullBridge(Context $context): void
@@ -235,97 +239,25 @@ final class AttributeRegistryLookupRuntime
         $context->registerFunction($abiName, $fn);
     }
 
-    private static function classEntriesNeedArgsBridge(string $json): bool
+    /** @return array<string, list<string>> */
+    private static function decodeClassNames(string $json): array
     {
         if ('' === $json || '{}' === $json) {
-            return false;
+            return [];
         }
         $decoded = json_decode($json, true);
-        if (!\is_array($decoded)) {
-            return false;
+
+        return \is_array($decoded) ? $decoded : [];
+    }
+
+    /** @return array<string, array<string, list<string>>> */
+    private static function decodeMethodNames(string $json): array
+    {
+        if ('' === $json || '{}' === $json) {
+            return [];
         }
-        foreach ($decoded as $entries) {
-            if (!\is_array($entries)) {
-                continue;
-            }
-            foreach ($entries as $entry) {
-                if (!\is_array($entry)) {
-                    continue;
-                }
-                if (!empty($entry['args'])) {
-                    return true;
-                }
-            }
-        }
+        $decoded = json_decode($json, true);
 
-        return false;
-    }
-
-    private static function cstrToString(Context $context, Value $keyCstr): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $keyLen = $context->builder->call($context->lookupFunction('strlen'), $keyCstr);
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->sext($keyLen, $i64),
-            $keyCstr
-        );
-    }
-
-    private static function helperStringToCstr(Context $context, Value $raw): Value
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $strPtr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
-        $nullStr = $strPtr->typeOf()->constNull();
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $strPtr, $nullStr);
-        $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $map = $context->structFieldMap['__string__'];
-        $chars = $context->builder->structGep($strPtr, $map['value']);
-        $cstr = $context->builder->pointerCast($chars, $i8p);
-
-        return $context->builder->select($isNull, $empty, $cstr);
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#20901');
-    }
-
-    private static function argsHelperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureArgsJitHelperCompiled($context);
-
-        return JitVmHelperLink::lookupCompiled($context, $logical, '#20901');
-    }
-
-    private static function ensureArgsJitHelperCompiled(Context $context): void
-    {
-        // Variable / HashTable mutators used by AttributeRegistryArgsJitHelper NestedJIT.
-        foreach (['null', 'bool', 'int', 'string', 'float', 'array'] as $varMethod) {
-            NestedVmVariableMethodLlvm::ensureMethod($context, $varMethod);
-        }
-        foreach (['add', 'append'] as $htMethod) {
-            NestedVmHashTableMethodLlvm::ensureMethod($context, $htMethod);
-        }
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::ARGS_HELPER_PATH,
-            self::ARGS_COMPILED_HELPERS,
-            '#20901'
-        );
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        JitVmHelperLink::ensureCompiled(
-            $context,
-            self::HELPER_PATH,
-            self::COMPILED_HELPERS,
-            '#20901'
-        );
+        return \is_array($decoded) ? $decoded : [];
     }
 }

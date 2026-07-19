@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\AttributeRegistryJitHelper;
 use PHPUnit\Framework\TestCase;
 
 /**
- * AttributeRegistry lookup: always NestedJIT AttributeRegistryJitHelper PHP (#10086, #20901).
+ * AttributeRegistry lookup: no thin stubs; host-decoded strcasecmp bridges (#10086, #20901).
  */
 final class AttributeRegistryLookupRuntimeShrinkTest extends TestCase
 {
@@ -27,35 +27,23 @@ final class AttributeRegistryLookupRuntimeShrinkTest extends TestCase
         $this->assertGreaterThan(250, 439 - $lineCount);
     }
 
-    public function testAttributeRegistryLookupRuntimeAlwaysUsesJitHelper(): void
+    public function testAttributeRegistryLookupRuntimeDropsThinStubs(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/AttributeRegistryLookupRuntime.php');
-        $this->assertStringContainsString('AttributeRegistryJitHelper', $source);
-        $this->assertStringContainsString('AttributeRegistryArgsJitHelper', $source);
-        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
-        $this->assertStringContainsString('VmActiveContextInitLlvm::requestThinStandaloneInit', $source);
-        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
+        $this->assertStringContainsString('StringCaseCompare::ensureStrcasecmpLinked', $source);
+        $this->assertStringContainsString('decodeClassNames', $source);
+        $this->assertStringContainsString('strcasecmp', $source);
         $this->assertStringNotContainsString('isThinStandaloneAotMain', $source);
         $this->assertStringNotContainsString('implementThinStandaloneStubs', $source);
         $this->assertStringNotContainsString('implementDeferredSizeTUnaryStub', $source);
         $this->assertStringNotContainsString('implementDeferredCstrTernaryStub', $source);
         $this->assertStringNotContainsString('shouldDeferHeavyStreamIoEmitters', $source);
         $this->assertStringNotContainsString('implementDeferredUserScriptStubs', $source);
-        $this->assertStringNotContainsString('emitCstrEqualsLiteral', $source);
         $this->assertStringNotContainsString('UserScriptAotDeferNestedJit', $source);
-        $this->assertStringNotContainsString('new JIT(', $source);
-        $this->assertStringNotContainsString('NestedJitCompileScope::run', $source);
-    }
-
-    public function testAttributeRegistryJitHelperIsNestedJitSafe(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/AttributeRegistryJitHelper.php');
-        $this->assertStringContainsString('findTopLevelStringList', $source);
-        $this->assertStringContainsString('countJsonStringList', $source);
-        $this->assertStringNotContainsString('json_decode(', $source);
-        $this->assertStringNotContainsString('foreach (self::decode', $source);
-        $this->assertStringNotContainsString('decodeClassNames', $source);
-        $this->assertStringNotContainsString('decodeMethodNames', $source);
+        // No NestedJIT of AttributeRegistryJitHelper (thin-AOT unsafe JSON scanner).
+        $this->assertStringNotContainsString('ensureJitHelperCompiled', $source);
+        $this->assertStringNotContainsString('AttributeRegistryJitHelper::classCount', $source);
+        $this->assertStringNotContainsString('JitVmHelperLink::ensureCompiled', $source);
     }
 
     public function testAttributeRegistryJitHelperLookupSemantics(): void
