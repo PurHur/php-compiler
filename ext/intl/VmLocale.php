@@ -485,6 +485,65 @@ final class VmLocale
     }
 
     /**
+     * locale_get_display_keyword() / Locale::getDisplayKeyword() — ICU uloc_getDisplayKeyword (#20928).
+     *
+     * @return string|false
+     */
+    public static function getDisplayKeyword(string $keyword, ?string $displayLocale = null): string|false
+    {
+        IntlError::clear();
+        if (null === $displayLocale || '' === $displayLocale) {
+            $displayLocale = self::getDefault();
+        }
+        $icu = self::ulocGetDisplayKeyword($keyword, $displayLocale);
+        if (null !== $icu) {
+            return $icu;
+        }
+        $fb = self::displayKeywordFallback($keyword);
+        if (null !== $fb) {
+            return $fb;
+        }
+        IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, 'unable to get locale keyword');
+
+        return false;
+    }
+
+    /**
+     * locale_get_display_keyword_value() / Locale::getDisplayKeywordValue() (#20928).
+     *
+     * @return string|false
+     */
+    public static function getDisplayKeywordValue(
+        string $locale,
+        string $keyword,
+        ?string $displayLocale = null
+    ): string|false {
+        IntlError::clear();
+        if (\strlen($locale) > self::MAX_LOCALE_LEN) {
+            IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, 'name too long');
+
+            return false;
+        }
+        if ('' === $locale) {
+            $locale = self::getDefault();
+        }
+        if (null === $displayLocale || '' === $displayLocale) {
+            $displayLocale = self::getDefault();
+        }
+        $icu = self::ulocGetDisplayKeywordValue($locale, $keyword, $displayLocale);
+        if (null !== $icu) {
+            return $icu;
+        }
+        $fb = self::displayKeywordValueFallback($locale, $keyword);
+        if (null !== $fb) {
+            return $fb;
+        }
+        IntlError::set(IntlError::U_ILLEGAL_ARGUMENT_ERROR, 'unable to get locale keywordvalue');
+
+        return false;
+    }
+
+    /**
      * locale_is_right_to_left() / Locale::isRightToLeft() — ICU uloc_isRightToLeft (#20927).
      *
      * php-src: ext/intl/locale/locale_methods.cpp (GH-18345). Empty locale → process default.
@@ -1106,6 +1165,141 @@ C;
     }
 
     /**
+     * @return string|false|null null = ICU unavailable; false = ICU error
+     */
+    private static function ulocGetDisplayKeyword(string $keyword, string $displayLocale): string|false|null
+    {
+        return self::ulocDisplayKeywordCall('uloc_getDisplayKeyword', [$keyword, $displayLocale]);
+    }
+
+    /**
+     * @return string|false|null null = ICU unavailable; false = ICU error
+     */
+    private static function ulocGetDisplayKeywordValue(
+        string $locale,
+        string $keyword,
+        string $displayLocale
+    ): string|false|null {
+        return self::ulocDisplayKeywordCall(
+            'uloc_getDisplayKeywordValue',
+            [$locale, $keyword, $displayLocale]
+        );
+    }
+
+    /**
+     * @param list<string> $args leading string args before UChar* dest
+     *
+     * @return string|false|null
+     */
+    private static function ulocDisplayKeywordCall(string $baseFn, array $args): string|false|null
+    {
+        $ffi = self::ulocFfi();
+        if (null === $ffi) {
+            return null;
+        }
+        $suffix = self::$ulocSuffix ?? '';
+        $fn = $baseFn.$suffix;
+        try {
+            $status = $ffi->new('UErrorCode');
+            $buflen = 512;
+            $buf = $ffi->new('UChar['.$buflen.']');
+            $status->cdata = 0;
+            if (2 === \count($args)) {
+                $len = (int) $ffi->$fn($args[0], $args[1], $buf, $buflen, \FFI::addr($status));
+            } else {
+                $len = (int) $ffi->$fn($args[0], $args[1], $args[2], $buf, $buflen, \FFI::addr($status));
+            }
+            if (15 === (int) $status->cdata) { // U_BUFFER_OVERFLOW_ERROR
+                $buflen = $len + 1;
+                $buf = $ffi->new('UChar['.$buflen.']');
+                $status->cdata = 0;
+                if (2 === \count($args)) {
+                    $len = (int) $ffi->$fn($args[0], $args[1], $buf, $buflen, \FFI::addr($status));
+                } else {
+                    $len = (int) $ffi->$fn($args[0], $args[1], $args[2], $buf, $buflen, \FFI::addr($status));
+                }
+            }
+            // U_STRING_NOT_TERMINATED_WARNING (-124) is admissible (php-src).
+            $code = (int) $status->cdata;
+            if ($code > 0) {
+                return false;
+            }
+            if ($len < 0) {
+                return false;
+            }
+            if (0 === $len) {
+                return '';
+            }
+
+            return self::utf16BufferToUtf8($buf, $len);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param \FFI\CData $buf UChar[]
+     */
+    private static function utf16BufferToUtf8(\FFI\CData $buf, int $len): string
+    {
+        $out = '';
+        $i = 0;
+        while ($i < $len) {
+            $u = (int) $buf[$i] & 0xFFFF;
+            if ($u >= 0xD800 && $u <= 0xDBFF && ($i + 1) < $len) {
+                $u2 = (int) $buf[$i + 1] & 0xFFFF;
+                if ($u2 >= 0xDC00 && $u2 <= 0xDFFF) {
+                    $cp = 0x10000 + (($u - 0xD800) << 10) + ($u2 - 0xDC00);
+                    $out .= UnicodeCanonical::codepointToUtf8($cp);
+                    $i += 2;
+                    continue;
+                }
+            }
+            $out .= UnicodeCanonical::codepointToUtf8($u);
+            ++$i;
+        }
+
+        return $out;
+    }
+
+    private static function displayKeywordFallback(string $keyword): ?string
+    {
+        static $en = [
+            'currency' => 'Currency',
+            'collation' => 'Sort Order',
+            'calendar' => 'Calendar',
+            'numbers' => 'Numbers',
+            'hours' => 'Hour Cycle',
+        ];
+
+        return $en[strtolower($keyword)] ?? null;
+    }
+
+    private static function displayKeywordValueFallback(string $locale, string $keyword): ?string
+    {
+        $keywords = self::getKeywordsFallback($locale) ?? self::getKeywords($locale);
+        if (!\is_array($keywords)) {
+            return null;
+        }
+        $val = $keywords[strtolower($keyword)] ?? $keywords[$keyword] ?? null;
+        if (!\is_string($val) || '' === $val) {
+            return null;
+        }
+        if ('currency' === strtolower($keyword)) {
+            static $currency = [
+                'EUR' => 'Euro',
+                'USD' => 'US Dollar',
+                'GBP' => 'British Pound',
+                'JPY' => 'Japanese Yen',
+            ];
+
+            return $currency[strtoupper($val)] ?? $val;
+        }
+
+        return $val;
+    }
+
+    /**
      * @param 'addLikely'|'minimize' $kind
      *
      * @return string|false|null null = ICU unavailable; false = ICU error
@@ -1368,6 +1562,7 @@ C;
                 $cdef = <<<C
 typedef int32_t UErrorCode;
 typedef int8_t UBool;
+typedef uint16_t UChar;
 typedef struct UEnumeration UEnumeration;
 int32_t uloc_canonicalize{$suffix}(const char *localeID, char *name, int32_t nameCapacity, UErrorCode *err);
 int32_t uloc_getLanguage{$suffix}(const char *localeID, char *language, int32_t languageCapacity, UErrorCode *err);
@@ -1377,6 +1572,8 @@ int32_t uloc_getVariant{$suffix}(const char *localeID, char *variant, int32_t va
 UBool uloc_isRightToLeft{$suffix}(const char *locale);
 int32_t uloc_addLikelySubtags{$suffix}(const char *localeID, char *maximizedLocaleID, int32_t maximizedLocaleIDCapacity, UErrorCode *err);
 int32_t uloc_minimizeSubtags{$suffix}(const char *localeID, char *minimizedLocaleID, int32_t minimizedLocaleIDCapacity, UErrorCode *err);
+int32_t uloc_getDisplayKeyword{$suffix}(const char *keyword, const char *displayLocale, UChar *dest, int32_t destCapacity, UErrorCode *status);
+int32_t uloc_getDisplayKeywordValue{$suffix}(const char *locale, const char *keyword, const char *displayLocale, UChar *dest, int32_t destCapacity, UErrorCode *status);
 UEnumeration *uloc_openKeywords{$suffix}(const char *localeID, UErrorCode *status);
 const char *uenum_next{$suffix}(UEnumeration *en, int32_t *resultLength, UErrorCode *status);
 void uenum_close{$suffix}(UEnumeration *en);
