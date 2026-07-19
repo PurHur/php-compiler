@@ -24,5 +24,5 @@ try {
 ?>
 --EXPECT--
 <div><b>x</b><i>y</i></div>
-<root><p>bb</p><div><b>x</b><i>y</i></div><em>ae</em><sib/></root>
+<root><p>bb</p><div><b>x</b><i>y</i></div><em>ae</em><sib></sib></root>
 ValueError
