@@ -68,6 +68,17 @@ final class nl2br extends Internal
             );
         }
 
+        // Null → soft-coerce to "" without helper IR (nl2br("") === ""; #21180 / #20007).
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'nl2br', 0, 'string');
+
+                return $context->getTypeFromString('__string__*')->constNull();
+            }
+
+            return JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'nl2br', 0, 'string');
+        }
+
         $str = JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'nl2br', 0, 'string');
         $i8 = $context->getTypeFromString('int8');
         $useXhtmlI8 = $i8->constInt(1, false);

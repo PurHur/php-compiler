@@ -37,6 +37,16 @@ final class quotemeta extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('quotemeta() requires exactly one argument in this compiler build');
         }
+        // Null → soft-coerce to "" without helper IR (quotemeta("") === ""; #21180 / #20007).
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'quotemeta', 0, 'string');
+
+                return $context->getTypeFromString('__string__*')->constNull();
+            }
+
+            return JitStringBuiltinArg::lowerTrimFamilyString($context, $args[0], 'quotemeta', 0, 'string');
+        }
         $str = self::jitStringArg($context, $args[0], 0, 'string');
         StringQuotemeta::ensureLinked($context);
 
