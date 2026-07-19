@@ -810,6 +810,7 @@
         "ext/intl/IntlConstants.php",
         "ext/intl/IntlDateFormatterCreate.php",
         "ext/intl/IntlDateFormatterFormat.php",
+        "ext/intl/IntlDateFormatterFormatObject.php",
         "ext/intl/IntlDateFormatterGetErrorCode.php",
         "ext/intl/IntlDateFormatterGetErrorMessage.php",
         "ext/intl/IntlDateFormatterGetPattern.php",
@@ -854,6 +855,7 @@
         "ext/intl/VmIntlCalendar.php",
         "ext/intl/VmIntlChar.php",
         "ext/intl/VmIntlDateFormatter.php",
+        "ext/intl/VmIntlDatePatternGenerator.php",
         "ext/intl/VmIntlTimeZone.php",
         "ext/intl/VmLocale.php",
         "ext/intl/VmMessageFormatter.php",
@@ -865,6 +867,7 @@
         "ext/intl/VmUConverter.php",
         "ext/intl/collator_compare.php",
         "ext/intl/collator_create.php",
+        "ext/intl/datefmt_format_object.php",
         "ext/intl/grapheme_extract.php",
         "ext/intl/grapheme_levenshtein.php",
         "ext/intl/grapheme_str_contains.php",
@@ -6084,9 +6087,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5850,
+        "inventory_files": 5853,
         "excluded": 0,
-        "eligible": 5850,
+        "eligible": 5853,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
