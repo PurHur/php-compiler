@@ -230,6 +230,23 @@ final class DomLivingBuiltinClasses
         self::copyMethods($ctx->classes[VmDom::CLASS_NAMED_NODE_MAP] ?? null, $namedNodeMap);
         $ctx->classes[VmDomLiving::CLASS_NAMED_NODE_MAP] = $namedNodeMap;
 
+        // Dom\DtdNamedNodeMap — DocumentType::$entities / $notations (php_dom.stub.php; #21014).
+        $dtdNamedNodeMap = new ClassEntry('Dom\\DtdNamedNodeMap');
+        $dtdNamedNodeMap->isInternal = true;
+        $dtdNamedNodeMap->interfaces[] = 'countable';
+        if (isset($ctx->classes['iterator'])) {
+            $dtdNamedNodeMap->interfaces[] = 'iterator';
+        }
+        if (isset($ctx->classes['traversable'])) {
+            $dtdNamedNodeMap->interfaces[] = 'traversable';
+        }
+        if (isset($ctx->classes['iteratoraggregate'])) {
+            $dtdNamedNodeMap->interfaces[] = 'iteratoraggregate';
+        }
+        $dtdNamedNodeMap->properties[] = new ClassProperty(VmDom::PROP_LENGTH, null, new Variable(Variable::TYPE_INTEGER));
+        self::copyMethods($ctx->classes[VmDom::CLASS_NAMED_NODE_MAP] ?? null, $dtdNamedNodeMap);
+        $ctx->classes[VmDomLiving::CLASS_DTD_NAMED_NODE_MAP] = $dtdNamedNodeMap;
+
         // Dom\Entity / EntityReference / Notation — DTD leaf nodes (#20983).
         $entity = new ClassEntry('Dom\\Entity');
         $entity->isInternal = true;

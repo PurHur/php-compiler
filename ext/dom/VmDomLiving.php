@@ -85,6 +85,9 @@ final class VmDomLiving
     /** php-src Dom\NamedNodeMap (php_dom.stub.php; #20948). */
     public const CLASS_NAMED_NODE_MAP = 'dom\\namednodemap';
 
+    /** php-src Dom\DtdNamedNodeMap — DocumentType entities/notations (php_dom.stub.php; #21014). */
+    public const CLASS_DTD_NAMED_NODE_MAP = 'dom\\dtdnamednodemap';
+
     /** php-src Dom\Entity (php_dom.stub.php; #20983). */
     public const CLASS_ENTITY = 'dom\\entity';
 
