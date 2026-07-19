@@ -11,7 +11,10 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** numfmt_parse() — procedural NumberFormatter::parse (#20754). */
+/**
+ * numfmt_parse() — procedural NumberFormatter::parse
+ * (php-src formatter.stub.php / formatter_main.c; #20754, #21139).
+ */
 final class numfmt_parse extends Internal
 {
     public function __construct()
@@ -22,9 +25,9 @@ final class numfmt_parse extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
+        if ($argc < 2 || $argc > 4) {
             throw new \ArgumentCountError(\sprintf(
-                'numfmt_parse() expects between 2 and 3 arguments, %d given',
+                'numfmt_parse() expects between 2 and 4 arguments, %d given',
                 $argc
             ));
         }
@@ -38,7 +41,20 @@ final class numfmt_parse extends Internal
         if ($argc >= 3) {
             $type = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'numfmt_parse', 2, 'type');
         }
-        $result = VmNumberFormatter::parse($receiver->toObject(), $value, $type);
+        $hasOffset = $argc >= 4;
+        $offset = null;
+        if ($hasOffset) {
+            $offsetVar = $frame->calledArgs[3]->resolveIndirect();
+            $offset = Variable::TYPE_NULL === $offsetVar->type
+                ? 0
+                : VmIntlDateFormatter::coerceIntArg($offsetVar, 'numfmt_parse', 3, 'offset');
+        }
+        if ($hasOffset) {
+            $result = VmNumberFormatter::parse($receiver->toObject(), $value, $type, $offset);
+            $frame->calledArgs[3]->byRefTarget()->int($offset);
+        } else {
+            $result = VmNumberFormatter::parse($receiver->toObject(), $value, $type);
+        }
         if (null === $frame->returnVar) {
             return;
         }
@@ -59,4 +75,3 @@ final class numfmt_parse extends Internal
         throw new \Error('numfmt_parse() is not implemented for JIT in this compiler build (issue #20754)');
     }
 }
-
