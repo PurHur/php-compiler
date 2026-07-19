@@ -272,6 +272,7 @@ class Module extends ModuleAbstract
             new intl_get_error_code(),
             new intl_get_error_message(),
             new intl_is_failure(),
+            new intl_error_name(),
         ];
     }
 }
