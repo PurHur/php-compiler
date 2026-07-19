@@ -885,6 +885,7 @@
         "ext/intl/grapheme_stristr.php",
         "ext/intl/grapheme_strlen.php",
         "ext/intl/grapheme_strpos.php",
+        "ext/intl/grapheme_strripos.php",
         "ext/intl/grapheme_strrpos.php",
         "ext/intl/grapheme_strstr.php",
         "ext/intl/grapheme_substr.php",
@@ -936,6 +937,9 @@
         "ext/intl/numfmt_set_attribute.php",
         "ext/intl/numfmt_set_pattern.php",
         "ext/intl/resourcebundle_count.php",
+        "ext/intl/resourcebundle_create.php",
+        "ext/intl/resourcebundle_get.php",
+        "ext/intl/resourcebundle_locales.php",
         "ext/intl/transliterator_create.php",
         "ext/intl/transliterator_create_from_rules.php",
         "ext/intl/transliterator_create_inverse.php",
@@ -6102,9 +6106,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 5864,
+        "inventory_files": 5865,
         "excluded": 0,
-        "eligible": 5864,
+        "eligible": 5865,
         "aot_lint_targets": 113,
         "aot_link_targets": 100,
         "aot_link_lib_targets": 1
