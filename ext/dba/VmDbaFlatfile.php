@@ -162,4 +162,87 @@ final class VmDbaFlatfile
         \fwrite($fp, $value);
         \fflush($fp);
     }
+
+    /**
+     * @param resource $fp
+     *
+     * @return array{0: ?string, 1: int} key + cursor (byte offset after key / at value-len line)
+     */
+    public static function firstKey($fp): array
+    {
+        \rewind($fp);
+        while (!\feof($fp)) {
+            $keyLenLine = \fgets($fp);
+            if (false === $keyLenLine) {
+                break;
+            }
+            $keyLen = (int) \trim($keyLenLine);
+            if ($keyLen < 0) {
+                break;
+            }
+            $foundKey = 0 === $keyLen ? '' : \fread($fp, $keyLen);
+            if (false === $foundKey) {
+                break;
+            }
+            if ('' !== $foundKey && "\0" !== $foundKey[0]) {
+                $cursor = (int) \ftell($fp);
+
+                return [$foundKey, $cursor];
+            }
+            $valLenLine = \fgets($fp);
+            if (false === $valLenLine) {
+                break;
+            }
+            $valLen = (int) \trim($valLenLine);
+            if ($valLen > 0) {
+                \fread($fp, $valLen);
+            }
+        }
+
+        return [null, 0];
+    }
+
+    /**
+     * @param resource $fp
+     *
+     * @return array{0: ?string, 1: int}
+     */
+    public static function nextKey($fp, int $cursor): array
+    {
+        if ($cursor < 0) {
+            return [null, 0];
+        }
+        \fseek($fp, $cursor, \SEEK_SET);
+        while (!\feof($fp)) {
+            // Skip value belonging to previous key (cursor points at its length line).
+            $valLenLine = \fgets($fp);
+            if (false === $valLenLine) {
+                break;
+            }
+            $valLen = (int) \trim($valLenLine);
+            if ($valLen > 0) {
+                \fread($fp, $valLen);
+            }
+            $keyLenLine = \fgets($fp);
+            if (false === $keyLenLine) {
+                break;
+            }
+            $keyLen = (int) \trim($keyLenLine);
+            if ($keyLen < 0) {
+                break;
+            }
+            $foundKey = 0 === $keyLen ? '' : \fread($fp, $keyLen);
+            if (false === $foundKey) {
+                break;
+            }
+            if ('' !== $foundKey && "\0" !== $foundKey[0]) {
+                $newCursor = (int) \ftell($fp);
+
+                return [$foundKey, $newCursor];
+            }
+            // Deleted key: loop again; next iteration skips this key's value.
+        }
+
+        return [null, 0];
+    }
 }
