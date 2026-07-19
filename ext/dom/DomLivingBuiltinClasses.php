@@ -290,6 +290,12 @@ final class DomLivingBuiltinClasses
         $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_CLASS_NAME, $nullProto, $strProto);
         $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_INNER_HTML, $nullProto, $strProto);
         $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_OUTER_HTML, $nullProto, $strProto);
+        // php-src Dom\Element::$substitutedNodeValue (ext/dom/element.c; #21034).
+        $element->properties[] = new ClassProperty(
+            DomHtmlElementPropertySupport::PROP_SUBSTITUTED_NODE_VALUE,
+            $nullProto,
+            $strProto
+        );
         if (CompilerVersion::supportsDomTokenList()) {
             $element->properties[] = new ClassProperty(VmDom::PROP_CLASS_LIST, $nullProto, $objProto);
         }
