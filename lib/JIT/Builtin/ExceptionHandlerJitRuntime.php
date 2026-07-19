@@ -309,13 +309,21 @@ final class ExceptionHandlerJitRuntime
 
         $fnAddr = $context->builder->ptrToInt($fnOpaque, $i64);
         $handlerName = self::optionalCstrToString($context, $fn, $name, $nameLen);
+        // NestedJIT setApply takes non-null __string__* (empty = none) (#21109).
+        $strPtr = $context->getTypeFromString('__string__*');
+        $emptyName = $context->builder->load($context->constantStringFromString(''));
+        $handlerNameNonNull = $context->builder->select(
+            $context->builder->icmp(Builder::INT_EQ, $handlerName, $strPtr->constNull()),
+            $emptyName,
+            $handlerName
+        );
         $previous = $context->builder->call(
             self::helperFunction($context, self::SET_APPLY_HELPER),
             $fnAddr,
-            $handlerName
+            $handlerNameNonNull
         );
 
-        self::writeNullableStringToValue($context, $fn, $out, $previous);
+        self::writeEmptyStringAsNullToValue($context, $fn, $out, $previous);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -374,7 +382,7 @@ final class ExceptionHandlerJitRuntime
 
         $out = $fn->getParam(0);
         $active = $context->builder->call(self::helperFunction($context, self::GET_CURRENT_NAME_HELPER));
-        self::writeNullableStringToValue($context, $fn, $out, $active);
+        self::writeEmptyStringAsNullToValue($context, $fn, $out, $active);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -416,6 +424,35 @@ final class ExceptionHandlerJitRuntime
         $phi->addIncoming($nameStr, $useBb);
 
         return $phi;
+    }
+
+    private static function writeEmptyStringAsNullToValue(
+        Context $context,
+        LlvmFunction $fn,
+        Value $out,
+        Value $str
+    ): void {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        $nullBb = $fn->appendBasicBlock('xh_prev_empty');
+        $strBb = $fn->appendBasicBlock('xh_prev_str');
+        $doneBb = $fn->appendBasicBlock('xh_prev_done');
+
+        $len = $context->builder->load(
+            $context->builder->structGep($str, $context->structFieldMap['__string__']['length'])
+        );
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $len->typeOf()->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $nullBb, $strBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $out);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($strBb);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
     }
 
     private static function writeNullableStringToValue(

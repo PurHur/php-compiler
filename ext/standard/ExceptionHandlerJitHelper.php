@@ -8,6 +8,7 @@ namespace PHPCompiler\ext\standard;
  * Exception-handler stack for compiled JIT/AOT modules (#9473, php-in-PHP).
  *
  * Scalar slot stack for nested JIT compile compatibility (mirrors ErrorHandlerJitHelper).
+ * Empty string = no handler name — nullable string ABI breaks NestedJIT module verify (#17671, #21109).
  * VM SSOT remains {@see VmExceptionHandler}.
  * php-src: ext/standard/basic_functions.c — set_exception_handler
  */
@@ -25,13 +26,13 @@ final class ExceptionHandlerJitHelper
 
     private static int $fn3 = 0;
 
-    private static ?string $name0 = null;
+    private static string $name0 = '';
 
-    private static ?string $name1 = null;
+    private static string $name1 = '';
 
-    private static ?string $name2 = null;
+    private static string $name2 = '';
 
-    private static ?string $name3 = null;
+    private static string $name3 = '';
 
     public static function currentDepth(): int
     {
@@ -47,14 +48,14 @@ final class ExceptionHandlerJitHelper
         return self::fnAt($index);
     }
 
-    /** @return ?string previous handler name (null when none) */
-    public static function setApply(int $fnAddr, ?string $handlerName): ?string
+    /** @return string previous handler name, or empty when none */
+    public static function setApply(int $fnAddr, string $handlerName): string
     {
         if (0 === $fnAddr) {
             return self::popReturningName();
         }
 
-        $previous = self::$depth > 0 ? self::nameAt(self::$depth - 1) : null;
+        $previous = self::$depth > 0 ? self::nameAt(self::$depth - 1) : '';
         if (self::$depth >= self::MAX) {
             return $previous;
         }
@@ -72,29 +73,29 @@ final class ExceptionHandlerJitHelper
         }
         --self::$depth;
         self::setFnAt(self::$depth, 0);
-        self::setNameAt(self::$depth, null);
+        self::setNameAt(self::$depth, '');
 
         return true;
     }
 
-    /** Active handler name for get_exception_handler() JIT/AOT (#17668). */
-    public static function getCurrentName(): ?string
+    /** Active handler name for get_exception_handler() JIT/AOT (#17668). Empty when none. */
+    public static function getCurrentName(): string
     {
         if (self::$depth <= 0) {
-            return null;
+            return '';
         }
 
         return self::nameAt(self::$depth - 1);
     }
 
-    private static function popReturningName(): ?string
+    private static function popReturningName(): string
     {
         if (self::$depth <= 0) {
-            return null;
+            return '';
         }
         $removed = self::nameAt(self::$depth - 1);
         self::setFnAt(self::$depth - 1, 0);
-        self::setNameAt(self::$depth - 1, null);
+        self::setNameAt(self::$depth - 1, '');
         --self::$depth;
 
         return $removed;
@@ -111,14 +112,14 @@ final class ExceptionHandlerJitHelper
         }
     }
 
-    private static function nameAt(int $index): ?string
+    private static function nameAt(int $index): string
     {
         switch ($index) {
             case 0: return self::$name0;
             case 1: return self::$name1;
             case 2: return self::$name2;
             case 3: return self::$name3;
-            default: return null;
+            default: return '';
         }
     }
 
@@ -132,7 +133,7 @@ final class ExceptionHandlerJitHelper
         }
     }
 
-    private static function setNameAt(int $index, ?string $name): void
+    private static function setNameAt(int $index, string $name): void
     {
         switch ($index) {
             case 0: self::$name0 = $name; break;

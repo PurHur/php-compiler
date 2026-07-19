@@ -5754,6 +5754,7 @@ require_once __DIR__.'/../../../lib/VM/ClosureBindJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/ClosureState.php';
 require_once __DIR__.'/../../../lib/VM/ClosureSupport.php';
 require_once __DIR__.'/../../../lib/VM/CoalesceJitHelper.php';
+require_once __DIR__.'/../../../lib/VM/CompareUnlikeHelper.php';
 require_once __DIR__.'/../../../lib/VM/CompareJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/CompareStringableHelper.php';
 require_once __DIR__.'/../../../lib/VM/Context.php';

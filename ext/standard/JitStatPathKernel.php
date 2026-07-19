@@ -114,9 +114,18 @@ final class JitStatPathKernel
 
     public static function implement(Context $context): void
     {
+        $restore = null;
+        try {
+            $restore = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         $probe = $context->module->getNamedFunction(self::FN_EXISTS);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+            if (null !== $restore) {
+                $context->builder->positionAtEnd($restore);
+            }
 
             return;
         }
@@ -134,7 +143,13 @@ final class JitStatPathKernel
         self::implementDiskBridge($context, self::FN_DISK_FREE, self::DISK_FREE_HELPER);
         self::implementDiskBridge($context, self::FN_DISK_TOTAL, self::DISK_TOTAL_HELPER);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        // Restore caller insert block — clearInsertionPosition mid-user-compile leaves
+        // parentless path_is_readable calls (#21109, EMBED lazy-link).
+        if (null !== $restore) {
+            $context->builder->positionAtEnd($restore);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementPathBoolBridge(Context $context, string $abiName, string $helper): void

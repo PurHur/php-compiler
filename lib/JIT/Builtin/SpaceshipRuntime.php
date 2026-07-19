@@ -47,7 +47,8 @@ final class SpaceshipRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        GcCollectCyclesRuntime::ensureLinked($context);
+        // Do not eager-link GC here (#21109): NestedJIT GC/NativeOps mid-spaceship
+        // compile pollutes the module with [8 x i8] icmp / bitcast verify failures.
         self::implement($context);
     }
 

@@ -35,13 +35,14 @@ final class ExceptionHandlerRuntimeShrinkTest extends TestCase
     public function testExceptionHandlerJitHelperSemantics(): void
     {
         $helper = \PHPCompiler\ext\standard\ExceptionHandlerJitHelper::class;
-        $this->assertNull($helper::setApply(100, 'a'));
+        $this->assertSame('', $helper::setApply(100, 'a'));
         $this->assertSame('a', $helper::setApply(200, 'b'));
         $this->assertSame(2, $helper::currentDepth());
         $this->assertSame(200, $helper::handlerFnAddrAt(1));
         $this->assertTrue($helper::restoreApply());
         $this->assertSame(1, $helper::currentDepth());
-        $this->assertSame('a', $helper::setApply(0, null));
+        $this->assertSame('a', $helper::setApply(0, ''));
         $this->assertSame(0, $helper::currentDepth());
+        $this->assertSame('', $helper::getCurrentName());
     }
 }

@@ -542,8 +542,8 @@ final class JitSpaceshipCompareKernel
     {
         $obj = $context->builder->call($context->lookupFunction('__value__readObject'), $value);
         $caseName = self::objectCaseNameSlot($context, $obj, 0);
-        $voidPtr = $context->getTypeFromString('void*');
-        $isEnum = $context->builder->icmp(Builder::INT_NE, $caseName, $voidPtr->constNull());
+        $strPtr = $context->getTypeFromString('__string__*');
+        $isEnum = $context->builder->icmp(Builder::INT_NE, $caseName, $strPtr->constNull());
         $i64 = $context->getTypeFromString('int64');
         $one = $i64->constInt(1, true);
 
@@ -607,7 +607,7 @@ final class JitSpaceshipCompareKernel
             'PHPCompiler\\VM\\CompareJitHelper::objectSpaceship'
         );
         $result = $context->builder->call($helperFn, $left, $right);
-        $context->builder->returnValue($context->builder->sext($result, $i64));
+        $context->builder->returnValue($result);
         $context->builder->clearInsertionPosition();
     }
 
@@ -641,7 +641,7 @@ final class JitSpaceshipCompareKernel
             'PHPCompiler\\VM\\CompareJitHelper::hashtableSpaceship'
         );
         $result = $context->builder->call($helperFn, $left, $right);
-        $context->builder->returnValue($context->builder->sext($result, $i64));
+        $context->builder->returnValue($result);
         $context->builder->clearInsertionPosition();
     }
 
@@ -745,14 +745,15 @@ final class JitSpaceshipCompareKernel
             $context,
             'PHPCompiler\\VM\\CompareJitHelper::spaceshipNumberString'
         );
+        // NestedJIT lowers PHP int params as i64 (#21109); i32 literals fail module verify.
         $cmp = $context->builder->call(
             $fn,
             $num,
             $str,
-            $context->getTypeFromString('int32')->constInt($numOnLeft ? 1 : 0, false)
+            $context->getTypeFromString('int64')->constInt($numOnLeft ? 1 : 0, false)
         );
 
-        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
+        return $cmp;
     }
 
     private static function longSpaceship(Context $context, Value $left, Value $right): Value
@@ -761,9 +762,8 @@ final class JitSpaceshipCompareKernel
             $context,
             'PHPCompiler\\VM\\CompareJitHelper::longSpaceship'
         );
-        $cmp = $context->builder->call($fn, $left, $right);
-
-        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
+        // NestedJIT int return is already i64 (#21109).
+        return $context->builder->call($fn, $left, $right);
     }
 
     private static function kindSpaceship(Context $context, Value $left, Value $right): Value
@@ -772,9 +772,8 @@ final class JitSpaceshipCompareKernel
             $context,
             'PHPCompiler\\VM\\CompareJitHelper::kindSpaceship'
         );
-        $cmp = $context->builder->call($fn, $left, $right);
 
-        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
+        return $context->builder->call($fn, $left, $right);
     }
 
     private static function doubleSpaceship(Context $context, Value $left, Value $right): Value
@@ -783,9 +782,8 @@ final class JitSpaceshipCompareKernel
             $context,
             'PHPCompiler\\VM\\CompareJitHelper::doubleSpaceship'
         );
-        $cmp = $context->builder->call($fn, $left, $right);
 
-        return $context->builder->sext($cmp, $context->getTypeFromString('int64'));
+        return $context->builder->call($fn, $left, $right);
     }
 
     private static function doubleToLong(Context $context, Value $num): Value
@@ -859,7 +857,7 @@ final class JitSpaceshipCompareKernel
 
         return $context->builder->select(
             $bad,
-            $voidPtr->constNull(),
+            $strPtr->constNull(),
             $context->builder->pointerCast($content, $strPtr)
         );
     }
