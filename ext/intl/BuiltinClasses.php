@@ -137,6 +137,10 @@ final class BuiltinClasses
             $methods['addlikelysubtags'] = [new LocaleAddLikelySubtags(), 'addLikelySubtags'];
             $methods['minimizesubtags'] = [new LocaleMinimizeSubtags(), 'minimizeSubtags'];
         }
+        if (IntlExtensionPolicy::advertisesLocaleDisplayKeyword()) {
+            $methods['getdisplaykeyword'] = [new LocaleGetDisplayKeyword(), 'getDisplayKeyword'];
+            $methods['getdisplaykeywordvalue'] = [new LocaleGetDisplayKeywordValue(), 'getDisplayKeywordValue'];
+        }
         foreach ($methods as $lc => [$handler, $name]) {
             $entry->methods[$lc] = $handler;
             $entry->methodVisibility[$lc] = $pubStatic;

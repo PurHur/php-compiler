@@ -108,6 +108,10 @@ class Module extends ModuleAbstract
                 $functions[] = new locale_add_likely_subtags();
                 $functions[] = new locale_minimize_subtags();
             }
+            if (IntlExtensionPolicy::advertisesLocaleDisplayKeyword()) {
+                $functions[] = new locale_get_display_keyword();
+                $functions[] = new locale_get_display_keyword_value();
+            }
         }
         $normalizer = IntlExtensionPolicy::advertisesNormalizer()
             ? [
