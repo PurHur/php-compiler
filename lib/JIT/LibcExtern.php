@@ -99,6 +99,10 @@ final class LibcExtern
             'isinf' => [$i32, false, [$dbl]],
             // x86_64 SYS_* trampoline — MCJIT relocates varargs libc better than write(2) (#21109)
             'syscall' => [$i64, true, [$i64]],
+            // Host aliases — custom names so MCJIT resolves via LLVMAddSymbol (#21124, #98).
+            // php_write is ob-aware (PHPUnit ob_start / SAPI); libc write(2) is not.
+            '__phpc_host_php_write' => [$sizeT, false, [$i8p, $sizeT]],
+            '__phpc_host_snprintf' => [$i32, true, [$i8p, $sizeT, $i8p]],
         ];
 
         foreach ($specs as $name => [$ret, $vararg, $params]) {

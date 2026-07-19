@@ -694,15 +694,25 @@ final class JitSpaceshipCompareKernel
             $right
         );
         $propsMatch = $context->builder->icmp(Builder::INT_EQ, $lprops, $rprops);
-        $propsZeroOrTwo = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $lprops, $i32->constInt(0, false)),
-            $context->builder->icmp(Builder::INT_EQ, $lprops, $i32->constInt(2, false))
-        );
+        $isUnit = $context->builder->icmp(Builder::INT_EQ, $lprops, $i32->constInt(0, false));
+        $isBackedShape = $context->builder->icmp(Builder::INT_EQ, $lprops, $i32->constInt(2, false));
+        $propsZeroOrTwo = $context->builder->or($isUnit, $isBackedShape);
         $validProps = $context->builder->and($propsMatch, $propsZeroOrTwo);
         $nameCheck = $fn->appendBasicBlock('ss_enum_name_check');
         $context->builder->branchIf($validProps, $nameCheck, $propCmp);
 
         $context->builder->positionAtEnd($nameCheck);
+        // Unit enums (prop_count 0): name slots may not be visible to typeinfo probes under
+        // MCJIT; distinct singletons of the same class are different cases (Zend #21124).
+        $unitSameClass = $fn->appendBasicBlock('ss_enum_unit_same_class');
+        $backedName = $fn->appendBasicBlock('ss_enum_backed_name');
+        $context->builder->branchIf($isUnit, $unitSameClass, $backedName);
+
+        $context->builder->positionAtEnd($unitSameClass);
+        // Pointers already differ (samePtr returned earlier). Zend <=> is 1 for unequal cases.
+        $context->builder->returnValue($one);
+
+        $context->builder->positionAtEnd($backedName);
         $lname = self::objectCaseNameSlot($context, $left, 0);
         $rname = self::objectCaseNameSlot($context, $right, 0);
         $strPtr = $context->getTypeFromString('__string__*');
@@ -746,8 +756,9 @@ final class JitSpaceshipCompareKernel
         $context->builder->positionAtEnd($caseCmp);
         $ldata = self::stringData($context, $lname);
         $rdata = self::stringData($context, $rname);
+        // memcmp is module-local under EMBED MCJIT; strncasecmp often relocates to null (#21124).
         $cmp = $context->builder->call(
-            $context->lookupFunction('strncasecmp'),
+            $context->lookupFunction('memcmp'),
             $ldata,
             $rdata,
             $llen

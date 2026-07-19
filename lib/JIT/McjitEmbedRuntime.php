@@ -69,11 +69,24 @@ final class McjitEmbedRuntime
             'malloc', 'calloc', 'realloc', 'free',
             'abort', 'exit', 'snprintf', 'fprintf', 'fwrite',
             'fopen', 'fclose', 'open', 'close', 'read', 'write',
+            'php_write', 'syscall',
         ] as $symbol) {
             $addr = $lib->LLVMSearchForAddressOfSymbol($symbol);
             if (null !== $addr) {
                 $lib->LLVMAddSymbol($symbol, $addr);
             }
+        }
+        // Custom MCJIT symbols → real host addrs (declared-only libc names often relocate to null).
+        self::aliasHostSymbol($lib, '__phpc_host_php_write', 'php_write');
+        self::aliasHostSymbol($lib, '__phpc_host_snprintf', 'snprintf');
+    }
+
+    /** @param object $lib PHPLLVM FFI llvm binding */
+    private static function aliasHostSymbol(object $lib, string $alias, string $real): void
+    {
+        $addr = $lib->LLVMSearchForAddressOfSymbol($real);
+        if (null !== $addr) {
+            $lib->LLVMAddSymbol($alias, $addr);
         }
     }
 }
