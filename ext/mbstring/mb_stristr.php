@@ -32,7 +32,7 @@ final class mb_stristr extends Internal
                 $argc
             ));
         }
-        $haystack = VmString::coerceStringBuiltinArg(
+        $haystack = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'mb_stristr',
             0,
@@ -41,7 +41,7 @@ final class mb_stristr extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $needle = VmString::coerceStringBuiltinArg(
+        $needle = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[1],
             'mb_stristr',
             1,

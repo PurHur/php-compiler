@@ -29,7 +29,8 @@ final class mb_strwidth extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('mb_strwidth() requires one or two arguments');
         }
-        $string = VmString::coerceStringBuiltinArg(
+        // Z_PARAM_STR — null TypeError on 8.4 forward profile (#21061, mbstring.c).
+        $string = VmString::coerceZparamStrBuiltinArg(
             $frame->calledArgs[0],
             'mb_strwidth',
             0,
