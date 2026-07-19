@@ -761,7 +761,12 @@ class Context {
             'phpc_access_kernel',
             // Hash algos always-helper NestedJIT leaves (#20652).
             'phpc_hash_algos_kernel',
-            'phpc_hash_hmac_algos_kernel' => true,
+            'phpc_hash_hmac_algos_kernel',
+            // Hash crypto always-helper NestedJIT EVP leaves (#21026).
+            'phpc_hash_crypto_hash',
+            'phpc_hash_crypto_hmac',
+            'phpc_hash_crypto_pbkdf2',
+            'phpc_hash_crypto_hkdf' => true,
             default => false,
         };
     }
