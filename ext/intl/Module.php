@@ -125,6 +125,13 @@ class Module extends ModuleAbstract
                 new numfmt_parse(),
                 new numfmt_parse_currency(),
                 new numfmt_format_currency(),
+                new numfmt_get_attribute(),
+                new numfmt_set_attribute(),
+                new numfmt_get_pattern(),
+                new numfmt_set_pattern(),
+                new numfmt_get_locale(),
+                new numfmt_get_error_code(),
+                new numfmt_get_error_message(),
             ]
             : [];
 
