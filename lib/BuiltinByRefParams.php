@@ -158,6 +158,10 @@ final class BuiltinByRefParams
             case 'collator::sortwithsortkeys':
                 // $this + &$array (+ optional flags) — php-src collator.stub.php (#5747, #20717)
                 return [1];
+            case 'uconverter::fromucallback':
+            case 'uconverter::toucallback':
+                // $this + $reason + $source + $codePoint|$codeUnits + &$error — php-src converter.stub.php (#20917)
+                return [4];
             case 'collator_asort':
             case 'collator_sort':
             case 'collator_sort_with_sort_keys':
