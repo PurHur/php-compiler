@@ -266,6 +266,13 @@ class Module extends ModuleAbstract
                 new intlcal_set_minimal_days_in_first_week(),
                 new intlcal_get_keyword_values_for_locale(),
                 new intlcal_is_equivalent_to(),
+                // IntlGregorianCalendar procedurals (php-src php_intl.stub.php @alias; #20906)
+                new intlgregcal_create_instance(),
+                new intlgregcal_is_leap_year(),
+                new intlgregcal_get_gregorian_change(),
+                new intlgregcal_set_gregorian_change(),
+                new intlgregcal_create_from_date(),
+                new intlgregcal_create_from_date_time(),
                 // IntlTimeZone procedural aliases (php-src timezone.stub.php @alias; #20859)
                 new intltz_get_gmt(),
                 new intltz_create_time_zone(),

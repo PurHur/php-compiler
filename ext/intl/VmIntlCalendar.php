@@ -15,21 +15,31 @@ use PHPCompiler\VM\Context;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ReflectionSupport;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * IntlCalendar — Gregorian field get/set via zoneinfo (php-src calendar_*; #6151, #20756).
+ * IntlCalendar / IntlGregorianCalendar — Gregorian field get/set via zoneinfo
+ * (php-src calendar_*; #6151, #20756, #20906).
  *
  * Subset: createInstance, get/set, getTimeZone, getTime/setTime, getType, getNow,
  * add/roll/clear/isSet/equals, toDateTime/fromDateTime, fieldDifference,
  * before/after, setDate/setDateTime/setTimeZone, field bounds, weekend, wall-time options (#20851, #20905),
- * getAvailableLocales + comparison/zone/min-max procedurals (#20897).
+ * getAvailableLocales + comparison/zone/min-max procedurals (#20897),
+ * IntlGregorianCalendar + isLeapYear/getGregorianChange/createFromDate* (#20906).
  * ICU field constants match UCalendarDateFields (unicode/ucal.h).
  */
 final class VmIntlCalendar
 {
     public const CLASS_LC = 'intlcalendar';
+    public const GREGORIAN_CLASS_LC = 'intlgregoriancalendar';
+
+    /**
+     * ICU GregorianCalendar default cutover (1582-10-15 00:00:00 UTC) in milliseconds
+     * since Unix epoch — php-src / ICU getGregorianChange().
+     */
+    public const DEFAULT_GREGORIAN_CHANGE = -12219292800000.0;
 
     // UCalendarDateFields
     public const FIELD_ERA = 0;
@@ -107,7 +117,8 @@ final class VmIntlCalendar
      *   skippedWallTimeOption: int,
      *   lenient: bool,
      *   firstDayOfWeek: int,
-     *   minimalDaysInFirstWeek: int
+     *   minimalDaysInFirstWeek: int,
+     *   gregorianChange: float
      * }>
      */
     private static array $state = [];
@@ -243,11 +254,54 @@ final class VmIntlCalendar
             $entry->methodNames[$lc] = $name;
         }
         $ctx->classes[self::CLASS_LC] = $entry;
+
+        // IntlGregorianCalendar extends IntlCalendar (php-src calendar.stub.php; #20906).
+        // createInstance() returns this concrete class (Zend parity).
+        $greg = new ClassEntry('IntlGregorianCalendar');
+        $greg->isInternal = true;
+        $greg->parentLc = self::CLASS_LC;
+        foreach (self::classConstants() as $name => $value) {
+            $lc = strtolower($name);
+            $const = new Variable(Variable::TYPE_INTEGER);
+            $const->int($value);
+            $greg->constants[$lc] = $const;
+            $greg->constNames[$lc] = $name;
+        }
+        $construct = new IntlGregorianCalendarConstruct();
+        $greg->constructor = $construct;
+        $greg->methods['__construct'] = $construct;
+        $greg->methodVisibility['__construct'] = $pub;
+        $greg->methodNames['__construct'] = '__construct';
+        $gregMethods = [
+            'createfromdate' => [new IntlGregorianCalendarCreateFromDate(), 'createFromDate', $pubStatic],
+            'createfromdatetime' => [new IntlGregorianCalendarCreateFromDateTime(), 'createFromDateTime', $pubStatic],
+            'isleapyear' => [new IntlGregorianCalendarIsLeapYear(), 'isLeapYear', $pub],
+            'getgregorianchange' => [new IntlGregorianCalendarGetGregorianChange(), 'getGregorianChange', $pub],
+            'setgregorianchange' => [new IntlGregorianCalendarSetGregorianChange(), 'setGregorianChange', $pub],
+        ];
+        foreach ($gregMethods as $lc => [$handler, $name, $vis]) {
+            $greg->methods[$lc] = $handler;
+            $greg->methodVisibility[$lc] = $vis;
+            $greg->methodNames[$lc] = $name;
+        }
+        $ctx->classes[self::GREGORIAN_CLASS_LC] = $greg;
     }
 
     public static function isCalendarObject(?ObjectEntry $object): bool
     {
-        return null !== $object && self::CLASS_LC === strtolower($object->class->name);
+        if (null === $object) {
+            return false;
+        }
+        $lc = strtolower($object->class->name);
+
+        return self::CLASS_LC === $lc
+            || self::GREGORIAN_CLASS_LC === $lc
+            || self::CLASS_LC === ($object->class->parentLc ?? '');
+    }
+
+    public static function isGregorianCalendarObject(?ObjectEntry $object): bool
+    {
+        return null !== $object && self::GREGORIAN_CLASS_LC === strtolower($object->class->name);
     }
 
     public static function createInstance(
@@ -260,7 +314,24 @@ final class VmIntlCalendar
         }
         // Ensure IntlTimeZone is registered for getTimeZone().
         VmIntlTimeZone::registerClass($ctx);
-        $object = new ObjectEntry($ctx->classes[self::CLASS_LC]);
+        // Zend intlcal_create_instance returns IntlGregorianCalendar when available.
+        $classLc = isset($ctx->classes[self::GREGORIAN_CLASS_LC])
+            ? self::GREGORIAN_CLASS_LC
+            : self::CLASS_LC;
+        $object = new ObjectEntry($ctx->classes[$classLc]);
+        self::initCalendarState($object, $timezoneId, $locale);
+
+        return $object;
+    }
+
+    /**
+     * Bind calendar state on a new or constructed object (createInstance / __construct).
+     */
+    public static function initCalendarState(
+        ObjectEntry $object,
+        string $timezoneId,
+        string $locale
+    ): void {
         $object->constructed = true;
         [$firstDow, $minDays] = self::localeWeekDefaults($locale);
         self::$state[$object->id] = [
@@ -274,10 +345,9 @@ final class VmIntlCalendar
             'lenient' => true,
             'firstDayOfWeek' => $firstDow,
             'minimalDaysInFirstWeek' => $minDays,
+            'gregorianChange' => self::DEFAULT_GREGORIAN_CHANGE,
         ];
         IntlError::clear();
-
-        return $object;
     }
 
     /** @return array{0: int, 1: int} firstDayOfWeek, minimalDaysInFirstWeek */
@@ -1509,8 +1579,118 @@ final class VmIntlCalendar
 
         return true;
     }
-}
 
+    /**
+     * Create IntlGregorianCalendar (or init $this) — php-src gregoriancalendar_methods.cpp (#20906).
+     */
+    public static function createGregorian(
+        Context $ctx,
+        string $timezoneId,
+        string $locale,
+        ?ObjectEntry $existing = null
+    ): ObjectEntry {
+        if (!isset($ctx->classes[self::GREGORIAN_CLASS_LC])) {
+            throw new \Error('Class "IntlGregorianCalendar" not found');
+        }
+        VmIntlTimeZone::registerClass($ctx);
+        $object = $existing ?? new ObjectEntry($ctx->classes[self::GREGORIAN_CLASS_LC]);
+        if (isset(self::$state[$object->id])) {
+            throw new \Error('IntlGregorianCalendar object is already constructed');
+        }
+        self::initCalendarState($object, $timezoneId, $locale);
+
+        return $object;
+    }
+
+    public static function createGregorianFromDate(
+        Context $ctx,
+        int $year,
+        int $month,
+        int $dayOfMonth,
+        ?int $hour = null,
+        ?int $minute = null,
+        ?int $second = null,
+        ?ObjectEntry $existing = null
+    ): ObjectEntry {
+        $cal = self::createGregorian($ctx, VmDate::defaultTimezoneGet(), '', $existing);
+        self::setDate($cal, $year, $month, $dayOfMonth, $hour, $minute, $second);
+
+        return $cal;
+    }
+
+    /** Proleptic Gregorian leap-year rule (ICU GregorianCalendar::isLeapYear). */
+    public static function isLeapYear(ObjectEntry $cal, int $year): bool
+    {
+        if (!isset(self::$state[$cal->id])) {
+            return false;
+        }
+        IntlError::clear();
+
+        return 0 === $year % 4 && (0 !== $year % 100 || 0 === $year % 400);
+    }
+
+    public static function getGregorianChange(ObjectEntry $cal): float
+    {
+        $state = self::$state[$cal->id] ?? null;
+        if (null === $state) {
+            return self::DEFAULT_GREGORIAN_CHANGE;
+        }
+        IntlError::clear();
+
+        return (float) $state['gregorianChange'];
+    }
+
+    public static function setGregorianChange(ObjectEntry $cal, float $timestamp): bool
+    {
+        $state = &self::$state[$cal->id];
+        if (!isset($state)) {
+            return false;
+        }
+        $state['gregorianChange'] = $timestamp;
+        IntlError::clear();
+
+        return true;
+    }
+
+    /** Clamp year/month/day/... to ICU int32 range (php-src ZEND_VALUE_ERROR_OUT_OF_BOUND_VALUE). */
+    public static function assertInt32Field(int $value, int $position, string $function): void
+    {
+        if ($value < -2147483648 || $value > 2147483647) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d must be between %d and %d',
+                $function,
+                $position,
+                -2147483648,
+                2147483647
+            ));
+        }
+    }
+
+    public static function coerceFloatArg(Variable $var, string $function, int $position, string $name): float
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_FLOAT === $var->type) {
+            return $var->toFloat();
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return (float) $var->toInt();
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            return $var->toBool() ? 1.0 : 0.0;
+        }
+        if (Variable::TYPE_STRING === $var->type && is_numeric($var->toString())) {
+            return (float) $var->toString();
+        }
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type float, %s given',
+            $function,
+            $position + 1,
+            $name,
+            ReflectionSupport::valueTypeLabelPublic($var)
+        ));
+    }
+
+}
 /** IntlCalendar::createInstance() — php-src intlcal_create_instance (#6151). */
 final class IntlCalendarCreateInstance extends VmClassMethod
 {
@@ -2817,5 +2997,264 @@ final class IntlCalendarGetAvailableLocales extends VmClassMethod
             return;
         }
         $frame->returnVar->array(VmIntlCalendar::getAvailableLocales());
+    }
+}
+
+/** IntlGregorianCalendar::__construct() — php-src gregoriancalendar_methods.cpp (#20906). */
+final class IntlGregorianCalendarConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1) {
+            throw new \LogicException('IntlGregorianCalendar::__construct() called without $this');
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isGregorianCalendarObject($receiver->toObject())) {
+            throw new \TypeError('IntlGregorianCalendar::__construct() must be called on IntlGregorianCalendar');
+        }
+        $userArgc = $argc - 1;
+        while ($userArgc > 0
+            && Variable::TYPE_NULL === $frame->calledArgs[$userArgc]->resolveIndirect()->type) {
+            --$userArgc;
+        }
+        if (4 === $userArgc) {
+            throw new \ArgumentCountError(
+                'IntlGregorianCalendar::__construct(): No variant with 4 arguments (excluding trailing NULLs)'
+            );
+        }
+        if ($userArgc > 6) {
+            throw new \ArgumentCountError('IntlGregorianCalendar::__construct(): Too many arguments');
+        }
+        $obj = $receiver->toObject();
+        $ctx = $frame->vmContext;
+        if ($userArgc <= 2) {
+            $timezone = VmDate::defaultTimezoneGet();
+            if ($userArgc >= 1) {
+                $timezone = VmIntlTimeZone::resolveTimezoneOperand(
+                    $frame->calledArgs[1],
+                    $ctx,
+                    'IntlGregorianCalendar::__construct',
+                    0
+                );
+            }
+            $locale = '';
+            if ($userArgc >= 2) {
+                $localeVar = $frame->calledArgs[2]->resolveIndirect();
+                if (Variable::TYPE_NULL !== $localeVar->type) {
+                    $locale = VmString::coerceStringBuiltinArg(
+                        $localeVar,
+                        'IntlGregorianCalendar::__construct',
+                        1,
+                        'locale'
+                    );
+                }
+            }
+            VmIntlCalendar::createGregorian($ctx, $timezone, $locale, $obj);
+
+            return;
+        }
+        $year = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlGregorianCalendar::__construct', 0, 'year');
+        $month = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'IntlGregorianCalendar::__construct', 1, 'month');
+        $day = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[3], 'IntlGregorianCalendar::__construct', 2, 'day');
+        VmIntlCalendar::assertInt32Field($year, 1, 'IntlGregorianCalendar::__construct');
+        VmIntlCalendar::assertInt32Field($month, 2, 'IntlGregorianCalendar::__construct');
+        VmIntlCalendar::assertInt32Field($day, 3, 'IntlGregorianCalendar::__construct');
+        $hour = null;
+        $minute = null;
+        $second = null;
+        if ($userArgc >= 5) {
+            $hour = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[4], 'IntlGregorianCalendar::__construct', 3, 'hour');
+            $minute = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[5], 'IntlGregorianCalendar::__construct', 4, 'minute');
+            VmIntlCalendar::assertInt32Field($hour, 4, 'IntlGregorianCalendar::__construct');
+            VmIntlCalendar::assertInt32Field($minute, 5, 'IntlGregorianCalendar::__construct');
+        }
+        if (6 === $userArgc) {
+            $second = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[6], 'IntlGregorianCalendar::__construct', 5, 'second');
+            VmIntlCalendar::assertInt32Field($second, 6, 'IntlGregorianCalendar::__construct');
+        }
+        VmIntlCalendar::createGregorianFromDate($ctx, $year, $month, $day, $hour, $minute, $second, $obj);
+    }
+}
+
+/** IntlGregorianCalendar::createFromDate() — php-src (#20906). */
+final class IntlGregorianCalendarCreateFromDate extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('createFromDate');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlGregorianCalendar::createFromDate() expects exactly 3 arguments, %d given',
+                $argc
+            ));
+        }
+        $year = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[0], 'IntlGregorianCalendar::createFromDate', 0, 'year');
+        $month = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlGregorianCalendar::createFromDate', 1, 'month');
+        $day = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'IntlGregorianCalendar::createFromDate', 2, 'dayOfMonth');
+        VmIntlCalendar::assertInt32Field($year, 1, 'IntlGregorianCalendar::createFromDate');
+        VmIntlCalendar::assertInt32Field($month, 2, 'IntlGregorianCalendar::createFromDate');
+        VmIntlCalendar::assertInt32Field($day, 3, 'IntlGregorianCalendar::createFromDate');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->object(VmIntlCalendar::createGregorianFromDate(
+            $frame->vmContext,
+            $year,
+            $month,
+            $day
+        ));
+    }
+}
+
+/** IntlGregorianCalendar::createFromDateTime() — php-src (#20906). */
+final class IntlGregorianCalendarCreateFromDateTime extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('createFromDateTime');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc < 5 || $argc > 6) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlGregorianCalendar::createFromDateTime() expects between 5 and 6 arguments, %d given',
+                $argc
+            ));
+        }
+        $year = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[0], 'IntlGregorianCalendar::createFromDateTime', 0, 'year');
+        $month = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlGregorianCalendar::createFromDateTime', 1, 'month');
+        $day = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[2], 'IntlGregorianCalendar::createFromDateTime', 2, 'dayOfMonth');
+        $hour = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[3], 'IntlGregorianCalendar::createFromDateTime', 3, 'hour');
+        $minute = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[4], 'IntlGregorianCalendar::createFromDateTime', 4, 'minute');
+        VmIntlCalendar::assertInt32Field($year, 1, 'IntlGregorianCalendar::createFromDateTime');
+        VmIntlCalendar::assertInt32Field($month, 2, 'IntlGregorianCalendar::createFromDateTime');
+        VmIntlCalendar::assertInt32Field($day, 3, 'IntlGregorianCalendar::createFromDateTime');
+        VmIntlCalendar::assertInt32Field($hour, 4, 'IntlGregorianCalendar::createFromDateTime');
+        VmIntlCalendar::assertInt32Field($minute, 5, 'IntlGregorianCalendar::createFromDateTime');
+        $second = null;
+        if (6 === $argc) {
+            $secVar = $frame->calledArgs[5]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $secVar->type) {
+                $second = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[5], 'IntlGregorianCalendar::createFromDateTime', 5, 'second');
+                VmIntlCalendar::assertInt32Field($second, 6, 'IntlGregorianCalendar::createFromDateTime');
+            }
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->object(VmIntlCalendar::createGregorianFromDate(
+            $frame->vmContext,
+            $year,
+            $month,
+            $day,
+            $hour,
+            $minute,
+            $second
+        ));
+    }
+}
+
+/** IntlGregorianCalendar::isLeapYear() — php-src intlgregcal_is_leap_year (#20906). */
+final class IntlGregorianCalendarIsLeapYear extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isLeapYear');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlGregorianCalendar::isLeapYear() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isGregorianCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlGregorianCalendar::isLeapYear() called on incompatible object');
+        }
+        $year = VmIntlDateFormatter::coerceIntArg($frame->calledArgs[1], 'IntlGregorianCalendar::isLeapYear', 1, 'year');
+        VmIntlCalendar::assertInt32Field($year, 1, 'IntlGregorianCalendar::isLeapYear');
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(VmIntlCalendar::isLeapYear($receiver->toObject(), $year));
+    }
+}
+
+/** IntlGregorianCalendar::getGregorianChange() — php-src intlgregcal_get_gregorian_change (#20906). */
+final class IntlGregorianCalendarGetGregorianChange extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getGregorianChange');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (1 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlGregorianCalendar::getGregorianChange() expects exactly 0 arguments, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isGregorianCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlGregorianCalendar::getGregorianChange() called on incompatible object');
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->float(VmIntlCalendar::getGregorianChange($receiver->toObject()));
+    }
+}
+
+/** IntlGregorianCalendar::setGregorianChange() — php-src intlgregcal_set_gregorian_change (#20906). */
+final class IntlGregorianCalendarSetGregorianChange extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setGregorianChange');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'IntlGregorianCalendar::setGregorianChange() expects exactly 1 argument, %d given',
+                max(0, $argc - 1)
+            ));
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type
+            || !VmIntlCalendar::isGregorianCalendarObject($receiver->toObject())) {
+            throw new \Error('IntlGregorianCalendar::setGregorianChange() called on incompatible object');
+        }
+        $ts = VmIntlCalendar::coerceFloatArg($frame->calledArgs[1], 'IntlGregorianCalendar::setGregorianChange', 1, 'timestamp');
+        $ok = VmIntlCalendar::setGregorianChange($receiver->toObject(), $ts);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool($ok);
     }
 }
