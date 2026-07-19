@@ -189,6 +189,8 @@ if (null !== $unitPath) {
         '/ext/standard/Bin2hexJitHelper.php' => true,
         // Peer always-helper (#20469); keep off HELPER_RUNTIME_O until unit.o green.
         '/ext/standard/HashEqualsJitHelper.php' => true,
+        // Peer always-helper (#21026); NestedJIT digest path until unit.o green.
+        '/ext/standard/HashCryptoJitHelper.php' => true,
         // Peer always-helper (#20487); keep off HELPER_RUNTIME_O until unit.o green.
         '/ext/standard/HtmlspecialcharsJitHelper.php' => true,
         // Peer always-helper (#20589); keep off HELPER_RUNTIME_O until unit.o green.

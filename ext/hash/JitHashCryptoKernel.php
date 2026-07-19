@@ -13,12 +13,11 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Thin libcrypto EVP bridge for user-script standalone AOT (#3357, #16734, #19274, #19362).
+ * libcrypto EVP NestedJIT leaf for HashCryptoJitHelper (#3357, #21026).
  *
- * Nested HashCryptoJitHelper does not run reliably in minimal standalone init
- * (helper unit __init__ skipped under PHP_COMPILER_AOT_USER_SCRIPT). OpenSSL
- * EVP_Digest/HMAC match php-src ext/hash without nested PHP lowering.
- * Moved out of lib/JIT/Builtin/StringHashCryptoLlvm so Builtin surface shrinks (#19355 / #19274).
+ * Always-helper path ({@see StringHashCryptoPhp} + {@see JitVmHelperLink}) NestedJIT-compiles
+ * HashCryptoJitHelper, which calls {@see phpc_hash_crypto_hash} Internals that invoke these
+ * `__phpc_hc_evp_*` leaves (HashAlgos #20652 / Fpow #20664 shape). Not a thin-standalone ABI fork.
  *
  * Digest buffers must use {@see allocaI8Bytes()} / {@see arrayAlloca} — PHPLLVM
  * {@see \PHPLLVM\Builder::alloca()} takes only a Type; bare `alloca($i8, N)`
@@ -29,9 +28,23 @@ final class JitHashCryptoKernel
 {
     private const MAX_DIGEST_BYTES = 64;
 
+    public const EVP_HASH = '__phpc_hc_evp_hash';
+
+    public const EVP_HMAC = '__phpc_hc_evp_hmac';
+
+    public const EVP_PBKDF2 = '__phpc_hc_evp_pbkdf2';
+
+    public const EVP_HKDF = '__phpc_hc_evp_hkdf';
+
     public static function available(): bool
     {
         return VmOpensslSignNative::available();
+    }
+
+    /** Emit EVP leaf functions for NestedJIT Internal::call (#21026). */
+    public static function ensureEvpLeaves(Context $context): void
+    {
+        self::implement($context);
     }
 
     public static function implement(Context $context): void
@@ -45,10 +58,10 @@ final class JitHashCryptoKernel
         LibcExtern::register($context);
         self::ensureLibcrypto($context);
 
-        self::implementIfMissing($context, '__compiler_hash', 'hc_llvm_hash_entry', self::emitHash(...));
-        self::implementIfMissing($context, '__compiler_hash_hmac', 'hc_llvm_hmac_entry', self::emitHmac(...));
-        self::implementIfMissing($context, '__compiler_hash_pbkdf2', 'hc_llvm_pbkdf2_entry', self::emitPbkdf2(...));
-        self::implementIfMissing($context, '__compiler_hash_hkdf', 'hc_llvm_hkdf_entry', self::emitHkdf(...));
+        self::implementIfMissing($context, self::EVP_HASH, 'hc_llvm_hash_entry', self::emitHash(...));
+        self::implementIfMissing($context, self::EVP_HMAC, 'hc_llvm_hmac_entry', self::emitHmac(...));
+        self::implementIfMissing($context, self::EVP_PBKDF2, 'hc_llvm_pbkdf2_entry', self::emitPbkdf2(...));
+        self::implementIfMissing($context, self::EVP_HKDF, 'hc_llvm_hkdf_entry', self::emitHkdf(...));
     }
 
     /**
@@ -73,7 +86,7 @@ final class JitHashCryptoKernel
         } catch (\Throwable) {
         }
 
-        $fn = null !== $probe ? $probe : $context->lookupFunction($abiName);
+        $fn = null !== $probe ? $probe : self::declareEvpLeaf($context, $abiName);
         $emit($context, $fn);
         $context->registerFunction($abiName, $fn);
 
@@ -82,6 +95,39 @@ final class JitHashCryptoKernel
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function declareEvpLeaf(Context $context, string $abiName): LlvmFunction
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = match ($abiName) {
+            self::EVP_HASH => $context->context->functionType($strPtr, false, $strPtr, $strPtr, $i32),
+            self::EVP_HMAC => $context->context->functionType($strPtr, false, $strPtr, $strPtr, $strPtr, $i32),
+            self::EVP_PBKDF2 => $context->context->functionType(
+                $strPtr,
+                false,
+                $strPtr,
+                $strPtr,
+                $strPtr,
+                $i64,
+                $i64,
+                $i32
+            ),
+            self::EVP_HKDF => $context->context->functionType(
+                $strPtr,
+                false,
+                $strPtr,
+                $strPtr,
+                $i64,
+                $strPtr,
+                $strPtr
+            ),
+            default => throw new \LogicException('unknown EVP leaf '.$abiName),
+        };
+
+        return $context->module->addFunction($abiName, $ft);
     }
 
     private static function implementNullAbiIfMissing(Context $context, string $abiName, string $entryName): void
@@ -99,7 +145,7 @@ final class JitHashCryptoKernel
         } catch (\Throwable) {
         }
 
-        $fn = null !== $probe ? $probe : $context->lookupFunction($abiName);
+        $fn = null !== $probe ? $probe : self::declareEvpLeaf($context, $abiName);
         $entry = $fn->appendBasicBlock($entryName);
         $context->builder->positionAtEnd($entry);
         $context->builder->returnValue($context->getTypeFromString('__string__*')->constNull());
@@ -115,10 +161,10 @@ final class JitHashCryptoKernel
     private static function implementNullStubs(Context $context): void
     {
         foreach ([
-            '__compiler_hash',
-            '__compiler_hash_hmac',
-            '__compiler_hash_pbkdf2',
-            '__compiler_hash_hkdf',
+            self::EVP_HASH,
+            self::EVP_HMAC,
+            self::EVP_PBKDF2,
+            self::EVP_HKDF,
         ] as $abiName) {
             self::implementNullAbiIfMissing($context, $abiName, 'hc_llvm_null_stub');
         }

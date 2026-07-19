@@ -4,14 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\hash\JitHashCryptoKernel;
 use PHPCompiler\JIT\Context;
 
 /**
  * LLVM lowering for hash() / hash_hmac() / hash_pbkdf2() / hash_equals() / hash_hmac_algos().
  *
- * Digest helpers via {@see StringHashCryptoPhp} → HashCryptoJitHelper → VmHash (#9164).
- * Thin standalone AOT: {@see JitHashCryptoKernel} libcrypto EVP bridge (#3357, #19362, #20065).
+ * Digest helpers via {@see StringHashCryptoPhp} → HashCryptoJitHelper → phpc_hash_crypto_* EVP leaves (#9164, #21026).
+ * Embed + thin standalone AOT both use {@see JitVmHelperLink} (no thin-standalone ABI fork).
  * hash_equals / hash_hmac_algos / hash_algos via {@see StringHashEquals} / {@see StringHashHmacAlgos} / {@see StringHashAlgos}.
  */
 final class StringHashCryptoJit
@@ -34,25 +33,10 @@ final class StringHashCryptoJit
 
     public static function implement(Context $context): void
     {
-        if ($context->isThinStandaloneAotMain()) {
-            self::implementThin($context);
-
-            return;
-        }
-
         StringHashEquals::ensureLinked($context);
         StringHashHmacAlgos::ensureLinked($context);
         StringHashAlgos::ensureLinked($context);
         StringHashCryptoPhp::implement($context);
-        self::registerLinkedRuntime($context);
-    }
-
-    private static function implementThin(Context $context): void
-    {
-        JitHashCryptoKernel::implement($context);
-        StringHashHmacAlgos::ensureLinked($context);
-        StringHashAlgos::ensureLinked($context);
-        StringHashEquals::ensureLinked($context);
         self::registerLinkedRuntime($context);
     }
 
