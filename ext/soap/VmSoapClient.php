@@ -24,6 +24,7 @@ use PHPCompiler\ext\standard\VmStreamContext;
  * returns that file's contents (no network). HTTP locations use host file_get_contents POST.
  * With options['trace'], __getLastRequestHeaders / __getLastResponseHeaders capture HTTP header blocks.
  * options['exceptions']=false returns SoapFault objects instead of throwing (#20293).
+ * options['classmap'] maps SOAP type names (xsi:type local name) to PHP classes (#21044).
  */
 final class VmSoapClient
 {
@@ -156,6 +157,10 @@ final class VmSoapClient
         if (isset($options['features']) && (\is_int($options['features']) || \is_float($options['features']))) {
             $state->features = (int) $options['features'];
         }
+        // php-src SoapClient ctor: classmap type_name → PHP class (#21044; php_encoding.c to_zval_object_ex).
+        if (isset($options['classmap']) && \is_array($options['classmap'])) {
+            $state->classmap = self::normalizeClassmap($options['classmap']);
+        }
 
         if (null !== $wsdl && '' !== $wsdl) {
             self::loadWsdl($state, $wsdl);
@@ -256,7 +261,7 @@ final class VmSoapClient
             $response = self::doRequest($object, $request, $state->location, $action, $state->soapVersion, $frame);
             $state->lastResponse = $response;
 
-            $decoded = self::decodeResponse($response, $name, $state->features);
+            $decoded = self::decodeResponse($response, $name, $state->features, $state->classmap);
 
             return self::importValue($decoded, $ctx);
         } catch (\SoapFault $e) {
@@ -1121,8 +1126,35 @@ final class VmSoapClient
         return '<'.$tag.' xsi:type="xsd:string">'.\htmlspecialchars((string) $value, \ENT_XML1).'</'.$tag.'>';
     }
 
-    private static function decodeResponse(string $response, string $name, int $features = 0): mixed
+    /**
+     * @param array<string, string> $classmap type local-name → PHP class (no leading \)
+     */
+    private static function normalizeClassmap(array $raw): array
     {
+        $out = [];
+        foreach ($raw as $type => $class) {
+            if (!\is_string($type) || '' === $type) {
+                continue;
+            }
+            if (!\is_string($class) || '' === $class) {
+                continue;
+            }
+            // php-src #69280 — strip leading backslash on FQCN values.
+            $out[$type] = \ltrim($class, '\\');
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, string> $classmap
+     */
+    private static function decodeResponse(
+        string $response,
+        string $name,
+        int $features = 0,
+        array $classmap = []
+    ): mixed {
         $dom = new \DOMDocument();
         if (!@$dom->loadXML($response)) {
             throw new \SoapFault('Client', 'looks like we got no XML document');
@@ -1166,7 +1198,11 @@ final class VmSoapClient
         $children = [];
         foreach ($responseEl->childNodes as $child) {
             if ($child instanceof \DOMElement) {
-                $children[$child->localName ?? $child->nodeName] = self::domElementToValue($child, $singleElementArrays);
+                $children[$child->localName ?? $child->nodeName] = self::domElementToValue(
+                    $child,
+                    $singleElementArrays,
+                    $classmap
+                );
             }
         }
         if (0 === \count($children)) {
@@ -1176,11 +1212,17 @@ final class VmSoapClient
             return \reset($children);
         }
 
-        return (object) $children;
+        return self::maybeMappedObject($responseEl, $children, $classmap);
     }
 
-    private static function domElementToValue(\DOMElement $el, bool $singleElementArrays = false): mixed
-    {
+    /**
+     * @param array<string, string> $classmap
+     */
+    private static function domElementToValue(
+        \DOMElement $el,
+        bool $singleElementArrays = false,
+        array $classmap = []
+    ): mixed {
         $childElements = [];
         foreach ($el->childNodes as $child) {
             if ($child instanceof \DOMElement) {
@@ -1203,9 +1245,9 @@ final class VmSoapClient
                 if (!\is_array($map[$key]) || !\array_is_list($map[$key])) {
                     $map[$key] = [$map[$key]];
                 }
-                $map[$key][] = self::domElementToValue($child, $singleElementArrays);
+                $map[$key][] = self::domElementToValue($child, $singleElementArrays, $classmap);
             } else {
-                $map[$key] = self::domElementToValue($child, $singleElementArrays);
+                $map[$key] = self::domElementToValue($child, $singleElementArrays, $classmap);
             }
             if ('item' !== $key) {
                 $list = false;
@@ -1223,21 +1265,128 @@ final class VmSoapClient
             }
         }
 
-        return (object) $map;
+        return self::maybeMappedObject($el, $map, $classmap);
+    }
+
+    /**
+     * php-src to_zval_object_ex: classmap keyed by type_str / xsi:type local name (#21044).
+     *
+     * @param array<string, mixed>  $props
+     * @param array<string, string> $classmap
+     */
+    private static function maybeMappedObject(\DOMElement $el, array $props, array $classmap): mixed
+    {
+        if ([] !== $classmap) {
+            $typeName = self::xsiTypeLocalName($el);
+            if (null !== $typeName && isset($classmap[$typeName])) {
+                return new SoapMappedObject($classmap[$typeName], $props);
+            }
+        }
+
+        return (object) $props;
+    }
+
+    private static function xsiTypeLocalName(\DOMElement $el): ?string
+    {
+        $xsi = $el->getAttributeNS('http://www.w3.org/2001/XMLSchema-instance', 'type');
+        if ('' === $xsi) {
+            // Some fixtures omit xmlns:xsi and use a prefixed attribute only.
+            $xsi = $el->getAttribute('xsi:type');
+        }
+        if ('' === $xsi) {
+            return null;
+        }
+        $pos = \strrpos($xsi, ':');
+        if (false !== $pos) {
+            return \substr($xsi, $pos + 1);
+        }
+
+        return $xsi;
     }
 
     private static function importValue(mixed $value, Context $ctx): Variable
     {
-        // Reuse json import path via encode/decode of scalars/objects/arrays.
-        if ($value instanceof \stdClass || \is_array($value) || null === $value
-            || \is_scalar($value)) {
-            $json = \json_encode($value, \JSON_THROW_ON_ERROR);
-            $decoded = \json_decode($json, false, 512, \JSON_THROW_ON_ERROR);
-
-            return self::importJsonLike($decoded, $ctx);
+        if ($value instanceof SoapMappedObject) {
+            return self::importMappedObject($value, $ctx);
+        }
+        // Nested SoapMappedObject cannot survive json_encode — walk the tree (#21044).
+        if ($value instanceof \stdClass || \is_array($value)) {
+            return self::importDecodedTree($value, $ctx);
+        }
+        if (null === $value || \is_scalar($value)) {
+            return self::importJsonLike($value, $ctx);
         }
         $var = new Variable();
         $var->string((string) $value);
+
+        return $var;
+    }
+
+    /**
+     * @param \stdClass|array<mixed> $value
+     */
+    private static function importDecodedTree(mixed $value, Context $ctx): Variable
+    {
+        if ($value instanceof SoapMappedObject) {
+            return self::importMappedObject($value, $ctx);
+        }
+        if ($value instanceof \stdClass) {
+            if (!isset($ctx->classes['stdclass'])) {
+                throw new \LogicException('stdClass is not registered');
+            }
+            $object = new ObjectEntry($ctx->classes['stdclass']);
+            $object->constructed = true;
+            foreach ((array) $value as $key => $item) {
+                $object->allocateProperty((string) $key)
+                    ->copyFrom(self::importValue($item, $ctx));
+            }
+            $var = new Variable();
+            $var->object($object);
+
+            return $var;
+        }
+        if (\is_array($value)) {
+            $ht = new HashTable();
+            $isList = \array_is_list($value);
+            foreach ($value as $key => $item) {
+                $slot = self::importValue($item, $ctx);
+                if ($isList) {
+                    $ht->addIndex((int) $key, $slot);
+                } else {
+                    $ht->add((string) $key, $slot);
+                }
+            }
+            $var = new Variable();
+            $var->array($ht);
+
+            return $var;
+        }
+
+        return self::importJsonLike($value, $ctx);
+    }
+
+    private static function importMappedObject(SoapMappedObject $mapped, Context $ctx): Variable
+    {
+        $classLc = \strtolower($mapped->className);
+        // php-src: zend_fetch_class failure → stay on stdClass (#21047).
+        if (!isset($ctx->classes[$classLc])) {
+            $std = new \stdClass();
+            foreach ($mapped->properties as $key => $item) {
+                $std->{$key} = $item;
+            }
+
+            return self::importDecodedTree($std, $ctx);
+        }
+        $ce = $ctx->classes[$classLc];
+        $object = new ObjectEntry($ce);
+        // php-src: constructor is not called for classmap hydration.
+        $object->constructed = true;
+        foreach ($mapped->properties as $key => $item) {
+            $object->allocateProperty((string) $key)
+                ->copyFrom(self::importValue($item, $ctx));
+        }
+        $var = new Variable();
+        $var->object($object);
 
         return $var;
     }
@@ -1382,6 +1531,13 @@ final class SoapClientState
     /** php-src features bitmask (SOAP_SINGLE_ELEMENT_ARRAYS, …) (#20367). */
     public int $features = 0;
 
+    /**
+     * php-src _classmap — SOAP type local-name → PHP class name (no leading \) (#21044).
+     *
+     * @var array<string, string>
+     */
+    public array $classmap = [];
+
     public int $soapVersion = SoapConstants::SOAP_1_1;
 
     public int $style = SoapConstants::SOAP_RPC;
@@ -1410,6 +1566,23 @@ final class SoapClientState
 
     /** @var list<ObjectEntry> */
     public array $soapHeaders = [];
+}
+
+/**
+ * Decode-time stand-in for a classmap-hydrated struct (host PHP; imported to ObjectEntry).
+ *
+ * @internal
+ */
+final class SoapMappedObject
+{
+    /**
+     * @param array<string, mixed> $properties
+     */
+    public function __construct(
+        public readonly string $className,
+        public readonly array $properties,
+    ) {
+    }
 }
 
 final class SoapClientConstruct extends SoapClassMethod
