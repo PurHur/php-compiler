@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\CliArgvRuntime;
 use PHPLLVM\Value;
 
 /**
@@ -49,6 +50,7 @@ final class CliArgvGlobalInit
         if (null === self::$global) {
             return;
         }
+        CliArgvRuntime::ensureLinked($context);
         $context->builder->call(
             $context->lookupFunction('__phpc_cli_refresh_argv_global'),
             $context->builder->pointerCast(

@@ -1049,6 +1049,9 @@ class Context {
         Builtin\StringFilePutContents::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
         Builtin\EnvLocalRuntime::ensureLinked($this);
+        // CLI argv: NestedJIT CliArgvJitHelper during thin init (peer IncludePath #20877 / #20904)
+        // — must precede {main} $argc/$argv lowering (compileToFile stubs are too late).
+        Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
         if (DomInstanceMethodJit::shouldDeferToVmClassMethodLowering()) {
             Builtin\DomStandaloneAotInitRuntime::ensureLinked($this);
         } elseif (CompilerVersion::supportsDomTokenList()) {
@@ -1061,7 +1064,7 @@ class Context {
     {
         $this->ensureMinimalUserStandaloneBodies();
         Builtin\EnvLocalRuntime::ensureBootstrapAotStubLinked($this);
-        Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
+        Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
         Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
     }
 
@@ -1173,7 +1176,7 @@ class Context {
         }
 
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isThinStandaloneAotMain()) {
-            Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
+            Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshEmit($this);
         }
 
