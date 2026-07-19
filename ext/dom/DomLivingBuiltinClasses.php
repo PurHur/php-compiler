@@ -207,6 +207,8 @@ final class DomLivingBuiltinClasses
         $fragment->properties[] = new ClassProperty(VmDom::PROP_FIRST_ELEMENT_CHILD, $nullProto, $objProto);
         $fragment->properties[] = new ClassProperty(VmDom::PROP_LAST_ELEMENT_CHILD, $nullProto, $objProto);
         $fragment->properties[] = new ClassProperty(VmDom::PROP_CHILD_ELEMENT_COUNT, null, new Variable(Variable::TYPE_INTEGER));
+        // ParentNode::$children — live HTMLCollection (php-src php_dom.stub.php; #21033).
+        $fragment->properties[] = new ClassProperty(VmDom::PROP_CHILDREN, $nullProto, $objProto);
         self::copyMethods($ctx->classes[VmDom::CLASS_DOCUMENT_FRAGMENT] ?? null, $fragment);
         // Living fragment also exposes Element querySelector* (#20948 / php_dom.stub.php).
         $fragment->methods['queryselector'] = new ElementQuerySelector();
@@ -280,6 +282,8 @@ final class DomLivingBuiltinClasses
         $element->interfaces[] = VmDomLiving::CLASS_PARENT_NODE;
         $element->interfaces[] = VmDomLiving::CLASS_CHILD_NODE;
         $element->properties[] = new ClassProperty(VmDom::PROP_TEXT_CONTENT, $nullProto, new Variable(Variable::TYPE_STRING));
+        // ParentNode::$children — live HTMLCollection (php-src php_dom.stub.php; #21033).
+        $element->properties[] = new ClassProperty(VmDom::PROP_CHILDREN, $nullProto, $objProto);
         // Living Standard string props (php-src php_dom.stub.php Dom\Element; #20532).
         $strProto = new Variable(Variable::TYPE_STRING);
         $element->properties[] = new ClassProperty(DomHtmlElementPropertySupport::PROP_ID, $nullProto, $strProto);
@@ -384,6 +388,8 @@ final class DomLivingBuiltinClasses
         $document->parentLc = VmDomLiving::CLASS_NODE;
         $document->interfaces[] = VmDomLiving::CLASS_PARENT_NODE;
         $document->properties[] = new ClassProperty(VmDomLiving::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
+        // ParentNode::$children — live HTMLCollection (php-src php_dom.stub.php; #21033).
+        $document->properties[] = new ClassProperty(VmDom::PROP_CHILDREN, $nullProto, $objProto);
         self::copySelectedMethods(
             $ctx->classes[VmDom::CLASS_DOCUMENT] ?? null,
             $document,
