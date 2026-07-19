@@ -112,6 +112,17 @@ final class VmBreakIterator
         $rb->properties[] = new ClassProperty(self::PROP_HANDLE, null, $strProto);
         self::installFactories($rb, $pubStatic);
         self::installInstanceMethods($rb, $pub);
+        $rbCtor = new RuleBasedBreakIteratorConstruct();
+        $rb->constructor = $rbCtor;
+        $rb->methods['__construct'] = $rbCtor;
+        $rb->methodVisibility['__construct'] = $pub;
+        $rb->methodNames['__construct'] = '__construct';
+        $rb->methods['getrules'] = new RuleBasedBreakIteratorGetRules();
+        $rb->methodVisibility['getrules'] = $pub;
+        $rb->methodNames['getrules'] = 'getRules';
+        $rb->methods['getbinaryrules'] = new RuleBasedBreakIteratorGetBinaryRules();
+        $rb->methodVisibility['getbinaryrules'] = $pub;
+        $rb->methodNames['getbinaryrules'] = 'getBinaryRules';
         $rb->methods['getrulestatus'] = new BreakIteratorGetRuleStatus();
         $rb->methodVisibility['getrulestatus'] = $pub;
         $rb->methodNames['getrulestatus'] = 'getRuleStatus';
@@ -239,6 +250,61 @@ final class VmBreakIterator
         IntlError::clear();
 
         return $obj;
+    }
+
+    /**
+     * IntlRuleBasedBreakIterator::__construct($rules, $compiled = false) — #20907.
+     *
+     * Allocates breakiterator state; uses character-boundary fallback when ICU
+     * ubrk_openRules is unavailable (setText / iteration still usable).
+     */
+    public static function constructFromRules(ObjectEntry $obj, string $rules, bool $compiled): void
+    {
+        $id = self::$nextId++;
+        $obj->getProperty(self::PROP_HANDLE)->string((string) $id);
+        self::$state[$id] = [
+            'type' => self::UBRK_CHARACTER,
+            'locale' => 'en_US',
+            'text' => '',
+            'pos' => 0,
+            'boundaries' => [0],
+            'ruleStatuses' => [0],
+            'parts' => null,
+            'index' => 0,
+            'lastCodePoint' => self::LAST_CODE_POINT_SENTINEL,
+            'errorCode' => IntlError::U_ZERO_ERROR,
+            'errorMessage' => 'U_ZERO_ERROR',
+            'rules' => $compiled ? null : $rules,
+            'binaryRules' => $compiled ? $rules : null,
+            'compiled' => $compiled,
+        ];
+        $obj->constructed = true;
+        self::clearObjectError($obj);
+        IntlError::clear();
+    }
+
+    public static function getRules(ObjectEntry $obj): string|false
+    {
+        $st = self::stateRef($obj);
+        if ($st['compiled'] ?? false) {
+            // Compiled binary input — source rules not available without ICU round-trip.
+            return false;
+        }
+        $rules = $st['rules'] ?? null;
+
+        return \is_string($rules) ? $rules : false;
+    }
+
+    public static function getBinaryRules(ObjectEntry $obj): string|false
+    {
+        $st = self::stateRef($obj);
+        if ($st['compiled'] ?? false) {
+            $bin = $st['binaryRules'] ?? null;
+
+            return \is_string($bin) ? $bin : false;
+        }
+        // Without ICU compile path, binary form is unavailable (php-src string|false).
+        return false;
     }
 
     public static function requireBreakIterator(Frame $frame, Variable $receiver): ObjectEntry
@@ -970,6 +1036,101 @@ C;
         }
 
         return $arg->toString();
+    }
+}
+
+/** IntlRuleBasedBreakIterator::__construct(string $rules, bool $compiled = false) — #20907. */
+final class RuleBasedBreakIteratorConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        // calledArgs[0] is $this
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'IntlRuleBasedBreakIterator::__construct() expects at least 1 argument, 0 given'
+            );
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(sprintf(
+                'IntlRuleBasedBreakIterator::__construct() expects at most 2 arguments, %d given',
+                $argc - 1
+            ));
+        }
+        $self = $frame->calledArgs[0]->resolveIndirect()->toObject();
+        $rulesVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_STRING !== $rulesVar->type) {
+            throw new \TypeError(
+                'IntlRuleBasedBreakIterator::__construct(): Argument #1 ($rules) must be of type string'
+            );
+        }
+        $compiled = false;
+        if ($argc >= 3) {
+            $c = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $c->type) {
+                $compiled = $c->toBool();
+            } elseif (Variable::TYPE_INTEGER === $c->type) {
+                $compiled = 0 !== $c->toInt();
+            } else {
+                throw new \TypeError(
+                    'IntlRuleBasedBreakIterator::__construct(): Argument #2 ($compiled) must be of type bool'
+                );
+            }
+        }
+        VmBreakIterator::constructFromRules($self, $rulesVar->toString(), $compiled);
+    }
+}
+
+final class RuleBasedBreakIteratorGetRules extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getRules');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $obj = VmBreakIterator::requireBreakIterator($frame, $frame->calledArgs[0]);
+        if (VmBreakIterator::RULE_BASED_LC !== strtolower($obj->class->name)) {
+            throw new \LogicException('getRules() requires IntlRuleBasedBreakIterator');
+        }
+        $rules = VmBreakIterator::getRules($obj);
+        if (null !== $frame->returnVar) {
+            if (false === $rules) {
+                $frame->returnVar->bool(false);
+            } else {
+                $frame->returnVar->string($rules);
+            }
+        }
+    }
+}
+
+final class RuleBasedBreakIteratorGetBinaryRules extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getBinaryRules');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $obj = VmBreakIterator::requireBreakIterator($frame, $frame->calledArgs[0]);
+        if (VmBreakIterator::RULE_BASED_LC !== strtolower($obj->class->name)) {
+            throw new \LogicException('getBinaryRules() requires IntlRuleBasedBreakIterator');
+        }
+        $bin = VmBreakIterator::getBinaryRules($obj);
+        if (null !== $frame->returnVar) {
+            if (false === $bin) {
+                $frame->returnVar->bool(false);
+            } else {
+                $frame->returnVar->string($bin);
+            }
+        }
     }
 }
 
