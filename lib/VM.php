@@ -6864,6 +6864,15 @@ restart:
                                     goto restart;
                                 }
                                 $this->tagReadonlyPropertyDimWriteContainer($result, $propertyObject, $name);
+                                // `&get`-only: dim writes mutate live backing through the by-ref get (#21098).
+                                if ($this->deliverByRefGetHookedPropertyDimWriteContainer(
+                                    $result,
+                                    $propertyObject,
+                                    $name,
+                                    $frame
+                                )) {
+                                    break;
+                                }
                                 // PROPERTY_FETCH_WRITE + []= must read-modify-write via hooks (#19171).
                                 $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
                                 if (null !== $hookValue) {
@@ -6897,6 +6906,14 @@ restart:
                         $hookValue = $this->fetchPropertyWithHooks($propertyObject, $name, $frame);
                         if (null !== $hookValue) {
                             if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
+                                if ($this->deliverByRefGetHookedPropertyDimWriteContainer(
+                                    $result,
+                                    $propertyObject,
+                                    $name,
+                                    $frame
+                                )) {
+                                    break;
+                                }
                                 $catchFrame = $this->deliverHookedPropertyDimWriteContainer(
                                     $result,
                                     $hookValue,
@@ -9117,6 +9134,121 @@ restart:
         return null;
     }
 
+    /**
+     * `&get`-only hooked property: `$o->x[] =` / `$o->x[$k] =` mutates the by-ref get target
+     * without a set hook or write-back (#21098, zend_property_hooks.c).
+     *
+     * @return bool true when the dest was wired as a live by-ref dim container
+     */
+    private function deliverByRefGetHookedPropertyDimWriteContainer(
+        Variable $dest,
+        ObjectEntry $owner,
+        string $propName,
+        Frame $frame,
+    ): bool {
+        $meta = $this->classPropertyMeta($owner, $propName);
+        if (null === $meta || !$meta->getHookByRef || null === $meta->getHookMethodLc) {
+            return false;
+        }
+        if (null !== $meta->setHookMethodLc) {
+            // Backed `&get`+`set` is illegal in php-src; virtual may allow both — use RMW path.
+            return false;
+        }
+        $lcClass = strtolower($owner->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        $backingName = is_array($propMeta)
+            ? ($propMeta['getBacking'] ?? null)
+            : null;
+        if (null !== $backingName && $owner->hasProperty($backingName)) {
+            $dest->indirect($owner->getProperty($backingName));
+
+            return true;
+        }
+        // No recorded backing: invoke `&get` and keep the returned reference live.
+        $hookValue = $this->fetchPropertyWithHooksByRef($owner, $propName, $frame);
+        if (null === $hookValue) {
+            return false;
+        }
+        $dest->indirect($hookValue);
+
+        return true;
+    }
+
+    /**
+     * Invoke a get hook preserving return-by-ref aliases (#21098).
+     */
+    private function fetchPropertyWithHooksByRef(ObjectEntry $object, string $name, Frame $frame): ?Variable
+    {
+        $meta = $this->classPropertyMeta($object, $name);
+        $getLc = $meta?->getHookMethodLc
+            ?? strtolower(SourcePreprocessor\PropertyHooks::getHookMethodName($name));
+        if (!isset($object->class->methods[$getLc])) {
+            return null;
+        }
+        $func = $object->class->methods[$getLc];
+        if (!$func instanceof Func\PHP) {
+            return null;
+        }
+        $thisVar = new Variable();
+        $thisVar->object($object);
+
+        return $this->invokePhpFunctionWithPropertyHookRawByRef($func, $name, $frame, $thisVar);
+    }
+
+    private function invokePhpFunctionWithPropertyHookRawByRef(
+        Func\PHP $func,
+        string $rawProperty,
+        Frame $parentFrame,
+        Variable ...$args
+    ): Variable {
+        $savedStack = null !== $this->context->currentFiber
+            ? null
+            : $this->context->swapRunStack(null);
+        $savedExternalCatch = $this->context->propertyHookExternalCatchFrame;
+        $this->context->propertyHookExternalCatchFrame = null;
+        try {
+            $child = $func->getFrame($this->context, $parentFrame);
+            $child->propertyHookRawProperty = $rawProperty;
+            $child->calledArgs = $args;
+            if (
+                [] !== $args
+                && null !== $func->block->func
+                && null !== $func->block->func->class
+            ) {
+                $thisIdx = $func->block->slotIndexForVariableName('this');
+                if (null !== $thisIdx) {
+                    $child->scope[$thisIdx] = $args[0];
+                }
+            }
+            $out = new Variable();
+            $child->returnVar = $out;
+            $this->context->push($child);
+            $result = $this->runFrames();
+            if (null !== $this->context->propertyHookExternalCatchFrame) {
+                throw new VM\PropertyHookRefWriteSignal($this->context->propertyHookExternalCatchFrame);
+            }
+            if (self::FIBER_SUSPEND === $result) {
+                throw new VM\PropertyHookFiberSuspendSignal($parentFrame);
+            }
+            if (self::SUCCESS !== $result) {
+                throw new \LogicException('Property hook invocation failed in this compiler build');
+            }
+            // Preserve TYPE_INDIRECT so dim writes mutate the `&get` target (#21098).
+            if (Variable::TYPE_INDIRECT === $out->type) {
+                return $out;
+            }
+
+            return $out->resolveIndirect();
+        } finally {
+            $this->context->propertyHookExternalCatchFrame = $savedExternalCatch;
+            if (null !== $savedStack) {
+                $this->context->swapRunStack($savedStack);
+            }
+        }
+    }
+
     private function deliverHookedStaticPropertyDimWriteContainer(
         Variable $dest,
         Variable $hookValue,
@@ -10959,6 +11091,9 @@ restart:
         }
         if (is_array($propMeta) && !empty($propMeta['getParameterized'])) {
             $prop->getHookParameterized = true;
+        }
+        if (is_array($propMeta) && !empty($propMeta['getByRef'])) {
+            $prop->getHookByRef = true;
         }
     }
 
@@ -15161,6 +15296,8 @@ restart:
         $cloned->getHookMethodLc = $property->getHookMethodLc;
         $cloned->setHookMethodLc = $property->setHookMethodLc;
         $cloned->unsetHookMethodLc = $property->unsetHookMethodLc;
+        $cloned->getHookParameterized = $property->getHookParameterized;
+        $cloned->getHookByRef = $property->getHookByRef;
         $cloned->propertyHookVirtual = $property->propertyHookVirtual;
         $cloned->propertyFinal = $property->propertyFinal;
         $cloned->fromConstructorPromotion = $property->fromConstructorPromotion;
