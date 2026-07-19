@@ -95,6 +95,8 @@ final class VmSodium
 
     public const CRYPTO_BOX_KEYPAIRBYTES = 64;
 
+    public const CRYPTO_BOX_SEEDBYTES = 32;
+
     public const CRYPTO_BOX_MACBYTES = 16;
 
     public const CRYPTO_BOX_NONCEBYTES = 24;
@@ -620,6 +622,23 @@ final class VmSodium
         return self::ffiBoxKeypair();
     }
 
+    /**
+     * sodium_crypto_box_seed_keypair() — deterministic box keypair from seed (#21019).
+     */
+    public static function boxSeedKeypair(string $seed): string
+    {
+        if (\strlen($seed) !== self::CRYPTO_BOX_SEEDBYTES) {
+            self::throwSodium(
+                'sodium_crypto_box_seed_keypair(): Argument #1 ($seed) must be SODIUM_CRYPTO_BOX_SEEDBYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_box_seed_keypair')) {
+            return \sodium_crypto_box_seed_keypair($seed);
+        }
+
+        return self::ffiBoxSeedKeypair($seed);
+    }
+
     public static function boxPublickey(string $keypair): string
     {
         self::validateBoxKeypair($keypair, 'sodium_crypto_box_publickey');
@@ -930,6 +949,18 @@ final class VmSodium
     }
 
     /**
+     * sodium_crypto_aead_xchacha20poly1305_ietf_keygen() — random XChaCha20-Poly1305 key (#21019).
+     */
+    public static function aeadXchacha20poly1305IetfKeygen(): string
+    {
+        if (\function_exists('sodium_crypto_aead_xchacha20poly1305_ietf_keygen')) {
+            return \sodium_crypto_aead_xchacha20poly1305_ietf_keygen();
+        }
+
+        return self::randomKeyBytes(self::CRYPTO_AEAD_XCHACHA20POLY1305_IETF_KEYBYTES);
+    }
+
+    /**
      * sodium_crypto_aead_chacha20poly1305_keygen() — random classic AEAD key (php-src #20031).
      */
     public static function aeadChacha20poly1305Keygen(): string
@@ -1059,6 +1090,21 @@ final class VmSodium
     }
 
     /**
+     * sodium_crypto_aead_aes256gcm_keygen() — random AES-256-GCM key (php-src #21019).
+     *
+     * Registered whenever AES-GCM symbols are advertised (same as encrypt/decrypt); keygen
+     * itself only needs randombytes and does not require HW AES (#ifdef HAVE_AESGCM).
+     */
+    public static function aeadAes256gcmKeygen(): string
+    {
+        if (\function_exists('sodium_crypto_aead_aes256gcm_keygen')) {
+            return \sodium_crypto_aead_aes256gcm_keygen();
+        }
+
+        return self::randomKeyBytes(self::CRYPTO_AEAD_AES256GCM_KEYBYTES);
+    }
+
+    /**
      * sodium_crypto_aead_aegis128l_keygen() — random AEGIS-128L key (php-src #20518).
      */
     public static function aeadAegis128lKeygen(): string
@@ -1173,6 +1219,37 @@ final class VmSodium
         }
 
         return self::ffiSignKeypair();
+    }
+
+    /**
+     * sodium_crypto_sign_seed_keypair() — deterministic Ed25519 keypair from seed (#21019).
+     */
+    public static function signSeedKeypair(string $seed): string
+    {
+        if (\strlen($seed) !== self::CRYPTO_SIGN_SEEDBYTES) {
+            self::throwSodium(
+                'sodium_crypto_sign_seed_keypair(): Argument #1 ($seed) must be SODIUM_CRYPTO_SIGN_SEEDBYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_sign_seed_keypair')) {
+            return \sodium_crypto_sign_seed_keypair($seed);
+        }
+
+        return self::ffiSignSeedKeypair($seed);
+    }
+
+    /**
+     * sodium_crypto_sign_keypair_from_secretkey_and_publickey() — assemble sign keypair (#21019).
+     */
+    public static function signKeypairFromSecretkeyAndPublickey(string $secretkey, string $publickey): string
+    {
+        self::validateSignSecretkey($secretkey, 'sodium_crypto_sign_keypair_from_secretkey_and_publickey', 1);
+        self::validateSignPublickey($publickey, 'sodium_crypto_sign_keypair_from_secretkey_and_publickey', 2);
+        if (\function_exists('sodium_crypto_sign_keypair_from_secretkey_and_publickey')) {
+            return \sodium_crypto_sign_keypair_from_secretkey_and_publickey($secretkey, $publickey);
+        }
+
+        return $secretkey.$publickey;
     }
 
     public static function signPublickey(string $keypair): string
@@ -2647,6 +2724,21 @@ final class VmSodium
             .self::unsignedCharArrayToString($pkBuf, self::CRYPTO_BOX_PUBLICKEYBYTES);
     }
 
+    private static function ffiBoxSeedKeypair(string $seed): string
+    {
+        $ffi = self::requireFfi();
+        $pkBuf = $ffi->new('unsigned char['.self::CRYPTO_BOX_PUBLICKEYBYTES.']');
+        $skBuf = $ffi->new('unsigned char['.self::CRYPTO_BOX_SECRETKEYBYTES.']');
+        $seedBuf = self::stringToUnsignedCharArray($ffi, $seed);
+        $rc = $ffi->crypto_box_seed_keypair($pkBuf, $skBuf, $seedBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($skBuf, self::CRYPTO_BOX_SECRETKEYBYTES)
+            .self::unsignedCharArrayToString($pkBuf, self::CRYPTO_BOX_PUBLICKEYBYTES);
+    }
+
     private static function ffiBoxSeal(string $message, string $publickey): string
     {
         $ffi = self::requireFfi();
@@ -3296,6 +3388,21 @@ final class VmSodium
             .self::unsignedCharArrayToString($pkBuf, self::CRYPTO_SIGN_PUBLICKEYBYTES);
     }
 
+    private static function ffiSignSeedKeypair(string $seed): string
+    {
+        $ffi = self::requireFfi();
+        $pkBuf = $ffi->new('unsigned char['.self::CRYPTO_SIGN_PUBLICKEYBYTES.']');
+        $skBuf = $ffi->new('unsigned char['.self::CRYPTO_SIGN_SECRETKEYBYTES.']');
+        $seedBuf = self::stringToUnsignedCharArray($ffi, $seed);
+        $rc = $ffi->crypto_sign_seed_keypair($pkBuf, $skBuf, $seedBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($skBuf, self::CRYPTO_SIGN_SECRETKEYBYTES)
+            .self::unsignedCharArrayToString($pkBuf, self::CRYPTO_SIGN_PUBLICKEYBYTES);
+    }
+
     private static function ffiSignPublickeyFromSecretkey(string $secretkey): string
     {
         $ffi = self::requireFfi();
@@ -3745,6 +3852,17 @@ final class VmSodium
         }
     }
 
+    private static function validateSignPublickey(string $publickey, string $fn, int $argNum = 1): void
+    {
+        if (\strlen($publickey) !== self::CRYPTO_SIGN_PUBLICKEYBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($public_key) must be SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES bytes long',
+                $fn,
+                $argNum
+            ));
+        }
+    }
+
     private static function validateSecretstreamKey(string $key, string $fn, int $argNum = 1): void
     {
         if (\strlen($key) !== self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_KEYBYTES) {
@@ -3999,6 +4117,7 @@ final class VmSodium
                     int crypto_scalarmult_ristretto255(unsigned char *q, const unsigned char *n, const unsigned char *p);
                     int crypto_scalarmult_ristretto255_base(unsigned char *q, const unsigned char *n);
                     int crypto_box_keypair(unsigned char *pk, unsigned char *sk);
+                    int crypto_box_seed_keypair(unsigned char *pk, unsigned char *sk, const unsigned char *seed);
                     int crypto_box_easy(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n, const unsigned char *pk, const unsigned char *sk);
                     int crypto_box_open_easy(unsigned char *m, const unsigned char *c, unsigned long long clen, const unsigned char *n, const unsigned char *pk, const unsigned char *sk);
                     int crypto_box_seal(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *pk);
@@ -4007,6 +4126,7 @@ final class VmSodium
                     int crypto_aead_aes256gcm_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k);
                     int crypto_aead_aes256gcm_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);
                     int crypto_sign_keypair(unsigned char *pk, unsigned char *sk);
+                    int crypto_sign_seed_keypair(unsigned char *pk, unsigned char *sk, const unsigned char *seed);
                     int crypto_sign_ed25519_sk_to_pk(unsigned char *pk, const unsigned char *sk);
                     int crypto_sign_ed25519_sk_to_curve25519(unsigned char *curve25519_sk, const unsigned char *ed25519_sk);
                     int crypto_sign_ed25519_pk_to_curve25519(unsigned char *curve25519_pk, const unsigned char *ed25519_pk);

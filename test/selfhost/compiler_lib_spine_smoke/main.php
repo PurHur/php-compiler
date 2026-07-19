@@ -1580,6 +1580,7 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aegis256_keygen.ph
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aes256gcm_decrypt.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aes256gcm_encrypt.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aes256gcm_is_available.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_aes256gcm_keygen.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_chacha20poly1305_decrypt.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_chacha20poly1305_encrypt.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_chacha20poly1305_ietf_decrypt.php';
@@ -1588,6 +1589,7 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_chacha20poly1305_i
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_chacha20poly1305_keygen.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_decrypt.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_encrypt.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_keygen.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_auth.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_auth_keygen.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_auth_verify.php';
@@ -1600,6 +1602,7 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_publickey_from_secr
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_seal.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_seal_open.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_secretkey.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_box_seed_keypair.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_add.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_from_hash.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_core_ristretto255_is_valid_point.php';
@@ -1650,10 +1653,12 @@ require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_detached.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_ed25519_pk_to_curve25519.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_ed25519_sk_to_curve25519.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_keypair.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_keypair_from_secretkey_and_publickey.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_open.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_publickey.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_publickey_from_secretkey.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_secretkey.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_seed_keypair.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_sign_verify_detached.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_keygen.php';

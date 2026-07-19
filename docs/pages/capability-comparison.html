@@ -64,7 +64,7 @@
         </article>
         <article>
           <div>Stdlib builtins</div>
-          <strong>1155</strong> / 1469 full (VM+JIT+AOT)
+          <strong>1160</strong> / 1474 full (VM+JIT+AOT)
           <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">288 partial · 26 gaps</p>
         </article>
         <article>
@@ -1381,6 +1381,7 @@
 <tr data-support="full"><td><code>`sodium_crypto_aead_aes256gcm_decrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_aead_aes256gcm_encrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_aead_aes256gcm_is_available`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_aead_aes256gcm_keygen`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_aead_chacha20poly1305_decrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_aead_chacha20poly1305_encrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_aead_chacha20poly1305_ietf_decrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -1389,6 +1390,7 @@
 <tr data-support="full"><td><code>`sodium_crypto_aead_chacha20poly1305_keygen`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_aead_xchacha20poly1305_ietf_decrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_aead_xchacha20poly1305_ietf_encrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_aead_xchacha20poly1305_ietf_keygen`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_auth`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_auth_keygen`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_auth_verify`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -1401,6 +1403,7 @@
 <tr data-support="full"><td><code>`sodium_crypto_box_seal`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_box_seal_open`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_box_secretkey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_box_seed_keypair`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_core_ristretto255_add`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_core_ristretto255_from_hash`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_core_ristretto255_is_valid_point`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -1451,10 +1454,12 @@
 <tr data-support="full"><td><code>`sodium_crypto_sign_ed25519_pk_to_curve25519`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_sign_ed25519_sk_to_curve25519`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_sign_keypair`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_sign_keypair_from_secretkey_and_publickey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_sign_open`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_sign_publickey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_sign_publickey_from_secretkey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_sign_secretkey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_sign_seed_keypair`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_sign_verify_detached`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_stream`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_stream_keygen`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
