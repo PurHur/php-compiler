@@ -25144,6 +25144,39 @@ class Compiler {
         return true;
     }
 
+    /**
+     * Whether a MethodCall should be skipped while walking the hoisted sibling call-arg chain.
+     *
+     * Typed producers (createElement → DOMElement) always stay. inferred:unknown results are kept
+     * when they fall inside the trailing dead-temp arg window (DOMNodeList::item(), getElementById(),
+     * … — #21171) and skipped when they are prior statement calls such as loadXML (#19719).
+     */
+    private function methodCallIsSkippedHoistedSiblingProducer(
+        Op\Expr\MethodCall $child,
+        int $childIndex,
+        int $consumerIndex,
+        int $deadInlineArgCount
+    ): bool {
+        if ($this->methodCallHasStatementLevelSideEffects($child)) {
+            return true;
+        }
+        $method = $this->staticNameFromOperand($child->name);
+        if (null !== $method && $this->methodCallIsKnownVoidReturn($method)) {
+            return true;
+        }
+        if ($this->methodCallIsStmtLevelDiscardPrelude($child)) {
+            return true;
+        }
+        if ($this->methodCallInlineProducerSuppliesCallArgValue($child)) {
+            return false;
+        }
+        if ($deadInlineArgCount < 1) {
+            return true;
+        }
+
+        return ($consumerIndex - $childIndex) > $deadInlineArgCount;
+    }
+
     /** php-cfg may leave void method results untyped; do not wire them as inline call-arg values (#10778). */
     private function methodCallIsKnownVoidReturn(string $method): bool
     {
@@ -27935,22 +27968,13 @@ class Compiler {
         while ($i >= 0) {
             $child = $cfgChildren[$i] ?? null;
             if ($child instanceof Op\Expr\MethodCall) {
-                if ($this->methodCallHasStatementLevelSideEffects($child)) {
-                    --$i;
-                    continue;
-                }
-                $method = $this->staticNameFromOperand($child->name);
-                if (null !== $method && $this->methodCallIsKnownVoidReturn($method)) {
-                    --$i;
-                    continue;
-                }
-                if ($this->methodCallIsStmtLevelDiscardPrelude($child)) {
-                    --$i;
-                    continue;
-                }
-                // Prior $d->loadXML(...) (inferred:unknown) before insertBefore(createElement, …) (#19719).
-                // Do not use empty(result->usages): php-cfg dead arg temps leave producer usages empty.
-                if (!$this->methodCallInlineProducerSuppliesCallArgValue($child)) {
+                // Skip loadXML-style prior stmts; keep trailing item()/unknown producers (#19719, #21171).
+                if ($this->methodCallIsSkippedHoistedSiblingProducer(
+                    $child,
+                    $i,
+                    $consumerIndex,
+                    $deadInlineArgCount
+                )) {
                     --$i;
                     continue;
                 }
@@ -28077,18 +28101,13 @@ class Compiler {
         while ($first < $consumerIndex) {
             $skip = $cfgChildren[$first] ?? null;
             if ($skip instanceof Op\Expr\MethodCall) {
-                $method = $this->staticNameFromOperand($skip->name);
-                if (null !== $method && $this->methodCallIsKnownVoidReturn($method)) {
-                    ++$first;
-                    continue;
-                }
-                if ($this->methodCallIsStmtLevelDiscardPrelude($skip)) {
-                    ++$first;
-                    continue;
-                }
-                // $d->loadXML(...); $d->documentElement->insertBefore($d->createElement(...), …)
-                // — loadXML is a prior stmt (inferred:unknown), not a hoisted arg producer (#19719).
-                if (!$this->methodCallInlineProducerSuppliesCallArgValue($skip)) {
+                // Leading loadXML — skip; trailing item() inside dead-arg window — keep (#19719, #21171).
+                if ($this->methodCallIsSkippedHoistedSiblingProducer(
+                    $skip,
+                    $first,
+                    $consumerIndex,
+                    $deadInlineArgCount
+                )) {
                     ++$first;
                     continue;
                 }

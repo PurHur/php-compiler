@@ -15965,6 +15965,13 @@ class JIT {
                 return;
             }
             if ('object' === $declaringClassLc || '' === $declaringClassLc) {
+                // childNodes/attributes temps often lower as :object; ensure DOM list item()
+                // proxies before building class-id candidates (#21171 AOT, #18493).
+                if ('item' === $methodLc) {
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domnodelist::item');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'domtokenlist::item');
+                    JIT\DomInstanceMethodJit::ensureProxy($this->context, 'dom\\tokenlist::item');
+                }
                 $runtimeCandidates = $this->buildRuntimeInstanceMethodCandidatesByClassId($methodLc);
                 if ([] !== $runtimeCandidates) {
                     $this->context->scope->toCall = new JIT\Call\RuntimeIndirectInstanceMethodCall(
@@ -15972,6 +15979,13 @@ class JIT {
                         $methodLc,
                         $runtimeCandidates
                     );
+                    $this->context->scope->args = [$receiverVar];
+
+                    return;
+                }
+                // User-script AOT may omit DOMNodeList from allClassNamesById — still bind item().
+                if ('item' === $methodLc && $this->context->functionIsRegistered('domnodelist::item')) {
+                    $this->context->scope->toCall = $this->context->resolveFunctionProxy('domnodelist::item');
                     $this->context->scope->args = [$receiverVar];
 
                     return;

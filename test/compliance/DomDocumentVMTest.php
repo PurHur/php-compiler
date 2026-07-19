@@ -295,6 +295,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/dom/dom_node_insertbefore_property_fetch_ref.phpt',
             'dom_node_insertbefore_property_fetch_ref.phpt'
         );
+        yield 'dom_node_insertbefore_live_childnodes_temps.phpt' => self::parsePHPT(
+            __DIR__.'/cases/dom/dom_node_insertbefore_live_childnodes_temps.phpt',
+            'dom_node_insertbefore_live_childnodes_temps.phpt'
+        );
         yield 'dom_import_node_chained_deep.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_import_node_chained_deep.phpt',
             'dom_import_node_chained_deep.phpt'
