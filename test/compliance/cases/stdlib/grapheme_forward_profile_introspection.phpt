@@ -15,7 +15,8 @@ $phantom = function_exists('grapheme_strlen')
     || function_exists('grapheme_strimwidth')
     || function_exists('grapheme_stripos')
     || function_exists('grapheme_stristr')
-    || function_exists('grapheme_strrpos');
+    || function_exists('grapheme_strrpos')
+    || function_exists('grapheme_strripos');
 echo $phantom ? "fail\n" : "ok\n";
 --EXPECT--
 ok

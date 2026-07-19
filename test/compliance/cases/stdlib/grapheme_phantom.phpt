@@ -11,6 +11,7 @@ $phantom = function_exists('grapheme_strlen')
     || function_exists('grapheme_stripos')
     || function_exists('grapheme_stristr')
     || function_exists('grapheme_strrpos')
+    || function_exists('grapheme_strripos')
     || function_exists('intl_get_error_code')
     || function_exists('intl_get_error_message')
     || function_exists('intl_is_failure');

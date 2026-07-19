@@ -901,6 +901,7 @@ require_once __DIR__.'/../../../ext/intl/grapheme_stristr.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_strlen.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_strpos.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_strrpos.php';
+require_once __DIR__.'/../../../ext/intl/grapheme_strripos.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_strstr.php';
 require_once __DIR__.'/../../../ext/intl/grapheme_substr.php';
 require_once __DIR__.'/../../../ext/intl/idn_to_ascii.php';

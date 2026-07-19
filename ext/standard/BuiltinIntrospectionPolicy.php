@@ -127,6 +127,7 @@ final class BuiltinIntrospectionPolicy
             'grapheme_stripos',
             'grapheme_stristr',
             'grapheme_strrpos',
+            'grapheme_strripos',
             'intl_get_error_code',
             'intl_get_error_message',
             'intl_is_failure',
