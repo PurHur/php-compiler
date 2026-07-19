@@ -1550,6 +1550,8 @@ final class VmSoapClient
     }
 
     /**
+     * Without xsi:type, WSDL element→type (SDL type_str) still applies (#21088 classmap, #21090 typemap).
+     *
      * @param list<array{type_ns: string, type_name: string, from_xml: ?string, to_xml: ?string}> $typemap
      * @param array<string, string>                                                                 $elementTypes
      */
