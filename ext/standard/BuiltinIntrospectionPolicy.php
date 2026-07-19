@@ -42,10 +42,11 @@ final class BuiltinIntrospectionPolicy
             'array_all_key',
             'array_find',
             'array_find_key',
-            'array_first',
-            'array_last',
         ], true)) {
             return CompilerVersion::advertisesPhp84ArraySearchFunctions();
+        }
+        if (\in_array($lc, ['array_first', 'array_last'], true)) {
+            return CompilerVersion::advertisesPhp85ArrayFirstLast();
         }
         if ('generator_to_array' === $lc) {
             return CompilerVersion::advertisesGeneratorToArray();

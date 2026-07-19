@@ -1871,10 +1871,11 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ array_all/any/find/find_key/first/last (ext/standard/array.c, issue #11845, #12796, #14505, #14516, #14621, #14622, #15027, #15675).
+     * PHP 8.4+ array_all/any/find/find_key (ext/standard/array.c, issue #11845, #12796, #14505, #14516, #14621, #14622, #15027, #15675).
      *
      * Withheld on 8.4.0-dev reference profile (matches Zend 8.2 function_exists gate). Enable via
      * stable 8.4.0+ or explicit `PHP_COMPILER_PROFILE=8.4` forward profile.
+     * array_first()/array_last() are PHP 8.5+ — see {@see supportsPhp85ArrayFirstLast()} (#21173).
      */
     public static function supportsPhp84ArraySearchFunctions(): bool
     {
@@ -1891,7 +1892,9 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4 array_all/any/find/first/last family visible to function_exists() (#17007).
+     * PHP 8.4 array_all/any/find family visible to function_exists() (#17007).
+     *
+     * Does not include array_first()/array_last() — those are PHP 8.5 (#21173).
      */
     public static function advertisesPhp84ArraySearchFunctions(): bool
     {
@@ -1900,6 +1903,36 @@ final class CompilerVersion
         }
 
         return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.5+ array_first()/array_last() (ext/standard/array.c; #21173).
+     *
+     * Withheld on 8.4.0-dev / PROFILE=8.4 so function_exists matches Zend 8.4. Enable via
+     * stable 8.5.0+ or explicit `PHP_COMPILER_PROFILE=8.5` forward profile.
+     */
+    public static function supportsPhp85ArrayFirstLast(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === trim($raw)) {
+            return false;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
+    }
+
+    /** array_first()/array_last() visible to function_exists() — stable 8.5+ or forward PROFILE=8.5 (#21173). */
+    public static function advertisesPhp85ArrayFirstLast(): bool
+    {
+        if (version_compare(self::VERSION, '8.5.0', '>=')) {
+            return true;
+        }
+
+        return version_compare(self::languageProfileVersion(), '8.5.0', '>=');
     }
 
     /**

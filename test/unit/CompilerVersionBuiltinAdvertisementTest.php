@@ -573,6 +573,8 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         try {
             $this->assertTrue(CompilerVersion::supportsPhp83ArrayKeyFunctions());
             $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
+            $this->assertFalse(CompilerVersion::supportsPhp85ArrayFirstLast());
+            $this->assertFalse(CompilerVersion::advertisesPhp85ArrayFirstLast());
             $this->assertTrue(CompilerVersion::supportsGeneratorToArray());
         } finally {
             if (false === $prev) {
@@ -581,6 +583,29 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
                 putenv('PHP_COMPILER_PROFILE='.$prev);
             }
         }
+    }
+
+    public function testPhp85ArrayFirstLastTrueWhenProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhp85ArrayFirstLast());
+            $this->assertTrue(CompilerVersion::advertisesPhp85ArrayFirstLast());
+            $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testPhp85ArrayFirstLastWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsPhp85ArrayFirstLast());
+        $this->assertFalse(CompilerVersion::advertisesPhp85ArrayFirstLast());
     }
 
     public function testDateTimeMicrosecondWithheldOnReferenceProfile(): void
@@ -869,6 +894,47 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $ctx = $runtime->vmContext;
         foreach (['array_find', 'array_find_key', 'array_any', 'array_any_key', 'array_all', 'array_all_key', 'array_first', 'array_last', 'array_first_key', 'array_last_key'] as $fn) {
             $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        }
+    }
+
+    public function testVmWithholdsArrayFirstLastOnProfile84ButRegistersFindFamily(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['array_find', 'array_find_key', 'array_any', 'array_all'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            }
+            foreach (['array_first', 'array_last'] as $fn) {
+                $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersArrayFirstLastOnProfile85(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.5');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['array_first', 'array_last'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
         }
     }
 

@@ -90,6 +90,17 @@ class AotTest extends BaseTest
                 && str_contains($name, 'array_first_last_key_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsPhp85ArrayFirstLast()
+                && ((str_contains($name, 'array_first') && !str_contains($name, 'array_first_key') && !str_contains($name, 'array_first_last_key'))
+                    || (str_contains($name, 'array_last') && !str_contains($name, 'array_last_key') && !str_contains($name, 'array_first_last_key')))
+                && !str_contains($name, 'array_first_last_phantom_forward_84')
+                && !str_contains($name, 'array_first_last_forward_85')) {
+                continue;
+            }
+            if (CompilerVersion::supportsPhp85ArrayFirstLast()
+                && str_contains($name, 'array_first_last_phantom_forward_84')) {
+                continue;
+            }
             if (!CompilerVersion::supportsPhp84ReflectionProbeBuiltins()
                 && (str_contains($name, 'attribute_exists')
                     || str_contains($name, 'class_meth_exists')

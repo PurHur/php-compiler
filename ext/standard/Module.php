@@ -245,7 +245,7 @@ class Module extends ModuleAbstract
             new prev(),
             new reset_(),
             new end_(),
-            ...(CompilerVersion::supportsPhp84ArraySearchFunctions() ? [new array_first(), new array_last()] : []),
+            ...(CompilerVersion::supportsPhp85ArrayFirstLast() ? [new array_first(), new array_last()] : []),
             new array_is_list(),
             new in_array(),
             new array_push(),
