@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5830 |
-| Phase A inventory files (M2 ratio SSOT) | 5830 |
+| PHP files on vm.php path | 5831 |
+| Phase A inventory files (M2 ratio SSOT) | 5831 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17374 |
+| Source constructs flagged (warnings) | 17377 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -216,6 +216,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DocumentSchemaValidateSource.php` | 0 | 2 |
 | `ext/dom/DocumentValidate.php` | 0 | 1 |
 | `ext/dom/DocumentXInclude.php` | 0 | 1 |
+| `ext/dom/DomAdjacentPositionEnum.php` | 0 | 3 |
 | `ext/dom/DomC14NJitHelper.php` | 0 | 1 |
 | `ext/dom/DomClassConstants.php` | 0 | 2 |
 | `ext/dom/DomClassMethod.php` | 0 | 1 |
@@ -6990,6 +6991,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/dom/DomAdjacentPositionEnum.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 39)
+- new Variable (line 87)
+- 4 class method(s)
+
 ### `ext/dom/DomC14NJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7004,7 +7012,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomClassMethod.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `ext/dom/DomContainsJitHelper.php`
 
@@ -7093,58 +7101,58 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomLivingBuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 65)
-- new Variable (line 66)
-- new ClassEntry (line 70)
-- new ClassProperty (line 73)
-- new Variable (line 73)
-- new ClassEntry (line 78)
-- new ClassProperty (line 81)
-- new Variable (line 81)
-- new Variable (line 83)
+- new Variable (line 68)
+- new Variable (line 69)
+- new ClassEntry (line 73)
+- new ClassProperty (line 76)
+- new Variable (line 76)
+- new ClassEntry (line 81)
 - new ClassProperty (line 84)
-- new ClassProperty (line 85)
-- new ClassProperty (line 86)
+- new Variable (line 84)
+- new Variable (line 86)
 - new ClassProperty (line 87)
+- new ClassProperty (line 88)
 - new ClassProperty (line 89)
-- new ElementClosest (line 92)
-- new ElementMatches (line 95)
-- new ElementQuerySelector (line 98)
-- new ElementQuerySelectorAll (line 101)
-- new ElementGetElementsByClassName (line 104)
-- new ClassEntry (line 109)
-- new ClassEntry (line 116)
-- new ClassProperty (line 119)
-- new Variable (line 119)
-- new ClassProperty (line 120)
-- new Variable (line 120)
-- new ClassEntry (line 126)
-- new ClassProperty (line 135)
-- new Variable (line 135)
-- new HtmlCollectionNamedItem (line 137)
-- new ClassEntry (line 143)
-- new ClassProperty (line 152)
-- new Variable (line 152)
-- new ClassEntry (line 157)
-- new LivingXPathConstruct (line 159)
-- new ClassEntry (line 166)
-- new ClassProperty (line 169)
-- new DocumentGetElementsByClassName (line 177)
-- new ClassEntry (line 182)
-- new ClassProperty (line 185)
-- new ClassProperty (line 186)
-- new ClassProperty (line 187)
-- new HtmlDocumentCreateFromString (line 188)
-- new HtmlDocumentCreateEmpty (line 191)
-- new HtmlDocumentCreateFromFile (line 194)
-- new HtmlDocumentGetElementById (line 197)
-- new HtmlDocumentQuerySelector (line 200)
-- new HtmlDocumentQuerySelectorAll (line 203)
-- new HtmlDocumentSaveHtml (line 206)
-- new ClassEntry (line 223)
-- new ClassProperty (line 226)
-- new XmlDocumentCreateFromString (line 227)
-- new XmlDocumentCreateEmpty (line 230)
+- new ClassProperty (line 90)
+- new ClassProperty (line 92)
+- new ElementClosest (line 95)
+- new ElementMatches (line 98)
+- new ElementQuerySelector (line 101)
+- new ElementQuerySelectorAll (line 104)
+- new ElementGetElementsByClassName (line 107)
+- new ClassEntry (line 112)
+- new ClassEntry (line 119)
+- new ClassProperty (line 122)
+- new Variable (line 122)
+- new ClassProperty (line 123)
+- new Variable (line 123)
+- new ClassEntry (line 129)
+- new ClassProperty (line 138)
+- new Variable (line 138)
+- new HtmlCollectionNamedItem (line 140)
+- new ClassEntry (line 146)
+- new ClassProperty (line 155)
+- new Variable (line 155)
+- new ClassEntry (line 160)
+- new LivingXPathConstruct (line 162)
+- new ClassEntry (line 169)
+- new ClassProperty (line 172)
+- new DocumentGetElementsByClassName (line 180)
+- new ClassEntry (line 185)
+- new ClassProperty (line 188)
+- new ClassProperty (line 189)
+- new ClassProperty (line 190)
+- new HtmlDocumentCreateFromString (line 191)
+- new HtmlDocumentCreateEmpty (line 194)
+- new HtmlDocumentCreateFromFile (line 197)
+- new HtmlDocumentGetElementById (line 200)
+- new HtmlDocumentQuerySelector (line 203)
+- new HtmlDocumentQuerySelectorAll (line 206)
+- new HtmlDocumentSaveHtml (line 209)
+- new ClassEntry (line 226)
+- new ClassProperty (line 229)
+- new XmlDocumentCreateFromString (line 230)
+- new XmlDocumentCreateEmpty (line 233)
 - 3 class method(s)
 
 ### `ext/dom/DomLoadHTMLFileJitHelper.php`
@@ -8551,19 +8559,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDomLiving.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 92)
-- new ObjectEntry (line 110)
-- new DOMException (line 139)
-- new Variable (line 142)
-- new DOMException (line 182)
-- new DOMException (line 265)
-- new DOMException (line 270)
-- new DOMException (line 277)
-- new DOMException (line 308)
-- new DOMException (line 320)
-- new DOMException (line 433)
-- new Variable (line 439)
-- new Variable (line 473)
+- new ObjectEntry (line 95)
+- new ObjectEntry (line 113)
+- new DOMException (line 142)
+- new Variable (line 145)
+- new DOMException (line 185)
+- new DOMException (line 268)
+- new DOMException (line 273)
+- new DOMException (line 280)
+- new DOMException (line 311)
+- new DOMException (line 323)
+- new DOMException (line 436)
+- new Variable (line 442)
+- new Variable (line 476)
 - 36 class method(s)
 - 1 closure(s)
 

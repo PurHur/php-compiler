@@ -62,6 +62,9 @@ final class DomLivingBuiltinClasses
             return;
         }
 
+        // Dom\AdjacentPosition — insertAdjacent* where (php-src php_dom.stub.php; #20782).
+        DomAdjacentPositionEnum::register($ctx);
+
         $objProto = new Variable(Variable::TYPE_OBJECT);
         $nullProto = new Variable(Variable::TYPE_NULL);
         $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;

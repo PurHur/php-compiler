@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
@@ -38,6 +39,49 @@ abstract class DomClassMethod extends VmClassMethod
                 '%s expects argument #%d to be of type string, %s given',
                 $label,
                 $index + 1,
+                VmDom::typeLabel($var)
+            ));
+        }
+        if (Variable::TYPE_NULL === $var->type) {
+            return '';
+        }
+
+        return $var->toString();
+    }
+
+    /**
+     * insertAdjacent* $where — string or Dom\AdjacentPosition (php-src php_dom.stub.php; #20782).
+     */
+    protected function adjacentPositionArg(
+        Variable $var,
+        string $label,
+        int $index,
+        ?Frame $frame = null,
+        string $paramName = 'where'
+    ): string {
+        $var = $var->resolveIndirect();
+        $fromEnum = DomAdjacentPositionEnum::tryPositionString($var);
+        if (null !== $fromEnum) {
+            return $fromEnum;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(sprintf(
+                '%s: Argument #%d ($%s) must be of type Dom\\AdjacentPosition|string, %s given',
+                $label,
+                $index + 1,
+                $paramName,
+                VmDom::typeLabel($var)
+            ));
+        }
+        if (null !== $frame && InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::rejectNullString($var, $label, $paramName, $index, $frame);
+        }
+        if (Variable::TYPE_STRING !== $var->type && Variable::TYPE_NULL !== $var->type) {
+            throw new \TypeError(sprintf(
+                '%s: Argument #%d ($%s) must be of type Dom\\AdjacentPosition|string, %s given',
+                $label,
+                $index + 1,
+                $paramName,
                 VmDom::typeLabel($var)
             ));
         }

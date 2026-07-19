@@ -36,6 +36,9 @@ final class VmDomLiving
     /** php-src Dom\XPath (php_dom.stub.php / xpath.c; #20757). */
     public const CLASS_XPATH = 'dom\\xpath';
 
+    /** php-src Dom\AdjacentPosition (php_dom.stub.php; #20782). */
+    public const CLASS_ADJACENT_POSITION = DomAdjacentPositionEnum::CLASS_LC;
+
     /** HTML namespace URI (https://html.spec.whatwg.org/#html-namespace). */
     public const HTML_NS = 'http://www.w3.org/1999/xhtml';
 
