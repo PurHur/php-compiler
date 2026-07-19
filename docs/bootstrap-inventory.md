@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5854 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17601 |
+| Source constructs flagged (warnings) | 17604 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -848,7 +848,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/VmIntlDatePatternGenerator.php` | 0 | 12 |
 | `ext/intl/VmIntlTimeZone.php` | 0 | 34 |
 | `ext/intl/VmLocale.php` | 0 | 2 |
-| `ext/intl/VmMessageFormatter.php` | 0 | 34 |
+| `ext/intl/VmMessageFormatter.php` | 0 | 37 |
 | `ext/intl/VmNormalizer.php` | 0 | 1 |
 | `ext/intl/VmNumberFormatter.php` | 0 | 56 |
 | `ext/intl/VmResourceBundle.php` | 0 | 28 |
@@ -11856,38 +11856,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 46)
-- new MessageFormatterCreate (line 51)
-- new MessageFormatterFormat (line 52)
-- new MessageFormatterSetPattern (line 53)
-- new MessageFormatterGetPattern (line 54)
-- new MessageFormatterFormatMessage (line 55)
-- new MessageFormatterParse (line 56)
-- new MessageFormatterParseMessage (line 57)
-- new MessageFormatterGetLocale (line 58)
-- new MessageFormatterGetErrorCode (line 59)
-- new MessageFormatterGetErrorMessage (line 60)
-- new Error (line 81)
-- new ObjectEntry (line 91)
-- new HashTable (line 296)
-- new Variable (line 298)
-- new ArgumentCountError (line 576)
-- new ArgumentCountError (line 608)
-- new Error (line 616)
-- new ArgumentCountError (line 644)
-- new Error (line 652)
-- new ArgumentCountError (line 675)
-- new Error (line 683)
-- new ArgumentCountError (line 710)
-- new ArgumentCountError (line 743)
-- new Error (line 751)
-- new ArgumentCountError (line 779)
-- new ArgumentCountError (line 812)
-- new Error (line 820)
-- new ArgumentCountError (line 847)
-- new Error (line 855)
-- new ArgumentCountError (line 876)
-- new Error (line 884)
-- 36 class method(s)
+- new MessageFormatterConstruct (line 50)
+- new MessageFormatterCreate (line 54)
+- new MessageFormatterFormat (line 55)
+- new MessageFormatterSetPattern (line 56)
+- new MessageFormatterGetPattern (line 57)
+- new MessageFormatterFormatMessage (line 58)
+- new MessageFormatterParse (line 59)
+- new MessageFormatterParseMessage (line 60)
+- new MessageFormatterGetLocale (line 61)
+- new MessageFormatterGetErrorCode (line 62)
+- new MessageFormatterGetErrorMessage (line 63)
+- new Error (line 111)
+- new ObjectEntry (line 113)
+- new HashTable (line 313)
+- new Variable (line 315)
+- new ArgumentCountError (line 593)
+- new Error (line 601)
+- new ArgumentCountError (line 621)
+- new ArgumentCountError (line 653)
+- new Error (line 661)
+- new ArgumentCountError (line 689)
+- new Error (line 697)
+- new ArgumentCountError (line 720)
+- new Error (line 728)
+- new ArgumentCountError (line 755)
+- new ArgumentCountError (line 788)
+- new Error (line 796)
+- new ArgumentCountError (line 824)
+- new ArgumentCountError (line 857)
+- new Error (line 865)
+- new ArgumentCountError (line 892)
+- new Error (line 900)
+- new ArgumentCountError (line 921)
+- new Error (line 929)
+- 38 class method(s)
 - 1 closure(s)
 
 ### `ext/intl/VmNormalizer.php`
