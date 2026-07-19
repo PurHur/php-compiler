@@ -960,6 +960,8 @@ class Context {
         }
         $this->functionProxies['datetime::format'] = new Call\DateTimeFormat();
         $this->functionProxies['datetimeimmutable::format'] = new Call\DateTimeFormat();
+        // Locale::canonicalize — avoid ExternalMethod null stub on user-script AOT (#20760).
+        $this->functionProxies['locale::canonicalize'] = new \PHPCompiler\ext\intl\LocaleCanonicalize();
         if (CompilerVersion::supportsDomTokenList()) {
             DomInstanceMethodJit::registerKnownProxies($this);
         }

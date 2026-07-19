@@ -27,6 +27,8 @@ final class LocaleParserRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmLocale::getPrimaryLanguage', $source);
         $this->assertStringContainsString('VmLocale::getRegion', $source);
         $this->assertStringContainsString('VmLocale::getScript', $source);
+        $this->assertStringContainsString('VmLocale::canonicalize', $source);
+        $this->assertStringContainsString('canonicalizeArgv', $source);
     }
 
     public function testSpineBundleIncludesLocaleParserHelper(): void

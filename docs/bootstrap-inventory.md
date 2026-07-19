@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 5818 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17259 |
+| Source constructs flagged (warnings) | 17261 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -804,7 +804,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/JitGraphemeStrSplit.php` | 0 | 1 |
 | `ext/intl/JitLocaleParser.php` | 0 | 1 |
 | `ext/intl/LocaleAcceptFromHttp.php` | 0 | 2 |
-| `ext/intl/LocaleCanonicalize.php` | 0 | 2 |
+| `ext/intl/LocaleCanonicalize.php` | 0 | 3 |
 | `ext/intl/LocaleComposeLocale.php` | 0 | 2 |
 | `ext/intl/LocaleFilterMatches.php` | 0 | 3 |
 | `ext/intl/LocaleGetDefault.php` | 0 | 2 |
@@ -857,7 +857,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/intl_get_error_message.php` | 0 | 1 |
 | `ext/intl/intl_is_failure.php` | 0 | 1 |
 | `ext/intl/locale_accept_from_http.php` | 0 | 2 |
-| `ext/intl/locale_canonicalize.php` | 0 | 2 |
+| `ext/intl/locale_canonicalize.php` | 0 | 3 |
 | `ext/intl/locale_compose.php` | 0 | 2 |
 | `ext/intl/locale_filter_matches.php` | 0 | 3 |
 | `ext/intl/locale_get_default.php` | 0 | 2 |
@@ -11183,7 +11183,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/JitLocaleParser.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/intl/LocaleAcceptFromHttp.php`
 
@@ -11194,8 +11194,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/LocaleCanonicalize.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
-- 1 class method(s)
+- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 50)
+- 2 class method(s)
 
 ### `ext/intl/LocaleComposeLocale.php`
 
@@ -11265,7 +11266,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/LocaleParserJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/intl/LocaleSetDefault.php`
 
@@ -11830,6 +11831,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 20)
+- new ArgumentCountError (line 45)
 - 2 class method(s)
 
 ### `ext/intl/locale_compose.php`
@@ -36517,7 +36519,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/LocaleParser.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 10 class method(s)
 
 ### `lib/JIT/Builtin/MathAbs.php`
 
@@ -39946,19 +39948,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 958)
 - new Call\DateTimeFormat (line 961)
 - new Call\DateTimeFormat (line 962)
-- new Result (line 1298)
-- new Result (line 1319)
-- new Variable (line 1920)
-- new Variable (line 2057)
-- new Variable (line 2283)
-- new Variable (line 2341)
-- new VMVariable (line 2479)
-- new VMVariable (line 2495)
-- new VMVariable (line 2501)
-- new VMVariable (line 2507)
-- new VMVariable (line 2518)
-- new Variable (line 2548)
-- new Variable (line 2588)
+- new Result (line 1300)
+- new Result (line 1321)
+- new Variable (line 1922)
+- new Variable (line 2059)
+- new Variable (line 2285)
+- new Variable (line 2343)
+- new VMVariable (line 2481)
+- new VMVariable (line 2497)
+- new VMVariable (line 2503)
+- new VMVariable (line 2509)
+- new VMVariable (line 2520)
+- new Variable (line 2550)
+- new Variable (line 2590)
 - 102 class method(s)
 - 28 closure(s)
 

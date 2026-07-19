@@ -11,7 +11,8 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for locale_get_primary_language/region/script via LocaleParserJitHelper PHP (#17072, #20101).
+ * JIT/AOT link for locale_get_primary_language/region/script + canonicalize via LocaleParserJitHelper
+ * (#17072, #20101, #20760).
  *
  * Always {@see JitVmHelperLink} → {@see \PHPCompiler\ext\intl\LocaleParserJitHelper}
  * (no user-script NestedJIT defer early-return — thin/user-script AOT must still link bridges).
@@ -26,6 +27,8 @@ final class LocaleParser
 
     private const ABI_SCRIPT = '__phpc_jit_locale_get_script';
 
+    private const ABI_CANONICALIZE = '__phpc_jit_locale_canonicalize';
+
     private const HELPER_PATH = '/ext/intl/LocaleParserJitHelper.php';
 
     private const PRIMARY_HELPER = 'PHPCompiler\\ext\\intl\\LocaleParserJitHelper::primaryLanguageArgv';
@@ -34,11 +37,14 @@ final class LocaleParser
 
     private const SCRIPT_HELPER = 'PHPCompiler\\ext\\intl\\LocaleParserJitHelper::scriptArgv';
 
+    private const CANONICALIZE_HELPER = 'PHPCompiler\\ext\\intl\\LocaleParserJitHelper::canonicalizeArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::PRIMARY_HELPER,
         self::REGION_HELPER,
         self::SCRIPT_HELPER,
+        self::CANONICALIZE_HELPER,
     ];
 
     public static function invokePrimaryLanguage(Context $context, Value $locale): Value
@@ -67,6 +73,16 @@ final class LocaleParser
 
         return $context->builder->call(
             $context->lookupFunction(self::ABI_SCRIPT),
+            $locale
+        );
+    }
+
+    public static function invokeCanonicalize(Context $context, Value $locale): Value
+    {
+        self::ensureCanonicalizeLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_CANONICALIZE),
             $locale
         );
     }
@@ -101,11 +117,22 @@ final class LocaleParser
         );
     }
 
+    public static function ensureCanonicalizeLinked(Context $context): void
+    {
+        self::ensureBridge(
+            $context,
+            self::ABI_CANONICALIZE,
+            'locale_canonicalize_bridge_entry',
+            self::CANONICALIZE_HELPER
+        );
+    }
+
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::ensurePrimaryLanguageLinked($context);
         self::ensureRegionLinked($context);
         self::ensureScriptLinked($context);
+        self::ensureCanonicalizeLinked($context);
     }
 
     private static function ensureBridge(

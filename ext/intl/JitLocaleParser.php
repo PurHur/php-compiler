@@ -8,10 +8,11 @@ use PHPCompiler\JIT\Builtin\LocaleParser;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM JIT helper for locale_get_* BCP-47 parsers (#17072). */
+/** LLVM JIT helper for locale_get_* BCP-47 parsers + canonicalize (#17072, #20760). */
 final class JitLocaleParser
 {
     public static function primaryLanguage(Context $context, JITVariable $locale): Value
@@ -56,6 +57,32 @@ final class JitLocaleParser
         return LocaleParser::invokeScript(
             $context,
             JitStringBuiltinArg::lower($context, $locale, 'locale_get_script', 0, 'locale')
+        );
+    }
+
+    public static function canonicalize(Context $context, JITVariable $locale, string $function = 'locale_canonicalize'): Value
+    {
+        $literal = $locale->compileTimeString ?? JitStringArg::compileTimeLiteral($locale);
+        if (null !== $literal) {
+            $result = VmLocale::canonicalize($literal);
+            if (null === $result) {
+                $slot = JitValueBox::alloc($context);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeNull'),
+                    JitValueBox::pointer($context, $slot)
+                );
+
+                return $slot;
+            }
+
+            return $context->builder->load(
+                $context->constantStringFromString($result)
+            );
+        }
+
+        return LocaleParser::invokeCanonicalize(
+            $context,
+            JitStringBuiltinArg::lower($context, $locale, $function, 0, 'locale')
         );
     }
 }
