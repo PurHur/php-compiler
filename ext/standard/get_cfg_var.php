@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -28,11 +29,15 @@ final class get_cfg_var extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $resolved = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_NULL === $resolved->type) {
-            $option = '';
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            $option = InternalStrictArg::requireString($frame, 0, 'get_cfg_var', 'option')->toString();
         } else {
-            $option = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'get_cfg_var', 0, 'option');
+            $resolved = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_NULL === $resolved->type) {
+                $option = '';
+            } else {
+                $option = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'get_cfg_var', 0, 'option');
+            }
         }
         $result = VmIni::getCfgVar($option);
         if (false === $result) {
@@ -47,7 +52,30 @@ final class get_cfg_var extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('get_cfg_var() requires exactly one argument');
         }
-        if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
+        if ($context->callerStrictTypes) {
+            // TypeError without linking IniRuntime for compile-time null (#16526 / #20361 AOT).
+            if (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant
+                || (JITVariable::TYPE_STRING !== $args[0]->type
+                    && JITVariable::TYPE_VALUE !== $args[0]->type
+                    && JITVariable::TYPE_OBJECT !== $args[0]->type)) {
+                JitStringBuiltinArg::lowerStrictOrCoercible(
+                    $context,
+                    $args[0],
+                    'get_cfg_var',
+                    0,
+                    'option'
+                );
+
+                return $context->getTypeFromString('__value__*')->constNull();
+            }
+            $optionStr = JitStringBuiltinArg::lowerStrictOrCoercible(
+                $context,
+                $args[0],
+                'get_cfg_var',
+                0,
+                'option'
+            );
+        } elseif (JITVariable::TYPE_NULL === $args[0]->type || $args[0]->isNullConstant) {
             $optionStr = $context->builder->load($context->constantStringFromString(''));
         } else {
             $optionStr = JitStringBuiltinArg::lower($context, $args[0], 'get_cfg_var', 0, 'option');

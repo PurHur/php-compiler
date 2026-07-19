@@ -22012,7 +22012,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/IniOptionArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/IniParseQuantityJitHelper.php`
 
@@ -30891,7 +30891,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/get_cfg_var.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 27)
 - 2 class method(s)
 
 ### `ext/standard/get_class_.php`
@@ -39127,8 +39127,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/IniRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 255)
-- 19 class method(s)
+- new JIT (line 331)
+- 23 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/IniSet.php`
@@ -42628,19 +42628,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\DatePeriodIteratorMethod (line 958)
 - new Call\DateTimeFormat (line 961)
 - new Call\DateTimeFormat (line 962)
-- new Result (line 1299)
-- new Result (line 1320)
-- new Variable (line 1921)
-- new Variable (line 2058)
-- new Variable (line 2284)
-- new Variable (line 2342)
-- new VMVariable (line 2480)
-- new VMVariable (line 2496)
-- new VMVariable (line 2502)
-- new VMVariable (line 2508)
-- new VMVariable (line 2519)
-- new Variable (line 2549)
-- new Variable (line 2589)
+- new Result (line 1302)
+- new Result (line 1323)
+- new Variable (line 1924)
+- new Variable (line 2061)
+- new Variable (line 2287)
+- new Variable (line 2345)
+- new VMVariable (line 2483)
+- new VMVariable (line 2499)
+- new VMVariable (line 2505)
+- new VMVariable (line 2511)
+- new VMVariable (line 2522)
+- new Variable (line 2552)
+- new Variable (line 2592)
 - 102 class method(s)
 - 28 closure(s)
 

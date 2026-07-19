@@ -1051,6 +1051,8 @@ class Context {
         Builtin\StringFilePutContents::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
         Builtin\EnvLocalRuntime::ensureLinked($this);
+        // Thin AOT: fill Type::register empty __compiler_ini_* shells (#20361).
+        Builtin\IniRuntime::ensureThinAotLinkStubs($this);
         // CLI argv: NestedJIT CliArgvJitHelper during thin init (peer IncludePath #20877 / #20904)
         // — must precede {main} $argc/$argv lowering (compileToFile stubs are too late).
         Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
@@ -1180,6 +1182,7 @@ class Context {
 
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isThinStandaloneAotMain()) {
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
+            Builtin\IniRuntime::ensureThinAotLinkStubs($this);
             Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshEmit($this);
         }
 

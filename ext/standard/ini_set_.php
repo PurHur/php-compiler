@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\SapiOutput;
 use PHPLLVM\Value;
 
@@ -55,6 +54,12 @@ final class ini_set_ extends Internal
         $fn = $this->getName();
         if (2 !== \count($args)) {
             throw new \LogicException($fn.'() requires exactly two arguments');
+        }
+        // Compile-time null/non-string TypeError: emit abort without linking IniRuntime (#20361).
+        if (IniOptionArg::jitOptionRejectsWithoutIniCall($context, $args[0])) {
+            IniOptionArg::jitOption($context, $args[0], $fn);
+
+            return $context->getTypeFromString('__value__*')->constNull();
         }
         $optionStr = IniOptionArg::jitOption($context, $args[0], $fn);
         $valueStr = JitIniValueArg::lower($context, $args[1], $fn);

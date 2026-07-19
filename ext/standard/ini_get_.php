@@ -43,6 +43,13 @@ final class ini_get_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('ini_get() requires exactly one argument');
         }
+        // Compile-time null/non-string TypeError: emit abort without linking IniRuntime
+        // (thin AOT lacks full IniJitHelper; stubs cover dead __compiler_ini_* refs; #20361).
+        if (IniOptionArg::jitOptionRejectsWithoutIniCall($context, $args[0])) {
+            IniOptionArg::jitOption($context, $args[0], 'ini_get');
+
+            return $context->getTypeFromString('__value__*')->constNull();
+        }
         $optionStr = IniOptionArg::jitOption($context, $args[0], 'ini_get');
 
         return JitIni::get($context, $optionStr);
