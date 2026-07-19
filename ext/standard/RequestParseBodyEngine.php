@@ -49,12 +49,13 @@ final class RequestParseBodyEngine
         if (self::$consumed) {
             return [[], []];
         }
-        self::$consumed = true;
 
+        // Do not trip the consumed latch on abort-before-read (missing Content-Type) (#21112).
         $mediaType = self::contentTypeMediaType();
         if ('' === $mediaType) {
             throw new NativeRequestParseBodyException('Request does not provide a content type');
         }
+        self::$consumed = true;
 
         $body = self::readRequestBody();
         if ('' === $body) {
@@ -222,9 +223,12 @@ final class RequestParseBodyEngine
 
     private static function overlayGetenv(string $name): string|false
     {
-        $jit = GetenvJitHelper::getenv($name, 0);
-        if (false !== $jit) {
-            return $jit;
+        // VM path: merge NestedJIT putenv overlay with VmEnv — do not call the
+        // NestedJIT getenv leaf (Internal kernel is not a userland callable under
+        // bin/vm.php) (#21112, re-#20644).
+        $local = GetenvJitHelper::localOverlayEntries();
+        if (\array_key_exists($name, $local)) {
+            return $local[$name];
         }
 
         return VmEnv::getenv($name);
