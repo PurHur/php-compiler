@@ -25,9 +25,21 @@ final class DomNodeState
     /**
      * xmlns / xmlns:prefix declarations on this element (php-src dom_namespace_decl).
      *
+     * Includes createElementNS nsDef synthetics used for saveXml; see
+     * {@see $xmlnsAttributePrefixes} for attribute-sourced decls only (#20924).
+     *
      * @var array<string, string>
      */
     public array $namespaceDeclarations = [];
+
+    /**
+     * Prefixes ('' = default) whose {@see $namespaceDeclarations} entry came from an
+     * xmlns / xmlns:* attribute (parse or setAttributeNS) — not createElementNS nsDef.
+     * Used by Dom\Element::getInScopeNamespaces() (php-src element.c; #20924).
+     *
+     * @var array<string, true>
+     */
+    public array $xmlnsAttributePrefixes = [];
 
     public ?string $publicId = null;
 

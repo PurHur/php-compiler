@@ -168,7 +168,27 @@ final class DomNodePropertySupport
             return $var;
         }
         if (strtolower(VmDom::PROP_PREFIX) === $lc) {
-            $var->string(VmDom::readPrefix($object));
+            // Living Dom\* nodes: empty prefix is null (php-src php_dom.stub.php; #20924).
+            // Legacy DOM*: empty string.
+            if (!DomRegistry::has($object)) {
+                $var->string('');
+
+                return $var;
+            }
+            $prefix = DomRegistry::state($object)->prefix;
+            if (null === $prefix || '' === $prefix) {
+                if (VmDomLiving::isLivingElement($object)
+                    || (isset($object->class->name)
+                        && str_starts_with(strtolower($object->class->name), 'dom\\'))) {
+                    $var->null();
+
+                    return $var;
+                }
+                $var->string('');
+
+                return $var;
+            }
+            $var->string($prefix);
 
             return $var;
         }

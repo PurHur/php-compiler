@@ -70,6 +70,15 @@ final class DomLivingBuiltinClasses
         // Dom\AdjacentPosition — insertAdjacent* where (php-src php_dom.stub.php; #20782).
         DomAdjacentPositionEnum::register($ctx);
 
+        // Dom\NamespaceInfo — getInScopeNamespaces / getDescendantNamespaces entries (#20924).
+        $nsInfo = new ClassEntry('Dom\\NamespaceInfo');
+        $nsInfo->isInternal = true;
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $nsInfo->properties[] = new ClassProperty(VmDomLiving::PROP_NAMESPACE_INFO_PREFIX, $nullProto, $strProto);
+        $nsInfo->properties[] = new ClassProperty(VmDomLiving::PROP_NAMESPACE_INFO_NAMESPACE_URI, $nullProto, $strProto);
+        $nsInfo->properties[] = new ClassProperty(VmDomLiving::PROP_NAMESPACE_INFO_ELEMENT, $nullProto, $objProto);
+        $ctx->classes[VmDomLiving::CLASS_NAMESPACE_INFO] = $nsInfo;
+
         // Dom\Implementation — Document::$implementation (php-src php_dom.stub.php; #20898, #20910).
         $impl = new ClassEntry('Dom\\Implementation');
         $impl->isInternal = true;
@@ -137,6 +146,15 @@ final class DomLivingBuiltinClasses
         $element->methods['getelementsbyclassname'] = new ElementGetElementsByClassName();
         $element->methodVisibility['getelementsbyclassname'] = $pub;
         $element->methodNames['getelementsbyclassname'] = 'getElementsByClassName';
+        $element->methods['getinscopenamespaces'] = new ElementGetInScopeNamespaces();
+        $element->methodVisibility['getinscopenamespaces'] = $pub;
+        $element->methodNames['getinscopenamespaces'] = 'getInScopeNamespaces';
+        $element->methods['getdescendantnamespaces'] = new ElementGetDescendantNamespaces();
+        $element->methodVisibility['getdescendantnamespaces'] = $pub;
+        $element->methodNames['getdescendantnamespaces'] = 'getDescendantNamespaces';
+        $element->methods['rename'] = new ElementRename();
+        $element->methodVisibility['rename'] = $pub;
+        $element->methodNames['rename'] = 'rename';
         $ctx->classes[VmDomLiving::CLASS_ELEMENT] = $element;
 
         $htmlElement = new ClassEntry('Dom\\HTMLElement');
