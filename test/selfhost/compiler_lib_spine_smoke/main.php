@@ -67,6 +67,9 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
+
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -1940,6 +1943,9 @@ require_once __DIR__.'/../../../ext/standard/GetHeadersJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetObjectVarsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetParentClassJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetcwdJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/GethostnameJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/JitGethostnameKernel.php';
+require_once __DIR__.'/../../../ext/standard/phpc_gethostname_kernel.php';
 require_once __DIR__.'/../../../ext/standard/GetdateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetenvJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetenvLookupJitHelper.php';
@@ -4517,6 +4523,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/GetBrowserRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetClassRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetHeadersRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetcwdJit.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringGethostname.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GethostbyaddrRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GethostbynamelRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetimagesizeJit.php';
@@ -6170,6 +6177,29 @@ require_once __DIR__.'/../../../ext/mailparse/mailparse_msg_free.php';
 require_once __DIR__.'/../../../ext/mailparse/mailparse_msg_get_part_data.php';
 require_once __DIR__.'/../../../ext/mailparse/mailparse_msg_parse.php';
 require_once __DIR__.'/../../../ext/mailparse/mailparse_rfc822_parse_addresses.php';
+require_once __DIR__.'/../../../ext/dba/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/dba/DbaExtensionPolicy.php';
+require_once __DIR__.'/../../../ext/dba/DbaFunction.php';
+require_once __DIR__.'/../../../ext/dba/Module.php';
+require_once __DIR__.'/../../../ext/dba/VmDbaConnection.php';
+require_once __DIR__.'/../../../ext/dba/VmDbaCore.php';
+require_once __DIR__.'/../../../ext/dba/VmDbaFlatfile.php';
+require_once __DIR__.'/../../../ext/dba/VmDbaInifile.php';
+require_once __DIR__.'/../../../ext/dba/dba_close.php';
+require_once __DIR__.'/../../../ext/dba/dba_delete.php';
+require_once __DIR__.'/../../../ext/dba/dba_exists.php';
+require_once __DIR__.'/../../../ext/dba/dba_fetch.php';
+require_once __DIR__.'/../../../ext/dba/dba_firstkey.php';
+require_once __DIR__.'/../../../ext/dba/dba_handlers.php';
+require_once __DIR__.'/../../../ext/dba/dba_insert.php';
+require_once __DIR__.'/../../../ext/dba/dba_key_split.php';
+require_once __DIR__.'/../../../ext/dba/dba_list.php';
+require_once __DIR__.'/../../../ext/dba/dba_nextkey.php';
+require_once __DIR__.'/../../../ext/dba/dba_open.php';
+require_once __DIR__.'/../../../ext/dba/dba_optimize.php';
+require_once __DIR__.'/../../../ext/dba/dba_popen.php';
+require_once __DIR__.'/../../../ext/dba/dba_replace.php';
+require_once __DIR__.'/../../../ext/dba/dba_sync.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 

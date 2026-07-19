@@ -668,6 +668,7 @@ class Module extends ModuleAbstract
             new phpc_native_environ_mirror_into_ht(),
             new phpc_rename_kernel(),
             new phpc_chdir_kernel(),
+            new phpc_gethostname_kernel(),
             new phpc_getenv_kernel(),
             new phpc_readfile_kernel(),
             new phpc_file_put_contents_kernel(),
@@ -1209,16 +1210,6 @@ class Module extends ModuleAbstract
             $ft = $context->context->functionType($i32, false, $i8p);
             $fn = $context->module->addFunction('chroot', $ft);
             $context->registerFunction('chroot', $fn);
-        }
-        try {
-            $context->lookupFunction('gethostname');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $sizeT = $context->getTypeFromString('size_t');
-            $ft = $context->context->functionType($i32, false, $i8p, $sizeT);
-            $fn = $context->module->addFunction('gethostname', $ft);
-            $context->registerFunction('gethostname', $fn);
         }
         $double = $context->getTypeFromString('double');
         try {

@@ -756,6 +756,7 @@ class Context {
             'phpc_sqrt_kernel',
             'phpc_rename_kernel',
             'phpc_chdir_kernel',
+            'phpc_gethostname_kernel',
             'phpc_getenv_kernel',
             // Stat path always-helper NestedJIT leaves (#20742) — peer rename (#20603).
             'phpc_stat_mode_kernel',
