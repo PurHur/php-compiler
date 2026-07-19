@@ -62,13 +62,23 @@ final class DomLivingBuiltinClasses
             return;
         }
 
-        // Dom\AdjacentPosition — insertAdjacent* where (php-src php_dom.stub.php; #20782).
-        DomAdjacentPositionEnum::register($ctx);
-
         $objProto = new Variable(Variable::TYPE_OBJECT);
         $nullProto = new Variable(Variable::TYPE_NULL);
         $pubStatic = CfgFunc::FLAG_PUBLIC | CfgFunc::FLAG_STATIC;
         $pub = CfgFunc::FLAG_PUBLIC;
+
+        // Dom\AdjacentPosition — insertAdjacent* where (php-src php_dom.stub.php; #20782).
+        DomAdjacentPositionEnum::register($ctx);
+
+        // Dom\Implementation — Document::$implementation (php-src php_dom.stub.php; #20898).
+        $impl = new ClassEntry('Dom\\Implementation');
+        $impl->isInternal = true;
+        self::copyMethods($ctx->classes[VmDom::CLASS_IMPLEMENTATION] ?? null, $impl);
+        $impl->methods['createhtmldocument'] = new ImplementationCreateHTMLDocument();
+        $impl->methodVisibility['createhtmldocument'] = $pub;
+        $impl->methodNames['createhtmldocument'] = 'createHTMLDocument';
+        $ctx->classes[VmDomLiving::CLASS_IMPLEMENTATION] = $impl;
+        VmDomLiving::bindImplementationClass($impl);
 
         $node = new ClassEntry('Dom\\Node');
         $node->isInternal = true;
@@ -233,6 +243,11 @@ final class DomLivingBuiltinClasses
         $xmlDocument->isInternal = true;
         $xmlDocument->parentLc = VmDomLiving::CLASS_DOCUMENT;
         $xmlDocument->properties[] = new ClassProperty(VmDomLiving::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
+        $xmlDocument->properties[] = new ClassProperty(
+            VmDom::PROP_FORMAT_OUTPUT,
+            null,
+            new Variable(Variable::TYPE_BOOLEAN)
+        );
         $xmlDocument->methods['createfromstring'] = new XmlDocumentCreateFromString();
         $xmlDocument->methodVisibility['createfromstring'] = $pubStatic;
         $xmlDocument->methodNames['createfromstring'] = 'createFromString';
