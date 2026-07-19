@@ -15,6 +15,7 @@ use PHPCompiler\Block;
 use PHPCompiler\ClassConstVisibility;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\dom\DomConstants;
+use PHPCompiler\ext\dom\VmDomLiving;
 use PHPCompiler\ext\zip\ZipArchiveConstants;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\PseudoClassScope;
@@ -1508,6 +1509,7 @@ class Object_ extends Type {
         $this->markInterfaceClass('DOMParentNode');
         $this->markInterfaceClass('DOMChildNode');
         $this->setInterfaceExtends('DOMChildNode', ['DOMParentNode']);
+        $this->ensureDomLivingParentChildInterfaces();
         $this->markInterfaceClass('SessionHandlerInterface');
         $this->markInterfaceClass('SessionIdInterface');
         $this->setInterfaceExtends('SessionIdInterface', ['SessionHandlerInterface']);
@@ -1517,6 +1519,38 @@ class Object_ extends Type {
         $this->markInterfaceClass('Random\\Engine');
         $this->markInterfaceClass('Random\\CryptoSafeEngine');
         $this->setInterfaceExtends('Random\\CryptoSafeEngine', ['Random\\Engine']);
+    }
+
+    /**
+     * Dom\ParentNode / Dom\ChildNode for instanceof / interface_exists under PROFILE=8.4 (#20961).
+     *
+     * Unlike legacy DOMChildNode, living ChildNode does not extend ParentNode (php_dom.stub.php).
+     */
+    private function ensureDomLivingParentChildInterfaces(): void
+    {
+        if (!CompilerVersion::supportsDomLivingStandardNamespace()) {
+            return;
+        }
+        $this->markInterfaceClass('Dom\\ParentNode');
+        $this->markInterfaceClass('Dom\\ChildNode');
+        $this->setClassInterfaces('Dom\\Document', [VmDomLiving::CLASS_PARENT_NODE]);
+        $this->setClassInterfaces('Dom\\HTMLDocument', [VmDomLiving::CLASS_PARENT_NODE]);
+        $this->setClassInterfaces('Dom\\XMLDocument', [VmDomLiving::CLASS_PARENT_NODE]);
+        $this->setClassInterfaces('Dom\\DocumentFragment', [VmDomLiving::CLASS_PARENT_NODE]);
+        $this->setClassInterfaces('Dom\\Element', [
+            VmDomLiving::CLASS_PARENT_NODE,
+            VmDomLiving::CLASS_CHILD_NODE,
+        ]);
+        $this->setClassInterfaces('Dom\\HTMLElement', [
+            VmDomLiving::CLASS_PARENT_NODE,
+            VmDomLiving::CLASS_CHILD_NODE,
+        ]);
+        $this->setClassInterfaces('Dom\\CharacterData', [VmDomLiving::CLASS_CHILD_NODE]);
+        $this->setClassInterfaces('Dom\\Text', [VmDomLiving::CLASS_CHILD_NODE]);
+        $this->setClassInterfaces('Dom\\Comment', [VmDomLiving::CLASS_CHILD_NODE]);
+        $this->setClassInterfaces('Dom\\CDATASection', [VmDomLiving::CLASS_CHILD_NODE]);
+        $this->setClassInterfaces('Dom\\ProcessingInstruction', [VmDomLiving::CLASS_CHILD_NODE]);
+        $this->setClassInterfaces('Dom\\DocumentType', [VmDomLiving::CLASS_CHILD_NODE]);
     }
 
     /** Zend traversable/iterator/iteratoraggregate hierarchy for instanceof (#4754, #4771). */
