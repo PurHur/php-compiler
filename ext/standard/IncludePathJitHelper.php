@@ -7,56 +7,60 @@ namespace PHPCompiler\ext\standard;
 /**
  * include_path stack for compiled JIT/AOT modules (#9245, php-in-PHP, #20877).
  *
- * Stack uses a NUL-delimited static string (JIT cannot lower static array push/pop yet).
- * NestedJIT-safe: no ini_get() (would pull __compiler_ini_get under thin AOT).
+ * Two-slot NestedJIT-safe model under thin AOT:
+ * - `$current` — active include_path (get never scans)
+ * - `$previous` — one restore frame (legacy restore_include_path; removed in PHP 8.0+)
+ * Avoids nullable statics and explode/implode (NestedJIT thin-AOT hazards).
  * Host SAPI seed lives in {@see VmIncludePath} (#10461).
- * VM SSOT delegates via {@see VmIncludePath}.
  * php-src: ext/standard/basic_functions.c — php_get_include_path / php_set_include_path
  */
 final class IncludePathJitHelper
 {
-    private static ?string $stack = null;
+    private static string $current = '.';
+
+    private static string $previous = '';
+
+    private static bool $seeded = false;
 
     /** True before first get/set/seed (VmIncludePath host-ini seed). */
     public static function isUninitialized(): bool
     {
-        return null === self::$stack;
+        return !self::$seeded;
     }
 
     /** Seed stack once (host ini or default "."); no-op if already initialized. */
     public static function seed(string $path): void
     {
-        if (null === self::$stack) {
-            self::$stack = '' !== $path ? $path : '.';
+        if (self::$seeded) {
+            return;
         }
+        self::$seeded = true;
+        self::$current = '' !== $path ? $path : '.';
+        self::$previous = '';
     }
 
-    /** Default "." — NestedJIT must not call ini_get (#20877 / thin stubs). */
-    private static function ensureStack(): string
+    private static function ensureSeeded(): void
     {
-        if (null !== self::$stack) {
-            return self::$stack;
+        if (!self::$seeded) {
+            self::$seeded = true;
+            self::$current = '.';
+            self::$previous = '';
         }
-        self::$stack = '.';
-
-        return self::$stack;
     }
 
     public static function get(): string
     {
-        $parts = \explode("\0", self::ensureStack());
+        self::ensureSeeded();
 
-        return $parts[\count($parts) - 1];
+        return self::$current;
     }
 
     /** @return string previous include_path */
     public static function set(string $newPath): string
     {
-        $old = self::get();
-        $stack = self::ensureStack();
-        $parts = \explode("\0", $stack);
-        $parts[\count($parts) - 1] = $newPath;
-        self::$stack = \implode("\0", $parts);
+        self::ensureSeeded();
+        $old = self::$current;
+        self::$current = $newPath;
 
         return $old;
     }
@@ -68,23 +72,27 @@ final class IncludePathJitHelper
      */
     public static function push(string $newPath): string|false
     {
-        VmString::rejectNullByteBuiltinStringArg($newPath, 'set_include_path', 0, 'include_path');
         if ('' === $newPath) {
             return false;
         }
-        $old = self::get();
-        self::$stack = self::ensureStack()."\0".$newPath;
+        self::ensureSeeded();
+        $old = self::$current;
+        // Assign from local — NestedJIT static←static stores can miss the global (#20877).
+        self::$previous = $old;
+        self::$current = $newPath;
 
         return $old;
     }
 
     public static function restore(): void
     {
-        $stack = self::ensureStack();
-        $pos = \strrpos($stack, "\0");
-        if (false !== $pos) {
-            self::$stack = \substr($stack, 0, $pos);
+        self::ensureSeeded();
+        if ('' === self::$previous) {
+            return;
         }
+        $prev = self::$previous;
+        self::$current = $prev;
+        self::$previous = '';
     }
 
     /**
