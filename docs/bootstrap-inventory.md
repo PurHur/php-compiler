@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 5810 |
-| Phase A inventory files (M2 ratio SSOT) | 5810 |
+| PHP files on vm.php path | 5818 |
+| Phase A inventory files (M2 ratio SSOT) | 5818 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 17233 |
+| Source constructs flagged (warnings) | 17259 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -790,7 +790,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/inotify/inotify_init.php` | 0 | 2 |
 | `ext/inotify/inotify_read.php` | 0 | 2 |
 | `ext/inotify/inotify_rm_watch.php` | 0 | 2 |
-| `ext/intl/BuiltinClasses.php` | 0 | 20 |
+| `ext/intl/BuiltinClasses.php` | 0 | 24 |
 | `ext/intl/GraphemeStrSplitJitHelper.php` | 0 | 3 |
 | `ext/intl/IdnFunction.php` | 0 | 3 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
@@ -804,16 +804,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/JitGraphemeStrSplit.php` | 0 | 1 |
 | `ext/intl/JitLocaleParser.php` | 0 | 1 |
 | `ext/intl/LocaleAcceptFromHttp.php` | 0 | 2 |
+| `ext/intl/LocaleCanonicalize.php` | 0 | 2 |
+| `ext/intl/LocaleComposeLocale.php` | 0 | 2 |
 | `ext/intl/LocaleFilterMatches.php` | 0 | 3 |
 | `ext/intl/LocaleGetDefault.php` | 0 | 2 |
 | `ext/intl/LocaleGetDisplayName.php` | 0 | 3 |
+| `ext/intl/LocaleGetKeywords.php` | 0 | 2 |
 | `ext/intl/LocaleGetPrimaryLanguage.php` | 0 | 2 |
 | `ext/intl/LocaleGetRegion.php` | 0 | 2 |
 | `ext/intl/LocaleGetScript.php` | 0 | 2 |
 | `ext/intl/LocaleLookup.php` | 0 | 3 |
+| `ext/intl/LocaleParseLocale.php` | 0 | 4 |
 | `ext/intl/LocaleParserJitHelper.php` | 0 | 1 |
 | `ext/intl/LocaleSetDefault.php` | 0 | 2 |
-| `ext/intl/Module.php` | 0 | 41 |
+| `ext/intl/Module.php` | 0 | 45 |
 | `ext/intl/NormalizerGetRawDecomposition.php` | 0 | 2 |
 | `ext/intl/NormalizerIsNormalized.php` | 0 | 2 |
 | `ext/intl/NormalizerNormalize.php` | 0 | 2 |
@@ -853,12 +857,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/intl_get_error_message.php` | 0 | 1 |
 | `ext/intl/intl_is_failure.php` | 0 | 1 |
 | `ext/intl/locale_accept_from_http.php` | 0 | 2 |
+| `ext/intl/locale_canonicalize.php` | 0 | 2 |
+| `ext/intl/locale_compose.php` | 0 | 2 |
 | `ext/intl/locale_filter_matches.php` | 0 | 3 |
 | `ext/intl/locale_get_default.php` | 0 | 2 |
+| `ext/intl/locale_get_keywords.php` | 0 | 2 |
 | `ext/intl/locale_get_primary_language.php` | 0 | 3 |
 | `ext/intl/locale_get_region.php` | 0 | 3 |
 | `ext/intl/locale_get_script.php` | 0 | 3 |
 | `ext/intl/locale_lookup.php` | 0 | 3 |
+| `ext/intl/locale_parse.php` | 0 | 2 |
 | `ext/intl/locale_set_default.php` | 0 | 2 |
 | `ext/intl/msgfmt_create.php` | 0 | 3 |
 | `ext/intl/msgfmt_format.php` | 0 | 3 |
@@ -11091,11 +11099,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new LocaleLookup (line 119)
 - new LocaleFilterMatches (line 120)
 - new LocaleAcceptFromHttp (line 121)
-- new ClassEntry (line 137)
-- new IntlDateFormatterCreate (line 148)
-- new IntlDateFormatterFormat (line 151)
-- new IntlDateFormatterGetPattern (line 154)
-- new ClassEntry (line 237)
+- new LocaleCanonicalize (line 122)
+- new LocaleParseLocale (line 123)
+- new LocaleComposeLocale (line 124)
+- new LocaleGetKeywords (line 125)
+- new ClassEntry (line 141)
+- new IntlDateFormatterCreate (line 152)
+- new IntlDateFormatterFormat (line 155)
+- new IntlDateFormatterGetPattern (line 158)
+- new ClassEntry (line 241)
 - 17 class method(s)
 
 ### `ext/intl/GraphemeStrSplitJitHelper.php`
@@ -11179,6 +11191,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 23)
 - 1 class method(s)
 
+### `ext/intl/LocaleCanonicalize.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
+- 1 class method(s)
+
+### `ext/intl/LocaleComposeLocale.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- 3 class method(s)
+
 ### `ext/intl/LocaleFilterMatches.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11197,6 +11221,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
 - new ArgumentCountError (line 29)
+- 1 class method(s)
+
+### `ext/intl/LocaleGetKeywords.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
 - 1 class method(s)
 
 ### `ext/intl/LocaleGetPrimaryLanguage.php`
@@ -11224,6 +11254,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 33)
 - 4 class method(s)
 
+### `ext/intl/LocaleParseLocale.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 24)
+- new HashTable (line 49)
+- new Variable (line 51)
+- 2 class method(s)
+
 ### `ext/intl/LocaleParserJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11247,37 +11285,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new locale_lookup (line 93)
 - new locale_filter_matches (line 94)
 - new locale_accept_from_http (line 95)
-- new normalizer_normalize (line 99)
-- new normalizer_is_normalized (line 100)
-- new normalizer_get_raw_decomposition (line 101)
-- new idn_to_ascii (line 105)
-- new idn_to_utf8 (line 105)
-- new collator_create (line 109)
-- new msgfmt_create (line 114)
-- new msgfmt_format (line 115)
-- new msgfmt_format_message (line 116)
-- new transliterator_create (line 122)
-- new transliterator_create_from_rules (line 123)
-- new transliterator_create_inverse (line 124)
-- new transliterator_list_ids (line 125)
-- new transliterator_transliterate (line 126)
-- new transliterator_get_error_code (line 127)
-- new transliterator_get_error_message (line 128)
-- new grapheme_strlen (line 151)
-- new grapheme_substr (line 152)
-- new grapheme_strpos (line 153)
-- new grapheme_str_contains (line 154)
-- new grapheme_strstr (line 155)
-- new grapheme_stristr (line 156)
-- new grapheme_stripos (line 157)
-- new grapheme_strrpos (line 158)
-- new grapheme_extract (line 159)
-- new grapheme_levenshtein (line 160)
-- new grapheme_str_split (line 161)
-- new grapheme_strimwidth (line 162)
-- new intl_get_error_code (line 163)
-- new intl_get_error_message (line 164)
-- new intl_is_failure (line 165)
+- new locale_canonicalize (line 96)
+- new locale_parse (line 97)
+- new locale_compose (line 98)
+- new locale_get_keywords (line 99)
+- new normalizer_normalize (line 103)
+- new normalizer_is_normalized (line 104)
+- new normalizer_get_raw_decomposition (line 105)
+- new idn_to_ascii (line 109)
+- new idn_to_utf8 (line 109)
+- new collator_create (line 113)
+- new msgfmt_create (line 118)
+- new msgfmt_format (line 119)
+- new msgfmt_format_message (line 120)
+- new transliterator_create (line 126)
+- new transliterator_create_from_rules (line 127)
+- new transliterator_create_inverse (line 128)
+- new transliterator_list_ids (line 129)
+- new transliterator_transliterate (line 130)
+- new transliterator_get_error_code (line 131)
+- new transliterator_get_error_message (line 132)
+- new grapheme_strlen (line 155)
+- new grapheme_substr (line 156)
+- new grapheme_strpos (line 157)
+- new grapheme_str_contains (line 158)
+- new grapheme_strstr (line 159)
+- new grapheme_stristr (line 160)
+- new grapheme_stripos (line 161)
+- new grapheme_strrpos (line 162)
+- new grapheme_extract (line 163)
+- new grapheme_levenshtein (line 164)
+- new grapheme_str_split (line 165)
+- new grapheme_strimwidth (line 166)
+- new intl_get_error_code (line 167)
+- new intl_get_error_message (line 168)
+- new intl_is_failure (line 169)
 - 4 class method(s)
 
 ### `ext/intl/NormalizerGetRawDecomposition.php`
@@ -11472,7 +11514,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/VmLocale.php`
 
 **Warnings** (review for bootstrap subset):
-- 25 class method(s)
+- 41 class method(s)
 - 1 closure(s)
 
 ### `ext/intl/VmMessageFormatter.php`
@@ -11784,6 +11826,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 20)
 - 2 class method(s)
 
+### `ext/intl/locale_canonicalize.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 2 class method(s)
+
+### `ext/intl/locale_compose.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 19)
+- 2 class method(s)
+
 ### `ext/intl/locale_filter_matches.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11795,6 +11849,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 19)
+- 2 class method(s)
+
+### `ext/intl/locale_get_keywords.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
 - 2 class method(s)
 
 ### `ext/intl/locale_get_primary_language.php`
@@ -11823,6 +11883,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 22)
 - new ArgumentCountError (line 28)
+- 2 class method(s)
+
+### `ext/intl/locale_parse.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
 - 2 class method(s)
 
 ### `ext/intl/locale_set_default.php`
@@ -21436,8 +21502,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStatPathKernel.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 371)
-- 12 class method(s)
+- new JIT (line 325)
+- 10 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/JitStrGetcsv.php`
@@ -39830,69 +39896,69 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Builtin\ErrorHandler (line 578)
 - new Scope (line 598)
 - new Call\ExternalMethod (line 648)
-- new Builtin\IsNullFn (line 894)
-- new Builtin\IsNullFn (line 895)
-- new Call\SplObjectStorageMethod (line 896)
-- new Call\SplObjectStorageMethod (line 897)
-- new Call\SplObjectStorageMethod (line 898)
+- new Builtin\IsNullFn (line 897)
+- new Builtin\IsNullFn (line 898)
 - new Call\SplObjectStorageMethod (line 899)
 - new Call\SplObjectStorageMethod (line 900)
 - new Call\SplObjectStorageMethod (line 901)
-- new Call\WeakReferenceCreate (line 903)
-- new Call\WeakReferenceGet (line 904)
-- new Call\WeakMapMethod (line 905)
-- new Call\WeakMapMethod (line 906)
-- new Call\WeakMapMethod (line 907)
+- new Call\SplObjectStorageMethod (line 902)
+- new Call\SplObjectStorageMethod (line 903)
+- new Call\SplObjectStorageMethod (line 904)
+- new Call\WeakReferenceCreate (line 906)
+- new Call\WeakReferenceGet (line 907)
 - new Call\WeakMapMethod (line 908)
 - new Call\WeakMapMethod (line 909)
-- new Call\ReflectionClassConstruct (line 911)
-- new Call\ReflectionObjectConstruct (line 912)
-- new Call\ReflectionClassGetName (line 913)
-- new Call\ReflectionClassGetShortName (line 914)
-- new Call\ReflectionClassGetAttributes (line 915)
-- new Call\ReflectionClassGetMethod (line 916)
-- new Call\ReflectionClassGetReflectionConstant (line 917)
-- new Call\ReflectionClassIsFinal (line 918)
-- new Call\ReflectionClassIsIterateable (line 919)
-- new Call\ReflectionClassNewLazyProxy (line 921)
-- new Call\ReflectionClassNewLazyGhost (line 922)
-- new Call\ReflectionClassCreateLazyGhost (line 923)
-- new Call\ReflectionClassCreateLazyProxy (line 924)
-- new Call\ReflectionPropertyConstruct (line 926)
-- new Call\ReflectionPropertyGetAttributes (line 927)
-- new Call\ReflectionConstantConstruct (line 928)
-- new Call\ReflectionConstantGetAttributes (line 929)
-- new Call\ReflectionMethodGetAttributes (line 930)
-- new Call\ReflectionParameterIsSensitiveParameter (line 932)
-- new Call\ReflectionFunctionGetNamedArguments (line 935)
-- new Call\ReflectionMethodGetNamedArguments (line 936)
-- new Call\ReflectionAttributeGetName (line 938)
-- new Call\ReflectionAttributeNewInstance (line 939)
-- new Call\ReflectionEnumConstruct (line 940)
-- new Call\ReflectionEnumGetName (line 941)
-- new Call\ReflectionEnumHasCase (line 942)
-- new Call\ReflectionEnumGetCase (line 943)
-- new Call\ReflectionEnumIsBacked (line 944)
-- new Call\ReflectionEnumUnitCaseGetName (line 945)
-- new Call\ReflectionEnumUnitCaseGetName (line 946)
-- new Call\ExceptionGetMessage (line 947)
-- new Call\DatePeriodCreateFromISO8601String (line 953)
-- new Call\DatePeriodIteratorMethod (line 955)
-- new Call\DateTimeFormat (line 958)
-- new Call\DateTimeFormat (line 959)
-- new Result (line 1295)
-- new Result (line 1316)
-- new Variable (line 1917)
-- new Variable (line 2054)
-- new Variable (line 2280)
-- new Variable (line 2338)
-- new VMVariable (line 2476)
-- new VMVariable (line 2492)
-- new VMVariable (line 2498)
-- new VMVariable (line 2504)
-- new VMVariable (line 2515)
-- new Variable (line 2545)
-- new Variable (line 2585)
+- new Call\WeakMapMethod (line 910)
+- new Call\WeakMapMethod (line 911)
+- new Call\WeakMapMethod (line 912)
+- new Call\ReflectionClassConstruct (line 914)
+- new Call\ReflectionObjectConstruct (line 915)
+- new Call\ReflectionClassGetName (line 916)
+- new Call\ReflectionClassGetShortName (line 917)
+- new Call\ReflectionClassGetAttributes (line 918)
+- new Call\ReflectionClassGetMethod (line 919)
+- new Call\ReflectionClassGetReflectionConstant (line 920)
+- new Call\ReflectionClassIsFinal (line 921)
+- new Call\ReflectionClassIsIterateable (line 922)
+- new Call\ReflectionClassNewLazyProxy (line 924)
+- new Call\ReflectionClassNewLazyGhost (line 925)
+- new Call\ReflectionClassCreateLazyGhost (line 926)
+- new Call\ReflectionClassCreateLazyProxy (line 927)
+- new Call\ReflectionPropertyConstruct (line 929)
+- new Call\ReflectionPropertyGetAttributes (line 930)
+- new Call\ReflectionConstantConstruct (line 931)
+- new Call\ReflectionConstantGetAttributes (line 932)
+- new Call\ReflectionMethodGetAttributes (line 933)
+- new Call\ReflectionParameterIsSensitiveParameter (line 935)
+- new Call\ReflectionFunctionGetNamedArguments (line 938)
+- new Call\ReflectionMethodGetNamedArguments (line 939)
+- new Call\ReflectionAttributeGetName (line 941)
+- new Call\ReflectionAttributeNewInstance (line 942)
+- new Call\ReflectionEnumConstruct (line 943)
+- new Call\ReflectionEnumGetName (line 944)
+- new Call\ReflectionEnumHasCase (line 945)
+- new Call\ReflectionEnumGetCase (line 946)
+- new Call\ReflectionEnumIsBacked (line 947)
+- new Call\ReflectionEnumUnitCaseGetName (line 948)
+- new Call\ReflectionEnumUnitCaseGetName (line 949)
+- new Call\ExceptionGetMessage (line 950)
+- new Call\DatePeriodCreateFromISO8601String (line 956)
+- new Call\DatePeriodIteratorMethod (line 958)
+- new Call\DateTimeFormat (line 961)
+- new Call\DateTimeFormat (line 962)
+- new Result (line 1298)
+- new Result (line 1319)
+- new Variable (line 1920)
+- new Variable (line 2057)
+- new Variable (line 2283)
+- new Variable (line 2341)
+- new VMVariable (line 2479)
+- new VMVariable (line 2495)
+- new VMVariable (line 2501)
+- new VMVariable (line 2507)
+- new VMVariable (line 2518)
+- new Variable (line 2548)
+- new Variable (line 2588)
 - 102 class method(s)
 - 28 closure(s)
 
