@@ -23,7 +23,8 @@ use PHPCfg\Func as CfgFunc;
  *
  * Subset: createInstance, get/set, getTimeZone, getTime/setTime, getType, getNow,
  * add/roll/clear/isSet/equals, toDateTime/fromDateTime, fieldDifference,
- * before/after, setDate/setTimeZone, field bounds, weekend, wall-time options (#20851).
+ * before/after, setDate/setTimeZone, field bounds, weekend, wall-time options (#20851),
+ * getAvailableLocales + comparison/zone/min-max procedurals (#20897).
  * ICU field constants match UCalendarDateFields (unicode/ucal.h).
  */
 final class VmIntlCalendar
@@ -227,6 +228,7 @@ final class VmIntlCalendar
             'getleastmaximum' => [new IntlCalendarGetLeastMaximum(), 'getLeastMaximum', $pub],
             'getgreatestminimum' => [new IntlCalendarGetGreatestMinimum(), 'getGreatestMinimum', $pub],
             'getkeywordvaluesforlocale' => [new IntlCalendarGetKeywordValuesForLocale(), 'getKeywordValuesForLocale', $pubStatic],
+            'getavailablelocales' => [new IntlCalendarGetAvailableLocales(), 'getAvailableLocales', $pubStatic],
             'geterrorcode' => [new IntlCalendarGetErrorCode(), 'getErrorCode', $pub],
             'geterrormessage' => [new IntlCalendarGetErrorMessage(), 'getErrorMessage', $pub],
             'getrepeatedwalltimeoption' => [new IntlCalendarGetRepeatedWallTimeOption(), 'getRepeatedWallTimeOption', $pub],
@@ -1412,6 +1414,26 @@ final class VmIntlCalendar
             'gregorian', 'japanese', 'buddhist', 'roc', 'persian', 'islamic', 'islamic-civil',
             'islamic-umalqura', 'hebrew', 'chinese', 'indian', 'coptic', 'ethiopic', 'ethiopic-amete-alem',
         ]);
+    }
+
+    /**
+     * IntlCalendar::getAvailableLocales() — ICU Calendar::getAvailableLocales (#20897).
+     *
+     * Uses ResourceBundle ICU locale enumeration (same catalog as php-src as of ICU 51+).
+     * Falls back to a non-empty curated subset when ICU FFI is unavailable.
+     */
+    public static function getAvailableLocales(): HashTable
+    {
+        IntlError::clear();
+        $locales = VmResourceBundle::getLocales('');
+        if (false === $locales || [] === $locales) {
+            $locales = [
+                'en', 'en_US', 'en_GB', 'de', 'de_DE', 'fr', 'fr_FR',
+                'ja', 'ja_JP', 'zh', 'zh_CN', 'ar', 'ar_SA', 'root',
+            ];
+        }
+
+        return VmFs::stringListToArray($locales);
     }
 
     public static function getErrorCode(ObjectEntry $cal): int|false
@@ -2739,5 +2761,22 @@ final class IntlCalendarGetKeywordValuesForLocale extends VmClassMethod
         if (null === $frame->returnVar) { return; }
         if (false === $result) { $frame->returnVar->bool(false); return; }
         $frame->returnVar->array($result);
+    }
+}
+
+/** IntlCalendar::getAvailableLocales() — php-src intlcal_get_available_locales (#20897). */
+final class IntlCalendarGetAvailableLocales extends VmClassMethod
+{
+    public function __construct() { parent::__construct('getAvailableLocales'); }
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if (0 !== $argc) {
+            throw new \ArgumentCountError(\sprintf('IntlCalendar::getAvailableLocales() expects exactly 0 arguments, %d given', $argc));
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(VmIntlCalendar::getAvailableLocales());
     }
 }

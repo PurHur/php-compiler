@@ -235,6 +235,12 @@ class Module extends ModuleAbstract
                 new intlcal_get_time_zone(),
                 new intlcal_to_date_time(),
                 new intlcal_field_difference(),
+                new intlcal_before(),
+                new intlcal_after(),
+                new intlcal_set_time_zone(),
+                new intlcal_get_minimum(),
+                new intlcal_get_maximum(),
+                new intlcal_get_available_locales(),
             ]
             : [];
 
